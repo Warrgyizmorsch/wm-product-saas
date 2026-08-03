@@ -6,18 +6,6 @@
 
 @section('content')
 
-    {{-- Session Alerts --}}
-    @if (session('success'))
-        <x-ui.alert variant="success" :dismissible="true" icon="feather-check-circle" class="shadow-sm mb-4">
-            <strong>Success!</strong> {{ session('success') }}
-        </x-ui.alert>
-    @endif
-    @if (session('error'))
-        <x-ui.alert variant="danger" :dismissible="true" icon="feather-alert-triangle" class="shadow-sm mb-4">
-            <strong>Error!</strong> {{ session('error') }}
-        </x-ui.alert>
-    @endif
-
     <div class="erp-single-panel">
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
@@ -141,10 +129,11 @@
                 <tbody class="text-dark">
                     @forelse ($deliveries as $do)
                         @php
-                            $badgeVariant = 'secondary';
+                            $badgeVariant = 'warning';
                             if (in_array($do->status, ['Ready', 'Delivered']))              $badgeVariant = 'success';
                             elseif (in_array($do->status, ['Partially Ready', 'Processing'])) $badgeVariant = 'info';
                             elseif (in_array($do->status, ['Picked', 'Packed']))             $badgeVariant = 'primary';
+                            elseif ($do->status === 'Pending' || $do->status === 'Draft')    $badgeVariant = 'warning';
                             elseif ($do->status === 'Dispatched')                            $badgeVariant = 'dark';
                             elseif ($do->status === 'Cancelled')                             $badgeVariant = 'danger';
                         @endphp

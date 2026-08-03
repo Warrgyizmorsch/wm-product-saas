@@ -36,11 +36,6 @@
 
 @section('content')
 
-    {{-- Session Alerts --}}
-    @if (session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
-
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
         <!-- Header Controls & System Filter -->
         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">

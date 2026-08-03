@@ -269,16 +269,6 @@
 
         <!-- Content Column -->
         <div class="settings-content-col">
-            @if(session('success'))
-                <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                    {{ session('success') }}
-                </x-ui.alert>
-            @endif
-            @if(session('error'))
-                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                    {{ session('error') }}
-                </x-ui.alert>
-            @endif
 
             <!-- Single Outer Card spanning full width -->
             <div class="col-12">

@@ -6,12 +6,8 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <a href="{{ route('sales.orders.index') }}" class="action-dropdown-btn" title="Back to Sales Orders" data-bs-toggle="tooltip">
-            <i class="feather feather-arrow-left"></i>
-        </a>
-
-        <a href="javascript:void(0)" onclick="window.print()" class="btn btn-sm btn-outline-secondary fw-bold px-3 d-print-none me-1">
-            <i class="feather-printer me-1.5"></i>Print
+        <a href="{{ route('sales.orders.index') }}" class="btn btn-sm btn-light border me-1" title="Back to Sales Orders" data-bs-toggle="tooltip">
+            <i class="feather feather-arrow-left me-1"></i>Back
         </a>
 
         @php
@@ -22,12 +18,20 @@
             $hasUnbilledQty = ($totalOrderedQty - $totalInvoicedQty) > 0.0001;
         @endphp
 
+        <!-- Primary Action Buttons (Confirm & Cancel together) -->
         @if ($order->status === 'Draft')
             <form action="{{ route('sales.orders.confirm', $order->id) }}" method="POST" class="d-inline d-print-none" id="confirmSoForm">
                 @csrf
-                <x-ui.button type="button" variant="success" size="sm" class="fw-bold px-3" onclick="confirmAction({ title: 'Confirm Sales Order', message: 'Confirm Sales Order {{ $order->sales_order_number }}?', variant: 'success', confirmText: 'Confirm' }, function() { document.getElementById('confirmSoForm').submit(); })">
+                <button type="button" class="btn btn-sm btn-success fw-bold px-3" onclick="confirmAction({ title: 'Confirm Sales Order', message: 'Confirm Sales Order {{ $order->sales_order_number }}?', variant: 'success', confirmText: 'Confirm' }, function() { document.getElementById('confirmSoForm').submit(); })">
                     <i class="feather-check-circle me-1.5"></i>Confirm Order
-                </x-ui.button>
+                </button>
+            </form>
+
+            <form action="{{ route('sales.orders.cancel', $order->id) }}" method="POST" class="d-inline d-print-none" onsubmit="return confirm('Are you sure you want to cancel this sales order?');">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-light border text-danger fw-bold px-3">
+                    <i class="feather-x-circle me-1.5 text-danger"></i>Cancel
+                </button>
             </form>
         @elseif (in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped']))
             <x-ui.button href="{{ route('sales.dispatches.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" class="fw-bold px-3 d-print-none">
@@ -39,27 +43,31 @@
                     <i class="feather-file-text me-1.5"></i>Create Invoice
                 </x-ui.button>
             @endif
+
+            @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
+                <form action="{{ route('sales.orders.cancel', $order->id) }}" method="POST" class="d-inline d-print-none" onsubmit="return confirm('Are you sure you want to cancel this sales order?');">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-light border text-danger fw-bold px-3">
+                        <i class="feather-x-circle me-1.5 text-danger"></i>Cancel
+                    </button>
+                </form>
+            @endif
         @endif
 
+        <!-- Action Dropdown using CRM Leads component -->
         @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
-            <x-ui.button href="{{ route('sales.orders.edit', $order->id) }}" variant="outline-secondary" size="sm" class="fw-bold px-3 d-print-none">
-                <i class="feather-edit-2 me-1.5"></i>Edit
-            </x-ui.button>
-
-            <form action="{{ route('sales.orders.cancel', $order->id) }}" method="POST" class="d-inline d-print-none" onsubmit="return confirm('Are you sure you want to cancel this sales order?');">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-soft-danger fw-bold px-3">
-                    <i class="feather-x-circle me-1"></i>Cancel
-                </button>
-            </form>
+            <x-ui.action-dropdown id="soProfileActionsDropdown">
+                <li>
+                    <a href="{{ route('sales.orders.edit', $order->id) }}" class="dropdown-item py-2">
+                        <i class="feather-edit me-2 text-muted fs-12"></i>Edit Sales Order
+                    </a>
+                </li>
+            </x-ui.action-dropdown>
         @endif
     </div>
 @endsection
 
 @section('content')
-    @if (session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
 
     @if ($errors->any())
         <x-ui.toast :auto="true" type="error" title="{{ $errors->first() }}" />
@@ -284,7 +292,6 @@
                             </div>
                         </div>
                     </div>
-
 
                     <!-- Items Table -->
                     <div class="table-responsive mb-4 border rounded" style="border-radius: 4px; border-color: #cbd5e1 !important;">

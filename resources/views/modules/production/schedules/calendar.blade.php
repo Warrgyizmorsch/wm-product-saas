@@ -15,9 +15,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-white p-4">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
 
         {{-- Calendar Navigation & Layout Toggle --}}
         @php

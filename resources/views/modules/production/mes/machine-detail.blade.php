@@ -12,12 +12,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-white">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="danger" title="{{ session('error') }}" />
-        @endif
 
         {{-- Header --}}
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">

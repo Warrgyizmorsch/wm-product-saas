@@ -14,7 +14,8 @@ class WipController extends Controller
 {
     public function __construct(
         private readonly ProductionWipService $wipService
-    ) {}
+    ) {
+    }
 
     public function index(Request $request)
     {
@@ -72,11 +73,11 @@ class WipController extends Controller
             ->first();
 
         $wipSummary = [
-            'total_count'     => (int) ($summary->total_count ?? 0),
+            'total_count' => (int) ($summary->total_count ?? 0),
             'total_available' => (float) ($summary->total_available ?? 0),
-            'active_count'    => (int) ($summary->active_count ?? 0),
-            'hold_count'      => (int) ($summary->hold_count ?? 0),
-            'rework_count'    => (int) ($summary->rework_count ?? 0),
+            'active_count' => (int) ($summary->active_count ?? 0),
+            'hold_count' => (int) ($summary->hold_count ?? 0),
+            'rework_count' => (int) ($summary->rework_count ?? 0),
             'completed_count' => (int) ($summary->completed_count ?? 0),
         ];
 
@@ -100,7 +101,7 @@ class WipController extends Controller
     public function transfer(Request $request, int $id)
     {
         abort_unless(auth()->user() && (auth()->user()->role === 'admin' || auth()->user()->hasProductionPermission('production.mes.execute')), 403);
-        
+
         $request->validate([
             'from_operation_id' => 'required|exists:production_routing_operations,id',
             'to_operation_id' => 'required|exists:production_routing_operations,id',

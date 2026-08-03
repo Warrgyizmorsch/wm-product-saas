@@ -51,8 +51,6 @@
     .rib-draft     { background:#64748b; }
     .rib-cancelled { background:#dc2626; }
 
-
-
     /* ── Allocations Table ──────────────── */
     .alloc-table { width: 100%; border-collapse: collapse; }
     .alloc-table thead th {
@@ -164,9 +162,6 @@
 @endpush
 
 @section('content')
-    @if (session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
 
     <div class="pay-sheet mb-5">
 

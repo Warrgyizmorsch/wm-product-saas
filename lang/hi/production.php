@@ -34,6 +34,14 @@ return [
     'cancel' => 'रद्द करें',
     'delete' => 'हटाएं',
 
+    // Statuses & Transitions
+    'submitted' => 'प्रस्तुत (सबमिट)',
+    'approved' => 'स्वीकृत',
+    'rejected' => 'अस्वीकृत',
+    'cancelled' => 'रद्द',
+    'created' => 'निर्मित',
+    'revision_created' => 'संशोधन निर्मित',
+
     // Form inputs and headers
     'bom_number' => 'BOM संख्या',
     'bom_name' => 'BOM नाम',

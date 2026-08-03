@@ -409,6 +409,8 @@ class ProductionOrderController extends Controller
 
         $request->validate([
             'operation_id' => 'required|exists:production_order_operations,id',
+            'batch_id' => 'nullable|exists:production_batches,id',
+            'production_batch_id' => 'nullable|exists:production_batches,id',
             'quantity_produced' => 'required|numeric|min:0',
             'quantity_rejected' => 'required|numeric|min:0',
             'quantity_scrapped' => 'required|numeric|min:0',
@@ -423,6 +425,8 @@ class ProductionOrderController extends Controller
             ->where('production_order_id', $order->id)
             ->findOrFail($request->input('operation_id'));
 
+        $resolvedBatchId = $request->input('batch_id') ?? $request->input('production_batch_id');
+
         try {
             $this->executionService->logProgress(
                 $request->input('operation_id'),
@@ -434,7 +438,9 @@ class ProductionOrderController extends Controller
                 $request->input('remarks'),
                 $request->input('machine_id'),
                 Auth::id(),
-                (bool) $request->input('complete_operation', false)
+                (bool) $request->input('complete_operation', false),
+                null,
+                $resolvedBatchId ? (int) $resolvedBatchId : null
             );
 
             return redirect()->back()->with('success', 'Execution progress logged successfully.');

@@ -4,34 +4,37 @@
 @section('page-title', 'Create Sales Order')
 @section('breadcrumb', 'Sales / Sales Orders / Create')
 
+@section('page-actions')
+    <a href="{{ route('sales.orders.index') }}" class="btn btn-light">
+        <i class="feather-arrow-left me-2"></i>Back to Listing
+    </a>
+@endsection
+
 @section('content')
-    <div class="erp-single-panel bg-white">
-        @if ($errors->any())
-            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-text avatar-md bg-danger text-white me-3">
-                        <i class="feather-alert-triangle"></i>
-                    </div>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                        <ul class="fs-12 mb-0 ps-3">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        @endif
+    <div class="erp-single-panel bg-white rounded-3">
 
         <form action="{{ route('sales.orders.store') }}" method="POST" id="salesOrderForm">
             @csrf
         
         <x-ui.odoo-form-ui type="sheet">
-            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-                <h5 class="fw-bold text-dark mb-0">Sales Order Details</h5>
-                <x-ui.button href="{{ route('sales.orders.index') }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom pb-3 gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-3 fs-18">
+                        <i class="feather-shopping-bag"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold text-dark mb-0">Sales Order Details</h4>
+                        <span class="text-muted fs-12">Create a new confirmed sales order or convert from an approved quotation.</span>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{{ route('sales.orders.index') }}" class="btn btn-light border px-3.5 py-2 fs-13">
+                        CANCEL
+                    </a>
+                    <button type="submit" form="salesOrderForm" class="btn btn-primary px-4 py-2 fs-13 fw-bold shadow-sm">
+                        <i class="feather-check-circle me-1.5"></i>SAVE SALES ORDER
+                    </button>
+                </div>
             </div>
 
             <div class="row g-4 mb-4 fs-13 text-dark">
@@ -39,8 +42,12 @@
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Customer" name="customer_id" id="customerSelect" :required="true">
                         <option value="">Select Customer...</option>
+                        <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="customer">+ Add New Customer</option>
                         @foreach ($customers as $c)
-                            <option value="{{ $c->id }}" @selected(old('customer_id', $prefillQuotation?->customer_id) == $c->id)>
+                            <option value="{{ $c->id }}"
+                                data-billing="{{ $c->billing_address ?? '' }}"
+                                data-shipping="{{ $c->shipping_address ?? '' }}"
+                                @selected(old('customer_id', $prefillQuotation?->customer_id) == $c->id)>
                                 {{ $c->name }} ({{ $c->email ?: $c->phone ?: 'No Contact' }})
                             </option>
                         @endforeach
@@ -138,42 +145,44 @@
                     </div>
                 </div>
                 <div class="col-md-5">
-                    <div class="d-flex justify-content-between py-1 border-bottom">
-                        <span class="text-muted fw-semibold">Subtotal:</span>
-                        <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
-                    </div>
-                    <div class="d-flex justify-content-between py-1 border-bottom">
-                        <span class="text-muted fw-semibold">Taxes:</span>
-                        <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                        <span class="text-muted fw-semibold">Discount (₹):</span>
-                        <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('discount', $prefillQuotation?->discount ?: 0) }}" min="0" step="0.01">
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                        <span class="text-muted fw-semibold">Shipping Charges (₹):</span>
-                        <input type="number" name="shipping_charges" id="shippingChargesInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('shipping_charges', 0) }}" min="0" step="0.01">
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                        <span class="text-muted fw-semibold">Adjustment (₹):</span>
-                        <input type="number" name="adjustment" id="adjustmentInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('adjustment', 0) }}" step="0.01">
-                    </div>
-                    <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light px-2 rounded mt-1.5">
-                        <span class="text-dark fw-bold">Grand Total:</span>
-                        <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                    <div class="pe-md-2">
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                            <span class="text-muted fw-semibold fs-13">Subtotal:</span>
+                            <span class="fw-bold text-dark fs-14" id="calcSubtotal">₹0.00</span>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                            <span class="text-muted fw-semibold fs-13">Taxes:</span>
+                            <span class="fw-bold text-dark fs-14" id="calcTax">₹0.00</span>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                            <span class="text-muted fw-semibold fs-13">Discount (₹):</span>
+                            <input type="number" name="discount" id="discountInput" class="odoo-table-input text-end fw-bold fs-13" style="width: 110px;" value="{{ old('discount', $prefillQuotation?->discount ?: 0) }}" min="0" step="0.01">
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                            <span class="text-muted fw-semibold fs-13">Shipping Charges (₹):</span>
+                            <input type="number" name="shipping_charges" id="shippingChargesInput" class="odoo-table-input text-end fw-bold fs-13" style="width: 110px;" value="{{ old('shipping_charges', 0) }}" min="0" step="0.01">
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                            <span class="text-muted fw-semibold fs-13">Adjustment (₹):</span>
+                            <input type="number" name="adjustment" id="adjustmentInput" class="odoo-table-input text-end fw-bold fs-13" style="width: 110px;" value="{{ old('adjustment', 0) }}" step="0.01">
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center py-3 border-top border-2 mt-3" style="border-top: 2px solid var(--bs-primary) !important;">
+                            <span class="text-dark fw-bold fs-15 text-uppercase">Grand Total:</span>
+                            <span class="fw-extrabold text-primary fs-20" id="calcTotal">₹0.00</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <x-ui.button href="{{ route('sales.orders.index') }}" variant="light" size="md" class="border py-2 px-4 fs-12 shadow-sm">Discard</x-ui.button>
-                <x-ui.button type="submit" variant="primary" size="md" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">Save Sales Order</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>
 
-    {{-- Product quick-create modal --}}
-    <x-ui.master-modals :masters="['product']" />
+    {{-- Product & Customer quick-create modals --}}
+    <x-ui.master-modals :masters="['product', 'customer']" />
     </div>
 @endsection
 
@@ -181,6 +190,21 @@
     <script>
         $(document).ready(function() {
             // Select2 Initialization is automated by odoo-select2 class
+
+            // Auto-fill billing & shipping address on customer change
+            $(document).on('change', '#customerSelect', function() {
+                var selected = $(this).find('option:selected');
+                var billing  = selected.data('billing')  || '';
+                var shipping = selected.data('shipping') || '';
+
+                if (billing) {
+                    $('textarea[name="billing_address"]').val(billing);
+                }
+                if (shipping) {
+                    $('textarea[name="shipping_address"]').val(shipping);
+                }
+            });
+
             // Redirect on quotation reference select
             $('#quotationSelect').on('change', function() {
                 const quotationId = $(this).val();
@@ -419,22 +443,41 @@
                                 });
                             }
 
-                            // Remove empty placeholder row if exists
+                            // Look for existing row with same product_id
+                            let targetRow = null;
                             $('.item-row').each(function() {
                                 const sel = $(this).find('.item-name-input');
-                                if (sel.length && (!sel.val() || sel.val() === '')) {
-                                    $(this).remove();
+                                if (sel.length && sel.val() == prod.id) {
+                                    targetRow = $(this);
+                                    return false;
                                 }
                             });
 
-                            // Add populated row
-                            addRow({
-                                product_id: prod.id,
-                                quantity: 1,
-                                unit_price: prod.selling_price || prod.cost_price || prod.unit_cost,
-                                tax_rate: prod.gst_rate || 18,
-                                discount: 0
-                            });
+                            if (targetRow) {
+                                const qtyInput = targetRow.find('.qty-input');
+                                if (qtyInput.length) {
+                                    const currentQty = parseFloat(qtyInput.val()) || 0;
+                                    qtyInput.val(currentQty + 1).trigger('input').trigger('change');
+                                }
+                            } else {
+                                // Remove empty placeholder row if exists
+                                $('.item-row').each(function() {
+                                    const sel = $(this).find('.item-name-input');
+                                    if (sel.length && (!sel.val() || sel.val() === '')) {
+                                        $(this).remove();
+                                    }
+                                });
+
+                                // Add populated row
+                                addRow({
+                                    product_id: prod.id,
+                                    quantity: 1,
+                                    unit_price: prod.selling_price || prod.cost_price || prod.unit_cost,
+                                    tax_rate: prod.gst_rate || 18,
+                                    discount: 0
+                                });
+                            }
+
                             calculateTotals();
                             input.val('');
                         }

@@ -304,6 +304,107 @@ class LotTraceabilityService
         ];
     }
 
+    /**
+     * Compute aggregated lot summary for a Production Order / Lot context across all batches.
+     */
+    public function getLotSummary(int $tenantId, int $orderId): array
+    {
+        $order = ProductionOrder::withoutGlobalScopes()
+            ->with(['product', 'batches.currentOperation', 'operations'])
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($orderId);
+
+        $batches = $order->batches;
+
+        $plannedTotal = (float) $batches->sum('planned_quantity');
+        if ($plannedTotal <= 0) {
+            $plannedTotal = (float) $order->quantity_ordered;
+        }
+
+        // Unique physical produced: logged output at initial operation
+        $firstOp = $order->operations()->orderBy('sequence', 'asc')->first();
+        $uniqueProduced = 0.0;
+        if ($firstOp) {
+            $uniqueProduced = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
+                ->where('operation_id', $firstOp->id)
+                ->sum('quantity_produced');
+        }
+
+        // Total Operation Throughput (sum across all routing operations)
+        $operationThroughput = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->sum('quantity_produced');
+
+        // Total Scrap
+        $totalScrap = (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->sum('quantity');
+
+        // Total Pending Rework
+        $totalReworkPending = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->where('status', 'pending')
+            ->sum('quantity');
+
+        // Total Completed Rework
+        $totalReworkRecovered = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->where('status', 'completed')
+            ->sum('quantity');
+
+        // Finished Goods Received Qty
+        $totalFinished = (float) \App\Domains\Production\Models\ProductionOrderReceipt::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->sum('quantity');
+
+        // Active WIP in progress
+        $currentWip = max(0.0, $uniqueProduced - $totalFinished - $totalScrap);
+
+        $batchSummaries = $batches->map(function ($b) use ($tenantId) {
+            $scrap = (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $tenantId)
+                ->where('production_batch_id', $b->id)
+                ->sum('quantity');
+
+            $reworkPending = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+                ->where('production_batch_id', $b->id)
+                ->where('status', 'pending')
+                ->sum('quantity');
+
+            $reworkRecovered = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+                ->where('production_batch_id', $b->id)
+                ->where('status', 'completed')
+                ->sum('quantity');
+
+            return [
+                'id' => $b->id,
+                'batch_number' => $b->batch_number,
+                'planned_quantity' => (float) $b->planned_quantity,
+                'actual_quantity' => (float) $b->actual_quantity,
+                'status' => $b->status,
+                'current_operation' => $b->currentOperation?->name ?? 'Initial',
+                'current_operation_sequence' => $b->currentOperation?->sequence ?? 10,
+                'scrap_quantity' => $scrap,
+                'rework_pending' => $reworkPending,
+                'rework_recovered' => $reworkRecovered,
+            ];
+        });
+
+        return [
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'product_name' => $order->product?->name ?? '—',
+            'planned_total' => $plannedTotal,
+            'unique_produced' => $uniqueProduced,
+            'operation_throughput' => $operationThroughput,
+            'current_wip' => $currentWip,
+            'finished_goods' => $totalFinished,
+            'scrap_total' => $totalScrap,
+            'rework_pending' => $totalReworkPending,
+            'rework_recovered' => $totalReworkRecovered,
+            'batches' => $batchSummaries->toArray(),
+        ];
+    }
+
     private function csvVal(string $value): string
     {
         $value = str_replace('"', '""', $value);

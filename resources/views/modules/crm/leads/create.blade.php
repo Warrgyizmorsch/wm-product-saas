@@ -27,9 +27,24 @@
                         @method('PUT')
                     @endif
 
-                    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-                        <h3 class="fw-bold text-dark mb-0">{{ $lead->exists ? __('crm.edit_call_lead') : __('crm.new_call_lead') }}</h3>
-                        <a href="{{ route('crm.leads.index') }}" class="btn btn-sm btn-light border">{{ __('crm.cancel') }}</a>
+                    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-3 fs-18">
+                                <i class="feather-user-plus"></i>
+                            </div>
+                            <div>
+                                <h4 class="fw-bold text-dark mb-0">{{ $lead->exists ? __('crm.edit_call_lead') : __('crm.new_call_lead') }}</h4>
+                                <span class="text-muted fs-12">Fill in the details below to {{ $lead->exists ? 'update the' : 'create a new' }} CRM Call Lead.</span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="{{ route('crm.leads.index') }}" class="btn btn-light border px-4 py-2 fs-13">
+                                {{ __('crm.cancel') }}
+                            </a>
+                            <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold shadow-sm">
+                                <i class="feather-check-circle me-1.5"></i>{{ $lead->exists ? __('crm.update_lead') : 'SAVE LEAD' }}
+                            </button>
+                        </div>
                     </div>
 
                     <div class="row g-4 mb-4 fs-13 text-dark">
@@ -338,17 +353,7 @@
                             <x-ui.odoo-form-ui type="input" :label="__('crm.expected_amount')" name="expected_amount" inputType="number" :value="old('expected_amount', $lead->expected_amount)" min="0" step="0.01" :placeholder="__('crm.expected_amount_placeholder')" />
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.expected_sale')" name="expected_sale_date" inputType="date" :value="old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '')" />
-                        </div>         </div>
-                    </div>
-
-                    <!-- Actions Row -->
-                    <div class="d-flex justify-content-end gap-3 border-top pt-4">
-                        <a href="{{ route('crm.leads.index') }}" class="btn btn-light px-4 py-2 border">
-                            {{ __('crm.cancel') }}
-                        </a>
-                        <button type="submit" class="btn btn-primary px-5 py-2 fw-semibold" style="background-color: #714B67; border-color: #714B67;">
-                            <i class="feather-check-circle me-2"></i>{{ $lead->exists ? __('crm.update_lead') : __('crm.create_lead') }}
-                        </button>
+                        </div>
                     </div>
                 </form>
             </div>

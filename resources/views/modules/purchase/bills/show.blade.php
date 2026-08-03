@@ -33,13 +33,6 @@
 
 @section('content')
 
-    {{-- Session Alerts --}}
-    @if (session('success'))
-        <x-ui.alert variant="success" :dismissible="true" icon="feather-check-circle" class="shadow-sm mb-4">
-            <strong>Success!</strong> {{ session('success') }}
-        </x-ui.alert>
-    @endif
-
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
         <!-- Status Bar -->
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-3 mb-4 border-bottom">

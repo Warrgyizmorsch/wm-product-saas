@@ -34,6 +34,14 @@ return [
     'cancel' => 'Отказ',
     'delete' => 'Изтрий',
 
+    // Statuses & Transitions
+    'submitted' => 'Подадено',
+    'approved' => 'Одобрено',
+    'rejected' => 'Отхвърлено',
+    'cancelled' => 'Отказано',
+    'created' => 'Създадено',
+    'revision_created' => 'Създадена ревизия',
+
     // Form inputs and headers
     'bom_number' => 'Номер на спецификация',
     'bom_name' => 'Име на спецификация',

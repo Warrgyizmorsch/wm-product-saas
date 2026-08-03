@@ -148,14 +148,6 @@
 
 @section('content')
 <div class="erp-single-panel">
-    {{-- Alerts --}}
-    @if (session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
-
-    @if (session('error'))
-        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-    @endif
 
     {{-- Hidden Bulk Action Form --}}
     <form id="bulk-action-form" action="{{ route('production.orders.bulk-action') }}" method="POST" class="d-none">

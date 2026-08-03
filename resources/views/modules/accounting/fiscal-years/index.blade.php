@@ -13,11 +13,6 @@
 @endsection
 
 @section('content')
-    @if (session('success'))
-        <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="mb-4">
-            <strong>Success!</strong> {{ session('success') }}
-        </x-ui.alert>
-    @endif
 
     @if ($errors->any())
         <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible class="mb-4">

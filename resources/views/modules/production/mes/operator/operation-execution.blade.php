@@ -40,36 +40,29 @@
 @section('content')
 <div class="erp-single-panel bg-white p-4">
 
-    @if (session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
-    @if (session('error'))
-        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-    @endif
-
     <x-ui.odoo-form-ui type="sheet">
 
         {{-- Header Identity Row --}}
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <div>
-                <span class="badge bg-soft-secondary font-monospace mb-2">{{ $op->operation_number ?? 'OP-??' }}</span>
+                <x-ui.badge variant="secondary" soft class="font-monospace mb-2">{{ $op->operation_number ?? 'OP-??' }}</x-ui.badge>
                 <h3 class="fw-bold text-dark mb-1">{{ $op->name }}</h3>
                 <p class="text-muted fs-13 mb-0">
                     Order: <strong class="text-dark">{{ $order->order_number }}</strong> | Product: <strong class="text-dark">{{ $order->product->name }}</strong>
-                    | Mode: <span class="badge bg-soft-info text-info font-monospace ms-1">{{ strtoupper($order->production_mode) }}</span>
+                    | Mode: <x-ui.badge variant="info" soft class="font-monospace ms-1">{{ strtoupper($order->production_mode) }}</x-ui.badge>
                 </p>
             </div>
             <div class="text-end">
                 <div class="fs-11 text-muted uppercase font-semibold mb-1">{{ __('production.status') }}</div>
                 @php
-                    $statusClass = match($op->status) {
-                        'running' => 'bg-success text-white',
-                        'paused' => 'bg-warning text-dark',
-                        'completed' => 'bg-secondary text-white',
-                        default => 'bg-primary text-white',
+                    $statusVariant = match($op->status) {
+                        'running' => 'success',
+                        'paused' => 'warning',
+                        'completed' => 'secondary',
+                        default => 'primary',
                     };
                 @endphp
-                <span class="badge {{ $statusClass }} fs-13 px-3 py-2 fw-bold">{{ strtoupper($op->status) }}</span>
+                <x-ui.badge :variant="$statusVariant" class="fs-13 px-3 py-2 fw-bold">{{ strtoupper($op->status) }}</x-ui.badge>
             </div>
         </div>
 
@@ -160,9 +153,9 @@
                                 {{ $assignment ? $assignment->user->name : 'No active assignments' }}
                                 @if($assignment)
                                     @if($assignment->status === 'assigned')
-                                        <span class="badge bg-soft-warning text-warning fs-10 ms-1">Pending Acceptance</span>
+                                        <x-ui.badge variant="warning" soft class="fs-10 ms-1">Pending Acceptance</x-ui.badge>
                                     @elseif($assignment->status === 'accepted')
-                                        <span class="badge bg-soft-success text-success fs-10 ms-1">Accepted</span>
+                                        <x-ui.badge variant="success" soft class="fs-10 ms-1">Accepted</x-ui.badge>
                                     @endif
                                 @endif
                             </span>
@@ -377,6 +370,15 @@
 
         {{-- Target Quantities --}}
         <div class="col-md-5 ps-md-4">
+            @if(!empty($batchQueue['active']))
+                <x-ui.odoo-form-ui type="select" label="Production Batch" name="production_batch_id">
+                    @foreach($batchQueue['active'] as $item)
+                        <option value="{{ $item['batch']->id }}">
+                            Batch #{{ $item['batch']->batch_number }} (Remaining: {{ number_format($item['remaining_to_process'], 2) }})
+                        </option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            @endif
             <x-ui.odoo-form-ui 
                 type="input" 
                 label="Quantity Produced (Today)" 

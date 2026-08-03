@@ -41,9 +41,6 @@
 
 @section('content')
 <div class="erp-single-panel bg-white p-4">
-    @if (session('error'))
-        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-    @endif
 
     <form action="{{ route('inventory.barcodes.print') }}" method="POST" target="_blank" id="barcodeForm">
         @csrf

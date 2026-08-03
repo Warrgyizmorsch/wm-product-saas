@@ -28,27 +28,6 @@
 
 @section('content')
 <div class="erp-single-panel bg-white p-4">
-    @if (session('error'))
-        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-    @endif
-    @if ($errors->any())
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Validation Errors:</h6>
-                    <ul class="fs-12 mb-0 ps-3">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
 
     <form action="{{ route('inventory.transfers.store') }}" method="POST" id="transferForm">
         @csrf
@@ -350,23 +329,32 @@
             .then(data => {
                 if (data.success && data.product) {
                     const prod = data.product;
+                    const targetWhId = data.warehouse_id || null;
                     let rows = document.querySelectorAll('.transfer-row');
                     let targetRow = null;
+                    let isNewRow = false;
 
-                    // 1. First check if row with this product already exists
+                    // 1. First check if row with SAME product AND SAME warehouse already exists
                     rows.forEach(r => {
                         let sel = r.querySelector('.product-select');
-                        if (sel && sel.value == prod.id) {
-                            targetRow = r;
+                        let whSel = r.querySelector('.warehouse-select, select[name*="[from_warehouse_id]"], select[name*="[warehouse_id]"]');
+                        let rowProdId = sel ? sel.value : null;
+                        let rowWhId = whSel ? whSel.value : null;
+
+                        if (rowProdId == prod.id) {
+                            if (!targetWhId || !rowWhId || rowWhId == targetWhId) {
+                                targetRow = r;
+                            }
                         }
                     });
 
-                    // 2. If no existing row for this product, use an empty row
+                    // 2. If no existing matching row, use an empty row
                     if (!targetRow) {
                         rows.forEach(r => {
                             let sel = r.querySelector('.product-select');
                             if (sel && (!sel.value || sel.value === '')) {
                                 targetRow = r;
+                                isNewRow = true;
                             }
                         });
                     }
@@ -376,6 +364,7 @@
                         document.getElementById('add-item').click();
                         let newRows = document.querySelectorAll('.transfer-row');
                         targetRow = newRows[newRows.length - 1];
+                        isNewRow = true;
                     }
 
                     if (targetRow) {
@@ -384,23 +373,38 @@
                             $(targetSelect).val(prod.id).trigger('change');
                         }
 
-                        if (data.warehouse_id) {
-                            let whSelect = targetRow.querySelector('.warehouse-select, select[name*="[warehouse_id]"], select[name*="[from_warehouse_id]"]');
-                            if (whSelect) {
-                                $(whSelect).val(data.warehouse_id).trigger('change');
+                        if (targetWhId) {
+                            let whSelect = targetRow.querySelector('.warehouse-select, select[name*="[from_warehouse_id]"], select[name*="[warehouse_id]"]');
+                            if (whSelect && whSelect.value != targetWhId) {
+                                $(whSelect).val(targetWhId).trigger('change');
+                            }
+                        }
+
+                        // Qty Increment or Set
+                        let qtyIn = targetRow.querySelector('.qty-input');
+                        if (qtyIn) {
+                            let currentQty = parseFloat(qtyIn.value) || 0;
+                            if (!isNewRow && currentQty > 0) {
+                                qtyIn.value = currentQty + 1;
+                                $(qtyIn).trigger('change');
+                            } else {
+                                if (currentQty === 0) {
+                                    qtyIn.value = 1;
+                                    $(qtyIn).trigger('change');
+                                }
                             }
                         }
 
                         // Auto-fill Serial Number if scanned code is a Serial Number!
-                        if (data.is_serial && data.serial_number) {
-                            let snInput = targetRow.querySelector('input[name*="[serial_numbers]"]');
+                        const scannedSn = data.serial_number || (data.is_serial ? code : null);
+                        if (scannedSn) {
+                            let snInput = targetRow.querySelector('input[name*="[serial_numbers]"], textarea[name*="[serial_numbers]"]');
                             if (snInput) {
-                                let currentSns = snInput.value ? snInput.value.split(',').map(s => s.trim()).filter(Boolean) : [];
-                                if (!currentSns.includes(data.serial_number)) {
-                                    currentSns.push(data.serial_number);
-                                    snInput.value = currentSns.join(', ');
-                                    let qtyIn = targetRow.querySelector('.qty-input');
-                                    if (qtyIn) {
+                                let currentSns = snInput.value ? snInput.value.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean) : [];
+                                if (!currentSns.includes(scannedSn)) {
+                                    currentSns.push(scannedSn);
+                                    snInput.value = currentSns.join('\n');
+                                    if (qtyIn && currentSns.length > (parseFloat(qtyIn.value) || 0)) {
                                         qtyIn.value = currentSns.length;
                                         $(qtyIn).trigger('change');
                                     }

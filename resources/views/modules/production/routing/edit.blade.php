@@ -23,10 +23,6 @@
             <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') }}: {{ $errors->first() }}" />
         @endif
 
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
-
         <form method="POST" action="{{ route('production.routing.update', $routing->id) }}" x-data="routingForm()">
             @csrf
             @method('PUT')

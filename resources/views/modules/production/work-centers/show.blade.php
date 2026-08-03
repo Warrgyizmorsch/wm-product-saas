@@ -20,13 +20,6 @@
 @section('content')
     <div class="erp-single-panel bg-white">
         <!-- Success & Error Alerts -->
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <!-- Profile / Metrics Layout -->
         <div class="row g-4 mb-4 pb-4 border-bottom">

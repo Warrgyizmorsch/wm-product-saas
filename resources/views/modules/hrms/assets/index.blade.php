@@ -172,16 +172,6 @@
 
         <!-- Right Content Column -->
         <div class="settings-content-col flex-grow-1">
-            @if(session('success'))
-                <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                    {{ session('success') }}
-                </x-ui.alert>
-            @endif
-            @if(session('error'))
-                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                    {{ session('error') }}
-                </x-ui.alert>
-            @endif
 
             <!-- Tabs Navigation -->
             <ul class="nav nav-tabs border-bottom mb-4" id="assetModuleTabs" role="tablist">
@@ -612,8 +602,6 @@
                 toggleRemoveButtons();
             });
 
-
-
             function toggleRemoveButtons() {
                 let rows = $('#bulk-units-tbody tr');
                 if (rows.length <= 1) {
@@ -622,8 +610,6 @@
                     rows.find('.btn-remove-unit-row').prop('disabled', false);
                 }
             }
-
-
 
             // Sequential Code Generator
             $('#btn-generate-units').on('click', function() {

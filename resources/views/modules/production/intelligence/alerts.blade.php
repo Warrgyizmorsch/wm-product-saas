@@ -12,9 +12,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
 
         <h5 class="fw-bold text-dark mb-4"><i class="feather-alert-triangle me-2 text-danger"></i>Production Limits & Alert Configurations</h5>
 

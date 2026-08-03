@@ -18,12 +18,6 @@
 
     <div class="erp-single-panel">
         <!-- Toast Notifications -->
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <div class="d-flex align-items-center mb-3">
             <h5 class="fw-bold text-dark mb-0">{{ __('purchase.purchase_requests_listing') }}</h5>

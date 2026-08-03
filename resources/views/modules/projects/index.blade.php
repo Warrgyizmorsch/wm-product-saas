@@ -167,9 +167,6 @@
 
 @section('content')
     <div class="erp-single-panel">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
 
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">

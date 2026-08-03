@@ -15,6 +15,7 @@ class ProductionOrderProgressLog extends BaseModel
         'idempotency_key',
         'production_order_id',
         'operation_id',
+        'production_batch_id',
         'quantity_produced',
         'quantity_rejected',
         'quantity_scrapped',
@@ -47,6 +48,11 @@ class ProductionOrderProgressLog extends BaseModel
     public function operation(): BelongsTo
     {
         return $this->belongsTo(ProductionOrderOperation::class, 'operation_id');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(ProductionBatch::class, 'production_batch_id');
     }
 
     public function user(): BelongsTo

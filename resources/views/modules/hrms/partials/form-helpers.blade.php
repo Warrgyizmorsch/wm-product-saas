@@ -51,7 +51,6 @@
     }
 </style>
 
-
 @once
     @push('scripts')
         <script>

@@ -106,7 +106,6 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
-
                             <x-ui.odoo-form-ui type="input" label="{{ __('purchase.po_no') }}" name="po_number_dummy" value="{{ $order->purchase_order_number }}" readonly="true" />
 
                             @if(!empty($order->reference))
@@ -329,7 +328,6 @@
                 });
             }
             initSelect2(document);
-
 
             function toggleRow($el, show) {
                 if (show) {

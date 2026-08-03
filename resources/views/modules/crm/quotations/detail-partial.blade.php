@@ -43,40 +43,85 @@
     <h6 class="fw-bold text-dark mb-0 fs-13">Line Items</h6>
 </div>
 
-<div class="table-responsive border rounded-3 mb-4">
-    <table class="table table-bordered align-middle fs-12 mb-0 w-100">
+<style>
+    .quotation-drawer-table {
+        table-layout: fixed;
+        width: 100% !important;
+    }
+    .quotation-drawer-table th,
+    .quotation-drawer-table td {
+        padding: 6px 6px !important;
+        font-size: 11px !important;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+</style>
+
+<div class="border rounded-3 mb-4 overflow-hidden">
+    <table class="table table-bordered align-middle mb-0 quotation-drawer-table">
         <thead class="table-light text-uppercase text-muted fs-10 letter-spacing-1">
             <tr>
-                <th>Product</th>
-                <th class="text-center">Qty</th>
-                <th class="text-end">Rate</th>
-                <th class="text-end">Total</th>
+                <th style="width: 38%;">Product</th>
+                <th class="text-center" style="width: 10%;">Qty</th>
+                <th class="text-end" style="width: 20%;">Rate</th>
+                <th class="text-end" style="width: 14%;">Tax</th>
+                <th class="text-end" style="width: 18%;">Total</th>
             </tr>
         </thead>
         <tbody class="bg-white">
-            @php $grandTotal = 0; @endphp
+            @php 
+                $calcSubtotal = 0; 
+                $calcTaxTotal = 0;
+            @endphp
             @foreach($quotation->items as $item)
                 @php
-                    $lineTotal = $item->quantity * $item->unit_price;
-                    $grandTotal += $lineTotal;
+                    $lineSubtotal = $item->quantity * $item->unit_price;
+                    $taxRate = (float)($item->tax_rate ?? 0);
+                    $lineTax = $item->tax_amount ?? ($lineSubtotal * ($taxRate / 100));
+                    $lineTotal = $item->amount ?? ($lineSubtotal + $lineTax);
+                    
+                    $calcSubtotal += $lineSubtotal;
+                    $calcTaxTotal += $lineTax;
                 @endphp
                 <tr>
                     <td>
-                        <div class="fw-semibold text-dark">{{ $item->product->name ?? $item->description ?? '—' }}</div>
+                        <div class="fw-semibold text-dark text-truncate">{{ $item->item_name ?? $item->product?->name ?? $item->description ?? '—' }}</div>
                         @if($item->product && $item->product->sku)
-                            <div class="text-muted fs-10">SKU: {{ $item->product->sku }}</div>
+                            <div class="text-muted fs-10 text-truncate">SKU: {{ $item->product->sku }}</div>
                         @endif
                     </td>
                     <td class="text-center fw-semibold">{{ (float)$item->quantity }}</td>
                     <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
+                    <td class="text-end text-muted">{{ $taxRate > 0 ? number_format($taxRate, 1) . '%' : '0%' }}</td>
                     <td class="text-end fw-bold">₹{{ number_format($lineTotal, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
-        <tfoot class="table-light fw-bold">
+        <tfoot class="table-light fs-11 border-top">
+            @php
+                $subtotalVal = $quotation->subtotal ?: $calcSubtotal;
+                $taxVal = ($quotation->tax_amount ?: $quotation->tax) ?: $calcTaxTotal;
+                if (!$taxVal && $quotation->total_amount) {
+                    $taxVal = max(0, $quotation->total_amount - $subtotalVal + ($quotation->discount ?: 0));
+                }
+            @endphp
             <tr>
-                <td colspan="3" class="text-end text-uppercase fs-10 text-muted letter-spacing-1">Grand Total</td>
-                <td class="text-end text-primary fs-14">₹{{ number_format($quotation->total_amount ?? $grandTotal, 2) }}</td>
+                <td colspan="4" class="text-end text-muted fw-semibold py-1.5">Subtotal:</td>
+                <td class="text-end fw-bold text-dark py-1.5">₹{{ number_format($subtotalVal, 2) }}</td>
+            </tr>
+            <tr>
+                <td colspan="4" class="text-end text-muted fw-semibold py-1.5">Tax:</td>
+                <td class="text-end fw-bold text-success py-1.5">+₹{{ number_format($taxVal, 2) }}</td>
+            </tr>
+            @if(($quotation->discount ?: 0) > 0)
+                <tr>
+                    <td colspan="4" class="text-end text-muted fw-semibold py-1.5">Discount:</td>
+                    <td class="text-end fw-bold text-danger py-1.5">-₹{{ number_format($quotation->discount, 2) }}</td>
+                </tr>
+            @endif
+            <tr class="table-primary border-top border-2">
+                <td colspan="4" class="text-end text-uppercase fs-10 fw-bold text-dark letter-spacing-1 py-2">Grand Total:</td>
+                <td class="text-end text-primary fs-13 fw-extrabold py-2">₹{{ number_format($quotation->total_amount ?: ($subtotalVal + $taxVal - ($quotation->discount ?: 0)), 2) }}</td>
             </tr>
         </tfoot>
     </table>
@@ -101,5 +146,4 @@
         </div>
     </div>
 @endif
-
 

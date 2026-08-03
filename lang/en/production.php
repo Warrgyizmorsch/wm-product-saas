@@ -34,6 +34,14 @@ return [
     'cancel' => 'Cancel',
     'delete' => 'Delete',
 
+    // Statuses & Transitions
+    'submitted' => 'Submitted',
+    'approved' => 'Approved',
+    'rejected' => 'Rejected',
+    'cancelled' => 'Cancelled',
+    'created' => 'Created',
+    'revision_created' => 'Revision Created',
+
     // Form inputs and headers
     'bom_number' => 'BOM Number',
     'bom_name' => 'BOM Name',

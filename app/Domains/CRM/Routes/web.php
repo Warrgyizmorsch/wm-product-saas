@@ -40,6 +40,8 @@ Route::prefix('crm')
             ->name('leads.update');
         Route::patch('leads/{lead}/status', [LeadController::class, 'updateStatus'])
             ->name('leads.updateStatus');
+        Route::patch('leads/{lead}/priority', [LeadController::class, 'updatePriority'])
+            ->name('leads.updatePriority');
         Route::patch('leads/{lead}/owner', [LeadController::class, 'updateOwner'])
             ->name('leads.updateOwner');
         Route::post('leads/{lead}/convert-to-quotation', [LeadController::class, 'convertToQuotation'])
@@ -70,6 +72,8 @@ Route::prefix('crm')
             ->name('customers.create');
         Route::post('customers', [CustomerController::class, 'store'])
             ->name('customers.store');
+        Route::post('customers/quick-create', [CustomerController::class, 'quickCreate'])
+            ->name('customers.quick-create');
 
         Route::get('approvals/quotations', [QuotationController::class, 'approvalsIndex'])->name('approvals.quotations.index');
         Route::get('quotations', [QuotationController::class, 'index'])->name('quotations.index');

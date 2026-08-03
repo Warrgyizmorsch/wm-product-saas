@@ -20,13 +20,6 @@
 @section('content')
     <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
         <!-- Success & Error Messages -->
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         {{-- WIP Summary Cards --}}
         @if(isset($wipSummary))

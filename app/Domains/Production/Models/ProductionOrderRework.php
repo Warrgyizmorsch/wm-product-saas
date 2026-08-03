@@ -14,6 +14,7 @@ class ProductionOrderRework extends BaseModel
         'tenant_id',
         'production_order_id',
         'production_order_operation_id',
+        'production_batch_id',
         'quantity',
         'reason',
         'status',
@@ -34,6 +35,11 @@ class ProductionOrderRework extends BaseModel
     public function operation(): BelongsTo
     {
         return $this->belongsTo(ProductionOrderOperation::class, 'production_order_operation_id');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(ProductionBatch::class, 'production_batch_id');
     }
 
     public function user(): BelongsTo

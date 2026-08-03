@@ -19,6 +19,7 @@ class BatchNumberService
             ->where('tenant_id', $tenantId)
             ->where('batch_number', 'like', "{$prefix}%")
             ->orderBy('id', 'desc')
+            ->lockForUpdate()
             ->first();
 
         if (!$latest) {

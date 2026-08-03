@@ -160,16 +160,6 @@
 
         <!-- Right Content Column -->
         <div class="settings-content-col flex-grow-1">
-            @if(session('success'))
-                <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                    {{ session('success') }}
-                </x-ui.alert>
-            @endif
-            @if(session('error'))
-                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                    {{ session('error') }}
-                </x-ui.alert>
-            @endif
             <div class="tab-content" id="settingsSubSidebarContent">
                 <!-- Org Structure Pane -->
                 <div class="tab-pane fade show active" id="org-structure-pane" role="tabpanel" aria-labelledby="org-structure-menu">

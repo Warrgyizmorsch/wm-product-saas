@@ -96,6 +96,10 @@
         display: inline-block;
         margin-right: 6px;
     }
+    .bg-indigo { background-color: #4f46e5 !important; }
+    .bg-purple { background-color: #7c3aed !important; }
+    .bg-pink   { background-color: #db2777 !important; }
+    .bg-amber  { background-color: #d97706 !important; }
 </style>
 @endpush
 
@@ -107,12 +111,6 @@
 
 @section('content')
 <div class="erp-single-panel bg-white p-4">
-    @if (session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
-    @if (session('error'))
-        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-    @endif
 
     @php
         $prevStart = match($view) {
@@ -282,35 +280,47 @@
                     <div class="activities-list flex-fill">
                         @foreach($dayFollowups as $f)
                             @php
-                                $isOverdue = $f->followup_date->isPast() && $f->status !== 'Completed';
+                                $isOverdue = $f->followup_date->isPast() && !in_array($f->status, ['Completed', 'Not Connected', 'Cancelled']);
 
-                                $badgeClass = match($f->type) {
-                                    'Meeting' => 'bg-primary text-white',
-                                    'Call' => 'bg-info text-white',
-                                    'Email' => 'bg-teal text-white',
-                                    default => 'bg-secondary text-white',
-                                };
                                 $iconClass = match($f->type) {
                                     'Meeting' => 'feather-users',
-                                    'Call' => 'feather-phone-call',
-                                    'Email' => 'feather-mail',
-                                    default => 'feather-check-square',
+                                    'Call'    => 'feather-phone-call',
+                                    'Email'   => 'feather-mail',
+                                    'Demo'    => 'feather-monitor',
+                                    default   => 'feather-check-square',
                                 };
 
-                                if ($isOverdue) {
-                                    $badgeClass = 'bg-danger text-white';
-                                    $iconClass = 'feather-alert-triangle';
-                                } elseif ($f->status === 'Completed') {
+                                if ($f->status === 'Completed') {
                                     $badgeClass = 'bg-success text-white';
-                                    $iconClass = 'feather-check-circle';
+                                    $iconClass  = 'feather-check-circle';
+                                } elseif ($f->status === 'Not Connected') {
+                                    $badgeClass = 'bg-warning text-white';
+                                    $iconClass  = 'feather-phone-off';
+                                } elseif ($f->status === 'Cancelled') {
+                                    $badgeClass = 'bg-danger text-white';
+                                    $iconClass  = 'feather-x-circle';
+                                } elseif ($f->status === 'Rescheduled') {
+                                    $badgeClass = 'bg-purple text-white';
+                                    $iconClass  = 'feather-refresh-cw';
+                                } elseif ($isOverdue) {
+                                    $badgeClass = 'bg-danger text-white';
+                                    $iconClass  = 'feather-alert-triangle';
+                                } else {
+                                    $badgeClass = match($f->type) {
+                                        'Meeting' => 'bg-indigo text-white',
+                                        'Call'    => 'bg-primary text-white',
+                                        'Email'   => 'bg-amber text-white',
+                                        'Demo'    => 'bg-pink text-white',
+                                        default   => 'bg-secondary text-white',
+                                    };
                                 }
                             @endphp
-                            <a href="{{ route('crm.leads.show', $f->lead_id) }}" class="activity-pill {{ $badgeClass }}" title="{{ $f->type }}: {{ $f->lead?->company_name }} — {{ $f->notes ?: 'Scheduled Follow-up' }}">
+                            <a href="{{ route('crm.leads.show', $f->lead_id) }}" class="activity-pill {{ $badgeClass }}" title="{{ $f->type }}: {{ $f->lead?->company_name }} — {{ $f->notes ?: 'Scheduled Follow-up' }} [Status: {{ $f->status ?: 'Pending' }}]">
                                 <span class="d-flex align-items-center text-truncate">
                                     <i class="{{ $iconClass }} me-1 opacity-85"></i>
                                     <span class="text-truncate">{{ $f->lead?->company_name ?: 'Lead #'.$f->lead_id }}</span>
                                 </span>
-                                <span class="font-monospace fs-10 opacity-90 ms-1">{{ $f->followup_date->format('H:i') }}</span>
+                                <span class="font-monospace fs-10 opacity-90 ms-1">{{ $f->followup_date->format('h:i A') }}</span>
                             </a>
                         @endforeach
                     </div>

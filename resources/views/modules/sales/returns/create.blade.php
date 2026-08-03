@@ -20,27 +20,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-white p-4">
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="danger" title="{{ session('error') }}" />
-        @endif
-        @if ($errors->any())
-            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-text avatar-md bg-danger text-white me-3">
-                        <i class="feather-alert-triangle"></i>
-                    </div>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Validation Errors:</h6>
-                        <ul class="fs-12 mb-0 ps-3">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        @endif
 
         <form action="{{ route('sales.returns.store') }}" method="POST" id="returnForm">
             @csrf

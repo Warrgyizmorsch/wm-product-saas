@@ -11,17 +11,6 @@
 @endsection
 
 @section('content')
-    @if (session('success'))
-        <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="mb-4">
-            <strong>Success!</strong> {{ session('success') }}
-        </x-ui.alert>
-    @endif
-
-    @if (session('error'))
-        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible class="mb-4">
-            <strong>Cannot reverse this journal.</strong> {{ session('error') }}
-        </x-ui.alert>
-    @endif
 
     <x-ui.card class="mb-4">
         <div class="row g-4 fs-13">

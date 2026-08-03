@@ -62,12 +62,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         {{-- Metrics Summary --}}
         <div class="row g-3 mb-4">

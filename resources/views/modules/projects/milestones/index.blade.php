@@ -6,9 +6,6 @@
 
 @section('content')
     <div class="erp-single-panel">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
 
         <div class="d-flex align-items-center mb-3">
             <h5 class="fw-bold text-dark mb-0">

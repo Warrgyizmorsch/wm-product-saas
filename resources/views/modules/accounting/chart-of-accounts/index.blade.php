@@ -20,17 +20,6 @@
 @endsection
 
 @section('content')
-    @if (session('success'))
-        <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="mb-4">
-            <strong>Success!</strong> {{ session('success') }}
-        </x-ui.alert>
-    @endif
-
-    @if (session('error'))
-        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible class="mb-4">
-            <strong>Cannot delete this account.</strong> {{ session('error') }}
-        </x-ui.alert>
-    @endif
 
     <div class="row g-4 mb-4">
         <div class="col-xxl-3 col-md-6">

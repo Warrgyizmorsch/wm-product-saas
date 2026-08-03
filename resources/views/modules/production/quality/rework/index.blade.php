@@ -6,13 +6,6 @@
 
 @section('content')
     {{-- Toast alerts --}}
-    @if (session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
-
-    @if (session('error'))
-        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-    @endif
 
     <div class="erp-single-panel">
         <!-- Toolbar: Sort, Filters -->

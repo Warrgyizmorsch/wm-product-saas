@@ -978,9 +978,38 @@
                                             </div>
                                         @else
                                             @foreach($groupedFollowups as $date => $items)
+                                                @php
+                                                    $hasNotConnected = $items->contains(fn($i) => $i->status === 'Not Connected');
+                                                    $hasCancelled    = $items->contains(fn($i) => $i->status === 'Cancelled');
+                                                    $hasCompleted    = $items->contains(fn($i) => $i->status === 'Completed');
+                                                    $hasRescheduled  = $items->contains(fn($i) => $i->status === 'Rescheduled');
+
+                                                    $dateBadgeBg     = '#eff6ff';
+                                                    $dateBadgeColor  = '#1d4ed8';
+                                                    $dateBadgeBorder = '#93c5fd';
+
+                                                    if ($hasNotConnected) {
+                                                        $dateBadgeBg     = '#fff7ed';
+                                                        $dateBadgeColor  = '#c2410c';
+                                                        $dateBadgeBorder = '#fdba74';
+                                                    } elseif ($hasCancelled) {
+                                                        $dateBadgeBg     = '#fef2f2';
+                                                        $dateBadgeColor  = '#b91c1c';
+                                                        $dateBadgeBorder = '#fca5a5';
+                                                    } elseif ($hasCompleted) {
+                                                        $dateBadgeBg     = '#f0fdf4';
+                                                        $dateBadgeColor  = '#15803d';
+                                                        $dateBadgeBorder = '#86efac';
+                                                    } elseif ($hasRescheduled) {
+                                                        $dateBadgeBg     = '#faf5ff';
+                                                        $dateBadgeColor  = '#6b21a8';
+                                                        $dateBadgeBorder = '#d8b4fe';
+                                                    }
+                                                @endphp
+
                                                 <!-- Date Header -->
                                                 <div class="activity-date-group mb-3">
-                                                    <div class="activity-date-badge mb-2">
+                                                    <div class="activity-date-badge mb-2" style="background: {{ $dateBadgeBg }}; color: {{ $dateBadgeColor }}; border: 1px solid {{ $dateBadgeBorder }}; font-weight: 700;">
                                                         <i class="feather-calendar fs-10 me-1"></i>{{ $date }}
                                                     </div>
 
@@ -989,16 +1018,16 @@
                                                             $actIcon = 'feather-phone-call';
                                                             $actIconBg = 'bg-soft-primary';
                                                             $actIconColor = 'text-primary';
-                                                            if($item->type === 'Email')   { $actIcon = 'feather-mail';    $actIconBg = 'bg-soft-info';    $actIconColor = 'text-info'; }
-                                                            elseif($item->type === 'Meeting') { $actIcon = 'feather-users';  $actIconBg = 'bg-soft-purple'; $actIconColor = 'text-purple'; }
-                                                            elseif($item->type === 'Demo')    { $actIcon = 'feather-monitor'; $actIconBg = 'bg-soft-teal';  $actIconColor = 'text-teal'; }
+                                                            if($item->type === 'Email')   { $actIcon = 'feather-mail';    $actIconBg = 'bg-soft-warning'; $actIconColor = 'text-warning'; }
+                                                            elseif($item->type === 'Meeting') { $actIcon = 'feather-users';  $actIconBg = 'bg-soft-purple';  $actIconColor = 'text-purple'; }
+                                                            elseif($item->type === 'Demo')    { $actIcon = 'feather-monitor'; $actIconBg = 'bg-soft-danger';  $actIconColor = 'text-danger'; }
 
-                                                            $statusBadgeClass = 'bg-warning text-white';
+                                                            $statusBadgeClass = 'bg-primary text-white';
                                                             $statusLabel = 'Pending';
                                                             if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = 'Connected'; }
                                                             elseif($item->status === 'Not Connected') { $statusBadgeClass = 'bg-warning text-white'; $statusLabel = 'Not Connected'; }
                                                             elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-danger text-white'; $statusLabel = 'Cancelled'; }
-                                                            elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-info text-white'; $statusLabel = 'Rescheduled'; }
+                                                            elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-purple text-white'; $statusLabel = 'Rescheduled'; }
                                                         @endphp
 
                                                         <div class="activity-card mb-2">
@@ -1011,7 +1040,7 @@
                                                                     </div>
                                                                     <span class="fw-bold text-dark fs-13">{{ __('crm.activity_types.' . $item->type) ?? $item->type }}</span>
                                                                     <span class="activity-time-chip"><i class="feather-clock fs-9 me-1"></i>{{ $item->followup_date->format('h:i A') }}</span>
-                                                                    <span class="badge rounded-pill {{ $statusBadgeClass }} px-2 py-1 fs-10 fw-semibold" @if($item->status !== 'Pending') title="Status updated on {{ $item->updated_at->format('d/m/Y h:i A') }}" @endif>{{ $statusLabel }}</span>
+                                                                    <span class="badge rounded-pill {{ $statusBadgeClass }} px-2.5 py-1 fs-10 fw-semibold" @if($item->status !== 'Pending') title="Status updated on {{ $item->updated_at->format('d/m/Y h:i A') }}" @endif>{{ $statusLabel }}</span>
 
                                                                     @php
                                                                         $lastRescheduledDate = $item->rescheduledFrom?->followup_date;
@@ -1417,14 +1446,6 @@
                                                          <input type="hidden" name="status" value="Pending Approval">
                                                          <button type="submit" class="btn btn-sm btn-warning"><i class="feather-send me-1"></i>{{ __('crm.send_for_approval') }}</button>
                                                      </form>
-                                                 @elseif ($activeQuotation->status === 'Pending Approval')
-                                                     <form action="{{ route('crm.quotations.approve', $activeQuotation->id) }}" method="POST" class="d-inline">
-                                                         @csrf
-                                                         <button type="submit" class="btn btn-sm btn-success"><i class="feather-check me-1"></i>{{ __('crm.approve') }}</button>
-                                                     </form>
-                                                     <button type="button" class="btn btn-sm btn-danger" onclick="openRejectModal('{{ route('crm.quotations.reject', $activeQuotation->id) }}', '{{ $activeQuotation->quotation_number }}')">
-                                                         <i class="feather-x me-1"></i>{{ __('crm.reject') }}
-                                                     </button>
                                                  @elseif ($activeQuotation->status === 'Approved')
                                                      <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
                                                          @csrf
@@ -1439,9 +1460,6 @@
                                                          <input type="hidden" name="status" value="Accepted">
                                                          <button type="submit" class="btn btn-sm btn-success">{{ __('crm.accept_quotation') }}</button>
                                                      </form>
-                                                     <button type="button" class="btn btn-sm btn-danger" onclick="openRejectModal('{{ route('crm.quotations.reject', $activeQuotation->id) }}', '{{ $activeQuotation->quotation_number }}')">
-                                                         <i class="feather-x me-1"></i>{{ __('crm.reject') }}
-                                                     </button>
                                                  @elseif ($activeQuotation->status === 'Accepted')
                                                      <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success">
                                                          <i class="feather-shopping-cart me-1"></i>{{ __('crm.convert_to_sales_order') }}
@@ -2075,19 +2093,23 @@
         .odoo-table td {
             padding: 6px 4px;
             border-bottom: 1px solid #e9ecef;
-            vertical-align: middle;
+            vertical-align: top !important;
         }
         .odoo-table-input {
             border: none;
-            border-bottom: 1px solid transparent;
+            border-bottom: 1px solid #cbd5e1 !important;
             background: transparent;
             border-radius: 0;
             padding: 4px 2px;
             width: 100%;
             font-size: 13px;
+            transition: border-color 0.2s ease-in-out;
+        }
+        .odoo-table-input:hover {
+            border-bottom-color: #94a3b8 !important;
         }
         .odoo-table-input:focus {
-            border-bottom-color: #1e40af;
+            border-bottom-color: var(--bs-primary) !important;
             outline: none;
             box-shadow: none;
         }

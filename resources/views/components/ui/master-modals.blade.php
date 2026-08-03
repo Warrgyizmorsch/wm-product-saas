@@ -93,11 +93,13 @@ $masterDefinitions = [
     ],
     'customer' => [
         'label'  => 'Customer',
-        'route'  => 'customers.quick-create',
+        'route'  => 'crm.customers.quick-create',
         'fields' => [
             ['component' => 'input', 'props' => ['label' => 'Customer Name',  'name' => 'name',  'placeholder' => 'e.g. Acme Corp',          'required' => true]],
             ['component' => 'input', 'props' => ['label' => 'Email Address',  'name' => 'email', 'placeholder' => 'e.g. contact@acme.com',   'type' => 'email']],
             ['component' => 'input', 'props' => ['label' => 'Phone Number',   'name' => 'phone', 'placeholder' => 'e.g. +91-9876543210']],
+            ['component' => 'textarea', 'props' => ['label' => 'Billing Address',  'name' => 'billing_address', 'placeholder' => 'Billing address...', 'rows' => 2]],
+            ['component' => 'textarea', 'props' => ['label' => 'Shipping Address', 'name' => 'shipping_address', 'placeholder' => 'Shipping address...', 'rows' => 2]],
         ],
     ],
     'supplier' => [

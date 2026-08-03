@@ -184,16 +184,6 @@
 
         <!-- Right Content Column -->
         <div class="settings-content-col flex-grow-1">
-            @if(session('success'))
-                <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                    {{ session('success') }}
-                </x-ui.alert>
-            @endif
-            @if(session('error'))
-                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                    {{ session('error') }}
-                </x-ui.alert>
-            @endif
 
             <div class="col-12">
                 <x-ui.card title="{{ __('hrms.salary.pay_groups') }}" bodyClass="p-0" stretch>
@@ -364,7 +354,6 @@
 
     <!-- Include all Unified Modals at body level to prevent parent wrapper blur/backdrop overlay bugs -->
     @include('modules.hrms.partials.form-helpers')
-
 
     <!-- Add Pay Group Modal -->
     <div class="modal fade" id="addPayGroupModal" tabindex="-1" aria-labelledby="addPayGroupModalLabel" aria-hidden="true">
@@ -651,5 +640,4 @@
     </script>
     @endpush
 @endsection
-
 

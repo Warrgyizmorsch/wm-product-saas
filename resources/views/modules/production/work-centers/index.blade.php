@@ -43,16 +43,6 @@
     @endphp
 
     <div class="erp-single-panel">
-        {{-- Toast Notifications --}}
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('warning'))
-            <x-ui.toast :auto="true" type="warning" title="{{ session('warning') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         {{-- Toolbar: Title + Sort + Filter --}}
         <div class="d-flex align-items-center mb-3">

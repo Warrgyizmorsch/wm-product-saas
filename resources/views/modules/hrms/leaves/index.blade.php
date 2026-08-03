@@ -318,7 +318,6 @@
             color: #64748b;
         }
 
-
         .odoo-underline-input {
             border: none !important;
             border-bottom: 2px solid #cbd5e1 !important;

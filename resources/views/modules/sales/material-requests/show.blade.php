@@ -58,12 +58,6 @@
 @section('content')
     <div class="erp-single-panel">
         <!-- Toast Notifications -->
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <x-ui.odoo-form-ui type="sheet">
             <!-- Header bar with title and status badge next to it -->

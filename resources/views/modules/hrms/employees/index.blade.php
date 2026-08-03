@@ -382,11 +382,6 @@
     </style>
 
     <div class="employee-page">
-            @if(session('success'))
-                <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                    {{ session('success') }}
-                </x-ui.alert>
-            @endif
 
             <div class="employee-list-card p-4" id="employeeListCard">
                 <!-- Card Header -->

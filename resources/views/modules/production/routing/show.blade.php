@@ -28,13 +28,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-white">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <!-- Workflow Banner (Inlined inside panel) -->
         <div class="p-3 border rounded bg-light mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
@@ -194,7 +187,6 @@
                                 <span class="fw-semibold text-dark">{{ format_currency(collect($costSummary['operations'])->sum('machine_cost')) }}</span>
                             </div>
 
-
                         </div>
                     </div>
                 @else
@@ -329,6 +321,10 @@
                                         <span class="badge bg-soft-warning text-warning text-uppercase font-monospace fs-10">{{ __('production.submitted') }}</span>
                                     @elseif ($approval->action === 'Cancelled')
                                         <span class="badge bg-soft-danger text-danger text-uppercase font-monospace fs-10">{{ __('production.cancelled') }}</span>
+                                    @elseif ($approval->action === 'Revision Created')
+                                        <span class="badge bg-soft-info text-info text-uppercase font-monospace fs-10">{{ __('production.revision_created') }}</span>
+                                    @elseif ($approval->action === 'Created')
+                                        <span class="badge bg-soft-secondary text-secondary text-uppercase font-monospace fs-10">{{ __('production.created') }}</span>
                                     @else
                                         <span class="badge bg-soft-secondary text-secondary text-uppercase font-monospace fs-10">{{ $approval->action }}</span>
                                     @endif
@@ -347,7 +343,6 @@
             </div>
         </div>
     </div>
-
 
     <!-- Reject Comment Modal -->
     <div class="modal fade" id="rejectModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">

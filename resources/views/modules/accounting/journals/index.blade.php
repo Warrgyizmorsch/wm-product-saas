@@ -45,11 +45,6 @@
 @endsection
 
 @section('content')
-    @if (session('success'))
-        <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="mb-4">
-            <strong>Success!</strong> {{ session('success') }}
-        </x-ui.alert>
-    @endif
 
     <x-ui.card bodyClass="p-0" class="accounting-dense">
         <div class="d-flex align-items-center gap-3 p-3 border-bottom">
