@@ -135,6 +135,7 @@
                         </th>
                         <th>{{ __('inventory.item_name_sku') }}</th>
                         <th>{{ __('inventory.type') }}</th>
+                        <th>Material Type</th>
                         <th>{{ __('inventory.variation') }}</th>
                         <th class="text-end">{{ __('inventory.selling_price') }}</th>
                         <th class="text-end">{{ __('inventory.cost_price') }}</th>
@@ -163,6 +164,22 @@
                                 @else
                                     <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.service') }}</span>
                                 @endif
+                            </td>
+                            <td>
+                                @php
+                                    $mtMap = [
+                                        'raw_material'  => ['label' => 'Raw Material',  'color' => 'warning'],
+                                        'semi_finished' => ['label' => 'Semi-Finished', 'color' => 'info'],
+                                        'finished_good' => ['label' => 'Finished Good', 'color' => 'success'],
+                                        'consumable'    => ['label' => 'Consumable',    'color' => 'secondary'],
+                                        'component'     => ['label' => 'Component',     'color' => 'danger'],
+                                        'service'       => ['label' => 'Service',       'color' => 'primary'],
+                                    ];
+                                    $mt = $mtMap[$product->type] ?? ['label' => ucfirst(str_replace('_', ' ', $product->type ?? '—')), 'color' => 'secondary'];
+                                @endphp
+                                <span class="badge bg-soft-{{ $mt['color'] }} text-{{ $mt['color'] }} border border-{{ $mt['color'] }}-subtle px-2 py-1 fs-11 fw-semibold">
+                                    {{ $mt['label'] }}
+                                </span>
                             </td>
                             <td>
                                 @if($product->variation_type === 'Variant')

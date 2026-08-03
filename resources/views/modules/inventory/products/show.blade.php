@@ -138,6 +138,25 @@
                                             <td class="text-muted" style="width: 140px;">{{ __('inventory.unit_of_measure') }}</td>
                                             <td class="fw-semibold">{{ $product->uom ? $product->uom->name . ' (' . $product->uom->code . ')' : '—' }}</td>
                                         </tr>
+                                        @php
+                                            $typeMap = [
+                                                'raw_material'  => ['label' => 'Raw Material',    'color' => 'warning'],
+                                                'semi_finished' => ['label' => 'Semi-Finished',   'color' => 'info'],
+                                                'finished_good' => ['label' => 'Finished Good',   'color' => 'success'],
+                                                'consumable'    => ['label' => 'Consumable',      'color' => 'secondary'],
+                                                'service'       => ['label' => 'Service',         'color' => 'primary'],
+                                                'component'     => ['label' => 'Component',       'color' => 'danger'],
+                                            ];
+                                            $typeInfo = $typeMap[$product->type] ?? ['label' => ucfirst(str_replace('_', ' ', $product->type ?? 'N/A')), 'color' => 'secondary'];
+                                        @endphp
+                                        <tr>
+                                            <td class="text-muted">Material Type</td>
+                                            <td>
+                                                <span class="badge bg-soft-{{ $typeInfo['color'] }} text-{{ $typeInfo['color'] }} border border-{{ $typeInfo['color'] }}-subtle px-2 py-1 fw-semibold fs-11">
+                                                    {{ $typeInfo['label'] }}
+                                                </span>
+                                            </td>
+                                        </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.brand') }}</td>
                                             <td class="fw-semibold">{{ $product->brand ?: '—' }}</td>
