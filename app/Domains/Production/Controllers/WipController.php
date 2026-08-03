@@ -40,27 +40,50 @@ class WipController extends Controller
             }
         }
 
-        $query = ProductionWip::where('tenant_id', $tenantId)
+        $viewMode = $request->input('view', 'order');
+        $search = $request->input('search');
+        $status = $request->input('status');
+        $workCenterIdFilter = $request->filled('work_center_id') ? (int) $request->input('work_center_id') : null;
+
+        // Validate work center filter ownership if provided
+        if ($workCenterIdFilter) {
+            \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->findOrFail($workCenterIdFilter);
+        }
+
+        // Server-side paginated orders query
+        $perPage = min(max((int) $request->input('per_page', 10), 1), 50);
+        $ordersPaginator = $this->wipService->getConsolidatedOrderWipSummaries($tenantId, $search, $status, $perPage);
+
+        // Pre-aggregate Work-Center summaries for orders on the current page
+        $orderSummariesMap = [];
+        foreach ($ordersPaginator->items() as $order) {
+            $summaries = $this->wipService->getWorkCenterWipSummaries($tenantId, $order->id, $workCenterIdFilter);
+            $orderSummariesMap[$order->id] = $summaries;
+        }
+
+        // Flat card fallback view query
+        $wipQuery = ProductionWip::where('tenant_id', $tenantId)
             ->with(['order', 'product', 'currentRoutingOperation', 'currentWorkCenter', 'currentMachine', 'batch']);
 
-        if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('product', function ($p) use ($search) {
-                    $p->where('name', 'like', $search)->orWhere('sku', 'like', $search);
-                })->orWhereHas('order', function ($o) use ($search) {
-                    $o->where('order_number', 'like', $search);
-                });
+        if ($search) {
+            $searchTerm = '%' . $search . '%';
+            $wipQuery->where(function ($q) use ($searchTerm) {
+                $q->whereHas('product', fn($p) => $p->where('name', 'like', $searchTerm)->orWhere('sku', 'like', $searchTerm))
+                    ->orWhereHas('order', fn($o) => $o->where('order_number', 'like', $searchTerm));
             });
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+        if ($status) {
+            $wipQuery->where('status', $status);
         }
 
-        $wips = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
+        if ($workCenterIdFilter) {
+            $wipQuery->where('current_work_center_id', $workCenterIdFilter);
+        }
 
-        // Calculate tenant-scoped summary KPI metrics
+        $wips = $wipQuery->orderBy('id', 'desc')->paginate($perPage)->withQueryString();
+
+        // Calculate tenant-scoped summary KPI metrics using aggregate DB selectRaw
         $summary = ProductionWip::where('tenant_id', $tenantId)
             ->selectRaw('
                 count(*) as total_count,
@@ -81,7 +104,62 @@ class WipController extends Controller
             'completed_count' => (int) ($summary->completed_count ?? 0),
         ];
 
-        return view('modules.production.wip.index', compact('wips', 'wipSummary'));
+        $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $warehouses = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)->orderByDesc('is_default')->get();
+
+        return view('modules.production.wip.index', compact(
+            'wips',
+            'wipSummary',
+            'viewMode',
+            'ordersPaginator',
+            'orderSummariesMap',
+            'workCenters',
+            'workCenterIdFilter',
+            'warehouses'
+        ));
+    }
+
+    /**
+     * AJAX endpoint for server-side paginated Work Center batch rows.
+     */
+    public function getWorkCenterBatches(Request $request, int $orderId, int $workCenterId)
+    {
+        abort_unless(auth()->user() && (auth()->user()->role === 'admin' || auth()->user()->hasProductionPermission('production.mes.execute')), 403);
+        $tenantId = require_tenant_id();
+
+        $order = \App\Domains\Production\Models\ProductionOrder::where('tenant_id', $tenantId)->findOrFail($orderId);
+        $workCenter = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->findOrFail($workCenterId);
+
+        $perPage = min(max((int) $request->input('per_page', 5), 1), 50);
+        $status = $request->input('status');
+        $search = $request->input('search');
+
+        $paginatedWips = $this->wipService->getPaginatedWorkCenterWips(
+            $tenantId,
+            $order->id,
+            $workCenter->id,
+            $status,
+            $search,
+            $perPage
+        );
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'order_id' => $order->id,
+                'work_center_id' => $workCenter->id,
+                'current_page' => $paginatedWips->currentPage(),
+                'last_page' => $paginatedWips->lastPage(),
+                'per_page' => $paginatedWips->perPage(),
+                'total' => $paginatedWips->total(),
+                'has_more' => $paginatedWips->hasMorePages(),
+                'html' => view('modules.production.wip.partials.work-center-batch-rows', [
+                    'wips' => $paginatedWips->items(),
+                ])->render(),
+            ]);
+        }
+
+        return redirect()->route('production.wip.index', ['view' => 'order']);
     }
 
     public function show(int $id)
@@ -170,6 +248,30 @@ class WipController extends Controller
             );
 
             return redirect()->route('production.wip.show', $id)->with('success', 'WIP converted and Finished Goods stock received.');
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function convertOrderToFg(Request $request, int $orderId)
+    {
+        abort_unless(auth()->user() && (auth()->user()->role === 'admin' || auth()->user()->hasProductionPermission('production.mes.execute')), 403);
+
+        $request->validate([
+            'warehouse_id' => 'required|exists:warehouses,id',
+            'remarks' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            $totalConverted = $this->wipService->convertOrderWipToFinishedGoods(
+                $orderId,
+                (int) $request->input('warehouse_id'),
+                $request->input('remarks'),
+                auth()->id()
+            );
+
+            return redirect()->back()
+                ->with('success', "Successfully received {$totalConverted} units into Finished Goods stock across all order WIP cards.");
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

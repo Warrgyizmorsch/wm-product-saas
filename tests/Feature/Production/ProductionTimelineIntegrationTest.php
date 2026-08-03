@@ -246,7 +246,7 @@ class ProductionTimelineIntegrationTest extends TestCase
             $this->tenantId,
             $order->id,
             $this->product->id,
-            100.0,
+            10.0,
             ProductionBatch::STATUS_PLANNED
         );
 

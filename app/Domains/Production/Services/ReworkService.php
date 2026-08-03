@@ -220,6 +220,10 @@ class ReworkService
                             ? (int) $batchIdCandidate
                             : null;
 
+                        if ($validBatchId) {
+                            app(\App\Domains\Production\Services\BatchProductionService::class)->reconcileBatchActualQuantity($validBatchId);
+                        }
+
                         // Log WIP Transaction Ledger for rework recovery
                         \App\Domains\Production\Models\ProductionWipTransaction::create([
                             'tenant_id' => $wip->tenant_id,

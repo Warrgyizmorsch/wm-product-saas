@@ -25,6 +25,19 @@ class ProductionCostAdjustmentController extends Controller
     {
         $order = ProductionOrder::findOrFail($orderId);
 
+        $user = auth()->user();
+        if (!$user || $user->tenant_id !== $order->tenant_id) {
+            abort(403, 'Unauthorized tenant access.');
+        }
+
+        $canCreate = $user->role === 'admin'
+            || $user->hasProductionPermission('production.cost_adjustment.create', $order->tenant_id)
+            || $user->hasProductionPermission('production.order.update', $order->tenant_id);
+
+        if (!$canCreate) {
+            abort(403, 'Unauthorized action.');
+        }
+
         try {
             $data = $request->validated();
             if (isset($data['amount'])) {
@@ -48,6 +61,24 @@ class ProductionCostAdjustmentController extends Controller
     public function update(UpdateProductionCostAdjustmentRequest $request, int $id)
     {
         $adjustment = ProductionCostAdjustment::findOrFail($id);
+        $order = $adjustment->order;
+
+        $user = auth()->user();
+        if (!$user || $user->tenant_id !== $adjustment->tenant_id || !$order || $order->tenant_id !== $user->tenant_id) {
+            abort(403, 'Unauthorized tenant access.');
+        }
+
+        if ($request->filled('production_order_id') && (int) $request->input('production_order_id') !== (int) $adjustment->production_order_id) {
+            abort(403, 'Adjustment does not belong to the supplied production order.');
+        }
+
+        $canUpdate = $user->role === 'admin'
+            || $user->hasProductionPermission('production.cost_adjustment.update', $order->tenant_id)
+            || $user->hasProductionPermission('production.order.update', $order->tenant_id);
+
+        if (!$canUpdate) {
+            abort(403, 'Unauthorized action.');
+        }
 
         try {
             $data = $request->validated();
@@ -75,7 +106,7 @@ class ProductionCostAdjustmentController extends Controller
         $order = $adjustment->order;
 
         $user = auth()->user();
-        if (!$user || $user->tenant_id !== $order->tenant_id) {
+        if (!$user || $user->tenant_id !== $adjustment->tenant_id || !$order || $order->tenant_id !== $user->tenant_id) {
             abort(403, 'Unauthorized tenant access.');
         }
 

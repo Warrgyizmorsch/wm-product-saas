@@ -101,96 +101,47 @@ class BatchProductionService
                 throw new \InvalidArgumentException("Total split quantity (" . number_format($totalSplitQty, 2) . ") cannot exceed parent batch planned quantity (" . number_format($parent->planned_quantity, 2) . ").");
             }
 
-            // Case 1: Full split (total split == parent planned quantity)
-            if (abs($totalSplitQty - (float) $parent->planned_quantity) < 0.0001) {
-                $firstChunk = array_shift($splits);
-                $firstQty = (float) $firstChunk['planned_quantity'];
+            $remainingBalance = max(0.00, (float) $parent->planned_quantity - $totalSplitQty);
+            $parent->update([
+                'planned_quantity' => $remainingBalance,
+                'remarks' => $parent->remarks . " | Split {$totalSplitQty} quantity into children.",
+            ]);
 
-                // Update parent batch to the first split chunk quantity
-                $parent->update([
-                    'planned_quantity' => $firstQty,
-                    'remarks' => ($firstChunk['remarks'] ?? $parent->remarks) . " | Split parent batch.",
+            $children = [];
+            foreach ($splits as $split) {
+                $qty = (float) $split['planned_quantity'];
+                $child = $this->createBatch(
+                    $tenantId,
+                    $parent->production_order_id,
+                    $parent->product_id,
+                    $qty,
+                    ProductionBatch::STATUS_PLANNED,
+                    $split['expiry_date'] ?? ($parent->expiry_date ? $parent->expiry_date->toDateString() : null),
+                    $split['remarks'] ?? "Split from parent batch #{$parent->batch_number}"
+                );
+                $child->current_operation_id = $parent->current_operation_id;
+                $child->source_operation_id = $parent->source_operation_id;
+                $child->save();
+
+                ProductionBatchGenealogy::create([
+                    'tenant_id' => $tenantId,
+                    'parent_batch_id' => $parent->id,
+                    'child_batch_id' => $child->id,
+                    'type' => 'split',
+                    'quantity' => $qty,
                 ]);
 
-                // Remaining split chunks create new child batches
-                foreach ($splits as $split) {
-                    $qty = (float) $split['planned_quantity'];
-                    $child = $this->createBatch(
-                        $tenantId,
-                        $parent->production_order_id,
-                        $parent->product_id,
-                        $qty,
-                        ProductionBatch::STATUS_PLANNED,
-                        $split['expiry_date'] ?? ($parent->expiry_date ? $parent->expiry_date->toDateString() : null),
-                        $split['remarks'] ?? "Split from parent batch #{$parent->batch_number}"
-                    );
-                    $child->current_operation_id = $parent->current_operation_id;
-                    $child->source_operation_id = $parent->source_operation_id;
-                    $child->save();
-
-                    ProductionBatchGenealogy::create([
-                        'tenant_id' => $tenantId,
-                        'parent_batch_id' => $parent->id,
-                        'child_batch_id' => $child->id,
-                        'type' => 'split',
-                        'quantity' => $qty,
-                    ]);
-
-                    ProductionLotTrace::create([
-                        'tenant_id' => $tenantId,
-                        'source_type' => 'batch',
-                        'source_id' => $parent->id,
-                        'target_type' => 'batch',
-                        'target_id' => $child->id,
-                        'quantity' => $qty,
-                        'remarks' => "Split trace from parent batch {$parent->batch_number}.",
-                    ]);
-
-                    $children[] = $child;
-                }
-            } else {
-                // Case 2: Partial split (total split < parent planned quantity)
-                $remainingBalance = max(0.00, (float) $parent->planned_quantity - $totalSplitQty);
-                $parent->update([
-                    'planned_quantity' => $remainingBalance,
-                    'remarks' => $parent->remarks . " | Partial split of {$totalSplitQty} quantity into children.",
+                ProductionLotTrace::create([
+                    'tenant_id' => $tenantId,
+                    'source_type' => 'batch',
+                    'source_id' => $parent->id,
+                    'target_type' => 'batch',
+                    'target_id' => $child->id,
+                    'quantity' => $qty,
+                    'remarks' => "Split trace from parent batch {$parent->batch_number}.",
                 ]);
 
-                foreach ($splits as $split) {
-                    $qty = (float) $split['planned_quantity'];
-                    $child = $this->createBatch(
-                        $tenantId,
-                        $parent->production_order_id,
-                        $parent->product_id,
-                        $qty,
-                        ProductionBatch::STATUS_PLANNED,
-                        $split['expiry_date'] ?? ($parent->expiry_date ? $parent->expiry_date->toDateString() : null),
-                        $split['remarks'] ?? "Split from parent batch #{$parent->batch_number}"
-                    );
-                    $child->current_operation_id = $parent->current_operation_id;
-                    $child->source_operation_id = $parent->source_operation_id;
-                    $child->save();
-
-                    ProductionBatchGenealogy::create([
-                        'tenant_id' => $tenantId,
-                        'parent_batch_id' => $parent->id,
-                        'child_batch_id' => $child->id,
-                        'type' => 'split',
-                        'quantity' => $qty,
-                    ]);
-
-                    ProductionLotTrace::create([
-                        'tenant_id' => $tenantId,
-                        'source_type' => 'batch',
-                        'source_id' => $parent->id,
-                        'target_type' => 'batch',
-                        'target_id' => $child->id,
-                        'quantity' => $qty,
-                        'remarks' => "Split trace from parent batch {$parent->batch_number}.",
-                    ]);
-
-                    $children[] = $child;
-                }
+                $children[] = $child;
             }
 
             app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($tenantId, [
@@ -593,10 +544,24 @@ class BatchProductionService
                 ->where('transaction_type', 'transferred')
                 ->sum('quantity');
 
-            // Transferred OUT from current operation to successor
+            // Transferred OUT from current operation to successor OR converted to Finished Goods
             $transferredOut = (float) $batchWip->where('from_operation_id', $operation->routing_operation_id)
-                ->where('transaction_type', 'transferred')
+                ->whereIn('transaction_type', ['transferred', 'converted_to_finished_goods'])
                 ->sum('quantity');
+
+            // If final operation, also sum finished goods conversion transactions for this batch
+            if (!$nextOp) {
+                $fgConvertedOut = (float) \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $batch->tenant_id)
+                    ->where('production_order_id', $operation->production_order_id)
+                    ->where(function ($q) use ($batch) {
+                        $q->where('production_batch_id', $batch->id)
+                            ->orWhereHas('wip', fn($w) => $w->where('production_batch_id', $batch->id));
+                    })
+                    ->where('transaction_type', 'converted_to_finished_goods')
+                    ->sum('quantity');
+
+                $transferredOut = max($transferredOut, $fgConvertedOut);
+            }
 
             // Input available & remaining processable quantity
             if ($isFirstOp) {
@@ -677,5 +642,48 @@ class BatchProductionService
         }
 
         return $queue;
+    }
+
+    /**
+     * Reconcile a batch's actual_quantity to include both direct progress logs and completed rework output.
+     */
+    public function reconcileBatchActualQuantity(int $batchId): ProductionBatch
+    {
+        $batch = ProductionBatch::findOrFail($batchId);
+        $tenantId = $batch->tenant_id;
+        $orderId = $batch->production_order_id;
+
+        $finalOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->orderBy('sequence', 'desc')
+            ->first();
+
+        if (!$finalOp) {
+            return $batch;
+        }
+
+        $directProduced = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->where('production_batch_id', $batchId)
+            ->where('operation_id', $finalOp->id)
+            ->sum('quantity_produced');
+
+        $reworkCompleted = (float) \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->where('production_batch_id', $batchId)
+            ->where('status', 'completed')
+            ->sum('quantity');
+
+        $reconciledActual = $directProduced + $reworkCompleted;
+
+        if ($reconciledActual > $batch->actual_quantity) {
+            $batch->actual_quantity = $reconciledActual;
+            if ($batch->actual_quantity >= $batch->planned_quantity && $batch->planned_quantity > 0) {
+                $batch->status = ProductionBatch::STATUS_COMPLETED;
+            }
+            $batch->save();
+        }
+
+        return $batch;
     }
 }

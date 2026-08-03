@@ -1918,7 +1918,7 @@ class SchedulingService
         // 3. Lookups on related progress logs, WIP records and quantities
         $schedOpIds = ProductionScheduleOperation::where('production_schedule_id', $schedule->id)->pluck('id')->toArray();
         if (!empty($schedOpIds)) {
-            if (DB::table('production_wips')->whereIn('current_schedule_operation_id', $schedOpIds)->exists()) {
+            if (\App\Domains\Production\Models\ProductionWip::where('tenant_id', $schedule->tenant_id)->whereIn('current_schedule_operation_id', $schedOpIds)->exists()) {
                 return true;
             }
         }
@@ -1929,7 +1929,7 @@ class SchedulingService
             ->toArray();
 
         if (!empty($opIds)) {
-            if (DB::table('production_order_progress_logs')->whereIn('operation_id', $opIds)->exists()) {
+            if (\App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $schedule->tenant_id)->whereIn('operation_id', $opIds)->exists()) {
                 return true;
             }
             $hasQuantity = ProductionOrderOperation::whereIn('id', $opIds)

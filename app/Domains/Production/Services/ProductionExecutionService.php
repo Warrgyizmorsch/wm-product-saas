@@ -91,8 +91,8 @@ class ProductionExecutionService
             $newConsumed = $isFirstOp ? (float) ($produced + $rejected) : (float) ($produced + $rejected + $scrapped);
 
             if ($isFirstOp) {
-                if ($newConsumed > $orderAvailableWip) {
-                    throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available order capacity of {$orderAvailableWip} units.");
+                if ($orderAvailableWip <= 0 || $newConsumed > $orderAvailableWip) {
+                    throw new InvalidArgumentException("Cannot log progress: Target production capacity of " . number_format($order->quantity_ordered, 2) . " units has already been reached for Order #{$order->order_number}.");
                 }
             } else {
                 if ($newConsumed > $availableWip) {
@@ -100,20 +100,20 @@ class ProductionExecutionService
                 }
             }
 
-            // Validate total logged units against remaining planned batch capacity when rejected/scrapped units are logged
-            if ($batch->planned_quantity > 0 && ($rejected > 0 || $scrapped > 0)) {
+            // Validate total logged units against remaining planned batch capacity when rejected units are logged
+            if ($batch->planned_quantity > 0 && $rejected > 0) {
                 $alreadyLoggedForBatch = ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
                     ->where('operation_id', $op->id)
                     ->where('production_batch_id', $batch->id)
-                    ->sum(\Illuminate\Support\Facades\DB::raw('quantity_produced + quantity_rejected + quantity_scrapped'));
+                    ->sum(\Illuminate\Support\Facades\DB::raw('quantity_produced + quantity_rejected'));
 
                 $remainingBatchCapacity = max(0.0, (float)$batch->planned_quantity - (float)$alreadyLoggedForBatch);
-                $totalInputQty = (float) ($produced + $rejected + $scrapped);
+                $totalInputQty = (float) ($produced + $rejected);
 
                 if ($totalInputQty > ($remainingBatchCapacity + 0.0001)) {
                     throw new InvalidArgumentException(
                         "Cannot log " . number_format($totalInputQty, 2) . " total units (Produced: " . number_format($produced, 2) . 
-                        ", Rejected: " . number_format($rejected, 2) . ", Scrapped: " . number_format($scrapped, 2) . 
+                        ", Rejected: " . number_format($rejected, 2) . 
                         "): Exceeds remaining planned capacity of " . number_format($remainingBatchCapacity, 2) . 
                         " units for Batch #{$batch->batch_number} (Planned: " . number_format($batch->planned_quantity, 2) . ")."
                     );
@@ -157,9 +157,11 @@ class ProductionExecutionService
             $op->quantity_produced += $produced;
             $op->quantity_rejected += $rejected;
             $op->quantity_scrapped += $scrapped;
+            $op->save();
 
             // 4. Update Batch actual_quantity ONLY on final routing operation (or on initial op when overproduction occurs)
-            if ($produced > 0 && ($isFinalOp || $order->operations()->count() === 1 || ($isFirstOp && $produced > $batch->planned_quantity && $batch->planned_quantity > 0))) {
+            $isAlreadyCompleted = $batch->status === ProductionBatch::STATUS_COMPLETED || ($batch->actual_quantity >= $batch->planned_quantity && $batch->planned_quantity > 0);
+            if ($produced > 0 && !$isAlreadyCompleted && ($isFinalOp || $order->operations()->count() === 1 || ($isFirstOp && $produced > $batch->planned_quantity && $batch->planned_quantity > 0))) {
                 $batch->actual_quantity += $produced;
 
                 $hasPendingRework = ProductionOrderRework::where('tenant_id', $order->tenant_id)

@@ -9,6 +9,7 @@ use App\Domains\Production\Models\ProductionOrderOperation;
 use App\Domains\Production\Models\ProductionSchedule;
 use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Models\RoutingOperation;
+use App\Domains\Production\Models\WorkCenter;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -424,7 +425,7 @@ class ProductionWipService
                 ->whereIn('production_order_operation_id', [$fromOrderOp->id, $fromOrderOp->routing_operation_id])
                 ->whereIn('status', ['hold', 'failed']);
             if ($targetBatchId) {
-                $qhQuery->where('batch_id', $targetBatchId);
+                $qhQuery->where(fn($sub) => $sub->whereNull('batch_id')->orWhere('batch_id', $targetBatchId));
             }
             $hasQualityHold = $qhQuery->exists();
 
@@ -437,9 +438,9 @@ class ProductionWipService
             }
             $hasPendingRework = $rwQuery->exists();
 
-            if ($hasQualityHold || $hasPendingRework) {
+            if ($hasQualityHold) {
                 $batchLabel = $batch ? "Batch #{$batch->batch_number}" : "Order #{$wip->production_order_id}";
-                throw new InvalidArgumentException("{$batchLabel} has an active quality hold or pending rework and cannot be transferred.");
+                throw new InvalidArgumentException("{$batchLabel} has an active quality hold and cannot be transferred.");
             }
 
             // Calculate actual ready-to-transfer balance
@@ -613,20 +614,20 @@ class ProductionWipService
                 // Quality Hold and Pending Rework Check per batch & operation
                 $hasQualityHold = \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
-                    ->when($batchId, fn($q) => $q->where('batch_id', $batchId))
+                    ->when($batchId, fn($q) => $q->where(fn($sub) => $sub->whereNull('batch_id')->orWhere('batch_id', $batchId)))
                     ->where('production_order_operation_id', $sourceOp->id)
                     ->whereIn('status', ['hold', 'failed'])
                     ->exists();
 
                 $hasPendingRework = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
-                    ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
+                    ->when($batchId, fn($q) => $q->where(fn($sub) => $sub->whereNull('production_batch_id')->orWhere('production_batch_id', $batchId)))
                     ->whereIn('production_order_operation_id', [$sourceOp->id, $sourceOp->routing_operation_id])
                     ->where('status', 'pending')
                     ->exists();
 
-                if ($hasQualityHold || $hasPendingRework) {
-                    continue; // Exclude blocked or pending rework quantity from transferable calculation
+                if ($hasQualityHold) {
+                    continue; // Exclude quality hold batches from automatic transfer calculation
                 }
 
                 $logQty = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
@@ -642,12 +643,7 @@ class ProductionWipService
                     ->whereIn('transaction_type', ['operation_completed', 'progress_logged', 'rework_completed'])
                     ->sum('quantity');
 
-                $goodOutput = max($logQty, $txQty, $batchId ? 0.0 : (float) ($sourceOp->quantity_produced ?? 0))
-                    - (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $tenantId)
-                        ->where('production_order_id', $sourceOp->production_order_id)
-                        ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                        ->where('production_order_operation_id', $sourceOp->id)
-                        ->sum('quantity');
+                $goodOutput = max($logQty, $txQty, $batchId ? 0.0 : (float) ($sourceOp->quantity_produced ?? 0));
 
                 $alreadyTransferred = (float) ProductionWipTransaction::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
@@ -1018,7 +1014,10 @@ class ProductionWipService
                 throw new InvalidArgumentException("Cannot convert WIP: This tracking card has no remaining available quantity.");
             }
 
-            $qtyToComplete = $wip->available_quantity;
+            $qtyToComplete = (float) ($wip->completed_quantity > 0 ? $wip->completed_quantity : $wip->available_quantity);
+            if ($qtyToComplete <= 0) {
+                throw new InvalidArgumentException("Cannot convert WIP: This tracking card has no remaining completed or available quantity.");
+            }
 
             // Trigger FG inflow receipt
             app(ProductionExecutionService::class)->receiveFinishedGoods(
@@ -1051,8 +1050,214 @@ class ProductionWipService
             $wip->update([
                 'quantity' => 0.0000,
                 'available_quantity' => 0.0000,
+                'completed_quantity' => 0.0000,
                 'status' => 'completed',
             ]);
         });
+    }
+
+    /**
+     * Convert all completed WIP for an entire Production Order into Finished Goods inventory in one transaction.
+     */
+    public function convertOrderWipToFinishedGoods(int $orderId, int $warehouseId, ?string $remarks = null, ?int $userId = null): float
+    {
+        return DB::transaction(function () use ($orderId, $warehouseId, $remarks, $userId) {
+            $order = ProductionOrder::findOrFail($orderId);
+
+            // Fetch all active WIP cards for this order that have completed quantity (excluding quality hold / rework)
+            $wips = ProductionWip::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $orderId)
+                ->whereNotIn('status', ['quality_hold', 'rework'])
+                ->where(function ($q) {
+                    $q->where('completed_quantity', '>', 0)
+                        ->orWhere(function ($sub) {
+                            $sub->where('available_quantity', '>', 0)
+                                ->where('status', 'completed');
+                        });
+                })
+                ->lockForUpdate()
+                ->get();
+
+            if ($wips->isEmpty()) {
+                throw new InvalidArgumentException("No completed WIP quantities ready to transfer for Order #" . ($order->order_number ?? $orderId));
+            }
+
+            $totalConverted = 0.0;
+
+            foreach ($wips as $wip) {
+                $qtyToComplete = (float) ($wip->completed_quantity > 0 ? $wip->completed_quantity : ($wip->status === 'completed' ? $wip->available_quantity : 0.0));
+                if ($qtyToComplete <= 0) {
+                    continue;
+                }
+
+                // Trigger FG inflow receipt
+                app(ProductionExecutionService::class)->receiveFinishedGoods(
+                    $wip->production_order_id,
+                    $qtyToComplete,
+                    'passed',
+                    $remarks ?? 'Bulk converted from order completed WIP.',
+                    $userId,
+                    $warehouseId,
+                    $wip->batch?->batch_number
+                );
+
+                // Log WIP conversion
+                ProductionWipTransaction::create([
+                    'tenant_id' => $wip->tenant_id,
+                    'wip_id' => $wip->id,
+                    'production_order_id' => $wip->production_order_id,
+                    'production_batch_id' => $wip->production_batch_id,
+                    'transaction_type' => 'converted_to_finished_goods',
+                    'quantity' => $qtyToComplete,
+                    'cost_before' => $wip->total_value,
+                    'cost_added' => 0.00,
+                    'cost_after' => 0.00,
+                    'remarks' => "Order Bulk Transfer: Completed WIP quantity of {$qtyToComplete} received into finished inventory.",
+                    'transaction_at' => now(),
+                    'created_by' => $userId,
+                ]);
+
+                $remCompleted = max(0.0000, (float) $wip->completed_quantity - $qtyToComplete);
+                $remAvailable = max(0.0000, (float) $wip->available_quantity - $qtyToComplete);
+
+                $wip->update([
+                    'quantity' => max(0.0000, (float) $wip->quantity - $qtyToComplete),
+                    'available_quantity' => $remAvailable,
+                    'completed_quantity' => $remCompleted,
+                    'status' => ($remCompleted <= 0 && $remAvailable <= 0) ? 'completed' : $wip->status,
+                ]);
+
+                $totalConverted += $qtyToComplete;
+            }
+
+            return $totalConverted;
+        });
+    }
+
+    /**
+     * Get Work-Center aggregate summaries for a production order using fast DB selectRaw queries.
+     */
+    public function getWorkCenterWipSummaries(int $tenantId, int $orderId, ?int $workCenterId = null): \Illuminate\Support\Collection
+    {
+        $query = ProductionWip::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId);
+
+        if ($workCenterId) {
+            $query->where('current_work_center_id', $workCenterId);
+        }
+
+        $rawSummaries = $query->select('current_work_center_id')
+            ->selectRaw('
+                count(*) as batch_count,
+                sum(available_quantity) as total_available,
+                sum(completed_quantity) as total_completed,
+                sum(rejected_quantity) as total_rejected,
+                sum(scrap_quantity) as total_scrap,
+                sum(rework_quantity) as total_rework,
+                sum(case when status = "active" then available_quantity else 0 end) as total_processing,
+                sum(case when status = "quality_hold" then available_quantity else 0 end) as total_hold,
+                sum(total_value) as accrued_value
+            ')
+            ->groupBy('current_work_center_id')
+            ->get();
+
+        $workCenterIds = $rawSummaries->pluck('current_work_center_id')->filter()->toArray();
+        $workCenters = WorkCenter::where('tenant_id', $tenantId)
+            ->whereIn('id', $workCenterIds)
+            ->get()
+            ->keyBy('id');
+
+        return $rawSummaries->map(function ($row) use ($workCenters) {
+            $wc = $workCenters->get($row->current_work_center_id);
+            return [
+                'work_center_id' => $row->current_work_center_id,
+                'work_center_name' => $wc ? $wc->name : 'Unassigned / General Work Center',
+                'work_center_code' => $wc ? $wc->code : 'GEN',
+                'batch_count' => (int) $row->batch_count,
+                'total_available' => (float) $row->total_available,
+                'total_completed' => (float) $row->total_completed,
+                'total_rejected' => (float) $row->total_rejected,
+                'total_scrap' => (float) $row->total_scrap,
+                'total_rework' => (float) $row->total_rework,
+                'total_processing' => (float) $row->total_processing,
+                'total_hold' => (float) $row->total_hold,
+                'accrued_value' => (float) $row->accrued_value,
+            ];
+        });
+    }
+
+    /**
+     * Get server-paginated WIP batches for a specific work center ordered by operational priority.
+     */
+    public function getPaginatedWorkCenterWips(int $tenantId, int $orderId, ?int $workCenterId, ?string $status = null, ?string $search = null, int $perPage = 5): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $perPage = min(max($perPage, 1), 50);
+
+        $query = ProductionWip::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->when($workCenterId !== null,
+                fn($q) => $q->where('current_work_center_id', $workCenterId),
+                fn($q) => $q->whereNull('current_work_center_id')
+            )
+            ->with(['batch', 'currentRoutingOperation', 'currentWorkCenter', 'product']);
+
+        if (!empty($status)) {
+            if ($status === 'quality_hold') {
+                $query->where('status', 'quality_hold');
+            } elseif ($status === 'rework') {
+                $query->where('status', 'rework');
+            } elseif ($status === 'active' || $status === 'running') {
+                $query->where('status', 'active');
+            } elseif ($status === 'completed') {
+                $query->where('status', 'completed');
+            }
+        }
+
+        if (!empty($search)) {
+            $term = '%' . $search . '%';
+            $query->where(function ($q) use ($term) {
+                $q->whereHas('batch', fn($b) => $b->where('batch_number', 'like', $term))
+                    ->orWhereHas('product', fn($p) => $p->where('name', 'like', $term)->orWhere('sku', 'like', $term));
+            });
+        }
+
+        // Priority ordering: 1. quality_hold, 2. rework, 3. active, 4. completed, 5. others
+        $query->orderByRaw('
+            CASE
+                WHEN status = "quality_hold" THEN 1
+                WHEN status = "rework" THEN 2
+                WHEN status = "active" AND available_quantity > 0 THEN 3
+                WHEN completed_quantity > 0 THEN 4
+                ELSE 5
+            END ASC, id DESC
+        ');
+
+        return $query->paginate($perPage)->withQueryString();
+    }
+
+    /**
+     * Get server-paginated production orders with aggregate WIP metrics.
+     */
+    public function getConsolidatedOrderWipSummaries(int $tenantId, ?string $search = null, ?string $status = null, int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $perPage = min(max($perPage, 1), 50);
+
+        $query = ProductionOrder::where('tenant_id', $tenantId)
+            ->whereIn('status', ['released', 'in_progress', 'completed'])
+            ->with(['product']);
+
+        if (!empty($search)) {
+            $term = '%' . $search . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('order_number', 'like', $term)
+                    ->orWhereHas('product', fn($p) => $p->where('name', 'like', $term)->orWhere('sku', 'like', $term));
+            });
+        }
+
+        if (!empty($status)) {
+            $query->where('status', $status);
+        }
+
+        return $query->orderBy('id', 'desc')->paginate($perPage)->withQueryString();
     }
 }
