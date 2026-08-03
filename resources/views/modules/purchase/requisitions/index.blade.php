@@ -22,7 +22,20 @@
         <div class="d-flex align-items-center mb-3">
             <h5 class="fw-bold text-dark mb-0">{{ __('purchase.purchase_requests_listing') }}</h5>
 
-            <div class="d-flex gap-2 ms-auto">
+            <div class="d-flex gap-2 ms-auto align-items-center flex-wrap">
+                <!-- Quick Search (HRMS Common Component Style) -->
+                <form method="GET" action="{{ route('purchase.requisitions.index') }}" class="d-flex align-items-center bg-light border rounded px-3 py-1">
+                    <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                    <input 
+                        type="text" 
+                        name="search" 
+                        class="form-control border-0 bg-transparent p-0 fs-13" 
+                        placeholder="{{ __('purchase.search_req_placeholder') }}" 
+                        value="{{ request('search') }}"
+                        style="box-shadow: none; height: 32px; width: 220px;"
+                    >
+                </form>
+
                 <!-- Sort -->
                 <x-ui.sort-dropdown :label="__('crm.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'requisition_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'requisition_date' && $sortOrder === 'desc' ? 'active' : '' }}">

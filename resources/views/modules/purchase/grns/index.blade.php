@@ -140,10 +140,18 @@
                             <td>
                                 <i class="feather-archive me-1 text-muted"></i>{{ $grn->warehouse?->name ?? __('purchase.main_warehouse') }}
                             </td>
-                            <td>{{ $grn->received_date ? $grn->received_date->format('d-M-Y') : '—' }}</td>
-                            <td class="text-center font-monospace fw-bold text-primary">{{ number_format($recQty, 2) }}</td>
+                            <td>{{ $grn->received_date ? $grn->received_date->format('d M Y') : '—' }}</td>
+                            <td class="text-center font-monospace">
+                                @if($recQty > 0)
+                                    <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fw-bold fs-11">
+                                        {{ number_format($recQty, 2) }}
+                                    </span>
+                                @else
+                                    <span class="text-muted fs-12">0.00</span>
+                                @endif
+                            </td>
                             <td class="text-center">
-                                <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $displayStatus }}</span>
+                                <x-ui.status-badge :status="$grn->status" size="sm" />
                             </td>
                             <td>
                                 <div class="fs-12 fw-semibold text-dark">{{ $grn->creator?->name ?? __('purchase.system') }}</div>

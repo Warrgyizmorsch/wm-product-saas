@@ -16,15 +16,22 @@ class InventoryReportController extends Controller
     {
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
 
-        $filteredProducts = Product::query()
+        $query = Product::query()
             ->with('warehouseStocks.warehouse')
-            ->where('tenant_id', $tenantId)
-            ->whereNotNull('reorder_point')
-            ->where('reorder_point', '>', 0)
-            ->sellable()
-            ->get()
+            ->where('tenant_id', $tenantId);
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                  ->orWhere('sku', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $filteredProducts = $query->sellable()->get()
             ->filter(function ($product) {
-                return $product->total_stock <= $product->reorder_point;
+                $reorderPoint = (float)($product->reorder_point > 0 ? $product->reorder_point : 10);
+                return (float)$product->total_stock <= $reorderPoint;
             })->values();
 
         $page = (int)$request->input('page', 1);
@@ -52,8 +59,20 @@ class InventoryReportController extends Controller
             ->where('tenant_id', $tenantId)
             ->where('quantity', '>', 0);
 
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->whereHas('product', function($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                  ->orWhere('sku', 'LIKE', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('warehouse_id')) {
+            $query->where('warehouse_id', $request->input('warehouse_id'));
+        }
+
         $totalValuation = (float)(clone $query)->get()->sum(fn($s) => (float)$s->quantity * (float)$s->unit_cost);
-        $stocks = $query->paginate(15);
+        $stocks = $query->paginate(15)->withQueryString();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
 
         return view('modules.inventory.reports.valuation', compact('stocks', 'totalValuation', 'warehouses'));

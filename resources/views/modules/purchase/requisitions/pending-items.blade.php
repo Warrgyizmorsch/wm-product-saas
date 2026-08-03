@@ -39,301 +39,302 @@
 @endpush
 
 @section('content')
-    <div class="row text-dark">
+    <div class="erp-single-panel text-dark">
         <!-- Toast Notifications -->
 
-        <div class="col-12">
-            <div class="card border-0 shadow-sm p-4 p-md-5 bg-white">
+        <x-ui.odoo-form-ui type="sheet">
                 
-                <!-- Page Top Control Bar -->
-                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-3">
-                    <div>
-                        <h4 class="fw-bold text-dark mb-0">{{ __('purchase.pending_req_line_items') }}</h4>
-                        <small class="text-muted fs-12">{{ __('purchase.pending_pr_help') }}</small>
-                    </div>
-                    
-                    <!-- Group By Filter Selector -->
+            <!-- Page Top Control Bar -->
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom flex-wrap gap-3">
+                <div>
+                    <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">
+                        <i class="feather-clock text-primary me-1"></i>Purchase Requisitions
+                    </span>
+                    <h4 class="fw-bold text-dark mb-0">{{ __('purchase.pending_req_line_items') }}</h4>
+                    <small class="text-muted fs-12">{{ __('purchase.pending_pr_help') }}</small>
+                </div>
+                
+                <!-- Group By Filter Selector -->
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-label fs-11 fw-bold text-muted mb-0 text-uppercase letter-spacing-1">{{ __('purchase.group_by') }}:</label>
+                    <select id="groupBySelect" class="form-select form-select-sm fw-bold text-primary border-gray-300 fs-12" style="width: 180px;" onchange="changeGroupBy(this.value)">
+                        <option value="supplier" @selected($groupBy === 'supplier')>{{ __('purchase.supplier_vendor') }}</option>
+                        <option value="pr" @selected($groupBy === 'pr')>{{ __('purchase.pr_number') }}</option>
+                        <option value="date" @selected($groupBy === 'date')>{{ __('purchase.date') }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <form id="bulkPoForm" action="#" method="POST" onsubmit="return false;">
+                @csrf
+
+                <!-- Execute Actions Banner -->
+                <div class="d-flex justify-content-between align-items-center p-3 mb-4 rounded border bg-light">
                     <div class="d-flex align-items-center gap-2">
-                        <label class="form-label fs-12 fw-bold text-muted mb-0 text-uppercase">{{ __('purchase.group_by') }}</label>
-                        <select id="groupBySelect" class="form-select form-select-sm fw-semibold text-primary" style="width: 180px;" onchange="changeGroupBy(this.value)">
-                            <option value="supplier" @selected($groupBy === 'supplier')>{{ __('purchase.supplier_vendor') }}</option>
-                            <option value="pr" @selected($groupBy === 'pr')>{{ __('purchase.pr_number') }}</option>
-                            <option value="date" @selected($groupBy === 'date')>{{ __('purchase.date') }}</option>
-                        </select>
+                        <i class="feather-info text-primary fs-18"></i>
+                        <span class="fs-13 fw-semibold text-dark">
+                            {{ __('purchase.bulk_pr_action_help') }}
+                        </span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <x-ui.button type="button" variant="primary" size="sm" class="btn-submit-bulk fw-bold px-3" data-action="po" icon="feather-plus-circle">
+                            {{ __('purchase.create_bulk_pos') }}
+                        </x-ui.button>
+                        <x-ui.button type="button" variant="success" size="sm" class="btn-submit-bulk text-white fw-bold px-3" data-action="rfq" icon="feather-mail">
+                            {{ __('purchase.create_bulk_rfqs') }}
+                        </x-ui.button>
                     </div>
                 </div>
 
-                <form id="bulkPoForm" action="#" method="POST" onsubmit="return false;">
-                    @csrf
+                @if($groupBy === 'supplier')
+                    <!-- Tab navigation for Supplier-wise grouping -->
+                    <ul class="nav nav-tabs nav-tabs-custom mb-4" id="pendingPrTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active fw-bold position-relative py-2 px-3" id="assigned-tab" data-bs-toggle="tab" data-bs-target="#assigned-pane" type="button" role="tab">
+                                <i class="feather-truck me-2"></i>{{ __('purchase.assigned_suppliers') }}
+                                <x-ui.badge :soft="true" variant="primary" class="ms-2 fs-11 fw-bold">{{ count($assignedItems) }}</x-ui.badge>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-bold position-relative py-2 px-3" id="unassigned-tab" data-bs-toggle="tab" data-bs-target="#unassigned-pane" type="button" role="tab">
+                                <i class="feather-help-circle text-danger me-2"></i>{{ __('purchase.no_supplier') }}
+                                <x-ui.badge :soft="true" variant="danger" class="ms-2 fs-11 fw-bold">{{ count($unassignedItems) }}</x-ui.badge>
+                            </button>
+                        </li>
+                    </ul>
 
-                    <!-- Execute Actions Banner -->
-                    <div class="d-flex justify-content-between align-items-center p-3 mb-4 rounded border" style="background-color: #f8f9fa;">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="feather-info text-primary fs-18"></i>
-                            <span class="fs-13 fw-semibold text-dark">
-                                {{ __('purchase.bulk_pr_action_help') }}
-                            </span>
+                    <!-- Tab Content panes -->
+                    <div class="tab-content" id="pendingPrTabsContent">
+                        
+                        <!-- Pane 1: Assigned Items Table -->
+                        <div class="tab-pane fade show active" id="assigned-pane" role="tabpanel">
+                            @if(empty($assignedItems))
+                                <div class="text-center py-5 border rounded bg-light">
+                                    <i class="feather-check-circle text-success fs-32 mb-2"></i>
+                                    <h6 class="fw-bold">{{ __('purchase.no_assigned_items') }}</h6>
+                                    <p class="text-muted fs-12 mb-0">{{ __('purchase.no_assigned_items_help') }}</p>
+                                </div>
+                            @else
+                                <div class="table-responsive" style="overflow: visible !important;">
+                                    <x-ui.odoo-form-ui type="table" id="assignedTable" class="align-middle fs-13 mb-0" style="margin-top:0;">
+                                        <thead class="fs-11 text-uppercase fw-semibold text-muted bg-light">
+                                            <tr>
+                                                <th style="width: 4%;" class="text-center">
+                                                    <input type="checkbox" class="form-check-input select-all-pane" data-pane="assigned-pane">
+                                                </th>
+                                                <th style="width: 24%;">{{ __('purchase.product_details') }}</th>
+                                                <th style="width: 18%;">{{ __('purchase.supplier_vendor') }}</th>
+                                                <th style="width: 14%;">{{ __('purchase.pr_date') }}</th>
+                                                <th style="width: 12%;">{{ __('purchase.warehouse') }}</th>
+                                                <th class="text-end" style="width: 8%;">{{ __('purchase.req_qty') }}</th>
+                                                <th class="text-end" style="width: 8%;">{{ __('purchase.ordered') }}</th>
+                                                <th class="text-end" style="width: 8%;">{{ __('purchase.status_pending') }}</th>
+                                                <th style="width: 12%;" class="text-center">{{ __('purchase.action') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="text-dark">
+                                            @foreach($assignedItems as $pi)
+                                                <tr class="item-row">
+                                                    <td class="text-center">
+                                                        <input type="checkbox" name="item_ids[]" value="{{ $pi['item_id'] }}" class="form-check-input row-checkbox pane-checkbox-assigned-pane" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] }}" data-warehouse-name="{{ $pi['warehouse_name'] }}">
+                                                    </td>
+                                                    <td>
+                                                        <strong class="text-dark d-block fs-13">{{ $pi['product_name'] }}</strong>
+                                                        <span class="badge bg-light text-muted font-monospace fs-10 px-1.5 py-0.5 border">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <strong class="text-primary fs-13">{{ $pi['vendor_name'] }}</strong>
+                                                    </td>
+                                                    <td>
+                                                        <span class="fw-bold text-dark fs-13">{{ $pi['requisition_number'] }}</span>
+                                                        <div class="text-muted fs-11">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d M Y') : '—' }}</div>
+                                                    </td>
+                                                    <td>
+                                                        <span class="text-dark fs-13">{{ $pi['warehouse_name'] }}</span>
+                                                    </td>
+                                                    <td class="text-end fw-semibold text-muted fs-13">
+                                                        {{ (float) $pi['quantity_requested'] }} {{ $pi['uom'] }}
+                                                    </td>
+                                                    <td class="text-end text-success fw-bold fs-13">
+                                                        {{ (float) $pi['quantity_ordered'] }} {{ $pi['uom'] }}
+                                                    </td>
+                                                    <td class="text-end text-danger fw-bold fs-13">
+                                                        {{ (float) $pi['quantity_pending'] }} {{ $pi['uom'] }}
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <div class="d-flex justify-content-center gap-1">
+                                                            <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="{{ __('purchase.convert_to_po') }}" data-bs-toggle="tooltip">
+                                                                <i class="feather feather-plus-circle"></i>
+                                                            </button>
+                                                            <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="{{ __('purchase.send_rfq') }}" data-bs-toggle="tooltip">
+                                                                <i class="feather feather-mail"></i>
+                                                            </a>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                            @endif
                         </div>
-                        <div class="d-flex gap-2">
-                            <x-ui.button type="button" variant="primary" size="sm" class="btn-submit-bulk" data-action="po" icon="feather-plus-circle">
-                                {{ __('purchase.create_bulk_pos') }}
-                            </x-ui.button>
-                            <x-ui.button type="button" variant="success" size="sm" class="btn-submit-bulk text-white" data-action="rfq" icon="feather-mail">
-                                {{ __('purchase.create_bulk_rfqs') }}
-                            </x-ui.button>
+
+                        <!-- Pane 2: Unassigned Items (No Supplier) Table -->
+                        <div class="tab-pane fade" id="unassigned-pane" role="tabpanel">
+                            @if(empty($unassignedItems))
+                                <div class="text-center py-5 border rounded bg-light">
+                                    <i class="feather-check-circle text-success fs-32 mb-2"></i>
+                                    <h6 class="fw-bold">{{ __('purchase.no_unassigned_items') }}</h6>
+                                    <p class="text-muted fs-12 mb-0">{{ __('purchase.no_unassigned_items_help') }}</p>
+                                </div>
+                            @else
+                                <div class="table-responsive" style="overflow: visible !important;">
+                                    <x-ui.odoo-form-ui type="table" id="unassignedTable" class="align-middle fs-13 mb-0" style="margin-top:0;">
+                                        <thead class="fs-11 text-uppercase fw-semibold text-muted bg-light">
+                                            <tr>
+                                                <th style="width: 4%;" class="text-center">
+                                                    <input type="checkbox" class="form-check-input select-all-pane" data-pane="unassigned-pane">
+                                                </th>
+                                                <th style="width: 24%;">{{ __('purchase.product_details') }}</th>
+                                                <th style="width: 18%;">{{ __('purchase.supplier_vendor') }}</th>
+                                                <th style="width: 14%;">{{ __('purchase.pr_date') }}</th>
+                                                <th style="width: 12%;">{{ __('purchase.warehouse') }}</th>
+                                                <th class="text-end" style="width: 8%;">{{ __('purchase.req_qty') }}</th>
+                                                <th class="text-end" style="width: 8%;">{{ __('purchase.ordered') }}</th>
+                                                <th class="text-end" style="width: 8%;">{{ __('purchase.status_pending') }}</th>
+                                                <th style="width: 12%;" class="text-center">{{ __('purchase.action') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="text-dark">
+                                            @foreach($unassignedItems as $pi)
+                                                <tr class="item-row">
+                                                    <td class="text-center">
+                                                        <input type="checkbox" name="item_ids[]" value="{{ $pi['item_id'] }}" class="form-check-input row-checkbox pane-checkbox-unassigned-pane" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] }}" data-warehouse-name="{{ $pi['warehouse_name'] }}">
+                                                    </td>
+                                                    <td>
+                                                        <strong class="text-dark d-block fs-13">{{ $pi['product_name'] }}</strong>
+                                                        <span class="badge bg-light text-muted font-monospace fs-10 px-1.5 py-0.5 border">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</span>
+                                                    </td>
+                                                    <td class="text-muted fst-italic">
+                                                        — {{ __('purchase.no_supplier') }} —
+                                                    </td>
+                                                    <td>
+                                                        <span class="fw-bold text-dark fs-13">{{ $pi['requisition_number'] }}</span>
+                                                        <div class="text-muted fs-11">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d M Y') : '—' }}</div>
+                                                    </td>
+                                                    <td>
+                                                        <span class="text-dark fs-13">{{ $pi['warehouse_name'] }}</span>
+                                                    </td>
+                                                    <td class="text-end fw-semibold text-muted fs-13">
+                                                        {{ (float) $pi['quantity_requested'] }} {{ $pi['uom'] }}
+                                                    </td>
+                                                    <td class="text-end text-success fw-bold fs-13">
+                                                        {{ (float) $pi['quantity_ordered'] }} {{ $pi['uom'] }}
+                                                    </td>
+                                                    <td class="text-end text-danger fw-bold fs-13">
+                                                        {{ (float) $pi['quantity_pending'] }} {{ $pi['uom'] }}
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <div class="d-flex justify-content-center gap-1">
+                                                            <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="{{ __('purchase.convert_to_po') }}" data-bs-toggle="tooltip">
+                                                                <i class="feather feather-plus-circle"></i>
+                                                            </button>
+                                                            <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="{{ __('purchase.send_rfq') }}" data-bs-toggle="tooltip">
+                                                                <i class="feather feather-mail"></i>
+                                                            </a>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                            @endif
                         </div>
+
                     </div>
-
-                    @if($groupBy === 'supplier')
-                        <!-- Tab navigation for Supplier-wise grouping -->
-                        <ul class="nav nav-tabs nav-tabs-custom mb-4" id="pendingPrTabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active fw-bold position-relative" id="assigned-tab" data-bs-toggle="tab" data-bs-target="#assigned-pane" type="button" role="tab">
-                                    <i class="feather-truck me-2"></i>{{ __('purchase.assigned_suppliers') }}
-                                    <span class="badge rounded-pill bg-primary ms-2 fs-10">{{ count($assignedItems) }}</span>
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link fw-bold position-relative" id="unassigned-tab" data-bs-toggle="tab" data-bs-target="#unassigned-pane" type="button" role="tab">
-                                    <i class="feather-help-circle text-danger me-2"></i>{{ __('purchase.no_supplier') }}
-                                    <span class="badge rounded-pill bg-danger ms-2 fs-10">{{ count($unassignedItems) }}</span>
-                                </button>
-                            </li>
-                        </ul>
-
-                        <!-- Tab Content panes -->
-                        <div class="tab-content" id="pendingPrTabsContent">
-                            
-                            <!-- Pane 1: Assigned Items Table -->
-                            <div class="tab-pane fade show active" id="assigned-pane" role="tabpanel">
-                                @if(empty($assignedItems))
-                                    <div class="text-center py-5 border rounded bg-light">
-                                        <i class="feather-check-circle text-success fs-32 mb-2"></i>
-                                        <h6 class="fw-bold">{{ __('purchase.no_assigned_items') }}</h6>
-                                        <p class="text-muted fs-12 mb-0">{{ __('purchase.no_assigned_items_help') }}</p>
-                                    </div>
-                                @else
-                                    <div class="table-responsive">
-                                        <x-ui.odoo-form-ui type="table" id="assignedTable">
-                                            <thead>
-                                                <tr>
-                                                    <th style="width: 4%;" class="text-center">
-                                                        <input type="checkbox" class="form-check-input select-all-pane" data-pane="assigned-pane">
-                                                    </th>
-                                                    <th style="width: 22%;">{{ __('purchase.product_details') }}</th>
-                                                    <th style="width: 18%;">{{ __('purchase.supplier_vendor') }}</th>
-                                                    <th style="width: 14%;">{{ __('purchase.pr_date') }}</th>
-                                                    <th style="width: 12%;">{{ __('purchase.warehouse') }}</th>
-                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.req_qty') }}</th>
-                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.ordered') }}</th>
-                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.status_pending') }}</th>
-                                                    <th style="width: 12%;" class="text-center">{{ __('purchase.action') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($assignedItems as $pi)
-                                                    <tr class="item-row">
-                                                        <td class="text-center">
-                                                            <input type="checkbox" name="item_ids[]" value="{{ $pi['item_id'] }}" class="form-check-input row-checkbox pane-checkbox-assigned-pane" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] }}" data-warehouse-name="{{ $pi['warehouse_name'] }}">
-                                                        </td>
-                                                        <td>
-                                                            <div class="fw-bold text-truncate text-dark" title="{{ $pi['product_name'] }}">{{ $pi['product_name'] }}</div>
-                                                            <div class="text-muted fs-11">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</div>
-                                                        </td>
-                                                        <td class="fw-semibold text-primary text-truncate" title="{{ $pi['vendor_name'] }}">
-                                                            {{ $pi['vendor_name'] }}
-                                                        </td>
-                                                        <td>
-                                                            <span class="fw-semibold text-dark">{{ $pi['requisition_number'] }}</span>
-                                                            <div class="text-muted fs-11">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d-M-Y') : '—' }}</div>
-                                                        </td>
-                                                        <td class="text-truncate" title="{{ $pi['warehouse_name'] }}">
-                                                            {{ $pi['warehouse_name'] }}
-                                                        </td>
-                                                        <td class="text-end fw-semibold text-muted">
-                                                            {{ (float) $pi['quantity_requested'] }} {{ $pi['uom'] }}
-                                                        </td>
-                                                        <td class="text-end text-success fw-semibold">
-                                                            {{ (float) $pi['quantity_ordered'] }} {{ $pi['uom'] }}
-                                                        </td>
-                                                        <td class="text-end text-danger fw-semibold">
-                                                            {{ (float) $pi['quantity_pending'] }} {{ $pi['uom'] }}
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <div class="d-flex justify-content-center gap-1">
-                                                                <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="{{ __('purchase.convert_to_po') }}" data-bs-toggle="tooltip">
-                                                                    <i class="feather feather-plus-circle"></i>
-                                                                </button>
-                                                                <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="{{ __('purchase.send_rfq') }}" data-bs-toggle="tooltip">
-                                                                    <i class="feather feather-mail"></i>
-                                                                </a>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </x-ui.odoo-form-ui>
-                                    </div>
-                                @endif
-                            </div>
-
-                            <!-- Pane 2: Unassigned Items (No Supplier) Table -->
-                            <div class="tab-pane fade" id="unassigned-pane" role="tabpanel">
-                                @if(empty($unassignedItems))
-                                    <div class="text-center py-5 border rounded bg-light">
-                                        <i class="feather-check-circle text-success fs-32 mb-2"></i>
-                                        <h6 class="fw-bold">{{ __('purchase.no_unassigned_items') }}</h6>
-                                        <p class="text-muted fs-12 mb-0">{{ __('purchase.no_unassigned_items_help') }}</p>
-                                    </div>
-                                @else
-                                    <div class="table-responsive">
-                                        <x-ui.odoo-form-ui type="table" id="unassignedTable">
-                                            <thead>
-                                                <tr>
-                                                    <th style="width: 4%;" class="text-center">
-                                                        <input type="checkbox" class="form-check-input select-all-pane" data-pane="unassigned-pane">
-                                                    </th>
-                                                    <th style="width: 22%;">{{ __('purchase.product_details') }}</th>
-                                                    <th style="width: 18%;">{{ __('purchase.supplier_vendor') }}</th>
-                                                    <th style="width: 14%;">{{ __('purchase.pr_date') }}</th>
-                                                    <th style="width: 12%;">{{ __('purchase.warehouse') }}</th>
-                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.req_qty') }}</th>
-                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.ordered') }}</th>
-                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.status_pending') }}</th>
-                                                    <th style="width: 12%;" class="text-center">{{ __('purchase.action') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($unassignedItems as $pi)
-                                                    <tr class="item-row">
-                                                        <td class="text-center">
-                                                            <input type="checkbox" name="item_ids[]" value="{{ $pi['item_id'] }}" class="form-check-input row-checkbox pane-checkbox-unassigned-pane" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] }}" data-warehouse-name="{{ $pi['warehouse_name'] }}">
-                                                        </td>
-                                                        <td>
-                                                            <div class="fw-bold text-truncate text-dark" title="{{ $pi['product_name'] }}">{{ $pi['product_name'] }}</div>
-                                                            <div class="text-muted fs-11">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</div>
-                                                        </td>
-                                                        <td class="text-muted italic">
-                                                            — {{ __('purchase.no_supplier') }} —
-                                                        </td>
-                                                        <td>
-                                                            <span class="fw-semibold text-dark">{{ $pi['requisition_number'] }}</span>
-                                                            <div class="text-muted fs-11">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d-M-Y') : '—' }}</div>
-                                                        </td>
-                                                        <td class="text-truncate" title="{{ $pi['warehouse_name'] }}">
-                                                            {{ $pi['warehouse_name'] }}
-                                                        </td>
-                                                        <td class="text-end fw-semibold text-muted">
-                                                            {{ (float) $pi['quantity_requested'] }} {{ $pi['uom'] }}
-                                                        </td>
-                                                        <td class="text-end text-success fw-semibold">
-                                                            {{ (float) $pi['quantity_ordered'] }} {{ $pi['uom'] }}
-                                                        </td>
-                                                        <td class="text-end text-danger fw-semibold">
-                                                            {{ (float) $pi['quantity_pending'] }} {{ $pi['uom'] }}
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <div class="d-flex justify-content-center gap-1">
-                                                                <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="{{ __('purchase.convert_to_po') }}" data-bs-toggle="tooltip">
-                                                                    <i class="feather feather-plus-circle"></i>
-                                                                </button>
-                                                                <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="{{ __('purchase.send_rfq') }}" data-bs-toggle="tooltip">
-                                                                    <i class="feather feather-mail"></i>
-                                                                </a>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </x-ui.odoo-form-ui>
-                                    </div>
-                                @endif
-                            </div>
-
+                @else
+                    <!-- Unified single table for PR or Date grouping -->
+                    @if(empty($pendingItems))
+                        <div class="text-center py-5 border rounded bg-light">
+                            <i class="feather-check-circle text-success fs-32 mb-2"></i>
+                            <h6 class="fw-bold">{{ __('purchase.no_pending_items') }}</h6>
+                            <p class="text-muted fs-12 mb-0">{{ __('purchase.no_pending_items_help') }}</p>
                         </div>
                     @else
-                        <!-- Unified single table for PR or Date grouping -->
-                        @if(empty($pendingItems))
-                            <div class="text-center py-5 border rounded bg-light">
-                                <i class="feather-check-circle text-success fs-32 mb-2"></i>
-                                <h6 class="fw-bold">{{ __('purchase.no_pending_items') }}</h6>
-                                <p class="text-muted fs-12 mb-0">{{ __('purchase.no_pending_items_help') }}</p>
-                            </div>
-                        @else
-                            <div class="table-responsive">
-                                <x-ui.odoo-form-ui type="table" id="generalTable">
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 4%;" class="text-center">
-                                                <input type="checkbox" id="selectAllGeneral" class="form-check-input">
-                                            </th>
-                                            <th style="width: 20%;">{{ __('purchase.product_details') }}</th>
-                                            <th style="width: 15%;">{{ __('purchase.supplier_vendor') }}</th>
-                                            <th style="width: 13%;">{{ __('purchase.pr_date') }}</th>
-                                            <th style="width: 12%;">{{ __('purchase.warehouse') }}</th>
-                                            <th class="text-end" style="width: 8%;">{{ __('purchase.req_qty') }}</th>
-                                            <th class="text-end" style="width: 8%;">{{ __('purchase.ordered') }}</th>
-                                            <th class="text-end" style="width: 8%;">{{ __('purchase.status_pending') }}</th>
-                                            <th style="width: 12%;" class="text-center">{{ __('purchase.action') }}</th>
+                        <div class="table-responsive" style="overflow: visible !important;">
+                            <x-ui.odoo-form-ui type="table" id="generalTable" class="align-middle fs-13 mb-0" style="margin-top:0;">
+                                <thead class="fs-11 text-uppercase fw-semibold text-muted bg-light">
+                                    <tr>
+                                        <th style="width: 4%;" class="text-center">
+                                            <input type="checkbox" id="selectAllGeneral" class="form-check-input">
+                                        </th>
+                                        <th style="width: 24%;">{{ __('purchase.product_details') }}</th>
+                                        <th style="width: 18%;">{{ __('purchase.supplier_vendor') }}</th>
+                                        <th style="width: 14%;">{{ __('purchase.pr_date') }}</th>
+                                        <th style="width: 12%;">{{ __('purchase.warehouse') }}</th>
+                                        <th class="text-end" style="width: 8%;">{{ __('purchase.req_qty') }}</th>
+                                        <th class="text-end" style="width: 8%;">{{ __('purchase.ordered') }}</th>
+                                        <th class="text-end" style="width: 8%;">{{ __('purchase.status_pending') }}</th>
+                                        <th style="width: 12%;" class="text-center">{{ __('purchase.action') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-dark">
+                                    @foreach($pendingItems as $pi)
+                                        <tr class="item-row">
+                                            <td class="text-center">
+                                                <input type="checkbox" name="item_ids[]" value="{{ $pi['item_id'] }}" class="form-check-input row-checkbox" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] }}" data-warehouse-name="{{ $pi['warehouse_name'] }}">
+                                            </td>
+                                            <td>
+                                                <strong class="text-dark d-block fs-13">{{ $pi['product_name'] }}</strong>
+                                                <span class="badge bg-light text-muted font-monospace fs-10 px-1.5 py-0.5 border">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</span>
+                                            </td>
+                                            <td>
+                                                <strong class="text-primary fs-13">{{ $pi['vendor_name'] ?: '— ' . __('purchase.no_supplier') . ' —' }}</strong>
+                                            </td>
+                                            <td>
+                                                <span class="fw-bold text-dark fs-13">{{ $pi['requisition_number'] }}</span>
+                                                <div class="text-muted fs-11">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d M Y') : '—' }}</div>
+                                            </td>
+                                            <td>
+                                                <span class="text-dark fs-13">{{ $pi['warehouse_name'] }}</span>
+                                            </td>
+                                            <td class="text-end fw-semibold text-muted fs-13">
+                                                {{ (float) $pi['quantity_requested'] }} {{ $pi['uom'] }}
+                                            </td>
+                                            <td class="text-end text-success fw-bold fs-13">
+                                                {{ (float) $pi['quantity_ordered'] }} {{ $pi['uom'] }}
+                                            </td>
+                                            <td class="text-end text-danger fw-bold fs-13">
+                                                {{ (float) $pi['quantity_pending'] }} {{ $pi['uom'] }}
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="d-flex justify-content-center gap-1">
+                                                    <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="{{ __('purchase.convert_to_po') }}" data-bs-toggle="tooltip">
+                                                        <i class="feather feather-plus-circle"></i>
+                                                    </button>
+                                                    <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="{{ __('purchase.send_rfq') }}" data-bs-toggle="tooltip">
+                                                        <i class="feather feather-mail"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($pendingItems as $pi)
-                                            <tr class="item-row">
-                                                <td class="text-center">
-                                                    <input type="checkbox" name="item_ids[]" value="{{ $pi['item_id'] }}" class="form-check-input row-checkbox" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] }}" data-warehouse-name="{{ $pi['warehouse_name'] }}">
-                                                </td>
-                                                <td>
-                                                    <div class="fw-bold text-truncate text-dark" title="{{ $pi['product_name'] }}">{{ $pi['product_name'] }}</div>
-                                                    <div class="text-muted fs-11">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</div>
-                                                </td>
-                                                <td class="fw-semibold text-primary text-truncate" title="{{ $pi['vendor_name'] }}">
-                                                     {{ $pi['vendor_name'] ?: '— ' . __('purchase.no_supplier') . ' —' }}
-                                                </td>
-                                                <td>
-                                                    <span class="fw-semibold text-dark">{{ $pi['requisition_number'] }}</span>
-                                                    <div class="text-muted fs-11">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d-M-Y') : '—' }}</div>
-                                                </td>
-                                                <td class="text-truncate" title="{{ $pi['warehouse_name'] }}">
-                                                    {{ $pi['warehouse_name'] }}
-                                                </td>
-                                                <td class="text-end fw-semibold text-muted">
-                                                    {{ (float) $pi['quantity_requested'] }} {{ $pi['uom'] }}
-                                                </td>
-                                                <td class="text-end text-success fw-semibold">
-                                                    {{ (float) $pi['quantity_ordered'] }} {{ $pi['uom'] }}
-                                                </td>
-                                                <td class="text-end text-danger fw-semibold">
-                                                    {{ (float) $pi['quantity_pending'] }} {{ $pi['uom'] }}
-                                                </td>
-                                                <td class="text-center">
-                                                    <div class="d-flex justify-content-center gap-1">
-                                                        <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="{{ __('purchase.convert_to_po') }}" data-bs-toggle="tooltip">
-                                                            <i class="feather feather-plus-circle"></i>
-                                                        </button>
-                                                        <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="{{ __('purchase.send_rfq') }}" data-bs-toggle="tooltip">
-                                                            <i class="feather feather-mail"></i>
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </x-ui.odoo-form-ui>
-                            </div>
-                        @endif
+                                    @endforeach
+                                </tbody>
+                            </x-ui.odoo-form-ui>
+                        </div>
                     @endif
-                </form>
+                @endif
+            </form>
 
-                <form id="postToCreatePoForm" action="{{ route('purchase.orders.create') }}" method="POST" style="display: none;">
-                    @csrf
-                    <input type="hidden" name="vendor_id" id="postPoVendorId">
-                    <input type="hidden" name="warehouse_id" id="postPoWarehouseId">
-                    <div id="postPoItemIdsContainer"></div>
-                </form>
+            <form id="postToCreatePoForm" action="{{ route('purchase.orders.create') }}" method="POST" style="display: none;">
+                @csrf
+                <input type="hidden" name="vendor_id" id="postPoVendorId">
+                <input type="hidden" name="warehouse_id" id="postPoWarehouseId">
+                <div id="postPoItemIdsContainer"></div>
+            </form>
 
-            </div>
-        </div>
+        </x-ui.odoo-form-ui>
     </div>
 
     <!-- Choose Supplier Modal -->

@@ -193,12 +193,18 @@
                 margin-top: 15px;
                 font-size: 13px;
             }
+            .odoo-table thead {
+                background-color: #f8fafc !important;
+            }
             .odoo-table th {
-                border-bottom: 2px solid #dee2e6;
-                padding: 8px 4px;
-                color: #6c757d;
-                font-weight: 600;
-                text-transform: capitalize;
+                background-color: #f8fafc !important;
+                border-bottom: 2px solid #e2e8f0;
+                padding: 10px 12px;
+                color: #475569;
+                font-weight: 700;
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             .odoo-table td {
                 padding: 6px 4px;

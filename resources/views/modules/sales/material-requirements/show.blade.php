@@ -4,6 +4,132 @@
 @section('page-title', 'Material Requirement ' . $delivery->requirement_number)
 @section('breadcrumb', 'Sales / Material Requirements / ' . $delivery->requirement_number)
 
+@section('page-actions')
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.button href="{{ route('sales.material-requirements.index') }}" variant="light" size="sm" class="border" icon="feather-arrow-left">
+            Back
+        </x-ui.button>
+        <x-ui.button href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" variant="light" size="sm" class="border" icon="feather-external-link">
+            SO Details
+        </x-ui.button>
+
+        @if (in_array($delivery->status, ['Ready', 'Partially Ready', 'Processing', 'Picked', 'Packed']))
+            <x-ui.button href="{{ route('sales.dispatches.create', ['material_requirement_id' => $delivery->id, 'sales_order_id' => $delivery->sales_order_id]) }}" variant="primary" size="sm" class="fw-bold px-3" icon="feather-truck">
+                Create Dispatch
+            </x-ui.button>
+        @elseif ($delivery->status === 'Dispatched')
+            <form action="{{ route('sales.material-requirements.deliver', $delivery->id) }}" method="POST" class="d-inline">
+                @csrf
+                <x-ui.button type="submit" variant="success" size="sm" class="fw-bold px-3" icon="feather-check-circle">
+                    Mark Delivered
+                </x-ui.button>
+            </form>
+        @endif
+
+        <x-ui.action-dropdown id="mrActionsDropdown">
+            <li>
+                <a href="javascript:void(0)" onclick="window.print()" class="dropdown-item py-2">
+                    <i class="feather-printer me-2 text-muted fs-12"></i>Print Requirement Sheet
+                </a>
+            </li>
+            <li>
+                <a href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" class="dropdown-item py-2">
+                    <i class="feather-shopping-cart me-2 text-muted fs-12"></i>View Sales Order #{{ $delivery->salesOrder->sales_order_number }}
+                </a>
+            </li>
+        </x-ui.action-dropdown>
+    </div>
+@endsection
+
+@push('styles')
+    <style>
+        .erp-single-panel {
+            padding: 0 !important;
+        }
+        .mr-status-pipeline {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+            background-color: #f8fafc;
+        }
+        .mr-status-pipeline .pipeline-step {
+            position: relative;
+            padding: 6px 14px 6px 22px;
+            background-color: #f8fafc;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .mr-status-pipeline .pipeline-step:first-child {
+            padding-left: 14px;
+        }
+        .mr-status-pipeline .pipeline-step::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: -10px;
+            width: 0;
+            height: 0;
+            border-top: 14px solid transparent;
+            border-bottom: 14px solid transparent;
+            border-left: 10px solid #f8fafc;
+            z-index: 10;
+            transition: all 0.2s ease;
+        }
+        .mr-status-pipeline .pipeline-step::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            border-top: 14px solid transparent;
+            border-bottom: 14px solid transparent;
+            border-left: 10px solid #ffffff;
+            z-index: 5;
+        }
+        .mr-status-pipeline .pipeline-step:first-child::before {
+            display: none;
+        }
+        .mr-status-pipeline .pipeline-step.active {
+            background-color: #2563eb;
+            color: #ffffff;
+        }
+        .mr-status-pipeline .pipeline-step.active::after {
+            border-left-color: #2563eb;
+        }
+        .mr-status-pipeline .pipeline-step.completed {
+            background-color: #e2e8f0;
+            color: #334155;
+        }
+        .mr-status-pipeline .pipeline-step.completed::after {
+            border-left-color: #e2e8f0;
+        }
+        .mr-line-table th {
+            background-color: #f8fafc;
+            border-bottom: 2px solid #e2e8f0;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #475569;
+        }
+        .mr-line-table td {
+            vertical-align: middle;
+        }
+        .mr-info-card {
+            background: #ffffff;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+    </style>
+@endpush
+
 @section('content')
 
     {{-- Session Alerts --}}
@@ -38,74 +164,121 @@
         elseif ($delivery->status === 'Dispatched')                             $doStatusClass = 'dark';
         elseif ($delivery->status === 'Cancelled')                              $doStatusClass = 'danger';
         elseif (in_array($delivery->status, ['Picked', 'Packed']))              $doStatusClass = 'primary';
+
+        $totalOrdered = (float)$delivery->items->sum(fn($i) => (float)($i->quantity_ordered > 0 ? $i->quantity_ordered : $i->quantity));
+        $totalReserved = (float)$delivery->items->sum('quantity_reserved');
+        $totalPending = max(0, $totalOrdered - $totalReserved);
+        $fulfillmentRate = $totalOrdered > 0 ? round(($totalReserved / $totalOrdered) * 100) : 0;
+
+        $statusStep = match($delivery->status) {
+            'Draft', 'Pending' => 1,
+            'Processing', 'Partially Ready' => 2,
+            'Ready', 'Picked', 'Packed' => 3,
+            'Dispatched' => 4,
+            'Delivered' => 5,
+            default => 1,
+        };
     @endphp
 
-    {{-- ─── Odoo-style Sheet ─── --}}
-    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+    {{-- ERP Single Panel Odoo Sheet (Matching purchase/orders/show & sales/orders/show) --}}
+    <div class="erp-single-panel">
         <x-ui.odoo-form-ui type="sheet" class="p-0">
 
-        {{-- Status Bar --}}
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 px-4 pt-4 pb-3 border-bottom">
+            {{-- Top Status Bar (Pipeline + Quick Status Badge) --}}
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 px-4 py-2.5 bg-light border-bottom">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fs-11 text-uppercase fw-bold text-muted letter-spacing-1 me-1">STATUS:</span>
+                    <x-ui.badge :soft="true" :variant="$doStatusClass" class="fs-11 px-2.5 py-1 fw-bold me-2">
+                        {{ $delivery->status }}
+                    </x-ui.badge>
 
-            {{-- Left: DO number + links --}}
-            <div>
-                <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">Material Requirement</span>
-                <h4 class="fw-bold text-dark mb-1">{{ $delivery->requirement_number }}</h4>
-                <span class="fs-13 text-muted">
-                    SO:&nbsp;<a href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" class="fw-semibold text-primary">{{ $delivery->salesOrder->sales_order_number }}</a>
-                    &nbsp;·&nbsp;Customer:&nbsp;<strong class="text-dark">{{ $delivery->salesOrder->customer?->name }}</strong>
-                </span>
+                    {{-- Quick KPI summary pills --}}
+                    <div class="d-flex align-items-center gap-3 fs-12 text-muted ms-1">
+                        <span><i class="feather-package text-primary me-1"></i>Order: <strong class="text-dark">{{ (int)$totalOrdered }} Units</strong></span>
+                        <span><i class="feather-check-circle text-success me-1"></i>Reserved: <strong class="text-success">{{ (int)$totalReserved }} Units</strong> <small class="text-muted">({{ $fulfillmentRate }}%)</small></span>
+                        <span><i class="feather-clock text-warning me-1"></i>Pending: <strong class="{{ $totalPending > 0 ? 'text-warning' : 'text-muted' }}">{{ (int)$totalPending }} Units</strong></span>
+                    </div>
+                </div>
+
+                {{-- Chevron Status Pipeline --}}
+                <div class="mr-status-pipeline d-none d-md-inline-flex">
+                    <div class="pipeline-step {{ $statusStep > 1 ? 'completed' : ($statusStep === 1 ? 'active' : '') }}">
+                        1. DRAFT
+                    </div>
+                    <div class="pipeline-step {{ $statusStep > 2 ? 'completed' : ($statusStep === 2 ? 'active' : '') }}">
+                        2. PROCESSING
+                    </div>
+                    <div class="pipeline-step {{ $statusStep > 3 ? 'completed' : ($statusStep === 3 ? 'active' : '') }}">
+                        3. READY
+                    </div>
+                    <div class="pipeline-step {{ $statusStep > 4 ? 'completed' : ($statusStep === 4 ? 'active' : '') }}">
+                        4. DISPATCHED
+                    </div>
+                    <div class="pipeline-step {{ $statusStep === 5 ? 'active' : '' }}">
+                        5. DELIVERED
+                    </div>
+                </div>
             </div>
 
-            {{-- Right: DO status badge + action buttons --}}
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <x-ui.badge :soft="true" :variant="$doStatusClass" class="px-3 py-1 fs-12 fw-semibold">
-                    {{ $delivery->status }}
-                </x-ui.badge>
-
-                <a href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" class="btn btn-light border btn-sm">
-                    <i class="feather-arrow-left me-1"></i>SO Details
-                </a>
-
-                @if (in_array($delivery->status, ['Ready', 'Partially Ready', 'Processing', 'Picked', 'Packed']))
-                    <a href="{{ route('sales.dispatches.create', ['material_requirement_id' => $delivery->id, 'sales_order_id' => $delivery->sales_order_id]) }}" class="btn btn-primary btn-sm fw-bold px-3">
-                        <i class="feather-truck me-1.5"></i>Create Dispatch
-                    </a>
-                @elseif ($delivery->status === 'Dispatched')
-                    <form action="{{ route('sales.material-requirements.deliver', $delivery->id) }}" method="POST" class="d-inline">
-                        @csrf
-                        <button type="submit" class="btn btn-success btn-sm fw-bold px-3">
-                            <i class="feather-check-circle me-1.5"></i>Mark Delivered
-                        </button>
-                    </form>
-                @endif
-            </div>
+        {{-- Document Header Metadata + 3 Compact Right Stat Boxes --}}
+        <div class="p-4 border-bottom">
+            <div class="row align-items-center justify-content-between g-4">
+                    <div class="col-md-7">
+                        <div class="d-flex align-items-start gap-3">
+                            <div class="avatar-text avatar-xl bg-soft-primary text-primary rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 48px; height: 48px;">
+                                <i class="feather-clipboard fs-3"></i>
+                            </div>
+                            <div>
+                                <span class="fs-10 text-uppercase fw-bold text-muted letter-spacing-1 d-block mb-1">MATERIAL REQUIREMENT DOCUMENT</span>
+                                <h3 class="fw-bold text-dark mb-2">{{ $delivery->requirement_number }}</h3>
+                                
+                                <div class="d-flex align-items-center flex-wrap gap-x-4 gap-y-2 fs-13 text-muted">
+                                    <div>
+                                        <i class="feather-shopping-bag text-primary me-1"></i>
+                                        Sales Order: 
+                                        <a href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" class="fw-bold text-primary">
+                                            {{ $delivery->salesOrder->sales_order_number }}
+                                        </a>
+                                    </div>
+                                    <div>
+                                        <i class="feather-user me-1 text-muted"></i>
+                                        Customer: <strong class="text-dark">{{ $delivery->salesOrder->customer?->name ?? 'Walk-in Customer' }}</strong>
+                                    </div>
+                                    <div>
+                                        <i class="feather-calendar me-1 text-muted"></i>
+                                        Date: <strong class="text-dark">{{ $delivery->requirement_date ? $delivery->requirement_date->format('d M Y') : $delivery->created_at->format('d M Y') }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>                   
+                </div>
         </div>
 
-        {{-- ─── Body: 2-column layout ─── --}}
-        <div class="row g-0">
-
-            {{-- Delivery Order Lines --}}
-            <div class="col-lg-12">
-                <div class="px-4 py-3">
-
-                    <h6 class="fw-bold text-dark mb-3 fs-13 text-uppercase text-muted letter-spacing-1">
-                         <i class="feather-list me-1 text-primary"></i> Material Requirement Lines
-                    </h6>
+        {{-- Material Requirement Lines Section --}}
+        <div class="p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h6 class="fw-bold text-dark mb-0 fs-14">
+                            <i class="feather-list me-2 text-primary"></i>Material Requirement Lines
+                        </h6>
+                        <span class="badge bg-soft-primary text-primary fw-bold px-2.5 py-1 fs-12">
+                            {{ count($delivery->items) }} Item(s)
+                        </span>
+                    </div>
 
                     <div class="table-responsive" style="overflow: visible !important;">
-                        <x-ui.odoo-form-ui type="table" class="align-middle fs-13 mb-0" style="margin-top:0;">
-                            <thead class="fs-11 text-uppercase fw-semibold text-muted">
+                        <x-ui.odoo-form-ui type="table" class="align-middle fs-13 mb-0 mr-line-table" style="margin-top:0;">
+                            <thead class="fs-11 text-uppercase fw-bold text-muted">
                                 <tr>
-                                    <th style="width:26%">Product</th>
-                                    <th style="width:9%">Method</th>
+                                    <th style="width:25%" class="ps-4">Product Details</th>
+                                    <th style="width:9%" class="text-center">Method</th>
                                     <th style="width:8%" class="text-end">Order Qty</th>
                                     <th style="width:8%" class="text-end">Reserved</th>
                                     <th style="width:8%" class="text-end">Pending</th>
-                                    <th style="width:16%">Warehouse</th>
+                                    <th style="width:18%">Warehouse</th>
                                     <th style="width:7%" class="text-end">Avail.</th>
                                     <th style="width:10%" class="text-center">Status</th>
-                                    <th style="width:8%" class="text-center">Action</th>
+                                    <th style="width:11%" class="text-center pe-4">Action</th>
                                 </tr>
                             </thead>
                             <tbody class="text-dark">
@@ -131,25 +304,36 @@
                                     @endphp
                                     <tr>
                                         {{-- Product --}}
-                                        <td>
-                                            <strong class="text-dark">{{ $item->product?->name ?? 'Unknown' }}</strong>
-                                            @if ($item->product?->sku)
-                                                <small class="text-muted d-block font-monospace fs-10">SKU: {{ $item->product->sku }}</small>
-                                            @endif
+                                        <td class="ps-4 py-3">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="avatar-text avatar-sm bg-soft-secondary text-dark rounded-circle">
+                                                    <i class="feather-box fs-12"></i>
+                                                </div>
+                                                <div>
+                                                    <strong class="text-dark d-block fs-13">{{ $item->product?->name ?? 'Unknown Product' }}</strong>
+                                                    @if ($item->product?->sku)
+                                                        <span class="badge bg-light text-muted font-monospace fs-10 px-1.5 py-0.5 border">SKU: {{ $item->product->sku }}</span>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         </td>
 
                                         {{-- Method --}}
-                                        <td>
+                                        <td class="text-center">
                                             @if ($method === 'manufacture')
-                                                <x-ui.badge :soft="true" variant="warning" class="fs-11 px-2">Mfg</x-ui.badge>
+                                                <x-ui.badge :soft="true" variant="warning" class="fs-11 px-2 py-1 fw-bold">
+                                                    <i class="feather-cpu me-1"></i>Mfg
+                                                </x-ui.badge>
                                             @else
-                                                <x-ui.badge :soft="true" variant="success" class="fs-11 px-2">Buy</x-ui.badge>
+                                                <x-ui.badge :soft="true" variant="success" class="fs-11 px-2 py-1 fw-bold">
+                                                    <i class="feather-shopping-cart me-1"></i>Buy
+                                                </x-ui.badge>
                                             @endif
                                         </td>
 
-                                        <td class="text-end fw-semibold">{{ (int)$orderedQty }}</td>
-                                        <td class="text-end fw-bold text-success">{{ (int)$reservedQty }}</td>
-                                        <td class="text-end text-muted">{{ (int)$pendingQty }}</td>
+                                        <td class="text-end fw-bold fs-13">{{ (int)$orderedQty }}</td>
+                                        <td class="text-end fw-bold text-success fs-13">{{ (int)$reservedQty }}</td>
+                                        <td class="text-end fw-semibold {{ $pendingQty > 0 ? 'text-warning' : 'text-muted' }} fs-13">{{ (int)$pendingQty }}</td>
                                         
                                         {{-- Warehouse Dropdown --}}
                                         <td>
@@ -158,7 +342,7 @@
                                             @else
                                                 <select
                                                     id="warehouse-select-{{ $item->id }}"
-                                                    class="form-select form-select-sm"
+                                                    class="form-select form-select-sm border-gray-300 fs-12"
                                                     onchange="changeWarehouse({{ $item->id }}, this)"
                                                     {{ $isLocked ? 'disabled' : '' }}
                                                     data-select2-selector="default"
@@ -177,7 +361,7 @@
                                         </td>
 
                                         {{-- Available Qty --}}
-                                        <td class="text-end fw-bold">
+                                        <td class="text-end fw-bold fs-13">
                                             @if ($isService)
                                                 <span class="text-muted">—</span>
                                             @else
@@ -190,20 +374,20 @@
 
                                         {{-- Line Status --}}
                                         <td class="text-center">
-                                            <x-ui.badge :soft="true" :variant="$lineBadge" class="fs-11 px-2">
+                                            <x-ui.badge :soft="true" :variant="$lineBadge" class="fs-11 px-2.5 py-1 fw-semibold">
                                                 {{ $item->status }}
                                             </x-ui.badge>
                                         </td>
 
                                         {{-- Action --}}
-                                        <td class="text-center">
+                                        <td class="text-center pe-4">
                                             @if (!$isLocked)
                                                 <div class="d-flex flex-column align-items-center gap-1">
                                                     @if ($pendingQty > 0)
                                                         @if ($availableQty > 0)
                                                             <button
                                                                 type="button"
-                                                                class="btn btn-sm btn-soft-primary px-2 py-1 fs-11 fw-semibold w-100"
+                                                                class="btn btn-sm btn-soft-primary px-2 py-1 fs-11 fw-bold w-100"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#reserveModal-{{ $item->id }}"
                                                             ><i class="feather-archive me-1"></i>Reserve</button>
@@ -216,49 +400,51 @@
                                                             @endphp
 
                                                             @if ($item->status === 'Waiting Purchase' || ($prRaised > 0 && $remainingPrQty <= 0))
-                                                                <span class="badge bg-warning-soft text-warning px-2 py-1 fs-11 w-100 text-center">
+                                                                <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 w-100 text-center fw-semibold">
                                                                     <i class="feather-check-circle me-1"></i>PR Raised ({{ (int)$prRaised }}/{{ (int)$pendingQty }})
                                                                 </span>
                                                             @elseif ($prRaised > 0 && $remainingPrQty > 0)
-                                                                <span class="badge bg-info-soft text-info px-2 py-1 fs-11 w-100 text-center mb-1">
-                                                                    <i class="feather-clock me-1"></i>Partially PR Raised ({{ (int)$prRaised }}/{{ (int)$pendingQty }})
+                                                                <span class="badge bg-soft-info text-info px-2 py-1 fs-11 w-100 text-center mb-1 fw-semibold">
+                                                                    <i class="feather-clock me-1"></i>PR Raised ({{ (int)$prRaised }}/{{ (int)$pendingQty }})
                                                                 </span>
                                                                 <button
                                                                     type="button"
-                                                                    class="btn btn-sm btn-soft-warning px-2 py-1 fs-11 fw-semibold w-100"
+                                                                    class="btn btn-sm btn-soft-warning px-2 py-1 fs-11 fw-bold w-100"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#indentModal-{{ $item->id }}"
                                                                 ><i class="feather-plus-circle me-1"></i>Create Indent (+{{ (int)$remainingPrQty }})</button>
                                                             @else
                                                                 <button
                                                                     type="button"
-                                                                    class="btn btn-sm btn-soft-warning px-2 py-1 fs-11 fw-semibold w-100"
+                                                                    class="btn btn-sm btn-soft-warning px-2 py-1 fs-11 fw-bold w-100"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#indentModal-{{ $item->id }}"
                                                                 ><i class="feather-file-text me-1"></i>Indent</button>
                                                             @endif
                                                         @elseif ($method === 'manufacture')
                                                             @if ($item->status === 'Waiting Production')
-                                                                <x-ui.badge :soft="true" variant="warning" class="fs-11 px-2 w-100 text-center">
+                                                                <x-ui.badge :soft="true" variant="warning" class="fs-11 px-2 py-1 w-100 text-center fw-semibold">
                                                                     <i class="feather-clock me-1"></i>MO Raised
                                                                 </x-ui.badge>
                                                             @else
                                                                 <button
                                                                     type="button"
-                                                                    class="btn btn-sm btn-soft-danger px-2 py-1 fs-11 fw-semibold w-100"
+                                                                    class="btn btn-sm btn-soft-danger px-2 py-1 fs-11 fw-bold w-100"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#generateMoModal-{{ $item->id }}"
                                                                 ><i class="feather-cpu me-1"></i>Gen MO</button>
                                                             @endif
                                                         @endif
                                                     @else
-                                                        <x-ui.badge :soft="true" variant="success" class="fs-11 px-2">
-                                                            <i class="feather-check me-1"></i>Fulfilled
+                                                        <x-ui.badge :soft="true" variant="success" class="fs-11 px-2.5 py-1 fw-bold">
+                                                            <i class="feather-check-circle me-1"></i>Fulfilled
                                                         </x-ui.badge>
                                                     @endif
                                                 </div>
                                             @else
-                                                <span class="text-muted fs-12">Locked</span>
+                                                <span class="text-muted fs-12 fw-semibold">
+                                                    <i class="feather-lock me-1"></i>Locked
+                                                </span>
                                             @endif
                                         </td>
                                     </tr>
@@ -266,11 +452,11 @@
                             </tbody>
                         </x-ui.odoo-form-ui>
                     </div>
+                </div>
 
-                </div>{{-- /px-4 py-3 --}}
-            </div>{{-- /col-lg-12 --}}
-        </div>{{-- /row g-0 --}}
-    </x-ui.odoo-form-ui>{{-- /sheet --}}
+        </div>{{-- /p-4 lines section --}}
+        </x-ui.odoo-form-ui>
+    </div>{{-- /erp-single-panel --}}
 
 
     {{-- ============================================================ --}}
@@ -289,7 +475,7 @@
 
         @if (($method === 'buy' || $method === 'manufacture') && $pendingQty > 0)
 
-            {{-- ─── Reserve Stock Modal ─── --}}
+            {{-- Reserve Stock Modal --}}
             <x-ui.modal
                 id="reserveModal-{{ $item->id }}"
                 title="Reserve Stock — {{ $item->product?->name }}"
@@ -385,7 +571,7 @@
             @endphp
 
             @if ($method === 'buy' && $item->status !== 'Waiting Purchase' && $remainingPrQty > 0)
-                {{-- ─── Create Indent Modal ─── --}}
+                {{-- Create Indent Modal --}}
                 <x-ui.modal
                     id="indentModal-{{ $item->id }}"
                     title="Create Purchase Indent — {{ $item->product?->name }}"
@@ -468,7 +654,7 @@
 
         @if ($method === 'manufacture' && $item->status !== 'Waiting Production')
 
-            {{-- ─── Generate MO Modal ─── --}}
+            {{-- Generate MO Modal --}}
             <x-ui.modal
                 id="generateMoModal-{{ $item->id }}"
                 title="Generate Manufacturing Order — {{ $item->product?->name }}"
@@ -528,7 +714,7 @@
 
     @endforeach
 
-    {{-- ─── Dispatch Modal ─── --}}
+    {{-- Dispatch Modal --}}
     @if ($delivery->status === 'Packed')
         <x-ui.modal
             id="dispatchModal"
@@ -559,7 +745,6 @@
             </div>
         </x-ui.modal>
     @endif
-    </div>
 
     <x-ui.master-modals :masters="['warehouse']" />
 @endsection
