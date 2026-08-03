@@ -126,32 +126,43 @@
         {{-- Utilization Bar --}}
         <div class="mt-4 p-3 bg-light rounded">
             <div class="d-flex justify-content-between mb-2">
-                <span class="fw-semibold text-dark fs-12">Capacity Utilization</span>
-                <span class="fw-bold text-primary fs-12">{{ $utilization }}% ({{ number_format($plannedMinutes, 0) }} / {{ number_format($availableMinutes, 0) }} min)</span>
+                <div>
+                    <span class="fw-semibold text-dark fs-12">Actual Runtime Utilization Today</span>
+                    <span class="badge bg-soft-info text-info fs-11 ms-2">Real-time MES</span>
+                </div>
+                <span class="fw-bold text-primary fs-12">
+                    {{ $actualUtilization }}% ({{ number_format($actualMinutesToday, 1) }} / {{ number_format($availableMinutes, 0) }} min worked today)
+                </span>
             </div>
-            <div class="progress" style="height: 8px;">
-                <div class="progress-bar {{ $utilization > 90 ? 'bg-danger' : ($utilization > 70 ? 'bg-warning' : 'bg-success') }}"
+            <div class="progress mb-2" style="height: 8px;">
+                <div class="progress-bar {{ $actualUtilization > 90 ? 'bg-danger' : ($actualUtilization > 70 ? 'bg-warning' : 'bg-success') }}"
                      role="progressbar"
-                     style="width: {{ $utilization }}%"
-                     aria-valuenow="{{ $utilization }}"
+                     style="width: {{ max(2, $actualUtilization) }}%"
+                     aria-valuenow="{{ $actualUtilization }}"
                      aria-valuemin="0"
                      aria-valuemax="100">
                 </div>
             </div>
-            <small class="text-muted fs-11 mt-1 d-flex align-items-center gap-1">
-                <i class="feather-clock fs-12"></i>
+            <div class="d-flex justify-content-between align-items-center text-muted fs-11 mt-2 border-top pt-2">
+                <span>
+                    <i class="feather-calendar me-1"></i>
+                    <strong>Planned Shift Commitment:</strong> {{ $plannedUtilization }}% ({{ number_format($plannedMinutesToday, 0) }} min allocated)
+                    @if($totalQueueMinutes > 0)
+                        &middot; <span class="font-monospace">Total Queue Backlog: {{ number_format($totalQueueMinutes, 0) }} min</span>
+                    @endif
+                </span>
                 <span>
                     @if($shifts->isNotEmpty())
                         Based on active shift{{ $shifts->count() > 1 ? 's' : '' }}:
                         @foreach($shifts as $index => $shift)
                             <strong>{{ $shift->name }}</strong> ({{ substr($shift->start_time, 0, 5) }} - {{ substr($shift->end_time, 0, 5) }}{{ $shift->break_minutes > 0 ? ', break: ' . $shift->break_minutes . 'm' : '' }}){{ $index < $shifts->count() - 1 ? ', ' : '' }}
                         @endforeach
-                        &middot; Adjusted for {{ $workCenter->efficiency_percentage }}% efficiency.
+                        &middot; {{ $workCenter->efficiency_percentage }}% efficiency across {{ $workCenter->machines()->where('status', \App\Domains\Production\Models\Machine::STATUS_ACTIVE)->count() ?: 1 }} active machine(s).
                     @else
-                        Based on Standard Shift (8 hours) &middot; Adjusted for {{ $workCenter->efficiency_percentage }}% efficiency. <span class="text-warning">(No active shifts configured; showing fallback)</span> &middot; <a href="{{ route('production.shifts.index') }}" class="text-primary fw-semibold"><i class="feather-settings"></i> Manage Shifts</a>
+                        Standard Shift (8h) &middot; {{ $workCenter->efficiency_percentage }}% efficiency.
                     @endif
                 </span>
-            </small>
+            </div>
         </div>
     </div>
 @endsection

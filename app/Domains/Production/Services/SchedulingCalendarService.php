@@ -165,10 +165,14 @@ class SchedulingCalendarService
                     return $overlapStart->lt($overlapFinish);
                 });
 
-                $allocatedMinutes = $dayOps->sum(function($op) use ($date) {
+                $activeMachineCount = $wc->machines->where('status', Machine::STATUS_ACTIVE)->count() ?: 1;
+                $perMachineShiftCap = $availMinutes > 0 ? ($availMinutes / $activeMachineCount) : 450.0;
+
+                $allocatedMinutes = $dayOps->sum(function($op) use ($date, $perMachineShiftCap) {
                     $overlapStart = $op->planned_start->max($date->copy()->startOfDay());
                     $overlapFinish = $op->planned_finish->min($date->copy()->endOfDay());
-                    return max(0, $overlapStart->diffInMinutes($overlapFinish));
+                    $rawMinutes = max(0, $overlapStart->diffInMinutes($overlapFinish));
+                    return min($perMachineShiftCap, $rawMinutes);
                 });
 
                 $isOverCapacity = $allocatedMinutes > $availMinutes;
@@ -509,7 +513,7 @@ class SchedulingCalendarService
                         }
                     }
                     $codeUpper = strtoupper(trim($skill->skill_code ?? ''));
-                    if (in_array($codeUpper, ['GENERAL', 'ALL', ''])) {
+                    if (in_array($codeUpper, ['GENERAL', 'ALL', 'SKL-ALL', 'SKILL-ALL', '']) || str_starts_with($codeUpper, 'SKL-ALL') || str_starts_with($codeUpper, 'ALL')) {
                         $qualified = true;
                         break;
                     }

@@ -62,7 +62,7 @@ class DowntimeService
                 'Preventive Maintenance', 'Calibration'    => 'Maintenance',
                 'Setup', 'Tool Change'                     => 'Setup',
                 'Material Shortage'                        => 'Waiting Material',
-                'Operator Shortage'                        => 'Waiting Operator',
+                'Operator Shortage', 'Operator Pause'      => 'Waiting Operator',
                 default                                    => 'Offline',
             };
 
@@ -92,9 +92,10 @@ class DowntimeService
         int $tenantId,
         int $downtimeId,
         ?int $userId = null,
-        ?string $remarks = null
+        ?string $remarks = null,
+        ?string $targetState = 'Idle'
     ): ProductionMachineDowntime {
-        return DB::transaction(function () use ($tenantId, $downtimeId, $userId, $remarks) {
+        return DB::transaction(function () use ($tenantId, $downtimeId, $userId, $remarks, $targetState) {
             $downtime = ProductionMachineDowntime::findOrFail($downtimeId);
 
             if ($downtime->status === ProductionMachineDowntime::STATUS_CLOSED) {
@@ -102,7 +103,8 @@ class DowntimeService
             }
 
             $endTime = now();
-            $durationMinutes = max(0.00, round($endTime->diffInSeconds($downtime->start_time) / 60.0, 2));
+            $start = \Illuminate\Support\Carbon::parse($downtime->start_time);
+            $durationMinutes = max(0.00, round($start->diffInSeconds($endTime) / 60.0, 2));
 
             $downtime->update([
                 'end_time'         => $endTime,
@@ -112,8 +114,8 @@ class DowntimeService
                 'status'           => ProductionMachineDowntime::STATUS_CLOSED,
             ]);
 
-            // Transition machine state back to Idle
-            $this->stateService->transitionState($tenantId, $downtime->machine_id, 'Idle', 'Downtime Ended', $userId, $remarks);
+            // Transition machine state to targetState (defaults to 'Idle')
+            $this->stateService->transitionState($tenantId, $downtime->machine_id, $targetState ?: 'Idle', $remarks ?: 'Downtime Ended', $userId, $remarks);
 
             $machineName = $downtime->machine ? $downtime->machine->name : 'Machine';
 

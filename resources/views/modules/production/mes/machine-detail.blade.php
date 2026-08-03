@@ -67,7 +67,18 @@
                         <div class="col-md-4">
                             <div class="text-muted fs-11 text-uppercase fw-bold mb-1">Progress</div>
                             @if($currentOp->actual_start)
-                                <div class="fw-bold text-warning">{{ $currentOp->actual_start->diffForHumans(null, true) }}</div>
+                                @php
+                                    $pausedSec = $currentOp->accumulated_paused_seconds ?? 0;
+                                    $netSeconds = max(0, now()->timestamp - $currentOp->actual_start->timestamp - $pausedSec);
+                                    $netMinutes = round($netSeconds / 60);
+                                @endphp
+                                <div class="fw-bold text-warning">
+                                    @if($netMinutes >= 60)
+                                        {{ floor($netMinutes / 60) }}h {{ $netMinutes % 60 }}m
+                                    @else
+                                        {{ $netMinutes }} minutes
+                                    @endif
+                                </div>
                                 <div class="text-muted fs-12">Started {{ $currentOp->actual_start->format('d/m H:i') }}</div>
                             @endif
                             <div class="text-muted fs-12 mt-1">Est. finish: {{ $currentOp->planned_finish->format('d/m H:i') }}</div>
@@ -252,8 +263,10 @@
                                                                 {{ round($sh->duration_seconds / 3600, 1) }}h
                                                             @elseif($sh->duration_seconds >= 60)
                                                                 {{ round($sh->duration_seconds / 60, 1) }}m
-                                                            @else
+                                                            @elseif($sh->duration_seconds > 0)
                                                                 {{ $sh->duration_seconds }}s
+                                                            @else
+                                                                < 1s
                                                             @endif
                                                         </small>
                                                     @else
@@ -296,7 +309,15 @@
                     <tbody>
                         @foreach($downtimes as $dt)
                             <tr>
-                                <td class="fs-12 fw-bold"><span class="text-capitalize text-danger">{{ $dt->category }}</span></td>
+                                @php
+                                    $catBadge = match(strtolower($dt->category ?? '')) {
+                                        'breakdown', 'power failure', 'equipment failure', 'operator shortage' => 'badge bg-soft-danger text-danger',
+                                        'material shortage', 'quality hold' => 'badge bg-soft-warning text-warning',
+                                        'operator pause', 'setup', 'cleaning', 'tool change', 'calibration' => 'badge bg-soft-info text-info',
+                                        default => 'badge bg-soft-secondary text-secondary',
+                                    };
+                                @endphp
+                                <td class="fs-12 fw-bold"><span class="{{ $catBadge }} fs-11">{{ $dt->category }}</span></td>
                                 <td class="fs-12 text-dark font-medium">
                                     {{ $dt->reason }}
                                     @if($dt->remarks)
@@ -306,14 +327,23 @@
                                 <td class="fs-12 text-muted">
                                     {{ $dt->start_time->format('d/m H:i') }}
                                     @if($dt->end_time)
-                                        - {{ $dt->end_time->format('d/m H:i') }}
+                                        &ndash; {{ $dt->end_time->format('H:i') }}
                                     @else
-                                        - <span class="text-danger fw-bold">Present</span>
+                                        &ndash; <span class="text-danger fw-bold">Present</span>
                                     @endif
                                 </td>
                                 <td class="fs-12 text-dark fw-bold">
                                     @if($dt->duration_minutes !== null)
-                                        {{ $dt->duration_minutes }} min
+                                        @php
+                                            $totalSec = round($dt->duration_minutes * 60);
+                                        @endphp
+                                        @if($totalSec < 60 && $totalSec > 0)
+                                            {{ $totalSec }}s
+                                        @elseif($totalSec === 0.0 || $totalSec === 0)
+                                            < 1s
+                                        @else
+                                            {{ number_format($dt->duration_minutes, 1) }} min
+                                        @endif
                                     @else
                                         —
                                     @endif

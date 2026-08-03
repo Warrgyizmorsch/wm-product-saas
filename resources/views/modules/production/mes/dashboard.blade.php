@@ -54,20 +54,33 @@
             border: 1px solid rgba(0,0,0,0.06);
         }
         /* Visual Routing Timelines */
+        .mes-progress-track-wrapper {
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+            padding: 10px 0;
+            width: 100%;
+        }
+        .mes-progress-track-wrapper::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
         .mes-progress-track {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             position: relative;
-            margin: 24px 0;
-            padding: 0 10px;
+            margin: 10px 0;
+            padding: 0;
+            min-width: max-content;
+            width: 100%;
         }
         .mes-progress-track::before {
             content: '';
             position: absolute;
             top: 20px;
-            left: 30px;
-            right: 30px;
+            left: 60px;
+            right: 60px;
             height: 4px;
             background-color: #e9ecef;
             z-index: 1;
@@ -75,7 +88,7 @@
         .mes-track-line-filled {
             position: absolute;
             top: 20px;
-            left: 30px;
+            left: 60px;
             height: 4px;
             background-color: #28a745;
             z-index: 2;
@@ -87,8 +100,10 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            flex: 1;
+            flex: 0 0 130px;
+            width: 130px;
             text-align: center;
+            padding: 0 5px;
         }
         .mes-step-icon {
             width: 40px;
@@ -103,6 +118,7 @@
             color: #6c757d;
             transition: all 0.3s ease;
             cursor: default;
+            flex-shrink: 0;
         }
         .mes-progress-step.step-completed .mes-step-icon {
             border-color: #28a745;
@@ -132,21 +148,30 @@
             font-weight: 600;
             margin-top: 8px;
             color: #495057;
-            line-height: 1.2;
-            max-width: 100px;
+            line-height: 1.3;
+            width: 100%;
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .mes-step-subtitle {
             font-size: 9px;
             color: #6c757d;
-            margin-top: 2px;
+            margin-top: 3px;
+            width: 100%;
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.2;
         }
         .mes-step-status-badge {
             font-size: 8px;
             text-transform: uppercase;
             padding: 2px 6px;
             border-radius: 4px;
-            margin-top: 4px;
+            margin-top: 6px;
             font-weight: 700;
+            display: inline-block;
         }
         .step-completed .mes-step-status-badge {
             background-color: #d1e7dd;
@@ -371,47 +396,49 @@
                         <div class="card-body p-4 bg-white">
                             <h6 class="fw-bold text-secondary mb-3 fs-11 text-uppercase tracking-wider">Project Routing Sequence</h6>
 
-                            <div class="mes-progress-track">
-                                @php
-                                    $stepPercent = $totalOps > 1 ? ($completedOps / ($totalOps - 1)) * 100 : 0;
-                                    if ($completedOps === $totalOps) {
-                                        $stepPercent = 100;
-                                    }
-                                @endphp
-                                <div class="mes-track-line-filled" style="width: calc({{ $stepPercent }}% - 60px);"></div>
-
-                                @foreach($ops as $op)
+                            <div class="mes-progress-track-wrapper">
+                                <div class="mes-progress-track">
                                     @php
-                                        $stepClass = 'step-waiting';
-                                        $stepIcon = 'lock';
-                                        if ($op->status === 'completed') {
-                                            $stepClass = 'step-completed';
-                                            $stepIcon = 'check';
-                                        } elseif ($op->status === 'running') {
-                                            $stepClass = 'step-running';
-                                            $stepIcon = 'play';
-                                        } elseif ($op->status === 'paused') {
-                                            $stepClass = 'step-paused';
-                                            $stepIcon = 'pause';
-                                        } elseif ($op->status === 'ready') {
-                                            $stepClass = 'step-ready';
-                                            $stepIcon = 'arrow-right';
+                                        $stepFraction = $totalOps > 1 ? ($completedOps / ($totalOps - 1)) : 0;
+                                        if ($completedOps >= $totalOps) {
+                                            $stepFraction = 1;
                                         }
                                     @endphp
+                                    <div class="mes-track-line-filled" style="width: calc((100% - 120px) * {{ $stepFraction }});"></div>
 
-                                    <div class="mes-progress-step {{ $stepClass }}">
-                                        <div class="mes-step-icon" title="{{ ucfirst($op->status) }}">
-                                            <i class="feather-{{ $stepIcon }}"></i>
+                                    @foreach($ops as $op)
+                                        @php
+                                            $stepClass = 'step-waiting';
+                                            $stepIcon = 'lock';
+                                            if ($op->status === 'completed') {
+                                                $stepClass = 'step-completed';
+                                                $stepIcon = 'check';
+                                            } elseif ($op->status === 'running') {
+                                                $stepClass = 'step-running';
+                                                $stepIcon = 'play';
+                                            } elseif ($op->status === 'paused') {
+                                                $stepClass = 'step-paused';
+                                                $stepIcon = 'pause';
+                                            } elseif ($op->status === 'ready') {
+                                                $stepClass = 'step-ready';
+                                                $stepIcon = 'arrow-right';
+                                            }
+                                        @endphp
+
+                                        <div class="mes-progress-step {{ $stepClass }}">
+                                            <div class="mes-step-icon" title="{{ ucfirst($op->status) }}">
+                                                <i class="feather-{{ $stepIcon }}"></i>
+                                            </div>
+                                            <div class="mes-step-title" title="{{ $op->orderOperation->name ?? $op->name }}">
+                                                {{ $op->orderOperation->name ?? 'Op' }}
+                                            </div>
+                                            <div class="mes-step-subtitle" title="{{ $op->workCenter->name ?? '' }}">
+                                                {{ $op->workCenter->name ?? '' }}
+                                            </div>
+                                            <span class="mes-step-status-badge">{{ $op->status }}</span>
                                         </div>
-                                        <div class="mes-step-title text-truncate" title="{{ $op->orderOperation->name ?? $op->name }}">
-                                            {{ $op->orderOperation->name ?? 'Op' }}
-                                        </div>
-                                        <div class="mes-step-subtitle text-truncate" title="{{ $op->workCenter->name ?? '' }}">
-                                            {{ $op->workCenter->name ?? '' }}
-                                        </div>
-                                        <span class="mes-step-status-badge">{{ $op->status }}</span>
-                                    </div>
-                                @endforeach
+                                    @endforeach
+                                </div>
                             </div>
 
                             {{-- Card Footer: Active Action Area --}}

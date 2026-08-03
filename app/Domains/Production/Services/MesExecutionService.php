@@ -255,11 +255,13 @@ class MesExecutionService
 
                 if (!$hasOpenDowntime) {
                     $reason = $remarks ?? 'Operation Paused';
-                    $category = 'Operator Shortage';
+                    $category = 'Operator Pause';
                     if (str_contains(strtolower($reason), 'material')) {
                         $category = 'Material Shortage';
                     } elseif (str_contains(strtolower($reason), 'breakdown') || str_contains(strtolower($reason), 'failure')) {
                         $category = 'Breakdown';
+                    } elseif (str_contains(strtolower($reason), 'shortage')) {
+                        $category = 'Operator Shortage';
                     }
 
                     // startDowntime will automatically transition machine state and write events
@@ -347,18 +349,18 @@ class MesExecutionService
                         $schedOp->schedule->order->tenant_id,
                         $activeDowntime->id,
                         $userId,
-                        'Operation Resumed'
+                        'Operation Resumed',
+                        'Running'
+                    );
+                } else {
+                    app(MachineStateService::class)->transitionState(
+                        $schedOp->schedule->order->tenant_id,
+                        $machineId,
+                        'Running',
+                        'Operation Resumed',
+                        $userId
                     );
                 }
-
-                // Always transition machine state back to Running on resume
-                app(MachineStateService::class)->transitionState(
-                    $schedOp->schedule->order->tenant_id,
-                    $machineId,
-                    'Running',
-                    'Operation Resumed',
-                    $userId
-                );
             }
 
             app(ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
