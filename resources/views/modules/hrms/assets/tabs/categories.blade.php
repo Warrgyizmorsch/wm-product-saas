@@ -27,7 +27,7 @@
                             <a class="dropdown-item py-2 {{ request('category_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'newest', this); event.preventDefault();">{{ __('hrms.assets.sort_newest') }}</a>
                         </x-ui.sort-dropdown>
 
-                        <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
+                        <x-ui.filter label="{{ __('hrms.common.filter') }}" offset="0, 5">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                             
                             <div class="mb-3" style="min-width: 250px;">

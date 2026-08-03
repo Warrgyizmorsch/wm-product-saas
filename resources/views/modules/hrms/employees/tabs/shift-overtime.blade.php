@@ -641,7 +641,6 @@
                     <textarea id="empRejectReasonInput" class="form-control" rows="3" placeholder="Enter reason for rejection..."></textarea>
                 </div>
             </div>
-            </div>
         </div>
     </div>
 </div>

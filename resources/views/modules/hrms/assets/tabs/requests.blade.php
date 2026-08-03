@@ -28,7 +28,7 @@
                             <a class="dropdown-item py-2 {{ request('request_sort') == 'status_desc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_desc', this); event.preventDefault();">{{ __('hrms.assets.sort_status_desc') }}</a>
                         </x-ui.sort-dropdown>
 
-                        <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
+                        <x-ui.filter label="{{ __('hrms.common.filter') }}" offset="0, 5">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                             
                             <div class="mb-3" style="min-width: 250px;">
@@ -300,7 +300,7 @@
 
 <!-- MODAL: BULK ALLOCATE ASSETS -->
 <div class="modal fade" id="bulkAllocateModal" tabindex="-1" aria-labelledby="bulkAllocateModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-dark" id="bulkAllocateModalLabel">

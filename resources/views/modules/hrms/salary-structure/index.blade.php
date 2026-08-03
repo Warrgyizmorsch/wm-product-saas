@@ -188,18 +188,23 @@
             <div class="col-12">
                 <x-ui.card title="{{ __('hrms.salary.pay_groups') }}" bodyClass="p-0" stretch>
                     <x-slot name="headerAction">
-                        <div class="d-flex align-items-center gap-2">
+                        <form method="GET" action="{{ route('hrms.salary-structure.index') }}" id="payGroupFilterForm" class="d-flex align-items-center gap-2 m-0">
+                            <!-- Hidden inputs for pagination/tabs state -->
+                            <input type="hidden" name="tab" value="{{ request()->get('tab', 'structures') }}">
+                            <input type="hidden" name="pay_group_id" value="{{ request()->get('pay_group_id', $selectedPayGroup ? $selectedPayGroup->id : '') }}">
+                            <input type="hidden" name="pg_sort" id="pg_sort" value="{{ request()->get('pg_sort', 'name_asc') }}">
+
                             <!-- Search Input -->
                             <div class="theme-search-container" style="width: 240px !important; position: relative;">
                                 <i class="feather-search"></i>
-                                <input type="text" id="payGroupSearch" class="theme-search-input" placeholder="{{ __('hrms.salary.search_pay_groups') }}">
+                                <input type="text" name="pg_search" id="payGroupSearch" class="theme-search-input" placeholder="{{ __('hrms.salary.search_pay_groups') }}" value="{{ request()->get('pg_search') }}">
                             </div>
 
                             <!-- Sort Dropdown -->
                             <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
-                                <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortPayGroups('name_asc', this); event.preventDefault();">{{ __('hrms.common.sort_name_asc') }}</a>
-                                <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortPayGroups('name_desc', this); event.preventDefault();">{{ __('hrms.common.sort_name_desc') }}</a>
-                                <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortPayGroups('newest', this); event.preventDefault();">{{ __('hrms.salary.newest_first') }}</a>
+                                <a class="dropdown-item py-2 {{ request()->get('pg_sort', 'name_asc') === 'name_asc' ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changePayGroupSort('name_asc', this); event.preventDefault();">{{ __('hrms.common.sort_name_asc') }}</a>
+                                <a class="dropdown-item py-2 {{ request()->get('pg_sort') === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changePayGroupSort('name_desc', this); event.preventDefault();">{{ __('hrms.common.sort_name_desc') }}</a>
+                                <a class="dropdown-item py-2 {{ request()->get('pg_sort') === 'newest' ? 'active' : '' }}" href="#" data-sort="newest" onclick="changePayGroupSort('newest', this); event.preventDefault();">{{ __('hrms.salary.newest_first') }}</a>
                             </x-ui.sort-dropdown>
 
                             <!-- Filter Dropdown -->
@@ -210,8 +215,8 @@
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="pg_status" id="pg_filter_status">
                                         <option value="">{{ __('hrms.common.all_statuses') }}</option>
-                                        <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
-                                        <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                        <option value="1" {{ request()->get('pg_status') === '1' ? 'selected' : '' }}>{{ __('hrms.employees.frm_status_active') }}</option>
+                                        <option value="0" {{ request()->get('pg_status') === '0' ? 'selected' : '' }}>{{ __('hrms.employees.frm_status_inactive') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
@@ -220,7 +225,7 @@
                                     <x-ui.odoo-form-ui type="select" name="pg_company" id="pg_filter_company">
                                         <option value="">{{ __('hrms.common.all_companies') }}</option>
                                         @foreach($companies as $company)
-                                            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                            <option value="{{ $company->id }}" {{ request()->get('pg_company') == $company->id ? 'selected' : '' }}>{{ $company->company_name }}</option>
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>
@@ -228,17 +233,17 @@
                                 <div class="dropdown-divider my-3"></div>
 
                                 <div class="d-flex gap-2">
-                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterPayGroups()">{{ __('hrms.common.apply') }}</x-ui.button>
+                                    <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
                                     <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetPayGroupFilters()">{{ __('hrms.common.reset') }}</x-ui.button>
                                 </div>
                             </x-ui.filter>
-                        </div>
+                        </form>
                     </x-slot>
                     <div class="row g-0">
                         <!-- LEFT COLUMN: ALL PAY GROUPS LIST -->
                         <div class="col-md-4 col-12 border-end">
 
-                            <div class="list-group list-group-flush rounded-0" style="min-height: 400px; max-height: 600px; overflow-y: auto;">
+                            <div class="list-group list-group-flush rounded-0" id="payGroupsListContainer" style="min-height: 400px; max-height: 600px; overflow-y: auto;">
                                 @forelse($payGroups as $pg)
                                     @php
                                         $isActive = $selectedPayGroup && $selectedPayGroup->id === $pg->id;
@@ -249,12 +254,12 @@
                                        data-status="{{ $pg->status ? 'active' : 'inactive' }}"
                                        data-company-id="{{ $pg->company_id }}"
                                        data-created-at="{{ $pg->created_at ? $pg->created_at->timestamp : 0 }}">
-                                        <span class="fw-bold text-dark" style="font-size: 14px;">
-                                            {{ $pg->name }}
-                                        </span>
-                                        <div class="fs-11 text-muted text-capitalize mt-1">
-                                            {{ $pg->status ? __('hrms.employees.frm_status_active') : __('hrms.employees.frm_status_inactive') }} &bull; {{ $pg->company ? $pg->company->company_name : __('hrms.salary.no_company') }}
-                                        </div>
+                                         <span class="fw-bold text-dark" style="font-size: 14px;">
+                                             {{ $pg->name }}
+                                         </span>
+                                         <div class="fs-11 text-muted text-capitalize mt-1">
+                                             {{ $pg->status ? __('hrms.employees.frm_status_active') : __('hrms.employees.frm_status_inactive') }} &bull; {{ $pg->company ? $pg->company->company_name : __('hrms.salary.no_company') }}
+                                         </div>
                                     </a>
                                 @empty
                                     <div class="text-center py-5 text-muted px-3">
@@ -436,6 +441,7 @@
         </div>
     </div>
 
+    @push('scripts')
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             // Edit Pay Group Trigger
@@ -461,11 +467,7 @@
                 document.body.appendChild(modal);
             });
 
-            // Client-side instant filter for left sidebar Pay Groups
-            const payGroupSearchInput = document.getElementById('payGroupSearch');
-            if (payGroupSearchInput) {
-                payGroupSearchInput.addEventListener('input', filterPayGroups);
-            }
+
 
             // Prevent structures search form submit
             $(document).on('submit', 'form:has(input[name="struct_search"])', function(e) {
@@ -551,75 +553,91 @@
             });
         });
 
-        function filterPayGroups() {
-            const search = document.getElementById('payGroupSearch').value.toLowerCase().trim();
-            
-            const statusSelect = document.getElementById('pg_filter_status');
-            const statusVal = statusSelect ? statusSelect.value : '';
-            const status = statusVal === '1' ? 'active' : (statusVal === '0' ? 'inactive' : 'all');
-            
-            const companySelect = document.getElementById('pg_filter_company');
-            const companyId = companySelect ? companySelect.value : '';
-            
-            document.querySelectorAll('.plan-item').forEach(item => {
-                const name = item.getAttribute('data-name') || '';
-                const itemStatus = item.getAttribute('data-status') || '';
-                const itemCompanyId = item.getAttribute('data-company-id') || '';
-                
-                const matchesSearch = name.includes(search);
-                const matchesStatus = (status === 'all') || (itemStatus === status);
-                const matchesCompany = (companyId === '') || (itemCompanyId === companyId);
-                
-                if (matchesSearch && matchesStatus && matchesCompany) {
-                    item.style.setProperty('display', '', 'important');
-                } else {
-                    item.style.setProperty('display', 'none', 'important');
+        function loadPayGroups() {
+            var search = $('#payGroupSearch').val() || '';
+            var sort = $('#pg_sort').val() || 'name_asc';
+            var status = $('#pg_filter_status').val() || '';
+            var company = $('#pg_filter_company').val() || '';
+            var tab = '{{ request()->get("tab", "structures") }}';
+            var payGroupId = '{{ request()->get("pay_group_id", $selectedPayGroup ? $selectedPayGroup->id : "") }}';
+
+            var url = '{{ route("hrms.salary-structure.index") }}?tab=' + tab +
+                      '&pay_group_id=' + payGroupId +
+                      '&pg_search=' + encodeURIComponent(search) +
+                      '&pg_sort=' + encodeURIComponent(sort) +
+                      '&pg_status=' + encodeURIComponent(status) +
+                      '&pg_company=' + encodeURIComponent(company);
+
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(response) {
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(response, 'text/html');
+                    
+                    // Update pay groups list
+                    var oldList = $('#payGroupsListContainer');
+                    var newList = $(doc).find('#payGroupsListContainer');
+                    if (oldList.length && newList.length) {
+                        oldList.html(newList.html());
+                    }
+                    
+                    // Close the filter dropdown if open
+                    $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                    $('.erp-filter-dropdown.show').removeClass('show');
+
+                    // Push state to browser URL
+                    history.pushState(null, '', url);
                 }
             });
+        }
 
-            // Auto close dropdowns
-            $('.dropdown-menu').removeClass('show');
-            $('.dropdown, .erp-sort-dropdown, .erp-filter-dropdown').removeClass('show');
+        $(document).on('submit', '#payGroupFilterForm', function(e) {
+            e.preventDefault();
+            loadPayGroups();
+        });
+
+        var payGroupSearchTimeout;
+        $(document).on('input', '#payGroupSearch', function() {
+            clearTimeout(payGroupSearchTimeout);
+            payGroupSearchTimeout = setTimeout(function() {
+                loadPayGroups();
+            }, 300);
+        });
+
+        function changePayGroupSort(criteria, element) {
+            var sortInput = document.getElementById('pg_sort');
+            if (sortInput) {
+                sortInput.value = criteria;
+            }
+            if (element) {
+                var menu = element.closest('.dropdown-menu');
+                if (menu) {
+                    menu.querySelectorAll('.dropdown-item').forEach(function(el) {
+                        el.classList.remove('active');
+                    });
+                }
+                element.classList.add('active');
+            }
+            loadPayGroups();
         }
 
         function resetPayGroupFilters() {
             $('#pg_filter_status').val('').trigger('change');
             $('#pg_filter_company').val('').trigger('change');
-            document.getElementById('payGroupSearch').value = '';
-            filterPayGroups();
-        }
-        
-        function sortPayGroups(criteria, element) {
-            // Toggle active class on sort options
-            element.closest('.dropdown-menu').querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
-            element.classList.add('active');
-            
-            const list = document.querySelector('.list-group-flush');
-            if (!list) return;
-            const items = Array.from(list.querySelectorAll('.plan-item'));
-            
-            items.sort((a, b) => {
-                if (criteria === 'name_asc') {
-                    return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
-                } else if (criteria === 'name_desc') {
-                    return b.getAttribute('data-name').localeCompare(a.getAttribute('data-name'));
-                } else if (criteria === 'newest') {
-                    return parseInt(b.getAttribute('data-created-at') || 0) - parseInt(a.getAttribute('data-created-at') || 0);
-                }
-                return 0;
-            });
-            
-            // Re-append in sorted order
-            items.forEach(item => list.appendChild(item));
-
-            // Auto close dropdowns
-            $('.dropdown-menu').removeClass('show');
-            $('.dropdown, .erp-sort-dropdown, .erp-filter-dropdown').removeClass('show');
+            $('#pg_sort').val('name_asc');
+            var searchInput = document.getElementById('payGroupSearch');
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            loadPayGroups();
+            $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+            $('.erp-filter-dropdown.show').removeClass('show');
         }
 
-        window.filterPayGroups = filterPayGroups;
+        window.changePayGroupSort = changePayGroupSort;
         window.resetPayGroupFilters = resetPayGroupFilters;
-        window.sortPayGroups = sortPayGroups;
     </script>
+    @endpush
 @endsection
 

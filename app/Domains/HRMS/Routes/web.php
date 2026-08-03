@@ -136,6 +136,7 @@ Route::prefix('hrms')
         // Leave Request Management
         Route::prefix('leaves')->group(function (): void {
             Route::get('/', [LeaveRequestController::class, 'index'])->name('leaves.index');
+            Route::get('/export', [LeaveRequestController::class, 'export'])->name('leaves.export');
             Route::post('/store', [LeaveRequestController::class, 'store'])->name('leaves.store');
             Route::post('/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])->name('leaves.approve');
             Route::post('/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])->name('leaves.reject');
@@ -150,6 +151,7 @@ Route::prefix('hrms')
 
             // Leave Encashments
             Route::post('/encashment/store', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'store'])->name('leaves.encashment.store');
+            Route::get('/encashment/export', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'exportEncashments'])->name('leaves.encashment.export');
             Route::post('/encashment/{leaveEncashment}/approve', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'approve'])->name('leaves.encashment.approve');
             Route::post('/encashment/{leaveEncashment}/reject', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'reject'])->name('leaves.encashment.reject');
             Route::delete('/encashment/{leaveEncashment}', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'destroy'])->name('leaves.encashment.destroy');
@@ -158,6 +160,7 @@ Route::prefix('hrms')
         // WFH Request Management
         Route::prefix('wfh')->group(function (): void {
             Route::get('/', [WfhRequestController::class, 'index'])->name('wfh.index');
+            Route::get('/export', [WfhRequestController::class, 'export'])->name('wfh.export');
             Route::post('/store', [WfhRequestController::class, 'store'])->name('wfh.store');
             Route::post('/{wfhRequest}/approve', [WfhRequestController::class, 'approve'])->name('wfh.approve');
             Route::post('/{wfhRequest}/reject', [WfhRequestController::class, 'reject'])->name('wfh.reject');

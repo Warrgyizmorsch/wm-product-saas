@@ -112,6 +112,7 @@
             </div>
         </div>
     </div>
+</div>
 
     <div class="modal fade" id="addAdhocModal" tabindex="-1" aria-labelledby="addAdhocModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -219,4 +220,4 @@
             </div>
         </div>
     </div>
-</div>
+

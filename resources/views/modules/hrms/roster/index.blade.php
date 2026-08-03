@@ -289,7 +289,7 @@
         }
         
         /* Dropdown options styling */
-        .select2-container--bootstrap-5 .select2-dropdown {
+        .select2-dropdown.roster-grid-select-dropdown {
             min-width: 125px !important;
             width: max-content !important;
             max-width: 170px !important;
@@ -299,22 +299,22 @@
             overflow: hidden !important;
             z-index: 1060 !important;
         }
-        .select2-container--bootstrap-5 .select2-results__option {
+        .roster-grid-select-dropdown .select2-results__option {
             font-size: 11.5px !important;
             padding: 5px 10px !important;
             font-weight: 600 !important;
             white-space: nowrap !important;
             word-break: keep-all !important;
         }
-        .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] {
+        .roster-grid-select-dropdown .select2-results__option--highlighted[aria-selected] {
             background-color: var(--bs-primary) !important;
             color: #ffffff !important;
         }
-        .select2-container--bootstrap-5 .select2-results__option[aria-selected=true] {
+        .roster-grid-select-dropdown .select2-results__option[aria-selected=true] {
             background-color: var(--bs-primary) !important;
             color: #ffffff !important;
         }
-        .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] span {
+        .roster-grid-select-dropdown .select2-results__option--highlighted[aria-selected] span {
             color: #ffffff !important;
         }
     </style>
@@ -792,7 +792,7 @@
  
                                                  <div class="mb-3">
                                                      <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.roster.start_date') }}</label>
-                                                     <input type="date" name="start_date" class="form-control form-control-sm" value="{{ $startDate->format('Y-m-d') }}" style="border-color: #cbd5e1; border-radius: 6px;">
+                                                     <x-ui.odoo-form-ui type="input" inputType="date" name="start_date" :value="$startDate->format('Y-m-d')" />
                                                  </div>
  
                                                  <div class="dropdown-divider my-3"></div>
@@ -1340,6 +1340,7 @@
                                 theme: "bootstrap-5",
                                 minimumResultsForSearch: -1, // Hide search box
                                 width: "100%",
+                                dropdownCssClass: "roster-grid-select-dropdown",
                                 templateResult: function(data) {
                                     if (!data.id) return data.text;
                                     var $result = $('<span></span>');
@@ -1407,6 +1408,11 @@
                             $('#rosterBoardGrid').parent().append(newPagination);
                         } else {
                             oldPagination.empty();
+                        }
+
+                        // Push state to sync browser URL with current pagination & filter params
+                        if (window.history.pushState) {
+                            window.history.pushState({path: url}, '', url);
                         }
                     }
                 });

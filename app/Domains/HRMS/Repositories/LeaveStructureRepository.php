@@ -11,7 +11,29 @@ class LeaveStructureRepository implements LeaveStructureRepositoryInterface
     public function getIndexData(array $inputs): array
     {
         $companies = Company::all();
-        $leavePlans = LeavePlan::with(['company', 'types'])->get();
+        $leavePlansQuery = LeavePlan::with(['company', 'types']);
+        if (isset($inputs['lp_status']) && $inputs['lp_status'] !== '') {
+            $leavePlansQuery->where('status', $inputs['lp_status']);
+        }
+        if (!empty($inputs['lp_company'])) {
+            $leavePlansQuery->where('company_id', $inputs['lp_company']);
+        }
+        if (!empty($inputs['lp_search'])) {
+            $leavePlansQuery->where('name', 'like', '%' . $inputs['lp_search'] . '%');
+        }
+        if (!empty($inputs['lp_sort'])) {
+            $lpSort = $inputs['lp_sort'];
+            if ($lpSort === 'name_asc') {
+                $leavePlansQuery->orderBy('name', 'asc');
+            } elseif ($lpSort === 'name_desc') {
+                $leavePlansQuery->orderBy('name', 'desc');
+            } elseif ($lpSort === 'newest') {
+                $leavePlansQuery->orderBy('created_at', 'desc');
+            }
+        } else {
+            $leavePlansQuery->orderBy('name', 'asc');
+        }
+        $leavePlans = $leavePlansQuery->get();
 
         $selectedPlanId = $inputs['plan_id'] ?? null;
         $selectedPlan = null;
