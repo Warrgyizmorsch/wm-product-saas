@@ -216,12 +216,6 @@
     <div class="row text-dark">
         <div class="col-12">
             <!-- Toast Notifications -->
-            @if (session('success'))
-                <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-            @endif
-            @if (session('error'))
-                <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-            @endif
 
             @if($rfq->status === 'Confirmed')
                 <div class="alert alert-success d-flex align-items-center mb-4 border-0 shadow-sm">
@@ -834,7 +828,6 @@
                     </x-ui.odoo-form-ui>
                 </div>
             </div>
-
 
             {{-- Items preview table --}}
             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-2">{{ __('purchase.selected_items') }}</label>

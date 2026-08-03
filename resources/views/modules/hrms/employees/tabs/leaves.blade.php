@@ -236,19 +236,6 @@
  
         <!-- RIGHT COLUMN: Application Logs & History -->
         <div class="col-lg-8 col-12">
-            @if(session('success'))
-                <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
-                    <i class="feather-check-circle me-2"></i>{{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            @endif
-
-            @if(session('error'))
-                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
-                    <i class="feather-alert-triangle me-2"></i>{{ session('error') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            @endif
 
             @if($errors->any())
                 <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
@@ -402,7 +389,6 @@
 
                     <!-- 1. LEAVE APPLICATIONS VIEW -->
                     <div id="leaveApplicationsViewContainer">
-
 
                         @if(!isset($empLeaveRequests) || $empLeaveRequests->isEmpty())
                             <div class="p-5 text-center text-muted">
@@ -841,7 +827,6 @@
             <button type="button" class="btn btn-light border fw-semibold text-uppercase" data-bs-dismiss="offcanvas">CLOSE PANEL</button>
         </x-slot:footer>
     </x-ui.drawer>
-
 
     {{-- Leave Cancellation Request Modal --}}
     <div class="modal fade" id="leaveCancellationModal" tabindex="-1" aria-labelledby="leaveCancellationModalLabel" aria-hidden="true">

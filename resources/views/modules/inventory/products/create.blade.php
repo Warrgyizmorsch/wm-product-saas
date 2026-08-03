@@ -90,12 +90,6 @@
     <div class="row">
         <div class="col-12">
             <!-- Toast Notifications -->
-            @if (session('success'))
-                <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-            @endif
-            @if (session('error'))
-                <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-            @endif
             @if ($errors->any())
                 <div class="alert alert-danger mb-3">
                     <ul class="mb-0">

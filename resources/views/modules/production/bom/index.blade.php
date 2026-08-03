@@ -4,7 +4,6 @@
 @section('page-title', __('production.bom_management'))
 @section('breadcrumb', __('production.bom_management'))
 
-
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -153,13 +152,6 @@
 
     <div class="erp-single-panel">
         <!-- Success & Error Messages (Rendered via Toast Component) -->
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">

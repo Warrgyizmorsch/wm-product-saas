@@ -197,12 +197,6 @@
     <div class="row text-dark">
         <div class="col-12">
             <!-- Toast Notifications -->
-            @if (session('success'))
-                <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-            @endif
-            @if (session('error'))
-                <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-            @endif
 
             @if($grn->status === 'Approved')
                 <div class="alert alert-success d-flex align-items-center mb-4 border-0 shadow-sm">

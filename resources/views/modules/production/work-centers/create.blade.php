@@ -21,10 +21,6 @@
             <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') ?? 'Validation Failed' }}: {{ $errors->first() }}" />
         @endif
 
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
-
         <form method="POST" action="{{ route('production.work-centers.store') }}">
             @csrf
             

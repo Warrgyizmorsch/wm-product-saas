@@ -41,12 +41,6 @@
 @section('content')
     <div class="row text-dark">
         <!-- Toast Notifications -->
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <div class="col-12">
             <div class="card border-0 shadow-sm p-4 p-md-5 bg-white">

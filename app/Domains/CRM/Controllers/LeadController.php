@@ -38,11 +38,27 @@ class LeadController extends Controller
             'search', 'duplicates_only', 'priority', 'segment', 'status', 'quotation_status', 'start_date', 'end_date', 'date_from', 'date_to', 'sort_by', 'sort_order'
         ]);
 
-        $leads = $this->leadRepo->getPaginatedLeads($filters, 15);
+        $leads = $this->leadRepo->getPaginatedLeads($filters, 10);
         $this->duplicateService->annotateDuplicates($leads->items(), $tenantId);
         $quotations = $this->quotationService->latest();
 
-        return view('modules.crm.leads.index', compact('leads', 'quotations'));
+        $statusCounts = Lead::query()
+            ->where('tenant_id', $tenantId)
+            ->select('status', \DB::raw('count(*) as aggregate'))
+            ->groupBy('status')
+            ->pluck('aggregate', 'status')
+            ->toArray();
+
+        $totalLeadsCount = Lead::query()->where('tenant_id', $tenantId)->count();
+
+        $allTenantLeads = Lead::query()
+            ->where('tenant_id', $tenantId)
+            ->select(['id', 'email', 'phone'])
+            ->get();
+        $this->duplicateService->annotateDuplicates($allTenantLeads, $tenantId);
+        $duplicatesCount = $allTenantLeads->where('is_duplicate', true)->count();
+
+        return view('modules.crm.leads.index', compact('leads', 'quotations', 'statusCounts', 'totalLeadsCount', 'duplicatesCount'));
     }
 
     public function kanban(Request $request)
@@ -242,6 +258,27 @@ class LeadController extends Controller
         }
 
         return redirect()->back()->with('success', $res['message']);
+    }
+
+    public function updatePriority(Request $request, Lead $lead)
+    {
+        $this->authorize('update', $lead);
+        $validated = $request->validate([
+            'priority' => 'required|string|in:Low,Medium,High,Urgent'
+        ]);
+
+        $lead->update(['priority' => $validated['priority']]);
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => "Priority updated to {$lead->priority}!",
+                'priority' => $lead->priority,
+                'lead_id' => $lead->id
+            ]);
+        }
+
+        return redirect()->back()->with('success', "Priority updated to {$lead->priority}!");
     }
 
     public function updateOwner(Request $request, Lead $lead)

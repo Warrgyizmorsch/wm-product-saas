@@ -17,27 +17,6 @@
 
 @section('content')
 <div class="erp-single-panel bg-white p-4">
-    @if (session('error'))
-        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-    @endif
-    @if ($errors->any())
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Validation Errors:</h6>
-                    <ul class="fs-12 mb-0 ps-3">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
 
     <form action="{{ route('inventory.adjustments.store') }}" method="POST" id="adjustmentForm">
         @csrf
@@ -231,25 +210,55 @@
                     const prod = data.product;
                     let rows = document.querySelectorAll('.adjustment-row');
                     let targetRow = null;
+                    let isNewRow = false;
 
+                    // 1. Look for existing row with SAME product
                     rows.forEach(r => {
                         let sel = r.querySelector('.product-select');
-                        if (sel && (!sel.value || sel.value === '')) {
+                        if (sel && sel.value == prod.id) {
                             targetRow = r;
                         }
                     });
 
+                    // 2. If no matching row found, look for empty row
+                    if (!targetRow) {
+                        rows.forEach(r => {
+                            let sel = r.querySelector('.product-select');
+                            if (sel && (!sel.value || sel.value === '')) {
+                                targetRow = r;
+                                isNewRow = true;
+                            }
+                        });
+                    }
+
+                    // 3. If no empty row found, create new row
                     if (!targetRow) {
                         document.getElementById('add-item').click();
                         let newRows = document.querySelectorAll('.adjustment-row');
                         targetRow = newRows[newRows.length - 1];
+                        isNewRow = true;
                     }
 
                     if (targetRow) {
                         let sel = targetRow.querySelector('.product-select');
                         let costIn = targetRow.querySelector('.cost-input');
-                        if (sel) $(sel).val(prod.id).trigger('change');
+                        if (sel && sel.value != prod.id) $(sel).val(prod.id).trigger('change');
                         if (costIn) costIn.value = prod.unit_cost || prod.cost_price;
+
+                        // Qty / Count Increment or Set
+                        let countIn = targetRow.querySelector('.count-input, input[name*="[counted_qty]"], input[name*="[quantity]"]');
+                        if (countIn) {
+                            let currentQty = parseFloat(countIn.value) || 0;
+                            if (!isNewRow && currentQty > 0) {
+                                countIn.value = currentQty + 1;
+                                $(countIn).trigger('change');
+                            } else {
+                                if (currentQty === 0) {
+                                    countIn.value = 1;
+                                    $(countIn).trigger('change');
+                                }
+                            }
+                        }
 
                         const scannedSn = data.serial_number || (data.is_serial ? code : null);
                         if (scannedSn) {
@@ -258,7 +267,11 @@
                                 let currentSns = snInput.value ? snInput.value.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean) : [];
                                 if (!currentSns.includes(scannedSn)) {
                                     currentSns.push(scannedSn);
-                                    snInput.value = currentSns.join(', ');
+                                    snInput.value = currentSns.join('\n');
+                                    if (countIn && currentSns.length > (parseFloat(countIn.value) || 0)) {
+                                        countIn.value = currentSns.length;
+                                        $(countIn).trigger('change');
+                                    }
                                 }
                             }
                         }

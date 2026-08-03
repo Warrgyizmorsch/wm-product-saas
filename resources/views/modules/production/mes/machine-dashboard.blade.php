@@ -15,9 +15,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-white">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
 
         @if($machines->count() === 0)
             <div class="text-center py-5 text-muted">

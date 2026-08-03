@@ -167,17 +167,8 @@
     </div>
 @endsection
 
-
 @section('content')
 <div class="erp-single-panel bg-white">
-
-    @if(session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
-
-    @if(session('error'))
-        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-    @endif
 
     {{-- ── Header Identity Row ──────────────────────────────────────────── --}}
     <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
@@ -2181,7 +2172,6 @@
                         <x-ui.odoo-form-ui type="input" label="{{ __('production.amount') }} ({{ active_currency_symbol() }})" name="amount" inputType="number" step="0.01" min="0.01" value="{{ number_format(convert_from_base($adj->amount), 2, '.', '') }}" :required="true" />
                     </div>
                 </div>
-
 
                 <x-ui.odoo-form-ui type="input" label="{{ __('production.description') }}" name="description" value="{{ $adj->description }}" :required="true" />
 

@@ -216,12 +216,6 @@
     <div class="erp-single-panel">
 
         {{-- Toasts --}}
-        @if(session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if(session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         {{-- ─── Toolbar (BOM-style) ─── --}}
         <div class="d-flex align-items-center mb-3">
@@ -581,7 +575,6 @@
                 @endforeach
             @endif
         </div>
-
 
         {{-- ══════════════════════════════════════════════════════════
              Panel 4: Scheduled Operations List

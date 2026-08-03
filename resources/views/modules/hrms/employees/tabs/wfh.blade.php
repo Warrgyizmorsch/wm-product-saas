@@ -3,7 +3,6 @@
         $wfhTotalCount = $empWfhRequests->count();
     @endphp
 
-
     <div class="card-custom">
         <!-- Header with actions -->
         <div class="card-custom-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-3 px-4 border-bottom">
@@ -75,7 +74,6 @@
             </div>
         </div>
 
-
         <div class="card-body p-0">
             @if($empWfhRequests->isEmpty())
                 <div class="p-5 text-center text-muted">
@@ -93,7 +91,6 @@
                                 <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 4%;">{{ __('hrms.wfh.file') }}</th>
                                 <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 12%;">{{ __('hrms.wfh.status') }}</th>
                                 <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 15%;">{{ __('hrms.wfh.actions') }}</th>
-
 
                             </tr>
                         </thead>

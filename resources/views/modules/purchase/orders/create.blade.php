@@ -72,16 +72,6 @@
                         </div>
                     </div>
 
-                    @if ($errors->any())
-                        <div class="alert alert-danger">
-                            <ul class="mb-0">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-
                     <div class="row g-4 fs-13 text-dark">
                         <!-- Left Panel: Supplier & Location details -->
                         <div class="col-md-6 border-end">
@@ -108,10 +98,7 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
-
                             <x-ui.odoo-form-ui type="input" label="{{ __('purchase.po_no') }}" name="po_number_dummy" value="[{{ __('purchase.auto_generated') }}]" readonly="true" />
-
-
 
                             <x-ui.odoo-form-ui type="select" label="{{ __('purchase.load_from_pr') }}" name="purchase_requisition_id" id="requisitionSelect">
                                 <option value="">{{ __('purchase.direct_po_no_pr') }}</option>
@@ -429,7 +416,6 @@
                 });
             }
             initSelect2(document);
-
 
             function toggleRow($el, show) {
                 if (show) {
@@ -848,17 +834,34 @@
                         if (res.success && res.product) {
                             const prod = res.product;
                             let targetRow = null;
+                            let isNewRow = false;
+
+                            // 1. Look for existing row with SAME product
                             $('#poItemsTable tbody tr.item-row').each(function() {
                                 const sel = $(this).find('.product-select');
-                                if (sel.length && (!sel.val() || sel.val() === '')) {
+                                if (sel.length && sel.val() == prod.id) {
                                     targetRow = $(this);
                                     return false;
                                 }
                             });
 
+                            // 2. If no matching row found, look for empty row
+                            if (!targetRow) {
+                                $('#poItemsTable tbody tr.item-row').each(function() {
+                                    const sel = $(this).find('.product-select');
+                                    if (sel.length && (!sel.val() || sel.val() === '')) {
+                                        targetRow = $(this);
+                                        isNewRow = true;
+                                        return false;
+                                    }
+                                });
+                            }
+
+                            // 3. If no empty row found, create new row
                             if (!targetRow) {
                                 $('#addPoItemBtn').click();
                                 targetRow = $('#poItemsTable tbody tr.item-row').last();
+                                isNewRow = true;
                             }
 
                             const selectEl = targetRow.find('.product-select');
@@ -866,8 +869,24 @@
                                 if (!selectEl.find(`option[value="${prod.id}"]`).length) {
                                     selectEl.append(`<option value="${prod.id}" data-cost="${prod.cost_price || prod.unit_cost}" data-name="${prod.name}">${prod.name} (${prod.sku})</option>`);
                                 }
-                                selectEl.val(prod.id).trigger('change');
+                                if (selectEl.val() != prod.id) {
+                                    selectEl.val(prod.id).trigger('change');
+                                }
                                 targetRow.find('.rate-input').val(prod.cost_price || prod.unit_cost);
+
+                                // Qty increment or initial set
+                                const qtyInput = targetRow.find('.qty-input');
+                                if (qtyInput.length) {
+                                    const currentQty = parseFloat(qtyInput.val()) || 0;
+                                    if (!isNewRow && currentQty > 0) {
+                                        qtyInput.val(currentQty + 1);
+                                    } else {
+                                        if (currentQty === 0) {
+                                            qtyInput.val(1);
+                                        }
+                                    }
+                                }
+
                                 calculateAll();
                             }
                             input.val('');

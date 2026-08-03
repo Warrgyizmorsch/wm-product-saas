@@ -24,27 +24,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-white p-4">
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="danger" title="{{ session('error') }}" />
-        @endif
-        @if ($errors->any())
-            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-text avatar-md bg-danger text-white me-3">
-                        <i class="feather-alert-triangle"></i>
-                    </div>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Validation Errors:</h6>
-                        <ul class="fs-12 mb-0 ps-3">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        @endif
 
         <form action="{{ route('sales.dispatches.store') }}" method="POST" id="dispatchForm">
             @csrf
@@ -548,7 +527,7 @@
                                 <strong class="text-dark fs-13">${escapeHtml(item.product_name || 'Unknown product')}</strong>
                                 ${item.product_sku ? `<small class="d-block text-muted font-monospace fs-11">SKU: ${escapeHtml(item.product_sku)}</small>` : ''}
                             </td>
-                            <td class="align-top"><select name="items[${index}][warehouse_id]" class="form-select form-select-sm odoo-select2">${options}</select></td>
+                            <td class="align-top"><select name="items[${index}][warehouse_id]" class="form-select odoo-table-select odoo-select2">${options}</select></td>
                             <td class="text-end fw-semibold mr-col align-top">${item.quantity_ordered}</td>
                             <td class="text-end fw-semibold text-success mr-col align-top">${item.available_qty ?? 0}</td>
                             <td class="text-end fw-semibold text-info mr-col align-top">${item.quantity_reserved}</td>
@@ -559,13 +538,14 @@
                                 <input
                                     type="number"
                                     name="items[${index}][quantity]"
-                                    class="form-control form-control-sm text-end dispatch-qty-input fw-bold"
+                                    class="odoo-table-input text-end dispatch-qty-input fw-bold"
                                     value="${item.dispatch_qty}"
                                     min="0.0001"
                                     max="${item.remaining_qty}"
                                     data-max="${item.remaining_qty}"
                                     required
                                 >
+                                <div class="qty-error-msg text-danger fs-11 fw-semibold text-end mt-1 d-none">Dispatch Qty must be greater than 0.</div>
                             </td>
                         </tr>`;
                 }
@@ -582,6 +562,32 @@
             element.textContent = value;
             return element.innerHTML;
         }
+
+        $(document).on('input change', '.dispatch-qty-input', function() {
+            const val = parseFloat($(this).val());
+            const max = parseFloat($(this).data('max')) || Infinity;
+            const $cell = $(this).closest('td');
+            let $error = $cell.find('.qty-error-msg');
+
+            if (!$error.length) {
+                $error = $('<div class="qty-error-msg text-danger fs-11 fw-semibold text-end mt-1">Dispatch Qty must be greater than 0.</div>');
+                $cell.append($error);
+            }
+
+            if (isNaN(val) || val <= 0) {
+                $(this).css('border-bottom-color', '#ef4444');
+                $error.text('Dispatch Qty must be greater than 0.').removeClass('d-none');
+                setSaveButtonsDisabled(true);
+            } else if (val > max) {
+                $(this).css('border-bottom-color', '#ef4444');
+                $error.text(`Cannot exceed remaining quantity (${max}).`).removeClass('d-none');
+                setSaveButtonsDisabled(true);
+            } else {
+                $(this).css('border-bottom-color', '#cbd5e1');
+                $error.addClass('d-none');
+                setSaveButtonsDisabled(false);
+            }
+        });
 
         document.getElementById('dispatchForm').addEventListener('submit', event => {
             const mode = document.querySelector('input[name="dispatch_mode"]:checked').value;
@@ -644,32 +650,47 @@
                             });
                         }
 
-                        // 1. Check if a row already has this product selected
-                        let targetSelect = null;
-                        $('#dispatchItemsBody select[name$="[product_id]"]').each(function() {
-                            if ($(this).val() == prod.id) {
-                                targetSelect = $(this);
-                                return false;
+                        // 1. Look for existing row with SAME product AND SAME warehouse
+                        let targetTr = null;
+                        const targetWhId = data.warehouse_id || null;
+
+                        $('#dispatchItemsBody tr').each(function() {
+                            const tr = $(this);
+                            const rowProdId = tr.find('select[name$="[product_id]"]').val();
+                            const rowWhId = tr.find('select[name$="[warehouse_id]"]').val();
+
+                            if (rowProdId == prod.id) {
+                                if (!targetWhId || !rowWhId || rowWhId == targetWhId) {
+                                    targetTr = tr;
+                                    return false; // Found matching product + warehouse row
+                                }
                             }
                         });
 
-                        // 2. If no existing row for this product, use an empty row
-                        if (!targetSelect) {
-                            $('#dispatchItemsBody select[name$="[product_id]"]').each(function() {
-                                if (!$(this).val()) {
-                                    targetSelect = $(this);
+                        let isNewRow = false;
+                        // 2. If no matching row found, look for an empty row
+                        if (!targetTr) {
+                            $('#dispatchItemsBody tr').each(function() {
+                                const tr = $(this);
+                                const rowProdId = tr.find('select[name$="[product_id]"]').val();
+                                if (!rowProdId) {
+                                    targetTr = tr;
+                                    isNewRow = true;
                                     return false;
                                 }
                             });
                         }
 
-                        // 3. If no empty row exists, add a new row
-                        if (!targetSelect) {
+                        // 3. If no empty row found, create a new row
+                        if (!targetTr) {
                             addDirectItemRow();
-                            targetSelect = $('#dispatchItemsBody select[name$="[product_id]"]').last();
+                            targetTr = $('#dispatchItemsBody tr').last();
+                            isNewRow = true;
                         }
 
-                        if (targetSelect && targetSelect.length) {
+                        if (targetTr && targetTr.length) {
+                            const targetSelect = targetTr.find('select[name$="[product_id]"]');
+
                             if (!targetSelect.find(`option[value="${prod.id}"]`).length) {
                                 targetSelect.append(`<option value="${prod.id}" data-serial="${prod.track_serial_number ? '1' : '0'}" data-batch="${prod.track_batch ? '1' : '0'}">${escapeHtml(prod.name)} ${prod.sku ? `(${escapeHtml(prod.sku)})` : ''}</option>`);
                             }
@@ -678,20 +699,31 @@
                             }
 
                             // Auto-select Warehouse for this row if provided
-                            if (data.warehouse_id) {
-                                const targetTr = targetSelect.closest('tr');
+                            if (targetWhId) {
                                 const whSelect = targetTr.find('select[name$="[warehouse_id]"]');
-                                if (whSelect.length && whSelect.find(`option[value="${data.warehouse_id}"]`).length) {
-                                    whSelect.val(data.warehouse_id).trigger('change');
+                                if (whSelect.length && whSelect.find(`option[value="${targetWhId}"]`).length) {
+                                    if (whSelect.val() != targetWhId) {
+                                        whSelect.val(targetWhId).trigger('change');
+                                    }
                                 }
                             }
-                        }
 
-                        // Auto-fill Serial Number if scanned code is a Serial Number
-                        const scannedSn = data.serial_number || (data.is_serial ? code : null);
-                        if (scannedSn) {
-                            const targetTr = targetSelect ? targetSelect.closest('tr') : null;
-                            if (targetTr && targetTr.length) {
+                            // Qty Increment or Initial Set
+                            const qtyInput = targetTr.find('input[name$="[qty]"], input[name$="[dispatch_qty]"], input[name$="[quantity]"]');
+                            if (qtyInput.length) {
+                                const currentQty = parseFloat(qtyInput.val()) || 0;
+                                if (!isNewRow && currentQty > 0) {
+                                    qtyInput.val(currentQty + 1).trigger('input').trigger('change');
+                                } else {
+                                    if (currentQty === 0) {
+                                        qtyInput.val(1).trigger('input').trigger('change');
+                                    }
+                                }
+                            }
+
+                            // Auto-fill Serial Number if scanned code is a Serial Number
+                            const scannedSn = data.serial_number || (data.is_serial ? code : null);
+                            if (scannedSn) {
                                 const serialTextarea = targetTr.find('textarea[name$="[serial_numbers]"], input[name$="[serial_numbers]"]');
                                 if (serialTextarea.length) {
                                     let currentText = serialTextarea.val().trim();
@@ -699,6 +731,9 @@
                                     if (!serialsArr.includes(scannedSn)) {
                                         serialsArr.push(scannedSn);
                                         serialTextarea.val(serialsArr.join('\n'));
+                                    }
+                                    if (qtyInput.length && serialsArr.length > (parseFloat(qtyInput.val()) || 0)) {
+                                        qtyInput.val(serialsArr.length).trigger('input').trigger('change');
                                     }
                                 }
                             }

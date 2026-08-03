@@ -85,10 +85,6 @@
             <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
         @endif
 
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
-
         <!-- BOM Details Header Grid -->
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <h4 class="fw-bold text-dark mb-0">{{ __('production.bom_details') }} (BOM #{{ $bom->bom_number }})</h4>
@@ -587,7 +583,6 @@
                         </tbody>
                     </x-ui.odoo-form-ui>
                 </div>
-
 
             </div>
 

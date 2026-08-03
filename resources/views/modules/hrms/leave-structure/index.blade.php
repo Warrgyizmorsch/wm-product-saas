@@ -224,20 +224,6 @@
         <!-- Content Column -->
         <div class="settings-content-col">
 
-            @if(session('success'))
-                <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-                <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                    {{ session('success') }}
-                </x-ui.alert>
-            @endif
-
-            @if(session('error'))
-                <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                    {{ session('error') }}
-                </x-ui.alert>
-            @endif
-
             <div class="col-12">
                 <x-ui.card title="{{ __('hrms.leave.leave_plans') }}" bodyClass="p-0" stretch>
                     <x-slot name="headerAction">
@@ -1334,7 +1320,6 @@
                     $('.dropdown-menu').removeClass('show');
                 }
             });
-
 
             // Instant client-side search for Leave Plans on left sidebar
             const leavePlanSearchInput = document.getElementById('leavePlanSearch');

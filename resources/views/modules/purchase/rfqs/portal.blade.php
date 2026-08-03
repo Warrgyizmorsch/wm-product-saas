@@ -81,22 +81,6 @@
             <div class="col-lg-12">
                 
                 <!-- Success/Error Messages -->
-                @if(session('success'))
-                    <div class="alert alert-success border-0 shadow-sm mb-4 py-3" role="alert">
-                        <div class="d-flex align-items-center">
-                            <i data-feather="check-circle" class="me-2 text-success"></i>
-                            <div class="fw-semibold">{{ session('success') }}</div>
-                        </div>
-                    </div>
-                @endif
-                @if(session('error'))
-                    <div class="alert alert-danger border-0 shadow-sm mb-4 py-3" role="alert">
-                        <div class="d-flex align-items-center">
-                            <i data-feather="alert-circle" class="me-2 text-danger"></i>
-                            <div class="fw-semibold">{{ session('error') }}</div>
-                        </div>
-                    </div>
-                @endif
                 @if($errors->any())
                     <div class="alert alert-danger border-0 shadow-sm mb-4 py-3" role="alert">
                         <div class="fw-bold mb-1"><i data-feather="alert-circle" class="me-2 text-danger"></i>Please correct the errors below:</div>

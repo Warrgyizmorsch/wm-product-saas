@@ -150,6 +150,10 @@ class DispatchOrderController extends Controller
             'items.*.quantity'        => ['required', 'numeric', 'min:0.0001'],
             'items.*.serial_numbers'  => ['nullable', 'string'],
             'items.*.batch_number'    => ['nullable', 'string'],
+        ], [
+            'items.*.quantity.min'      => 'Dispatch quantity must be greater than 0.',
+            'items.*.quantity.required' => 'Dispatch quantity is required.',
+            'items.*.quantity.numeric'  => 'Dispatch quantity must be a valid number.',
         ]);
 
         try {

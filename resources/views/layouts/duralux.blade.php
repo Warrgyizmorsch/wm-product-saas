@@ -207,8 +207,7 @@
         });
 
         // Generic Quick Create Master Dropdown handler (Supports Single & Multiselect)
-        $(document).on('change', '.erp-premium-select, select[data-master]', function () {
-            var select = $(this);
+        function handleQuickCreateSelect(select) {
             var val = select.val();
             var isAddNew = false;
 
@@ -219,7 +218,10 @@
             }
 
             if (isAddNew) {
-                var master = select.attr('data-master');
+                // Get master from select attr first, then fallback to selected option attr
+                var master = select.attr('data-master') || select.find('option[value="__ADD_NEW__"]').attr('data-master');
+                if (!master) return;
+
                 var modalId = 'quickCreateModal_' + master;
                 var modalEl = document.getElementById(modalId);
                 if (modalEl) {
@@ -234,6 +236,18 @@
                 } else {
                     select.val('').trigger('change.select2');
                 }
+            }
+        }
+
+        // Native select change
+        $(document).on('change', 'select', function () {
+            handleQuickCreateSelect($(this));
+        });
+
+        // Select2 select event (fires when user picks from Select2 dropdown)
+        $(document).on('select2:select', 'select', function (e) {
+            if (e.params && e.params.data && e.params.data.id === '__ADD_NEW__') {
+                handleQuickCreateSelect($(this));
             }
         });
 
@@ -315,6 +329,12 @@
                             });
                             if (response.type) {
                                 optionEl.attr('data-type', response.type);
+                            }
+                            if (response.billing_address) {
+                                optionEl.attr('data-billing', response.billing_address);
+                            }
+                            if (response.shipping_address) {
+                                optionEl.attr('data-shipping', response.shipping_address);
                             }
 
                             // Append new DB product option to dropdown

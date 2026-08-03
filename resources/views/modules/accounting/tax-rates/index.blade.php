@@ -5,11 +5,6 @@
 @section('breadcrumb', 'Accounting / Tax Rates')
 
 @section('content')
-    @if (session('success'))
-        <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="mb-4">
-            <strong>Success!</strong> {{ session('success') }}
-        </x-ui.alert>
-    @endif
 
     <div class="row">
         <!-- Left: Tax Rate List Table -->
