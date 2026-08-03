@@ -49,7 +49,7 @@ class DatabaseSeeder extends Seeder
             RbacSeeder::class,
             InventoryMasterDemoSeeder::class,
             CrusherMachineInventorySeeder::class,
-            FurnitureManufacturingDemoSeeder::class,
+            CrusherMachineProductionSeeder::class,
             HrmsDemoSeeder::class,
             AccountingChartOfAccountsSeeder::class,
         ]);
