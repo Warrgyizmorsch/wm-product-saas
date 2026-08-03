@@ -171,6 +171,14 @@ class ProductionOrderController extends Controller
             }
         }
 
+        foreach ($order->batches as $batch) {
+            try {
+                app(\App\Domains\Production\Services\BatchProductionService::class)->reconcileBatchActualQuantity($batch->id);
+            } catch (\Exception $e) {
+                // Fail-safe to avoid blocking page load
+            }
+        }
+
         // Get variance analysis calculations
         $costs = $this->costService->getCostAnalysis($order);
 
@@ -188,10 +196,20 @@ class ProductionOrderController extends Controller
         $categories = \App\Domains\Production\Models\ProductionCostAdjustment::getCategories();
         $warehouses = Warehouse::where('tenant_id', $order->tenant_id)->orderByDesc('is_default')->orderBy('name')->get();
         $operators = \App\Models\User::where('tenant_id', $order->tenant_id)->orderBy('name')->get();
+        $wipWorkCenterSummaries = app(\App\Domains\Production\Services\ProductionWipService::class)
+            ->getWorkCenterWipSummaries($order->tenant_id, $order->id);
 
         return view('modules.production.orders.show', compact(
-            'order', 'costs', 'dailyHistory', 'costAdjustments', 'finalCostingSummary',
-            'costComponents', 'categories', 'warehouses', 'operators'
+            'order',
+            'costs',
+            'costAdjustments',
+            'dailyHistory',
+            'finalCostingSummary',
+            'costComponents',
+            'categories',
+            'warehouses',
+            'operators',
+            'wipWorkCenterSummaries'
         ));
     }
 

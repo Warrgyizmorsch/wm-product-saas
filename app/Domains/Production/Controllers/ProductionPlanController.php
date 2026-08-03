@@ -85,9 +85,13 @@ class ProductionPlanController extends Controller
     {
         Gate::authorize('create', ProductionPlan::class);
 
-        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
-
         $tenantId = require_tenant_id();
+
+        $products = Product::where('tenant_id', $tenantId)
+            ->whereIn('type', ['finished_good', 'semi_finished'])
+            ->select(['id', 'name', 'sku'])
+            ->orderBy('name')
+            ->get();
 
         // Load default BOM and Routing dropdowns
         $boms = ProductionBom::withoutGlobalScopes()

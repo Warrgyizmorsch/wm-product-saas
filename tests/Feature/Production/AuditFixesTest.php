@@ -120,8 +120,44 @@ class AuditFixesTest extends TestCase
         $service = app(DashboardRefreshService::class);
 
         // Attempting to query other tenant's machine under this tenant's context should throw an exception
-        $this->expectException(\InvalidArgumentException::class);
-        $service->refreshMachineDashboard($this->tenant->id, $machineOther->id);
+        try {
+            $service->refreshMachineDashboard($this->tenant->id, $machineOther->id);
+            $this->fail('Expected InvalidArgumentException when querying other tenant machine');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('Machine not found or access denied', $e->getMessage());
+        }
+
+        // Test refreshWorkCenterDashboard metric scoping against multi-tenant machine table
+        $wc1 = WorkCenter::create([
+            'tenant_id' => $this->tenant->id,
+            'name'      => 'WC 1',
+            'code'      => 'WC-1',
+            'status'    => 'active',
+        ]);
+        Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc1->id,
+            'name'           => 'Machine 1',
+            'code'           => 'M-1',
+            'status'         => 'active',
+            'current_state'  => 'Running',
+        ]);
+
+        // Direct DB insert simulating another tenant machine with same work_center_id value
+        \Illuminate\Support\Facades\DB::table('production_machines')->insert([
+            'tenant_id'      => $otherTenant->id,
+            'work_center_id' => $wc1->id,
+            'name'           => 'Machine Foreign Tenant',
+            'code'           => 'M-FOREIGN',
+            'status'         => 'active',
+            'current_state'  => 'Running',
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+
+        $wcDash = $service->refreshWorkCenterDashboard($this->tenant->id, $wc1->id);
+        $this->assertEquals(1, $wcDash['running_machines']);
+        $this->assertEquals(1, $wcDash['total_machines']);
     }
 
     /** @test */
@@ -158,6 +194,43 @@ class AuditFixesTest extends TestCase
             ->withHeader('X-Tenant', 'test-tenant')
             ->post(route('production.plans.create-order', $plan->id));
         $response->assertForbidden();
+    }
+
+    /** @test */
+    public function test_production_plan_create_product_query_tenant_isolation(): void
+    {
+        $otherTenant = Tenant::create([
+            'name'   => 'Other Tenant Prod',
+            'slug'   => 'other-tenant-prod',
+            'status' => 'active',
+            'plan'   => 'enterprise',
+        ]);
+
+        Product::create([
+            'tenant_id' => $otherTenant->id,
+            'name'      => 'Foreign Finished Good',
+            'sku'       => 'FG-FOREIGN',
+            'type'      => 'finished_good',
+            'selling_price' => 10,
+            'cost_price' => 5,
+        ]);
+
+        $localProduct = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name'      => 'Local Finished Good',
+            'sku'       => 'FG-LOCAL',
+            'type'      => 'finished_good',
+            'selling_price' => 10,
+            'cost_price' => 5,
+        ]);
+
+        $response = $this->actingAs($this->pmUser)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('production.plans.create'));
+        $response->assertOk();
+        $response->assertViewHas('products', function ($products) use ($localProduct) {
+            return $products->count() === 1 && $products->first()->id === $localProduct->id;
+        });
     }
 
     /** @test */
@@ -274,5 +347,112 @@ class AuditFixesTest extends TestCase
 
         $this->assertInstanceOf(ProductionBatch::class, $ncr->batch);
         $this->assertEquals($batch->id, $ncr->batch->id);
+    }
+
+    /** @test */
+    public function test_scheduling_service_has_actuals_or_wip_tenant_isolation(): void
+    {
+        $otherTenant = Tenant::create([
+            'name'   => 'Scheduling Tenant B',
+            'slug'   => 'sched-tenant-b',
+            'status' => 'active',
+            'plan'   => 'enterprise',
+        ]);
+
+        $product = Product::create([
+            'tenant_id'      => $this->tenant->id,
+            'name'           => 'Sched Product',
+            'sku'            => 'SKU-SCHED',
+            'type'           => 'finished_good',
+            'item_type'      => 'Goods',
+            'variation_type' => 'Single',
+            'status'         => 'active',
+            'selling_price'  => 10,
+            'cost_price'     => 5,
+        ]);
+
+        $orderA = \App\Domains\Production\Models\ProductionOrder::create([
+            'tenant_id'        => $this->tenant->id,
+            'order_number'     => 'ORD-SCHED-A',
+            'product_id'       => $product->id,
+            'quantity_ordered' => 10,
+            'start_date'       => today(),
+            'end_date'         => today()->addDays(2),
+            'status'           => 'released',
+        ]);
+
+        $scheduleA = \App\Domains\Production\Models\ProductionSchedule::create([
+            'tenant_id'           => $this->tenant->id,
+            'production_order_id' => $orderA->id,
+            'schedule_number'     => 'SCHED-A',
+            'status'              => 'draft',
+            'start_date'          => today(),
+            'end_date'            => today()->addDays(2),
+        ]);
+
+        $wcSched = WorkCenter::create([
+            'tenant_id' => $this->tenant->id,
+            'name'      => 'WC Sched',
+            'code'      => 'WC-SCHED',
+            'status'    => 'active',
+        ]);
+
+        $opOrderA = \App\Domains\Production\Models\ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenant->id,
+            'production_order_id' => $orderA->id,
+            'work_center_id'      => $wcSched->id,
+            'operation_number'    => 'OP-10',
+            'name'                => 'Operation 10',
+            'sequence'            => 10,
+            'status'              => 'ready',
+        ]);
+
+        $schedOpA = \App\Domains\Production\Models\ProductionScheduleOperation::create([
+            'tenant_id'                     => $this->tenant->id,
+            'production_schedule_id'        => $scheduleA->id,
+            'production_order_id'           => $orderA->id,
+            'production_order_operation_id' => $opOrderA->id,
+            'work_center_id'                => $wcSched->id,
+            'sequence'                      => 10,
+            'planned_start'                 => now(),
+            'planned_finish'                => now()->addHour(),
+        ]);
+
+        $productB = Product::create([
+            'tenant_id'      => $otherTenant->id,
+            'name'           => 'Sched Product B',
+            'sku'            => 'SKU-SCHED-B',
+            'type'           => 'finished_good',
+            'item_type'      => 'Goods',
+            'variation_type' => 'Single',
+            'status'         => 'active',
+            'selling_price'  => 10,
+            'cost_price'     => 5,
+        ]);
+
+        $orderB = \App\Domains\Production\Models\ProductionOrder::create([
+            'tenant_id'        => $otherTenant->id,
+            'order_number'     => 'ORD-SCHED-B',
+            'product_id'       => $productB->id,
+            'quantity_ordered' => 10,
+            'start_date'       => today(),
+            'end_date'         => today()->addDays(2),
+            'status'           => 'released',
+        ]);
+
+        // Cross-tenant WIP belonging to otherTenant referencing same schedOpA ID integer
+        \App\Domains\Production\Models\ProductionWip::create([
+            'tenant_id'                      => $otherTenant->id,
+            'production_order_id'            => $orderB->id,
+            'product_id'                     => $productB->id,
+            'current_schedule_operation_id' => $schedOpA->id,
+            'status'                         => 'active',
+            'available_quantity'             => 10,
+        ]);
+
+        $service = app(\App\Domains\Production\Services\SchedulingService::class);
+        $hasActuals = $service->hasExecutionHistory($scheduleA);
+
+        $this->assertFalse($hasActuals, 'Cross-tenant WIP record should not trigger hasExecutionHistory for Tenant A schedule.');
     }
 }

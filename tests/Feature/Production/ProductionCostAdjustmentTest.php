@@ -315,4 +315,67 @@ class ProductionCostAdjustmentTest extends TestCase
         $this->assertEquals($finalSummary['totals']['manual'], $sumDailyManual);
         $this->assertEquals($finalSummary['totals']['final'], $sumDailyFinal);
     }
+
+    /** @test */
+    public function cost_adjustment_store_and_update_enforces_tenant_and_authorization()
+    {
+        $unauthorizedUser = User::factory()->create([
+            'tenant_id' => $this->tenantId,
+            'role'      => 'viewer',
+        ]);
+
+        $otherTenant = Tenant::factory()->create([
+            'slug' => 'other-tenant-cost',
+        ]);
+        $foreignUser = User::factory()->create([
+            'tenant_id' => $otherTenant->id,
+            'role'      => 'admin',
+        ]);
+
+        // 1. Unauthorized user cannot create cost adjustment
+        $response = $this->actingAs($unauthorizedUser)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('production.orders.cost-adjustments.store', $this->order->id), [
+                'cost_component'  => 'material',
+                'category'        => 'Extra Material',
+                'description'     => 'Unauthorized attempt',
+                'amount'          => 100.00,
+                'adjustment_date' => now()->toDateString(),
+            ]);
+        $response->assertStatus(403);
+
+        // 2. Foreign tenant user cannot create cost adjustment on Tenant A order
+        $response = $this->actingAs($foreignUser)
+            ->withHeader('X-Tenant', 'other-tenant-cost')
+            ->post(route('production.orders.cost-adjustments.store', $this->order->id), [
+                'cost_component'  => 'material',
+                'category'        => 'Extra Material',
+                'description'     => 'Cross-tenant attempt',
+                'amount'          => 100.00,
+                'adjustment_date' => now()->toDateString(),
+            ]);
+        $response->assertStatus(403);
+
+        // Create adjustment as authorized admin user
+        $service = app(ProductionCostAdjustmentService::class);
+        $adj = $service->createAdjustment($this->order, [
+            'cost_component'  => 'material',
+            'category'        => 'Extra Material',
+            'description'     => 'Valid adjustment',
+            'amount'          => 100.00,
+            'adjustment_date' => now()->toDateString(),
+        ], userId: $this->user->id);
+
+        // 3. Unauthorized user cannot update cost adjustment
+        $response = $this->actingAs($unauthorizedUser)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('production.cost-adjustments.update', $adj->id), [
+                'cost_component'  => 'material',
+                'category'        => 'Extra Material',
+                'description'     => 'Unauthorized update attempt',
+                'amount'          => 200.00,
+                'adjustment_date' => now()->toDateString(),
+            ]);
+        $response->assertStatus(403);
+    }
 }

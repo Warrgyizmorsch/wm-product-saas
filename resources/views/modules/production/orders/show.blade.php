@@ -400,137 +400,179 @@
         {{-- Tab 3: WIP Tracking --}}
         <div class="tab-pane fade {{ $activeTab === 'vtab-wip' ? 'show active' : '' }}" id="vtab-wip" role="tabpanel" aria-labelledby="vtab-wip-tab">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold text-dark mb-0"><i class="feather-activity text-primary me-2"></i> {{ __('production.wip_tracking_status') }}</h5>
-                <span class="fs-12 text-muted">{{ __('production.wip_tracking_desc') }}</span>
+                <div>
+                    <h5 class="fw-bold text-dark mb-1"><i class="feather-layers text-primary me-2"></i> {{ __('production.wip_tracking_status') }}</h5>
+                    <span class="fs-12 text-muted">Shop floor work center breakdown, batch progress tracking, and accrued costing sheets.</span>
+                </div>
             </div>
 
-            @if($order->wips->isNotEmpty())
-                @foreach($order->wips as $wip)
-                    <div class="row g-4 mb-4">
-                        <div class="col-md-6">
-                            <div class="card shadow-sm border-0 bg-light p-3">
-                                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">{{ __('production.wip_reference') }}: WIP-#{{ str_pad($wip->id, 5, '0', STR_PAD_LEFT) }}</h6>
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <small class="text-muted d-block">{{ __('production.current_stage') }}</small>
-                                        <span class="fw-bold text-dark">{{ $wip->currentRoutingOperation ? $wip->currentRoutingOperation->name : 'N/A' }}</span>
-                                    </div>
-                                    <div class="col-6">
-                                        <small class="text-muted d-block">{{ __('production.work_center') }}</small>
-                                        <span class="fw-bold text-dark">{{ $wip->currentWorkCenter ? $wip->currentWorkCenter->name : 'N/A' }}</span>
-                                    </div>
-                                    <div class="col-6 border-top pt-2">
-                                        <small class="text-muted d-block">{{ __('production.available_qty') }}</small>
-                                        <span class="fw-bold fs-15 text-dark">{{ number_format($wip->available_quantity, 2) }}</span>
-                                    </div>
-                                    <div class="col-6 border-top pt-2">
-                                        <small class="text-muted d-block">{{ __('production.quantity_produced') }}</small>
-                                        <span class="fw-bold fs-15 text-success">{{ number_format($wip->completed_quantity, 2) }}</span>
-                                    </div>
-                                    <div class="col-6 border-top pt-2">
-                                        <small class="text-muted d-block">{{ __('production.rejected_rework') }} / {{ __('production.scrapped_qty') }}</small>
-                                        <span class="fw-semibold text-danger">{{ number_format($wip->rejected_quantity, 2) }} / {{ number_format($wip->scrap_quantity, 2) }}</span>
-                                    </div>
-                                    <div class="col-6 border-top pt-2">
-                                        <small class="text-muted d-block">{{ __('production.status') }}</small>
-                                        @if($wip->status === 'active')
-                                            <span class="badge bg-soft-success text-success text-uppercase">{{ __('production.active') ?? 'Active' }}</span>
-                                        @elseif($wip->status === 'quality_hold')
-                                            <span class="badge bg-soft-warning text-warning text-uppercase">Quality Hold</span>
-                                        @elseif($wip->status === 'rework')
-                                            <span class="badge bg-soft-danger text-danger text-uppercase">Rework</span>
-                                        @else
-                                            <span class="badge bg-soft-secondary text-secondary text-uppercase">{{ __('production.completed') }}</span>
-                                        @endif
+            @if(isset($wipWorkCenterSummaries) && $wipWorkCenterSummaries->isNotEmpty())
+                {{-- Summary Metrics Cards --}}
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card shadow-sm border-0 bg-light p-3">
+                            <span class="fs-11 text-uppercase text-muted fw-bold">Active Shop Floor WIP</span>
+                            <div class="fs-20 fw-bold text-dark mt-1">{{ number_format($wipWorkCenterSummaries->sum('total_available'), 2) }} <small class="fs-12 text-muted fw-normal">pcs</small></div>
+                            <small class="text-muted fs-11 mt-1">In-process across {{ $wipWorkCenterSummaries->count() }} active {{ Str::plural('work center', $wipWorkCenterSummaries->count()) }}</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card shadow-sm border-0 bg-soft-success p-3">
+                            <span class="fs-11 text-uppercase text-success fw-bold">Completed Output (Ready)</span>
+                            <div class="fs-20 fw-bold text-success mt-1">{{ number_format($wipWorkCenterSummaries->sum('total_completed'), 2) }} <small class="fs-12 text-success fw-normal">pcs</small></div>
+                            <small class="text-success fs-11 mt-1">Final stage output ready for FG transfer</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card shadow-sm border-0 bg-light p-3">
+                            <span class="fs-11 text-uppercase text-muted fw-bold">Quality Scrapped / Rejected</span>
+                            <div class="fs-20 fw-bold text-danger mt-1">
+                                {{ number_format($wipWorkCenterSummaries->sum('total_rejected'), 2) }} <small class="fs-11 text-muted">rej</small> / {{ number_format($wipWorkCenterSummaries->sum('total_scrap'), 2) }} <small class="fs-11 text-muted">scrap</small>
+                            </div>
+                            <small class="text-muted fs-11 mt-1">Defects logged across tracking cards</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card shadow-sm border-0 bg-soft-primary p-3">
+                            <span class="fs-11 text-uppercase text-primary fw-bold">Total Accrued WIP Value</span>
+                            <div class="fs-20 fw-bold text-primary mt-1">{{ format_currency($wipWorkCenterSummaries->sum('accrued_value')) }}</div>
+                            <small class="text-primary fs-11 mt-1">Material + Labor + Machine + Overhead</small>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Work Center Wise & Batch Wise Progress Tables --}}
+                <div class="mb-4">
+                    <h6 class="fw-bold text-dark mb-3"><i class="feather-grid me-2 text-primary"></i> Work Center & Batch Tracking Progress</h6>
+
+                    @foreach($wipWorkCenterSummaries as $s)
+                        @php
+                            $wcId = $s['work_center_id'];
+                            $tenantId = require_tenant_id();
+                            // Only call paginator for real work centers; null means unassigned WIPs
+                            $initialBatchesPaginator = $wcId !== null
+                                ? app(\App\Domains\Production\Services\ProductionWipService::class)
+                                    ->getPaginatedWorkCenterWips($tenantId, $order->id, $wcId, null, null, 5)
+                                : null;
+                        @endphp
+                        @if($wcId === null && $initialBatchesPaginator === null)
+                            @continue
+                        @endif
+                        <div class="card shadow-sm border mb-4">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2 px-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="feather-cpu text-primary fs-16 me-2"></i>
+                                    <div>
+                                        <h6 class="fw-bold text-dark mb-0">{{ $s['work_center_name'] }}</h6>
+                                        <span class="fs-11 text-muted">{{ $s['batch_count'] }} {{ Str::plural('Batch Card', $s['batch_count']) }} at this Work Center</span>
                                     </div>
                                 </div>
-                                <div class="mt-3">
-                                    <a href="{{ route('production.wip.show', $wip->id) }}" class="btn btn-sm btn-primary w-100">
-                                        <i class="feather-external-link me-1"></i> {{ __('production.open_wip_card') }}
-                                    </a>
+                                <div class="d-flex gap-3 text-end fs-12">
+                                    <div>
+                                        <span class="text-muted">Floor Qty:</span>
+                                        <strong class="text-dark me-2">{{ number_format($s['total_available'], 2) }}</strong>
+                                    </div>
+                                    <div>
+                                        <span class="text-muted">Ready Output:</span>
+                                        <strong class="text-success me-2">{{ number_format($s['total_completed'], 2) }}</strong>
+                                    </div>
+                                    <div>
+                                        <span class="text-muted">Total Cost:</span>
+                                        <strong class="text-primary">{{ format_currency($s['accrued_value']) }}</strong>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="card shadow-sm border-0 bg-light p-3">
-                                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">{{ __('production.wip_costing_sheet') }}</h6>
-                                <table class="w-100 fs-13">
-                                    <tr class="border-bottom py-1">
-                                        <td class="text-muted py-2">{{ __('production.material_costs') }}</td>
-                                        <td class="text-end fw-semibold text-dark">{{ format_currency($wip->material_cost) }}</td>
-                                    </tr>
-                                    <tr class="border-bottom py-1">
-                                        <td class="text-muted py-2">{{ __('production.labor_cost') }}</td>
-                                        <td class="text-end fw-semibold text-dark">{{ format_currency($wip->labor_cost) }}</td>
-                                    </tr>
-                                    <tr class="border-bottom py-1">
-                                        <td class="text-muted py-2">{{ __('production.machine_utilization_cost') }}</td>
-                                        <td class="text-end fw-semibold text-dark">{{ format_currency($wip->machine_cost) }}</td>
-                                    </tr>
-                                    <tr class="border-bottom py-1">
-                                        <td class="text-muted py-2">{{ __('production.work_center_overhead') }}</td>
-                                        <td class="text-end fw-semibold text-dark">{{ format_currency($wip->overhead_cost) }}</td>
-                                    </tr>
-                                    <tr class="py-1">
-                                        <td class="fw-bold text-primary pt-2">{{ __('production.total_cost') }}</td>
-                                        <td class="text-end fw-bold text-primary pt-2 fs-15">{{ format_currency($wip->total_value) }}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div class="col-12 mt-3">
-                            <h6 class="fw-bold text-dark mb-2">{{ __('production.stage_transaction_log') }}</h6>
                             <div class="table-responsive">
-                                <table class="erp-thin-table">
-                                    <thead>
+                                <table class="table table-sm align-middle mb-0 fs-12">
+                                    <thead class="bg-light fs-11 text-muted text-uppercase">
                                         <tr>
-                                            <th>{{ __('production.date') }}</th>
-                                            <th>{{ __('production.type') }}</th>
-                                            <th>{{ __('production.from_stage') }}</th>
-                                            <th>{{ __('production.to_stage') }}</th>
-                                            <th class="text-end">{{ __('production.quantity') }}</th>
-                                            <th class="text-end">{{ __('production.cost_added') }}</th>
-                                            <th>{{ __('production.remarks') }}</th>
+                                            <th>WIP Card #</th>
+                                            <th>Batch #</th>
+                                            <th>Current Stage</th>
+                                            <th class="text-end">Available Qty</th>
+                                            <th class="text-end">Completed Qty</th>
+                                            <th class="text-end">WIP Value</th>
+                                            <th>Status</th>
+                                            <th class="text-end">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        @forelse($wip->transactions as $tx)
-                                            <tr>
-                                                <td class="font-monospace text-muted">{{ $tx->transaction_at->format('Y-m-d H:i') }}</td>
-                                                <td>
-                                                    @php
-                                                        $badgeClass = match ($tx->transaction_type) {
-                                                            'created' => 'bg-soft-primary text-primary',
-                                                            'operation_started' => 'bg-soft-info text-info',
-                                                            'progress_logged' => 'bg-soft-primary text-primary',
-                                                            'operation_completed' => 'bg-soft-success text-success',
-                                                            'transferred' => 'bg-soft-warning text-warning',
-                                                            'converted_to_finished_goods' => 'bg-success text-white',
-                                                            default => 'bg-soft-secondary text-secondary'
-                                                        };
-                                                    @endphp
-                                                    <span class="badge {{ $badgeClass }} text-uppercase">{{ str_replace('_', ' ', $tx->transaction_type) }}</span>
-                                                </td>
-                                                <td>{{ $tx->fromOperation ? $tx->fromOperation->name : '—' }}</td>
-                                                <td>{{ $tx->toOperation ? $tx->toOperation->name : '—' }}</td>
-                                                <td class="text-end fw-semibold">{{ number_format($tx->quantity, 2) }}</td>
-                                                <td class="text-end text-success fw-semibold">{{ $tx->cost_added > 0 ? '+' . format_currency($tx->cost_added) : '—' }}</td>
-                                                <td class="text-muted">{{ $tx->remarks }}</td>
-                                            </tr>
-
-                                        @empty
-                                            <tr>
-                                                <td colspan="7" class="text-center text-muted py-3">{{ __('production.no_daily_cost_history') }}</td>
-                                            </tr>
-                                        @endforelse
+                                    <tbody id="wc-batches-tbody-{{ $order->id }}-{{ $wcId }}">
+                                        @include('modules.production.wip.partials.work-center-batch-rows', ['wips' => $initialBatchesPaginator->items()])
                                     </tbody>
                                 </table>
                             </div>
+                            <div id="wc-batches-pagination-{{ $order->id }}-{{ $wcId }}">
+                                @if($initialBatchesPaginator->lastPage() > 1)
+                                    @include('modules.production.wip.partials.wc-pagination', [
+                                        'paginator'    => $initialBatchesPaginator,
+                                        'orderId'      => $order->id,
+                                        'workCenterId' => $wcId,
+                                    ])
+                                @endif
+                            </div>
                         </div>
+                    @endforeach
+                </div>
+
+                {{-- Consolidated Order Stage Movement Transaction Ledger --}}
+                @php
+                    $allTransactions = $order->wips->flatMap->transactions->sortByDesc('transaction_at');
+                @endphp
+                <div class="card shadow-sm border">
+                    <div class="card-header bg-light py-2 px-3">
+                        <h6 class="fw-bold text-dark mb-0"><i class="feather-clock me-2 text-primary"></i> Order Stage Movement & Cost Transaction Ledger</h6>
                     </div>
-                @endforeach
+                    <div class="table-responsive">
+                        <table class="erp-thin-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('production.date') }}</th>
+                                    <th>WIP / Batch</th>
+                                    <th>{{ __('production.type') }}</th>
+                                    <th>{{ __('production.from_stage') }}</th>
+                                    <th>{{ __('production.to_stage') }}</th>
+                                    <th class="text-end">{{ __('production.quantity') }}</th>
+                                    <th class="text-end">{{ __('production.cost_added') }}</th>
+                                    <th>{{ __('production.remarks') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($allTransactions as $tx)
+                                    <tr>
+                                        <td class="font-monospace text-muted fs-11">{{ $tx->transaction_at ? $tx->transaction_at->format('Y-m-d H:i') : '—' }}</td>
+                                        <td class="font-monospace fs-11">
+                                            WIP-#{{ str_pad($tx->wip_id, 5, '0', STR_PAD_LEFT) }}
+                                        </td>
+                                        <td>
+                                            @php
+                                                $badgeClass = match ($tx->transaction_type) {
+                                                    'created' => 'bg-soft-primary text-primary',
+                                                    'operation_started' => 'bg-soft-info text-info',
+                                                    'progress_logged' => 'bg-soft-primary text-primary',
+                                                    'operation_completed' => 'bg-soft-success text-success',
+                                                    'transferred' => 'bg-soft-warning text-warning',
+                                                    'rework_completed' => 'bg-soft-success text-success',
+                                                    'converted_to_finished_goods' => 'bg-success text-white',
+                                                    default => 'bg-soft-secondary text-secondary'
+                                                };
+                                            @endphp
+                                            <span class="badge {{ $badgeClass }} text-uppercase fs-10">{{ str_replace('_', ' ', $tx->transaction_type) }}</span>
+                                        </td>
+                                        <td>{{ $tx->fromOperation ? $tx->fromOperation->name : '—' }}</td>
+                                        <td>{{ $tx->toOperation ? $tx->toOperation->name : '—' }}</td>
+                                        <td class="text-end fw-semibold">{{ number_format($tx->quantity, 2) }}</td>
+                                        <td class="text-end text-success fw-semibold">{{ $tx->cost_added > 0 ? '+' . format_currency($tx->cost_added) : '—' }}</td>
+                                        <td class="text-muted fs-11">{{ $tx->remarks }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted py-3">{{ __('production.no_daily_cost_history') }}</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             @else
                 <div class="text-center py-5 text-muted bg-light rounded">
                     <i class="feather-alert-circle fs-24 mb-2 d-block text-warning"></i>
@@ -2329,5 +2371,71 @@
             });
         }
     });
+</script>
+
+<script>
+    function loadWorkCenterBatchPage(orderId, workCenterId, page) {
+        var tbody = document.getElementById('wc-batches-tbody-' + orderId + '-' + workCenterId);
+        var paginationContainer = document.getElementById('wc-batches-pagination-' + orderId + '-' + workCenterId);
+        if (!tbody) return;
+
+        tbody.style.opacity = '0.5';
+        var url = "{{ url('production/wip/orders') }}/" + orderId + "/work-centers/" + workCenterId + "/batches?page=" + page;
+
+        fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            tbody.style.opacity = '1';
+            if (data.success) {
+                tbody.innerHTML = data.html;
+                if (paginationContainer) {
+                    renderWcPaginationControls(paginationContainer, orderId, workCenterId, data.current_page, data.last_page, data.total, data.per_page);
+                }
+            }
+        })
+        .catch(function() { tbody.style.opacity = '1'; });
+    }
+
+    function renderWcPaginationControls(container, orderId, workCenterId, currentPage, lastPage, total, perPage) {
+        if (lastPage <= 1) { container.innerHTML = ''; return; }
+        total   = total   || (lastPage * (perPage || 5));
+        perPage = perPage || 5;
+        var from = Math.min((currentPage - 1) * perPage + 1, total);
+        var to   = Math.min(currentPage * perPage, total);
+
+        var html = '<div class="erp-pagination-container border-top"><ul class="erp-pagination">';
+
+        // Prev
+        html += '<li class="page-item' + (currentPage <= 1 ? ' disabled' : '') + '">';
+        html += '<button type="button" class="page-link"' + (currentPage <= 1 ? ' disabled' : '') + ' onclick="loadWorkCenterBatchPage(' + orderId + ',' + workCenterId + ',' + (currentPage - 1) + ')" aria-label="Previous"><i class="feather-chevron-left"></i></button></li>';
+
+        // Page numbers (window of 5)
+        var start = Math.max(1, currentPage - 2);
+        var end   = Math.min(lastPage, currentPage + 2);
+        if (start > 1) {
+            html += '<li class="page-item"><button type="button" class="page-link" onclick="loadWorkCenterBatchPage(' + orderId + ',' + workCenterId + ',1)">1</button></li>';
+            if (start > 2) html += '<li class="page-item disabled"><span class="page-link">…</span></li>';
+        }
+        for (var i = start; i <= end; i++) {
+            html += '<li class="page-item' + (currentPage === i ? ' active' : '') + '">';
+            html += '<button type="button" class="page-link" onclick="loadWorkCenterBatchPage(' + orderId + ',' + workCenterId + ',' + i + ')">' + i + '</button></li>';
+        }
+        if (end < lastPage) {
+            if (end < lastPage - 1) html += '<li class="page-item disabled"><span class="page-link">…</span></li>';
+            html += '<li class="page-item"><button type="button" class="page-link" onclick="loadWorkCenterBatchPage(' + orderId + ',' + workCenterId + ',' + lastPage + ')">' + lastPage + '</button></li>';
+        }
+
+        // Next
+        html += '<li class="page-item' + (currentPage >= lastPage ? ' disabled' : '') + '">';
+        html += '<button type="button" class="page-link"' + (currentPage >= lastPage ? ' disabled' : '') + ' onclick="loadWorkCenterBatchPage(' + orderId + ',' + workCenterId + ',' + (currentPage + 1) + ')" aria-label="Next"><i class="feather-chevron-right"></i></button></li>';
+
+        html += '</ul><div class="erp-pagination-info">Showing ' + from + ' to ' + to + ' of ' + total + ' batches</div></div>';
+        container.innerHTML = html;
+    }
 </script>
 @endsection

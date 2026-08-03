@@ -105,12 +105,16 @@ class DashboardRefreshService
         $metrics = $this->oeeService->calculateForWorkCenter($tenantId, $wcId, $start, $end);
 
         $running = DB::table('production_machines')
+            ->where('tenant_id', $tenantId)
             ->where('work_center_id', $wcId)
             ->where('current_state', 'Running')
+            ->whereNull('deleted_at')
             ->count();
 
         $total = DB::table('production_machines')
+            ->where('tenant_id', $tenantId)
             ->where('work_center_id', $wcId)
+            ->whereNull('deleted_at')
             ->count();
 
         return [

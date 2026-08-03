@@ -127,9 +127,11 @@ Route::prefix('production')
         Route::resource('orders', ProductionOrderController::class);
 
         // ── Work-in-Progress (WIP) Management ───────────────────────────────
+        Route::get('wip/orders/{order}/work-centers/{workCenter}/batches', [WipController::class, 'getWorkCenterBatches'])->name('wip.order-work-center-batches');
         Route::post('wip/{wip}/transfer', [WipController::class, 'transfer'])->name('wip.transfer');
         Route::post('wip/{wip}/adjust', [WipController::class, 'adjust'])->name('wip.adjust');
         Route::post('wip/{wip}/convert', [WipController::class, 'convertToFg'])->name('wip.convert');
+        Route::post('wip/orders/{order}/convert-fg', [WipController::class, 'convertOrderToFg'])->name('wip.convert-order');
         Route::get('wip', [WipController::class, 'index'])->name('wip.index');
         Route::get('wip/{wip}', [WipController::class, 'show'])->name('wip.show');
 

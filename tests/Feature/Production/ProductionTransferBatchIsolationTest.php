@@ -340,20 +340,27 @@ class ProductionTransferBatchIsolationTest extends TestCase
 
         $wipOp10 = ProductionWip::where('production_batch_id', $batch1->id)->where('current_routing_operation_id', $op10->routing_operation_id)->first();
 
-        // Create pending rework record
-        ProductionOrderRework::create([
+        $qualityPlan = \App\Domains\Production\Models\ProductionQualityPlan::create([
             'tenant_id' => $this->tenant->id,
+            'name' => 'Isolation Quality Plan',
+            'type' => 'in_process',
+            'status' => 'active',
+            'created_by' => $this->user->id,
+        ]);
+
+        // Create quality inspection hold record
+        \App\Domains\Production\Models\ProductionQualityInspection::create([
+            'tenant_id' => $this->tenant->id,
+            'quality_plan_id' => $qualityPlan->id,
             'production_order_id' => $order->id,
             'production_order_operation_id' => $op10->id,
-            'production_batch_id' => $batch1->id,
-            'quantity' => 5.0,
-            'rework_quantity' => 5.0,
-            'status' => 'pending',
-            'recorded_at' => now(),
+            'batch_id' => $batch1->id,
+            'stage' => 'in_process',
+            'status' => 'hold',
         ]);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('has an active quality hold or pending rework');
+        $this->expectExceptionMessage('has an active quality hold');
 
         $this->wipService->transferWip($wipOp10->id, $op10->routing_operation_id, $op20->routing_operation_id, 5.0, 'Attempt transfer', $this->user->id);
     }
