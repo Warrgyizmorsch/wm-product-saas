@@ -2,6 +2,7 @@
 
 namespace App\Domains\HRMS\Controllers;
 
+use App\Domains\HRMS\Helpers\XlsxHelper;
 use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\LeaveBalance;
@@ -170,5 +171,56 @@ class LeaveEncashmentController extends Controller
         $balance->update([
             'encashed' => round($approvedEncashedSum * 2) / 2,
         ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Export Encashment Requests to Excel
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function exportEncashments(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $user = auth()->user();
+
+        $employee = Employee::where('personal_email', $user->email)
+            ->orWhere('office_email', $user->email)
+            ->first();
+
+        $query = LeaveEncashment::with(['employee', 'leaveType'])->orderBy('created_at', 'desc');
+
+        // Non-admin: scope to own records only
+        if ($employee) {
+            $isAdmin = $employee->is_admin ?? false;
+            if (!$isAdmin) {
+                $query->where('employee_id', $employee->id);
+            }
+        }
+
+        $rows = $query->get();
+
+        $headers = [
+            'Employee Name',
+            'Employee ID',
+            'Leave Type',
+            'Requested Days',
+            'Reason',
+            'Status',
+            'Submitted Date',
+        ];
+
+        $data = $rows->map(function ($enc) {
+            return [
+                $enc->employee->full_name ?? '—',
+                $enc->employee->employee_id ?? '—',
+                $enc->leaveType->name ?? '—',
+                floatval($enc->requested_days),
+                $enc->reason ?? '',
+                ucfirst($enc->status),
+                $enc->created_at ? $enc->created_at->format('d M Y') : '—',
+            ];
+        })->toArray();
+
+        $filename = 'leave_encashments_' . now()->format('Y-m-d') . '.xlsx';
+
+        return XlsxHelper::export($headers, $data, $filename);
     }
 }

@@ -241,18 +241,22 @@
             <div class="col-12">
                 <x-ui.card title="{{ __('hrms.leave.leave_plans') }}" bodyClass="p-0" stretch>
                     <x-slot name="headerAction">
-                        <div class="d-flex align-items-center gap-2">
+                        <form method="GET" action="{{ route('hrms.leave-structure.index') }}" id="leavePlanFilterForm" class="d-flex align-items-center gap-2 m-0">
+                            <!-- Hidden inputs for pagination/plan state -->
+                            <input type="hidden" name="plan_id" value="{{ request()->get('plan_id', $selectedPlan ? $selectedPlan->id : '') }}">
+                            <input type="hidden" name="lp_sort" id="lp_sort" value="{{ request()->get('lp_sort', 'name_asc') }}">
+
                             <!-- Search Input -->
                             <div class="theme-search-container" style="width: 240px !important; position: relative;">
                                 <i class="feather-search"></i>
-                                <input type="text" id="leavePlanSearch" class="theme-search-input" placeholder="{{ __('hrms.leave.search_plans') }}">
+                                <input type="text" name="lp_search" id="leavePlanSearch" class="theme-search-input" placeholder="{{ __('hrms.leave.search_plans') }}" value="{{ request()->get('lp_search') }}">
                             </div>
 
                             <!-- Sort Dropdown -->
                             <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
-                                <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortLeavePlans('name_asc', this); event.preventDefault();">{{ __('hrms.common.sort_name_asc') }}</a>
-                                <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortLeavePlans('name_desc', this); event.preventDefault();">{{ __('hrms.common.sort_name_desc') }}</a>
-                                <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortLeavePlans('newest', this); event.preventDefault();">{{ __('hrms.salary.newest_first') }}</a>
+                                <a class="dropdown-item py-2 {{ request()->get('lp_sort', 'name_asc') === 'name_asc' ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeLeavePlanSort('name_asc', this); event.preventDefault();">{{ __('hrms.common.sort_name_asc') }}</a>
+                                <a class="dropdown-item py-2 {{ request()->get('lp_sort') === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeLeavePlanSort('name_desc', this); event.preventDefault();">{{ __('hrms.common.sort_name_desc') }}</a>
+                                <a class="dropdown-item py-2 {{ request()->get('lp_sort') === 'newest' ? 'active' : '' }}" href="#" data-sort="newest" onclick="changeLeavePlanSort('newest', this); event.preventDefault();">{{ __('hrms.salary.newest_first') }}</a>
                             </x-ui.sort-dropdown>
 
                             <!-- Filter Dropdown -->
@@ -262,8 +266,8 @@
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="lp_status" id="lp_filter_status">
                                         <option value="">{{ __('hrms.common.all_statuses') }}</option>
-                                        <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
-                                        <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                        <option value="1" {{ request()->get('lp_status') === '1' ? 'selected' : '' }}>{{ __('hrms.employees.frm_status_active') }}</option>
+                                        <option value="0" {{ request()->get('lp_status') === '0' ? 'selected' : '' }}>{{ __('hrms.employees.frm_status_inactive') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
@@ -272,7 +276,7 @@
                                     <x-ui.odoo-form-ui type="select" name="lp_company" id="lp_filter_company">
                                         <option value="">{{ __('hrms.salary.all_companies') }}</option>
                                         @foreach($companies as $company)
-                                            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                            <option value="{{ $company->id }}" {{ request()->get('lp_company') == $company->id ? 'selected' : '' }}>{{ $company->company_name }}</option>
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>
@@ -280,18 +284,18 @@
                                 <div class="dropdown-divider my-3"></div>
 
                                 <div class="d-flex gap-2">
-                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterLeavePlans()">{{ __('hrms.common.apply') }}</x-ui.button>
+                                    <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
                                     <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetLeavePlanFilters()">{{ __('hrms.common.reset') }}</x-ui.button>
                                 </div>
                             </x-ui.filter>
-                        </div>
+                        </form>
                     </x-slot>
 
                     <div class="row g-0">
                         <!-- LEFT COLUMN: ALL PLANS NAMES ONLY -->
                         <div class="col-md-4 col-12 border-end">
 
-                            <div class="list-group list-group-flush rounded-0" style="min-height: 400px; max-height: 600px; overflow-y: auto;">
+                            <div class="list-group list-group-flush rounded-0" id="leavePlansListContainer" style="min-height: 400px; max-height: 600px; overflow-y: auto;">
                                 @forelse($leavePlans as $plan)
                                     @php
                                         $isActive = ($selectedPlan && $selectedPlan->id === $plan->id) || (!$selectedPlan && $loop->first);
@@ -1306,6 +1310,7 @@
          }
      </style>
 
+    @push('scripts')
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             // Initialize Select2 dropdowns on modal open
@@ -1336,11 +1341,19 @@
             });
 
 
-            // Instant client-side search for Leave Plans on left sidebar
-            const leavePlanSearchInput = document.getElementById('leavePlanSearch');
-            if (leavePlanSearchInput) {
-                leavePlanSearchInput.addEventListener('input', filterLeavePlans);
-            }
+            // AJAX GET form submit binding for Leave Plans
+            $(document).on('submit', '#leavePlanFilterForm', function(e) {
+                e.preventDefault();
+                loadLeavePlans();
+            });
+
+            var leavePlanSearchTimeout;
+            $(document).on('input', '#leavePlanSearch', function() {
+                clearTimeout(leavePlanSearchTimeout);
+                leavePlanSearchTimeout = setTimeout(function() {
+                    loadLeavePlans();
+                }, 300);
+            });
 
             // AJAX-based plan switching (no full page reloads)
             $(document).on('click', '.plan-switch-btn', function(e) {
@@ -1789,64 +1802,71 @@
                 });
             };
 
-            // Client-side filtering and sorting functions for Leave Plans
-            function filterLeavePlans() {
-                const search = $('#leavePlanSearch').val().toLowerCase().trim();
-                const statusVal = $('#lp_filter_status').val();
-                const status = statusVal === '1' ? 'active' : (statusVal === '0' ? 'inactive' : 'all');
-                const companyId = $('#lp_filter_company').val();
-                
-                $('.plan-item').each(function() {
-                    const name = $(this).attr('data-name') || '';
-                    const itemStatus = $(this).attr('data-status') || '';
-                    const itemCompanyId = $(this).attr('data-company-id') || '';
-                    
-                    const matchesSearch = name.includes(search);
-                    const matchesStatus = (status === 'all') || (itemStatus === status);
-                    const matchesCompany = (companyId === '') || (itemCompanyId === companyId);
-                    
-                    if (matchesSearch && matchesStatus && matchesCompany) {
-                        $(this).removeClass('d-none');
-                    } else {
-                        $(this).addClass('d-none');
+            function loadLeavePlans() {
+                var search = $('#leavePlanSearch').val() || '';
+                var sort = $('#lp_sort').val() || 'name_asc';
+                var status = $('#lp_filter_status').val() || '';
+                var company = $('#lp_filter_company').val() || '';
+                var planId = '{{ request()->get("plan_id", $selectedPlan ? $selectedPlan->id : "") }}';
+
+                var url = '{{ route("hrms.leave-structure.index") }}?plan_id=' + planId +
+                          '&lp_search=' + encodeURIComponent(search) +
+                          '&lp_sort=' + encodeURIComponent(sort) +
+                          '&lp_status=' + encodeURIComponent(status) +
+                          '&lp_company=' + encodeURIComponent(company);
+
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    success: function(response) {
+                        var parser = new DOMParser();
+                        var doc = parser.parseFromString(response, 'text/html');
+                        
+                        // Update leave plans list
+                        var oldList = $('#leavePlansListContainer');
+                        var newList = $(doc).find('#leavePlansListContainer');
+                        if (oldList.length && newList.length) {
+                            oldList.html(newList.html());
+                        }
+                        
+                        // Close the filter dropdown if open
+                        $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                        $('.erp-filter-dropdown.show').removeClass('show');
+
+                        // Push state to browser URL
+                        history.pushState(null, '', url);
                     }
                 });
+            }
 
-                // Auto close dropdowns
-                $('.dropdown-menu').removeClass('show');
+            function changeLeavePlanSort(criteria, element) {
+                var sortInput = document.getElementById('lp_sort');
+                if (sortInput) {
+                    sortInput.value = criteria;
+                }
+                if (element) {
+                    var menu = element.closest('.dropdown-menu');
+                    if (menu) {
+                        menu.querySelectorAll('.dropdown-item').forEach(function(el) {
+                            el.classList.remove('active');
+                        });
+                    }
+                    element.classList.add('active');
+                }
+                loadLeavePlans();
             }
 
             function resetLeavePlanFilters() {
                 $('#lp_filter_status').val('').trigger('change');
                 $('#lp_filter_company').val('').trigger('change');
-                filterLeavePlans();
-            }
-
-            function sortLeavePlans(criteria, element) {
-                // Toggle active class
-                $(element).closest('.dropdown-menu').find('.dropdown-item').removeClass('active');
-                $(element).addClass('active');
-                
-                const list = $('.list-group-flush');
-                const items = list.find('.plan-item').get();
-                
-                items.sort((a, b) => {
-                    if (criteria === 'name_asc') {
-                        return $(a).attr('data-name').localeCompare($(b).attr('data-name'));
-                    } else if (criteria === 'name_desc') {
-                        return $(b).attr('data-name').localeCompare($(a).attr('data-name'));
-                    } else if (criteria === 'newest') {
-                        return parseInt($(b).attr('data-created-at') || 0) - parseInt($(a).attr('data-created-at') || 0);
-                    }
-                    return 0;
-                });
-                
-                $.each(items, function(i, item) {
-                    list.append(item);
-                });
-
-                // Auto close dropdowns
-                $('.dropdown-menu').removeClass('show');
+                $('#lp_sort').val('name_asc');
+                var searchInput = document.getElementById('leavePlanSearch');
+                if (searchInput) {
+                    searchInput.value = '';
+                }
+                loadLeavePlans();
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
             }
 
             // AJAX-based search, sort, filter and pagination for Leave Types
@@ -1979,11 +1999,11 @@
             });
 
             // Expose function references to window to bypass scope restrictions
-            window.filterLeavePlans = filterLeavePlans;
+            window.changeLeavePlanSort = changeLeavePlanSort;
             window.resetLeavePlanFilters = resetLeavePlanFilters;
-            window.sortLeavePlans = sortLeavePlans;
         });
     </script>
+    @endpush
     <script>
         (function () {
             if (window.hrmsThemedValidationInstalled) {

@@ -6,6 +6,12 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
+        <a href="{{ route('hrms.leaves.export') }}"
+           id="btnExportHeader"
+           class="btn btn-light border fw-bold text-uppercase d-flex align-items-center gap-1"
+           style="height: 38px; color: #475569; border-color: #cbd5e1 !important;">
+            <i class="feather-download"></i> {{ __('hrms.common.export_excel') }}
+        </a>
         <button type="button" id="btnApplyEncashmentHeader" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1 d-none" data-bs-toggle="modal" data-bs-target="#applyEncashmentModal" style="height: 38px;">
             <i class="feather-dollar-sign"></i> {{ __('hrms.leave.encashment_app.apply_encashment') }}
         </button>
@@ -379,6 +385,38 @@
             border-bottom: 2px solid var(--bs-primary) !important;
             font-weight: 600;
         }
+
+        /* ── Table Responsive Dropdown Visibility Fix ── */
+        .table-responsive {
+            position: relative;
+        }
+        .table-responsive:has(.dropdown.show) {
+            overflow: visible !important;
+        }
+
+        /* ── Custom Sort Dropdown Chevrons ── */
+        .erp-sort-dropdown .dropdown-item.active:not(:has(i))::after {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            margin-left: 12px;
+        }
+        .erp-sort-dropdown .dropdown-item.active[data-sort*="desc"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[data-sort*="high"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[data-sort*="oldest"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[onclick*="desc"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[onclick*="high"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[onclick*="oldest"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[href*="desc"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[href*="high"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[href*="oldest"]:not(:has(i))::after {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+        }
     </style>
 @endpush
 
@@ -397,6 +435,9 @@
             });
             $('[id^="leaveRulesModal"]').appendTo('body');
 
+            var leavesExportUrl = "{{ route('hrms.leaves.export') }}";
+            var encashmentExportUrl = "{{ route('hrms.leaves.encashment.export') }}";
+
             $('button[data-bs-toggle="tab"]').on('shown.bs.tab click', function (e) {
                 var target = $(this).attr('data-bs-target') || $(this).attr('id');
                 var isEncashment = target === '#pane-leave-encashments' || target === 'tab-encashments';
@@ -404,9 +445,11 @@
                 if (isEncashment) {
                     $('#btnApplyLeaveHeader').addClass('d-none');
                     $('#btnApplyEncashmentHeader').removeClass('d-none');
+                    $('#btnExportHeader').attr('href', encashmentExportUrl);
                 } else {
                     $('#btnApplyEncashmentHeader').addClass('d-none');
                     $('#btnApplyLeaveHeader').removeClass('d-none');
+                    $('#btnExportHeader').attr('href', leavesExportUrl);
                 }
 
                 var tabName = isEncashment ? 'encashments' : 'applications';
@@ -422,10 +465,12 @@
                     tabObj.show();
                     $('#btnApplyLeaveHeader').addClass('d-none');
                     $('#btnApplyEncashmentHeader').removeClass('d-none');
+                    $('#btnExportHeader').attr('href', encashmentExportUrl);
                 }
             } else {
                 $('#btnApplyEncashmentHeader').addClass('d-none');
                 $('#btnApplyLeaveHeader').removeClass('d-none');
+                $('#btnExportHeader').attr('href', leavesExportUrl);
             }
 
             // Initialize custom Select2 dropdowns parented inside modal-content

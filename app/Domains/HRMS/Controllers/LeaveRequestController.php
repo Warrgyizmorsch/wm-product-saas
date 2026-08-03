@@ -3,6 +3,7 @@
 namespace App\Domains\HRMS\Controllers;
 
 use App\Domains\HRMS\Helpers\SessionConflictChecker;
+use App\Domains\HRMS\Helpers\XlsxHelper;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface;
@@ -194,5 +195,60 @@ class LeaveRequestController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Cancellation request denied. Application remains approved.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Export Leave Applications to Excel
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $user = auth()->user();
+
+        $employee = \App\Domains\HRMS\Models\Employee::where('personal_email', $user->email)
+            ->orWhere('office_email', $user->email)
+            ->first();
+
+        $query = LeaveRequest::with(['employee', 'leaveType'])->orderBy('created_at', 'desc');
+
+        // Non-admin: scope to own records only
+        if ($employee) {
+            $isAdmin = $employee->is_admin ?? false;
+            if (!$isAdmin) {
+                $query->where('employee_id', $employee->id);
+            }
+        }
+
+        $rows = $query->get();
+
+        $headers = [
+            'Employee Name',
+            'Employee ID',
+            'Leave Type',
+            'Start Date',
+            'End Date',
+            'Duration (Days)',
+            'Status',
+            'Applied On',
+            'Reason',
+        ];
+
+        $data = $rows->map(function ($req) {
+            return [
+                $req->employee->full_name ?? '—',
+                $req->employee->employee_id ?? '—',
+                $req->leaveType->name ?? '—',
+                $req->start_date ? $req->start_date->format('d M Y') : '—',
+                $req->end_date   ? $req->end_date->format('d M Y')   : '—',
+                floatval($req->duration),
+                ucfirst($req->status),
+                $req->created_at ? $req->created_at->format('d M Y') : '—',
+                $req->reason ?? '',
+            ];
+        })->toArray();
+
+        $filename = 'leave_applications_' . now()->format('Y-m-d') . '.xlsx';
+
+        return XlsxHelper::export($headers, $data, $filename);
     }
 }

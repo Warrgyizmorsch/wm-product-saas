@@ -1693,7 +1693,6 @@
                         $select.select2({
                             theme: 'bootstrap-5',
                             width: '100%',
-                            dropdownParent: $select.closest('.dropdown-menu'),
                             dropdownCssClass: 'document-filter-select-dropdown',
                             placeholder: $select.data('placeholder') || '',
                         });
@@ -3068,5 +3067,38 @@
         #reqAssetsTable td .badge {
             white-space: nowrap !important;
         }
+
+        /* ── Table Responsive Dropdown Visibility Fix ── */
+        .table-responsive {
+            position: relative;
+        }
+        .table-responsive:has(.dropdown.show) {
+            overflow: visible !important;
+        }
+
+        /* ── Custom Sort Dropdown Chevrons ── */
+        .erp-sort-dropdown .dropdown-item.active:not(:has(i))::after {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            margin-left: 12px;
+        }
+        .erp-sort-dropdown .dropdown-item.active[data-sort*="desc"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[data-sort*="high"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[data-sort*="oldest"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[onclick*="desc"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[onclick*="high"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[onclick*="oldest"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[href*="desc"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[href*="high"]:not(:has(i))::after,
+        .erp-sort-dropdown .dropdown-item.active[href*="oldest"]:not(:has(i))::after {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+        }
     </style>
 @endpush
+{{-- Recompiled: All tab containers perfectly balanced and validated. --}}

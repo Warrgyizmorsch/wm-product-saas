@@ -724,10 +724,11 @@
                             </div>
                         @endif
                     </div>
-                </div>
             </div>
         </div>
     </div>
+</div>
+</div>
 
     {{-- Detail Drawer --}}
     {{-- Detail Drawer --}}
@@ -1030,7 +1031,6 @@
             </div>
         </div>
     </div>
-</div>
     
     @push('scripts')
         <script>

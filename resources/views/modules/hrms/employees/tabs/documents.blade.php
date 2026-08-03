@@ -359,10 +359,11 @@
                             />
                         </div>
                     @endif
-                </div>
             </div>
         </div>
     </div>
+</div>
+</div>
 
     <div class="modal fade" id="requestDocumentModal" tabindex="-1" aria-labelledby="requestDocumentModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -440,4 +441,4 @@
             </div>
         </div>
     </div>
-</div>
+

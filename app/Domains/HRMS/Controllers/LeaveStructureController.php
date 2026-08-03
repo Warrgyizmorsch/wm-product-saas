@@ -273,6 +273,10 @@ class LeaveStructureController extends Controller
     public function transitionView(\Illuminate\Http\Request $request)
     {
         $data = $this->leaveStructureRepository->getIndexData($request->all());
+        $data['departments'] = \App\Domains\HRMS\Models\Department::all();
+        $data['employees'] = \App\Domains\HRMS\Models\Employee::where('status', true)
+            ->with(['leavePlan', 'department'])
+            ->get();
 
         return view('modules.hrms.leave-structure.transition', $data);
     }

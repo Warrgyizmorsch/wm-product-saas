@@ -153,7 +153,7 @@
             min-height: 350px;
         }
         .table-responsive {
-            overflow-x: hidden !important;
+            overflow-x: auto !important;
         }
     </style>
 @endpush
@@ -1113,6 +1113,7 @@
                         } else {
                             oldPagination.remove();
                         }
+                        history.pushState(null, '', url);
                     }
                 });
             });
@@ -1153,6 +1154,7 @@
                             } else {
                                 oldPagination.remove();
                             }
+                            history.pushState(null, '', url);
                         }
                     });
                 }, 300); // 300ms debounce
@@ -1198,6 +1200,7 @@
                         } else {
                             oldPagination.remove();
                         }
+                        history.pushState(null, '', url);
                     }
                 });
             });
@@ -1235,6 +1238,7 @@
                         } else {
                             oldPagination.remove();
                         }
+                        history.pushState(null, '', url);
                     }
                 });
             });

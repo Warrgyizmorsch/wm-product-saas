@@ -15,11 +15,26 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
     {
         $companies = Company::all();
         $payGroupsQuery = PayGroup::with(['company']);
-        if (!empty($inputs['pg_status'])) {
+        if (isset($inputs['pg_status']) && $inputs['pg_status'] !== '') {
             $payGroupsQuery->where('status', $inputs['pg_status']);
         }
         if (!empty($inputs['pg_company'])) {
             $payGroupsQuery->where('company_id', $inputs['pg_company']);
+        }
+        if (!empty($inputs['pg_search'])) {
+            $payGroupsQuery->where('name', 'like', '%' . $inputs['pg_search'] . '%');
+        }
+        if (!empty($inputs['pg_sort'])) {
+            $pgSort = $inputs['pg_sort'];
+            if ($pgSort === 'name_asc') {
+                $payGroupsQuery->orderBy('name', 'asc');
+            } elseif ($pgSort === 'name_desc') {
+                $payGroupsQuery->orderBy('name', 'desc');
+            } elseif ($pgSort === 'newest') {
+                $payGroupsQuery->orderBy('created_at', 'desc');
+            }
+        } else {
+            $payGroupsQuery->orderBy('name', 'asc');
         }
         $payGroups = $payGroupsQuery->get();
         
@@ -50,7 +65,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
             $salaryStructuresQuery->where('name', 'like', "%{$structSearch}%");
         }
 
-        if (!empty($inputs['struct_status'])) {
+        if (isset($inputs['struct_status']) && $inputs['struct_status'] !== '') {
             $structStatus = $inputs['struct_status'];
             $salaryStructuresQuery->where('status', $structStatus);
         }
