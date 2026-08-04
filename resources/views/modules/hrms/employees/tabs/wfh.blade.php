@@ -213,7 +213,7 @@
                                                     </button>
                                                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
                                                         <li>
-                                                            <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirm('{{ __('hrms.wfh.confirm_approve_cancellation') }}')" class="m-0">
+                                                            <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.wfh.confirm_approve_cancellation') }}', { title: 'Approve Cancellation', variant: 'success', confirmButtonText: 'Approve' })" class="m-0">
                                                                 @csrf
                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-success">
                                                                     <span>{{ __('hrms.wfh.accept') }}</span>
@@ -222,7 +222,7 @@
                                                             </form>
                                                         </li>
                                                         <li>
-                                                            <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirm('{{ __('hrms.wfh.confirm_deny_cancellation') }}')" class="m-0">
+                                                            <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.wfh.confirm_deny_cancellation') }}', { title: 'Deny Cancellation', variant: 'danger', confirmButtonText: 'Deny' })" class="m-0">
                                                                 @csrf
                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-danger">
                                                                     <span>{{ __('hrms.wfh.deny') }}</span>
@@ -276,7 +276,7 @@
 
                                             {{-- Unified Withdraw / Cancellation Delete button --}}
                                             @if($req->canWithdraw())
-                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirm('{{ __('hrms.wfh.confirm_withdraw') }}')" class="d-inline-flex" onclick="event.stopPropagation();">
+                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.wfh.confirm_withdraw') }}', { title: 'Withdraw WFH Application', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline-flex" onclick="event.stopPropagation();">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-soft-danger border" 
                                                             title="{{ __('hrms.wfh.withdraw_application') }}"

@@ -7,7 +7,7 @@
 @endphp
 
 <div class="row g-4">
-    <div class="col-xl-3">
+    <div class="col-xl-3 employee-photo-col">
         <div class="employee-photo-panel">
             <div class="employee-photo-preview" id="{{ $prefix }}_photo_preview">
                 {{ $isEdit ? 'EM' : strtoupper(substr((string) old('full_name', 'Employee'), 0, 2)) }}

@@ -298,13 +298,26 @@
             background-color: #e2e8f0;
         }
 
+        .employee-photo-col {
+            position: sticky;
+            top: 0;
+            align-self: flex-start;
+        }
+
         .employee-photo-panel {
             border: 1px dashed #cbd5e1;
             border-radius: 16px;
             background-color: #f8fafc;
-            padding: 18px;
+            padding: 24px 18px;
             text-align: center;
-            height: 100%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+            transition: all 0.3s ease;
+        }
+
+        .employee-photo-panel:hover {
+            border-color: var(--bs-primary);
+            box-shadow: 0 6px 18px rgba(13, 110, 253, 0.08);
+            background-color: #ffffff;
         }
 
         .employee-photo-preview {
@@ -600,7 +613,7 @@
                                                 </button>
                                             </li>
                                             <li>
-                                                <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.employees.confirm_delete') }}')">
+                                                <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete') }}', { title: 'Delete Employee Profile', variant: 'danger', confirmButtonText: 'Delete' })">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger">
@@ -705,7 +718,7 @@
                         @include('modules.hrms.employees.form-fields', ['mode' => 'create'])
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
                         <button type="submit" class="btn btn-primary">{{ __('hrms.employees.mdl_btn_save_employee') }}</button>
                     </div>
                 </form>
@@ -736,7 +749,7 @@
                         @include('modules.hrms.employees.form-fields', ['mode' => 'edit'])
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
                         <button type="submit" class="btn btn-primary">{{ __('hrms.employees.mdl_btn_update_employee') }}</button>
                     </div>
                 </form>

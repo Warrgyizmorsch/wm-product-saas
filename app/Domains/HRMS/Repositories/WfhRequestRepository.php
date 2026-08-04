@@ -31,36 +31,39 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
                 ->first();
         }
 
+        $wfhSearch = $inputs['wfh_search'] ?? $inputs['search'] ?? '';
+        $wfhEmployeeId = $inputs['wfh_employee_id'] ?? $inputs['employee_id'] ?? '';
+        $wfhStatus = $inputs['wfh_status'] ?? $inputs['status'] ?? '';
+        $wfhSort = $inputs['wfh_sort'] ?? $inputs['sort'] ?? 'newest';
+
         $query = WfhRequest::query()->with(['employee', 'approvedByEmployee']);
 
-        if (!empty($inputs['employee_id'])) {
-            $query->where('employee_id', $inputs['employee_id']);
+        if (!empty($wfhEmployeeId)) {
+            $query->where('employee_id', $wfhEmployeeId);
         }
 
-        if (!empty($inputs['status'])) {
-            $query->where('status', $inputs['status']);
+        if (!empty($wfhStatus)) {
+            $query->where('status', $wfhStatus);
         }
 
-        if (!empty($inputs['search'])) {
-            $search = $inputs['search'];
-            $query->whereHas('employee', function ($eq) use ($search) {
-                $eq->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('employee_id', 'like', "%{$search}%");
+        if (!empty($wfhSearch)) {
+            $query->whereHas('employee', function ($eq) use ($wfhSearch) {
+                $eq->where('full_name', 'like', "%{$wfhSearch}%")
+                    ->orWhere('employee_id', 'like', "%{$wfhSearch}%");
             });
         }
 
-        $sort = $inputs['sort'] ?? 'newest';
-        if ($sort === 'oldest') {
+        if ($wfhSort === 'oldest') {
             $query->orderBy('created_at', 'asc');
-        } elseif ($sort === 'duration_high') {
+        } elseif ($wfhSort === 'duration_high') {
             $query->orderBy('duration', 'desc');
-        } elseif ($sort === 'duration_low') {
+        } elseif ($wfhSort === 'duration_low') {
             $query->orderBy('duration', 'asc');
         } else {
             $query->orderBy('created_at', 'desc');
         }
 
-        $requests = (clone $query)->get();
+        $requests = $query->paginate(10, ['*'], 'wfh_page')->withQueryString();
 
         // Metric Counts
         $summaryQuery = WfhRequest::query();
@@ -80,7 +83,11 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
             'totalRequests',
             'pendingRequests',
             'approvedRequests',
-            'rejectedRequests'
+            'rejectedRequests',
+            'wfhSearch',
+            'wfhEmployeeId',
+            'wfhStatus',
+            'wfhSort'
         );
     }
 

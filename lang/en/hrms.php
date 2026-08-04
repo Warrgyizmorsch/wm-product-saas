@@ -133,6 +133,7 @@ return [
         'approved_no_delete' => 'Approved applications cannot be deleted.',
         'deleted_successfully' => 'Shift change request deleted successfully.',
         'type_temporary' => 'Temporary',
+        'type_one_time' => 'One-time',
         'type_permanent' => 'Permanent',
         'type_recurring' => 'Recurring',
         'shift_details' => 'Shift Details',
@@ -1833,6 +1834,7 @@ return [
         'late_arrival' => 'Late Arrival',
         'under_hours' => 'Work Hours Deficit',
         'missing_logs' => 'Missing Logs',
+        'attendance_rules' => 'Attendance Rules',
         'configure_rules' => 'Configure :type Rules',
         'set_thresholds_desc' => 'Set thresholds, deductions, and active policy scope',
         'company_scope' => 'Company Scope',
@@ -1869,6 +1871,7 @@ return [
         'deduct_leave_balance' => 'Deduct Leave Balance',
         'both_settlements' => 'Both (Salary & Leave)',
         'unlimited' => 'Unlimited',
+        'policy_created' => 'Penalization Policy created successfully.',
         'policy_updated' => 'Penalization Policy updated successfully.',
     ),
     'track_status' => [

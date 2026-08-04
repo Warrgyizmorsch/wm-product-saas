@@ -207,21 +207,21 @@
                     <!-- Search Input -->
                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                        <input type="text" name="search" id="wfh_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.wfh.search_employee') }}" value="{{ request('search') }}" style="box-shadow: none; height: 32px;">
+                        <input type="text" name="search" id="wfh_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.wfh.search_employee') }}" value="{{ $wfhSearch ?? '' }}" style="box-shadow: none; height: 32px;">
                     </div>
 
                     <!-- Sort Dropdown -->
                     <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
-                        <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="setWfhSort('newest', this); event.preventDefault();">
+                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($wfhSort ?? 'newest') === 'newest' ? 'active' : '' }}" href="#" onclick="setWfhSort('newest', this); event.preventDefault();">
                             <span>{{ __('hrms.wfh.sort_newest') }}</span>
                         </a>
-                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setWfhSort('oldest', this); event.preventDefault();">
+                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($wfhSort ?? '') === 'oldest' ? 'active' : '' }}" href="#" onclick="setWfhSort('oldest', this); event.preventDefault();">
                             <span>{{ __('hrms.wfh.sort_oldest') }}</span>
                         </a>
-                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setWfhSort('duration_high', this); event.preventDefault();">
+                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($wfhSort ?? '') === 'duration_high' ? 'active' : '' }}" href="#" onclick="setWfhSort('duration_high', this); event.preventDefault();">
                             <span>{{ __('hrms.wfh.sort_duration_high_low') }}</span>
                         </a>
-                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setWfhSort('duration_low', this); event.preventDefault();">
+                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($wfhSort ?? '') === 'duration_low' ? 'active' : '' }}" href="#" onclick="setWfhSort('duration_low', this); event.preventDefault();">
                             <span>{{ __('hrms.wfh.sort_duration_low_high') }}</span>
                         </a>
                     </x-ui.sort-dropdown>
@@ -234,9 +234,9 @@
                             <div class="mb-3" style="min-width: 250px;">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.wfh.employee') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_wfh_employee_id">
-                                    <option value="">{{ __('hrms.common.all_employees') }}</option>
+                                    <option value="" {{ ($wfhEmployeeId ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.common.all_employees') }}</option>
                                     @foreach(($employees ?? []) as $emp)
-                                        <option value="{{ $emp->id }}" {{ request('employee_id') == $emp->id ? 'selected' : '' }}>
+                                        <option value="{{ $emp->id }}" {{ ($wfhEmployeeId ?? '') == $emp->id ? 'selected' : '' }}>
                                             {{ $emp->full_name }} ({{ $emp->employee_id }})
                                         </option>
                                     @endforeach
@@ -247,14 +247,14 @@
                         <div class="mb-3" style="min-width: 250px;">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.wfh.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status" id="filter_wfh_status">
-                                <option value="">{{ __('hrms.wfh.all_statuses') }}</option>
-                                <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>{{ __('hrms.wfh.pending') }}</option>
-                                <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>{{ __('hrms.wfh.approved') }}</option>
-                                <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>{{ __('hrms.wfh.rejected') }}</option>
+                                <option value="" {{ ($wfhStatus ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.wfh.all_statuses') }}</option>
+                                <option value="pending" {{ ($wfhStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('hrms.wfh.pending') }}</option>
+                                <option value="approved" {{ ($wfhStatus ?? '') === 'approved' ? 'selected' : '' }}>{{ __('hrms.wfh.approved') }}</option>
+                                <option value="rejected" {{ ($wfhStatus ?? '') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.wfh.rejected') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
-                        <input type="hidden" name="sort" id="wfh_sort_input" value="{{ request('sort', 'newest') }}">
+                        <input type="hidden" name="sort" id="wfh_sort_input" value="{{ $wfhSort ?? 'newest' }}">
 
                         <div class="dropdown-divider my-3"></div>
 
@@ -397,7 +397,7 @@
                                                     </button>
                                                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
                                                         <li>
-                                                            <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirm('Approve this WFH cancellation?')" class="m-0">
+                                                            <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Approve this WFH cancellation?', { title: 'Approve Cancellation', variant: 'success', confirmButtonText: 'Approve' })" class="m-0">
                                                                 @csrf
                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-success">
                                                                     <span>{{ __('hrms.wfh.approved') }}</span>
@@ -406,7 +406,7 @@
                                                             </form>
                                                         </li>
                                                         <li>
-                                                            <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirm('Deny this cancellation request?')" class="m-0">
+                                                            <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Deny this cancellation request?', { title: 'Deny Cancellation', variant: 'danger', confirmButtonText: 'Deny' })" class="m-0">
                                                                 @csrf
                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-danger">
                                                                     <span>{{ __('hrms.wfh.rejected') }}</span>
@@ -461,7 +461,7 @@
 
                                             {{-- Unified Withdraw / Cancellation Delete button --}}
                                             @if($req->canWithdraw())
-                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this WFH application?')" class="d-inline">
+                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Withdraw this WFH application?', { title: 'Withdraw WFH Application', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-soft-danger border" 
                                                             title="Withdraw Application"
@@ -487,7 +487,7 @@
                                             {{-- Non-admin actions --}}
                                             {{-- Unified Withdraw / Cancellation Delete button --}}
                                             @if($req->canWithdraw())
-                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this WFH application?')" class="d-inline">
+                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Withdraw this WFH application?', { title: 'Withdraw WFH Application', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-soft-danger border" 
                                                             title="Withdraw Application"
@@ -530,13 +530,17 @@
                     </tbody>
                 </table>
             </div>
-            <div class="erp-pagination-container">
-                <ul class="erp-pagination mb-2" id="wfh_pagination_ul">
-                    <!-- Dynamically generated pagination links -->
-                </ul>
-                <div class="erp-pagination-info">
-                    Showing <span id="wfh_showing_start">0</span> to <span id="wfh_showing_end">0</span> of <span id="wfh_total_count">0</span> entries
-                </div>
+            <div id="wfh_pagination_container">
+                @if($requests instanceof \Illuminate\Pagination\LengthAwarePaginator && $requests->hasPages())
+                    <x-ui.pagination
+                        class="px-0 py-0"
+                        :current-page="$requests->currentPage()"
+                        :total-pages="$requests->lastPage()"
+                        :total-results="$requests->total()"
+                        :per-page="$requests->perPage()"
+                        page-param="wfh_page"
+                    />
+                @endif
             </div>
         </div>
     </div>
@@ -863,129 +867,93 @@ document.addEventListener('DOMContentLoaded', function () {
         document.body.appendChild(wfhCancelEl);
     }
 
-    // ── Client-side WFH search, sort, and filter ───────────────────────────────
-    var currentWfhPage = 1;
-    var wfhItemsPerPage = 10;
+    // AJAX Loader for server-side search, sort, filter, and pagination
+    function loadWfhApplications(page = 1) {
+        var search = $('#wfh_search').val() || '';
+        var empId = $('#filter_wfh_employee_id').val() || '';
+        var status = $('#filter_wfh_status').val() || '';
+        var sort = $('#wfh_sort_input').val() || 'newest';
 
-    function updateWfhPagination() {
-        var searchVal = $('#wfh_search').val().toLowerCase().trim();
-        var empId = $('#filter_wfh_employee_id').val();
-        var status = $('#filter_wfh_status').val();
+        var url = '{{ route("hrms.wfh.index") }}?' +
+                  'wfh_search=' + encodeURIComponent(search) +
+                  '&wfh_employee_id=' + encodeURIComponent(empId) +
+                  '&wfh_status=' + encodeURIComponent(status) +
+                  '&wfh_sort=' + encodeURIComponent(sort) +
+                  '&wfh_page=' + page;
 
-        var $visibleRows = $('.wfh-row').filter(function() {
-            var $row = $(this);
-            var rowEmp = $row.attr('data-employee') || '';
-            var rowEmpId = $row.attr('data-employee-id') || '';
-            var rowStatus = $row.attr('data-status') || '';
+        $.ajax({
+            url: url,
+            type: 'GET',
+            success: function(response) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(response, 'text/html');
+                
+                var oldBody = $('#wfhTable tbody');
+                var newBody = $(doc).find('#wfhTable tbody');
+                if (oldBody.length && newBody.length) {
+                    oldBody.html(newBody.html());
+                }
+                
+                var oldPagination = $('#wfh_pagination_container');
+                var newPagination = $(doc).find('#wfh_pagination_container');
+                if (oldPagination.length && newPagination.length) {
+                    oldPagination.replaceWith(newPagination);
+                }
 
-            var matchesSearch = !searchVal || rowEmp.indexOf(searchVal) !== -1;
-            var matchesEmp = !empId || rowEmpId === empId;
-            var matchesStatus = !status || rowStatus === status;
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
 
-            return matchesSearch && matchesEmp && matchesStatus;
+                history.pushState(null, '', url);
+            }
         });
-
-        var totalItems = $visibleRows.length;
-        var totalPages = Math.ceil(totalItems / wfhItemsPerPage) || 1;
-
-        if (currentWfhPage > totalPages) {
-            currentWfhPage = totalPages;
-        }
-        if (currentWfhPage < 1) {
-            currentWfhPage = 1;
-        }
-
-        var startIndex = (currentWfhPage - 1) * wfhItemsPerPage;
-        var endIndex = Math.min(startIndex + wfhItemsPerPage, totalItems);
-
-        $('.wfh-row').hide();
-        $visibleRows.slice(startIndex, endIndex).show();
-
-        if (totalPages > 1) {
-            $('.erp-pagination-container').show();
-        } else {
-            $('.erp-pagination-container').hide();
-        }
-
-        if (totalItems === 0) {
-            $('#no_matching_wfh_row').removeClass('d-none');
-        } else {
-            $('#no_matching_wfh_row').addClass('d-none');
-        }
-
-        $('#wfh_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
-        $('#wfh_showing_end').text(endIndex);
-        $('#wfh_total_count').text(totalItems);
-
-        var paginationHtml = '';
-
-        // Previous button
-        paginationHtml += `
-            <li class="page-item ${currentWfhPage === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${currentWfhPage - 1}" aria-label="Previous">
-                    <i class="feather-chevron-left"></i>
-                </a>
-            </li>
-        `;
-
-        // Page numbers
-        for (var i = 1; i <= totalPages; i++) {
-            paginationHtml += `
-                <li class="page-item ${currentWfhPage === i ? 'active' : ''}">
-                    <a class="page-link" href="#" data-page="${i}">${i}</a>
-                </li>
-            `;
-        }
-
-        // Next button
-        paginationHtml += `
-            <li class="page-item ${currentWfhPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${currentWfhPage + 1}" aria-label="Next">
-                    <i class="feather-chevron-right"></i>
-                </a>
-            </li>
-        `;
-
-        $('#wfh_pagination_ul').html(paginationHtml);
     }
 
-    // Search trigger
-    $('#wfh_search').on('input', function() {
-        currentWfhPage = 1;
-        updateWfhPagination();
+    var wfhSearchTimeout;
+    $(document).on('input', '#wfh_search', function() {
+        clearTimeout(wfhSearchTimeout);
+        wfhSearchTimeout = setTimeout(function() {
+            loadWfhApplications(1);
+        }, 300);
     });
 
-    // Apply Filter trigger
     $('#wfhFilterForm').on('submit', function(e) {
         e.preventDefault();
-        currentWfhPage = 1;
-        updateWfhPagination();
+        loadWfhApplications(1);
         $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
     });
 
-    // Reset Filter trigger
     $('#wfhFilterForm').find('.btn-light').on('click', function(e) {
         e.preventDefault();
         $('#wfh_search').val('');
         $('#filter_wfh_employee_id').val('').trigger('change');
-        $('#filter_wfh_status').val('');
-        currentWfhPage = 1;
-        updateWfhPagination();
+        $('#filter_wfh_status').val('').trigger('change');
+        $('#wfh_sort_input').val('newest');
+
+        var sortDropdown = $('.erp-sort-dropdown');
+        if (sortDropdown.length) {
+            sortDropdown.find('.dropdown-item').removeClass('active');
+            sortDropdown.find('.dropdown-item:first').addClass('active');
+        }
+
+        loadWfhApplications(1);
         $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
     });
 
-    // Pagination click handler
-    $(document).on('click', '#wfh_pagination_ul .page-link', function(e) {
+    $(document).on('click', '#wfh_pagination_container a', function(e) {
         e.preventDefault();
-        var page = $(this).data('page');
-        if (page && !$(this).parent().hasClass('disabled')) {
-            currentWfhPage = parseInt(page);
-            updateWfhPagination();
-        }
+        var url = $(this).attr('href');
+        if (!url) return;
+        var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+        var page = urlParams.get('wfh_page') || 1;
+        loadWfhApplications(page);
     });
 
-    // Sort function
+    window.loadWfhApplications = loadWfhApplications;
     window.setWfhSort = function(criteria, element) {
+        var input = document.getElementById('wfh_sort_input');
+        if (input) {
+            input.value = criteria;
+        }
         if (element) {
             var menu = element.closest('.dropdown-menu');
             if (menu) {
@@ -995,33 +963,10 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             element.classList.add('active');
         }
-
-        var $tbody = $('#wfhTable tbody');
-        var $rows = $tbody.find('.wfh-row').get();
-
-        $rows.sort(function(a, b) {
-            var keyA, keyB;
-
-            if (criteria === 'newest' || criteria === 'oldest') {
-                keyA = parseInt($(a).attr('data-created-at') || 0);
-                keyB = parseInt($(b).attr('data-created-at') || 0);
-                return criteria === 'newest' ? keyB - keyA : keyA - keyB;
-            } else if (criteria === 'duration_high' || criteria === 'duration_low') {
-                keyA = parseFloat($(a).attr('data-duration') || 0);
-                keyB = parseFloat($(b).attr('data-duration') || 0);
-                return criteria === 'duration_high' ? keyB - keyA : keyA - keyB;
-            }
-            return 0;
-        });
-
-        $.each($rows, function(index, row) {
-            $tbody.append(row);
-        });
-        updateWfhPagination();
+        if (typeof window.loadWfhApplications === 'function') {
+            window.loadWfhApplications(1);
+        }
     };
-
-    // Initial load
-    updateWfhPagination();
 });
 
 // ── WFH Cancellation Modal ─────────────────────────────────────────────────

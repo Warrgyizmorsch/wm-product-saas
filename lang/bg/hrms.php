@@ -132,6 +132,7 @@ return [
         'approved_no_delete' => 'Одобрени заявки не могат да бъдат изтривани.',
         'deleted_successfully' => 'Заявката за промяна на смяна е изтрита успешно.',
         'type_temporary' => 'Временна',
+        'type_one_time' => 'Еднократна',
         'type_permanent' => 'Постоянна',
         'type_recurring' => 'Повтаряща се',
         'shift_details' => 'Детайли за смяната',
@@ -1726,6 +1727,7 @@ return [
         'deduct_leave_balance' => 'Удържане от баланса на отпуск',
         'both_settlements' => 'И двете (Заплата и Отпуск)',
         'unlimited' => 'Неограничен',
+        'policy_created' => 'Политиката за наказания е създадена успешно.',
         'policy_updated' => 'Политиката за наказания е актуализирана успешно.',
     ],
     'track_status' => [

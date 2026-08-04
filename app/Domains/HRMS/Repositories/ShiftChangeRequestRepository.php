@@ -36,30 +36,33 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
 
         $query = ShiftChangeRequest::query()->with(['employee', 'currentShift', 'requestedShift', 'approvedByEmployee']);
 
-        if (!empty($inputs['employee_id'])) {
-            $query->where('employee_id', $inputs['employee_id']);
+        $shiftSearch = $inputs['shift_search'] ?? $inputs['search'] ?? '';
+        $shiftEmployeeId = $inputs['shift_employee_id'] ?? $inputs['employee_id'] ?? '';
+        $shiftStatus = $inputs['shift_status'] ?? $inputs['status'] ?? '';
+        $shiftSort = $inputs['shift_sort'] ?? $inputs['sort'] ?? 'newest';
+
+        if (!empty($shiftEmployeeId)) {
+            $query->where('employee_id', $shiftEmployeeId);
         }
 
-        if (!empty($inputs['status'])) {
-            $query->where('status', $inputs['status']);
+        if (!empty($shiftStatus)) {
+            $query->where('status', $shiftStatus);
         }
 
-        if (!empty($inputs['search'])) {
-            $search = $inputs['search'];
-            $query->whereHas('employee', function ($eq) use ($search) {
-                $eq->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('employee_id', 'like', "%{$search}%");
+        if (!empty($shiftSearch)) {
+            $query->whereHas('employee', function ($eq) use ($shiftSearch) {
+                $eq->where('full_name', 'like', "%{$shiftSearch}%")
+                    ->orWhere('employee_id', 'like', "%{$shiftSearch}%");
             });
         }
 
-        $sort = $inputs['sort'] ?? 'newest';
-        if ($sort === 'oldest') {
+        if ($shiftSort === 'oldest') {
             $query->orderBy('created_at', 'asc');
         } else {
             $query->orderBy('created_at', 'desc');
         }
 
-        $requests = $query->get();
+        $requests = $query->paginate(10, ['*'], 'shift_page')->withQueryString();
 
         // Metric Counts
         $summaryQuery = ShiftChangeRequest::query();
@@ -81,7 +84,11 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
             'totalRequests',
             'pendingRequests',
             'approvedRequests',
-            'rejectedRequests'
+            'rejectedRequests',
+            'shiftSearch',
+            'shiftEmployeeId',
+            'shiftStatus',
+            'shiftSort'
         );
     }
 

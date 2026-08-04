@@ -30,6 +30,10 @@ use App\Domains\HRMS\Models\Document;
 use App\Domains\HRMS\Models\LeaveBalance;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\LeaveEncashment;
+use App\Domains\HRMS\Models\AttendanceRule;
+use App\Domains\HRMS\Models\WfhRequest;
+use App\Domains\HRMS\Models\ShiftChangeRequest;
+use App\Domains\HRMS\Models\OvertimeRequest;
 use App\Domains\Production\Models\ProductionShift;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +48,9 @@ class HrmsDemoSeeder extends Seeder
     {
         Schema::disableForeignKeyConstraints();
 
-        // Truncate tables to ensure idempotency and prevent duplicate records
+        DB::table('wfh_requests')->truncate();
+        DB::table('shift_change_requests')->truncate();
+        DB::table('overtime_requests')->truncate();
         DB::table('leave_encashments')->truncate();
         DB::table('leave_requests')->truncate();
         DB::table('leave_balances')->truncate();
@@ -410,43 +416,46 @@ class HrmsDemoSeeder extends Seeder
             }
         }
 
-        // 9. Employees (12 Employees)
-        $employeesData = [
-            ['id' => 'ACM-0001', 'name' => 'Sophia Martinez', 'title' => 'HR Manager', 'dept' => $deptHR, 'desig' => $desigHRManager, 'salary' => 95000.00, 'gender' => 'Female'],
-            ['id' => 'ACM-0002', 'name' => 'Rajesh Sharma', 'title' => 'Production Lead', 'dept' => $deptProd, 'desig' => $desigProdLead, 'salary' => 75000.00, 'gender' => 'Male'],
-            ['id' => 'ACM-0003', 'name' => 'Amit Patel', 'title' => 'Machine Welder', 'dept' => $deptProd, 'desig' => $desigOperator, 'salary' => 35000.00, 'gender' => 'Male'],
-            ['id' => 'ACM-0004', 'name' => 'Vikram Malhotra', 'title' => 'Senior Full Stack Lead', 'dept' => $deptEng, 'desig' => $desigEngLead, 'salary' => 125000.00, 'gender' => 'Male'],
-            ['id' => 'ACM-0005', 'name' => 'Ananya Roy', 'title' => 'QA Manager', 'dept' => $deptQA, 'desig' => $desigQAManager, 'salary' => 85000.00, 'gender' => 'Female'],
-            ['id' => 'ACM-0006', 'name' => 'Karan Singhania', 'title' => 'Enterprise Sales Executive', 'dept' => $deptSales, 'desig' => $desigSalesExec, 'salary' => 65000.00, 'gender' => 'Male'],
-            ['id' => 'ACM-0007', 'name' => 'Priya Nair', 'title' => 'Senior Financial Analyst', 'dept' => $deptFinance, 'desig' => $desigFinAnalyst, 'salary' => 78000.00, 'gender' => 'Female'],
-            ['id' => 'ACM-0008', 'name' => 'Rohan Joshi', 'title' => 'IT Systems Administrator', 'dept' => $deptIT, 'desig' => $desigSysAdmin, 'salary' => 58000.00, 'gender' => 'Male'],
-            ['id' => 'ACM-0009', 'name' => 'Meera Deshmukh', 'title' => 'Supply Chain Manager', 'dept' => $deptSCM, 'desig' => $desigSCMManager, 'salary' => 90000.00, 'gender' => 'Female'],
-            ['id' => 'ACM-0010', 'name' => 'Siddharth Rao', 'title' => 'Customer Success Lead', 'dept' => $deptSupport, 'desig' => $desigCustLead, 'salary' => 62000.00, 'gender' => 'Male'],
-            ['id' => 'ACM-0011', 'name' => 'Divya Kulkarni', 'title' => 'Legal Counsel', 'dept' => $deptLegal, 'desig' => $desigLegalCounsel, 'salary' => 110000.00, 'gender' => 'Female'],
-            ['id' => 'ACM-0012', 'name' => 'Arjun Verma', 'title' => 'Senior Procurement Executive', 'dept' => $deptProc, 'desig' => $desigProcExec, 'salary' => 54000.00, 'gender' => 'Male'],
+        $dbUsers = \App\Models\User::all()->take(15);
+        $employeesList = [];
+        
+        $designations = [
+            $desigHRManager, $desigProdLead, $desigOperator, $desigEngLead, 
+            $desigQAManager, $desigSalesExec, $desigFinAnalyst, $desigSysAdmin,
+            $desigSCMManager, $desigCustLead, $desigLegalCounsel, $desigProcExec
         ];
 
-        $employeesList = [];
-        foreach ($employeesData as $idx => $empInfo) {
+        $departments = [
+            $deptHR, $deptProd, $deptProd, $deptEng,
+            $deptQA, $deptSales, $deptFinance, $deptIT,
+            $deptSCM, $deptSupport, $deptLegal, $deptProc
+        ];
+
+        $idx = 0;
+        foreach ($dbUsers as $user) {
+            $desig = $designations[$idx % count($designations)];
+            $dept = $departments[$idx % count($departments)];
+
             $empObj = Employee::create([
                 'tenant_id' => $tenant->id,
-                'employee_id' => $empInfo['id'],
+                'user_id' => $user->id,
+                'employee_id' => 'EMP-' . str_pad($idx + 1, 4, '0', STR_PAD_LEFT),
                 'company_id' => $company->id,
                 'business_unit_id' => ($idx % 2 === 0) ? $buServices->id : $buManufacturing->id,
                 'branch_id' => ($idx % 2 === 0) ? $branchHQ->id : $branchFactory->id,
-                'department_id' => $empInfo['dept']->id,
-                'designation_id' => $empInfo['desig']->id,
+                'department_id' => $dept->id,
+                'designation_id' => $desig->id,
                 'pay_group_id' => ($idx < 3) ? $payGroupExecutive->id : $payGroupStandard->id,
                 'salary_structure_id' => $salaryStructureStandard->id,
                 'leave_plan_id' => $leavePlan->id,
                 'attendance_penalty_id' => $attendancePenalty->id,
                 'reporting_manager_id' => ($idx > 0) ? $employeesList[0]->id : null,
                 'shift_id' => $productionShift->id,
-                'full_name' => $empInfo['name'],
-                'nick_name' => explode(' ', $empInfo['name'])[0],
+                'full_name' => $user->name,
+                'nick_name' => explode(' ', $user->name)[0],
                 'blood_group' => 'O+',
                 'employee_stage' => 'Confirmed',
-                'job_title' => $empInfo['title'],
+                'job_title' => $desig->name,
                 'role' => 'Employee',
                 'employment_type' => 'Full-time',
                 'date_of_joining' => '2023-01-15',
@@ -454,7 +463,7 @@ class HrmsDemoSeeder extends Seeder
                 'probation_end_date' => '2023-07-15',
                 'confirmation_date' => '2023-07-15',
                 'office' => 'HQ Floor 4',
-                'gender' => $empInfo['gender'],
+                'gender' => ($idx % 2 === 0) ? 'Male' : 'Female',
                 'marital_status' => 'Single',
                 'diet_preference' => 'Veg',
                 'aadhaar_card_number' => '1111-2222-' . str_pad($idx + 1, 4, '0', STR_PAD_LEFT),
@@ -464,12 +473,12 @@ class HrmsDemoSeeder extends Seeder
                 'city' => 'Bangalore',
                 'postal_code' => '560001',
                 'personal_mobile_number' => '+9198000000' . str_pad($idx + 1, 2, '0', STR_PAD_LEFT),
-                'personal_email' => strtolower(str_replace(' ', '.', $empInfo['name'])) . '@example.com',
-                'office_email' => strtolower(str_replace(' ', '.', $empInfo['name'])) . '@acme.com',
+                'personal_email' => $user->email,
+                'office_email' => $user->email,
                 'experience' => 5.0 + $idx,
                 'source_of_hire' => 'Internal',
                 'skill_set' => 'Management, Operations, Domain Expertise',
-                'current_salary' => $empInfo['salary'],
+                'current_salary' => 50000.00 + ($idx * 5000),
                 'qualification' => 'Bachelor Degree',
                 'bank_name' => 'HDFC Bank',
                 'account_number' => '501000' . str_pad($idx + 1, 8, '0', STR_PAD_LEFT),
@@ -480,11 +489,12 @@ class HrmsDemoSeeder extends Seeder
                 'status' => true,
             ]);
             $employeesList[] = $empObj;
+            $idx++;
         }
 
         $employeeHR = $employeesList[0];
-        $employeeLead = $employeesList[1];
-        $employeeOperator = $employeesList[2];
+        $employeeLead = $employeesList[1] ?? $employeeHR;
+        $employeeOperator = $employeesList[2] ?? $employeeHR;
 
         // Update Circular Manager/Head references in Organization tables
         $buManufacturing->update(['head_employee_id' => $employeeLead->id]);
@@ -1447,5 +1457,104 @@ class HrmsDemoSeeder extends Seeder
             'expiry_date' => null,
             'requested_by_id' => $adminUser->id,
         ]);
+
+        // Seed new HRMS-related tables: WfhRequest, ShiftChangeRequest, OvertimeRequest
+        $seederEmployees = Employee::all();
+        
+        $requestedShift1 = ProductionShift::where('code', 'SHIFT-AM')->first() ?? $productionShift ?? ProductionShift::first();
+        $requestedShift2 = ProductionShift::where('code', 'SHIFT-PM')->first() ?? $productionShift ?? ProductionShift::first();
+
+        foreach ($seederEmployees as $emp) {
+            // Find another employee to act as the manager/approver (so they don't self-approve)
+            $approver = $seederEmployees->where('id', '!=', $emp->id)->first() ?? $emp;
+
+            // 1. Seed 2 WFH Requests for every employee
+            WfhRequest::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'employee_id' => $emp->id,
+                'start_date' => now()->addDays(2)->format('Y-m-d'),
+                'end_date' => now()->addDays(4)->format('Y-m-d'),
+                'duration' => 3.0,
+                'start_date_type' => 'full_day',
+                'end_date_type' => 'full_day',
+                'reason' => 'Quarterly remote work arrangement.',
+                'status' => 'approved',
+                'approved_by' => $approver->id,
+            ]);
+
+            WfhRequest::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'employee_id' => $emp->id,
+                'start_date' => now()->addDays(12)->format('Y-m-d'),
+                'end_date' => now()->addDays(12)->format('Y-m-d'),
+                'duration' => 1.0,
+                'start_date_type' => 'full_day',
+                'end_date_type' => 'full_day',
+                'reason' => 'Broadband upgrade and maintenance.',
+                'status' => 'pending',
+            ]);
+
+            // 2. Seed 2 Shift Change Requests for every employee
+            ShiftChangeRequest::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'employee_id' => $emp->id,
+                'type' => 'recurring',
+                'start_date' => now()->addDays(1)->format('Y-m-d'),
+                'end_date' => now()->addDays(10)->format('Y-m-d'),
+                'recurring_days' => ['Monday', 'Wednesday', 'Friday'],
+                'current_shift_id' => $emp->shift_id ?? ($productionShift->id ?? null),
+                'requested_shift_id' => $requestedShift1->id ?? null,
+                'reason' => 'Family commitments require morning timings.',
+                'status' => 'pending',
+            ]);
+
+            ShiftChangeRequest::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'employee_id' => $emp->id,
+                'type' => 'temporary',
+                'start_date' => now()->addDays(15)->format('Y-m-d'),
+                'end_date' => now()->addDays(15)->format('Y-m-d'),
+                'current_shift_id' => $emp->shift_id ?? ($productionShift->id ?? null),
+                'requested_shift_id' => $requestedShift2->id ?? null,
+                'reason' => 'Doctor appointment shift swap.',
+                'status' => 'approved',
+                'approved_by' => $approver->id,
+            ]);
+
+            // 3. Seed 2 Overtime Requests for every employee
+            OvertimeRequest::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'employee_id' => $emp->id,
+                'date' => now()->subDays(2)->format('Y-m-d'),
+                'start_time' => '18:00:00',
+                'end_time' => '21:00:00',
+                'duration_hours' => 3.00,
+                'approved_duration_hours' => 3.00,
+                'compensation_type' => 'pay',
+                'reason' => 'Extra support for monthly inventory count.',
+                'status' => 'approved',
+                'approved_by' => $approver->id,
+            ]);
+
+            OvertimeRequest::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'employee_id' => $emp->id,
+                'date' => now()->subDays(5)->format('Y-m-d'),
+                'start_time' => '18:00:00',
+                'end_time' => '20:00:00',
+                'duration_hours' => 2.00,
+                'approved_duration_hours' => 0.00,
+                'compensation_type' => 'pay',
+                'reason' => 'Unscheduled troubleshooting assistance.',
+                'status' => 'rejected',
+                'rejection_reason' => 'Not pre-approved by shift lead.',
+            ]);
+        }
     }
 }

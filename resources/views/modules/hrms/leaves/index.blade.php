@@ -771,134 +771,84 @@
                 return duration;
             }
 
-            var currentPage = 1;
-            var itemsPerPage = 10;
+            function loadLeaveApplications(page = 1) {
+                var search = $('#leaves_search').val() || '';
+                var empId = $('#filter_employee_id').val() || '';
+                var status = $('#filter_status').val() || '';
+                var sort = $('#leaves_sort_value').val() || 'date_desc';
+                var tab = 'applications';
 
-            function updatePagination() {
-                var searchVal = $('#leaves_search').val().toLowerCase().trim();
-                var empId = $('#filter_employee_id').val();
-                var status = $('#filter_status').val();
+                var url = '{{ route("hrms.leaves.index") }}?tab=' + tab +
+                          '&leaves_search=' + encodeURIComponent(search) +
+                          '&leaves_employee_id=' + encodeURIComponent(empId) +
+                          '&leaves_status=' + encodeURIComponent(status) +
+                          '&leaves_sort=' + encodeURIComponent(sort) +
+                          '&leaves_page=' + page;
 
-                var $visibleRows = $('.leave-row').filter(function() {
-                    var $row = $(this);
-                    var rowEmp = $row.attr('data-employee') || '';
-                    var rowEmpId = $row.attr('data-employee-id') || '';
-                    var rowStatus = $row.attr('data-status') || '';
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    success: function(response) {
+                        var parser = new DOMParser();
+                        var doc = parser.parseFromString(response, 'text/html');
+                        
+                        var oldBody = $('#leavesTableBody');
+                        var newBody = $(doc).find('#leavesTableBody');
+                        if (oldBody.length && newBody.length) {
+                            oldBody.html(newBody.html());
+                        }
+                        
+                        var oldPagination = $('#leaves_pagination_container');
+                        var newPagination = $(doc).find('#leaves_pagination_container');
+                        if (oldPagination.length && newPagination.length) {
+                            oldPagination.replaceWith(newPagination);
+                        }
 
-                    var matchesSearch = !searchVal || rowEmp.indexOf(searchVal) !== -1;
-                    var matchesEmp = !empId || rowEmpId === empId;
-                    var matchesStatus = !status || rowStatus === status;
+                        $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                        $('.erp-filter-dropdown.show').removeClass('show');
 
-                    return matchesSearch && matchesEmp && matchesStatus;
+                        history.pushState(null, '', url);
+                    }
                 });
-
-                var totalItems = $visibleRows.length;
-                var totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-
-                if (currentPage > totalPages) {
-                    currentPage = totalPages;
-                }
-                if (currentPage < 1) {
-                    currentPage = 1;
-                }
-
-                var startIndex = (currentPage - 1) * itemsPerPage;
-                var endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-
-                $('.leave-row').hide();
-                $visibleRows.slice(startIndex, endIndex).show();
-
-                if (totalPages > 1) {
-                    $('.erp-pagination-container').show();
-                } else {
-                    $('.erp-pagination-container').hide();
-                }
-
-                if (totalItems === 0) {
-                    $('#no_matching_leaves_row').removeClass('d-none');
-                } else {
-                    $('#no_matching_leaves_row').addClass('d-none');
-                }
-
-                $('#leaves_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
-                $('#leaves_showing_end').text(endIndex);
-                $('#leaves_total_count').text(totalItems);
-
-                var paginationHtml = '';
-
-                // Previous button
-                paginationHtml += `
-                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                        <a class="page-link" href="#" data-page="${currentPage - 1}" aria-label="Previous">
-                            <i class="feather-chevron-left"></i>
-                        </a>
-                    </li>
-                `;
-
-                // Page numbers
-                for (var i = 1; i <= totalPages; i++) {
-                    paginationHtml += `
-                        <li class="page-item ${currentPage === i ? 'active' : ''}">
-                            <a class="page-link" href="#" data-page="${i}">${i}</a>
-                        </li>
-                    `;
-                }
-
-                // Next button
-                paginationHtml += `
-                    <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                        <a class="page-link" href="#" data-page="${currentPage + 1}" aria-label="Next">
-                            <i class="feather-chevron-right"></i>
-                        </a>
-                    </li>
-                `;
-
-                $('#leaves_pagination_ul').html(paginationHtml);
             }
 
-            // Client-side search trigger
-            $('#leaves_search').on('input', function() {
-                currentPage = 1;
-                updatePagination();
+            var leavesSearchTimeout;
+            $(document).on('input', '#leaves_search', function() {
+                clearTimeout(leavesSearchTimeout);
+                leavesSearchTimeout = setTimeout(function() {
+                    loadLeaveApplications(1);
+                }, 300);
             });
 
-            // Client-side filter Apply trigger
-            $('#btnApplyFilters').on('click', function(e) {
+            $(document).on('click', '#btnApplyFilters', function(e) {
                 e.preventDefault();
-                currentPage = 1;
-                updatePagination();
-                $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
+                loadLeaveApplications(1);
             });
 
-            // Client-side filter Reset trigger
-            $('#btnResetFilters').on('click', function(e) {
+            $(document).on('click', '#btnResetFilters', function(e) {
                 e.preventDefault();
                 $('#leaves_search').val('');
                 $('#filter_employee_id').val('').trigger('change');
-                $('#filter_status').val('');
-                currentPage = 1;
-                updatePagination();
-                $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
-            });
+                $('#filter_status').val('').trigger('change');
+                $('#leaves_sort_value').val('date_desc');
 
-            // Pagination click handler
-            $(document).on('click', '#leaves_pagination_ul .page-link', function(e) {
-                e.preventDefault();
-                var page = $(this).data('page');
-                if (page && !$(this).parent().hasClass('disabled')) {
-                    currentPage = parseInt(page);
-                    updatePagination();
-
-                    var url = new URL(window.location.href);
-                    url.searchParams.set('leaves_page', currentPage);
-                    if (window.history.pushState) {
-                        window.history.pushState({path: url.toString()}, '', url.toString());
-                    }
+                var sortDropdown = $('#pane-leave-applications .erp-sort-dropdown');
+                if (sortDropdown.length) {
+                    sortDropdown.find('.dropdown-item').removeClass('active');
+                    sortDropdown.find('.dropdown-item:first').addClass('active');
                 }
+
+                loadLeaveApplications(1);
             });
 
-            // Initial pagination display
-            updatePagination();
+            $(document).on('click', '#leaves_pagination_container a', function(e) {
+                e.preventDefault();
+                var url = $(this).attr('href');
+                if (!url) return;
+                var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+                var page = urlParams.get('leaves_page') || 1;
+                loadLeaveApplications(page);
+            });
 
             // Reject Leave Trigger Modal
             $('.reject-leave-btn').on('click', function() {
@@ -931,127 +881,85 @@
                 }
             });
 
-            // Client-side Encashments Pagination & Filtering
-            var encashCurrentPage = 1;
-            var encashRowsPerPage = 10;
+            function loadLeaveEncashments(page = 1) {
+                var search = $('#encashments_search').val() || '';
+                var empId = $('#filter_encashment_employee_id').val() || '';
+                var status = $('#filter_encashment_status').val() || '';
+                var sort = $('#encashments_sort_value').val() || 'date_desc';
+                var tab = 'encashments';
 
-            function updateEncashmentsPagination() {
-                var searchTerm = ($('#encashments_search').val() || '').toLowerCase().trim();
-                var empFilter = $('#filter_encashment_employee_id').val();
-                var statusFilter = $('#filter_encashment_status').val();
+                var url = '{{ route("hrms.leaves.index") }}?tab=' + tab +
+                          '&encashments_search=' + encodeURIComponent(search) +
+                          '&encashments_employee_id=' + encodeURIComponent(empId) +
+                          '&encashments_status=' + encodeURIComponent(status) +
+                          '&encashments_sort=' + encodeURIComponent(sort) +
+                          '&encash_page=' + page;
 
-                var $allRows = $('#encashmentsTableBody .encashment-row');
-                var $visibleRows = $allRows.filter(function() {
-                    var text = ($(this).attr('data-employee') || '').toLowerCase();
-                    var empId = $(this).attr('data-employee-id') || '';
-                    var status = $(this).attr('data-status') || '';
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    success: function(response) {
+                        var parser = new DOMParser();
+                        var doc = parser.parseFromString(response, 'text/html');
+                        
+                        var oldBody = $('#encashmentsTableBody');
+                        var newBody = $(doc).find('#encashmentsTableBody');
+                        if (oldBody.length && newBody.length) {
+                            oldBody.html(newBody.html());
+                        }
+                        
+                        var oldPagination = $('#encashments_pagination_container');
+                        var newPagination = $(doc).find('#encashments_pagination_container');
+                        if (oldPagination.length && newPagination.length) {
+                            oldPagination.replaceWith(newPagination);
+                        }
 
-                    var matchesSearch = !searchTerm || text.indexOf(searchTerm) !== -1;
-                    var matchesEmp = !empFilter || empId === empFilter;
-                    var matchesStatus = !statusFilter || status === statusFilter;
+                        $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                        $('.erp-filter-dropdown.show').removeClass('show');
 
-                    return matchesSearch && matchesEmp && matchesStatus;
-                });
-
-                $allRows.addClass('d-none');
-
-                var totalVisible = $visibleRows.length;
-                var totalPages = Math.ceil(totalVisible / encashRowsPerPage) || 1;
-
-                if (encashCurrentPage > totalPages) encashCurrentPage = totalPages;
-                if (encashCurrentPage < 1) encashCurrentPage = 1;
-
-                var startIndex = (encashCurrentPage - 1) * encashRowsPerPage;
-                var endIndex = startIndex + encashRowsPerPage;
-
-                $visibleRows.slice(startIndex, endIndex).removeClass('d-none');
-
-                if ($allRows.length > 0 && totalVisible === 0) {
-                    $('#no_matching_encashments_row').removeClass('d-none');
-                } else {
-                    $('#no_matching_encashments_row').addClass('d-none');
-                }
-
-                $('#encashments_showing_start').text(totalVisible > 0 ? startIndex + 1 : 0);
-                $('#encashments_showing_end').text(Math.min(endIndex, totalVisible));
-                $('#encashments_total_count').text(totalVisible);
-
-                if (totalPages > 1) {
-                    $('#pane-leave-encashments .erp-pagination-container').show();
-                } else {
-                    $('#pane-leave-encashments .erp-pagination-container').hide();
-                }
-
-                var paginationHtml = '';
-                paginationHtml += `
-                    <li class="page-item ${encashCurrentPage === 1 ? 'disabled' : ''}">
-                        <a class="page-link" href="#" data-page="${encashCurrentPage - 1}" aria-label="Previous">
-                            <i class="feather-chevron-left"></i>
-                        </a>
-                    </li>
-                `;
-
-                for (var i = 1; i <= totalPages; i++) {
-                    if (i === 1 || i === totalPages || (i >= encashCurrentPage - 1 && i <= encashCurrentPage + 1)) {
-                        paginationHtml += `
-                            <li class="page-item ${i === encashCurrentPage ? 'active' : ''}">
-                                <a class="page-link" href="#" data-page="${i}">${i}</a>
-                            </li>
-                        `;
-                    } else if (i === encashCurrentPage - 2 || i === encashCurrentPage + 2) {
-                        paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                        history.pushState(null, '', url);
                     }
-                }
-
-                paginationHtml += `
-                    <li class="page-item ${encashCurrentPage === totalPages ? 'disabled' : ''}">
-                        <a class="page-link" href="#" data-page="${encashCurrentPage + 1}" aria-label="Next">
-                            <i class="feather-chevron-right"></i>
-                        </a>
-                    </li>
-                `;
-
-                $('#encashments_pagination_ul').html(paginationHtml);
+                });
             }
 
-            $('#encashments_search').on('input', function() {
-                encashCurrentPage = 1;
-                updateEncashmentsPagination();
+            var encashmentsSearchTimeout;
+            $(document).on('input', '#encashments_search', function() {
+                clearTimeout(encashmentsSearchTimeout);
+                encashmentsSearchTimeout = setTimeout(function() {
+                    loadLeaveEncashments(1);
+                }, 300);
             });
 
-            $('#btnApplyEncashmentFilters').on('click', function(e) {
+            $(document).on('click', '#btnApplyEncashmentFilters', function(e) {
                 e.preventDefault();
-                encashCurrentPage = 1;
-                updateEncashmentsPagination();
-                $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
+                loadLeaveEncashments(1);
             });
 
-            $('#btnResetEncashmentFilters').on('click', function(e) {
+            $(document).on('click', '#btnResetEncashmentFilters', function(e) {
                 e.preventDefault();
                 $('#encashments_search').val('');
                 $('#filter_encashment_employee_id').val('').trigger('change');
-                $('#filter_encashment_status').val('');
-                encashCurrentPage = 1;
-                updateEncashmentsPagination();
-                $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
-            });
+                $('#filter_encashment_status').val('').trigger('change');
+                $('#encashments_sort_value').val('date_desc');
 
-            $(document).on('click', '#encashments_pagination_ul .page-link', function(e) {
-                e.preventDefault();
-                var page = $(this).data('page');
-                if (page && !$(this).parent().hasClass('disabled')) {
-                    encashCurrentPage = parseInt(page);
-                    updateEncashmentsPagination();
-
-                    var url = new URL(window.location.href);
-                    url.searchParams.set('encash_page', encashCurrentPage);
-                    if (window.history.pushState) {
-                        window.history.pushState({path: url.toString()}, '', url.toString());
-                    }
+                var sortDropdown = $('#pane-leave-encashments .erp-sort-dropdown');
+                if (sortDropdown.length) {
+                    sortDropdown.find('.dropdown-item').removeClass('active');
+                    sortDropdown.find('.dropdown-item').find('.encash-sort-check').addClass('d-none');
+                    sortDropdown.find('.dropdown-item:first').addClass('active').find('.encash-sort-check').removeClass('d-none');
                 }
+
+                loadLeaveEncashments(1);
             });
 
-            updateEncashmentsPagination();
+            $(document).on('click', '#encashments_pagination_container a', function(e) {
+                e.preventDefault();
+                var url = $(this).attr('href');
+                if (!url) return;
+                var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+                var page = urlParams.get('encash_page') || 1;
+                loadLeaveEncashments(page);
+            });
 
             // Dynamic Encashment Leave Type Population
             function updateEncashmentLeaveTypes(empId) {
@@ -1090,10 +998,17 @@
             if (initialEncashEmpId) {
                 updateEncashmentLeaveTypes(initialEncashEmpId);
             }
+
+            window.loadLeaveApplications = loadLeaveApplications;
+            window.loadLeaveEncashments = loadLeaveEncashments;
         });
 
-        // Client-side sort selection handler for leave applications
+        // Sort selection handler for leave applications
         function changeLeavesSort(criteria, element) {
+            var input = document.getElementById('leaves_sort_value');
+            if (input) {
+                input.value = criteria;
+            }
             if (element) {
                 var menu = element.closest('.dropdown-menu');
                 if (menu) {
@@ -1103,33 +1018,17 @@
                 }
                 element.classList.add('active');
             }
-
-            var $tbody = $('#leavesTableBody');
-            var $rows = $tbody.find('.leave-row').get();
-
-            $rows.sort(function(a, b) {
-                var keyA, keyB;
-
-                if (criteria === 'date_desc' || criteria === 'date_asc') {
-                    keyA = parseInt($(a).attr('data-created-at') || 0);
-                    keyB = parseInt($(b).attr('data-created-at') || 0);
-                    return criteria === 'date_desc' ? keyB - keyA : keyA - keyB;
-                } else if (criteria === 'duration_desc' || criteria === 'duration_asc') {
-                    keyA = parseFloat($(a).attr('data-duration') || 0);
-                    keyB = parseFloat($(b).attr('data-duration') || 0);
-                    return criteria === 'duration_desc' ? keyB - keyA : keyA - keyB;
-                }
-                return 0;
-            });
-
-            $.each($rows, function(index, row) {
-                $tbody.append(row);
-            });
-            updatePagination();
+            if (typeof window.loadLeaveApplications === 'function') {
+                window.loadLeaveApplications(1);
+            }
         }
 
-        // Client-side sort selection handler for encashment requests
+        // Sort selection handler for encashment requests
         function changeEncashmentsSort(criteria, element) {
+            var input = document.getElementById('encashments_sort_value');
+            if (input) {
+                input.value = criteria;
+            }
             $('.encash-sort-check').addClass('d-none');
             if (element) {
                 $(element).find('.encash-sort-check').removeClass('d-none');
@@ -1141,30 +1040,13 @@
                 }
                 element.classList.add('active');
             }
-
-            var $tbody = $('#encashmentsTableBody');
-            var $rows = $tbody.find('.encashment-row').get();
-
-            $rows.sort(function(a, b) {
-                var keyA, keyB;
-
-                if (criteria === 'date_desc' || criteria === 'date_asc') {
-                    keyA = parseInt($(a).attr('data-created-at') || 0);
-                    keyB = parseInt($(b).attr('data-created-at') || 0);
-                    return criteria === 'date_desc' ? keyB - keyA : keyA - keyB;
-                } else if (criteria === 'days_desc' || criteria === 'days_asc') {
-                    keyA = parseFloat($(a).attr('data-days') || 0);
-                    keyB = parseFloat($(b).attr('data-days') || 0);
-                    return criteria === 'days_desc' ? keyB - keyA : keyA - keyB;
-                }
-                return 0;
-            });
-
-            $.each($rows, function(index, row) {
-                $tbody.append(row);
-            });
-            updateEncashmentsPagination();
+            if (typeof window.loadLeaveEncashments === 'function') {
+                window.loadLeaveEncashments(1);
+            }
         }
+
+        window.changeLeavesSort = changeLeavesSort;
+        window.changeEncashmentsSort = changeEncashmentsSort;
     </script>
 
     <script>
@@ -1452,24 +1334,25 @@
                             
                             <div class="d-flex align-items-center gap-2">
                                 <form method="GET" action="javascript:void(0);" class="d-flex align-items-center gap-2 m-0" id="leavesFilterForm">
+                                    <input type="hidden" id="leaves_sort_value" value="{{ $leavesSort ?? 'date_desc' }}">
                                     <!-- Registry Style Search Input -->
                                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                        <input type="text" id="leaves_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;">
+                                        <input type="text" id="leaves_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;" value="{{ $leavesSearch ?? '' }}">
                                     </div>
 
                                     <!-- Sort Dropdown with Checkmark Icons -->
                                     <x-ui.sort-dropdown :label="__('hrms.common.sort')">
-                                        <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="changeLeavesSort('date_desc', this); event.preventDefault();">
+                                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($leavesSort ?? 'date_desc') === 'date_desc' ? 'active' : '' }}" href="#" onclick="changeLeavesSort('date_desc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.app.sort_newest') }}</span>
                                         </a>
-                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('date_asc', this); event.preventDefault();">
+                                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($leavesSort ?? '') === 'date_asc' ? 'active' : '' }}" href="#" onclick="changeLeavesSort('date_asc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.app.sort_oldest') }}</span>
                                         </a>
-                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_desc', this); event.preventDefault();">
+                                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($leavesSort ?? '') === 'duration_desc' ? 'active' : '' }}" href="#" onclick="changeLeavesSort('duration_desc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.app.sort_duration_high_low') }}</span>
                                         </a>
-                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_asc', this); event.preventDefault();">
+                                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($leavesSort ?? '') === 'duration_asc' ? 'active' : '' }}" href="#" onclick="changeLeavesSort('duration_asc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.app.sort_duration_low_high') }}</span>
                                         </a>
                                     </x-ui.sort-dropdown>
@@ -1482,9 +1365,9 @@
                                             <div class="mb-3" style="min-width: 250px;">
                                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_employee_id">
-                                                    <option value="">{{ __('hrms.common.all_employees') ?? 'All Employees' }}</option>
+                                                    <option value="" {{ ($leavesEmployeeId ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.common.all_employees') ?? 'All Employees' }}</option>
                                                     @foreach(($allEmployees ?? $employees ?? []) as $emp)
-                                                        <option value="{{ $emp->id }}">
+                                                        <option value="{{ $emp->id }}" {{ ($leavesEmployeeId ?? '') == $emp->id ? 'selected' : '' }}>
                                                             {{ $emp->full_name }}
                                                         </option>
                                                     @endforeach
@@ -1495,10 +1378,10 @@
                                         <div class="mb-3" style="min-width: 250px;">
                                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
                                             <x-ui.odoo-form-ui type="select" name="status" id="filter_status">
-                                                <option value="">{{ __('hrms.common.all_statuses') }}</option>
-                                                <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
-                                                <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
-                                                <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
+                                                <option value="" {{ ($leavesStatus ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.common.all_statuses') }}</option>
+                                                <option value="pending" {{ ($leavesStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_pending') }}</option>
+                                                <option value="approved" {{ ($leavesStatus ?? '') === 'approved' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_approved') }}</option>
+                                                <option value="rejected" {{ ($leavesStatus ?? '') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_rejected') }}</option>
                                             </x-ui.odoo-form-ui>
                                         </div>
 
@@ -1656,7 +1539,7 @@
 
                                                          {{-- Unified Withdraw / Cancellation Delete button --}}
                                                          @if($req->canWithdraw())
-                                                             <form method="POST" action="{{ route('hrms.leaves.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this leave application?')" class="d-inline">
+                                                             <form method="POST" action="{{ route('hrms.leaves.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Withdraw this leave application?', { title: 'Withdraw Leave Application', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline">
                                                                  @csrf
                                                                  <button type="submit" class="btn btn-sm btn-soft-danger border" 
                                                                          title="Withdraw Application"
@@ -1697,17 +1580,17 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <div class="erp-pagination-container">
-                                <ul class="erp-pagination mb-2" id="leaves_pagination_ul">
-                                    <!-- Dynamically generated pagination links -->
-                                </ul>
-                                <div class="erp-pagination-info">
-                                    {!! __('hrms.leave.app.showing_entries', [
-                                        'start' => '<span id="leaves_showing_start">0</span>',
-                                        'end'   => '<span id="leaves_showing_end">0</span>',
-                                        'total' => '<strong id="leaves_total_count">0</strong>'
-                                    ]) !!}
-                                </div>
+                            <div id="leaves_pagination_container">
+                                @if($leaveRequests instanceof \Illuminate\Pagination\LengthAwarePaginator && $leaveRequests->hasPages())
+                                    <x-ui.pagination
+                                        class="px-0 py-0"
+                                        :current-page="$leaveRequests->currentPage()"
+                                        :total-pages="$leaveRequests->lastPage()"
+                                        :total-results="$leaveRequests->total()"
+                                        :per-page="$leaveRequests->perPage()"
+                                        page-param="leaves_page"
+                                    />
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -1838,29 +1721,30 @@
                             
                             <div class="d-flex align-items-center gap-2">
                                 <form method="GET" action="javascript:void(0);" class="d-flex align-items-center gap-2 m-0" id="encashmentFilterForm">
+                                    <input type="hidden" id="encashments_sort_value" value="{{ $encashmentsSort ?? 'date_desc' }}">
                                     <!-- Registry Style Search Input -->
                                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                        <input type="text" id="encashments_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;">
+                                        <input type="text" id="encashments_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;" value="{{ $encashmentsSearch ?? '' }}">
                                     </div>
 
                                     <!-- Sort Dropdown -->
                                     <x-ui.sort-dropdown :label="__('hrms.common.sort')">
-                                        <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="changeEncashmentsSort('date_desc', this); event.preventDefault();">
+                                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($encashmentsSort ?? 'date_desc') === 'date_desc' ? 'active' : '' }}" href="#" onclick="changeEncashmentsSort('date_desc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.encashment_app.sort_newest') }}</span>
-                                            <i class="feather-check text-dark ms-auto encash-sort-check"></i>
+                                            <i class="feather-check text-dark ms-auto encash-sort-check {{ ($encashmentsSort ?? 'date_desc') === 'date_desc' ? '' : 'd-none' }}"></i>
                                         </a>
-                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeEncashmentsSort('date_asc', this); event.preventDefault();">
+                                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($encashmentsSort ?? '') === 'date_asc' ? 'active' : '' }}" href="#" onclick="changeEncashmentsSort('date_asc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.encashment_app.sort_oldest') }}</span>
-                                            <i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
+                                            <i class="feather-check text-dark ms-auto encash-sort-check {{ ($encashmentsSort ?? '') === 'date_asc' ? '' : 'd-none' }}"></i>
                                         </a>
-                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeEncashmentsSort('days_desc', this); event.preventDefault();">
+                                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($encashmentsSort ?? '') === 'days_desc' ? 'active' : '' }}" href="#" onclick="changeEncashmentsSort('days_desc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.encashment_app.sort_days_high_low') }}</span>
-                                            <i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
+                                            <i class="feather-check text-dark ms-auto encash-sort-check {{ ($encashmentsSort ?? '') === 'days_desc' ? '' : 'd-none' }}"></i>
                                         </a>
-                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeEncashmentsSort('days_asc', this); event.preventDefault();">
+                                        <a class="dropdown-item py-2 d-flex align-items-center {{ ($encashmentsSort ?? '') === 'days_asc' ? 'active' : '' }}" href="#" onclick="changeEncashmentsSort('days_asc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.encashment_app.sort_days_low_high') }}</span>
-                                            <i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
+                                            <i class="feather-check text-dark ms-auto encash-sort-check {{ ($encashmentsSort ?? '') === 'days_asc' ? '' : 'd-none' }}"></i>
                                         </a>
                                     </x-ui.sort-dropdown>
 
@@ -1872,9 +1756,9 @@
                                             <div class="mb-3" style="min-width: 250px;">
                                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.leave.encashment_app.employee') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_encashment_employee_id">
-                                                    <option value="">{{ __('hrms.common.all_employees') }}</option>
+                                                    <option value="" {{ ($encashmentsEmployeeId ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.common.all_employees') }}</option>
                                                     @foreach(($allEmployees ?? $employees ?? []) as $emp)
-                                                        <option value="{{ $emp->id }}">
+                                                        <option value="{{ $emp->id }}" {{ ($encashmentsEmployeeId ?? '') == $emp->id ? 'selected' : '' }}>
                                                             {{ $emp->full_name }}
                                                         </option>
                                                     @endforeach
@@ -1885,10 +1769,10 @@
                                         <div class="mb-3" style="min-width: 250px;">
                                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
                                             <x-ui.odoo-form-ui type="select" name="status" id="filter_encashment_status">
-                                                <option value="">{{ __('hrms.leave.encashment_app.all_statuses') }}</option>
-                                                <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
-                                                <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
-                                                <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
+                                                <option value="" {{ ($encashmentsStatus ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.leave.encashment_app.all_statuses') }}</option>
+                                                <option value="pending" {{ ($encashmentsStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_pending') }}</option>
+                                                <option value="approved" {{ ($encashmentsStatus ?? '') === 'approved' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_approved') }}</option>
+                                                <option value="rejected" {{ ($encashmentsStatus ?? '') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_rejected') }}</option>
                                             </x-ui.odoo-form-ui>
                                         </div>
 
@@ -2001,17 +1885,17 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <div class="erp-pagination-container">
-                                <ul class="erp-pagination mb-2" id="encashments_pagination_ul">
-                                    <!-- Encashments Pagination -->
-                                </ul>
-                                <div class="erp-pagination-info">
-                                    {!! __('hrms.leave.app.showing_entries', [
-                                        'start' => '<span id="encashments_showing_start">0</span>',
-                                        'end' => '<span id="encashments_showing_end">0</span>',
-                                        'total' => '<strong id="encashments_total_count">0</strong>'
-                                    ]) !!}
-                                </div>
+                            <div id="encashments_pagination_container">
+                                @if($leaveEncashments instanceof \Illuminate\Pagination\LengthAwarePaginator && $leaveEncashments->hasPages())
+                                    <x-ui.pagination
+                                        class="px-0 py-0"
+                                        :current-page="$leaveEncashments->currentPage()"
+                                        :total-pages="$leaveEncashments->lastPage()"
+                                        :total-results="$leaveEncashments->total()"
+                                        :per-page="$leaveEncashments->perPage()"
+                                        page-param="encash_page"
+                                    />
+                                @endif
                             </div>
                         </div>
                     </div>

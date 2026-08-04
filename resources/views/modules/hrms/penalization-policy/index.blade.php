@@ -281,7 +281,8 @@
                                     $policyTypes = [
                                         'late_arrival' => [__('hrms.penalization.late_arrival'), 'feather-clock'],
                                         'under_hours' => [__('hrms.penalization.under_hours'), 'feather-trending-down'],
-                                        'missing_logs' => [__('hrms.penalization.missing_logs'), 'feather-alert-triangle']
+                                        'missing_logs' => [__('hrms.penalization.missing_logs'), 'feather-alert-triangle'],
+                                        'attendance_rules' => [__('hrms.penalization.attendance_rules'), 'feather-check-square']
                                     ];
                                     $lateArrivalRule = $rules->get('late_arrival');
                                     $savedLateTiers = ($lateArrivalRule && $lateArrivalRule->penalty_tiers) ? $lateArrivalRule->penalty_tiers : null;
@@ -320,7 +321,7 @@
                                     $statusVal = $rule ? ($rule->status ? '1' : '0') : '1';
                                 @endphp
                                 <div class="policy-details-pane {{ $isPaneActive ? '' : 'd-none' }}" id="policy-details-{{ $typeKey }}">
-                                    <form action="{{ route('hrms.penalization-policy.store') }}" method="POST" class="p-4">
+                                    <form action="{{ $typeKey === 'attendance_rules' ? route('hrms.attendance-rules.save') : route('hrms.penalization-policy.store') }}" method="POST" class="p-4">
                                         @csrf
                                         <input type="hidden" name="rule_type" value="{{ $typeKey }}">
 
@@ -328,7 +329,12 @@
                                         <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
                                             <div>
                                                 <h5 class="fw-bold text-dark mb-1" style="font-size: 16px;">
-                                                    <i class="{{ $typeData[1] }} text-primary me-2 fs-18"></i>{{ __('hrms.penalization.configure_rules', ['type' => $typeData[0]]) }}
+                                                    <i class="{{ $typeData[1] }} text-primary me-2 fs-18"></i>
+                                                    @if($typeKey === 'attendance_rules')
+                                                        Configure Attendance Rules
+                                                    @else
+                                                        {{ __('hrms.penalization.configure_rules', ['type' => $typeData[0]]) }}
+                                                    @endif
                                                 </h5>
                                                 <span class="text-muted fs-12">{{ __('hrms.penalization.set_thresholds_desc') }}</span>
                                             </div>
@@ -342,10 +348,10 @@
                                         <div class="row g-3 mb-4">
                                             <!-- Entity Scope -->
                                             <div class="col-md-6 col-12">
-                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_scope') }}" name="company_id" select2-selector="default">
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_scope') }}" name="company_id" select2-selector="default" id="{{ $typeKey === 'attendance_rules' ? 'sel_company_id' : 'company_id_' . $typeKey }}">
                                                     <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
                                                     @foreach($companies as $company)
-                                                        <option value="{{ $company->id }}" {{ ($rule && $rule->company_id === $company->id) ? 'selected' : '' }}>
+                                                        <option value="{{ $company->id }}" {{ (($typeKey === 'attendance_rules' ? request('company_id') : ($rule ? $rule->company_id : null)) == $company->id) ? 'selected' : '' }}>
                                                             {{ $company->company_name }}
                                                         </option>
                                                     @endforeach
@@ -354,7 +360,7 @@
 
                                             <!-- Status -->
                                             <div class="col-md-6 col-12">
-                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.policy_status') }}" name="status" select2-selector="default" :required="true">
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.policy_status') }}" name="status" select2-selector="default" :required="true" id="{{ $typeKey === 'attendance_rules' ? 'sel_status' : 'status_' . $typeKey }}">
                                                     <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>{{ __('hrms.penalization.active_enforce') }}</option>
                                                     <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>{{ __('hrms.penalization.inactive_ignore') }}</option>
                                                 </x-ui.odoo-form-ui>
@@ -532,13 +538,150 @@
                                                          </x-ui.button>
                                                      </div>
                                                  </div>
-                                             @endif
-                                         </div>
+                                              @endif
+
+                                              @if($typeKey === 'attendance_rules')
+                                                  <!-- Scope Selection: Business Unit & Branch -->
+                                                  <div class="row g-3 mb-4 border-bottom pb-4">
+                                                      <!-- Business Unit -->
+                                                      <div class="col-md-6 col-12" id="div_business_unit">
+                                                          <x-ui.odoo-form-ui type="select" label="Business Unit (Optional)" name="business_unit_id" id="sel_business_unit_id" onchange="loadAttendanceRulesForScope()">
+                                                              <option value="">All Business Units</option>
+                                                              @foreach($businessUnits as $bu)
+                                                                  <option value="{{ $bu->id }}" data-company="{{ $bu->company_id }}" {{ request('business_unit_id') == $bu->id ? 'selected' : '' }}>{{ $bu->name }}</option>
+                                                              @endforeach
+                                                          </x-ui.odoo-form-ui>
+                                                      </div>
+                                                      <!-- Branch -->
+                                                      <div class="col-md-6 col-12" id="div_branch">
+                                                          <x-ui.odoo-form-ui type="select" label="Branch (Optional)" name="branch_id" id="sel_branch_id" onchange="loadAttendanceRulesForScope()">
+                                                              <option value="">All Branches</option>
+                                                              @foreach($branches as $branch)
+                                                                  <option value="{{ $branch->id }}" data-company="{{ $branch->company_id }}" data-bu="{{ $branch->business_unit_id }}" {{ request('branch_id') == $branch->id ? 'selected' : '' }}>{{ $branch->name }}</option>
+                                                              @endforeach
+                                                          </x-ui.odoo-form-ui>
+                                                      </div>
+                                                  </div>
+
+                                                  <!-- Office Rules -->
+                                                  <div class="col-12 border-bottom pb-4 mb-4">
+                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                          <i class="feather-home text-primary fs-16"></i> Office Settings
+                                                      </h6>
+                                                      <span class="text-muted fs-11 d-block mb-3">Define how employees working in the office can check in and out. Note: Checks will lookup employee's Legal Entity (Company), and optional Business Unit and Branch.</span>
+                                                      
+                                                      <div class="d-flex flex-column gap-3 px-2">
+                                                          <div>
+                                                              <x-ui.checkbox name="office_biometric" id="office_biometric" label="Enable Biometric Device Check-In" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Allow check-in and check-out logs to sync from biometric devices.</span>
+                                                          </div>
+                                                          <div>
+                                                              <x-ui.checkbox name="office_web" id="office_web" label="Enable Web/Mobile App Check-In (Geofenced)" onchange="toggleOfficeGeofenceFields()" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Allow check-in via the button when inside the office geofence.</span>
+                                                          </div>
+                                                      </div>
+
+                                                       <div class="row g-3 mt-2 px-2 align-items-end d-none" id="office_geofence_fields">
+                                                           <div class="col-md-3">
+                                                               <label class="form-label fs-12 text-muted mb-1">Office Latitude</label>
+                                                               <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="e.g. 37.7749">
+                                                           </div>
+                                                           <div class="col-md-3">
+                                                               <label class="form-label fs-12 text-muted mb-1">Office Longitude</label>
+                                                               <input type="text" name="office_longitude" id="office_longitude" class="form-control fs-12" placeholder="e.g. -122.4194">
+                                                           </div>
+                                                           <div class="col-md-3">
+                                                               <label class="form-label fs-12 text-muted mb-1">Allowed Range (Radius in Meters)</label>
+                                                               <input type="number" name="office_radius" id="office_radius" class="form-control fs-12" value="50" min="1">
+                                                           </div>
+                                                           <div class="col-md-3">
+                                                               <button type="button" class="btn btn-sm btn-soft-primary w-100 d-flex align-items-center justify-content-center gap-1" style="height: 38px; border-radius: 4px;" onclick="detectCurrentCoordinates(event)">
+                                                                   <i class="feather-map-pin"></i> Detect Location
+                                                               </button>
+                                                           </div>
+                                                       </div>
+                                                  </div>
+
+                                                  <!-- WFH Rules -->
+                                                  <div class="col-12 border-bottom pb-4 mb-4">
+                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                          <i class="feather-rss text-primary fs-16"></i> WFH Settings
+                                                      </h6>
+                                                      <span class="text-muted fs-11 d-block mb-3">Configure check-in methods, validations, and location tracking for remote employees. Note: Validation methods are uniform on check-in and check-out.</span>
+                                                      
+                                                      <div class="d-flex flex-column gap-3 px-2">
+                                                          <div>
+                                                              <x-ui.checkbox name="wfh_location" id="wfh_location" label="Require Location Coordinate Capture" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Record GPS coordinates when checking in or out.</span>
+                                                          </div>
+                                                          <div>
+                                                              <x-ui.checkbox name="wfh_selfie" id="wfh_selfie" label="Require Selfie Capture" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Mandate employee to snap a selfie photo on check-in and check-out.</span>
+                                                          </div>
+                                                          <div>
+                                                              <x-ui.checkbox name="wfh_geofence" id="wfh_geofence" label="Enforce Home Location Geofence (Strict)" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">If checked, they must check-in from their home location (tracking anchor is assigned location). If unchecked, home location is optional (tracking anchor is first check-in location).</span>
+                                                          </div>
+                                                          <div>
+                                                              <x-ui.checkbox name="wfh_tracking" id="wfh_tracking" label="Enable Live Location Tracking during Shift" onchange="toggleTrackingThreshold('wfh')" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Track and record location updates in the background. Note: Live movement tracking requires this to be enabled.</span>
+                                                          </div>
+                                                          <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13 d-none" id="wfh_tracking_meters_container">
+                                                              <div class="d-flex align-items-center gap-2">
+                                                                  <i class="feather-map-pin text-primary fs-16"></i>
+                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                      Track new coordinates if the employee moves more than 
+                                                                      <input type="number" name="wfh_tracking_meters" id="wfh_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                      meters from the last/first check-in coordinates.
+                                                                  </p>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+
+                                                  <!-- On-Site Rules -->
+                                                  <div class="col-12 mb-2">
+                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                          <i class="feather-map text-primary fs-16"></i> On-Site Settings
+                                                      </h6>
+                                                      <span class="text-muted fs-11 d-block mb-3">Configure check-in methods, validations, and location tracking for client-site deployments. Note: Validation methods are uniform on check-in and check-out.</span>
+                                                      
+                                                      <div class="d-flex flex-column gap-3 px-2">
+                                                          <div>
+                                                              <x-ui.checkbox name="site_location" id="site_location" label="Require Location Coordinate Capture" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Record GPS coordinates when checking in or out.</span>
+                                                          </div>
+                                                          <div>
+                                                              <x-ui.checkbox name="site_selfie" id="site_selfie" label="Require Selfie Capture" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Mandate employee to snap a selfie photo on check-in and check-out.</span>
+                                                          </div>
+                                                          <div>
+                                                              <x-ui.checkbox name="site_geofence" id="site_geofence" label="Enforce Assigned Site Geofence (Strict)" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">If checked, they must check-in from the assigned site location (tracking anchor is assigned location). If unchecked, site is optional (tracking anchor is first check-in location).</span>
+                                                          </div>
+                                                          <div>
+                                                              <x-ui.checkbox name="site_tracking" id="site_tracking" label="Enable Live Location Tracking during Shift" onchange="toggleTrackingThreshold('site')" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Track and record location updates in the background. Note: Live movement tracking requires this to be enabled.</span>
+                                                          </div>
+                                                          <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13 d-none" id="site_tracking_meters_container">
+                                                              <div class="d-flex align-items-center gap-2">
+                                                                  <i class="feather-map-pin text-primary fs-16"></i>
+                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                      Track new coordinates if the employee moves more than 
+                                                                      <input type="number" name="site_tracking_meters" id="site_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                      meters from the last/first check-in coordinates.
+                                                                  </p>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                              @endif
+                                          </div>
 
                                          <!-- Save Footer Button -->
                                          <div class="border-top pt-3 d-flex justify-content-end">
                                              <x-ui.button type="submit" variant="primary" icon="feather-save">
-                                                 {{ __('hrms.penalization.save_policy') }}
+                                                 {{ $typeKey === 'attendance_rules' ? 'Save Rules' : __('hrms.penalization.save_policy') }}
                                              </x-ui.button>
                                          </div>
                                      </form>
@@ -551,6 +694,7 @@
         </div>
     </div>
 
+    @push('scripts')
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             // Close Select2 dropdowns when any parent scrollable container scrolls
@@ -1115,5 +1259,329 @@
             document.addEventListener('DOMContentLoaded', () => bindHrmsValidation(document));
             document.addEventListener('shown.bs.modal', event => bindHrmsValidation(event.target));
         })();
+
+        window.toggleTrackingThreshold = function(mode) {
+            var checkbox = document.getElementById(mode + '_tracking');
+            var container = document.getElementById(mode + '_tracking_meters_container');
+            if (checkbox && container) {
+                if (checkbox.checked) {
+                    container.classList.remove('d-none');
+                } else {
+                    container.classList.add('d-none');
+                }
+            }
+        };
+
+        window.toggleOfficeGeofenceFields = function() {
+            var checkbox = document.getElementById('office_web');
+            var container = document.getElementById('office_geofence_fields');
+            if (checkbox && container) {
+                if (checkbox.checked) {
+                    container.classList.remove('d-none');
+                } else {
+                    container.classList.add('d-none');
+                }
+            }
+        };
+
+        window.loadAttendanceRulesForScope = function() {
+            if (typeof isUpdatingScope !== 'undefined' && isUpdatingScope) return;
+            var companyId = document.getElementById('sel_company_id')?.value;
+            var buId = document.getElementById('sel_business_unit_id')?.value;
+            var branchId = document.getElementById('sel_branch_id')?.value;
+
+            if (!companyId) return;
+
+            $.ajax({
+                url: "{{ route('hrms.attendance-rules.query') }}",
+                type: 'GET',
+                data: {
+                    company_id: companyId,
+                    business_unit_id: buId,
+                    branch_id: branchId
+                },
+                success: function(rule) {
+                    if (rule) {
+                        document.getElementById('office_biometric').checked = !!rule.office_biometric;
+                        document.getElementById('office_web').checked = !!rule.office_web;
+                        document.getElementById('office_latitude').value = rule.office_latitude || '';
+                        document.getElementById('office_longitude').value = rule.office_longitude || '';
+                        document.getElementById('office_radius').value = rule.office_radius || 50;
+
+                        document.getElementById('wfh_location').checked = !!rule.wfh_location;
+                        document.getElementById('wfh_selfie').checked = !!rule.wfh_selfie;
+                        document.getElementById('wfh_geofence').checked = !!rule.wfh_geofence;
+                        document.getElementById('wfh_tracking').checked = !!rule.wfh_tracking;
+                        document.getElementById('wfh_tracking_meters').value = rule.wfh_tracking_meters || 50;
+
+                        document.getElementById('site_location').checked = !!rule.site_location;
+                        document.getElementById('site_selfie').checked = !!rule.site_selfie;
+                        document.getElementById('site_geofence').checked = !!rule.site_geofence;
+                        document.getElementById('site_tracking').checked = !!rule.site_tracking;
+                        document.getElementById('site_tracking_meters').value = rule.site_tracking_meters || 50;
+
+                        if ($('#sel_status').length) {
+                            var statusVal = rule.status ? '1' : '0';
+                            $('#sel_status').val(statusVal).trigger('change.select2');
+                        }
+                    } else {
+                        // Reset to defaults
+                        document.getElementById('office_biometric').checked = false;
+                        document.getElementById('office_web').checked = false;
+                        document.getElementById('office_latitude').value = '';
+                        document.getElementById('office_longitude').value = '';
+                        document.getElementById('office_radius').value = 50;
+
+                        document.getElementById('wfh_location').checked = false;
+                        document.getElementById('wfh_selfie').checked = false;
+                        document.getElementById('wfh_geofence').checked = false;
+                        document.getElementById('wfh_tracking').checked = false;
+                        document.getElementById('wfh_tracking_meters').value = 50;
+
+                        document.getElementById('site_location').checked = false;
+                        document.getElementById('site_selfie').checked = false;
+                        document.getElementById('site_geofence').checked = false;
+                        document.getElementById('site_tracking').checked = false;
+                        document.getElementById('site_tracking_meters').value = 50;
+
+                        if ($('#sel_status').length) {
+                            $('#sel_status').val('1').trigger('change.select2');
+                        }
+                    }
+                    toggleTrackingThreshold('wfh');
+                    toggleTrackingThreshold('site');
+                    toggleOfficeGeofenceFields();
+                }
+            });
+        };
+
+        // Geolocation Coordinates Detection Logic
+        window.detectCurrentCoordinates = function(event) {
+            if (!navigator.geolocation) {
+                showAppToast('error', 'Geolocation is not supported by your browser.');
+                return;
+            }
+            
+            var $btn = $(event.currentTarget || 'button[onclick^="detectCurrentCoordinates"]');
+            var originalText = $btn.html();
+            $btn.prop('disabled', true).html('<i class="feather-loader animate-spin me-1"></i> Detecting...');
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    $('#office_latitude').val(position.coords.latitude.toFixed(6));
+                    $('#office_longitude').val(position.coords.longitude.toFixed(6));
+                    $btn.prop('disabled', false).html(originalText);
+                    showAppToast('success', 'Location coordinates detected successfully!');
+                },
+                function(error) {
+                    $btn.prop('disabled', false).html(originalText);
+                    var msg = 'Unable to retrieve location.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        msg = 'Permission denied. Please allow location access in your browser settings.';
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        msg = 'Location position unavailable.';
+                    } else if (error.code === error.TIMEOUT) {
+                        msg = 'Location detection request timed out.';
+                    }
+                    showAppToast('error', msg);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 0
+                }
+            );
+        };
+
+        // Dynamic Scope Dropdown Filtering Logic
+        var originalBus = [];
+        var originalBranches = [];
+        var isUpdatingScope = false;
+
+        function updateScopeSelectors() {
+            if (isUpdatingScope) return;
+            isUpdatingScope = true;
+
+            var companyId = $('#sel_company_id').val();
+            var $buSelect = $('#sel_business_unit_id');
+            var $branchSelect = $('#sel_branch_id');
+
+            // 1. If Company is not selected ("All Companies"), hide both fields and reset their values
+            if (!companyId) {
+                $('#div_business_unit').addClass('d-none');
+                $('#div_branch').addClass('d-none');
+                $buSelect.val('').trigger('change.select2');
+                $branchSelect.val('').trigger('change.select2');
+                isUpdatingScope = false;
+                return;
+            }
+
+            // 2. Determine which Business Units belong to this Company
+            var filteredBUs = originalBus.filter(function(bu) {
+                return bu.company == companyId;
+            });
+            var hasBUs = filteredBUs.length > 0;
+
+            // 3. Determine which Branches belong to this Company
+            var filteredBranchesForCompany = originalBranches.filter(function(b) {
+                return b.company == companyId;
+            });
+            var hasBranchesForCompany = filteredBranchesForCompany.length > 0;
+
+            // Save current values to restore if still valid
+            var currentBu = $buSelect.val();
+            var currentBranch = $branchSelect.val();
+
+            if (hasBUs) {
+                // Show Business Unit field
+                $('#div_business_unit').removeClass('d-none');
+
+                // Rebuild Business Unit select options
+                $buSelect.empty().append('<option value="">All Business Units</option>');
+                filteredBUs.forEach(function(bu) {
+                    var selectedAttr = (currentBu == bu.id) ? ' selected' : '';
+                    $buSelect.append('<option value="' + bu.id + '" data-company="' + bu.company + '"' + selectedAttr + '>' + bu.text + '</option>');
+                });
+                
+                // Re-initialize select2
+                if ($buSelect.hasClass('select2-hidden-accessible')) {
+                    $buSelect.select2('destroy');
+                }
+                $buSelect.select2({
+                    theme: 'bootstrap-5',
+                    width: '100%'
+                });
+
+                // Get resolved Business Unit
+                var activeBu = $buSelect.val();
+
+                if (activeBu) {
+                    // Filter branches for this particular Business Unit
+                    var filteredBranchesForBu = originalBranches.filter(function(b) {
+                        return b.company == companyId && b.bu == activeBu;
+                    });
+                    var hasBranchesForBu = filteredBranchesForBu.length > 0;
+
+                    if (hasBranchesForBu) {
+                        $('#div_branch').removeClass('d-none');
+                        $branchSelect.empty().append('<option value="">All Branches</option>');
+                        filteredBranchesForBu.forEach(function(b) {
+                            var selectedAttr = (currentBranch == b.id) ? ' selected' : '';
+                            $branchSelect.append('<option value="' + b.id + '" data-company="' + b.company + '" data-bu="' + b.bu + '"' + selectedAttr + '>' + b.text + '</option>');
+                        });
+
+                        if ($branchSelect.hasClass('select2-hidden-accessible')) {
+                            $branchSelect.select2('destroy');
+                        }
+                        $branchSelect.select2({
+                            theme: 'bootstrap-5',
+                            width: '100%'
+                        });
+                    } else {
+                        $('#div_branch').addClass('d-none');
+                        $branchSelect.val('').trigger('change.select2');
+                    }
+                } else {
+                    // No BU selected -> hide branch
+                    $('#div_branch').addClass('d-none');
+                    $branchSelect.val('').trigger('change.select2');
+                }
+            } else {
+                // No Business Units exist for this Company.
+                $('#div_business_unit').addClass('d-none');
+                $buSelect.val('').trigger('change.select2');
+
+                // Check if there are branches directly belonging to this company
+                if (hasBranchesForCompany) {
+                    // Show Branch selector directly, skipping Business Unit
+                    $('#div_branch').removeClass('d-none');
+                    $branchSelect.empty().append('<option value="">All Branches</option>');
+                    filteredBranchesForCompany.forEach(function(b) {
+                        var selectedAttr = (currentBranch == b.id) ? ' selected' : '';
+                        $branchSelect.append('<option value="' + b.id + '" data-company="' + b.company + '" data-bu="' + b.bu + '"' + selectedAttr + '>' + b.text + '</option>');
+                    });
+
+                    if ($branchSelect.hasClass('select2-hidden-accessible')) {
+                        $branchSelect.select2('destroy');
+                    }
+                    $branchSelect.select2({
+                        theme: 'bootstrap-5',
+                        width: '100%'
+                    });
+                } else {
+                    // No business units AND no branches
+                    $('#div_branch').addClass('d-none');
+                    $branchSelect.val('').trigger('change.select2');
+                }
+            }
+
+            isUpdatingScope = false;
+        }
+
+        // Trigger loading when entering tab
+        $(document).on('click', '.policy-switch-btn', function() {
+            var policyType = $(this).attr('data-policy-type');
+            if (policyType === 'attendance_rules') {
+                setTimeout(function() {
+                    updateScopeSelectors();
+                    loadAttendanceRulesForScope();
+                }, 100);
+            }
+        });
+
+        // Initialize on DOM load if active
+        document.addEventListener('DOMContentLoaded', function() {
+            // Store original options on load
+            $('#sel_business_unit_id option').each(function() {
+                var $opt = $(this);
+                if ($opt.val()) {
+                    originalBus.push({
+                        id: $opt.val(),
+                        text: $opt.text(),
+                        company: $opt.data('company')
+                    });
+                }
+            });
+
+            $('#sel_branch_id option').each(function() {
+                var $opt = $(this);
+                if ($opt.val()) {
+                    originalBranches.push({
+                        id: $opt.val(),
+                        text: $opt.text(),
+                        company: $opt.data('company'),
+                        bu: $opt.data('bu')
+                    });
+                }
+            });
+
+            // Perform initial update of selectors
+            updateScopeSelectors();
+
+            var activeBtn = $('.policy-switch-btn.active');
+            if (activeBtn.attr('data-policy-type') === 'attendance_rules') {
+                loadAttendanceRulesForScope();
+            }
+
+            $(document).on('change', '#sel_company_id', function() {
+                if (typeof isUpdatingScope !== 'undefined' && isUpdatingScope) return;
+                updateScopeSelectors();
+                loadAttendanceRulesForScope();
+            });
+
+            $(document).on('change', '#sel_business_unit_id', function() {
+                if (typeof isUpdatingScope !== 'undefined' && isUpdatingScope) return;
+                updateScopeSelectors();
+                loadAttendanceRulesForScope();
+            });
+
+            // Redirect and reload when changing company scope for non-ajax tabs
+            $(document).on('change', 'select[id^="company_id_"]', function() {
+                var companyId = $(this).val() || '';
+                var policyType = $(this).attr('id').replace('company_id_', '');
+                window.location.href = "{{ route('hrms.penalization-policy.index') }}?policy_type=" + policyType + "&company_id=" + companyId;
+            });
+        });
     </script>
+    @endpush
 @endsection

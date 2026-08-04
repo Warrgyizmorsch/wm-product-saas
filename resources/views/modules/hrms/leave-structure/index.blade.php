@@ -1340,7 +1340,21 @@
                     loadLeavePlans();
                 }, 300);
             });
+
             // Instant client-side search for Leave Plans on left sidebar
+            function filterLeavePlans(e) {
+                var target = e ? e.target : document.getElementById('leavePlanSearch');
+                var query = (target ? target.value : '').toLowerCase().trim();
+                $('.plan-item').each(function() {
+                    var name = ($(this).attr('data-name') || '').toLowerCase();
+                    if (name.indexOf(query) > -1) {
+                        $(this).removeClass('d-none');
+                    } else {
+                        $(this).addClass('d-none');
+                    }
+                });
+            }
+
             const leavePlanSearchInput = document.getElementById('leavePlanSearch');
             if (leavePlanSearchInput) {
                 leavePlanSearchInput.addEventListener('input', filterLeavePlans);
@@ -1798,7 +1812,7 @@
                 var sort = $('#lp_sort').val() || 'name_asc';
                 var status = $('#lp_filter_status').val() || '';
                 var company = $('#lp_filter_company').val() || '';
-                var planId = '{{ request()->get("plan_id", $selectedPlan ? $selectedPlan->id : "") }}';
+                var planId = $('.plan-switch-btn.active').attr('data-plan-id') || '{{ $selectedPlan ? $selectedPlan->id : "" }}';
 
                 var url = '{{ route("hrms.leave-structure.index") }}?plan_id=' + planId +
                           '&lp_search=' + encodeURIComponent(search) +
@@ -1855,6 +1869,14 @@
                 if (searchInput) {
                     searchInput.value = '';
                 }
+                
+                // Reset active class in sort dropdown
+                var sortDropdown = $('.erp-sort-dropdown');
+                if (sortDropdown.length) {
+                    sortDropdown.find('.dropdown-item').removeClass('active');
+                    sortDropdown.find('.dropdown-item[data-sort="name_asc"]').addClass('active');
+                }
+                
                 loadLeavePlans();
                 $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
                 $('.erp-filter-dropdown.show').removeClass('show');

@@ -42,6 +42,34 @@
 </div>
 
 <style>
+    /* Fixed/Sticky settings sidebar panel styles */
+    @media (min-width: 992px) {
+        .nxl-container, .nxl-content, .main-content {
+            overflow: visible !important;
+            overflow-x: visible !important;
+            overflow-y: visible !important;
+        }
+        .settings-container {
+            align-items: flex-start !important;
+        }
+        .settings-sidebar-col {
+            position: sticky !important;
+            top: 92px !important;
+            height: calc(100vh - 120px) !important;
+            align-self: flex-start !important;
+            z-index: 100 !important;
+        }
+        .settings-sidebar-panel {
+            display: flex !important;
+            flex-direction: column !important;
+            height: 100% !important;
+        }
+        .settings-sidebar-body {
+            flex-grow: 1 !important;
+            overflow-y: auto !important;
+        }
+    }
+
     /* Premium dynamic settings sidebar shadow styles */
     #settingsSubSidebar .nav-link {
         background-color: transparent;

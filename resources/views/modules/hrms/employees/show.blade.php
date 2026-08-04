@@ -2062,17 +2062,21 @@
                 if (isOvertimeHidden) {
                     $('#shiftApplicationsViewContainer').addClass('d-none');
                     $('#shiftAppsHeaderTitle').addClass('d-none');
+                    $('#shiftAppsToolbar').addClass('d-none');
 
                     $('#overtimeApplicationsViewContainer').removeClass('d-none');
                     $('#overtimeAppsHeaderTitle').removeClass('d-none');
+                    $('#overtimeAppsToolbar').removeClass('d-none');
 
                     $('#toggleShiftOvertimeBtnLabel').html('<i class="feather-git-pull-request me-1"></i> ' + "{{ __('hrms.shift_change.shift_details') }}");
                 } else {
                     $('#overtimeApplicationsViewContainer').addClass('d-none');
                     $('#overtimeAppsHeaderTitle').addClass('d-none');
+                    $('#overtimeAppsToolbar').addClass('d-none');
 
                     $('#shiftApplicationsViewContainer').removeClass('d-none');
                     $('#shiftAppsHeaderTitle').removeClass('d-none');
+                    $('#shiftAppsToolbar').removeClass('d-none');
 
                     $('#toggleShiftOvertimeBtnLabel').html('<i class="feather-clock me-1"></i> ' + "{{ __('hrms.shift_change.overtime_details') }}");
                 }
