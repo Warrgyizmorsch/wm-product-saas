@@ -22,7 +22,8 @@ class KpiCalculationService
      */
     public function getKpiWithTargetsAndVariance(int $tenantId, string $kpiName, float $currentValue): array
     {
-        $targetRecord = ProductionKpiTarget::where('tenant_id', $tenantId)
+        $targetRecord = ProductionKpiTarget::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->where('kpi_name', $kpiName)
             ->first();
 
@@ -111,32 +112,64 @@ class KpiCalculationService
     /**
      * Get asset utilizations (machines, operators, work centers).
      */
+    /**
+     * Get asset utilizations (machines, operators, work centers).
+     */
     public function getUtilizations(int $tenantId, array $filters = []): array
     {
-        // Machine Utilization
+        $start = empty($filters['date_start']) ? \Carbon\Carbon::today() : \Carbon\Carbon::parse($filters['date_start']);
+        $end   = empty($filters['date_end']) ? \Carbon\Carbon::today()->endOfDay() : \Carbon\Carbon::parse($filters['date_end']);
+
+        // Machine Utilization: machines currently Running OR machines with logged run time in date range
         $totalMachines = Machine::where('tenant_id', $tenantId)->count();
-        $runningMachines = Machine::where('tenant_id', $tenantId)->where('current_state', 'Running')->count();
-        $machineUtilization = $totalMachines > 0 ? ($runningMachines / $totalMachines) * 100 : 0.00;
+        $utilizedMachineIds = DB::table('production_order_progress_logs')
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('recorded_at', [$start, $end])
+            ->pluck('machine_id')
+            ->merge(Machine::where('tenant_id', $tenantId)->where('current_state', 'Running')->pluck('id'))
+            ->filter()
+            ->unique();
+
+        $machineUtilization = $totalMachines > 0 ? ($utilizedMachineIds->count() / $totalMachines) * 100 : 0.00;
 
         // Operator Utilization
         $totalOperators = User::where('tenant_id', $tenantId)->count();
         $activeAssignments = DB::table('production_operator_assignments')
             ->where('tenant_id', $tenantId)
-            ->where('status', 'accepted')
-            ->count();
+            ->whereIn('status', ['accepted', 'completed'])
+            ->whereBetween('created_at', [$start, $end])
+            ->distinct('user_id')
+            ->count('user_id');
+
+        if ($activeAssignments === 0) {
+            $activeAssignments = DB::table('production_operator_assignments')
+                ->where('tenant_id', $tenantId)
+                ->where('status', 'accepted')
+                ->count();
+        }
+
         $operatorUtilization = $totalOperators > 0 ? min(100.00, ($activeAssignments / $totalOperators) * 100) : 0.00;
 
-        // Work Center Utilization
+        // Work Center Utilization: work centers with active, running, or completed operations in date range
         $totalWcs = WorkCenter::where('tenant_id', $tenantId)->count();
-        $busyWcs = ProductionScheduleOperation::where('tenant_id', $tenantId)
-            ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
-            ->distinct('work_center_id')
-            ->count('work_center_id');
-        $wcUtilization = $totalWcs > 0 ? ($busyWcs / $totalWcs) * 100 : 0.00;
+        $utilizedWcIds = DB::table('production_order_operations')
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', [ProductionOrderOperation::STATUS_RUNNING, ProductionOrderOperation::STATUS_COMPLETED])
+            ->whereBetween('updated_at', [$start, $end])
+            ->pluck('work_center_id')
+            ->merge(
+                ProductionScheduleOperation::where('tenant_id', $tenantId)
+                    ->whereIn('status', [ProductionScheduleOperation::STATUS_RUNNING, ProductionScheduleOperation::STATUS_COMPLETED])
+                    ->pluck('work_center_id')
+            )
+            ->filter()
+            ->unique();
+
+        $wcUtilization = $totalWcs > 0 ? ($utilizedWcIds->count() / $totalWcs) * 100 : 0.00;
 
         return [
-            'machine_utilization'  => round($machineUtilization, 2),
-            'operator_utilization' => round($operatorUtilization, 2),
+            'machine_utilization'     => round($machineUtilization, 2),
+            'operator_utilization'    => round($operatorUtilization, 2),
             'work_center_utilization' => round($wcUtilization, 2),
         ];
     }
@@ -192,10 +225,11 @@ class KpiCalculationService
         $produced = (float) $allLogs->sum('quantity_produced');
         $rejected = (float) $allLogs->sum('quantity_rejected');
         $scrapped = (float) $allLogs->sum('quantity_scrapped');
+        $totalInput = $produced + $rejected + $scrapped;
 
-        $scrapRate  = $produced > 0 ? (($scrapped) / $produced) * 100 : 0.00;
-        $rejectRate = $produced > 0 ? (($rejected) / $produced) * 100 : 0.00;
-        $yield      = $produced > 0 ? ((max(0, $produced - $rejected - $scrapped)) / $produced) * 100 : 100.00;
+        $scrapRate  = $totalInput > 0 ? ($scrapped / $totalInput) * 100 : 0.00;
+        $rejectRate = $totalInput > 0 ? ($rejected / $totalInput) * 100 : 0.00;
+        $yield      = $totalInput > 0 ? ($produced / $totalInput) * 100 : 100.00;
 
         return [
             'scrap_rate'  => round($scrapRate, 2),

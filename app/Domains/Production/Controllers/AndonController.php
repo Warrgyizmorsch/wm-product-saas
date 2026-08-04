@@ -28,4 +28,14 @@ class AndonController extends Controller
 
         return view('modules.production.intelligence.andon', compact('andonData', 'machines'));
     }
+
+    public function data(Request $request)
+    {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
+        $tenantId = require_tenant_id();
+
+        $andonData = $this->refreshService->refreshAndonBoard($tenantId);
+
+        return response()->json($andonData);
+    }
 }

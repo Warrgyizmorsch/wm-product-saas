@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'KPI Target Configuration | SaaS ERP')
-@section('page-title', 'KPI Target Configuration')
-@section('breadcrumb', 'KPI Targets')
+@section('title', __('production.kpi_target_configuration') . ' | SaaS ERP')
+@section('page-title', __('production.kpi_target_configuration'))
+@section('breadcrumb', __('production.kpi_targets'))
 
 @section('content')
     <div class="container-fluid py-2">
@@ -16,14 +16,14 @@
 
                 <x-ui.odoo-form-ui type="sheet">
                     <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-                        <h4 class="fw-bold text-dark mb-0"><i class="feather-target text-primary me-2"></i>KPI Target Configurations</h4>
+                        <h4 class="fw-bold text-dark mb-0"><i class="feather-target text-primary me-2"></i>{{ __('production.kpi_target_configuration') }}</h4>
                         <a href="{{ route('production.intelligence.dashboard') }}" class="text-muted hover-danger fs-18">
                             <i class="feather-x"></i>
                         </a>
                     </div>
 
                     <p class="fs-13 text-muted mb-4">
-                        Configure target thresholds for your manufacturing metrics. These targets are evaluated by the Manufacturing Intelligence KPI Engine to calculate OEE metrics and display targets/variances across the production floor.
+                        {{ __('production.kpi_target_desc') }}
                     </p>
 
                     <div class="row g-4 mb-4">
@@ -45,10 +45,10 @@
 
                     <div class="mt-4 pt-3 border-top d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
-                            <i class="feather-save me-1"></i> Save KPI Targets
+                            <i class="feather-save me-1"></i> {{ __('production.save_kpi_targets') }}
                         </button>
                         <a href="{{ route('production.intelligence.dashboard') }}" class="btn btn-secondary">
-                            Cancel
+                            {{ __('production.cancel') }}
                         </a>
                     </div>
                 </x-ui.odoo-form-ui>

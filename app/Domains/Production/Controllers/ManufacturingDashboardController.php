@@ -35,7 +35,7 @@ class ManufacturingDashboardController extends Controller
         // Fetch targets for display
         $oeeKpi          = $this->kpiService->getKpiWithTargetsAndVariance($tenantId, 'oee', $data['today_oee']['current_value']);
         $scrapKpi        = $this->kpiService->getKpiWithTargetsAndVariance($tenantId, 'scrap_rate', $data['scrap_stats']['scrap_rate']);
-        $downtimeKpi     = $this->kpiService->getKpiWithTargetsAndVariance($tenantId, 'downtime', $data['utilizations']['machine_utilization'] > 0 ? max(0, 100 - $data['utilizations']['machine_utilization']) : 15.0);
+        $downtimeKpi     = $this->kpiService->getKpiWithTargetsAndVariance($tenantId, 'downtime', $data['downtime_rate']);
         $availabilityKpi = $this->kpiService->getKpiWithTargetsAndVariance($tenantId, 'availability', $data['today_oee']['current_value'] * 1.05);
 
         // Fetch drop downs
