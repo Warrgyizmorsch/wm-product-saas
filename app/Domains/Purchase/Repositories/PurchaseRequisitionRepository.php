@@ -110,7 +110,7 @@ class PurchaseRequisitionRepository
                     ->where('product_id', $item->product_id)
                     ->whereHas('order', function ($q) use ($pr) {
                         $q->where('purchase_requisition_id', $pr->id)
-                          ->where('status', '!=', 'Cancelled');
+                          ->where('status', 'Approved');
                     })
                     ->sum('quantity');
 

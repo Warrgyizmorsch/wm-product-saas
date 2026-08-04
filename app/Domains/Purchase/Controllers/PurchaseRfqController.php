@@ -89,7 +89,7 @@ class PurchaseRfqController extends Controller
                     ->where('product_id', $prItem->product_id)
                     ->whereHas('order', function ($q) use ($prItem) {
                         $q->where('purchase_requisition_id', $prItem->purchase_requisition_id)
-                          ->where('status', '!=', 'Cancelled');
+                          ->where('status', 'Approved');
                     })
                     ->sum('quantity');
 
@@ -132,7 +132,7 @@ class PurchaseRfqController extends Controller
                     ->where('product_id', $prItem->product_id)
                     ->whereHas('order', function ($q) use ($prItem) {
                         $q->where('purchase_requisition_id', $prItem->purchase_requisition_id)
-                          ->where('status', '!=', 'Cancelled');
+                          ->where('status', 'Approved');
                     })
                     ->sum('quantity');
 

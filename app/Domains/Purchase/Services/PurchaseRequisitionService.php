@@ -124,7 +124,7 @@ class PurchaseRequisitionService
 
             $existingPos = PurchaseOrder::where('tenant_id', $tenantId)
                 ->whereNotNull('purchase_requisition_id')
-                ->where('status', '!=', 'Cancelled')
+                ->where('status', 'Approved')
                 ->with('items')
                 ->get();
 
