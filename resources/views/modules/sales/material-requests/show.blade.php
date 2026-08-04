@@ -170,7 +170,7 @@
                                 $totalAvailableStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $slip->tenant_id)
                                     ->where('product_id', $item->product_id)
                                     ->sum('available_qty');
-                                $shortageQty = max(0.0, $remainingToIssue - ($item->quantity_reserved + $totalAvailableStock));
+                                $shortageQty = max(0.0, $remainingToIssue - $item->quantity_reserved);
                                 
                                 // Warehouse stocks mapping
                                 $stocksMap = [];
@@ -181,7 +181,7 @@
                             @endphp
                             <tr data-item-id="{{ $item->id }}" data-stocks="{{ json_encode($stocksMap) }}" data-planned="{{ $item->quantity_planned }}" data-reserved="{{ $item->quantity_reserved }}" data-issued="{{ $item->quantity_issued }}" data-pr-raised-warehouses="{{ json_encode($prWarehouseIds) }}">
                                 <td class="text-center">
-                                    <input type="checkbox" name="item_ids[]" value="{{ $item->id }}" class="form-check-input item-checkbox" disabled>
+                                    <input type="checkbox" name="item_ids[]" value="{{ implode(',', $item->all_item_ids ?? [$item->id]) }}" class="form-check-input item-checkbox" disabled>
                                 </td>
                                 <td>
                                     <div class="fw-bold">{{ $item->product->name }}</div>
@@ -237,7 +237,7 @@
             $totalAvailableStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $slip->tenant_id)
                 ->where('product_id', $item->product_id)
                 ->sum('available_qty');
-            $shortageQty = max(0.0, $remainingToIssue - ($item->quantity_reserved + $totalAvailableStock));
+            $shortageQty = max(0.0, $remainingToIssue - $item->quantity_reserved);
         @endphp
 
         <!-- Reserve Modal -->
@@ -781,6 +781,7 @@
                 $checked.each(function () {
                     const $row = $(this).closest('tr');
                     const itemId = $row.data('item-id');
+                    const itemIdsStr = $row.find('.item-checkbox').val();
                     const productName = $row.find('td:nth-child(2) div.fw-bold').text();
                     const sku = $row.find('td:nth-child(2) div.text-muted').text();
                     const stocks = $row.data('stocks') || {};
@@ -792,7 +793,7 @@
                     
                     const remainingToIssue = Math.max(0.0, planned - issued);
                     const remainingToReserve = Math.max(0.0, planned - (issued + reserved));
-                    const shortageQty = Math.max(0.0, remainingToIssue - (reserved + warehouseStock));
+                    const shortageQty = Math.max(0.0, remainingToIssue - reserved);
 
                     let maxVal = 0.0;
                     let defaultQty = 0.0;
@@ -809,7 +810,7 @@
                     }
 
                     // Add hidden item ID input
-                    $hiddenFields.append($('<input>', { type: 'hidden', name: 'item_ids[]', value: itemId }));
+                    $hiddenFields.append($('<input>', { type: 'hidden', name: 'item_ids[]', value: itemIdsStr }));
 
                     // Build table row
                     const trHtml = `
@@ -820,7 +821,7 @@
                             </td>
                             <td class="text-center font-monospace">${action === 'indent' ? '—' : warehouseStock}</td>
                             <td class="text-center">
-                                <input type="number" name="action_qtys[${itemId}]" class="form-control form-control-sm text-center fw-semibold mx-auto" style="max-width: 100px;" step="0.0001" min="0.0001" max="${maxVal}" value="${defaultQty}" required>
+                                <input type="number" name="action_qtys[${itemIdsStr}]" class="form-control form-control-sm text-center fw-semibold mx-auto" style="max-width: 100px;" step="0.0001" min="0.0001" max="${maxVal}" value="${defaultQty}" required>
                             </td>
                         </tr>
                     `;

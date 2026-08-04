@@ -119,9 +119,17 @@ class MaterialRequestController extends Controller
         $tenantId = require_tenant_id();
 
         try {
-            $pr = $this->requestService->createPurchaseRequisition(
+            $item = ProductionRequisitionSlipItem::findOrFail($itemId);
+            
+            // Find all slip items of the same product in this slip to include merged quantities
+            $allItemIds = ProductionRequisitionSlipItem::where('production_requisition_slip_id', $item->production_requisition_slip_id)
+                ->where('product_id', $item->product_id)
+                ->pluck('id')
+                ->toArray();
+
+            $pr = $this->requestService->createBulkPurchaseRequisition(
                 $tenantId,
-                $itemId,
+                $allItemIds,
                 $request->input('warehouse_id'),
                 $request->input('notes')
             );
@@ -137,7 +145,7 @@ class MaterialRequestController extends Controller
             'action_type'   => 'required|string|in:reserve,issue,indent',
             'warehouse_id'  => 'nullable|integer',
             'item_ids'      => 'required|array',
-            'item_ids.*'    => 'integer',
+            'item_ids.*'    => 'string',
             'action_qtys'   => 'nullable|array',
             'remarks'       => 'nullable|string',
             'notes'         => 'nullable|string',
@@ -154,13 +162,23 @@ class MaterialRequestController extends Controller
         // ── INDENT: Create ONE consolidated PR with all selected items ─────────
         if ($actionType === 'indent') {
             try {
+                $expandedItemIds = [];
+                foreach ($itemIds as $idStr) {
+                    foreach (explode(',', (string) $idStr) as $parsedId) {
+                        if (is_numeric($parsedId) && (int)$parsedId > 0) {
+                            $expandedItemIds[] = (int)$parsedId;
+                        }
+                    }
+                }
+                $expandedItemIds = array_unique($expandedItemIds);
+
                 $pr = $this->requestService->createBulkPurchaseRequisition(
                     $tenantId,
-                    array_map('intval', $itemIds),
+                    $expandedItemIds,
                     $warehouseId,
                     $notes
                 );
-                $itemCount = count($itemIds);
+                $itemCount = count($expandedItemIds);
                 return redirect()->back()->with('success', "Purchase Requisition {$pr->requisition_number} created with {$itemCount} item(s) successfully.");
             } catch (InvalidArgumentException $e) {
                 return redirect()->back()->with('error', $e->getMessage());
@@ -173,9 +191,20 @@ class MaterialRequestController extends Controller
         $processedCount = 0;
         $errors = [];
 
-        foreach ($itemIds as $itemId) {
-            $itemId = (int) $itemId;
-            $qty = isset($actionQtys[$itemId]) ? (float) $actionQtys[$itemId] : 0.0;
+        foreach ($itemIds as $idKey) {
+            $idStr = (string) $idKey;
+            $firstId = (int) explode(',', $idStr)[0];
+
+            if ($firstId <= 0) {
+                continue;
+            }
+
+            $qty = 0.0;
+            if (isset($actionQtys[$idStr])) {
+                $qty = (float) $actionQtys[$idStr];
+            } elseif (isset($actionQtys[$firstId])) {
+                $qty = (float) $actionQtys[$firstId];
+            }
 
             if ($qty <= 0) {
                 continue;
@@ -183,16 +212,16 @@ class MaterialRequestController extends Controller
 
             try {
                 if ($actionType === 'reserve') {
-                    $this->requestService->reserve($tenantId, $itemId, $qty, $warehouseId);
+                    $this->requestService->reserve($tenantId, $firstId, $qty, $warehouseId);
                     $processedCount++;
                 } elseif ($actionType === 'issue') {
-                    $this->requestService->issue($tenantId, $itemId, $qty, $warehouseId, $remarks);
+                    $this->requestService->issue($tenantId, $firstId, $qty, $warehouseId, $remarks);
                     $processedCount++;
                 }
             } catch (InvalidArgumentException $e) {
-                $errors[] = "Item #{$itemId}: " . $e->getMessage();
+                $errors[] = "Item #{$firstId}: " . $e->getMessage();
             } catch (\Exception $e) {
-                $errors[] = "Item #{$itemId}: " . $e->getMessage();
+                $errors[] = "Item #{$firstId}: " . $e->getMessage();
             }
         }
 
