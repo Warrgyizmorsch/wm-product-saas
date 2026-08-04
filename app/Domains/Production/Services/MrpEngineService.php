@@ -124,12 +124,12 @@ class MrpEngineService
                     $childBomId = $defaultChildBom ? $defaultChildBom->id : null;
                 }
 
-                if ($childBomId) {
+                if ($childBomId && $shortage > 0) {
                     $this->explodeBom(
                         $plan,
                         $item->material_id,
                         $childBomId,
-                        $requiredQty,
+                        $shortage,
                         $level + 1,
                         $item->material_id
                     );

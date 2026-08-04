@@ -551,7 +551,6 @@ class ProductionOrderService
         }
 
         $warehouseId = $this->resolveReservationWarehouseId($order->tenant_id, $productId);
-        $reservedQty = 0.0;
 
         $reservation = ProductionOrderReservation::create([
             'tenant_id' => $order->tenant_id,
@@ -565,68 +564,54 @@ class ProductionOrderService
             'uom_id' => $uomId,
         ]);
 
-        if ($warehouseId) {
-            $availableQty = StockService::getAvailableStock($productId, $warehouseId);
-            $reservedQty = min($plannedQty, $availableQty);
-
-            if ($reservedQty > 0) {
-                StockService::reserveStock(
-                    $order->tenant_id,
-                    $productId,
-                    $warehouseId,
-                    $reservedQty,
-                    'Production Order',
-                    $order->id,
-                    $reservation->id
-                );
-            }
-        }
-
-        $reservation->update(['quantity_reserved' => $reservedQty]);
-
-        // If product is semi-finished or has child BOM, explode and create reservations for child components
+        // If product is semi-finished or has child BOM, explode and create reservations for child components based on shortage
         $product = \App\Domains\Inventory\Models\Product::withoutGlobalScopes()
             ->where('tenant_id', $order->tenant_id)
             ->find($productId);
 
         if ($product && ($product->type === 'semi_finished' || $childBomId)) {
-            $subBom = null;
-            if ($childBomId) {
-                $subBom = ProductionBom::withoutGlobalScopes()
-                    ->where('tenant_id', $order->tenant_id)
-                    ->where('id', $childBomId)
-                    ->with(['items.material'])
-                    ->first();
-            }
-            if (!$subBom) {
-                $subBom = ProductionBom::withoutGlobalScopes()
-                    ->where('tenant_id', $order->tenant_id)
-                    ->where('product_id', $productId)
-                    ->where('status', 'approved')
-                    ->with(['items.material'])
-                    ->first();
-            }
+            $availableQty = $warehouseId ? StockService::getAvailableStock($productId, $warehouseId) : 0.0;
+            $shortageQty = max(0.0, $plannedQty - $availableQty);
 
-            if ($subBom && count($subBom->items) > 0) {
-                $baseQty = $subBom->base_quantity > 0 ? $subBom->base_quantity : 1.0;
-                $multiplier = $plannedQty / $baseQty;
+            if ($shortageQty > 0) {
+                $subBom = null;
+                if ($childBomId) {
+                    $subBom = ProductionBom::withoutGlobalScopes()
+                        ->where('tenant_id', $order->tenant_id)
+                        ->where('id', $childBomId)
+                        ->with(['items.material'])
+                        ->first();
+                }
+                if (!$subBom) {
+                    $subBom = ProductionBom::withoutGlobalScopes()
+                        ->where('tenant_id', $order->tenant_id)
+                        ->where('product_id', $productId)
+                        ->where('status', 'approved')
+                        ->with(['items.material'])
+                        ->first();
+                }
 
-                foreach ($subBom->items as $subItem) {
-                    if (!$subItem->material) continue;
+                if ($subBom && count($subBom->items) > 0) {
+                    $baseQty = $subBom->base_quantity > 0 ? $subBom->base_quantity : 1.0;
+                    $multiplier = $shortageQty / $baseQty;
 
-                    $subPlannedQty = $subItem->quantity * $multiplier;
-                    if ($subItem->material_scrap_percentage > 0) {
-                        $subPlannedQty *= (1 + ($subItem->material_scrap_percentage / 100));
+                    foreach ($subBom->items as $subItem) {
+                        if (!$subItem->material) continue;
+
+                        $subPlannedQty = $subItem->quantity * $multiplier;
+                        if ($subItem->material_scrap_percentage > 0) {
+                            $subPlannedQty *= (1 + ($subItem->material_scrap_percentage / 100));
+                        }
+
+                        $this->createMaterialReservation(
+                            $order,
+                            $subItem->id,
+                            $subItem->material_id,
+                            $subPlannedQty,
+                            $subItem->uom_id ?? $uomId,
+                            $subItem->child_bom_id
+                        );
                     }
-
-                    $this->createMaterialReservation(
-                        $order,
-                        $subItem->id,
-                        $subItem->material_id,
-                        $subPlannedQty,
-                        $subItem->uom_id ?? $uomId,
-                        $subItem->child_bom_id
-                    );
                 }
             }
         }
@@ -796,20 +781,15 @@ class ProductionOrderService
             ->find($productId);
 
         if ($product && $product->type === 'semi_finished') {
+            // Always create requisition slip item for the FULL planned quantity of the semi-finished item
+            $this->createRequisitionSlipItem($slip, $productId, $plannedQty, $uomId, $warehouseId);
+
             if ($availableQty >= $plannedQty) {
-                // Semi-finished item is fully available in warehouse, so request/reserve it directly
-                $this->createRequisitionSlipItem($slip, $productId, $plannedQty, $uomId, $warehouseId);
                 return;
             }
 
-            // Semi-finished is not fully available.
-            // 1. Request/reserve the available quantity first (if any)
-            if ($availableQty > 0) {
-                $this->createRequisitionSlipItem($slip, $productId, $availableQty, $uomId, $warehouseId);
-            }
-
-            // 2. Explode the shortage quantity to child BOM components
-            $shortageQty = $plannedQty - $availableQty;
+            // Explode the shortage quantity to child BOM components
+            $shortageQty = max(0.0, $plannedQty - $availableQty);
             
             if ($childBomId) {
                 $subBom = ProductionBom::withoutGlobalScopes()
@@ -861,9 +841,7 @@ class ProductionOrderService
         int $uomId,
         ?int $warehouseId
     ): ProductionRequisitionSlipItem {
-        $reservedQty = 0.0;
-
-        $slipItem = ProductionRequisitionSlipItem::create([
+        return ProductionRequisitionSlipItem::create([
             'tenant_id' => $slip->tenant_id,
             'production_requisition_slip_id' => $slip->id,
             'product_id' => $productId,
@@ -873,26 +851,5 @@ class ProductionOrderService
             'quantity_issued' => 0.0000,
             'uom_id' => $uomId,
         ]);
-
-        if ($warehouseId) {
-            $availableQty = StockService::getAvailableStock($productId, $warehouseId);
-            $reservedQty = min($plannedQty, $availableQty);
-
-            if ($reservedQty > 0) {
-                StockService::reserveStock(
-                    $slip->tenant_id,
-                    $productId,
-                    $warehouseId,
-                    $reservedQty,
-                    'Production Order',
-                    $slip->production_order_id,
-                    $slipItem->id
-                );
-            }
-        }
-
-        $slipItem->update(['quantity_reserved' => $reservedQty]);
-
-        return $slipItem;
     }
 }
