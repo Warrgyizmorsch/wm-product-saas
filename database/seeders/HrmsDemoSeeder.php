@@ -416,7 +416,25 @@ class HrmsDemoSeeder extends Seeder
             }
         }
 
-        $dbUsers = \App\Models\User::all()->take(15);
+        $dbUsers = \App\Models\User::all();
+        if ($dbUsers->count() < 12) {
+            $needed = 12 - $dbUsers->count();
+            for ($i = 1; $i <= $needed; $i++) {
+                \App\Models\User::firstOrCreate(
+                    [
+                        'email' => 'demouser' . $i . '@example.com',
+                    ],
+                    [
+                        'tenant_id' => $tenant->id,
+                        'name' => 'Demo User ' . $i,
+                        'password' => bcrypt('password'),
+                    ]
+                );
+            }
+            $dbUsers = \App\Models\User::all()->take(15);
+        } else {
+            $dbUsers = $dbUsers->take(15);
+        }
         $employeesList = [];
         
         $designations = [
