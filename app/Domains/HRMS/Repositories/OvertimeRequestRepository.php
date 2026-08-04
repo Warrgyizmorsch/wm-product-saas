@@ -38,30 +38,33 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
 
         $query = OvertimeRequest::query()->with(['employee', 'approvedByEmployee']);
 
-        if (!empty($inputs['employee_id'])) {
-            $query->where('employee_id', $inputs['employee_id']);
+        $overtimeSearch = $inputs['overtime_search'] ?? $inputs['search'] ?? '';
+        $overtimeEmployeeId = $inputs['overtime_employee_id'] ?? $inputs['employee_id'] ?? '';
+        $overtimeStatus = $inputs['overtime_status'] ?? $inputs['status'] ?? '';
+        $overtimeSort = $inputs['overtime_sort'] ?? $inputs['sort'] ?? 'newest';
+
+        if (!empty($overtimeEmployeeId)) {
+            $query->where('employee_id', $overtimeEmployeeId);
         }
 
-        if (!empty($inputs['status'])) {
-            $query->where('status', $inputs['status']);
+        if (!empty($overtimeStatus)) {
+            $query->where('status', $overtimeStatus);
         }
 
-        if (!empty($inputs['search'])) {
-            $search = $inputs['search'];
-            $query->whereHas('employee', function ($eq) use ($search) {
-                $eq->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('employee_id', 'like', "%{$search}%");
+        if (!empty($overtimeSearch)) {
+            $query->whereHas('employee', function ($eq) use ($overtimeSearch) {
+                $eq->where('full_name', 'like', "%{$overtimeSearch}%")
+                    ->orWhere('employee_id', 'like', "%{$overtimeSearch}%");
             });
         }
 
-        $sort = $inputs['sort'] ?? 'newest';
-        if ($sort === 'oldest') {
+        if ($overtimeSort === 'oldest') {
             $query->orderBy('created_at', 'asc');
         } else {
             $query->orderBy('created_at', 'desc');
         }
 
-        $requests = $query->get();
+        $requests = $query->paginate(10, ['*'], 'overtime_page')->withQueryString();
 
         // Metric Counts
         $summaryQuery = OvertimeRequest::query();
@@ -97,7 +100,11 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
             'totalRequests',
             'pendingRequests',
             'approvedRequests',
-            'rejectedRequests'
+            'rejectedRequests',
+            'overtimeSearch',
+            'overtimeEmployeeId',
+            'overtimeStatus',
+            'overtimeSort'
         );
     }
 

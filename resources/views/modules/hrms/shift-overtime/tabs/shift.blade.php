@@ -9,18 +9,19 @@
     
     <div class="d-flex align-items-center gap-2">
         <form method="GET" action="javascript:void(0);" id="shiftFilterForm" class="d-flex align-items-center gap-2 m-0 flex-wrap">
+            <input type="hidden" name="sort" id="shift_sort_input" value="{{ $shiftSort ?? 'newest' }}">
             <!-- Search Input -->
             <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; height: 38px;">
                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                <input type="text" name="search" id="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.shift_change.search_employee') }}" style="box-shadow: none; height: 32px;">
+                <input type="text" name="search" id="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.shift_change.search_employee') }}" value="{{ $shiftSearch ?? '' }}" style="box-shadow: none; height: 32px;">
             </div>
 
             <!-- Sort Dropdown -->
             <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
-                <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="setShiftSort('newest', this); event.preventDefault();">
+                <a class="dropdown-item py-2 d-flex align-items-center {{ ($shiftSort ?? 'newest') === 'newest' ? 'active' : '' }}" href="#" onclick="setShiftSort('newest', this); event.preventDefault();">
                     <span>{{ __('hrms.shift_change.sort_newest') }}</span>
                 </a>
-                <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setShiftSort('oldest', this); event.preventDefault();">
+                <a class="dropdown-item py-2 d-flex align-items-center {{ ($shiftSort ?? '') === 'oldest' ? 'active' : '' }}" href="#" onclick="setShiftSort('oldest', this); event.preventDefault();">
                     <span>{{ __('hrms.shift_change.sort_oldest') }}</span>
                 </a>
             </x-ui.sort-dropdown>
@@ -33,9 +34,9 @@
                     <div class="mb-3" style="min-width: 250px;">
                         <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.shift_change.employee') }}</label>
                         <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_shift_employee_id">
-                            <option value="">{{ __('hrms.common.all_employees') }}</option>
+                            <option value="" {{ ($shiftEmployeeId ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.common.all_employees') }}</option>
                             @foreach(($employees ?? []) as $emp)
-                                <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
+                                <option value="{{ $emp->id }}" {{ ($shiftEmployeeId ?? '') == $emp->id ? 'selected' : '' }}>{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>
                     </div>
@@ -44,10 +45,10 @@
                 <div class="mb-3" style="min-width: 250px;">
                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.shift_change.status') }}</label>
                     <x-ui.odoo-form-ui type="select" name="status" id="filter_shift_status">
-                        <option value="">{{ __('hrms.shift_change.all_statuses') }}</option>
-                        <option value="pending">{{ __('hrms.shift_change.pending') }}</option>
-                        <option value="approved">{{ __('hrms.shift_change.approved') }}</option>
-                        <option value="rejected">{{ __('hrms.shift_change.rejected') }}</option>
+                        <option value="" {{ ($shiftStatus ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.shift_change.all_statuses') }}</option>
+                        <option value="pending" {{ ($shiftStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('hrms.shift_change.pending') }}</option>
+                        <option value="approved" {{ ($shiftStatus ?? '') === 'approved' ? 'selected' : '' }}>{{ __('hrms.shift_change.approved') }}</option>
+                        <option value="rejected" {{ ($shiftStatus ?? '') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.shift_change.rejected') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
 
@@ -176,13 +177,17 @@
             </tbody>
         </table>
     </div>
-    <div class="erp-pagination-container" id="shift_pagination_container">
-        <ul class="erp-pagination mb-2" id="shift_pagination_ul">
-            <!-- Dynamically generated pagination links -->
-        </ul>
-        <div class="erp-pagination-info">
-            Showing <span id="shift_showing_start">0</span> to <span id="shift_showing_end">0</span> of <span id="shift_total_count">0</span> entries
-        </div>
+    <div id="shift_pagination_container">
+        @if($shiftRequests instanceof \Illuminate\Pagination\LengthAwarePaginator && $shiftRequests->hasPages())
+            <x-ui.pagination
+                class="px-0 py-0"
+                :current-page="$shiftRequests->currentPage()"
+                :total-pages="$shiftRequests->lastPage()"
+                :total-results="$shiftRequests->total()"
+                :per-page="$shiftRequests->perPage()"
+                page-param="shift_page"
+            />
+        @endif
     </div>
 </div>
 </div>

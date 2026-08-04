@@ -182,50 +182,83 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
 
         $balances = $employee ? LeaveBalance::where('employee_id', $employee->id)->with('leaveType')->get() : collect();
 
+        $leavesSearch = $inputs['leaves_search'] ?? $inputs['search'] ?? '';
+        $leavesEmployeeId = $inputs['leaves_employee_id'] ?? $inputs['employee_id'] ?? '';
+        $leavesStatus = $inputs['leaves_status'] ?? $inputs['status'] ?? '';
+        $leavesSort = $inputs['leaves_sort'] ?? 'date_desc';
+
+        $encashmentsSearch = $inputs['encashments_search'] ?? $inputs['search'] ?? '';
+        $encashmentsEmployeeId = $inputs['encashments_employee_id'] ?? $inputs['employee_id'] ?? '';
+        $encashmentsStatus = $inputs['encashments_status'] ?? $inputs['status'] ?? '';
+        $encashmentsSort = $inputs['encashments_sort'] ?? 'date_desc';
+
         $query = LeaveRequest::query()->with(['employee', 'leaveType']);
         $encashQuery = LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
 
-        if (!empty($inputs['employee_id'])) {
-            $query->where('employee_id', $inputs['employee_id']);
-            $encashQuery->where('employee_id', $inputs['employee_id']);
+        // Apply filters to Leave Requests
+        if (!empty($leavesEmployeeId)) {
+            $query->where('employee_id', $leavesEmployeeId);
         }
-
-        if (!empty($inputs['leave_type_id'])) {
-            $query->where('leave_type_id', $inputs['leave_type_id']);
-            $encashQuery->where('leave_type_id', $inputs['leave_type_id']);
+        if (!empty($leavesStatus)) {
+            $query->where('status', $leavesStatus);
         }
-
-        if (!empty($inputs['status'])) {
-            $query->where('status', $inputs['status']);
-            $encashQuery->where('status', $inputs['status']);
-        }
-
-        if (!empty($inputs['search'])) {
-            $search = $inputs['search'];
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('employee', function ($eq) use ($search) {
-                    $eq->where('full_name', 'like', "%{$search}%")
-                        ->orWhere('employee_id', 'like', "%{$search}%");
-                })->orWhereHas('leaveType', function ($tq) use ($search) {
-                    $tq->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%");
-                });
-            });
-            $encashQuery->where(function ($q) use ($search) {
-                $q->whereHas('employee', function ($eq) use ($search) {
-                    $eq->where('full_name', 'like', "%{$search}%")
-                        ->orWhere('employee_id', 'like', "%{$search}%");
-                })->orWhereHas('leaveType', function ($tq) use ($search) {
-                    $tq->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%");
+        if (!empty($leavesSearch)) {
+            $query->where(function ($q) use ($leavesSearch) {
+                $q->whereHas('employee', function ($eq) use ($leavesSearch) {
+                    $eq->where('full_name', 'like', "%{$leavesSearch}%")
+                        ->orWhere('employee_id', 'like', "%{$leavesSearch}%");
+                })->orWhereHas('leaveType', function ($tq) use ($leavesSearch) {
+                    $tq->where('name', 'like', "%{$leavesSearch}%")
+                        ->orWhere('code', 'like', "%{$leavesSearch}%");
                 });
             });
         }
 
-        $requests = $query->orderBy('created_at', 'desc')->get();
-        $leaveRequests = $requests;
-        $encashments = $encashQuery->orderBy('created_at', 'desc')->get();
-        $leaveEncashments = $encashments;
+        // Apply sorting to Leave Requests
+        if ($leavesSort === 'date_asc') {
+            $query->orderBy('created_at', 'asc');
+        } elseif ($leavesSort === 'duration_desc') {
+            $query->orderBy('duration', 'desc');
+        } elseif ($leavesSort === 'duration_asc') {
+            $query->orderBy('duration', 'asc');
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
+        // Apply filters to Leave Encashments
+        if (!empty($encashmentsEmployeeId)) {
+            $encashQuery->where('employee_id', $encashmentsEmployeeId);
+        }
+        if (!empty($encashmentsStatus)) {
+            $encashQuery->where('status', $encashmentsStatus);
+        }
+        if (!empty($encashmentsSearch)) {
+            $encashQuery->where(function ($q) use ($encashmentsSearch) {
+                $q->whereHas('employee', function ($eq) use ($encashmentsSearch) {
+                    $eq->where('full_name', 'like', "%{$encashmentsSearch}%")
+                        ->orWhere('employee_id', 'like', "%{$encashmentsSearch}%");
+                })->orWhereHas('leaveType', function ($tq) use ($encashmentsSearch) {
+                    $tq->where('name', 'like', "%{$encashmentsSearch}%")
+                        ->orWhere('code', 'like', "%{$encashmentsSearch}%");
+                });
+            });
+        }
+
+        // Apply sorting to Leave Encashments
+        if ($encashmentsSort === 'date_asc') {
+            $encashQuery->orderBy('created_at', 'asc');
+        } elseif ($encashmentsSort === 'days_desc') {
+            $encashQuery->orderBy('requested_days', 'desc');
+        } elseif ($encashmentsSort === 'days_asc') {
+            $encashQuery->orderBy('requested_days', 'asc');
+        } else {
+            $encashQuery->orderBy('created_at', 'desc');
+        }
+
+        $leaveRequests = $query->paginate(10, ['*'], 'leaves_page')->withQueryString();
+        $requests = $leaveRequests;
+        $leaveEncashments = $encashQuery->paginate(10, ['*'], 'encash_page')->withQueryString();
+        $encashments = $leaveEncashments;
 
         $employees = Employee::where('status', true)->get();
         $leaveTypes = LeaveType::where('status', true)->get();
@@ -241,7 +274,15 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
             'isAdmin',
             'employeeDataMap',
             'encashments',
-            'leaveEncashments'
+            'leaveEncashments',
+            'leavesSearch',
+            'leavesEmployeeId',
+            'leavesStatus',
+            'leavesSort',
+            'encashmentsSearch',
+            'encashmentsEmployeeId',
+            'encashmentsStatus',
+            'encashmentsSort'
         );
     }
 

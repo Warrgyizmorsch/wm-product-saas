@@ -221,7 +221,7 @@
                      <!-- 1. SHIFT APPLICATIONS VIEW -->
                     <div id="shiftApplicationsViewContainer">
                         <div>
-                            <table class="table table-hover align-middle mb-0" style="width:100%; table-layout: fixed;">
+                            <table class="table table-hover align-middle mb-0" id="shiftAppTable" style="width:100%; table-layout: fixed;">
                                 <thead class="table-light">
                                     <tr>
                                         <th style="width:13%; white-space:nowrap;">{{ __('hrms.shift_change.type') }}</th>
@@ -323,7 +323,7 @@
                                             </td>
                                         </tr>
                                     @empty
-                                        <tr>
+                                        <tr class="empty-registry-row">
                                             <td colspan="6" class="text-center py-4 text-muted fs-13">{{ __('hrms.shift_change.no_requests_found') }}</td>
                                         </tr>
                                     @endforelse
@@ -349,7 +349,7 @@
                     <!-- 2. OVERTIME APPLICATIONS VIEW -->
                     <div id="overtimeApplicationsViewContainer" class="d-none">
                         <div>
-                            <table class="table table-hover align-middle mb-0" style="width:100%; table-layout: fixed;">
+                            <table class="table table-hover align-middle mb-0" id="overtimeAppTable" style="width:100%; table-layout: fixed;">
                                 <thead class="table-light">
                                     <tr>
                                         <th style="width:13%; white-space:nowrap;">{{ __('hrms.overtime.date') }}</th>
@@ -441,7 +441,7 @@
                                             </td>
                                         </tr>
                                     @empty
-                                        <tr>
+                                        <tr class="empty-registry-row">
                                             <td colspan="7" class="text-center py-4 text-muted fs-13">{{ __('hrms.overtime.no_requests_found') }}</td>
                                         </tr>
                                     @endforelse
@@ -641,6 +641,10 @@
                     <textarea id="empRejectReasonInput" class="form-control" rows="3" placeholder="Enter reason for rejection..."></textarea>
                 </div>
             </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmEmpRejectBtn">Reject</button>
+            </div>
         </div>
     </div>
 </div>
@@ -648,17 +652,7 @@
 @push('scripts')
 <script>
     $(document).ready(function () {
-        // Toggle toolbars on view switch
-        $(document).on('click', '#btnToggleShiftOvertimeView', function () {
-            var isOvertimeHidden = $('#overtimeApplicationsViewContainer').hasClass('d-none');
-            if (isOvertimeHidden) {
-                $('#shiftAppsToolbar').addClass('d-none');
-                $('#overtimeAppsToolbar').removeClass('d-none');
-            } else {
-                $('#overtimeAppsToolbar').addClass('d-none');
-                $('#shiftAppsToolbar').removeClass('d-none');
-            }
-        });
+
 
         // 1. Shift Applications Search / Sort / Filter Logic
         var empShiftAppSortMode = 'date_desc';
@@ -725,10 +719,17 @@
                 $('#empShiftAppsPaginationContainer').addClass('d-none');
             }
 
-            if (totalItems === 0) {
-                $('#no_matching_emp_shift_apps_row').removeClass('d-none');
-            } else {
+            var hasAnyRows = $allRows.length > 0;
+            if (!hasAnyRows) {
+                $('#shiftAppTable tbody tr.empty-registry-row').removeClass('d-none');
                 $('#no_matching_emp_shift_apps_row').addClass('d-none');
+            } else {
+                $('#shiftAppTable tbody tr.empty-registry-row').addClass('d-none');
+                if (totalItems === 0) {
+                    $('#no_matching_emp_shift_apps_row').removeClass('d-none');
+                } else {
+                    $('#no_matching_emp_shift_apps_row').addClass('d-none');
+                }
             }
 
             $('#emp_shift_apps_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
@@ -767,7 +768,8 @@
             $link.addClass('active').find('.shift-sort-check').removeClass('d-none');
             empShiftAppCurrentPage = 1;
             refreshEmpShiftAppRows();
-            $link.closest('.erp-sort-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+            $link.closest('.dropdown-menu').removeClass('show');
+            $link.closest('.dropdown').removeClass('show');
         });
 
         $('#btnEmpShiftAppFilterApply').on('click', function () {
@@ -775,7 +777,8 @@
             empShiftAppFilters.type = $('#empShiftAppFilterType').val() || '';
             empShiftAppCurrentPage = 1;
             refreshEmpShiftAppRows();
-            $(this).closest('.erp-filter-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+            $(this).closest('.dropdown-menu').removeClass('show');
+            $(this).closest('.dropdown').removeClass('show');
         });
 
         $('#btnEmpShiftAppFilterReset').on('click', function () {
@@ -785,7 +788,8 @@
             empShiftAppFilters.type = '';
             empShiftAppCurrentPage = 1;
             refreshEmpShiftAppRows();
-            $(this).closest('.erp-filter-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+            $(this).closest('.dropdown-menu').removeClass('show');
+            $(this).closest('.dropdown').removeClass('show');
         });
 
         $(document).on('click', '#emp_shift_apps_pagination_ul .page-link', function (e) {
@@ -862,10 +866,17 @@
                 $('#empOvertimeAppsPaginationContainer').addClass('d-none');
             }
 
-            if (totalItems === 0) {
-                $('#no_matching_emp_overtime_apps_row').removeClass('d-none');
-            } else {
+            var hasAnyRows = $allRows.length > 0;
+            if (!hasAnyRows) {
+                $('#overtimeAppTable tbody tr.empty-registry-row').removeClass('d-none');
                 $('#no_matching_emp_overtime_apps_row').addClass('d-none');
+            } else {
+                $('#overtimeAppTable tbody tr.empty-registry-row').addClass('d-none');
+                if (totalItems === 0) {
+                    $('#no_matching_emp_overtime_apps_row').removeClass('d-none');
+                } else {
+                    $('#no_matching_emp_overtime_apps_row').addClass('d-none');
+                }
             }
 
             $('#emp_overtime_apps_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
@@ -904,7 +915,8 @@
             $link.addClass('active').find('.ot-sort-check').removeClass('d-none');
             empOvertimeAppCurrentPage = 1;
             refreshEmpOvertimeAppRows();
-            $link.closest('.erp-sort-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+            $link.closest('.dropdown-menu').removeClass('show');
+            $link.closest('.dropdown').removeClass('show');
         });
 
         $('#btnEmpOvertimeAppFilterApply').on('click', function () {
@@ -912,7 +924,8 @@
             empOvertimeAppFilters.compensation = $('#empOvertimeAppFilterCompensation').val() || '';
             empOvertimeAppCurrentPage = 1;
             refreshEmpOvertimeAppRows();
-            $(this).closest('.erp-filter-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+            $(this).closest('.dropdown-menu').removeClass('show');
+            $(this).closest('.dropdown').removeClass('show');
         });
 
         $('#btnEmpOvertimeAppFilterReset').on('click', function () {
@@ -922,7 +935,8 @@
             empOvertimeAppFilters.compensation = '';
             empOvertimeAppCurrentPage = 1;
             refreshEmpOvertimeAppRows();
-            $(this).closest('.erp-filter-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+            $(this).closest('.dropdown-menu').removeClass('show');
+            $(this).closest('.dropdown').removeClass('show');
         });
 
         $(document).on('click', '#emp_overtime_apps_pagination_ul .page-link', function (e) {

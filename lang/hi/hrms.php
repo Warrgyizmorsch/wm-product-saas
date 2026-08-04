@@ -132,6 +132,7 @@ return [
         'approved_no_delete' => 'स्वीकृत आवेदनों को हटाया नहीं जा सकता।',
         'deleted_successfully' => 'पारी परिवर्तन अनुरोध सफलतापूर्वक हटा दिया गया।',
         'type_temporary' => 'अस्थायी',
+        'type_one_time' => 'एक बार',
         'type_permanent' => 'स्थायी',
         'type_recurring' => 'आवर्ती',
         'shift_details' => 'शिफ्ट विवरण',
@@ -1730,6 +1731,7 @@ return [
         'deduct_leave_balance' => 'अवकाश शेष राशि से कटौती करें',
         'both_settlements' => 'दोनों (वेतन और अवकाश)',
         'unlimited' => 'असीमित',
+        'policy_created' => 'दंड नीति सफलतापूर्वक बनाई गई।',
         'policy_updated' => 'दंड नीति सफलतापूर्वक अपडेट की गई।',
     ],
     'track_status' => [

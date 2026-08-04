@@ -18,13 +18,21 @@ class PenalizationPolicyController extends Controller
             ->unique('name')
             ->values();
         
-        // Fetch all configuration rules keyed by their rule type for easy reference
-        $rules = AttendancePenalty::all()->keyBy('rule_type');
-        
-        // Track which policy type is active (defaulting to 'late_arrival')
         $selectedType = $request->query('policy_type', 'late_arrival');
+        
+        // Fetch all configuration rules keyed by their rule type for easy reference
+        $companyId = null;
+        if ($request->has('company_id')) {
+            $companyId = $request->query('company_id') !== '' ? $request->query('company_id') : null;
+        }
+        
+        $rules = AttendancePenalty::where('company_id', $companyId)->get()->keyBy('rule_type');
 
-        return view('modules.hrms.penalization-policy.index', compact('companies', 'leaveTypes', 'rules', 'selectedType'));
+        $businessUnits = \App\Domains\HRMS\Models\BusinessUnit::all();
+        $branches = \App\Domains\HRMS\Models\Branch::all();
+        $attendanceRules = \App\Domains\HRMS\Models\AttendanceRule::with(['company', 'businessUnit', 'branch'])->get();
+
+        return view('modules.hrms.penalization-policy.index', compact('companies', 'leaveTypes', 'rules', 'selectedType', 'businessUnits', 'branches', 'attendanceRules'));
     }
 
     public function store(Request $request)
@@ -132,15 +140,106 @@ class PenalizationPolicyController extends Controller
         }
 
         // Find or create rule setting for this type and company scoping
+        $companyId = $request->company_id ?: null;
+        $existingRule = AttendancePenalty::where('rule_type', $request->rule_type)
+            ->where('company_id', $companyId)
+            ->first();
+        $isCreate = ($existingRule === null);
+
         AttendancePenalty::updateOrCreate(
             [
                 'rule_type' => $request->rule_type,
-                'company_id' => $request->company_id,
+                'company_id' => $companyId,
             ],
             $updateData
         );
 
-        return redirect()->route('hrms.penalization-policy.index', ['policy_type' => $request->rule_type])
-            ->with('success', __('hrms.penalization.policy_updated'));
+        $successMsg = $isCreate ? __('hrms.penalization.policy_created') : __('hrms.penalization.policy_updated');
+
+        return redirect()->route('hrms.penalization-policy.index', [
+            'policy_type' => $request->rule_type,
+            'company_id' => $request->company_id ?? '',
+        ])->with('success', $successMsg);
+    }
+
+    public function queryAttendanceRule(Request $request)
+    {
+        $companyId = $request->query('company_id');
+        $buId = $request->query('business_unit_id');
+        $branchId = $request->query('branch_id');
+
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::where('company_id', $companyId)
+            ->where('business_unit_id', $buId ?: null)
+            ->where('branch_id', $branchId ?: null)
+            ->first();
+
+        return response()->json($rule);
+    }
+
+    public function saveAttendanceRule(Request $request)
+    {
+        $validated = $request->validate([
+            'company_id' => 'required|integer|exists:companies,id',
+            'business_unit_id' => 'nullable|integer|exists:business_units,id',
+            'branch_id' => 'nullable|integer|exists:branches,id',
+            'office_latitude' => 'nullable|string',
+            'office_longitude' => 'nullable|string',
+            'office_radius' => 'required|integer|min:1',
+            'wfh_tracking_meters' => 'required|integer|min:1',
+            'site_tracking_meters' => 'required|integer|min:1',
+            'status' => 'required',
+        ]);
+
+        $validated['office_biometric'] = $request->has('office_biometric');
+        $validated['office_web'] = $request->has('office_web');
+        $validated['wfh_location'] = $request->has('wfh_location');
+        $validated['wfh_selfie'] = $request->has('wfh_selfie');
+        $validated['wfh_geofence'] = $request->has('wfh_geofence');
+        $validated['wfh_tracking'] = $request->has('wfh_tracking');
+        $validated['site_location'] = $request->has('site_location');
+        $validated['site_selfie'] = $request->has('site_selfie');
+        $validated['site_geofence'] = $request->has('site_geofence');
+        $validated['site_tracking'] = $request->has('site_tracking');
+
+        $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
+
+        // Normalize empty strings to null for integer foreign keys
+        $validated['business_unit_id'] = $validated['business_unit_id'] ?: null;
+        $validated['branch_id'] = $validated['branch_id'] ?: null;
+
+        // Clean up any historical duplicate entries for this exact scope
+        $duplicates = \App\Domains\HRMS\Models\AttendanceRule::where('company_id', $validated['company_id'])
+            ->where('business_unit_id', $validated['business_unit_id'])
+            ->where('branch_id', $validated['branch_id'])
+            ->get();
+        
+        $isCreate = ($duplicates->count() === 0);
+
+        if ($duplicates->count() > 1) {
+            $keepId = $duplicates->last()->id;
+            \App\Domains\HRMS\Models\AttendanceRule::where('company_id', $validated['company_id'])
+                ->where('business_unit_id', $validated['business_unit_id'])
+                ->where('branch_id', $validated['branch_id'])
+                ->where('id', '!=', $keepId)
+                ->delete();
+        }
+
+        \App\Domains\HRMS\Models\AttendanceRule::updateOrCreate(
+            [
+                'company_id' => $validated['company_id'],
+                'business_unit_id' => $validated['business_unit_id'],
+                'branch_id' => $validated['branch_id'],
+            ],
+            $validated
+        );
+
+        $successMsg = $isCreate ? 'Attendance rules created successfully.' : 'Attendance rules updated successfully.';
+
+        return redirect()->route('hrms.penalization-policy.index', [
+            'policy_type' => 'attendance_rules',
+            'company_id' => $validated['company_id'],
+            'business_unit_id' => $validated['business_unit_id'] ?? '',
+            'branch_id' => $validated['branch_id'] ?? '',
+        ])->with('success', $successMsg);
     }
 }

@@ -306,9 +306,6 @@
             // Trigger employee change logic on load if pre-selected
             $('#shift_employee_id').trigger('change');
 
-            // Trigger pagination display on load
-            updateShiftPagination();
-            updateOvertimePagination();
         });
 
         // Sync apply button state with the selected tab
@@ -372,114 +369,62 @@
             $reqShiftSelect.trigger('change.select2');
         });
 
-        // Client-side Shift Change filtering, sorting and pagination
-        var currentShiftPage = 1;
-        var shiftItemsPerPage = 10;
-        var currentShiftSort = 'newest';
+        // ── AJAX Shift Change filtering, sorting and pagination ──────────────────
+        function loadShiftApplications(page = 1) {
+            var search = $('#shift_search').val() || '';
+            var empId = $('#filter_shift_employee_id').val() || '';
+            var status = $('#filter_shift_status').val() || '';
+            var sort = $('#shift_sort_input').val() || 'newest';
+            var tab = 'shift';
 
-        function updateShiftPagination() {
-            var searchVal = $('#shift_search').val() ? $('#shift_search').val().toLowerCase().trim() : '';
-            var empId = $('#filter_shift_employee_id').val();
-            var status = $('#filter_shift_status').val();
+            var url = '{{ route("hrms.shift-overtime.index") }}?tab=' + tab +
+                      '&shift_search=' + encodeURIComponent(search) +
+                      '&shift_employee_id=' + encodeURIComponent(empId) +
+                      '&shift_status=' + encodeURIComponent(status) +
+                      '&shift_sort=' + encodeURIComponent(sort) +
+                      '&shift_page=' + page;
 
-            var $visibleRows = $('.shift-row').filter(function() {
-                var $row = $(this);
-                var rowEmp = $row.attr('data-employee') || '';
-                var rowEmpId = $row.attr('data-employee-id') || '';
-                var rowStatus = $row.attr('data-status') || '';
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(response) {
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(response, 'text/html');
+                    
+                    var oldBody = $('#shiftTableBody');
+                    var newBody = $(doc).find('#shiftTableBody');
+                    if (oldBody.length && newBody.length) {
+                        oldBody.html(newBody.html());
+                    }
+                    
+                    var oldPagination = $('#shift_pagination_container');
+                    var newPagination = $(doc).find('#shift_pagination_container');
+                    if (oldPagination.length && newPagination.length) {
+                        oldPagination.replaceWith(newPagination);
+                    }
 
-                var matchesSearch = !searchVal || rowEmp.indexOf(searchVal) !== -1;
-                var matchesEmp = !empId || rowEmpId === empId;
-                var matchesStatus = !status || rowStatus === status;
+                    closeAllFilterDropdowns();
 
-                return matchesSearch && matchesEmp && matchesStatus;
+                    history.pushState(null, '', url);
+                }
             });
-
-            // Sort logic
-            var rowsArray = $visibleRows.get();
-            rowsArray.sort(function(a, b) {
-                var keyA = parseInt($(a).attr('data-created-at') || 0);
-                var keyB = parseInt($(b).attr('data-created-at') || 0);
-                return currentShiftSort === 'newest' ? keyB - keyA : keyA - keyB;
-            });
-
-            var $tbody = $('#shiftTableBody');
-            $.each(rowsArray, function(index, row) {
-                $tbody.append(row);
-            });
-
-            var totalItems = $visibleRows.length;
-            var totalPages = Math.ceil(totalItems / shiftItemsPerPage) || 1;
-
-            if (currentShiftPage > totalPages) {
-                currentShiftPage = totalPages;
-            }
-            if (currentShiftPage < 1) {
-                currentShiftPage = 1;
-            }
-
-            var startIndex = (currentShiftPage - 1) * shiftItemsPerPage;
-            var endIndex = Math.min(startIndex + shiftItemsPerPage, totalItems);
-
-            $('.shift-row').hide();
-            $visibleRows.slice(startIndex, endIndex).show();
-
-            // Hide empty initial row if dynamic results are evaluated
-            $('#empty_initial_shift_row').hide();
-
-            if (totalPages > 1) {
-                $('#shift_pagination_container').show();
-            } else {
-                $('#shift_pagination_container').hide();
-            }
-
-            if (totalItems === 0) {
-                $('#no_matching_shift_row').removeClass('d-none');
-            } else {
-                $('#no_matching_shift_row').addClass('d-none');
-            }
-
-            $('#shift_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
-            $('#shift_showing_end').text(endIndex);
-            $('#shift_total_count').text(totalItems);
-
-            var paginationHtml = '';
-            paginationHtml += `
-                <li class="page-item ${currentShiftPage === 1 ? 'disabled' : ''}">
-                    <a class="page-link" href="#" data-page="${currentShiftPage - 1}" aria-label="Previous">
-                        <i class="feather-chevron-left"></i>
-                    </a>
-                </li>
-            `;
-            for (var i = 1; i <= totalPages; i++) {
-                paginationHtml += `
-                    <li class="page-item ${currentShiftPage === i ? 'active' : ''}">
-                        <a class="page-link" href="#" data-page="${i}">${i}</a>
-                    </li>
-                `;
-            }
-            paginationHtml += `
-                <li class="page-item ${currentShiftPage === totalPages ? 'disabled' : ''}">
-                    <a class="page-link" href="#" data-page="${currentShiftPage + 1}" aria-label="Next">
-                        <i class="feather-chevron-right"></i>
-                    </a>
-                </li>
-            `;
-            $('#shift_pagination_ul').html(paginationHtml);
         }
 
-        $(document).on('click', '#shift_pagination_ul .page-link', function(e) {
+        $(document).on('click', '#shift_pagination_container a', function(e) {
             e.preventDefault();
-            var page = $(this).data('page');
-            if (page && page !== currentShiftPage) {
-                currentShiftPage = page;
-                updateShiftPagination();
-            }
+            var url = $(this).attr('href');
+            if (!url) return;
+            var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+            var page = urlParams.get('shift_page') || 1;
+            loadShiftApplications(page);
         });
 
-        $('#shift_search').on('input', function() {
-            currentShiftPage = 1;
-            updateShiftPagination();
+        var shiftSearchTimeout;
+        $(document).on('input', '#shift_search', function() {
+            clearTimeout(shiftSearchTimeout);
+            shiftSearchTimeout = setTimeout(function() {
+                loadShiftApplications(1);
+            }, 300);
         });
 
         function closeAllFilterDropdowns() {
@@ -489,13 +434,14 @@
 
         $('#shiftFilterForm').on('submit', function(e) {
             e.preventDefault();
-            currentShiftPage = 1;
-            updateShiftPagination();
-            closeAllFilterDropdowns();
+            loadShiftApplications(1);
         });
 
         function setShiftSort(value, element) {
-            currentShiftSort = value;
+            var input = document.getElementById('shift_sort_input');
+            if (input) {
+                input.value = value;
+            }
             if (element) {
                 var menu = element.closest('.dropdown-menu');
                 if (menu) {
@@ -505,147 +451,86 @@
                 }
                 element.classList.add('active');
             }
-            currentShiftPage = 1;
-            updateShiftPagination();
+            loadShiftApplications(1);
         }
 
         function resetShiftFilters() {
             $('#shift_search').val('');
             $('#filter_shift_employee_id').val('').trigger('change');
             $('#filter_shift_status').val('').trigger('change');
-            currentShiftSort = 'newest';
+            $('#shift_sort_input').val('newest');
             $('#shiftFilterForm').find('.dropdown-menu .dropdown-item').removeClass('active').first().addClass('active');
-            currentShiftPage = 1;
-            updateShiftPagination();
-            closeAllFilterDropdowns();
+            loadShiftApplications(1);
         }
 
-        // Client-side Overtime filtering, sorting and pagination
-        var currentOvertimePage = 1;
-        var overtimeItemsPerPage = 10;
-        var currentOvertimeSort = 'newest';
+        // ── AJAX Overtime filtering, sorting and pagination ──────────────────────
+        function loadOvertimeApplications(page = 1) {
+            var search = $('#overtime_search').val() || '';
+            var empId = $('#filter_overtime_employee_id').val() || '';
+            var status = $('#filter_overtime_status').val() || '';
+            var sort = $('#overtime_sort_input').val() || 'newest';
+            var tab = 'overtime';
 
-        function updateOvertimePagination() {
-            var searchVal = $('#overtime_search').val() ? $('#overtime_search').val().toLowerCase().trim() : '';
-            var empId = $('#filter_overtime_employee_id').val();
-            var status = $('#filter_overtime_status').val();
+            var url = '{{ route("hrms.shift-overtime.index") }}?tab=' + tab +
+                      '&overtime_search=' + encodeURIComponent(search) +
+                      '&overtime_employee_id=' + encodeURIComponent(empId) +
+                      '&overtime_status=' + encodeURIComponent(status) +
+                      '&overtime_sort=' + encodeURIComponent(sort) +
+                      '&overtime_page=' + page;
 
-            var $visibleRows = $('.overtime-row').filter(function() {
-                var $row = $(this);
-                var rowEmp = $row.attr('data-employee') || '';
-                var rowEmpId = $row.attr('data-employee-id') || '';
-                var rowStatus = $row.attr('data-status') || '';
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(response) {
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(response, 'text/html');
+                    
+                    var oldBody = $('#overtimeTableBody');
+                    var newBody = $(doc).find('#overtimeTableBody');
+                    if (oldBody.length && newBody.length) {
+                        oldBody.html(newBody.html());
+                    }
+                    
+                    var oldPagination = $('#overtime_pagination_container');
+                    var newPagination = $(doc).find('#overtime_pagination_container');
+                    if (oldPagination.length && newPagination.length) {
+                        oldPagination.replaceWith(newPagination);
+                    }
 
-                var matchesSearch = !searchVal || rowEmp.indexOf(searchVal) !== -1;
-                var matchesEmp = !empId || rowEmpId === empId;
-                var matchesStatus = !status || rowStatus === status;
+                    closeAllFilterDropdowns();
 
-                return matchesSearch && matchesEmp && matchesStatus;
-            });
-
-            // Sort logic
-            var rowsArray = $visibleRows.get();
-            rowsArray.sort(function(a, b) {
-                var keyA, keyB;
-                if (currentOvertimeSort === 'newest' || currentOvertimeSort === 'oldest') {
-                    keyA = parseInt($(a).attr('data-created-at') || 0);
-                    keyB = parseInt($(b).attr('data-created-at') || 0);
-                    return currentOvertimeSort === 'newest' ? keyB - keyA : keyA - keyB;
-                } else if (currentOvertimeSort === 'duration_high' || currentOvertimeSort === 'duration_low') {
-                    keyA = parseFloat($(a).attr('data-duration') || 0);
-                    keyB = parseFloat($(b).attr('data-duration') || 0);
-                    return currentOvertimeSort === 'duration_high' ? keyB - keyA : keyA - keyB;
+                    history.pushState(null, '', url);
                 }
-                return 0;
             });
-
-            var $tbody = $('#overtimeTableBody');
-            $.each(rowsArray, function(index, row) {
-                $tbody.append(row);
-            });
-
-            var totalItems = $visibleRows.length;
-            var totalPages = Math.ceil(totalItems / overtimeItemsPerPage) || 1;
-
-            if (currentOvertimePage > totalPages) {
-                currentOvertimePage = totalPages;
-            }
-            if (currentOvertimePage < 1) {
-                currentOvertimePage = 1;
-            }
-
-            var startIndex = (currentOvertimePage - 1) * overtimeItemsPerPage;
-            var endIndex = Math.min(startIndex + overtimeItemsPerPage, totalItems);
-
-            $('.overtime-row').hide();
-            $visibleRows.slice(startIndex, endIndex).show();
-
-            $('#empty_initial_overtime_row').hide();
-
-            if (totalPages > 1) {
-                $('#overtime_pagination_container').show();
-            } else {
-                $('#overtime_pagination_container').hide();
-            }
-
-            if (totalItems === 0) {
-                $('#no_matching_overtime_row').removeClass('d-none');
-            } else {
-                $('#no_matching_overtime_row').addClass('d-none');
-            }
-
-            $('#overtime_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
-            $('#overtime_showing_end').text(endIndex);
-            $('#overtime_total_count').text(totalItems);
-
-            var paginationHtml = '';
-            paginationHtml += `
-                <li class="page-item ${currentOvertimePage === 1 ? 'disabled' : ''}">
-                    <a class="page-link" href="#" data-page="${currentOvertimePage - 1}" aria-label="Previous">
-                        <i class="feather-chevron-left"></i>
-                    </a>
-                </li>
-            `;
-            for (var i = 1; i <= totalPages; i++) {
-                paginationHtml += `
-                    <li class="page-item ${currentOvertimePage === i ? 'active' : ''}">
-                        <a class="page-link" href="#" data-page="${i}">${i}</a>
-                    </li>
-                `;
-            }
-            paginationHtml += `
-                <li class="page-item ${currentOvertimePage === totalPages ? 'disabled' : ''}">
-                    <a class="page-link" href="#" data-page="${currentOvertimePage + 1}" aria-label="Next">
-                        <i class="feather-chevron-right"></i>
-                    </a>
-                </li>
-            `;
-            $('#overtime_pagination_ul').html(paginationHtml);
         }
 
-        $(document).on('click', '#overtime_pagination_ul .page-link', function(e) {
+        $(document).on('click', '#overtime_pagination_container a', function(e) {
             e.preventDefault();
-            var page = $(this).data('page');
-            if (page && page !== currentOvertimePage) {
-                currentOvertimePage = page;
-                updateOvertimePagination();
-            }
+            var url = $(this).attr('href');
+            if (!url) return;
+            var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+            var page = urlParams.get('overtime_page') || 1;
+            loadOvertimeApplications(page);
         });
 
-        $('#overtime_search').on('input', function() {
-            currentOvertimePage = 1;
-            updateOvertimePagination();
+        var overtimeSearchTimeout;
+        $(document).on('input', '#overtime_search', function() {
+            clearTimeout(overtimeSearchTimeout);
+            overtimeSearchTimeout = setTimeout(function() {
+                loadOvertimeApplications(1);
+            }, 300);
         });
 
         $('#overtimeFilterForm').on('submit', function(e) {
             e.preventDefault();
-            currentOvertimePage = 1;
-            updateOvertimePagination();
-            closeAllFilterDropdowns();
+            loadOvertimeApplications(1);
         });
 
         function setOvertimeSort(value, element) {
-            currentOvertimeSort = value;
+            var input = document.getElementById('overtime_sort_input');
+            if (input) {
+                input.value = value;
+            }
             if (element) {
                 var menu = element.closest('.dropdown-menu');
                 if (menu) {
@@ -655,20 +540,24 @@
                 }
                 element.classList.add('active');
             }
-            currentOvertimePage = 1;
-            updateOvertimePagination();
+            loadOvertimeApplications(1);
         }
 
         function resetOvertimeFilters() {
             $('#overtime_search').val('');
             $('#filter_overtime_employee_id').val('').trigger('change');
             $('#filter_overtime_status').val('').trigger('change');
-            currentOvertimeSort = 'newest';
+            $('#overtime_sort_input').val('newest');
             $('#overtimeFilterForm').find('.dropdown-menu .dropdown-item').removeClass('active').first().addClass('active');
-            currentOvertimePage = 1;
-            updateOvertimePagination();
-            closeAllFilterDropdowns();
+            loadOvertimeApplications(1);
         }
+
+        window.loadShiftApplications = loadShiftApplications;
+        window.loadOvertimeApplications = loadOvertimeApplications;
+        window.setShiftSort = setShiftSort;
+        window.setOvertimeSort = setOvertimeSort;
+        window.resetShiftFilters = resetShiftFilters;
+        window.resetOvertimeFilters = resetOvertimeFilters;
 
         // Handle Shift Approval/Rejection
         function handleShiftDecision(action, requestId) {

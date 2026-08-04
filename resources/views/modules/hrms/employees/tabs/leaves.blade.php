@@ -532,7 +532,7 @@
 
                                                         {{-- Unified Withdraw / Cancellation Delete button --}}
                                                         @if($req->canWithdraw())
-                                                            <form method="POST" action="{{ route('hrms.leaves.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this leave application?')" class="d-inline" onclick="event.stopPropagation();">
+                                                            <form method="POST" action="{{ route('hrms.leaves.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Withdraw this leave application?', { title: 'Withdraw Leave Application', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline" onclick="event.stopPropagation();">
                                                                 @csrf
                                                                 <button type="submit" class="btn btn-sm btn-soft-danger border" 
                                                                         title="Withdraw Application"
@@ -674,7 +674,7 @@
                                                         @endif
 
                                                         @if($enc->status === 'pending')
-                                                            <form action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" method="POST" onsubmit="return confirm('Withdraw this encashment request?')" class="d-inline-flex m-0" onclick="event.stopPropagation();">
+                                                            <form action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Withdraw this encashment request?', { title: 'Withdraw Encashment Request', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline-flex m-0" onclick="event.stopPropagation();">
                                                                 @csrf
                                                                 @method('DELETE')
                                                                 <button type="submit" class="btn btn-sm btn-soft-danger border" 

@@ -131,6 +131,10 @@ Route::prefix('hrms')
         Route::prefix('penalization-policy')->group(function (): void {
             Route::get('/', [PenalizationPolicyController::class, 'index'])->name('penalization-policy.index');
             Route::post('/store', [PenalizationPolicyController::class, 'store'])->name('penalization-policy.store');
+            
+            // Custom Attendance Rules routes
+            Route::get('/attendance-rules/query', [PenalizationPolicyController::class, 'queryAttendanceRule'])->name('attendance-rules.query');
+            Route::post('/attendance-rules/save', [PenalizationPolicyController::class, 'saveAttendanceRule'])->name('attendance-rules.save');
         });
 
         // Leave Request Management
