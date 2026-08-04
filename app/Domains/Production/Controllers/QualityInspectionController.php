@@ -56,6 +56,7 @@ class QualityInspectionController extends Controller
         $plans = ProductionQualityPlan::where('tenant_id', $tenantId)->get();
         $orders = ProductionOrder::where('tenant_id', $tenantId)
             ->whereIn('status', [ProductionOrder::STATUS_IN_PROGRESS, ProductionOrder::STATUS_COMPLETED])
+            ->with(['operations'])
             ->orderBy('id', 'desc')
             ->get();
 

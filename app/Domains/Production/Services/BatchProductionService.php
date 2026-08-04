@@ -536,7 +536,11 @@ class BatchProductionService
                 ->where('transaction_type', 'rework_completed')
                 ->sum('quantity');
             $processedAtOp = (float) $batchLogs->where('operation_id', $operation->id)->sum('quantity_produced') + $reworkCompletedAtOp;
-            $scrapAtOp = (float) $batchScraps->where('operation_id', $operation->id)->sum('quantity');
+
+            $logScrapAtOp = (float) $batchLogs->where('operation_id', $operation->id)->sum('quantity_scrapped');
+            $disposalScrapAtOp = (float) $batchScraps->where('production_order_operation_id', $operation->id)->sum('quantity');
+            $scrapAtOp = max($disposalScrapAtOp, $logScrapAtOp);
+
             $reworkAtOp = (float) $batchReworks->where('operation_id', $operation->id)->sum('rework_quantity');
 
             // Transferred IN into current operation's routing_operation_id
@@ -564,16 +568,18 @@ class BatchProductionService
             }
 
             // Input available & remaining processable quantity
+            $totalInputConsumed = $processedAtOp + $scrapAtOp;
+
             if ($isFirstOp) {
-                $inputAvailable = max(0.0, (float) $batch->planned_quantity - $processedAtOp);
+                $inputAvailable = max(0.0, (float) $batch->planned_quantity - $totalInputConsumed);
                 $totalInputReceived = (float) $batch->planned_quantity;
             } else {
-                $inputAvailable = max(0.0, $transferredIn - $processedAtOp);
+                $inputAvailable = max(0.0, $transferredIn - $totalInputConsumed);
                 $totalInputReceived = $transferredIn;
             }
 
             $remainingToProcess = max(0.0, $inputAvailable);
-            $goodAtOp = max(0.0, $processedAtOp - $scrapAtOp);
+            $goodAtOp = $processedAtOp;
 
             // Ready to transfer forward
             $readyToTransfer = $nextOp ? max(0.0, $goodAtOp - $transferredOut) : 0.0;
@@ -587,15 +593,15 @@ class BatchProductionService
                 $displayStatus = 'BLOCKED';
             } elseif ($hasPendingRework) {
                 $displayStatus = 'REWORK';
-            } elseif ($isFirstOp && $processedAtOp >= $batch->planned_quantity && $readyToTransfer <= 0) {
+            } elseif ($isFirstOp && $totalInputConsumed >= $batch->planned_quantity && $readyToTransfer <= 0) {
                 $displayStatus = 'COMPLETED_AT_OPERATION';
             } elseif (!$isFirstOp && $transferredIn > 0 && $remainingToProcess <= 0 && $readyToTransfer <= 0) {
                 $displayStatus = 'COMPLETED_AT_OPERATION';
-            } elseif ($processedAtOp > 0 && $remainingToProcess <= 0 && $readyToTransfer > 0) {
+            } elseif (($processedAtOp > 0 || $scrapAtOp > 0) && $remainingToProcess <= 0 && $readyToTransfer > 0) {
                 $displayStatus = 'WAITING_FOR_TRANSFER';
-            } elseif ($processedAtOp > 0 && $remainingToProcess > 0) {
+            } elseif (($processedAtOp > 0 || $scrapAtOp > 0) && $remainingToProcess > 0) {
                 $displayStatus = 'PARTIALLY_PROCESSED';
-            } elseif ($processedAtOp == 0 && $totalInputReceived > 0 && $remainingToProcess > 0) {
+            } elseif ($processedAtOp == 0 && $scrapAtOp == 0 && $totalInputReceived > 0 && $remainingToProcess > 0) {
                 $displayStatus = 'READY';
             } else {
                 $displayStatus = 'WAITING_FOR_INPUT';

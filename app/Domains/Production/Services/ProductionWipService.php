@@ -803,23 +803,36 @@ class ProductionWipService
                 $batch = \App\Domains\Production\Models\ProductionBatch::find($batchId);
                 if ($batch) {
                     $plannedTarget = (float) $batch->planned_quantity;
-                    $processed = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
+                    $logProduced = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
                         ->where('production_order_id', $op->production_order_id)
                         ->where('production_batch_id', $batchId)
                         ->where('operation_id', $op->id)
-                        ->sum('quantity_produced')
-                        + (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
-                            ->where('production_order_id', $op->production_order_id)
-                            ->where('production_batch_id', $batchId)
-                            ->where('operation_id', $op->id)
-                            ->sum('quantity_rejected');
+                        ->sum('quantity_produced');
+                    $logRejected = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
+                        ->where('production_order_id', $op->production_order_id)
+                        ->where('production_batch_id', $batchId)
+                        ->where('operation_id', $op->id)
+                        ->sum('quantity_rejected');
+                    $logScrapped = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
+                        ->where('production_order_id', $op->production_order_id)
+                        ->where('production_batch_id', $batchId)
+                        ->where('operation_id', $op->id)
+                        ->sum('quantity_scrapped');
+                    $disposalScrapped = (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $op->tenant_id)
+                        ->where('production_order_id', $op->production_order_id)
+                        ->where('production_batch_id', $batchId)
+                        ->where('production_order_operation_id', $op->id)
+                        ->sum('quantity');
+
+                    $scrapped = max($logScrapped, $disposalScrapped);
+                    $processed = $logProduced + $logRejected + $scrapped;
 
                     return round(max(0.0, $plannedTarget - $processed), 4);
                 }
             }
 
             $plannedTarget = (float) ($op->order?->quantity_ordered ?? 0.0);
-            $processed = (float) ($op->quantity_produced + $op->quantity_rejected);
+            $processed = (float) ($op->quantity_produced + $op->quantity_rejected + $op->quantity_scrapped);
             return round(max(0.0, $plannedTarget - $processed), 4);
         }
 
@@ -831,21 +844,29 @@ class ProductionWipService
             ->sum('quantity');
 
         $transferredIn = max((float) ($batchId ? 0.0 : $op->quantity_transferred_in), $txTransferredIn);
-        $processed = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
+        $logProduced = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
             ->where('production_order_id', $op->production_order_id)
             ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
             ->where('operation_id', $op->id)
-            ->sum('quantity_produced')
-            + (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
-                ->where('production_order_id', $op->production_order_id)
-                ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                ->where('operation_id', $op->id)
-                ->sum('quantity_rejected')
-            + (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
-                ->where('production_order_id', $op->production_order_id)
-                ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                ->where('operation_id', $op->id)
-                ->sum('quantity_scrapped');
+            ->sum('quantity_produced');
+        $logRejected = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
+            ->where('production_order_id', $op->production_order_id)
+            ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
+            ->where('operation_id', $op->id)
+            ->sum('quantity_rejected');
+        $logScrapped = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
+            ->where('production_order_id', $op->production_order_id)
+            ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
+            ->where('operation_id', $op->id)
+            ->sum('quantity_scrapped');
+        $disposalScrapped = (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $op->tenant_id)
+            ->where('production_order_id', $op->production_order_id)
+            ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
+            ->where('production_order_operation_id', $op->id)
+            ->sum('quantity');
+
+        $scrapped = max($logScrapped, $disposalScrapped);
+        $processed = $logProduced + $logRejected + $scrapped;
 
         return round(max(0.0, $transferredIn - $processed), 4);
     }

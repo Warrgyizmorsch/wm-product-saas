@@ -12,8 +12,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("ALTER TABLE production_machine_downtimes MODIFY COLUMN start_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
-        DB::statement("ALTER TABLE production_machine_state_histories MODIFY COLUMN started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE production_machine_downtimes MODIFY COLUMN start_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+            DB::statement("ALTER TABLE production_machine_state_histories MODIFY COLUMN started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+        }
     }
 
     /**

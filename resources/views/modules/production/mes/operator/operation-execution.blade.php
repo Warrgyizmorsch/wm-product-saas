@@ -289,6 +289,16 @@
 
         {{-- Target Quantities --}}
         <div class="col-md-5 ps-md-4">
+            @php
+                $totalScrappedAtOp = max(
+                    (float) ($op->quantity_scrapped ?? 0),
+                    (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $op->tenant_id)
+                        ->where('production_order_id', $op->production_order_id)
+                        ->where('production_order_operation_id', $op->id)
+                        ->sum('quantity')
+                );
+                $remainingToComplete = max(0.0, (float)$order->quantity_ordered - (($op->quantity_produced ?? 0) + $totalScrappedAtOp + ($op->quantity_rejected ?? 0)));
+            @endphp
             <x-ui.odoo-form-ui 
                 type="input" 
                 label="Quantity Produced" 
@@ -296,7 +306,7 @@
                 id="producedInput" 
                 inputType="number" 
                 step="0.0001"
-                :value="max(0, $order->quantity_ordered - ($op->quantity_produced ?? 0))" 
+                :value="$remainingToComplete" 
                 :required="true" 
             />
             <x-ui.odoo-form-ui 

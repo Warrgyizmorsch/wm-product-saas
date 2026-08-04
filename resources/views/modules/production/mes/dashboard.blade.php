@@ -548,12 +548,22 @@
                             }
                             $elapsedMinutes = round($elapsedSecs / 60, 1);
                         @endphp
+                        @php
+                            $activeScrapQty = max(
+                                (float) ($activeOp->orderOperation->quantity_scrapped ?? 0.0),
+                                (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $activeOp->tenant_id ?? require_tenant_id())
+                                    ->where('production_order_id', $activeOp->production_order_id ?? $activeOp->order_id)
+                                    ->where('production_order_operation_id', $activeOp->production_order_operation_id ?? $activeOp->id)
+                                    ->sum('quantity')
+                            );
+                            $activeRemainingToComplete = max(0.0, ($activeOp->schedule->order->quantity_ordered ?? 0.0) - (($activeOp->orderOperation->quantity_produced ?? 0.0) + $activeScrapQty + ($activeOp->orderOperation->quantity_rejected ?? 0.0)));
+                        @endphp
                         <x-ui.modal id="completeModal{{ $activeOp->id }}" title="Log Production Progress — {{ $activeOp->orderOperation->name ?? 'Op #' . $activeOp->sequence }}" class="text-start">
                             <form method="POST" action="{{ route('production.mes.complete', $activeOp->id) }}" id="completeForm{{ $activeOp->id }}">
                                 @csrf
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Qty Produced" name="quantity_produced" inputType="number" step="any" value="{{ max(0.0, ($activeOp->schedule->order->quantity_ordered ?? 0.0) - ($activeOp->orderOperation->quantity_produced ?? 0.0)) }}" :required="true" />
+                                        <x-ui.odoo-form-ui type="input" label="Qty Produced" name="quantity_produced" inputType="number" step="any" value="{{ $activeRemainingToComplete }}" :required="true" />
                                     </div>
                                     <div class="col-md-6">
                                         <x-ui.odoo-form-ui type="input" label="Qty Rejected" name="quantity_rejected" inputType="number" step="any" value="0" />

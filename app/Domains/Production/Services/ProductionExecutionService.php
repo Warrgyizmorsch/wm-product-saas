@@ -431,6 +431,14 @@ class ProductionExecutionService
                 'stock_transaction_id' => null,
             ]);
 
+            if ($operationId) {
+                $orderOp = ProductionOrderOperation::find($operationId);
+                if ($orderOp) {
+                    $orderOp->quantity_scrapped += $quantity;
+                    $orderOp->save();
+                }
+            }
+
             // Optional Quality NCR creation
             if ($createNcr) {
                 app(NcrService::class)->createNcr($order->tenant_id, array_merge([
@@ -454,9 +462,12 @@ class ProductionExecutionService
             // Resolve warehouse: prefer passed param, then default
             $resolvedWarehouseId = $warehouseId ?: $this->defaultWarehouseId($order->tenant_id);
 
-            // Post inventory outflow only if the scrapped item is an inventory-tracked product
+            // Post warehouse inventory outflow ONLY if the scrapped item is a warehouse inventory item that was already received into the warehouse.
+            // In-process WIP scrap (where operationId or batchId is set) does NOT deduct finished goods warehouse inventory
+            // because the item has not yet been received into the warehouse.
+            $isWipScrap = !empty($operationId) || !empty($batchId);
             $transaction = null;
-            if ($resolvedWarehouseId) {
+            if ($resolvedWarehouseId && !$isWipScrap && $productId) {
                 try {
                     $transaction = StockService::recordOutflow(
                         $order->tenant_id,
@@ -467,7 +478,7 @@ class ProductionExecutionService
                         $order->id
                     );
                 } catch (\Exception $e) {
-                    // Stock outflow may fail if insufficient stock (e.g. in-process items not yet received).
+                    // Stock outflow may fail if insufficient stock.
                     // We record the scrap event regardless; the stock posting failure is noted in the event log.
                     app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                         'production_order_id' => $order->id,
@@ -772,7 +783,11 @@ class ProductionExecutionService
         }
 
         $passedInspectionExists = ProductionQualityInspection::where('tenant_id', $operation->tenant_id)
-            ->where('production_order_operation_id', $operation->id)
+            ->where('production_order_id', $operation->production_order_id)
+            ->where(function ($q) use ($operation) {
+                $q->where('production_order_operation_id', $operation->id)
+                  ->orWhereNull('production_order_operation_id');
+            })
             ->where('status', 'approved')
             ->where('result', 'passed')
             ->exists();
