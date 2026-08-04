@@ -27,14 +27,14 @@ class KpiTargetController extends Controller
         $configuredTargets = $this->repository->getAllForTenant($tenantId)->keyBy('kpi_name');
 
         $standardKpis = [
-            'oee'          => ['label' => 'Overall Equipment Effectiveness (OEE)', 'default' => 85.00, 'unit' => '%'],
-            'availability' => ['label' => 'Availability Rate', 'default' => 90.00, 'unit' => '%'],
-            'performance'  => ['label' => 'Performance Rate', 'default' => 95.00, 'unit' => '%'],
-            'quality'      => ['label' => 'Quality Rate', 'default' => 99.00, 'unit' => '%'],
-            'throughput'   => ['label' => 'Throughput Target', 'default' => 100.00, 'unit' => 'units/hr'],
-            'utilization'  => ['label' => 'Asset Utilization', 'default' => 80.00, 'unit' => '%'],
-            'scrap_rate'   => ['label' => 'Scrap Rate Limit', 'default' => 2.00, 'unit' => '%'],
-            'downtime'     => ['label' => 'Max Allowed Downtime', 'default' => 10.00, 'unit' => 'mins/shift'],
+            'oee'          => ['label' => __('production.kpi_label_oee'), 'default' => 85.00, 'unit' => '%'],
+            'availability' => ['label' => __('production.kpi_label_availability'), 'default' => 90.00, 'unit' => '%'],
+            'performance'  => ['label' => __('production.kpi_label_performance'), 'default' => 95.00, 'unit' => '%'],
+            'quality'      => ['label' => __('production.kpi_label_quality'), 'default' => 99.00, 'unit' => '%'],
+            'throughput'   => ['label' => __('production.kpi_label_throughput'), 'default' => 100.00, 'unit' => 'units/hr'],
+            'utilization'  => ['label' => __('production.kpi_label_utilization'), 'default' => 80.00, 'unit' => '%'],
+            'scrap_rate'   => ['label' => __('production.kpi_label_scrap_rate'), 'default' => 2.00, 'unit' => '%'],
+            'downtime'     => ['label' => __('production.kpi_label_downtime'), 'default' => 10.00, 'unit' => 'mins/shift'],
         ];
 
         $targets = [];
@@ -66,7 +66,7 @@ class KpiTargetController extends Controller
             $this->service->updateTargets($tenantId, $dtos);
             return redirect()
                 ->route('production.kpi-targets.index')
-                ->with('success', 'KPI Target configurations updated successfully.');
+                ->with('success', __('production.kpi_target_updated_success'));
         } catch (\Exception $e) {
             return redirect()
                 ->back()

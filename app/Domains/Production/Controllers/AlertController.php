@@ -4,6 +4,7 @@ namespace App\Domains\Production\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionAlertConfiguration;
+use App\Domains\Production\Models\ProductionEventTimeline;
 use App\Domains\Production\Services\AlertService;
 use App\Domains\Production\Requests\UpdateAlertConfigurationRequest;
 
@@ -35,12 +36,20 @@ class AlertController extends Controller
         // Trigger manual audit test if run request is in url
         if (request()->has('audit')) {
             $this->alertService->checkAlerts($tenantId);
-            return redirect()->back()->with('success', 'Alert check executed and timeline updated.');
+            return redirect()->back()->with('success', __('production.alert_check_executed'));
         }
 
         $alerts = ProductionAlertConfiguration::where('tenant_id', $tenantId)->get();
 
-        return view('modules.production.intelligence.alerts', compact('alerts'));
+        // Fetch recent alert events for real-time log from production_event_timelines
+        $recentEvents = ProductionEventTimeline::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('event_type', 'Alert Fired')
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get();
+
+        return view('modules.production.intelligence.alerts', compact('alerts', 'recentEvents'));
     }
 
     public function update(UpdateAlertConfigurationRequest $request, int $id)
@@ -49,14 +58,12 @@ class AlertController extends Controller
         $tenantId = require_tenant_id();
         $alert = ProductionAlertConfiguration::where('tenant_id', $tenantId)->findOrFail($id);
 
-        $data = $request->validated();
-
         $alert->update([
             'threshold' => $request->input('threshold'),
             'severity'  => $request->input('severity'),
-            'active'    => $request->has('active'),
+            'active'    => $request->has('active') ? (bool)$request->input('active') : false,
         ]);
 
-        return redirect()->back()->with('success', 'Alert rule updated.');
+        return redirect()->back()->with('success', __('production.alert_rule_updated'));
     }
 }

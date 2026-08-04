@@ -23,7 +23,11 @@ class ReportingService
         $start = empty($filters['date_start']) ? Carbon::today()->subMonth() : Carbon::parse($filters['date_start']);
         $end   = empty($filters['date_end']) ? Carbon::today()->endOfDay() : Carbon::parse($filters['date_end']);
 
-        $machines = Machine::where('tenant_id', $tenantId)->get();
+        $query = Machine::where('tenant_id', $tenantId);
+        if (!empty($filters['machine_id'])) {
+            $query->where('id', $filters['machine_id']);
+        }
+        $machines = $query->get();
         $reportData = [];
 
         foreach ($machines as $m) {
@@ -60,7 +64,11 @@ class ReportingService
         $start = empty($filters['date_start']) ? Carbon::today()->subMonth() : Carbon::parse($filters['date_start']);
         $end   = empty($filters['date_end']) ? Carbon::today()->endOfDay() : Carbon::parse($filters['date_end']);
 
-        $wcs = WorkCenter::where('tenant_id', $tenantId)->get();
+        $query = WorkCenter::where('tenant_id', $tenantId);
+        if (!empty($filters['work_center_id'])) {
+            $query->where('id', $filters['work_center_id']);
+        }
+        $wcs = $query->get();
         $reportData = [];
 
         foreach ($wcs as $wc) {

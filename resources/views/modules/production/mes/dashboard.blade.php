@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Shop Floor Dashboard | SaaS ERP')
-@section('page-title', 'Shop Floor — Operator Dashboard')
-@section('breadcrumb', 'MES Dashboard')
+@section('title', __('production.shop_floor_dashboard') . ' | SaaS ERP')
+@section('page-title', __('production.shop_floor_operator_dashboard'))
+@section('breadcrumb', __('production.mes_dashboard'))
 
 @push('styles')
     <style>
@@ -304,11 +304,8 @@
             // Automatically pre-fill run minutes in the completion modals based on actual elapsed stopwatch time
             document.querySelectorAll('[id^="completeModal"]').forEach(modal => {
                 modal.addEventListener('show.bs.modal', function () {
-                    // Try to find card relative to modal or match by ID suffix
                     const opId = modal.id.replace('completeModal', '');
                     const block = document.querySelector(`.mes-timer-block[data-start]`);
-
-                    // Fallback to find nearest block using sibling relationships
                     const card = modal.closest('.card') || document.getElementById(`completeModal${opId}`).closest('.card');
                     if (card) {
                         const timerElapsedText = card.querySelector('.timer-elapsed')?.textContent;
@@ -329,15 +326,27 @@
                 });
             });
         });
+
+        function toggleExtraShifts(btn) {
+            const extra = document.getElementById('extra-shifts');
+            const label = document.getElementById('more-shifts-label');
+            if (extra.classList.contains('d-none')) {
+                extra.classList.remove('d-none');
+                label.textContent = @js(__('production.show_less_shifts'));
+            } else {
+                extra.classList.add('d-none');
+                label.textContent = @js(__('production.view_more_shifts')) + ' (' + ({{ $shifts->count() }} - 2) + ')';
+            }
+        }
     </script>
 @endpush
 
 @section('page-actions')
     <a href="{{ route('production.mes.machines.index') }}" class="btn btn-light me-2">
-        <i class="feather-cpu me-2"></i>Machines
+        <i class="feather-cpu me-2"></i>{{ __('production.machines') ?? 'Machines' }}
     </a>
     <a href="{{ route('production.mes.work-centers.index') }}" class="btn btn-light">
-        <i class="feather-settings me-2"></i>Work Centers
+        <i class="feather-settings me-2"></i>{{ __('production.col_work_center') }}
     </a>
 @endsection
 
@@ -350,7 +359,7 @@
 
                 <div class="d-flex align-items-center mb-4">
                     <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
-                        <i class="feather-grid me-2 text-primary"></i>Active Manufacturing Projects
+                        <i class="feather-grid me-2 text-primary"></i>{{ __('production.active_manufacturing_projects') }}
                     </h5>
                     <span class="badge bg-soft-primary text-primary rounded-pill ms-2 fw-bold font-monospace">{{ $activeSchedules->count() }}</span>
                 </div>
@@ -377,14 +386,14 @@
                                     {{ $order->product->name ?? 'Unknown Product' }}
                                 </h6>
                                 <div class="text-muted fs-11">
-                                    Schedule: <strong class="text-secondary">{{ $schedule->schedule_number }}</strong>
+                                    {{ __('production.schedule') }}: <strong class="text-secondary">{{ $schedule->schedule_number }}</strong>
                                     <span class="mx-2">|</span>
-                                    Quantity: <strong class="text-secondary">{{ (int) $order->quantity_ordered }} units</strong>
+                                    {{ __('production.quantity') ?? 'Quantity' }}: <strong class="text-secondary">{{ (int) $order->quantity_ordered }} {{ __('production.units') }}</strong>
                                 </div>
                             </div>
                             <div class="text-end">
                                 <span class="badge bg-soft-success text-success fs-10 px-2 py-1 rounded-pill mb-1">
-                                    {{ $completedOps }} / {{ $totalOps }} Steps Complete
+                                    {{ __('production.steps_complete', ['completed' => $completedOps, 'total' => $totalOps]) }}
                                 </span>
                                 <div class="progress progress-sm bg-white border" style="width: 150px; height: 6px;">
                                     <div class="progress-bar bg-success" role="progressbar" style="width: {{ $progressPercent }}%" aria-valuenow="{{ $progressPercent }}" aria-valuemin="0" aria-valuemax="100"></div>
@@ -394,7 +403,7 @@
 
                         {{-- Card Body: Visual Routing Flow --}}
                         <div class="card-body p-4 bg-white">
-                            <h6 class="fw-bold text-secondary mb-3 fs-11 text-uppercase tracking-wider">Project Routing Sequence</h6>
+                            <h6 class="fw-bold text-secondary mb-3 fs-11 text-uppercase tracking-wider">{{ __('production.project_routing_sequence') }}</h6>
 
                             <div class="mes-progress-track-wrapper">
                                 <div class="mes-progress-track">
@@ -423,6 +432,8 @@
                                                 $stepClass = 'step-ready';
                                                 $stepIcon = 'arrow-right';
                                             }
+                                            $statusKey = 'production.' . $op->status;
+                                            $translatedStatus = __($statusKey) != $statusKey ? __($statusKey) : $op->status;
                                         @endphp
 
                                         <div class="mes-progress-step {{ $stepClass }}">
@@ -435,7 +446,7 @@
                                             <div class="mes-step-subtitle" title="{{ $op->workCenter->name ?? '' }}">
                                                 {{ $op->workCenter->name ?? '' }}
                                             </div>
-                                            <span class="mes-step-status-badge">{{ $op->status }}</span>
+                                            <span class="mes-step-status-badge">{{ $translatedStatus }}</span>
                                         </div>
                                     @endforeach
                                 </div>
@@ -444,7 +455,7 @@
                             {{-- Card Footer: Active Action Area --}}
                             @if($activeOps->count() > 0)
                                 <div class="mt-4 pt-3 border-top">
-                                    <h6 class="fw-bold text-secondary mb-3 fs-11 text-uppercase tracking-wider">Active Shopfloor Controls</h6>
+                                    <h6 class="fw-bold text-secondary mb-3 fs-11 text-uppercase tracking-wider">{{ __('production.active_shopfloor_controls') }}</h6>
 
                                     @foreach($activeOps as $activeOp)
                                         <div class="p-3 bg-light rounded border mb-3">
@@ -455,10 +466,10 @@
                                                         <span class="badge bg-secondary font-monospace fs-10 px-2 py-0.5">Seq {{ $activeOp->sequence }}</span>
                                                     </div>
                                                     <div class="text-muted fs-11 mt-1">
-                                                        <i class="feather-settings me-1"></i>Work Center: <strong>{{ $activeOp->workCenter->name ?? 'Generic' }}</strong>
+                                                        <i class="feather-settings me-1"></i>{{ __('production.work_center') }}: <strong>{{ $activeOp->workCenter->name ?? 'Generic' }}</strong>
                                                         @if($activeOp->machine)
                                                             <span class="mx-1">&middot;</span>
-                                                            <i class="feather-cpu me-1"></i>Machine: <strong>{{ $activeOp->machine->name }}</strong>
+                                                            <i class="feather-cpu me-1"></i>{{ __('production.col_machine') ?? 'Machine' }}: <strong>{{ $activeOp->machine->name }}</strong>
                                                         @endif
                                                     </div>
                                                 </div>
@@ -477,12 +488,12 @@
                                                              data-server-time="{{ now()->toISOString() }}">
                                                             <div class="d-flex justify-content-between gap-3">
                                                                 <div>
-                                                                    <small class="text-muted text-uppercase d-block fs-8 fw-bold">Stopwatch</small>
+                                                                    <small class="text-muted text-uppercase d-block fs-8 fw-bold">{{ __('production.stopwatch') }}</small>
                                                                     <span class="timer-elapsed font-monospace fw-bold text-dark fs-12">00:00:00</span>
                                                                 </div>
                                                                 <div class="border-end"></div>
                                                                 <div>
-                                                                    <small class="text-muted text-uppercase d-block fs-8 fw-bold">Countdown</small>
+                                                                    <small class="text-muted text-uppercase d-block fs-8 fw-bold">{{ __('production.countdown') }}</small>
                                                                     <span class="timer-remaining font-monospace fw-bold text-success fs-12">00:00:00</span>
                                                                 </div>
                                                             </div>
@@ -492,18 +503,18 @@
                                                             <form method="POST" action="{{ route('production.mes.pause', $activeOp->id) }}">
                                                                 @csrf
                                                                 <button type="submit" class="btn btn-sm btn-warning text-dark px-3 fw-semibold">
-                                                                    <i class="feather-pause me-1"></i>Pause
+                                                                    <i class="feather-pause me-1"></i>{{ __('production.pause') }}
                                                                 </button>
                                                             </form>
                                                             <button type="button" class="btn btn-sm btn-success px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#completeModal{{ $activeOp->id }}">
-                                                                <i class="feather-check-circle me-1"></i>Complete
-                                                                </button>
+                                                                <i class="feather-check-circle me-1"></i>{{ __('production.complete') }}
+                                                            </button>
                                                         </div>
 
                                                     @elseif($activeOp->status === 'paused')
                                                         {{-- Paused display --}}
                                                         <div class="bg-white px-3 py-2 rounded border text-center" style="min-width: 200px;">
-                                                            <span class="text-danger fw-bold fs-12 d-block"><i class="feather-pause-circle me-1"></i>Paused</span>
+                                                            <span class="text-danger fw-bold fs-12 d-block"><i class="feather-pause-circle me-1"></i>{{ __('production.paused') }}</span>
                                                             <small class="text-muted fs-10 italic">"{{ $activeOp->remarks ?? 'No remarks' }}"</small>
                                                         </div>
 
@@ -511,11 +522,11 @@
                                                             <form method="POST" action="{{ route('production.mes.resume', $activeOp->id) }}">
                                                                 @csrf
                                                                 <button type="submit" class="btn btn-sm btn-primary px-3 fw-semibold">
-                                                                    <i class="feather-play me-1"></i>Resume
+                                                                    <i class="feather-play me-1"></i>{{ __('production.resume') }}
                                                                 </button>
                                                             </form>
                                                             <button type="button" class="btn btn-sm btn-success px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#completeModal{{ $activeOp->id }}">
-                                                                <i class="feather-check-circle me-1"></i>Complete
+                                                                <i class="feather-check-circle me-1"></i>{{ __('production.complete') }}
                                                             </button>
                                                         </div>
 
@@ -524,7 +535,7 @@
                                                         <form method="POST" action="{{ route('production.mes.start', $activeOp->id) }}">
                                                             @csrf
                                                             <button type="submit" class="btn btn-sm btn-success px-4 py-2 fw-bold shadow-sm">
-                                                                <i class="feather-play me-1"></i>Start Operation
+                                                                <i class="feather-play me-1"></i>{{ __('production.start_operation') }}
                                                             </button>
                                                         </form>
                                                     @endif
@@ -547,8 +558,7 @@
                                 $elapsedSecs = max(0, now()->timestamp - $activeOp->actual_start->timestamp - $activeOp->accumulated_paused_seconds);
                             }
                             $elapsedMinutes = round($elapsedSecs / 60, 1);
-                        @endphp
-                        @php
+                            
                             $activeScrapQty = max(
                                 (float) ($activeOp->orderOperation->quantity_scrapped ?? 0.0),
                                 (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $activeOp->tenant_id ?? require_tenant_id())
@@ -558,34 +568,34 @@
                             );
                             $activeRemainingToComplete = max(0.0, ($activeOp->schedule->order->quantity_ordered ?? 0.0) - (($activeOp->orderOperation->quantity_produced ?? 0.0) + $activeScrapQty + ($activeOp->orderOperation->quantity_rejected ?? 0.0)));
                         @endphp
-                        <x-ui.modal id="completeModal{{ $activeOp->id }}" title="Log Production Progress — {{ $activeOp->orderOperation->name ?? 'Op #' . $activeOp->sequence }}" class="text-start">
+                        <x-ui.modal id="completeModal{{ $activeOp->id }}" title="{{ __('production.log_production_progress') }} — {{ $activeOp->orderOperation->name ?? 'Op #' . $activeOp->sequence }}" class="text-start">
                             <form method="POST" action="{{ route('production.mes.complete', $activeOp->id) }}" id="completeForm{{ $activeOp->id }}">
                                 @csrf
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Qty Produced" name="quantity_produced" inputType="number" step="any" value="{{ $activeRemainingToComplete }}" :required="true" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('production.produced') }}" name="quantity_produced" inputType="number" step="any" value="{{ $activeRemainingToComplete }}" :required="true" />
                                     </div>
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Qty Rejected" name="quantity_rejected" inputType="number" step="any" value="0" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('production.rejects') ?? 'Qty Rejected' }}" name="quantity_rejected" inputType="number" step="any" value="0" />
                                     </div>
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Qty Scrapped" name="quantity_scrapped" inputType="number" step="any" value="0" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('production.scrapped') ?? 'Qty Scrapped' }}" name="quantity_scrapped" inputType="number" step="any" value="0" />
                                     </div>
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Setup Time (min)" name="setup_minutes" inputType="number" step="any" value="0" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('production.setup_adjustment') }} (min)" name="setup_minutes" inputType="number" step="any" value="0" />
                                     </div>
                                     <div class="col-md-12">
-                                        <x-ui.odoo-form-ui type="input" label="Run Time (min)" name="run_minutes" inputType="number" step="any" value="{{ $elapsedMinutes }}" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('production.run_time_min') }}" name="run_minutes" inputType="number" step="any" value="{{ $elapsedMinutes }}" />
                                     </div>
                                     <div class="col-md-12">
-                                        <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" placeholder="Optional completion notes..." />
+                                        <x-ui.odoo-form-ui type="textarea" label="{{ __('production.revision_notes') ?? 'Remarks' }}" name="remarks" placeholder="Optional completion notes..." />
                                     </div>
                                 </div>
                             </form>
                             <x-slot name="footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
                                 <button type="submit" class="btn btn-success px-4" onclick="document.getElementById('completeForm{{ $activeOp->id }}').submit();">
-                                    <i class="feather-check me-1"></i>Complete Operation
+                                    <i class="feather-check me-1"></i>{{ __('production.complete') }}
                                 </button>
                             </x-slot>
                         </x-ui.modal>
@@ -595,8 +605,8 @@
                         <div class="avatar-text avatar-lg bg-soft-light text-muted rounded mx-auto mb-3">
                             <i class="feather-grid fs-28"></i>
                         </div>
-                        <h6 class="fw-bold text-dark">No active projects running</h6>
-                        <p class="text-muted fs-12 mb-0">Create and release a production schedule to see the visual routing flows here.</p>
+                        <h6 class="fw-bold text-dark">{{ __('production.no_active_projects') }}</h6>
+                        <p class="text-muted fs-12 mb-0">{{ __('production.create_release_schedule_desc') }}</p>
                     </div>
                 @endforelse
             </div>
@@ -607,18 +617,18 @@
                 {{-- Side Widget A: Stats Summary --}}
                 <div class="card border-0 shadow-sm mb-4 sidebar-widget">
                     <div class="card-body p-4">
-                        <h6 class="fw-bold text-dark mb-3"><i class="feather-pie-chart text-primary me-2"></i>Performance Tracking</h6>
+                        <h6 class="fw-bold text-dark mb-3"><i class="feather-pie-chart text-primary me-2"></i>{{ __('production.performance_tracking') }}</h6>
                         <div class="row g-2">
                             <div class="col-6">
                                 <div class="bg-light p-3 rounded text-center border">
                                     <span class="fs-20 fw-bold text-success">{{ $completedToday }}</span>
-                                    <span class="text-muted text-uppercase fs-9 d-block mt-1 font-monospace fw-bold">Done Today</span>
+                                    <span class="text-muted text-uppercase fs-9 d-block mt-1 font-monospace fw-bold">{{ __('production.done_today') }}</span>
                                 </div>
                             </div>
                             <div class="col-6">
                                 <div class="bg-light p-3 rounded text-center border">
                                     <span class="fs-20 fw-bold text-warning">{{ $running->count() }}</span>
-                                    <span class="text-muted text-uppercase fs-9 d-block mt-1 font-monospace fw-bold">Active Ops</span>
+                                    <span class="text-muted text-uppercase fs-9 d-block mt-1 font-monospace fw-bold">{{ __('production.active_ops') }}</span>
                                 </div>
                             </div>
                         </div>
@@ -628,15 +638,15 @@
                 {{-- Side Widget B: Quick Scan Shortcuts --}}
                 <div class="card border-0 shadow-sm mb-4 sidebar-widget">
                     <div class="card-body p-4">
-                        <h6 class="fw-bold text-dark mb-3"><i class="feather-maximize text-secondary me-2"></i>Shop Floor Scan Center</h6>
+                        <h6 class="fw-bold text-dark mb-3"><i class="feather-maximize text-secondary me-2"></i>{{ __('production.shop_floor_scan_center') }}</h6>
                         <div class="list-group list-group-flush mb-0">
                             <a href="{{ route('production.mes.scanner.index') }}" class="list-group-item list-group-item-action d-flex align-items-center px-0 py-3">
                                 <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded me-3">
                                     <i class="feather-maximize"></i>
                                 </div>
                                 <div class="flex-grow-1">
-                                    <div class="fs-13 fw-semibold text-dark">Barcode Scanner</div>
-                                    <small class="text-muted">Simulate scan actions for parts</small>
+                                    <div class="fs-13 fw-semibold text-dark">{{ __('production.barcode_scanner') }}</div>
+                                    <small class="text-muted">{{ __('production.simulate_scan_actions') }}</small>
                                 </div>
                                 <i class="feather-chevron-right text-muted fs-12"></i>
                             </a>
@@ -645,8 +655,8 @@
                                     <i class="feather-git-commit"></i>
                                 </div>
                                 <div class="flex-grow-1">
-                                    <div class="fs-13 fw-semibold text-dark">Lot Traceability</div>
-                                    <small class="text-muted">Trace component origins</small>
+                                    <div class="fs-13 fw-semibold text-dark">{{ __('production.lot_traceability') }}</div>
+                                    <small class="text-muted">{{ __('production.trace_component_origins') }}</small>
                                 </div>
                                 <i class="feather-chevron-right text-muted fs-12"></i>
                             </a>
@@ -655,8 +665,8 @@
                                     <i class="feather-list"></i>
                                 </div>
                                 <div class="flex-grow-1">
-                                    <div class="fs-13 fw-semibold text-dark">Scan Logs</div>
-                                    <small class="text-muted">View historical scans</small>
+                                    <div class="fs-13 fw-semibold text-dark">{{ __('production.scan_logs') }}</div>
+                                    <small class="text-muted">{{ __('production.view_historical_scans') }}</small>
                                 </div>
                                 <i class="feather-chevron-right text-muted fs-12"></i>
                             </a>
@@ -664,33 +674,63 @@
                     </div>
                 </div>
 
-                {{-- Side Widget C: Shifts Integration --}}
+                {{-- Side Widget C: Active Shifts (Showing max 2 by default + View More toggle) --}}
                 <div class="card border-0 shadow-sm sidebar-widget">
                     <div class="card-body p-4">
                         <div class="d-flex align-items-center mb-3">
-                            <h6 class="fw-bold text-dark mb-0"><i class="feather-sun me-2 text-warning"></i>Active Shifts</h6>
+                            <h6 class="fw-bold text-dark mb-0"><i class="feather-sun me-2 text-warning"></i>{{ __('production.active_shifts') }}</h6>
                             <a href="{{ route('production.shifts.index') }}" class="btn btn-xs btn-outline-primary ms-auto">
-                                <i class="feather-settings me-1"></i>Manage
+                                <i class="feather-settings me-1"></i>{{ __('production.manage') }}
                             </a>
                         </div>
                         @if($shifts->count() > 0)
+                            @php
+                                $initialShifts = $shifts->take(2);
+                                $remainingShifts = $shifts->slice(2);
+                            @endphp
+
                             <div class="d-flex flex-column gap-2">
-                                @foreach($shifts as $sf)
+                                @foreach($initialShifts as $sf)
                                     <div class="bg-light p-3 rounded border">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <span class="font-monospace fw-bold text-primary fs-11">{{ $sf->code }}</span>
                                             @if($sf->active)
-                                                <span class="badge bg-soft-success text-success fs-9 rounded-pill px-2">Active</span>
+                                                <span class="badge bg-soft-success text-success fs-9 rounded-pill px-2">{{ __('production.status_active') }}</span>
                                             @endif
                                         </div>
                                         <h6 class="fw-semibold text-dark mb-1 fs-12">{{ $sf->name }}</h6>
                                         <div class="text-muted fs-11">
                                             <i class="feather-clock me-1"></i>{{ substr($sf->start_time, 0, 5) }} - {{ substr($sf->end_time, 0, 5) }}
                                             <span class="mx-1">&middot;</span>
-                                            <span>Break: {{ $sf->break_minutes }}m</span>
+                                            <span>{{ __('production.break') }}: {{ $sf->break_minutes }}m</span>
                                         </div>
                                     </div>
                                 @endforeach
+
+                                @if($remainingShifts->count() > 0)
+                                    <div id="extra-shifts" class="d-none d-flex flex-column gap-2">
+                                        @foreach($remainingShifts as $sf)
+                                            <div class="bg-light p-3 rounded border">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="font-monospace fw-bold text-primary fs-11">{{ $sf->code }}</span>
+                                                    @if($sf->active)
+                                                        <span class="badge bg-soft-success text-success fs-9 rounded-pill px-2">{{ __('production.status_active') }}</span>
+                                                    @endif
+                                                </div>
+                                                <h6 class="fw-semibold text-dark mb-1 fs-12">{{ $sf->name }}</h6>
+                                                <div class="text-muted fs-11">
+                                                    <i class="feather-clock me-1"></i>{{ substr($sf->start_time, 0, 5) }} - {{ substr($sf->end_time, 0, 5) }}
+                                                    <span class="mx-1">&middot;</span>
+                                                    <span>{{ __('production.break') }}: {{ $sf->break_minutes }}m</span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    <button type="button" class="btn btn-sm btn-link text-primary p-0 mt-2 fw-semibold text-decoration-none text-start" onclick="toggleExtraShifts(this)">
+                                        <span id="more-shifts-label">{{ __('production.view_more_shifts') }} ({{ $remainingShifts->count() }})</span>
+                                    </button>
+                                @endif
                             </div>
                         @else
                             <div class="text-center py-4 text-muted fs-12">

@@ -221,6 +221,7 @@ Route::prefix('production')
         Route::get('intelligence/work-centers', [ManufacturingDashboardController::class, 'workCenterDashboard'])->name('intelligence.work-centers');
         Route::post('intelligence/dashboard/preferences', [ManufacturingDashboardController::class, 'savePreferences'])->name('intelligence.dashboard.preferences');
         Route::get('intelligence/andon', [AndonController::class, 'index'])->name('intelligence.andon');
+        Route::get('intelligence/andon/data', [AndonController::class, 'data'])->name('intelligence.andon.data');
         Route::get('intelligence/analytics', [AnalyticsController::class, 'historical'])->name('intelligence.analytics');
         Route::get('intelligence/reports', [ReportsController::class, 'index'])->name('intelligence.reports.index');
         Route::get('intelligence/reports/{type}', [ReportsController::class, 'show'])->name('intelligence.reports.show');

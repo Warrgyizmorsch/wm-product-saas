@@ -1,17 +1,17 @@
 @extends('layouts.duralux')
 
-@section('title', 'Work Center Queue | SaaS ERP')
-@section('page-title', $workCenter->name . ' — Execution Queue')
-@section('breadcrumb', 'Work Center Queue')
+@section('title', __('production.work_center_queue') . ' | SaaS ERP')
+@section('page-title', $workCenter->name . ' — ' . __('production.ordered_execution_queue'))
+@section('breadcrumb', __('production.work_center_queue'))
 
 @section('page-actions')
     <a href="{{ route('production.mes.work-centers.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>All Work Centers
+        <i class="feather-arrow-left me-2"></i>{{ __('production.col_work_center') }}
     </a>
 @endsection
 
 @section('content')
-    <div class="erp-single-panel bg-white">
+    <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
 
         {{-- Header --}}
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
@@ -29,42 +29,34 @@
         {{-- Stats Cards --}}
         <div class="row g-3 mb-4">
             <div class="col-md-3">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body py-3 text-center">
-                        <div class="fs-22 fw-bold text-warning">{{ $queue->where('status', 'running')->count() }}</div>
-                        <div class="fs-11 text-muted text-uppercase">Running Jobs</div>
-                    </div>
-                </div>
+                <x-ui.card class="border-0 shadow-sm text-center py-1">
+                    <div class="fs-22 fw-bold text-warning">{{ $queue->where('status', 'running')->count() }}</div>
+                    <div class="fs-11 text-muted text-uppercase">{{ __('production.running_jobs') }}</div>
+                </x-ui.card>
             </div>
             <div class="col-md-3">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body py-3 text-center">
-                        <div class="fs-22 fw-bold text-info">{{ $queue->where('status', 'ready')->count() + $queue->where('status', 'waiting')->count() }}</div>
-                        <div class="fs-11 text-muted text-uppercase">Queued</div>
-                    </div>
-                </div>
+                <x-ui.card class="border-0 shadow-sm text-center py-1">
+                    <div class="fs-22 fw-bold text-info">{{ $queue->where('status', 'ready')->count() + $queue->where('status', 'waiting')->count() }}</div>
+                    <div class="fs-11 text-muted text-uppercase">{{ __('production.queued') }}</div>
+                </x-ui.card>
             </div>
             <div class="col-md-3">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body py-3 text-center">
-                        <div class="fs-22 fw-bold text-success">{{ $completedToday }}</div>
-                        <div class="fs-11 text-muted text-uppercase">Done Today</div>
-                    </div>
-                </div>
+                <x-ui.card class="border-0 shadow-sm text-center py-1">
+                    <div class="fs-22 fw-bold text-success">{{ $completedToday }}</div>
+                    <div class="fs-11 text-muted text-uppercase">{{ __('production.done_today') }}</div>
+                </x-ui.card>
             </div>
             <div class="col-md-3">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body py-3 text-center">
-                        <div class="fs-22 fw-bold text-primary">{{ $utilization }}%</div>
-                        <div class="fs-11 text-muted text-uppercase">Utilization</div>
-                    </div>
-                </div>
+                <x-ui.card class="border-0 shadow-sm text-center py-1">
+                    <div class="fs-22 fw-bold text-primary">{{ $utilization }}%</div>
+                    <div class="fs-11 text-muted text-uppercase">{{ __('production.utilization') }}</div>
+                </x-ui.card>
             </div>
         </div>
 
         {{-- Ordered Execution Queue --}}
         <h5 class="fw-bold text-dark mb-3">
-            <i class="feather-list me-2"></i>Ordered Execution Queue
+            <i class="feather-list me-2"></i>{{ __('production.ordered_execution_queue') }}
         </h5>
 
         @if($queue->count() > 0)
@@ -73,17 +65,21 @@
                     <thead>
                         <tr>
                             <th style="width: 5%" class="text-center">#</th>
-                            <th style="width: 15%">Order #</th>
-                            <th style="width: 20%">Product</th>
-                            <th style="width: 18%">Operation</th>
-                            <th style="width: 10%">Machine</th>
-                            <th style="width: 12%">Planned Start</th>
-                            <th style="width: 12%">Planned Finish</th>
-                            <th style="width: 10%">Status</th>
+                            <th style="width: 15%">{{ __('production.order_hash') }}</th>
+                            <th style="width: 20%">{{ __('production.col_product') }}</th>
+                            <th style="width: 18%">{{ __('production.col_operation') }}</th>
+                            <th style="width: 10%">{{ __('production.col_machine') }}</th>
+                            <th style="width: 12%">{{ __('production.planned_start') }}</th>
+                            <th style="width: 12%">{{ __('production.planned_finish') }}</th>
+                            <th style="width: 10%">{{ __('production.status') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($queue as $position => $op)
+                            @php
+                                $statusKey = 'production.' . $op->status;
+                                $translatedStatus = __($statusKey) != $statusKey ? __($statusKey) : $op->status;
+                            @endphp
                             <tr class="{{ $op->status === 'running' ? 'table-warning' : '' }}">
                                 <td class="fw-bold text-center align-middle">{{ $position + 1 }}</td>
                                 <td class="align-middle">
@@ -103,13 +99,13 @@
                                 <td class="align-middle fs-12 text-muted">{{ $op->planned_finish->format('d/m H:i') }}</td>
                                 <td class="align-middle">
                                     @if($op->status === 'running')
-                                        <span class="badge bg-soft-warning text-warning">Running</span>
+                                        <span class="badge bg-soft-warning text-warning">{{ $translatedStatus }}</span>
                                     @elseif($op->status === 'ready')
-                                        <span class="badge bg-soft-info text-info">Ready</span>
+                                        <span class="badge bg-soft-info text-info">{{ $translatedStatus }}</span>
                                     @elseif($op->status === 'waiting')
-                                        <span class="erp-badge-draft">Waiting</span>
+                                        <span class="erp-badge-draft">{{ $translatedStatus }}</span>
                                     @else
-                                        <span class="badge bg-soft-secondary text-secondary text-capitalize">{{ $op->status }}</span>
+                                        <span class="badge bg-soft-secondary text-secondary text-capitalize">{{ $translatedStatus }}</span>
                                     @endif
                                 </td>
                             </tr>
@@ -127,11 +123,11 @@
         <div class="mt-4 p-3 bg-light rounded">
             <div class="d-flex justify-content-between mb-2">
                 <div>
-                    <span class="fw-semibold text-dark fs-12">Actual Runtime Utilization Today</span>
-                    <span class="badge bg-soft-info text-info fs-11 ms-2">Real-time MES</span>
+                    <span class="fw-semibold text-dark fs-12">{{ __('production.actual_runtime_utilization_today') }}</span>
+                    <span class="badge bg-soft-info text-info fs-11 ms-2">{{ __('production.realtime_mes') }}</span>
                 </div>
                 <span class="fw-bold text-primary fs-12">
-                    {{ $actualUtilization }}% ({{ number_format($actualMinutesToday, 1) }} / {{ number_format($availableMinutes, 0) }} min worked today)
+                    {{ $actualUtilization }}% ({{ number_format($actualMinutesToday, 1) }} / {{ number_format($availableMinutes, 0) }} min)
                 </span>
             </div>
             <div class="progress mb-2" style="height: 8px;">
@@ -146,9 +142,9 @@
             <div class="d-flex justify-content-between align-items-center text-muted fs-11 mt-2 border-top pt-2">
                 <span>
                     <i class="feather-calendar me-1"></i>
-                    <strong>Planned Shift Commitment:</strong> {{ $plannedUtilization }}% ({{ number_format($plannedMinutesToday, 0) }} min allocated)
+                    <strong>{{ __('production.planned_shift_commitment') }}:</strong> {{ $plannedUtilization }}% ({{ number_format($plannedMinutesToday, 0) }} min allocated)
                     @if($totalQueueMinutes > 0)
-                        &middot; <span class="font-monospace">Total Queue Backlog: {{ number_format($totalQueueMinutes, 0) }} min</span>
+                        &middot; <span class="font-monospace">{{ __('production.total_queue_backlog') }}: {{ number_format($totalQueueMinutes, 0) }} min</span>
                     @endif
                 </span>
                 <span>

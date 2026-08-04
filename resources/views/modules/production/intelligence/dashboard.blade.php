@@ -54,18 +54,18 @@
                     <div class="card border border-light h-100 shadow-sm">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="text-uppercase text-muted fw-bold mb-0">Overall Equipment Effectiveness (OEE)</h6>
+                                <h6 class="text-uppercase text-muted fw-bold mb-0">{{ __('production.overall_equipment_effectiveness') }}</h6>
                                 <span class="badge {{ $oeeKpi['status'] === 'Above Target' ? 'bg-soft-success text-success' : 'bg-soft-danger text-danger' }}">
-                                    {{ $oeeKpi['status'] }}
+                                    {{ __('production.status_' . Str::snake(Str::lower($oeeKpi['status']))) != 'production.status_' . Str::snake(Str::lower($oeeKpi['status'])) ? __('production.status_' . Str::snake(Str::lower($oeeKpi['status']))) : $oeeKpi['status'] }}
                                 </span>
                             </div>
                             <h2 class="fw-bold text-dark mb-2">{{ $oeeKpi['current_value'] }}%</h2>
                             <div class="text-muted fs-13">
-                                Target: <strong>{{ $oeeKpi['target_value'] }}%</strong> | 
-                                Variance: <span class="{{ $oeeKpi['variance'] >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold' }}">{{ $oeeKpi['variance'] >= 0 ? '+' : '' }}{{ $oeeKpi['variance'] }}%</span>
+                                {{ __('production.target') }}: <strong>{{ $oeeKpi['target_value'] }}%</strong> | 
+                                {{ __('production.variance') }}: <span class="{{ $oeeKpi['variance'] >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold' }}">{{ $oeeKpi['variance'] >= 0 ? '+' : '' }}{{ $oeeKpi['variance'] }}%</span>
                             </div>
-                            <div class="progress mt-3" style="height: 6px;">
-                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ $oeeKpi['current_value'] }}%"></div>
+                            <div class="mt-3">
+                                <x-ui.progress-bar :value="$oeeKpi['current_value']" color="primary" height="6px" />
                             </div>
                         </div>
                     </div>
@@ -78,16 +78,16 @@
                     <div class="card border border-light h-100 shadow-sm">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="text-uppercase text-muted fw-bold mb-0">Production Volume</h6>
-                                <span class="badge bg-soft-info text-info">Steady</span>
+                                <h6 class="text-uppercase text-muted fw-bold mb-0">{{ __('production.production_volume') }}</h6>
+                                <span class="badge bg-soft-info text-info">{{ __('production.steady') }}</span>
                             </div>
-                            <h2 class="fw-bold text-dark mb-2">{{ $data['production_summary']['actual_quantity'] }} units</h2>
+                            <h2 class="fw-bold text-dark mb-2">{{ $data['production_summary']['actual_quantity'] }} {{ __('production.units') }}</h2>
                             <div class="text-muted fs-13">
-                                Planned: <strong>{{ $data['production_summary']['planned_quantity'] }} units</strong> |
-                                Adherence: <strong>{{ $data['production_summary']['schedule_adherence'] }}%</strong>
+                                {{ __('production.planned') }}: <strong>{{ $data['production_summary']['planned_quantity'] }} {{ __('production.units') }}</strong> |
+                                {{ __('production.adherence') }}: <strong>{{ $data['production_summary']['schedule_adherence'] }}%</strong>
                             </div>
-                            <div class="progress mt-3" style="height: 6px;">
-                                <div class="progress-bar bg-info" role="progressbar" style="width: {{ $data['production_summary']['schedule_adherence'] }}%"></div>
+                            <div class="mt-3">
+                                <x-ui.progress-bar :value="$data['production_summary']['schedule_adherence']" color="info" height="6px" />
                             </div>
                         </div>
                     </div>
@@ -100,18 +100,18 @@
                     <div class="card border border-light h-100 shadow-sm">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="text-uppercase text-muted fw-bold mb-0">Today's Downtime</h6>
+                                <h6 class="text-uppercase text-muted fw-bold mb-0">{{ __('production.todays_downtime') }}</h6>
                                 <span class="badge {{ $downtimeKpi['status'] === 'Above Target' ? 'bg-soft-success text-success' : 'bg-soft-danger text-danger' }}">
-                                    {{ $downtimeKpi['status'] }}
+                                    {{ __('production.status_' . Str::snake(Str::lower($downtimeKpi['status']))) != 'production.status_' . Str::snake(Str::lower($downtimeKpi['status'])) ? __('production.status_' . Str::snake(Str::lower($downtimeKpi['status']))) : $downtimeKpi['status'] }}
                                 </span>
                             </div>
                             <h2 class="fw-bold text-dark mb-2">{{ $downtimeKpi['current_value'] }}%</h2>
                             <div class="text-muted fs-13">
-                                Target Limit: <strong>{{ $downtimeKpi['target_value'] }}%</strong> |
-                                Variance: <span class="{{ $downtimeKpi['variance'] <= 0 ? 'text-success fw-bold' : 'text-danger fw-bold' }}">{{ $downtimeKpi['variance'] >= 0 ? '+' : '' }}{{ $downtimeKpi['variance'] }}%</span>
+                                {{ __('production.target_limit') }}: <strong>{{ $downtimeKpi['target_value'] }}%</strong> |
+                                {{ __('production.variance') }}: <span class="{{ $downtimeKpi['variance'] <= 0 ? 'text-success fw-bold' : 'text-danger fw-bold' }}">{{ $downtimeKpi['variance'] >= 0 ? '+' : '' }}{{ $downtimeKpi['variance'] }}%</span>
                             </div>
-                            <div class="progress mt-3" style="height: 6px;">
-                                <div class="progress-bar bg-danger" role="progressbar" style="width: {{ $downtimeKpi['current_value'] }}%"></div>
+                            <div class="mt-3">
+                                <x-ui.progress-bar :value="$downtimeKpi['current_value']" color="danger" height="6px" />
                             </div>
                         </div>
                     </div>
@@ -123,90 +123,91 @@
                 <div class="col-md-6" data-widget="scrap_rejects">
                     <div class="card border border-light shadow-sm">
                         <div class="card-body">
-                            <h6 class="text-uppercase text-muted fw-bold mb-3">Production Yield & Waste Analysis</h6>
+                            <h6 class="text-uppercase text-muted fw-bold mb-3">{{ __('production.yield_waste_analysis') }}</h6>
                             <div class="row text-center mb-3">
                                 <div class="col">
-                                    <div class="text-muted fs-11 text-uppercase">Yield Rate</div>
+                                    <div class="text-muted fs-11 text-uppercase">{{ __('production.yield_rate') }}</div>
                                     <h4 class="fw-bold text-success">{{ $data['scrap_stats']['yield'] }}%</h4>
                                 </div>
                                 <div class="col">
-                                    <div class="text-muted fs-11 text-uppercase">Scrap Rate</div>
+                                    <div class="text-muted fs-11 text-uppercase">{{ __('production.scrap_rate') }}</div>
                                     <h4 class="fw-bold text-danger">{{ $data['scrap_stats']['scrap_rate'] }}%</h4>
                                 </div>
                                 <div class="col">
-                                    <div class="text-muted fs-11 text-uppercase">Rejects Rate</div>
+                                    <div class="text-muted fs-11 text-uppercase">{{ __('production.rejects_rate') }}</div>
                                     <h4 class="fw-bold text-warning">{{ $data['scrap_stats']['reject_rate'] }}%</h4>
                                 </div>
                             </div>
                             <div class="text-muted fs-13">
-                                Target Scrap Limit: <strong>{{ $scrapKpi['target_value'] }}%</strong> |
-                                Variance: <span class="{{ $scrapKpi['variance'] <= 0 ? 'text-success fw-bold' : 'text-danger fw-bold' }}">{{ $scrapKpi['variance'] >= 0 ? '+' : '' }}{{ $scrapKpi['variance'] }}%</span>
+                                {{ __('production.target_scrap_limit') }}: <strong>{{ $scrapKpi['target_value'] }}%</strong> |
+                                {{ __('production.variance') }}: <span class="{{ $scrapKpi['variance'] <= 0 ? 'text-success fw-bold' : 'text-danger fw-bold' }}">{{ $scrapKpi['variance'] >= 0 ? '+' : '' }}{{ $scrapKpi['variance'] }}%</span>
                             </div>
                         </div>
                     </div>
                 </div>
             @endif
 
-            {{-- Six Big Losses breakdown chart placeholder --}}
+            {{-- Six Big Losses breakdown chart --}}
             <div class="col-md-6">
                 <div class="card border border-light shadow-sm">
                     <div class="card-body">
-                        <h6 class="text-uppercase text-muted fw-bold mb-3">OEE Loss Analysis (Six Big Losses)</h6>
+                        <h6 class="text-uppercase text-muted fw-bold mb-3">{{ __('production.oee_loss_analysis') }}</h6>
+                        
+                        @php
+                            $losses = $data['six_big_losses'] ?? [
+                                'equipment_failure_minutes' => 0,
+                                'setup_adjustment_minutes' => 0,
+                                'minor_stops_minutes' => 0,
+                                'reduced_speed_minutes' => 0,
+                                'startup_rejects_count' => 0,
+                                'production_rejects_count' => 0,
+                            ];
+                            $maxMins = max(1, $losses['equipment_failure_minutes'] + $losses['setup_adjustment_minutes'] + $losses['minor_stops_minutes'] + $losses['reduced_speed_minutes']);
+                            $maxUnits = max(1, $losses['startup_rejects_count'] + $losses['production_rejects_count']);
+                        @endphp
                         
                         <div class="space-y-3">
                             <div>
                                 <div class="d-flex justify-content-between fs-12 mb-1">
-                                    <span>Equipment Failure (Breakdowns)</span>
-                                    <strong>15 mins</strong>
+                                    <span>{{ __('production.equipment_failure_breakdowns') }}</span>
+                                    <strong>{{ number_format($losses['equipment_failure_minutes'], 0) }} {{ __('production.mins') }}</strong>
                                 </div>
-                                <div class="progress" style="height: 5px;">
-                                    <div class="progress-bar bg-danger" role="progressbar" style="width: 35%"></div>
-                                </div>
+                                <x-ui.progress-bar :value="($losses['equipment_failure_minutes'] / $maxMins) * 100" color="danger" height="5px" />
                             </div>
                             <div class="mt-2">
                                 <div class="d-flex justify-content-between fs-12 mb-1">
-                                    <span>Setup & Adjustment</span>
-                                    <strong>25 mins</strong>
+                                    <span>{{ __('production.setup_adjustment') }}</span>
+                                    <strong>{{ number_format($losses['setup_adjustment_minutes'], 0) }} {{ __('production.mins') }}</strong>
                                 </div>
-                                <div class="progress" style="height: 5px;">
-                                    <div class="progress-bar bg-warning" role="progressbar" style="width: 50%"></div>
-                                </div>
+                                <x-ui.progress-bar :value="($losses['setup_adjustment_minutes'] / $maxMins) * 100" color="warning" height="5px" />
                             </div>
                             <div class="mt-2">
                                 <div class="d-flex justify-content-between fs-12 mb-1">
-                                    <span>Minor Stops & Idling</span>
-                                    <strong>8 mins</strong>
+                                    <span>{{ __('production.minor_stops_idling') }}</span>
+                                    <strong>{{ number_format($losses['minor_stops_minutes'], 0) }} {{ __('production.mins') }}</strong>
                                 </div>
-                                <div class="progress" style="height: 5px;">
-                                    <div class="progress-bar bg-info" role="progressbar" style="width: 20%"></div>
-                                </div>
+                                <x-ui.progress-bar :value="($losses['minor_stops_minutes'] / $maxMins) * 100" color="info" height="5px" />
                             </div>
                             <div class="mt-2">
                                 <div class="d-flex justify-content-between fs-12 mb-1">
-                                    <span>Reduced Speed Losses</span>
-                                    <strong>12 mins</strong>
+                                    <span>{{ __('production.reduced_speed_losses') }}</span>
+                                    <strong>{{ number_format($losses['reduced_speed_minutes'], 0) }} {{ __('production.mins') }}</strong>
                                 </div>
-                                <div class="progress" style="height: 5px;">
-                                    <div class="progress-bar bg-primary" role="progressbar" style="width: 30%"></div>
-                                </div>
+                                <x-ui.progress-bar :value="($losses['reduced_speed_minutes'] / $maxMins) * 100" color="primary" height="5px" />
                             </div>
                             <div class="mt-2">
                                 <div class="d-flex justify-content-between fs-12 mb-1">
-                                    <span>Startup Rejects</span>
-                                    <strong>3 units</strong>
+                                    <span>{{ __('production.startup_rejects') }}</span>
+                                    <strong>{{ number_format($losses['startup_rejects_count'], 0) }} {{ __('production.units') }}</strong>
                                 </div>
-                                <div class="progress" style="height: 5px;">
-                                    <div class="progress-bar bg-secondary" role="progressbar" style="width: 10%"></div>
-                                </div>
+                                <x-ui.progress-bar :value="($losses['startup_rejects_count'] / $maxUnits) * 100" color="secondary" height="5px" />
                             </div>
                             <div class="mt-2">
                                 <div class="d-flex justify-content-between fs-12 mb-1">
-                                    <span>Production Rejects</span>
-                                    <strong>8 units</strong>
+                                    <span>{{ __('production.production_rejects') }}</span>
+                                    <strong>{{ number_format($losses['production_rejects_count'], 0) }} {{ __('production.units') }}</strong>
                                 </div>
-                                <div class="progress" style="height: 5px;">
-                                    <div class="progress-bar bg-dark" role="progressbar" style="width: 25%"></div>
-                                </div>
+                                <x-ui.progress-bar :value="($losses['production_rejects_count'] / $maxUnits) * 100" color="dark" height="5px" />
                             </div>
                         </div>
                     </div>
@@ -218,27 +219,27 @@
                 <div class="col-md-12" data-widget="utilization_charts">
                     <div class="card border border-light shadow-sm">
                         <div class="card-body">
-                            <h6 class="text-uppercase text-muted fw-bold mb-3">Asset Capacity Utilizations</h6>
+                            <h6 class="text-uppercase text-muted fw-bold mb-3">{{ __('production.asset_capacity_utilizations') }}</h6>
                             <div class="row text-center">
                                 <div class="col-md-4">
-                                    <div class="fs-13 text-muted">Machine Utilization</div>
+                                    <div class="fs-13 text-muted">{{ __('production.machine_utilization') }}</div>
                                     <h3 class="fw-bold text-dark mt-1">{{ $data['utilizations']['machine_utilization'] }}%</h3>
-                                    <div class="progress mt-2" style="height: 5px;">
-                                        <div class="progress-bar bg-primary" style="width: {{ $data['utilizations']['machine_utilization'] }}%"></div>
+                                    <div class="mt-2">
+                                        <x-ui.progress-bar :value="$data['utilizations']['machine_utilization']" color="primary" height="5px" />
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="fs-13 text-muted">Operator Utilization</div>
+                                    <div class="fs-13 text-muted">{{ __('production.operator_utilization') }}</div>
                                     <h3 class="fw-bold text-dark mt-1">{{ $data['utilizations']['operator_utilization'] }}%</h3>
-                                    <div class="progress mt-2" style="height: 5px;">
-                                        <div class="progress-bar bg-success" style="width: {{ $data['utilizations']['operator_utilization'] }}%"></div>
+                                    <div class="mt-2">
+                                        <x-ui.progress-bar :value="$data['utilizations']['operator_utilization']" color="success" height="5px" />
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="fs-13 text-muted">Work Center Utilization</div>
+                                    <div class="fs-13 text-muted">{{ __('production.work_center_utilization') }}</div>
                                     <h3 class="fw-bold text-dark mt-1">{{ $data['utilizations']['work_center_utilization'] }}%</h3>
-                                    <div class="progress mt-2" style="height: 5px;">
-                                        <div class="progress-bar bg-warning" style="width: {{ $data['utilizations']['work_center_utilization'] }}%"></div>
+                                    <div class="mt-2">
+                                        <x-ui.progress-bar :value="$data['utilizations']['work_center_utilization']" color="warning" height="5px" />
                                     </div>
                                 </div>
                             </div>
@@ -249,25 +250,28 @@
 
             {{-- Andon overview panel --}}
             @if(in_array('andon_overview', $prefs['widgets']))
+                @php
+                    $andon = $data['andon_counts'] ?? ['Running' => 0, 'Idle' => 0, 'Setup' => 0, 'Breakdown' => 0];
+                @endphp
                 <div class="col-md-12" data-widget="andon_overview">
                     <div class="card border border-light shadow-sm">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="text-uppercase text-muted fw-bold mb-0">Shop Floor Machine States (Andon Summary)</h6>
-                                <a href="{{ route('production.intelligence.andon') }}" class="btn btn-xs btn-outline-primary">Open Live Board</a>
+                                <h6 class="text-uppercase text-muted fw-bold mb-0">{{ __('production.andon_summary') }}</h6>
+                                <a href="{{ route('production.intelligence.andon') }}" class="btn btn-xs btn-outline-primary">{{ __('production.open_live_board') }}</a>
                             </div>
                             <div class="row text-center g-2">
                                 <div class="col">
-                                    <div class="p-2 bg-soft-success text-success rounded fw-bold">Running</div>
+                                    <div class="p-2 bg-soft-success text-success rounded fw-bold">{{ __('production.running') }}: {{ $andon['Running'] ?? 0 }}</div>
                                 </div>
                                 <div class="col">
-                                    <div class="p-2 bg-soft-warning text-warning rounded fw-bold">Idle</div>
+                                    <div class="p-2 bg-soft-warning text-warning rounded fw-bold">{{ __('production.idle') }}: {{ $andon['Idle'] ?? 0 }}</div>
                                 </div>
                                 <div class="col">
-                                    <div class="p-2 bg-soft-primary text-primary rounded fw-bold">Setup</div>
+                                    <div class="p-2 bg-soft-primary text-primary rounded fw-bold">{{ __('production.setup') }}: {{ $andon['Setup'] ?? 0 }}</div>
                                 </div>
                                 <div class="col">
-                                    <div class="p-2 bg-soft-danger text-danger rounded fw-bold">Breakdown</div>
+                                    <div class="p-2 bg-soft-danger text-danger rounded fw-bold">{{ __('production.breakdown') }}: {{ $andon['Breakdown'] ?? 0 }}</div>
                                 </div>
                             </div>
                         </div>

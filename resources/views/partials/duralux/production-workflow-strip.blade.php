@@ -1,11 +1,10 @@
 @if(request()->routeIs('production.*') || request()->is('production*'))
 @php
-
     $steps = [
         [
             'id' => 'work-centers',
             'num' => '1',
-            'name' => 'Work Centers',
+            'name' => __('production.step_work_centers'),
             'route' => 'production.work-centers.index',
             'active_routes' => ['production.work-centers.*', 'production.machines.*', 'production.shifts.*'],
             'icon' => 'feather-cpu',
@@ -13,7 +12,7 @@
         [
             'id' => 'routings',
             'num' => '2',
-            'name' => 'Routings',
+            'name' => __('production.step_routings'),
             'route' => 'production.routing.index',
             'active_routes' => ['production.routing.*'],
             'icon' => 'feather-sliders',
@@ -21,7 +20,7 @@
         [
             'id' => 'boms',
             'num' => '3',
-            'name' => 'BOMs',
+            'name' => __('production.step_boms'),
             'route' => 'production.boms.index',
             'active_routes' => ['production.boms.*'],
             'icon' => 'feather-layers',
@@ -29,7 +28,7 @@
         [
             'id' => 'orders',
             'num' => '4',
-            'name' => 'Production Orders',
+            'name' => __('production.step_production_orders'),
             'route' => 'production.orders.index',
             'active_routes' => ['production.orders.*', 'production.cost-adjustments.*', 'sales.material-requests.*'],
             'icon' => 'feather-file-text',
@@ -37,7 +36,7 @@
         [
             'id' => 'schedules',
             'num' => '5',
-            'name' => 'Schedules',
+            'name' => __('production.step_schedules'),
             'route' => 'production.schedules.index',
             'active_routes' => ['production.schedules.*', 'production.capacity.*', 'production.calendars.*'],
             'icon' => 'feather-calendar',
@@ -45,7 +44,7 @@
         [
             'id' => 'mes',
             'num' => '6',
-            'name' => 'Shop Floor (MES)',
+            'name' => __('production.step_shop_floor'),
             'route' => 'production.mes.dashboard',
             'active_routes' => ['production.mes.*', 'production.scanners.*'],
             'icon' => 'feather-monitor',
@@ -53,7 +52,7 @@
         [
             'id' => 'wip',
             'num' => '7',
-            'name' => 'WIP Tracking',
+            'name' => __('production.step_wip'),
             'route' => 'production.wip.index',
             'active_routes' => ['production.wip.*'],
             'icon' => 'feather-activity',
@@ -61,7 +60,7 @@
         [
             'id' => 'quality',
             'num' => '8',
-            'name' => 'Quality Control',
+            'name' => __('production.step_quality'),
             'route' => 'production.quality.dashboard',
             'active_routes' => ['production.quality.*', 'production.scrap.*', 'production.rework.*', 'production.ncrs.*', 'production.capas.*', 'production.inspections.*', 'production.quality-plans.*'],
             'icon' => 'feather-shield',
@@ -85,10 +84,12 @@
     <div class="d-flex align-items-center justify-content-between pb-1 mb-2 border-bottom flex-wrap gap-2">
         <div class="d-flex align-items-center gap-2">
             <span class="badge bg-primary text-white px-2.5 py-1.5 fs-11 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
-                <i class="feather-git-commit me-1"></i> MFG FLOW
+                <i class="feather-git-commit me-1"></i> {{ __('production.mfg_flow') }}
             </span>
             <span class="text-muted fs-12 fw-medium d-none d-md-inline-block">
-                Work Centers <i class="feather-arrow-right fs-10 mx-1"></i> Routings <i class="feather-arrow-right fs-10 mx-1"></i> BOMs <i class="feather-arrow-right fs-10 mx-1"></i> Orders <i class="feather-arrow-right fs-10 mx-1"></i> Schedules <i class="feather-arrow-right fs-10 mx-1"></i> Shop Floor <i class="feather-arrow-right fs-10 mx-1"></i> WIP <i class="feather-arrow-right fs-10 mx-1"></i> Quality
+                @foreach($steps as $idx => $st)
+                    {{ $st['name'] }}@if(!$loop->last) <i class="feather-arrow-right fs-10 mx-1"></i> @endif
+                @endforeach
             </span>
         </div>
 
@@ -106,7 +107,7 @@
                 @php $nextStep = $steps[$activeStepIndex + 1]; @endphp
                 <a href="{{ Route::has($nextStep['route']) ? route($nextStep['route']) : '#' }}"
                    class="btn btn-sm btn-primary fw-semibold fs-12 px-3 py-1 d-inline-flex align-items-center gap-1 shadow-sm">
-                    <span>Next: {{ $nextStep['name'] }}</span>
+                    <span>{{ __('production.next_step', ['step' => $nextStep['name']]) }}</span>
                     <i class="feather-arrow-right fs-12"></i>
                 </a>
             @endif
