@@ -903,8 +903,6 @@
                         @foreach($order->reservations as $res)
                             @php
                                 $isSemiFinished = ($res->product->type === 'semi_finished' || $res->product->supplier_method === 'manufacture');
-                                $fontWeight = $isSemiFinished ? 'fw-bold text-dark fs-13' : 'fw-semibold text-secondary fs-12';
-                                $bgRowClass = $isSemiFinished ? 'bg-light-subtle' : '';
                                 
                                 // Line level store status
                                 if ($res->quantity_issued >= $res->quantity_planned && $res->quantity_planned > 0) {
@@ -921,14 +919,11 @@
                                     $lineStatusText = 'Store Request Sent';
                                 }
                             @endphp
-                            <tr class="{{ $bgRowClass }}">
+                            <tr>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        @if(!$isSemiFinished)
-                                            <span class="ps-2 me-1 text-muted"><i class="feather-corner-down-right fs-11"></i></span>
-                                        @endif
                                         <div>
-                                            <div class="{{ $fontWeight }}">{{ $res->product->name }}</div>
+                                            <div class="fw-bold text-dark fs-13">{{ $res->product->name }}</div>
                                             <small class="text-muted font-monospace fs-10">{{ $res->product->sku }}</small>
                                         </div>
                                     </div>

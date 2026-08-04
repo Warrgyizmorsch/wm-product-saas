@@ -254,16 +254,11 @@
                                     $skuClass = $hasShortage ? 'text-danger opacity-75 font-monospace fs-10' : 'text-muted font-monospace fs-10';
                                 @endphp
                                 <tr class="{{ $rowClass }}">
-                                    <td class="fw-bold {{ $hasShortage ? 'text-danger' : '' }}">{{ $level }}</td>
+                                    <td class="fw-bold {{ $hasShortage ? 'text-danger' : '' }}">{{ $loop->iteration }}</td>
                                     <td>
-                                        <div style="padding-left: {{ $padding }}px;" class="d-flex align-items-start">
-                                            @if($isChild)
-                                                <i class="feather-corner-down-right {{ $hasShortage ? 'text-danger' : 'text-muted' }} me-2 mt-1" style="font-size: 11px;"></i>
-                                            @endif
-                                            <div class="d-flex flex-column">
-                                                <span class="{{ $componentClass }}">{{ $req->product->name }}</span>
-                                                <small class="{{ $skuClass }}">{{ $req->product->sku }}</small>
-                                            </div>
+                                        <div class="d-flex flex-column">
+                                            <span class="{{ $componentClass }}">{{ $req->product->name }}</span>
+                                            <small class="{{ $skuClass }}">{{ $req->product->sku }}</small>
                                         </div>
                                     </td>
                                     <td class="text-end fw-semibold {{ $hasShortage ? 'text-danger' : 'text-dark' }}">{{ number_format($req->required_quantity, 2) }}</td>

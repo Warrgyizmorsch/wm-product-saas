@@ -94,19 +94,11 @@
                     success: function(response) {
                         if (response.success && response.items.length > 0) {
                             var html = '';
-                            response.items.forEach(function(item) {
-                                var indent = '';
-                                var nameHtml = '';
-                                var dotCount = (item.prefix.match(/\./g) || []).length;
-                                if (dotCount > 0) {
-                                    indent = '↳ ';
-                                    nameHtml = '<div style="margin-left: ' + (dotCount * 15) + 'px;"><span class="text-muted fw-bold">' + indent + '</span><span class="text-dark fw-normal">' + item.component_name + '</span><div class="text-muted fs-11" style="padding-left: 15px;">SKU: ' + item.component_sku + '</div></div>';
-                                } else {
-                                    nameHtml = '<div class="fw-bold text-dark">' + item.component_name + '</div><div class="text-muted fs-11">SKU: ' + item.component_sku + '</div>';
-                                }
+                            response.items.forEach(function(item, idx) {
+                                var nameHtml = '<div class="fw-bold text-dark">' + item.component_name + '</div><div class="text-muted fs-11">SKU: ' + item.component_sku + '</div>';
 
-                                html += '<tr style="' + (dotCount > 0 ? 'background-color: #fcfcfc;' : '') + '">';
-                                html += '<td class="fw-semibold">' + item.prefix + '</td>';
+                                html += '<tr>';
+                                html += '<td class="fw-semibold">' + (idx + 1) + '</td>';
                                 html += '<td>' + nameHtml + '</td>';
                                 html += '<td>' + item.type + '</td>';
                                 html += '<td class="text-center fw-semibold">' + parseFloat(item.quantity_required).toFixed(4) + '</td>';
