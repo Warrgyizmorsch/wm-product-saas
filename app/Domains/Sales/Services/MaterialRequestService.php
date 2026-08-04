@@ -189,12 +189,11 @@ class MaterialRequestService
             $item = ProductionRequisitionSlipItem::findOrFail($itemId);
             $slip = $item->slip;
 
-            $warehouseStock = (float) StockService::getAvailableStock($item->product_id, $warehouseId ?: $item->warehouse_id);
             $remainingToIssue = max(0.0, (float) $item->quantity_planned - (float) $item->quantity_issued);
-            $shortageQty = max(0.0, $remainingToIssue - ((float) $item->quantity_reserved + $warehouseStock));
+            $shortageQty = max(0.0, $remainingToIssue - (float) $item->quantity_reserved);
 
             if ($shortageQty <= 0) {
-                throw new InvalidArgumentException('No shortage for this item in the selected warehouse.');
+                throw new InvalidArgumentException('No un-issued remaining quantity for this item.');
             }
 
             $year = now()->format('Y');
@@ -239,14 +238,13 @@ class MaterialRequestService
 
     /**
      * Create a SINGLE Purchase Requisition with ALL selected items as line items.
-     * Used by bulk action — avoids creating one PR per item.
+     * Consolidates items by product_id so multiple items of the same product are merged.
      */
     public function createBulkPurchaseRequisition(int $tenantId, array $itemIds, ?int $warehouseId, ?string $notes): PurchaseRequisition
     {
         return DB::transaction(function () use ($tenantId, $itemIds, $warehouseId, $notes) {
 
-            // Collect all items with shortages
-            $lineItems = [];
+            $groupedByProduct = [];
             $slip = null;
 
             foreach ($itemIds as $itemId) {
@@ -254,25 +252,29 @@ class MaterialRequestService
                 if (!$item) continue;
 
                 $slip = $slip ?? $item->slip;
+                $resolvedWh = $warehouseId ?: $item->warehouse_id;
 
-                $resolvedWh   = $warehouseId ?: $item->warehouse_id;
-                $warehouseStock   = (float) StockService::getAvailableStock($item->product_id, $resolvedWh);
                 $remainingToIssue = max(0.0, (float) $item->quantity_planned - (float) $item->quantity_issued);
-                $shortageQty      = max(0.0, $remainingToIssue - ((float) $item->quantity_reserved + $warehouseStock));
+                $shortageQty = max(0.0, $remainingToIssue - (float) $item->quantity_reserved);
 
                 if ($shortageQty <= 0) {
-                    continue; // Skip items with no shortage
+                    continue;
                 }
 
-                $lineItems[] = [
-                    'item'         => $item,
-                    'shortageQty'  => $shortageQty,
-                    'resolvedWh'   => $resolvedWh,
-                ];
+                $productId = $item->product_id;
+                if (!isset($groupedByProduct[$productId])) {
+                    $groupedByProduct[$productId] = [
+                        'item' => $item,
+                        'totalQty' => 0.0,
+                        'resolvedWh' => $resolvedWh,
+                    ];
+                }
+
+                $groupedByProduct[$productId]['totalQty'] += $shortageQty;
             }
 
-            if (empty($lineItems)) {
-                throw new InvalidArgumentException('No items with shortage found for the selected items and warehouse.');
+            if (empty($groupedByProduct)) {
+                throw new InvalidArgumentException('No items with remaining required quantity found for the selected items.');
             }
 
             // Generate single PR number
@@ -296,22 +298,22 @@ class MaterialRequestService
                 'requisition_date'   => now()->toDateString(),
                 'status'             => 'Draft',
                 'source_type'        => 'material_request',
-                'source_id'          => $slip->id,
-                'notes'              => $notes ?: 'Bulk PR from Material Request #' . $slip->requisition_number,
+                'source_id'          => $slip?->id,
+                'notes'              => $notes ?: 'Bulk PR from Material Request #' . ($slip?->requisition_number ?? ''),
                 'requested_by'       => auth()->id() ?: 1,
             ]);
 
-            // Add ALL shortage items as line items to the SAME PR
-            foreach ($lineItems as $line) {
+            // Add consolidated PR line items by product
+            foreach ($groupedByProduct as $productId => $group) {
                 PurchaseRequisitionItem::create([
                     'purchase_requisition_id' => $pr->id,
                     'tenant_id'               => $tenantId,
-                    'product_id'              => $line['item']->product_id,
-                    'quantity'                => $line['shortageQty'],
-                    'uom_id'                  => $line['item']->uom_id,
-                    'warehouse_id'            => $line['resolvedWh'],
-                    'estimated_unit_cost'     => $line['item']->product?->unit_cost ?? 0.0,
-                    'notes'                   => "Shortage for {$line['item']->product?->name}",
+                    'product_id'              => $productId,
+                    'quantity'                => $group['totalQty'],
+                    'uom_id'                  => $group['item']->uom_id,
+                    'warehouse_id'            => $group['resolvedWh'],
+                    'estimated_unit_cost'     => $group['item']->product?->unit_cost ?? 0.0,
+                    'notes'                   => "Consolidated PR for {$group['item']->product?->name}",
                 ]);
             }
 
