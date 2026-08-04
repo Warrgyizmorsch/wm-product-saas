@@ -62,6 +62,17 @@
                                 </option>
                             @endforeach
                         </x-ui.odoo-form-ui>
+
+                        <x-ui.odoo-form-ui type="select" label="Operation Step (Optional)" name="production_order_operation_id" :error-text="$errors->first('production_order_operation_id')">
+                            <option value="">All Operations / Order Level</option>
+                            @foreach($orders as $order)
+                                @foreach($order->operations as $op)
+                                    <option value="{{ $op->id }}" @selected(old('production_order_operation_id') == $op->id)>
+                                        [{{ $order->order_number }}] OP{{ $op->sequence }} - {{ $op->name }}
+                                    </option>
+                                @endforeach
+                            @endforeach
+                        </x-ui.odoo-form-ui>
                     </div>
                 </div>
 
