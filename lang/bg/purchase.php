@@ -603,6 +603,7 @@ return [
     'pay_method_bank_transfer' => 'Банков превод',
     'pay_method_cheque' => 'Чек',
     'pay_method_credit_card' => 'Кредитна карта',
+    'pay_method_upi' => 'UPI',
     'pay_method_other' => 'Друг',
 
     // Vendor Payments Details & Allocation
@@ -775,8 +776,26 @@ return [
     'po_line_items' => 'Редове с артикули на поръчката',
     'disc_percent' => 'Отст. %',
     'disc_amt' => 'Отст. сума',
-    'tax_percent' => 'Данък %',
-    'tax_amt' => 'Данък сума',
+    'tax_percent'     => 'Данък %',
+    'tax_amt'         => 'Данък сума',
     'select_supplier' => 'Изберете доставчик...',
-    'no_sku' => 'Без SKU',
+    'no_sku'          => 'Без SKU',
+
+    // Действия с доставчици и редове
+    'add'                      => 'Добавяне',
+    'remove'                   => 'Уключване',
+    'add_line'                 => 'Добави ред',
+    'purchase_add'             => 'Добави покупка',
+    'purchase_remove'          => 'Уключи покупка',
+    'bulk_supplier'            => 'Групов доставчик',
+
+    // RFQ Детайли и Статуси
+    'back_to_rfqs'             => 'Обратно към RFQ',
+    'created_at'               => 'Дата на създаване',
+    'status_sent'              => 'Изпратено',
+    'status_confirmed'         => 'Потвърдено',
+    'terms_conditions'         => 'Правила и условия',
+    'terms_conditions_remarks' => 'Условия / Забележки...',
+    'quote_no'                 => 'Оферта №',
+    'pending'                  => 'В очакване',
 ];

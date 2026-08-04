@@ -31,6 +31,9 @@ class VendorPaymentService
         return DB::transaction(function () use ($validated, $bill, $paymentType, $tenantId) {
             $paymentNumber = $this->paymentRepo->getNextPaymentNumber($tenantId);
 
+            $allocatedAmount = $bill ? (float)($validated['allocations'][0]['allocated_amount'] ?? $validated['amount']) : (float)$validated['amount'];
+            $actualPaymentAmount = $bill ? $allocatedAmount : (float)$validated['amount'];
+
             $payment = $this->paymentRepo->create([
                 'tenant_id'         => $tenantId,
                 'payment_number'   => $paymentNumber,
@@ -39,7 +42,7 @@ class VendorPaymentService
                 'payment_type'     => $paymentType,
                 'payment_method'   => $validated['payment_method'],
                 'payment_date'     => $validated['payment_date'],
-                'amount'           => $validated['amount'],
+                'amount'           => $actualPaymentAmount,
                 'reference_number' => $validated['reference_number'] ?? null,
                 'status'           => 'Posted',
                 'notes'            => $validated['notes'] ?? null,
@@ -47,8 +50,6 @@ class VendorPaymentService
             ]);
 
             if ($bill) {
-                $allocatedAmount = (float)($validated['allocations'][0]['allocated_amount'] ?? $validated['amount']);
-
                 VendorPaymentAllocation::create([
                     'tenant_id'         => $tenantId,
                     'vendor_payment_id' => $payment->id,

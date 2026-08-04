@@ -130,23 +130,11 @@ class PurchaseOrderService
                     'total_amount' => $lineSubtotal + $lineTax,
                 ]);
 
-                // Sync PR item ordered_qty
-                if (!empty($item['requisition_item_id'])) {
-                    $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::find($item['requisition_item_id']);
-                    if ($prItem) {
-                        $prItem->increment('ordered_qty', $qty);
-                        if (!$po->purchase_requisition_id) {
-                            $po->update(['purchase_requisition_id' => $prItem->purchase_requisition_id]);
-                        }
-                    }
-                } elseif ($po->purchase_requisition_id) {
-                    $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('purchase_requisition_id', $po->purchase_requisition_id)
-                        ->where('product_id', $item['product_id'])
-                        ->first();
-                    if ($prItem) {
-                        $prItem->increment('ordered_qty', $qty);
-                    }
-                }
+            }
+
+            // Sync PR ordered_qty ONLY if PO is directly created as Approved
+            if ($po->status === 'Approved') {
+                $this->syncPrOrderedQtyOnApproval($po);
             }
 
             return $po;
@@ -155,10 +143,20 @@ class PurchaseOrderService
 
     public function confirmOrder(PurchaseOrder $order): bool
     {
+        if ($order->status === 'Approved') {
+            return true;
+        }
+
         $order->status = 'Approved';
-        return $this->orderRepo->update($order, [
+        $updated = $this->orderRepo->update($order, [
             'status' => 'Approved',
         ]);
+
+        if ($updated) {
+            $this->syncPrOrderedQtyOnApproval($order);
+        }
+
+        return $updated;
     }
 
     public function approveOrder(PurchaseOrder $order): bool
@@ -168,9 +166,103 @@ class PurchaseOrderService
 
     public function cancelOrder(PurchaseOrder $order): bool
     {
+        $previousStatus = $order->status;
         $order->status = 'Cancelled';
-        return $this->orderRepo->update($order, [
+        $updated = $this->orderRepo->update($order, [
             'status' => 'Cancelled',
         ]);
+
+        if ($updated && $previousStatus === 'Approved') {
+            $this->revertPrOrderedQtyOnCancel($order);
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Allocate PO item quantities to PR items when PO is Approved
+     */
+    public function syncPrOrderedQtyOnApproval(PurchaseOrder $po): void
+    {
+        $po->loadMissing('items');
+        $tenantId = $po->tenant_id;
+
+        foreach ($po->items as $item) {
+            $qty = (float) $item->quantity;
+            $productId = $item->product_id;
+            $remainingQtyToAllocate = $qty;
+
+            $candidateQuery = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('tenant_id', $tenantId)
+                ->where('product_id', $productId);
+
+            $requestItemIds = (array) request()->input('requisition_item_ids', []);
+
+            $candidatePrItems = $candidateQuery->get();
+            if (!empty($requestItemIds)) {
+                $candidatePrItems = $candidatePrItems->sortBy(function ($pi) use ($requestItemIds) {
+                    return in_array($pi->id, $requestItemIds) ? 0 : 1;
+                });
+            } elseif ($po->purchase_requisition_id) {
+                $candidatePrItems = $candidatePrItems->sortBy(function ($pi) use ($po) {
+                    return $pi->purchase_requisition_id == $po->purchase_requisition_id ? 0 : 1;
+                });
+            }
+
+            foreach ($candidatePrItems as $prItem) {
+                if ($remainingQtyToAllocate <= 0) {
+                    break;
+                }
+
+                $alreadyOrdered = (float) $prItem->ordered_qty;
+                $pendingOnItem = max(0.0, (float) $prItem->quantity - $alreadyOrdered);
+
+                if ($pendingOnItem > 0) {
+                    $allocated = min($remainingQtyToAllocate, $pendingOnItem);
+                    $prItem->increment('ordered_qty', $allocated);
+                    $remainingQtyToAllocate -= $allocated;
+
+                    if (!$po->purchase_requisition_id && $prItem->purchase_requisition_id) {
+                        $po->update(['purchase_requisition_id' => $prItem->purchase_requisition_id]);
+                    }
+                }
+            }
+
+            if ($remainingQtyToAllocate > 0 && $candidatePrItems->count() > 0) {
+                $lastPrItem = $candidatePrItems->last();
+                $lastPrItem->increment('ordered_qty', $remainingQtyToAllocate);
+            }
+        }
+    }
+
+    /**
+     * Revert PR ordered_qty if an Approved PO is Cancelled
+     */
+    public function revertPrOrderedQtyOnCancel(PurchaseOrder $po): void
+    {
+        $po->loadMissing('items');
+        $tenantId = $po->tenant_id;
+
+        foreach ($po->items as $item) {
+            $qtyToRevert = (float) $item->quantity;
+            $productId = $item->product_id;
+
+            $candidatePrItems = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->where('ordered_qty', '>', 0)
+                ->orderBy('id', 'desc')
+                ->get();
+
+            foreach ($candidatePrItems as $prItem) {
+                if ($qtyToRevert <= 0) {
+                    break;
+                }
+
+                $alreadyOrdered = (float) $prItem->ordered_qty;
+                $toDecrement = min($qtyToRevert, $alreadyOrdered);
+
+                $prItem->decrement('ordered_qty', $toDecrement);
+                $qtyToRevert -= $toDecrement;
+            }
+        }
     }
 }

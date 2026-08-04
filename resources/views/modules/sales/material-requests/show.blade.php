@@ -67,12 +67,20 @@
                     <div class="d-flex align-items-center gap-2 mb-1">
                         <h4 class="fw-bold text-dark mb-0">{{ $slip->requisition_number }}</h4>
                         @php
+                            $statusLower = strtolower($slip->status ?? 'pending');
                             $statusClass = 'danger';
-                            if ($slip->status === 'completed') $statusClass = 'success';
-                            elseif ($slip->status === 'partial') $statusClass = 'warning';
+                            $statusLabel = 'Pending Issue';
+
+                            if (in_array($statusLower, ['fully issued', 'completed', 'issued'])) {
+                                $statusClass = 'success';
+                                $statusLabel = 'Fully Issued';
+                            } elseif (in_array($statusLower, ['partially issued', 'partial', 'reserved'])) {
+                                $statusClass = 'warning';
+                                $statusLabel = $statusLower === 'reserved' ? 'Reserved' : 'Partially Issued';
+                            }
                         @endphp
                         <x-ui.badge :soft="true" :variant="$statusClass" class="px-2.5 py-1 fs-11 fw-bold">
-                            {{ $slip->status === 'completed' ? 'Fully Issued' : ($slip->status === 'partial' ? 'Partially Issued' : 'Pending Issue') }}
+                            {{ $statusLabel }}
                         </x-ui.badge>
                     </div>
                     <span class="fs-13 text-muted">

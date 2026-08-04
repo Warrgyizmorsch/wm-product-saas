@@ -58,57 +58,92 @@ class PurchaseOrderController extends Controller
                 ->with(['product', 'warehouse', 'requisition'])
                 ->get();
 
+            $mergedItems = [];
             foreach ($prItems as $prItem) {
                 if (!$selectedRequisitionId && $prItem->purchase_requisition_id) {
                     $selectedRequisitionId = $prItem->purchase_requisition_id;
                 }
 
                 $alreadyOrderedQty = (float) $prItem->ordered_qty;
+                $poOrderedQty = (float) \App\Domains\Purchase\Models\PurchaseOrderItem::where('tenant_id', $tenantId)
+                    ->where('product_id', $prItem->product_id)
+                    ->whereHas('order', function ($q) use ($prItem) {
+                        $q->where('purchase_requisition_id', $prItem->purchase_requisition_id)
+                          ->where('status', '!=', 'Cancelled');
+                    })
+                    ->sum('quantity');
+
+                $alreadyOrderedQty = max($alreadyOrderedQty, $poOrderedQty);
                 $pendingQty = max(0.0, (float) $prItem->quantity - $alreadyOrderedQty);
                 if ($pendingQty <= 0) {
-                    $pendingQty = (float) $prItem->quantity;
+                    continue;
                 }
 
-                $product = $prItem->product;
-                $costRate = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
+                $productId = $prItem->product_id;
+                $product   = $prItem->product;
+                $costRate  = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
 
-                $prefilledItems[] = [
-                    'requisition_item_id' => $prItem->id,
-                    'product_id' => $prItem->product_id,
-                    'product_name' => $product?->name ?? 'Product #' . $prItem->product_id,
-                    'quantity' => $pendingQty,
-                    'rate' => $costRate,
-                    'warehouse_id' => $prItem->warehouse_id,
-                ];
+                if (isset($mergedItems[$productId])) {
+                    $mergedItems[$productId]['quantity'] += $pendingQty;
+                    $mergedItems[$productId]['requisition_item_ids'][] = $prItem->id;
+                } else {
+                    $mergedItems[$productId] = [
+                        'requisition_item_id'  => $prItem->id,
+                        'requisition_item_ids' => [$prItem->id],
+                        'product_id'           => $productId,
+                        'product_name'         => $product?->name ?? 'Product #' . $productId,
+                        'quantity'             => $pendingQty,
+                        'rate'                 => $costRate,
+                        'warehouse_id'         => $prItem->warehouse_id,
+                    ];
+                }
             }
+            $prefilledItems = array_values($mergedItems);
         } elseif ($selectedRequisitionId) {
-            // If whole requisition_id was passed
             $prItems = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('tenant_id', $tenantId)
                 ->where('purchase_requisition_id', $selectedRequisitionId)
                 ->with(['product', 'warehouse'])
                 ->get();
 
+            $mergedItems = [];
             foreach ($prItems as $prItem) {
                 $alreadyOrderedQty = (float) $prItem->ordered_qty;
+                $poOrderedQty = (float) \App\Domains\Purchase\Models\PurchaseOrderItem::where('tenant_id', $tenantId)
+                    ->where('product_id', $prItem->product_id)
+                    ->whereHas('order', function ($q) use ($prItem) {
+                        $q->where('purchase_requisition_id', $prItem->purchase_requisition_id)
+                          ->where('status', '!=', 'Cancelled');
+                    })
+                    ->sum('quantity');
+
+                $alreadyOrderedQty = max($alreadyOrderedQty, $poOrderedQty);
                 $pendingQty = max(0.0, (float) $prItem->quantity - $alreadyOrderedQty);
                 if ($pendingQty <= 0) {
-                    $pendingQty = (float) $prItem->quantity;
+                    continue;
                 }
 
-                $product = $prItem->product;
-                $costRate = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
+                $productId = $prItem->product_id;
+                $product   = $prItem->product;
+                $costRate  = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
 
-                $prefilledItems[] = [
-                    'requisition_item_id' => $prItem->id,
-                    'product_id' => $prItem->product_id,
-                    'product_name' => $product?->name ?? 'Product #' . $prItem->product_id,
-                    'quantity' => $pendingQty,
-                    'rate' => $costRate,
-                    'warehouse_id' => $prItem->warehouse_id,
-                ];
+                if (isset($mergedItems[$productId])) {
+                    $mergedItems[$productId]['quantity'] += $pendingQty;
+                    $mergedItems[$productId]['requisition_item_ids'][] = $prItem->id;
+                } else {
+                    $mergedItems[$productId] = [
+                        'requisition_item_id'  => $prItem->id,
+                        'requisition_item_ids' => [$prItem->id],
+                        'product_id'           => $productId,
+                        'product_name'         => $product?->name ?? 'Product #' . $productId,
+                        'quantity'             => $pendingQty,
+                        'rate'                 => $costRate,
+                        'warehouse_id'         => $prItem->warehouse_id,
+                    ];
+                }
 
                 $requisitionItemIds[] = $prItem->id;
             }
+            $prefilledItems = array_values($mergedItems);
         }
 
         return view('modules.purchase.orders.create', compact(

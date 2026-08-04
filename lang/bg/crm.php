@@ -340,6 +340,19 @@ return [
     'viewing' => 'Преглед',
     'select_product' => 'Изберете продукт...',
     'add_new_product' => 'Добавяне на нов продукт',
+
+    // Activity Calendar - Color Legend
+    'color_legend'      => 'Легенда на цветовете',
+    'legend_red_label'  => 'Червено',
+    'legend_red_desc'   => 'Просрочено / Пропусната кол',
+    'legend_cyan_label' => 'Синьо/Циан',
+    'legend_cyan_desc'  => 'Планирано обаждане',
+    'legend_blue_label' => 'Тъмносиньо',
+    'legend_blue_desc'  => 'Среща с клиент',
+    'legend_teal_label' => 'Зелено-синьо',
+    'legend_teal_desc'  => 'Имейл / Оферта',
+    'legend_green_label'=> 'Зелено',
+    'legend_green_desc' => 'Завършено действие',
 ];
 
 

@@ -338,6 +338,19 @@ return [
     'viewing' => 'Viewing',
     'select_product' => 'Select Product...',
     'add_new_product' => 'Add New Product',
+
+    // Activity Calendar - Color Legend
+    'color_legend'      => 'Color Legend',
+    'legend_red_label'  => 'Red',
+    'legend_red_desc'   => 'Overdue / Missed Call',
+    'legend_cyan_label' => 'Cyan/Blue',
+    'legend_cyan_desc'  => 'Scheduled Call',
+    'legend_blue_label' => 'Dark Blue',
+    'legend_blue_desc'  => 'Client Meeting',
+    'legend_teal_label' => 'Teal Green',
+    'legend_teal_desc'  => 'Email / Proposal',
+    'legend_green_label'=> 'Green',
+    'legend_green_desc' => 'Completed Action',
 ];
 
 

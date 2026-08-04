@@ -232,20 +232,7 @@
                         <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $statusLabel }}</span>
                     </div>
 
-                    <!-- Chevron Status Pipeline -->
-                    <div class="so-status-pipeline my-2 d-print-none">
-                        @php
-                            $statuses = ['Approved' => 'Approved'];
-                            if ($grn->status === 'Cancelled') {
-                                $statuses['Cancelled'] = 'Cancelled';
-                            }
-                        @endphp
-                        @foreach($statuses as $key => $label)
-                            <span class="pipeline-step active">
-                                {{ $label }}
-                            </span>
-                        @endforeach
-                    </div>
+
                 </div>
 
                 <div class="card-body p-4 p-md-5">

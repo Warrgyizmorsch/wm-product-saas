@@ -120,3 +120,22 @@
     </div>
 
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const amountInput = document.querySelector('input[name="amount"]');
+            const allocInput = document.querySelector('input[name="allocations[0][allocated_amount]"]');
+
+            if (amountInput && allocInput) {
+                allocInput.addEventListener('input', function () {
+                    amountInput.value = this.value;
+                });
+                amountInput.addEventListener('input', function () {
+                    allocInput.value = this.value;
+                });
+            }
+        });
+    </script>
+@endpush
+

@@ -38,7 +38,8 @@
             </div>
             <div class="col-md-3">
                 <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.payment_method') }}</span>
-                <span class="badge bg-soft-info text-info fs-12 fw-semibold">{{ __('purchase.pay_method_' . strtolower(str_replace(' ', '_', $payment->payment_method))) }}</span>
+                @php $methodKey = 'purchase.pay_method_' . strtolower(str_replace(' ', '_', $payment->payment_method)); @endphp
+                <span class="badge bg-soft-info text-info fs-12 fw-semibold">{{ \Illuminate\Support\Facades\Lang::has($methodKey) ? __($methodKey) : $payment->payment_method }}</span>
             </div>
             <div class="col-md-3">
                 <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.reference_utr_no') }}</span>

@@ -35,11 +35,27 @@ class MaterialRequestController extends Controller
             ->with(['order.product', 'items.product', 'items.uom', 'items.warehouse'])
             ->findOrFail($id);
 
-        $items = $slip->items->map(function ($item) use ($tenantId) {
-            $warehouseId = $item->warehouse_id ?? Warehouse::where('tenant_id', $tenantId)->orderByDesc('is_default')->first()?->id;
-            $item->available_stock = $warehouseId ? StockService::getAvailableStock($item->product_id, $warehouseId) : 0.0;
+        // Group items by product_id so duplicate items in the same slip merge into a single row
+        $items = $slip->items->groupBy('product_id')->map(function ($itemsForProduct) use ($tenantId) {
+            $first = $itemsForProduct->first();
+            
+            $totalPlanned  = (float) $itemsForProduct->sum('quantity_planned');
+            $totalReserved = (float) $itemsForProduct->sum('quantity_reserved');
+            $totalIssued   = (float) $itemsForProduct->sum('quantity_issued');
+            
+            $warehouseId = $first->warehouse_id ?? Warehouse::where('tenant_id', $tenantId)->orderByDesc('is_default')->first()?->id;
+            $availableStock = $warehouseId ? StockService::getAvailableStock($first->product_id, $warehouseId) : 0.0;
+
+            $item = clone $first;
+            $item->id = $first->id;
+            $item->all_item_ids = $itemsForProduct->pluck('id')->toArray();
+            $item->quantity_planned = $totalPlanned;
+            $item->quantity_reserved = $totalReserved;
+            $item->quantity_issued = $totalIssued;
+            $item->available_stock = $availableStock;
+
             return $item;
-        });
+        })->values();
 
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $existingPrItems = PurchaseRequisitionItem::where('tenant_id', $tenantId)
@@ -127,14 +143,33 @@ class MaterialRequestController extends Controller
             'notes'         => 'nullable|string',
         ]);
 
-        $tenantId = require_tenant_id();
-        $actionType = $request->input('action_type');
+        $tenantId    = require_tenant_id();
+        $actionType  = $request->input('action_type');
         $warehouseId = $request->input('warehouse_id') ? (int) $request->input('warehouse_id') : null;
-        $itemIds = $request->input('item_ids', []);
-        $actionQtys = $request->input('action_qtys', []);
-        $remarks = $request->input('remarks');
-        $notes = $request->input('notes');
+        $itemIds     = $request->input('item_ids', []);
+        $actionQtys  = $request->input('action_qtys', []);
+        $remarks     = $request->input('remarks');
+        $notes       = $request->input('notes');
 
+        // ── INDENT: Create ONE consolidated PR with all selected items ─────────
+        if ($actionType === 'indent') {
+            try {
+                $pr = $this->requestService->createBulkPurchaseRequisition(
+                    $tenantId,
+                    array_map('intval', $itemIds),
+                    $warehouseId,
+                    $notes
+                );
+                $itemCount = count($itemIds);
+                return redirect()->back()->with('success', "Purchase Requisition {$pr->requisition_number} created with {$itemCount} item(s) successfully.");
+            } catch (InvalidArgumentException $e) {
+                return redirect()->back()->with('error', $e->getMessage());
+            } catch (\Exception $e) {
+                return redirect()->back()->with('error', 'Failed to create Purchase Requisition: ' . $e->getMessage());
+            }
+        }
+
+        // ── RESERVE / ISSUE: Process each item individually ────────────────────
         $processedCount = 0;
         $errors = [];
 
@@ -142,7 +177,7 @@ class MaterialRequestController extends Controller
             $itemId = (int) $itemId;
             $qty = isset($actionQtys[$itemId]) ? (float) $actionQtys[$itemId] : 0.0;
 
-            if ($qty <= 0 && $actionType !== 'indent') {
+            if ($qty <= 0) {
                 continue;
             }
 
@@ -153,9 +188,6 @@ class MaterialRequestController extends Controller
                 } elseif ($actionType === 'issue') {
                     $this->requestService->issue($tenantId, $itemId, $qty, $warehouseId, $remarks);
                     $processedCount++;
-                } elseif ($actionType === 'indent') {
-                    $this->requestService->createPurchaseRequisition($tenantId, $itemId, $warehouseId, $notes);
-                    $processedCount++;
                 }
             } catch (InvalidArgumentException $e) {
                 $errors[] = "Item #{$itemId}: " . $e->getMessage();
@@ -165,7 +197,7 @@ class MaterialRequestController extends Controller
         }
 
         if ($processedCount > 0) {
-            $msg = "Bulk action '{$actionType}' processed successfully for {$processedCount} item(s).";
+            $msg = "Bulk '{$actionType}' processed for {$processedCount} item(s).";
             if (!empty($errors)) {
                 $msg .= " Some items failed: " . implode('; ', $errors);
             }

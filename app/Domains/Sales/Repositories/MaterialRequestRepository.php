@@ -24,7 +24,14 @@ class MaterialRequestRepository
         }
 
         if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            $statusVal = $filters['status'];
+            if (in_array($statusVal, ['completed', 'fully_issued', 'Fully Issued'])) {
+                $query->whereIn('status', ['completed', 'Fully Issued', 'issued']);
+            } elseif (in_array($statusVal, ['partial', 'partially_issued', 'Partially Issued'])) {
+                $query->whereIn('status', ['partial', 'Partially Issued', 'Reserved']);
+            } else {
+                $query->where('status', $statusVal);
+            }
         }
 
         return $query->orderBy('id', 'desc')->paginate($perPage)->withQueryString();

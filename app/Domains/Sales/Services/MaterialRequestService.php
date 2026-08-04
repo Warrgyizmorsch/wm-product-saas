@@ -20,6 +20,10 @@ class MaterialRequestService
             $item = ProductionRequisitionSlipItem::lockForUpdate()->findOrFail($itemId);
             $slip = $item->slip;
 
+            $sameProductItems = ProductionRequisitionSlipItem::where('production_requisition_slip_id', $slip->id)
+                ->where('product_id', $item->product_id)
+                ->get();
+
             $warehouseId = $requestedWh
                 ?? $item->warehouse_id
                 ?? Warehouse::where('tenant_id', $tenantId)->orderByDesc('is_default')->first()?->id;
@@ -54,7 +58,7 @@ class MaterialRequestService
                 ],
                 [
                     'bom_item_id'       => null,
-                    'quantity_planned'  => $item->quantity_planned,
+                    'quantity_planned'  => $sameProductItems->sum('quantity_planned'),
                     'quantity_reserved' => 0.0,
                     'quantity_issued'   => 0.0,
                     'uom_id'            => $item->uom_id,
@@ -62,9 +66,21 @@ class MaterialRequestService
             );
             $poReservation->increment('quantity_reserved', $qtyToReserve);
 
-            $item->warehouse_id = $warehouseId;
-            $item->quantity_reserved += $qtyToReserve;
-            $item->save();
+            // Sequentially allocate reserve across matching items of this product
+            $remRes = $qtyToReserve;
+            foreach ($sameProductItems as $pItem) {
+                if ($remRes <= 0) break;
+
+                $pRemToRes = max(0.0, (float)$pItem->quantity_planned - ((float)$pItem->quantity_issued + (float)$pItem->quantity_reserved));
+                if ($pRemToRes > 0) {
+                    $alloc = min($remRes, $pRemToRes);
+                    $pItem->warehouse_id = $warehouseId;
+                    $pItem->quantity_reserved += $alloc;
+                    $pItem->save();
+
+                    $remRes -= $alloc;
+                }
+            }
 
             $this->updateSlipStatus($slip);
 
@@ -78,18 +94,26 @@ class MaterialRequestService
             $item = ProductionRequisitionSlipItem::lockForUpdate()->findOrFail($itemId);
             $slip = $item->slip;
 
+            $sameProductItems = ProductionRequisitionSlipItem::where('production_requisition_slip_id', $slip->id)
+                ->where('product_id', $item->product_id)
+                ->get();
+
             $resolvedWarehouseId = $warehouseId ?: ($item->warehouse_id ?? Warehouse::where('tenant_id', $tenantId)->orderByDesc('is_default')->first()?->id);
             if (!$resolvedWarehouseId) {
                 throw new InvalidArgumentException('No warehouse resolved for material issue.');
             }
 
-            $remainingToIssue = max(0.0, (float) $item->quantity_planned - (float) $item->quantity_issued);
-            if ($quantity > $remainingToIssue) {
-                throw new InvalidArgumentException("Cannot issue more than the remaining planned quantity ({$remainingToIssue}).");
+            $totalPlanned = (float) $sameProductItems->sum('quantity_planned');
+            $totalIssued = (float) $sameProductItems->sum('quantity_issued');
+            $totalReserved = (float) $sameProductItems->sum('quantity_reserved');
+            $totalRemainingToIssue = max(0.0, $totalPlanned - $totalIssued);
+
+            if ($quantity > $totalRemainingToIssue) {
+                throw new InvalidArgumentException("Cannot issue more than the remaining planned quantity ({$totalRemainingToIssue}).");
             }
 
             $availableQty = StockService::getAvailableStock($item->product_id, $resolvedWarehouseId);
-            $maxAllowed = (float) $item->quantity_reserved + $availableQty;
+            $maxAllowed = $totalReserved + $availableQty;
             if ($quantity > $maxAllowed) {
                 throw new InvalidArgumentException("Cannot issue {$quantity} units. Only {$maxAllowed} units are available.");
             }
@@ -103,10 +127,23 @@ class MaterialRequestService
                 $slip->production_order_id
             );
 
-            $qtyFromReserved = min($quantity, (float) $item->quantity_reserved);
-            $item->quantity_reserved -= $qtyFromReserved;
-            $item->quantity_issued += $quantity;
-            $item->save();
+            // Sequentially allocate issue quantity across matching items of this product
+            $remIssue = $quantity;
+            foreach ($sameProductItems as $pItem) {
+                if ($remIssue <= 0) break;
+
+                $pRemaining = max(0.0, (float)$pItem->quantity_planned - (float)$pItem->quantity_issued);
+                if ($pRemaining > 0) {
+                    $alloc = min($remIssue, $pRemaining);
+
+                    $qtyFromRes = min($alloc, (float)$pItem->quantity_reserved);
+                    $pItem->quantity_reserved -= $qtyFromRes;
+                    $pItem->quantity_issued += $alloc;
+                    $pItem->save();
+
+                    $remIssue -= $alloc;
+                }
+            }
 
             $poReservation = ProductionOrderReservation::where('tenant_id', $tenantId)
                 ->where('production_order_id', $slip->production_order_id)
@@ -199,6 +236,89 @@ class MaterialRequestService
             return $pr;
         });
     }
+
+    /**
+     * Create a SINGLE Purchase Requisition with ALL selected items as line items.
+     * Used by bulk action — avoids creating one PR per item.
+     */
+    public function createBulkPurchaseRequisition(int $tenantId, array $itemIds, ?int $warehouseId, ?string $notes): PurchaseRequisition
+    {
+        return DB::transaction(function () use ($tenantId, $itemIds, $warehouseId, $notes) {
+
+            // Collect all items with shortages
+            $lineItems = [];
+            $slip = null;
+
+            foreach ($itemIds as $itemId) {
+                $item = ProductionRequisitionSlipItem::with('product')->find((int) $itemId);
+                if (!$item) continue;
+
+                $slip = $slip ?? $item->slip;
+
+                $resolvedWh   = $warehouseId ?: $item->warehouse_id;
+                $warehouseStock   = (float) StockService::getAvailableStock($item->product_id, $resolvedWh);
+                $remainingToIssue = max(0.0, (float) $item->quantity_planned - (float) $item->quantity_issued);
+                $shortageQty      = max(0.0, $remainingToIssue - ((float) $item->quantity_reserved + $warehouseStock));
+
+                if ($shortageQty <= 0) {
+                    continue; // Skip items with no shortage
+                }
+
+                $lineItems[] = [
+                    'item'         => $item,
+                    'shortageQty'  => $shortageQty,
+                    'resolvedWh'   => $resolvedWh,
+                ];
+            }
+
+            if (empty($lineItems)) {
+                throw new InvalidArgumentException('No items with shortage found for the selected items and warehouse.');
+            }
+
+            // Generate single PR number
+            $year   = now()->format('Y');
+            $prefix = "PR-{$year}-";
+            $lastPr = PurchaseRequisition::where('tenant_id', $tenantId)
+                ->where('requisition_number', 'like', "{$prefix}%")
+                ->orderBy('id', 'desc')
+                ->first();
+
+            $nextNum = $lastPr
+                ? ((int) str_replace($prefix, '', $lastPr->requisition_number)) + 1
+                : 1;
+
+            $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+
+            // Create ONE PR
+            $pr = PurchaseRequisition::create([
+                'tenant_id'          => $tenantId,
+                'requisition_number' => $requisitionNumber,
+                'requisition_date'   => now()->toDateString(),
+                'status'             => 'Draft',
+                'source_type'        => 'material_request',
+                'source_id'          => $slip->id,
+                'notes'              => $notes ?: 'Bulk PR from Material Request #' . $slip->requisition_number,
+                'requested_by'       => auth()->id() ?: 1,
+            ]);
+
+            // Add ALL shortage items as line items to the SAME PR
+            foreach ($lineItems as $line) {
+                PurchaseRequisitionItem::create([
+                    'purchase_requisition_id' => $pr->id,
+                    'tenant_id'               => $tenantId,
+                    'product_id'              => $line['item']->product_id,
+                    'quantity'                => $line['shortageQty'],
+                    'uom_id'                  => $line['item']->uom_id,
+                    'warehouse_id'            => $line['resolvedWh'],
+                    'estimated_unit_cost'     => $line['item']->product?->unit_cost ?? 0.0,
+                    'notes'                   => "Shortage for {$line['item']->product?->name}",
+                ]);
+            }
+
+            return $pr;
+        });
+    }
+
 
     public function updateSlipStatus(ProductionRequisitionSlip $slip): void
     {

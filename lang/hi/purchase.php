@@ -603,6 +603,7 @@ return [
     'pay_method_bank_transfer' => 'बैंक ट्रांसफर',
     'pay_method_cheque' => 'चेक',
     'pay_method_credit_card' => 'क्रेडिट कार्ड',
+    'pay_method_upi' => 'UPI',
     'pay_method_other' => 'अन्य',
 
     // Vendor Payments Details & Allocation
@@ -775,8 +776,26 @@ return [
     'po_line_items' => 'क्रय आदेश आइटम (Purchase Order Line Items)',
     'disc_percent' => 'छूट %',
     'disc_amt' => 'छूट राशि',
-    'tax_percent' => 'कर %',
-    'tax_amt' => 'कर राशि',
+    'tax_percent'     => 'कर %',
+    'tax_amt'         => 'कर राशि',
     'select_supplier' => 'सप्लायर चुनें...',
-    'no_sku' => 'कोई SKU नहीं',
+    'no_sku'          => 'कोई SKU नहीं',
+
+    // सप्लायर और लाइन आइटम क्रियाएं
+    'add'                      => 'जोड़ें',
+    'remove'                   => 'हटाएं',
+    'add_line'                 => 'लाइन जोड़ें',
+    'purchase_add'             => 'खरीद जोड़ें',
+    'purchase_remove'          => 'खरीद हटाएं',
+    'bulk_supplier'            => 'बल्क सप्लायर',
+
+    // RFQ विवरण और स्टेटस (RFQ Show Page)
+    'back_to_rfqs'             => 'RFQ सूची पर वापस जाएं',
+    'created_at'               => 'निर्माण तिथि',
+    'status_sent'              => 'भेजा गया',
+    'status_confirmed'         => 'पुष्ट किया गया',
+    'terms_conditions'         => 'नियम और शर्तें',
+    'terms_conditions_remarks' => 'नियम / टिप्पणियां...',
+    'quote_no'                 => 'कोट संख्या',
+    'pending'                  => 'लंबित',
 ];

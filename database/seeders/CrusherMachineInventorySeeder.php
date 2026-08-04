@@ -7,6 +7,7 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Inventory\Models\ProductWarehouseStock;
+use App\Domains\Inventory\Models\StockTransaction;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -193,39 +194,65 @@ class CrusherMachineInventorySeeder extends Seeder
             ],
         ];
 
-        // 4. Seed Products and Warehouse Stocks
+        // 4. Seed Products, Warehouse Stocks & Stock Transactions
         foreach ($items as $data) {
             $whId = $data['warehouse_id'];
             unset($data['warehouse_id']);
 
+            $qty = (float) $data['opening_stock'];
+
             $product = Product::updateOrCreate(
                 [
                     'tenant_id' => $tenant->id,
-                    'sku' => $data['sku'],
+                    'sku'       => $data['sku'],
                 ],
                 array_merge($data, [
-                    'tenant_id' => $tenant->id,
-                    'item_type' => 'Goods',
-                    'variation_type' => 'Single',
-                    'status' => 'active',
+                    'tenant_id'          => $tenant->id,
+                    'item_type'          => 'Goods',
+                    'variation_type'     => 'Single',
+                    'status'             => 'active',
                     'opening_stock_rate' => $data['cost_price'],
                 ])
             );
 
-            // Seed Product Warehouse Stock record
+            // ── A. Product Warehouse Stock (quantity + reserved_qty + available_qty) ──
             ProductWarehouseStock::updateOrCreate(
                 [
-                    'tenant_id' => $tenant->id,
-                    'product_id' => $product->id,
+                    'tenant_id'    => $tenant->id,
+                    'product_id'   => $product->id,
                     'warehouse_id' => $whId,
                 ],
                 [
-                    'quantity' => $data['opening_stock'],
-                    'unit_cost' => $data['cost_price'],
+                    'quantity'      => $qty,
+                    'reserved_qty'  => 0.0000,
+                    'available_qty' => $qty,   // available = onhand - reserved
+                    'unit_cost'     => $data['cost_price'],
                 ]
             );
+
+            // ── B. Stock Transaction — Opening Stock IN entry ──────────────────
+            // Remove any old seeder entry for idempotency
+            StockTransaction::where('tenant_id',      $tenant->id)
+                            ->where('product_id',     $product->id)
+                            ->where('warehouse_id',   $whId)
+                            ->where('reference_type', 'Opening Stock')
+                            ->delete();
+
+            StockTransaction::create([
+                'tenant_id'      => $tenant->id,
+                'product_id'     => $product->id,
+                'warehouse_id'   => $whId,
+                'batch_id'       => null,
+                'type'           => 'IN',
+                'reference_type' => 'Opening Stock',
+                'reference_id'   => null,
+                'quantity'       => $qty,
+                'unit_cost'      => $data['cost_price'],
+                'total_value'    => round($qty * $data['cost_price'], 4),
+                'balance_qty'    => $qty,
+            ]);
         }
 
-        $this->command->info('Crusher Machine Inventory seeded cleanly with 1 Finished Good, Sub-Assemblies, and Raw Materials!');
+        $this->command->info('Crusher Machine Inventory seeded cleanly with 1 Finished Good, Sub-Assemblies, Raw Materials + Stock Transactions!');
     }
 }

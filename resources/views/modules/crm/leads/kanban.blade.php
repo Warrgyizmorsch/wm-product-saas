@@ -63,6 +63,27 @@
         background-color: #f1f5f9 !important;
         border: 2px dashed #3b82f6 !important;
     }
+
+    /* Star Rating Widget — Kanban Cards */
+    .star-rating-widget {
+        cursor: pointer;
+        user-select: none;
+    }
+    .star-rating-widget .star-icon {
+        font-size: 13px;
+        color: #cbd5e1;
+        fill: transparent;
+        transition: transform 0.15s ease, color 0.15s ease, fill 0.15s ease;
+    }
+    .star-rating-widget .star-icon.active-star {
+        color: #f59e0b;
+        fill: #f59e0b;
+    }
+    .star-rating-widget .star-icon.hovered-star {
+        color: #f59e0b !important;
+        fill: #f59e0b !important;
+        transform: scale(1.25);
+    }
 </style>
 @endpush
 
@@ -171,6 +192,16 @@
                     @forelse($leads as $lead)
                         @php
                             $expAmt = (float)($lead->expected_amount ?: ($lead->quotations->last()?->total_amount ?: 0));
+                            $kStarsMap = ['Low' => 1, 'Medium' => 2, 'High' => 3, 'Urgent' => 4];
+                            $kStarsCount = $kStarsMap[$lead->priority] ?? 0;
+                            $kBadgeClass = match($lead->priority) {
+                                'Low'    => 'bg-soft-success text-success',
+                                'Medium' => 'bg-soft-warning text-warning',
+                                'High'   => 'bg-soft-danger text-danger',
+                                'Urgent' => 'bg-danger text-white',
+                                default  => 'bg-soft-secondary text-secondary',
+                            };
+                            $kStarLabels = [1 => 'Low', 2 => 'Medium', 3 => 'High', 4 => 'Urgent'];
                         @endphp
                         <div class="kanban-card" draggable="true" data-lead-id="{{ $lead->id }}" data-company-name="{{ addslashes($lead->company_name) }}" data-is-qualified="{{ $lead->is_qualified ? '1' : '0' }}" data-amount="{{ $expAmt }}">
                             <!-- Lead Title & Value -->
@@ -191,16 +222,26 @@
                                 @endif
                             </div>
 
-                            <!-- Priority & Actions Footer -->
+                            <!-- Priority Stars & Actions Footer -->
                             <div class="d-flex align-items-center justify-content-between pt-2 border-top">
-                                <div>
-                                    @if($lead->priority === 'Urgent')
-                                        <span class="badge bg-soft-danger text-danger fs-10 fw-bold">Urgent</span>
-                                    @elseif($lead->priority === 'High')
-                                        <span class="badge bg-soft-warning text-warning fs-10 fw-bold">High</span>
-                                    @else
-                                        <span class="badge bg-soft-secondary text-secondary fs-10 fw-semibold">{{ $lead->priority ?: 'Normal' }}</span>
-                                    @endif
+                                <!-- Star Rating Widget -->
+                                <div class="d-flex align-items-center gap-1">
+                                    <div class="star-rating-widget d-inline-flex align-items-center gap-1" id="starRating_{{ $lead->id }}" data-current-stars="{{ $kStarsCount }}" data-current-priority="{{ $lead->priority }}">
+                                        @for($i = 1; $i <= 4; $i++)
+                                            @php $targetPriority = $kStarLabels[$i]; @endphp
+                                            <i class="feather-star star-icon {{ $i <= $kStarsCount ? 'active-star' : 'inactive-star' }}"
+                                               data-star="{{ $i }}"
+                                               data-priority="{{ $targetPriority }}"
+                                               data-lead-id="{{ $lead->id }}"
+                                               data-bs-toggle="tooltip"
+                                               data-bs-placement="top"
+                                               title="{{ $targetPriority }} ({{ $i }}★)"
+                                               onclick="updateLeadPriority({{ $lead->id }}, '{{ $targetPriority }}', this)"></i>
+                                        @endfor
+                                    </div>
+                                    <span class="badge fs-10 ms-1 priority-badge-{{ $lead->id }} {{ $kBadgeClass }}">
+                                        {{ $lead->priority ?: 'Unset' }}
+                                    </span>
                                 </div>
 
                                 <div class="d-flex align-items-center gap-1">
@@ -354,6 +395,74 @@
                 if (totalSpan) totalSpan.textContent = '₹ ' + totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             });
         }
+    });
+
+    // ── Star Rating: Update Priority via AJAX ──
+    window.updateLeadPriority = function(leadId, priority, el) {
+        var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        fetch('/crm/leads/' + leadId + '/priority', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({ priority: priority })
+        })
+        .then(r => r.json())
+        .then(function(res) {
+            if (res.success) {
+                var widget = document.getElementById('starRating_' + leadId);
+                var starsCount = priority === 'Low' ? 1 : (priority === 'Medium' ? 2 : (priority === 'High' ? 3 : 4));
+                widget.setAttribute('data-current-stars', starsCount);
+                widget.setAttribute('data-current-priority', priority);
+
+                widget.querySelectorAll('.star-icon').forEach(function(icon) {
+                    var s = parseInt(icon.getAttribute('data-star'));
+                    if (s <= starsCount) {
+                        icon.classList.add('active-star'); icon.classList.remove('inactive-star');
+                    } else {
+                        icon.classList.add('inactive-star'); icon.classList.remove('active-star');
+                    }
+                });
+
+                var badge = document.querySelector('.priority-badge-' + leadId);
+                if (badge) {
+                    badge.textContent = priority;
+                    badge.className = 'badge fs-10 ms-1 priority-badge-' + leadId;
+                    if (priority === 'Low')         badge.classList.add('bg-soft-success', 'text-success');
+                    else if (priority === 'Medium') badge.classList.add('bg-soft-warning', 'text-warning');
+                    else if (priority === 'High')   badge.classList.add('bg-soft-danger',  'text-danger');
+                    else if (priority === 'Urgent') badge.classList.add('bg-danger',        'text-white');
+                }
+            }
+        })
+        .catch(function(err) { console.error('Priority update failed:', err); });
+    };
+
+    // ── Star Hover Effect ──
+    document.addEventListener('mouseover', function(e) {
+        if (!e.target.classList.contains('star-icon')) return;
+        var hoveredStar = parseInt(e.target.getAttribute('data-star'));
+        var widget = e.target.closest('.star-rating-widget');
+        if (!widget) return;
+        widget.querySelectorAll('.star-icon').forEach(function(icon) {
+            var s = parseInt(icon.getAttribute('data-star'));
+            if (s <= hoveredStar) icon.classList.add('hovered-star');
+            else icon.classList.remove('hovered-star');
+        });
+    });
+    document.addEventListener('mouseout', function(e) {
+        if (!e.target.classList.contains('star-icon')) return;
+        var widget = e.target.closest('.star-rating-widget');
+        if (widget) widget.querySelectorAll('.star-icon').forEach(i => i.classList.remove('hovered-star'));
+    });
+
+    // Tooltip init for kanban stars
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+            new bootstrap.Tooltip(el);
+        });
     });
 </script>
 @endpush

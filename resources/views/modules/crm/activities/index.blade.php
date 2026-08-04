@@ -205,36 +205,37 @@
         </div>
     </div>
 
-    <!-- 2. COLOR LEGEND BAR (रंगों की स्पष्ट जानकारी) -->
+    <!-- 2. COLOR LEGEND BAR -->
     <div class="card border-0 bg-light mb-4 shadow-none">
         <div class="card-body py-2 px-3">
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 fs-12">
-                <span class="fw-bold text-dark d-flex align-items-center"><i class="feather-info me-1 text-primary"></i> Color Legend (गतिविधि रंग सूची):</span>
+                <span class="fw-bold text-dark d-flex align-items-center"><i class="feather-info me-1 text-primary"></i> {{ __('crm.color_legend') }}:</span>
                 <div class="d-flex flex-wrap align-items-center gap-3">
                     <span class="d-flex align-items-center text-secondary">
                         <span class="legend-indicator bg-danger"></span>
-                        <strong class="text-dark me-1">Red:</strong> Overdue / Missed Call (छूटा हुआ फ़ॉलो-अप)
+                        <strong class="text-dark me-1">{{ __('crm.legend_red_label') }}:</strong> {{ __('crm.legend_red_desc') }}
                     </span>
                     <span class="d-flex align-items-center text-secondary">
                         <span class="legend-indicator bg-info"></span>
-                        <strong class="text-dark me-1">Cyan/Blue:</strong> Scheduled Call (फोन कॉल)
+                        <strong class="text-dark me-1">{{ __('crm.legend_cyan_label') }}:</strong> {{ __('crm.legend_cyan_desc') }}
                     </span>
                     <span class="d-flex align-items-center text-secondary">
                         <span class="legend-indicator bg-primary"></span>
-                        <strong class="text-dark me-1">Dark Blue:</strong> Client Meeting (मीटिंग)
+                        <strong class="text-dark me-1">{{ __('crm.legend_blue_label') }}:</strong> {{ __('crm.legend_blue_desc') }}
                     </span>
                     <span class="d-flex align-items-center text-secondary">
                         <span class="legend-indicator bg-teal"></span>
-                        <strong class="text-dark me-1">Teal Green:</strong> Email / Proposal (ईमेल/प्रस्ताव)
+                        <strong class="text-dark me-1">{{ __('crm.legend_teal_label') }}:</strong> {{ __('crm.legend_teal_desc') }}
                     </span>
                     <span class="d-flex align-items-center text-secondary">
                         <span class="legend-indicator bg-success"></span>
-                        <strong class="text-dark me-1">Green:</strong> Completed Action (पूरा हुआ कार्य)
+                        <strong class="text-dark me-1">{{ __('crm.legend_green_label') }}:</strong> {{ __('crm.legend_green_desc') }}
                     </span>
                 </div>
             </div>
         </div>
     </div>
+
 
     <!-- 3. Calendar Grid -->
     @php
