@@ -94,10 +94,13 @@
                             </td>
                             <td>{{ date('d-M-Y', strtotime($slip->requisition_date)) }}</td>
                             <td class="text-center">
-                                @if($slip->status === 'completed')
+                                @php
+                                    $statusLower = strtolower($slip->status ?? 'pending');
+                                @endphp
+                                @if(in_array($statusLower, ['fully issued', 'completed', 'issued']))
                                     <span class="badge bg-soft-success text-success px-2.5 py-1 fw-bold fs-11">Fully Issued</span>
-                                @elseif($slip->status === 'partial')
-                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 fw-bold fs-11">Partially Issued</span>
+                                @elseif(in_array($statusLower, ['partially issued', 'partial', 'reserved']))
+                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 fw-bold fs-11">{{ $statusLower === 'reserved' ? 'Reserved' : 'Partially Issued' }}</span>
                                 @else
                                     <span class="badge bg-soft-danger text-danger px-2.5 py-1 fw-bold fs-11">Pending Issue</span>
                                 @endif

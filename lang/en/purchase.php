@@ -604,6 +604,7 @@ return [
     'pay_method_bank_transfer' => 'Bank Transfer',
     'pay_method_cheque' => 'Cheque',
     'pay_method_credit_card' => 'Credit Card',
+    'pay_method_upi' => 'UPI',
     'pay_method_other' => 'Other',
 
     // Vendor Payments Details & Allocation
@@ -776,8 +777,26 @@ return [
     'po_line_items' => 'Purchase Order Line Items',
     'disc_percent' => 'Disc %',
     'disc_amt' => 'Disc Amt',
-    'tax_percent' => 'Tax %',
-    'tax_amt' => 'Tax Amt',
-    'select_supplier' => 'Select Supplier...',
-    'no_sku' => 'No SKU',
+    'tax_percent'      => 'Tax %',
+    'tax_amt'          => 'Tax Amt',
+    'select_supplier'  => 'Select Supplier...',
+    'no_sku'           => 'No SKU',
+
+    // Supplier & line item actions
+    'add'                      => 'Add',
+    'remove'                   => 'Remove',
+    'add_line'                 => 'Add Line',
+    'purchase_add'             => 'Purchase Add',
+    'purchase_remove'          => 'Purchase Remove',
+    'bulk_supplier'            => 'Bulk Supplier',
+
+    // RFQ Show Page
+    'back_to_rfqs'             => 'Back to RFQs',
+    'created_at'               => 'Created At',
+    'status_sent'              => 'Sent',
+    'status_confirmed'         => 'Confirmed',
+    'terms_conditions'         => 'Terms & Conditions',
+    'terms_conditions_remarks' => 'Terms / Remarks...',
+    'quote_no'                 => 'Quote No.',
+    'pending'                  => 'Pending',
 ];

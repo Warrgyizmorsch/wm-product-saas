@@ -338,6 +338,19 @@ return [
     'viewing' => 'देख रहे हैं',
     'select_product' => 'उत्पाद चुनें...',
     'add_new_product' => 'नया उत्पाद जोड़ें',
+
+    // Activity Calendar - Color Legend (रंग सूची)
+    'color_legend'      => 'गतिविधि रंग सूची',
+    'legend_red_label'  => 'लाल',
+    'legend_red_desc'   => 'समय सीमा पार / छूटी कॉल',
+    'legend_cyan_label' => 'नीला/सियान',
+    'legend_cyan_desc'  => 'निर्धारित फोन कॉल',
+    'legend_blue_label' => 'गहरा नीला',
+    'legend_blue_desc'  => 'क्लाइंट मीटिंग',
+    'legend_teal_label' => 'हरा-नीला',
+    'legend_teal_desc'  => 'ईमेल / प्रस्ताव',
+    'legend_green_label'=> 'हरा',
+    'legend_green_desc' => 'पूर्ण कार्य',
 ];
 
 

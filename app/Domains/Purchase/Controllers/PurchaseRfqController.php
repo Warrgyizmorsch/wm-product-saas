@@ -11,6 +11,7 @@ use App\Domains\Purchase\Models\PurchaseRfqVendorRate;
 use App\Domains\Purchase\Models\PurchaseRequisition;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\PurchaseRequisitionItem;
+use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
@@ -77,56 +78,92 @@ class PurchaseRfqController extends Controller
                 ->with(['product', 'warehouse', 'requisition'])
                 ->get();
 
+            $mergedItems = [];
             foreach ($prItems as $prItem) {
                 if (!$selectedRequisitionId && $prItem->purchase_requisition_id) {
                     $selectedRequisitionId = $prItem->purchase_requisition_id;
                 }
 
                 $alreadyOrderedQty = (float) $prItem->ordered_qty;
+                $poOrderedQty = (float) PurchaseOrderItem::where('tenant_id', $tenantId)
+                    ->where('product_id', $prItem->product_id)
+                    ->whereHas('order', function ($q) use ($prItem) {
+                        $q->where('purchase_requisition_id', $prItem->purchase_requisition_id)
+                          ->where('status', '!=', 'Cancelled');
+                    })
+                    ->sum('quantity');
+
+                $alreadyOrderedQty = max($alreadyOrderedQty, $poOrderedQty);
                 $pendingQty = max(0.0, (float) $prItem->quantity - $alreadyOrderedQty);
                 if ($pendingQty <= 0) {
-                    $pendingQty = (float) $prItem->quantity;
+                    continue;
                 }
 
-                $product = $prItem->product;
-                $costRate = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
+                $productId = $prItem->product_id;
+                $product   = $prItem->product;
+                $costRate  = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
 
-                $prefilledItems[] = [
-                    'requisition_item_id' => $prItem->id,
-                    'product_id' => $prItem->product_id,
-                    'product_name' => $product?->name ?? 'Product #' . $prItem->product_id,
-                    'quantity' => $pendingQty,
-                    'estimated_cost' => $costRate,
-                    'vendor_id' => $product?->preferred_vendor_id,
-                ];
+                if (isset($mergedItems[$productId])) {
+                    $mergedItems[$productId]['quantity'] += $pendingQty;
+                    $mergedItems[$productId]['requisition_item_ids'][] = $prItem->id;
+                } else {
+                    $mergedItems[$productId] = [
+                        'requisition_item_id'  => $prItem->id,
+                        'requisition_item_ids' => [$prItem->id],
+                        'product_id'           => $productId,
+                        'product_name'         => $product?->name ?? 'Product #' . $productId,
+                        'quantity'             => $pendingQty,
+                        'estimated_cost'       => $costRate,
+                        'vendor_id'            => $product?->preferred_vendor_id,
+                    ];
+                }
             }
+            $prefilledItems = array_values($mergedItems);
         } elseif ($selectedRequisitionId) {
             $prItems = PurchaseRequisitionItem::where('tenant_id', $tenantId)
                 ->where('purchase_requisition_id', $selectedRequisitionId)
                 ->with(['product', 'warehouse'])
                 ->get();
 
+            $mergedItems = [];
             foreach ($prItems as $prItem) {
                 $alreadyOrderedQty = (float) $prItem->ordered_qty;
+                $poOrderedQty = (float) PurchaseOrderItem::where('tenant_id', $tenantId)
+                    ->where('product_id', $prItem->product_id)
+                    ->whereHas('order', function ($q) use ($prItem) {
+                        $q->where('purchase_requisition_id', $prItem->purchase_requisition_id)
+                          ->where('status', '!=', 'Cancelled');
+                    })
+                    ->sum('quantity');
+
+                $alreadyOrderedQty = max($alreadyOrderedQty, $poOrderedQty);
                 $pendingQty = max(0.0, (float) $prItem->quantity - $alreadyOrderedQty);
                 if ($pendingQty <= 0) {
-                    $pendingQty = (float) $prItem->quantity;
+                    continue;
                 }
 
-                $product = $prItem->product;
-                $costRate = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
+                $productId = $prItem->product_id;
+                $product   = $prItem->product;
+                $costRate  = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
 
-                $prefilledItems[] = [
-                    'requisition_item_id' => $prItem->id,
-                    'product_id' => $prItem->product_id,
-                    'product_name' => $product?->name ?? 'Product #' . $prItem->product_id,
-                    'quantity' => $pendingQty,
-                    'estimated_cost' => $costRate,
-                    'vendor_id' => $product?->preferred_vendor_id,
-                ];
+                if (isset($mergedItems[$productId])) {
+                    $mergedItems[$productId]['quantity'] += $pendingQty;
+                    $mergedItems[$productId]['requisition_item_ids'][] = $prItem->id;
+                } else {
+                    $mergedItems[$productId] = [
+                        'requisition_item_id'  => $prItem->id,
+                        'requisition_item_ids' => [$prItem->id],
+                        'product_id'           => $productId,
+                        'product_name'         => $product?->name ?? 'Product #' . $productId,
+                        'quantity'             => $pendingQty,
+                        'estimated_cost'       => $costRate,
+                        'vendor_id'            => $product?->preferred_vendor_id,
+                    ];
+                }
 
                 $requisitionItemIds[] = $prItem->id;
             }
+            $prefilledItems = array_values($mergedItems);
         }
 
         return view('modules.purchase.rfqs.create', compact(
