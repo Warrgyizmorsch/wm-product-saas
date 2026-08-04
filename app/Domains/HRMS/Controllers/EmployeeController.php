@@ -107,6 +107,7 @@ class EmployeeController extends Controller
                 'nullable',
                 Rule::unique('employees', 'user_id')->ignore($employeeId),
             ],
+            'role_id' => ['nullable', 'exists:roles,id'],
 
             'title' => ['nullable', 'string', 'max:50'],
             'full_name' => ['required', 'string', 'max:255'],
@@ -133,6 +134,7 @@ class EmployeeController extends Controller
             'shift_id' => ['nullable', 'exists:production_shifts,id'],
             'employment_type' => ['nullable', 'string', 'max:100'],
             'employee_stage' => ['nullable', 'string', 'max:100'],
+            'office' => ['nullable', 'string', 'in:office,wfh,onsite'],
             'date_of_joining' => ['required', 'date'],
             'date_of_birth' => ['nullable', 'date'],
             'gender' => ['required', 'string', 'max:50'],

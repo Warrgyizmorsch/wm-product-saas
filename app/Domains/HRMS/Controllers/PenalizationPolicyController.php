@@ -49,25 +49,25 @@ class PenalizationPolicyController extends Controller
             $rules['penalty_tiers'] = 'required|array';
             $rules['penalty_tiers.*.min_occurrence'] = 'required|integer|min:1';
             $rules['penalty_tiers.*.max_occurrence'] = 'nullable|integer|min:1';
-            $rules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,leave_deduction,both_deductions';
+            $rules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,working_hour_deduction,both_deductions';
             $rules['penalty_tiers.*.penalty_value'] = 'required|numeric|min:0';
-            $rules['penalty_tiers.*.leave_type_id'] = 'nullable|integer|exists:leave_types,id';
+            $rules['penalty_tiers.*.leave_type_id'] = 'nullable';
         } elseif ($request->rule_type === 'missing_logs') {
             $rules['threshold_count'] = 'required|integer|min:0';
             $rules['penalty_tiers'] = 'required|array';
             $rules['penalty_tiers.*.min_occurrence'] = 'required|integer|min:1';
             $rules['penalty_tiers.*.max_occurrence'] = 'nullable|integer|min:1';
-            $rules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,leave_deduction,both_deductions';
+            $rules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,working_hour_deduction,both_deductions';
             $rules['penalty_tiers.*.penalty_value'] = 'required|numeric|min:0';
-            $rules['penalty_tiers.*.leave_type_id'] = 'nullable|integer|exists:leave_types,id';
+            $rules['penalty_tiers.*.leave_type_id'] = 'nullable';
         } elseif ($request->rule_type === 'under_hours') {
             $rules['grace_period_hours'] = 'required|numeric|min:0';
             $rules['threshold_count'] = 'required|integer|min:0';
             $rules['penalty_tiers'] = 'required|array';
             $rules['penalty_tiers.*.hours_threshold'] = 'required|numeric|min:0|max:24';
-            $rules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,leave_deduction,both_deductions';
+            $rules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,working_hour_deduction,both_deductions';
             $rules['penalty_tiers.*.penalty_value'] = 'required|numeric|min:0';
-            $rules['penalty_tiers.*.leave_type_id'] = 'nullable|integer|exists:leave_types,id';
+            $rules['penalty_tiers.*.leave_type_id'] = 'nullable';
         }
 
         $request->validate($rules);
@@ -89,7 +89,7 @@ class PenalizationPolicyController extends Controller
                         'max_occurrence' => $tier['max_occurrence'] !== null && $tier['max_occurrence'] !== '' ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value' => (float) $tier['penalty_value'],
-                        'leave_type_id' => !empty($tier['leave_type_id']) ? (int) $tier['leave_type_id'] : null,
+                        'leave_type_id' => null,
                     ];
                 }
             }
@@ -110,7 +110,7 @@ class PenalizationPolicyController extends Controller
                         'max_occurrence' => $tier['max_occurrence'] !== null && $tier['max_occurrence'] !== '' ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value' => (float) $tier['penalty_value'],
-                        'leave_type_id' => !empty($tier['leave_type_id']) ? (int) $tier['leave_type_id'] : null,
+                        'leave_type_id' => null,
                     ];
                 }
             }
@@ -129,7 +129,7 @@ class PenalizationPolicyController extends Controller
                         'hours_threshold' => (float) $tier['hours_threshold'],
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value' => (float) $tier['penalty_value'],
-                        'leave_type_id' => !empty($tier['leave_type_id']) ? (int) $tier['leave_type_id'] : null,
+                        'leave_type_id' => null,
                     ];
                 }
             }
@@ -198,7 +198,7 @@ class PenalizationPolicyController extends Controller
         $validated['wfh_tracking'] = $request->has('wfh_tracking');
         $validated['site_location'] = $request->has('site_location');
         $validated['site_selfie'] = $request->has('site_selfie');
-        $validated['site_geofence'] = $request->has('site_geofence');
+        $validated['site_geofence'] = false;
         $validated['site_tracking'] = $request->has('site_tracking');
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);

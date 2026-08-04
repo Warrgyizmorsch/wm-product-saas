@@ -121,7 +121,7 @@
         ],
         'HRMS' => [
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
-            ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#'],
+            ['label' => 'Attendance', 'icon' => 'feather-clock', 'route' => 'hrms.attendance.index'],
             ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],

@@ -59,6 +59,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
+            \App\Domains\HRMS\Repositories\AttendanceRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\AttendanceRepository::class
+        );
+
+        $this->app->bind(
             \App\Domains\HRMS\Repositories\EmployeeRepositoryInterface::class,
             \App\Domains\HRMS\Repositories\EmployeeRepository::class
         );

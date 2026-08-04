@@ -406,16 +406,15 @@
                                                  <div class="col-12">
                                                      <div class="table-responsive border rounded bg-white">
                                                          <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="late-arrival-tiers-table" style="font-size: 13px;">
-                                                             <thead class="table-light">
-                                                                 <tr>
-                                                                     <th style="width: 10%; min-width: 95px;">{{ __('hrms.penalization.min_occurrences') }}</th>
-                                                                     <th style="width: 10%; min-width: 105px;">{{ __('hrms.penalization.max_occurrences') }}</th>
-                                                                     <th style="width: 30%; min-width: 240px;">{{ __('hrms.penalization.settlement_method') }}</th>
-                                                                     <th style="width: 12%; min-width: 115px;">{{ __('hrms.penalization.deduction_value') }}</th>
-                                                                     <th style="width: 28%; min-width: 210px;">{{ __('hrms.penalization.deduct_leave_type') }}</th>
-                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">{{ __('hrms.penalization.action') }}</th>
-                                                                 </tr>
-                                                             </thead>
+                                                              <thead class="table-light">
+                                                                  <tr>
+                                                                      <th style="width: 15%;">{{ __('hrms.penalization.min_occurrences') }}</th>
+                                                                      <th style="width: 15%;">{{ __('hrms.penalization.max_occurrences') }}</th>
+                                                                      <th style="width: 45%;">{{ __('hrms.penalization.settlement_method') }}</th>
+                                                                      <th style="width: 15%;">Deduction Value (Days)</th>
+                                                                      <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
+                                                                  </tr>
+                                                              </thead>
                                                              <tbody id="late-arrival-tiers-tbody">
                                                                  <!-- Tiers will be dynamically rendered here -->
                                                              </tbody>
@@ -470,11 +469,10 @@
                                                          <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="under-hours-tiers-table" style="font-size: 13px;">
                                                              <thead class="table-light">
                                                                  <tr>
-                                                                     <th style="width: 18%; min-width: 150px;">{{ __('hrms.penalization.if_hours_less') }}</th>
-                                                                     <th style="width: 32%; min-width: 240px;">{{ __('hrms.penalization.settlement_method') }}</th>
-                                                                     <th style="width: 12%; min-width: 115px;">{{ __('hrms.penalization.deduction_value') }}</th>
-                                                                     <th style="width: 28%; min-width: 210px;">{{ __('hrms.penalization.deduct_leave_type') }}</th>
-                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">{{ __('hrms.penalization.action') }}</th>
+                                                                     <th style="width: 25%;">{{ __('hrms.penalization.if_hours_less') }}</th>
+                                                                     <th style="width: 50%;">{{ __('hrms.penalization.settlement_method') }}</th>
+                                                                     <th style="width: 15%;">Deduction Value (Days)</th>
+                                                                     <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
                                                                  </tr>
                                                              </thead>
                                                              <tbody id="under-hours-tiers-tbody">
@@ -517,16 +515,15 @@
                                                  <div class="col-12">
                                                      <div class="table-responsive border rounded bg-white">
                                                          <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="missing-logs-tiers-table" style="font-size: 13px;">
-                                                             <thead class="table-light">
-                                                                 <tr>
-                                                                     <th style="width: 11%; min-width: 95px;">{{ __('hrms.penalization.min_occurrences') }}</th>
-                                                                     <th style="width: 12%; min-width: 105px;">{{ __('hrms.penalization.max_occurrences') }}</th>
-                                                                     <th style="width: 25%; min-width: 195px;">{{ __('hrms.penalization.settlement_method') }}</th>
-                                                                     <th style="width: 15%; min-width: 115px;">{{ __('hrms.penalization.deduction_value') }}</th>
-                                                                     <th style="width: 27%; min-width: 175px;">{{ __('hrms.penalization.deduct_leave_type') }}</th>
-                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">{{ __('hrms.penalization.action') }}</th>
-                                                                 </tr>
-                                                             </thead>
+                                                              <thead class="table-light">
+                                                                  <tr>
+                                                                      <th style="width: 15%;">{{ __('hrms.penalization.min_occurrences') }}</th>
+                                                                      <th style="width: 15%;">{{ __('hrms.penalization.max_occurrences') }}</th>
+                                                                      <th style="width: 45%;">{{ __('hrms.penalization.settlement_method') }}</th>
+                                                                      <th style="width: 15%;">Deduction Value (Days)</th>
+                                                                      <th style="width: 10%;" class="text-center">{{ __('hrms.penalization.action') }}</th>
+                                                                  </tr>
+                                                              </thead>
                                                              <tbody id="missing-logs-tiers-tbody">
                                                                  <!-- Tiers will be dynamically rendered here -->
                                                              </tbody>
@@ -654,10 +651,6 @@
                                                           <div>
                                                               <x-ui.checkbox name="site_selfie" id="site_selfie" label="Require Selfie Capture" />
                                                               <span class="text-muted fs-11 d-block ms-4 ps-1">Mandate employee to snap a selfie photo on check-in and check-out.</span>
-                                                          </div>
-                                                          <div>
-                                                              <x-ui.checkbox name="site_geofence" id="site_geofence" label="Enforce Assigned Site Geofence (Strict)" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">If checked, they must check-in from the assigned site location (tracking anchor is assigned location). If unchecked, site is optional (tracking anchor is first check-in location).</span>
                                                           </div>
                                                           <div>
                                                               <x-ui.checkbox name="site_tracking" id="site_tracking" label="Enable Live Location Tracking during Shift" onchange="toggleTrackingThreshold('site')" />
@@ -797,15 +790,6 @@
 
             function addTierRow(min_occ = '', max_occ = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
                 let tbody = $('#late-arrival-tiers-tbody');
-                
-                let leaveOptions = `<option value="">{{ __('hrms.penalization.select_leave_quota') }}</option>`;
-                @foreach($leaveTypes as $lType)
-                    leaveOptions += `<option value="{{ $lType->id }}" ${leave_type_id == "{{ $lType->id }}" ? 'selected' : ''}>{{ $lType->name }} ({{ strtoupper($lType->code) }})</option>`;
-                @endforeach
-
-                let isLeaveRequired = (penalty_action === 'leave_deduction' || penalty_action === 'both_deductions');
-                let leaveStyles = isLeaveRequired ? '' : 'style="display:none;"';
-                let leaveDisabled = isLeaveRequired ? '' : 'disabled';
                 let valueReadonly = (penalty_action === 'no_deduction') ? 'readonly' : '';
 
                 let rowHtml = `
@@ -818,19 +802,14 @@
                         </td>
                         <td>
                             <select name="penalty_tiers[${tierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
-                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.no_deduction_free') }}</option>
-                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.loss_of_pay') }}</option>
-                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_leave_balance') }}</option>
-                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>{{ __('hrms.penalization.both_settlements') }}</option>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Deduct Salary (Loss of Pay)</option>
+                                <option value="working_hour_deduction" ${penalty_action === 'working_hour_deduction' ? 'selected' : ''}>Deduct Working Day</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Working Day)</option>
                             </select>
                         </td>
                         <td>
-                            <input type="number" step="0.1" name="penalty_tiers[${tierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
-                        </td>
-                        <td>
-                            <select name="penalty_tiers[${tierIndex}][leave_type_id]" class="odoo-table-select tier-leave-select" ${leaveDisabled} ${leaveStyles}>
-                                ${leaveOptions}
-                            </select>
+                            <input type="number" step="any" name="penalty_tiers[${tierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
                         </td>
                         <td class="text-center">
                             <button type="button" class="btn btn-sm btn-soft-danger btn-remove-tier"><i class="feather-trash-2"></i></button>
@@ -841,13 +820,12 @@
                 let row = $(rowHtml);
                 tbody.append(row);
                 
-                row.find('.tier-action-select, .tier-leave-select').select2({
+                row.find('.tier-action-select').select2({
                     theme: 'bootstrap-5',
                     dropdownParent: $(document.body)
                 });
 
                 tierIndex++;
-                updateLeaveColumnVisibility('late-arrival-tiers-table');
             }
 
             // Pre-populate late arrival tiers
@@ -857,7 +835,6 @@
                     addTierRow(t.min_occurrence, t.max_occurrence, t.penalty_action, t.penalty_value, t.leave_type_id);
                 });
             } else {
-                // Seed standard defaults: 1-3 Free, 4-5 Salary Deduct 1 day, 6+ Salary Deduct 2 days
                 addTierRow(1, 3, 'no_deduction', 0, '');
                 addTierRow(4, 5, 'salary_deduction', 1, '');
                 addTierRow(6, '', 'salary_deduction', 2, '');
@@ -865,7 +842,6 @@
 
             // Add Tier Button Click handler
             $(document).on('click', '#btn-add-tier', function() {
-                // Try to find the max value of existing rows to guess next min occurrence
                 let lastMax = 0;
                 $('.max-occ').each(function() {
                     let val = parseInt($(this).val());
@@ -882,12 +858,9 @@
             $(document).on('click', '.btn-remove-tier', function() {
                 let row = $(this).closest('tr');
                 row.remove();
-                
-                // If all rows removed, insert a default row
                 if ($('#late-arrival-tiers-tbody tr').length === 0) {
                     addTierRow(1, '', 'no_deduction', 0, '');
                 }
-                updateLeaveColumnVisibility('late-arrival-tiers-table');
             });
 
             // Work Hours Deficit Tiers Builder Logic
@@ -895,15 +868,6 @@
 
             function addDeficitTierRow(hours_threshold = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
                 let tbody = $('#under-hours-tiers-tbody');
-                
-                let leaveOptions = `<option value="">{{ __('hrms.penalization.select_leave_quota') }}</option>`;
-                @foreach($leaveTypes as $lType)
-                    leaveOptions += `<option value="{{ $lType->id }}" ${leave_type_id == "{{ $lType->id }}" ? 'selected' : ''}>{{ $lType->name }} ({{ strtoupper($lType->code) }})</option>`;
-                @endforeach
-
-                let isLeaveRequired = (penalty_action === 'leave_deduction' || penalty_action === 'both_deductions');
-                let leaveStyles = isLeaveRequired ? '' : 'style="display:none;"';
-                let leaveDisabled = isLeaveRequired ? '' : 'disabled';
                 let valueReadonly = (penalty_action === 'no_deduction') ? 'readonly' : '';
 
                 let rowHtml = `
@@ -913,19 +877,14 @@
                         </td>
                         <td>
                             <select name="penalty_tiers[${deficitTierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
-                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.no_deduction_free') }}</option>
-                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.loss_of_pay') }}</option>
-                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_leave_balance') }}</option>
-                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>{{ __('hrms.penalization.both_settlements') }}</option>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Deduct Salary (Loss of Pay)</option>
+                                <option value="working_hour_deduction" ${penalty_action === 'working_hour_deduction' ? 'selected' : ''}>Deduct Working Day</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Working Day)</option>
                             </select>
                         </td>
                         <td>
-                            <input type="number" step="0.1" name="penalty_tiers[${deficitTierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
-                        </td>
-                        <td>
-                            <select name="penalty_tiers[${deficitTierIndex}][leave_type_id]" class="odoo-table-select tier-leave-select" ${leaveDisabled} ${leaveStyles}>
-                                ${leaveOptions}
-                            </select>
+                            <input type="number" step="any" name="penalty_tiers[${deficitTierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
                         </td>
                         <td class="text-center">
                             <button type="button" class="btn btn-sm btn-soft-danger btn-remove-deficit-tier"><i class="feather-trash-2"></i></button>
@@ -936,13 +895,12 @@
                 let row = $(rowHtml);
                 tbody.append(row);
                 
-                row.find('.tier-action-select, .tier-leave-select').select2({
+                row.find('.tier-action-select').select2({
                     theme: 'bootstrap-5',
                     dropdownParent: $(document.body)
                 });
 
                 deficitTierIndex++;
-                updateLeaveColumnVisibility('under-hours-tiers-table');
             }
 
             // Pre-populate deficit tiers
@@ -952,7 +910,6 @@
                     addDeficitTierRow(t.hours_threshold, t.penalty_action, t.penalty_value, t.leave_type_id);
                 });
             } else {
-                // Seed standard defaults: < 6 Hours -> Loss of Pay (1 Day), < 4 Hours -> Loss of Pay (2 Days)
                 addDeficitTierRow(6, 'salary_deduction', 1, '');
                 addDeficitTierRow(4, 'salary_deduction', 2, '');
             }
@@ -966,12 +923,9 @@
             $(document).on('click', '.btn-remove-deficit-tier', function() {
                 let row = $(this).closest('tr');
                 row.remove();
-                
-                // If all rows removed, insert a default row
                 if ($('#under-hours-tiers-tbody tr').length === 0) {
                     addDeficitTierRow(6, 'salary_deduction', 1, '');
                 }
-                updateLeaveColumnVisibility('under-hours-tiers-table');
             });
 
             // Missing Logs Tiers Builder Logic
@@ -979,15 +933,6 @@
 
             function addMissingTierRow(min_occ = '', max_occ = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
                 let tbody = $('#missing-logs-tiers-tbody');
-                
-                let leaveOptions = `<option value="">{{ __('hrms.penalization.select_leave_quota') }}</option>`;
-                @foreach($leaveTypes as $lType)
-                    leaveOptions += `<option value="{{ $lType->id }}" ${leave_type_id == "{{ $lType->id }}" ? 'selected' : ''}>{{ $lType->name }} ({{ strtoupper($lType->code) }})</option>`;
-                @endforeach
-
-                let isLeaveRequired = (penalty_action === 'leave_deduction' || penalty_action === 'both_deductions');
-                let leaveStyles = isLeaveRequired ? '' : 'style="display:none;"';
-                let leaveDisabled = isLeaveRequired ? '' : 'disabled';
                 let valueReadonly = (penalty_action === 'no_deduction') ? 'readonly' : '';
 
                 let rowHtml = `
@@ -1000,19 +945,14 @@
                         </td>
                         <td>
                             <select name="penalty_tiers[${missingTierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
-                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.no_deduction_free') }}</option>
-                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.loss_of_pay') }}</option>
-                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_leave_balance') }}</option>
-                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>{{ __('hrms.penalization.both_settlements') }}</option>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Deduct Salary (Loss of Pay)</option>
+                                <option value="working_hour_deduction" ${penalty_action === 'working_hour_deduction' ? 'selected' : ''}>Deduct Working Day</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Working Day)</option>
                             </select>
                         </td>
                         <td>
-                            <input type="number" step="0.1" name="penalty_tiers[${missingTierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
-                        </td>
-                        <td>
-                            <select name="penalty_tiers[${missingTierIndex}][leave_type_id]" class="odoo-table-select tier-leave-select" ${leaveDisabled} ${leaveStyles}>
-                                ${leaveOptions}
-                            </select>
+                            <input type="number" step="any" name="penalty_tiers[${missingTierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
                         </td>
                         <td class="text-center">
                             <button type="button" class="btn btn-sm btn-soft-danger btn-remove-missing-tier"><i class="feather-trash-2"></i></button>
@@ -1023,13 +963,12 @@
                 let row = $(rowHtml);
                 tbody.append(row);
                 
-                row.find('.tier-action-select, .tier-leave-select').select2({
+                row.find('.tier-action-select').select2({
                     theme: 'bootstrap-5',
                     dropdownParent: $(document.body)
                 });
 
                 missingTierIndex++;
-                updateLeaveColumnVisibility('missing-logs-tiers-table');
             }
 
             // Pre-populate missing logs tiers
@@ -1039,7 +978,6 @@
                     addMissingTierRow(t.min_occurrence, t.max_occurrence, t.penalty_action, t.penalty_value, t.leave_type_id);
                 });
             } else {
-                // Seed standard defaults: 1-3 Free, 4-5 Salary Deduct 0.5 day, 6+ Salary Deduct 1 day
                 addMissingTierRow(1, 3, 'no_deduction', 0, '');
                 addMissingTierRow(4, 5, 'salary_deduction', 0.5, '');
                 addMissingTierRow(6, '', 'salary_deduction', 1, '');
@@ -1047,7 +985,6 @@
 
             // Add Missing Tier Button Click handler
             $(document).on('click', '#btn-add-missing-tier', function() {
-                // Try to find the max value of existing rows to guess next min occurrence
                 let lastMax = 0;
                 $('.missing-max-occ').each(function() {
                     let val = parseInt($(this).val());
@@ -1064,87 +1001,26 @@
             $(document).on('click', '.btn-remove-missing-tier', function() {
                 let row = $(this).closest('tr');
                 row.remove();
-                
-                // If all rows removed, insert a default row
                 if ($('#missing-logs-tiers-tbody tr').length === 0) {
                     addMissingTierRow(1, '', 'no_deduction', 0, '');
                 }
-                updateLeaveColumnVisibility('missing-logs-tiers-table');
             });
-
-            // Helper to dynamically show/hide the Deduct Leave column if no rows require it
-            function updateLeaveColumnVisibility(tableId) {
-                let table = $('#' + tableId);
-                if (table.length === 0) return;
-                
-                let hasLeaveAction = false;
-                table.find('.tier-action-select').each(function() {
-                    let val = $(this).val();
-                    if (val === 'leave_deduction' || val === 'both_deductions') {
-                        hasLeaveAction = true;
-                    }
-                });
-
-                // Find index of column header that contains "Leave Type"
-                let leaveColIdx = -1;
-                table.find('thead th').each(function(index) {
-                    let text = $(this).text().toUpperCase();
-                    if (text.indexOf('LEAVE TYPE') !== -1) {
-                        leaveColIdx = index;
-                    }
-                });
-
-                if (leaveColIdx !== -1) {
-                    if (hasLeaveAction) {
-                        table.find('thead th').eq(leaveColIdx).show();
-                        table.find('tbody tr').each(function() {
-                            $(this).find('td').eq(leaveColIdx).show();
-                        });
-                    } else {
-                        table.find('thead th').eq(leaveColIdx).hide();
-                        table.find('tbody tr').each(function() {
-                            $(this).find('td').eq(leaveColIdx).hide();
-                        });
-                    }
-                }
-            }
 
             // Handle action select changes dynamically
             $(document).on('change', '.tier-action-select', function() {
                 let select = $(this);
                 let row = select.closest('tr');
                 let valueInput = row.find('.tier-value-input');
-                let leaveSelect = row.find('.tier-leave-select');
-                let select2Container = leaveSelect.next('.select2-container');
 
                 if (select.val() === 'no_deduction') {
                     valueInput.val(0).prop('readonly', true);
-                    leaveSelect.val('').prop('required', false).prop('disabled', true).trigger('change.select2');
-                    if (select2Container.length) select2Container.hide();
-                    else leaveSelect.hide();
                 } else {
                     valueInput.prop('readonly', false);
-                    if (select.val() === 'leave_deduction' || select.val() === 'both_deductions') {
-                        leaveSelect.prop('required', false).prop('disabled', false);
-                        if (select2Container.length) select2Container.show();
-                        else leaveSelect.show();
-                    } else {
-                        // salary_deduction
-                        leaveSelect.val('').prop('required', false).prop('disabled', true).trigger('change.select2');
-                        if (select2Container.length) select2Container.hide();
-                        else leaveSelect.hide();
-                    }
                 }
-
-                let tableId = select.closest('table').attr('id');
-                updateLeaveColumnVisibility(tableId);
             });
 
             // Initial load visibility checks
             initPolicyPaneSelects('.policy-details-pane:not(.d-none)');
-            updateLeaveColumnVisibility('late-arrival-tiers-table');
-            updateLeaveColumnVisibility('under-hours-tiers-table');
-            updateLeaveColumnVisibility('missing-logs-tiers-table');
         });
     </script>
     <script>
