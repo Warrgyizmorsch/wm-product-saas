@@ -96,7 +96,7 @@ class ProductionScheduleController extends Controller
 
             return redirect()
                 ->route('production.schedules.show', $schedule->id)
-                ->with('success', "Schedule [{$schedule->schedule_number}] generated successfully.");
+                ->with('success', "Scheduling created! Now you can release it to the shop floor.");
         } catch (\LogicException $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         } catch (\Exception $e) {
@@ -182,7 +182,7 @@ class ProductionScheduleController extends Controller
                 'released_by' => auth()->id(),
             ]);
 
-            return redirect()->back()->with('success', "Schedule [{$schedule->schedule_number}] released to shop floor.");
+            return redirect()->back()->with('success', "Released to the shop floor! Visit Shop Floor (MES) to see operations.");
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -233,9 +233,12 @@ class ProductionScheduleController extends Controller
                 $newSchedule->update(['notes' => $schedule->notes]);
             }
 
+            $actualStart = $newSchedule->operations()->min('planned_start');
+            $displayDate = $actualStart ? \Carbon\Carbon::parse($actualStart)->format('d/m/Y H:i') : $startDate->format('d/m/Y H:i');
+
             return redirect()
                 ->route('production.schedules.show', $newSchedule->id)
-                ->with('success', "Schedule rescheduled to {$startDate->format('d/m/Y H:i')} successfully.");
+                ->with('success', "Schedule updated. Earliest available working start: {$displayDate}.");
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to reschedule schedule: ' . $e->getMessage());
         }

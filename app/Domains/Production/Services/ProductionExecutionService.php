@@ -91,11 +91,11 @@ class ProductionExecutionService
             $newConsumed = $isFirstOp ? (float) ($produced + $rejected) : (float) ($produced + $rejected + $scrapped);
 
             if ($isFirstOp) {
-                if ($orderAvailableWip <= 0 || $newConsumed > $orderAvailableWip) {
+                if ($newConsumed > 0 && ($orderAvailableWip <= 0 || $newConsumed > $orderAvailableWip)) {
                     throw new InvalidArgumentException("Cannot log progress: Target production capacity of " . number_format($order->quantity_ordered, 2) . " units has already been reached for Order #{$order->order_number}.");
                 }
             } else {
-                if ($newConsumed > $availableWip) {
+                if ($newConsumed > 0 && $newConsumed > $availableWip) {
                     throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available transferred input WIP of {$availableWip} units for Batch #{$batch->batch_number}.");
                 }
             }

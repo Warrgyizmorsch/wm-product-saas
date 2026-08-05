@@ -75,6 +75,11 @@
 
             <div class="page-header">
                 <div class="page-header-left d-flex align-items-center">
+                    @hasSection('page-back-button')
+                        <div class="me-2">
+                            @yield('page-back-button')
+                        </div>
+                    @endif
                     <div class="page-header-title">
                         <h5 class="m-b-10">@yield('page-title', __('ui.dashboard'))</h5>
                     </div>
@@ -418,7 +423,7 @@
     <!-- Global Toast Notifications -->
     <div class="erp-toast-container">
         @if (session('success'))
-            <x-ui.toast :auto="true" title="{{ session('success') }}" type="success" delay="5000">
+            <x-ui.toast :auto="true" title="{{ session('success') }}" type="success" delay="6000">
             </x-ui.toast>
         @endif
 

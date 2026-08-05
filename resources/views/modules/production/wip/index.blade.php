@@ -18,6 +18,22 @@
 @endpush
 
 @section('content')
+
+    {{-- ── WIP Tracking Workflow Guidance Component ── --}}
+    @php
+        $firstOrder = isset($ordersPaginator) ? $ordersPaginator->first() : null;
+        $orderTargetId = $firstOrder ? $firstOrder->id : null;
+    @endphp
+
+    <x-ui.workflow-guide title="What's Next?">
+        Track live shop floor production progress across work centers. The <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold me-1"><i class="feather-box me-1"></i>Receive Completed FG</span> button will automatically appear once completed finished goods units are available. Clicking it transfers the finished goods into your warehouse. All receipt logs can be tracked under the 
+        @if($orderTargetId)
+            <a href="{{ route('production.orders.show', ['order' => $orderTargetId, 'tab' => 'vtab-progress']) }}" class="fw-bold text-primary text-decoration-underline">Order Progress & Receipts Tab</a>.
+        @else
+            <span class="fw-bold text-primary text-decoration-underline">Order Progress & Receipts Tab</span> on the Production Order page.
+        @endif
+    </x-ui.workflow-guide>
+
     <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
         <!-- Success & Error Messages -->
 

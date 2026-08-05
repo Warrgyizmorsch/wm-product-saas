@@ -29,7 +29,8 @@ class ProductionOrderController extends Controller
         private readonly ProductionExecutionService $executionService,
         private readonly ProductionCostVarianceService $costService,
         private readonly ProductionCostAdjustmentService $adjustmentService
-    ) {}
+    ) {
+    }
 
     public function index(Request $request)
     {
@@ -39,7 +40,7 @@ class ProductionOrderController extends Controller
         $query = ProductionOrder::with(['product', 'bom', 'routing']);
 
         if ($request->filled('search')) {
-            $search = '%'.$request->input('search').'%';
+            $search = '%' . $request->input('search') . '%';
             $query->where(function ($q) use ($search) {
                 $q->where('order_number', 'like', $search)
                     ->orWhereHas('product', function ($p) use ($search) {
@@ -99,7 +100,7 @@ class ProductionOrderController extends Controller
             $salesOrderItems = $salesOrder->items->filter(function ($item) {
                 return $item->product && $item->product->supplier_method === 'manufacture';
             });
-            $products = $salesOrderItems->map(fn ($item) => $item->product)->unique('id');
+            $products = $salesOrderItems->map(fn($item) => $item->product)->unique('id');
         } else {
             $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         }
@@ -117,8 +118,8 @@ class ProductionOrderController extends Controller
             $order = $this->orderService->createDirect($request->validated(), $tenantId, Auth::id());
 
             return redirect()
-                ->route('production.orders.show', $order->id)
-                ->with('success', 'Production Order created successfully.');
+                ->route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-reservations'])
+                ->with('success', "Requisition request sent to Store. Once items are issued, you can release the order.");
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -142,17 +143,43 @@ class ProductionOrderController extends Controller
     public function show(int $id)
     {
         $order = ProductionOrder::with([
-            'product', 'bom', 'routing', 'creator', 'releaser', 'completer', 'closer',
-            'operations.workCenter', 'operations.machine', 'operations.scheduleOperation', 'operations.operatorAssignments.user',
-            'reservations.product', 'reservations.uom', 'reservations.warehouse',
-            'issues.product', 'issues.user', 'issues.warehouse',
-            'progressLogs.operation', 'progressLogs.user', 'progressLogs.machine',
-            'receipts.user', 'receipts.warehouse',
-            'scraps.operation', 'scraps.product', 'scraps.user',
-            'reworks.operation', 'reworks.user',
-            'wips.currentRoutingOperation', 'wips.currentWorkCenter', 'wips.transactions.fromOperation', 'wips.transactions.toOperation',
-            'requisitionSlips.items.product', 'requisitionSlips.items.uom', 'requisitionSlips.purchaseRequisitions.items',
-            'schedules', 'batches', 'serialNumbers',
+            'product',
+            'bom',
+            'routing',
+            'creator',
+            'releaser',
+            'completer',
+            'closer',
+            'operations.workCenter',
+            'operations.machine',
+            'operations.scheduleOperation',
+            'operations.operatorAssignments.user',
+            'reservations.product',
+            'reservations.uom',
+            'reservations.warehouse',
+            'issues.product',
+            'issues.user',
+            'issues.warehouse',
+            'progressLogs.operation',
+            'progressLogs.user',
+            'progressLogs.machine',
+            'receipts.user',
+            'receipts.warehouse',
+            'scraps.operation',
+            'scraps.product',
+            'scraps.user',
+            'reworks.operation',
+            'reworks.user',
+            'wips.currentRoutingOperation',
+            'wips.currentWorkCenter',
+            'wips.transactions.fromOperation',
+            'wips.transactions.toOperation',
+            'requisitionSlips.items.product',
+            'requisitionSlips.items.uom',
+            'requisitionSlips.purchaseRequisitions.items',
+            'schedules',
+            'batches',
+            'serialNumbers',
         ])->findOrFail($id);
 
         Gate::authorize('view', $order);
@@ -223,11 +250,11 @@ class ProductionOrderController extends Controller
         }
 
         $validated = $request->validate([
-            'items'              => 'required|array|min:1',
+            'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
-            'items.*.quantity'   => 'required|numeric|gt:0',
-            'items.*.notes'      => 'nullable|string|max:255',
-            'notes'              => 'nullable|string|max:500',
+            'items.*.quantity' => 'required|numeric|gt:0',
+            'items.*.notes' => 'nullable|string|max:255',
+            'notes' => 'nullable|string|max:500',
         ]);
 
         try {
@@ -306,7 +333,9 @@ class ProductionOrderController extends Controller
         try {
             $this->orderService->release($id, Auth::id());
 
-            return redirect()->back()->with('success', 'Production Order released to shop floor.');
+            return redirect()
+                ->route('production.orders.show', $order->id)
+                ->with('success', "Order {$order->order_number} released. Next: generate a schedule.");
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -320,7 +349,9 @@ class ProductionOrderController extends Controller
         try {
             $this->orderService->complete($id, Auth::id());
 
-            return redirect()->back()->with('success', 'Production Order completed.');
+            return redirect()
+                ->route('production.orders.show', $order->id)
+                ->with('success', "Order {$order->order_number} completed. Review cost analysis.");
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -474,10 +505,10 @@ class ProductionOrderController extends Controller
 
         $request->validate([
             'operation_id' => 'nullable|exists:production_order_operations,id',
-            'product_id'   => 'nullable|exists:products,id',
-            'quantity'     => 'required|numeric|min:0.0001',
-            'reason'       => 'nullable|string|max:255',
-            'create_ncr'   => 'nullable|boolean',
+            'product_id' => 'nullable|exists:products,id',
+            'quantity' => 'required|numeric|min:0.0001',
+            'reason' => 'nullable|string|max:255',
+            'create_ncr' => 'nullable|boolean',
             'ncr_category' => 'nullable|string|max:100',
         ]);
 

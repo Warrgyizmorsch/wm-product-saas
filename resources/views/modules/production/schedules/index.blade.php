@@ -275,7 +275,7 @@
                                         </li>
                                         <li><hr class="dropdown-divider"></li>
                                         <li>
-                                            <form method="POST" action="{{ route('production.schedules.destroy', $schedule->id) }}" onsubmit="return confirm('{{ __('production.confirm_delete_plan') }}');">
+                                            <form method="POST" action="{{ route('production.schedules.destroy', $schedule->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('production.confirm_delete_plan') }}', { title: 'Delete Production Schedule', variant: 'danger', confirmButtonText: 'Delete' });">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="dropdown-item text-danger">

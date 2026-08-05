@@ -2,31 +2,54 @@
 
 @section('title', __('production.schedule_details', ['number' => $schedule->schedule_number]) . ' | SaaS ERP')
 
+@section('page-back-button')
+    <x-ui.icon-btn href="{{ route('production.schedules.index') }}" icon="feather-arrow-left" variant="transparent-dark" title="{{ __('production.back_to_list') }}" />
+@endsection
+
 @section('page-actions')
-    <a href="{{ route('production.schedules.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        @if($schedule->isScheduled())
+            <form method="POST" action="{{ route('production.schedules.release', $schedule->id) }}" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5">
+                    <i class="feather-play-circle"></i> {{ __('production.release_to_shop_floor') }}
+                </button>
+            </form>
+        @endif
 
-    @if($schedule->isScheduled())
-        <button type="button" class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#rescheduleStartModal">
-            <i class="feather-calendar me-2"></i>Change Schedule Start Date
-        </button>
-        <form method="POST" action="{{ route('production.schedules.release', $schedule->id) }}" class="d-inline me-2">
-            @csrf
-            <button type="submit" class="btn btn-primary">
-                <i class="feather-play-circle me-2"></i>{{ __('production.release_to_shop_floor') }}
-            </button>
-        </form>
-    @endif
-
-    @if(!$schedule->isFrozen())
-        <button type="button" class="btn btn-danger me-2" data-bs-toggle="modal" data-bs-target="#cancelModal">
-            <i class="feather-slash me-2"></i>{{ __('production.cancel_schedule') }}
-        </button>
-    @endif
+        @if(!$schedule->isFrozen())
+            <x-ui.action-dropdown id="scheduleHeaderActionsDropdown">
+                <li>
+                    <a href="javascript:void(0)" class="dropdown-item py-1.5 fs-12" data-bs-toggle="modal" data-bs-target="#rescheduleStartModal">
+                        <i class="feather-calendar me-2 text-warning fs-12"></i>Change Schedule Start Date
+                    </a>
+                </li>
+                <li>
+                    <form method="POST" action="{{ route('production.schedules.cancel', $schedule->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('production.cancel_schedule_confirm', ['number' => $schedule->schedule_number]) }}', { title: 'Cancel Production Schedule', variant: 'danger', confirmButtonText: 'Cancel Schedule' });">
+                        @csrf
+                        <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
+                            <i class="feather-slash me-2 text-danger fs-12"></i>{{ __('production.cancel_schedule') }}
+                        </button>
+                    </form>
+                </li>
+            </x-ui.action-dropdown>
+        @endif
+    </div>
 @endsection
 
 @section('content')
+
+    {{-- ── Schedule Workflow Guidance Component (Placed outside panel, matching mockup) ── --}}
+    <x-ui.workflow-guide title="What's Next?">
+        @if($schedule->isScheduled())
+            Schedule created for Order <a href="{{ route('production.orders.show', $schedule->production_order_id) }}" class="fw-bold text-primary text-decoration-underline">{{ $schedule->order->order_number ?? '' }}</a>. Review the machine allocations below and click <a href="javascript:void(0)" class="fw-bold text-primary text-decoration-underline" onclick="document.querySelector('form[action*=\'schedules/{{ $schedule->id }}/release\'] button')?.click();">Release to Shop Floor</a> to begin execution.
+        @elseif($schedule->isReleased() || $schedule->isInProgress())
+            Schedule released to Shop Floor. Visit <a href="{{ route('production.mes.dashboard') }}" class="fw-bold text-primary text-decoration-underline me-1">Shop Floor (MES)</a> or <a href="{{ route('production.mes.work-centers.index') }}" class="fw-bold text-primary text-decoration-underline me-1">Work Center Monitor</a> to view live operation execution. Assign operators under <a href="{{ route('production.orders.show', ['order' => $schedule->production_order_id, 'tab' => 'vtab-operations']) }}" class="fw-bold text-primary text-decoration-underline">Production Order Operations</a>.
+        @else
+            Schedule Status: {{ ucfirst($schedule->status) }}
+        @endif
+    </x-ui.workflow-guide>
+
     <div class="erp-single-panel bg-white">
 
         {{-- Header --}}
