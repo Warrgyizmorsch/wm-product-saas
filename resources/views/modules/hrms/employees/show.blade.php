@@ -1005,6 +1005,11 @@
                     <i class="feather-package"></i> {{ __('hrms.employees.tab_assets') }}
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {{ $activeTabName === 'attendance' ? 'active' : '' }}" id="attendance-tab" data-bs-toggle="tab" data-bs-target="#attendance-pane" type="button" role="tab" aria-controls="attendance-pane" aria-selected="{{ $activeTabName === 'attendance' ? 'true' : 'false' }}">
+                    <i class="feather-clock"></i> Attendance
+                </button>
+            </li>
         </ul>
 
         <!-- Tab Content -->
@@ -1019,6 +1024,7 @@
             @include('modules.hrms.employees.tabs.documents')
             @include('modules.hrms.employees.tabs.history')
             @include('modules.hrms.employees.tabs.assets')
+            @include('modules.hrms.employees.tabs.attendance')
         </div>
     </div>
     

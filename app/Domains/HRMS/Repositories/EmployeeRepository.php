@@ -217,6 +217,8 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             ->withQueryString();
         $attendancePenalty = $employee->attendancePenalty;
         $attendancePenalties = \App\Domains\HRMS\Models\AttendancePenalty::where('status', true)->get();
+        $empAttendances = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->with('breaks')->orderBy('date', 'desc')->get();
+        $todayAttendance = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->where('date', \Carbon\Carbon::today()->format('Y-m-d'))->first();
 
         $isAdminUser = true;
 
@@ -282,6 +284,8 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'documents'                 => $documents,
             'attendancePenalty'         => $attendancePenalty,
             'attendancePenalties'       => $attendancePenalties,
+            'empAttendances'            => $empAttendances,
+            'todayAttendance'           => $todayAttendance,
             'isAdminUser'               => $isAdminUser,
             'isAdmin'                   => $isAdminUser,
             'employeeDataMap'           => $employeeDataMap,
@@ -297,7 +301,13 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             $validated['photo'] = $request->file('photo')->store('employees', 'public');
         }
 
-        return Employee::create($validated);
+        $employee = Employee::create($validated);
+
+        if ($request->filled('role_id') && $employee->user) {
+            $employee->user->update(['role_id' => $request->role_id]);
+        }
+
+        return $employee;
     }
 
     public function updateEmployee(Employee $employee, array $validated, Request $request): bool
@@ -311,7 +321,13 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             $validated['photo'] = $request->file('photo')->store('employees', 'public');
         }
 
-        return $employee->update($validated);
+        $updated = $employee->update($validated);
+
+        if ($request->filled('role_id') && $employee->user) {
+            $employee->user->update(['role_id' => $request->role_id]);
+        }
+
+        return $updated;
     }
 
     public function deleteEmployee(Employee $employee): bool
@@ -347,6 +363,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                 ->whereDoesntHave('employee')
                 ->orderBy('name')
                 ->get(),
+            'roles' => \App\Models\Access\Role::all(),
         ];
     }
 }

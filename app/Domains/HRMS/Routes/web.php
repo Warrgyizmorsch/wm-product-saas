@@ -14,6 +14,7 @@ use App\Domains\HRMS\Controllers\WfhRequestController;
 use App\Domains\HRMS\Controllers\ShiftChangeRequestController;
 use App\Domains\HRMS\Controllers\OvertimeRequestController;
 use App\Domains\HRMS\Controllers\ShiftOvertimeController;
+use App\Domains\HRMS\Controllers\AttendanceController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -65,6 +66,16 @@ Route::prefix('hrms')
             Route::post('/shift/store', [RosterController::class, 'storeShift'])->name('shift.store');
             Route::post('/shift/update/{shift}', [RosterController::class, 'updateShift'])->name('shift.update');
             Route::delete('/shift/delete/{shift}', [RosterController::class, 'destroyShift'])->name('shift.destroy');
+        });
+
+        // Attendance Management
+        Route::prefix('attendance')->group(function (): void {
+            Route::get('/', [AttendanceController::class, 'index'])->name('attendance.index');
+            Route::post('/check-in', [AttendanceController::class, 'checkIn'])->name('attendance.check-in');
+            Route::post('/{attendance}/check-out', [AttendanceController::class, 'checkOut'])->name('attendance.check-out');
+            Route::post('/{attendance}/break-in', [AttendanceController::class, 'breakIn'])->name('attendance.break-in');
+            Route::post('/{attendance}/break-out', [AttendanceController::class, 'breakOut'])->name('attendance.break-out');
+            Route::get('/employee/{employee}', [AttendanceController::class, 'getEmployeeLogs'])->name('attendance.employee-logs');
         });
 
         // Employee Management

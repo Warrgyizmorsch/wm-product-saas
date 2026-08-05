@@ -281,6 +281,10 @@ class EmployeeApiController extends Controller
 
             $employee = Employee::create($validated);
 
+            if ($request->filled('role_id') && $employee->user) {
+                $employee->user->update(['role_id' => $request->role_id]);
+            }
+
             return $this->sendSuccess($employee->load(['company', 'department', 'designation']), 'Employee created successfully', 201);
         } catch (ValidationException $e) {
             return $this->sendError('Validation failed', 422, $e->errors());
@@ -324,6 +328,10 @@ class EmployeeApiController extends Controller
             }
 
             $employee->update($validated);
+
+            if ($request->filled('role_id') && $employee->user) {
+                $employee->user->update(['role_id' => $request->role_id]);
+            }
 
             $newPlanId = $employee->leave_plan_id;
             if ($oldPlanId != $newPlanId) {
@@ -802,6 +810,7 @@ class EmployeeApiController extends Controller
             'leave_transition_unused'     => ['nullable', 'string', 'in:carry,lapse'],
             'employee_id'                 => ['nullable', 'string', 'max:255', Rule::unique('employees', 'employee_id')->ignore($employee?->id)],
             'user_id'                     => ['nullable', Rule::unique('employees', 'user_id')->ignore($employee?->id)],
+            'role_id'                     => ['nullable', 'exists:roles,id'],
             'full_name'                   => ['required', 'string', 'max:255'],
             'nick_name'                   => ['nullable', 'string', 'max:255'],
             'blood_group'                 => ['nullable', Rule::in(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])],

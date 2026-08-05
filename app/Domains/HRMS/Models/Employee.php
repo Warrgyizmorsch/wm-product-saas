@@ -203,6 +203,11 @@ class Employee extends BaseModel
         return $this->hasMany(Asset::class, 'assigned_employee_id');
     }
 
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class, 'employee_id');
+    }
+
     public function assetRequests(): HasMany
     {
         return $this->hasMany(AssetRequest::class, 'employee_id')->orderBy('request_date', 'desc');

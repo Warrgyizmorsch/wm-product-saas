@@ -129,6 +129,16 @@
                 @endif
             </div>
             <div class="col-md-6">
+                <x-ui.odoo-form-ui type="select" label="System Role" name="role_id" id="{{ $prefix }}_role_id" :required="true" select2-selector="default" :errorText="$errors->first('role_id')">
+                    <option value="">Select Role</option>
+                    @foreach($roles as $r)
+                        <option value="{{ $r->id }}" @selected((string) old('role_id', ($isEdit && isset($employee) && $employee->user) ? $employee->user->role_id : '') === (string) $r->id)>
+                            {{ $r->name }}
+                        </option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            </div>
+            <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_nick_name') }}" name="nick_name" id="{{ $prefix }}_nick_name" :value="$fieldValue('nick_name')" placeholder="{{ __('hrms.employees.frm_nick_name_placeholder') }}" :errorText="$errors->first('nick_name')" />
             </div>
             <div class="col-md-6">
@@ -195,7 +205,11 @@
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_location') }}" name="office" id="{{ $prefix }}_office" :value="$fieldValue('office')" placeholder="{{ __('hrms.employees.frm_location_placeholder') }}" :errorText="$errors->first('office')" />
+                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_location') }}" name="office" id="{{ $prefix }}_office" :errorText="$errors->first('office')" select2-selector="default">
+                    <option value="office" @selected($fieldValue('office') === 'office' || !$fieldValue('office'))>Office</option>
+                    <option value="wfh" @selected($fieldValue('office') === 'wfh')>Work From Home (WFH)</option>
+                    <option value="onsite" @selected($fieldValue('office') === 'onsite')>On-Site (Client/Project)</option>
+                </x-ui.odoo-form-ui>
             </div>
         </div>
 

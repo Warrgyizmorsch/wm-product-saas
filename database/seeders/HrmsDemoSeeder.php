@@ -480,7 +480,7 @@ class HrmsDemoSeeder extends Seeder
                 'date_of_birth' => '1992-05-10',
                 'probation_end_date' => '2023-07-15',
                 'confirmation_date' => '2023-07-15',
-                'office' => 'HQ Floor 4',
+                'office' => ($idx % 3 === 0) ? 'office' : (($idx % 3 === 1) ? 'wfh' : 'onsite'),
                 'gender' => ($idx % 2 === 0) ? 'Male' : 'Female',
                 'marital_status' => 'Single',
                 'diet_preference' => 'Veg',

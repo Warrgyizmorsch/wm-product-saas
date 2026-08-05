@@ -131,25 +131,25 @@ class PenalizationPolicyApiController extends Controller
             $validationRules['penalty_tiers']                = 'required|array';
             $validationRules['penalty_tiers.*.min_occurrence'] = 'required|integer|min:1';
             $validationRules['penalty_tiers.*.max_occurrence'] = 'nullable|integer|min:1';
-            $validationRules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,leave_deduction,both_deductions';
+            $validationRules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,working_hour_deduction,both_deductions';
             $validationRules['penalty_tiers.*.penalty_value']  = 'required|numeric|min:0';
-            $validationRules['penalty_tiers.*.leave_type_id'] = 'nullable|integer|exists:leave_types,id';
+            $validationRules['penalty_tiers.*.leave_type_id'] = 'nullable';
         } elseif ($request->rule_type === 'missing_logs') {
             $validationRules['threshold_count']              = 'required|integer|min:0';
             $validationRules['penalty_tiers']                = 'required|array';
             $validationRules['penalty_tiers.*.min_occurrence'] = 'required|integer|min:1';
             $validationRules['penalty_tiers.*.max_occurrence'] = 'nullable|integer|min:1';
-            $validationRules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,leave_deduction,both_deductions';
+            $validationRules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,working_hour_deduction,both_deductions';
             $validationRules['penalty_tiers.*.penalty_value']  = 'required|numeric|min:0';
-            $validationRules['penalty_tiers.*.leave_type_id'] = 'nullable|integer|exists:leave_types,id';
+            $validationRules['penalty_tiers.*.leave_type_id'] = 'nullable';
         } elseif ($request->rule_type === 'under_hours') {
             $validationRules['grace_period_hours']           = 'required|numeric|min:0';
             $validationRules['threshold_count']              = 'required|integer|min:0';
             $validationRules['penalty_tiers']                = 'required|array';
             $validationRules['penalty_tiers.*.hours_threshold'] = 'required|numeric|min:0|max:24';
-            $validationRules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,leave_deduction,both_deductions';
+            $validationRules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,working_hour_deduction,both_deductions';
             $validationRules['penalty_tiers.*.penalty_value']  = 'required|numeric|min:0';
-            $validationRules['penalty_tiers.*.leave_type_id'] = 'nullable|integer|exists:leave_types,id';
+            $validationRules['penalty_tiers.*.leave_type_id'] = 'nullable';
         }
 
         $validated = $request->validate($validationRules);
@@ -170,7 +170,7 @@ class PenalizationPolicyApiController extends Controller
                         'max_occurrence' => isset($tier['max_occurrence']) && $tier['max_occurrence'] !== '' && $tier['max_occurrence'] !== null ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value'  => (float) $tier['penalty_value'],
-                        'leave_type_id'  => !empty($tier['leave_type_id']) ? (int) $tier['leave_type_id'] : null,
+                        'leave_type_id'  => null,
                     ];
                 }
             }
@@ -190,7 +190,7 @@ class PenalizationPolicyApiController extends Controller
                         'max_occurrence' => isset($tier['max_occurrence']) && $tier['max_occurrence'] !== '' && $tier['max_occurrence'] !== null ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value'  => (float) $tier['penalty_value'],
-                        'leave_type_id'  => !empty($tier['leave_type_id']) ? (int) $tier['leave_type_id'] : null,
+                        'leave_type_id'  => null,
                     ];
                 }
             }
@@ -208,7 +208,7 @@ class PenalizationPolicyApiController extends Controller
                         'hours_threshold' => (float) $tier['hours_threshold'],
                         'penalty_action'  => $tier['penalty_action'],
                         'penalty_value'   => (float) $tier['penalty_value'],
-                        'leave_type_id'   => !empty($tier['leave_type_id']) ? (int) $tier['leave_type_id'] : null,
+                        'leave_type_id'   => null,
                     ];
                 }
             }

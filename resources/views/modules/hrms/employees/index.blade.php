@@ -574,6 +574,7 @@
                                                     'shift_id'                  => $employee->shift_id,
                                                     'pay_group_id'              => $employee->pay_group_id,
                                                     'leave_plan_id'             => $employee->leave_plan_id,
+                                                    'role_id'                   => $employee->user?->role_id,
                                                     'employment_type'           => $employee->employment_type,
                                                     'employee_stage'            => $employee->employee_stage,
                                                     'date_of_joining'           => $employee->date_of_joining,
@@ -1102,6 +1103,7 @@
                     edit_status: employee.status ? '1' : '0',
                     edit_pay_group_id: employee.pay_group_id || '',
                     edit_leave_plan_id: employee.leave_plan_id || '',
+                    edit_role_id: employee.role_id || '',
                 };
 
                 Object.keys(selectAssignments).forEach(function (id) {
