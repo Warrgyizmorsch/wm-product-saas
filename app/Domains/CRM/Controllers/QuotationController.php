@@ -176,7 +176,7 @@ class QuotationController extends Controller
         $this->authorize('update', $quotation);
 
         $validated = $request->validate([
-            'status' => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework,Converted'],
+            'status' => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework,Converted,Won'],
         ]);
 
         $newStatus = $validated['status'];

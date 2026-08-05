@@ -36,6 +36,7 @@ return [
         'New' => 'New',
         'Qualified' => 'Qualified',
         'Won' => 'Won',
+        'Converted' => 'Won',
         'Lost' => 'Lost',
     ],
     'priorities' => [
@@ -330,6 +331,8 @@ return [
         'Accepted' => 'Accepted',
         'Rejected' => 'Rejected',
         'Quotation Rework' => 'Quotation Rework',
+        'Converted' => 'Converted to Sales Order',
+        'Won' => 'Won',
     ],
     'save_changes' => 'Save Changes',
     'customer_account' => 'Customer / Account',

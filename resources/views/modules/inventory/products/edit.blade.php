@@ -118,7 +118,7 @@
                     </div>
 
                     <!-- Supplier Method Selector -->
-                    <div class="custom-radio-group mb-4">
+                    <div class="custom-radio-group mb-4 supplier-method-container">
                         <span class="custom-radio-label">{{ __('inventory.supplier_method') }} <span class="text-danger">*</span></span>
                         <x-ui.radio name="supplier_method" value="buy" :label="__('inventory.buy')" :checked="$product->supplier_method === 'buy' || is_null($product->supplier_method)" />
                         <x-ui.radio name="supplier_method" value="manufacture" :label="__('inventory.manufacture')" :checked="$product->supplier_method === 'manufacture'" />
@@ -184,7 +184,7 @@
                         <div class="col-lg-6">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-dollar-sign me-2"></i>{{ __('inventory.sales_purchase_info') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" value="{{ $product->selling_price }}" inputType="number" step="0.01" placeholder="Selling Price (₹)" required="true" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" value="{{ $product->selling_price }}" inputType="number" step="0.01" placeholder="Selling Price (₹)" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" required="true">
                                 <option value="" disabled {{ empty($product->sales_account) ? 'selected' : '' }}>Select Sales Account</option>
@@ -199,7 +199,7 @@
                                 @endforelse
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" value="{{ $product->cost_price }}" inputType="number" step="0.01" placeholder="Purchase Cost (₹)" required="true" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" value="{{ $product->cost_price }}" inputType="number" step="0.01" placeholder="Purchase Cost (₹)" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" required="true">
                                 <option value="" disabled {{ empty($product->purchase_account) ? 'selected' : '' }}>Select Purchase Account</option>
@@ -707,10 +707,27 @@
                 }
             }
 
+            function setFieldRequired(fieldName, isRequired) {
+                const $input = $(`input[name="${fieldName}"]`);
+                $input.prop('required', isRequired);
+
+                const $label = $input.closest('.odoo-form-group').find('.odoo-form-label');
+                if (isRequired) {
+                    $label.css('color', '#dc3545');
+                    if ($label.find('.text-danger').length === 0) {
+                        $label.append(' <span class="text-danger">*</span>');
+                    }
+                } else {
+                    $label.css('color', '');
+                    $label.find('.text-danger').remove();
+                }
+            }
+
             filterUomOptions();
 
             if (itemType === 'Service') {
                 $('.physical-goods-only').hide();
+                $('.supplier-method-container').hide();
                 $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').hide();
                 $('select[name="type"]').prop('required', false).closest('.odoo-form-group').hide();
                 $('#inventorySection').hide();

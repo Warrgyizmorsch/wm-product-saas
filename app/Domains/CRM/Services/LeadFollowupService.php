@@ -25,12 +25,17 @@ class LeadFollowupService
             $followupDateTime = Carbon::now();
         }
 
+        $taggedUserIds = !empty($validated['tagged_user_ids']) ? array_values(array_filter($validated['tagged_user_ids'])) : null;
+        $primaryTaggedId = !empty($taggedUserIds) ? $taggedUserIds[0] : ($validated['tagged_user_id'] ?? null);
+
         $followup = $this->followupRepo->create([
             'lead_id' => $lead->id,
             'followup_date' => $followupDateTime,
             'type' => $validated['type'],
             'status' => $validated['status'],
             'notes' => $validated['notes'] ?? null,
+            'tagged_user_id' => $primaryTaggedId,
+            'tagged_user_ids' => $taggedUserIds,
         ]);
 
         $eventType = $followup->status === 'Pending' ? 'activity_scheduled' : 'activity_completed';
@@ -58,6 +63,9 @@ class LeadFollowupService
     {
         $isReschedule = !empty($validated['followup_date']) && ($isRescheduleRequested || $followup->status === 'Pending');
 
+        $taggedUserIds = isset($validated['tagged_user_ids']) ? array_values(array_filter($validated['tagged_user_ids'])) : null;
+        $primaryTaggedId = !empty($taggedUserIds) ? $taggedUserIds[0] : (array_key_exists('tagged_user_id', $validated) ? ($validated['tagged_user_id'] ?: null) : $followup->tagged_user_id);
+
         if ($isReschedule && !empty($validated['followup_date'])) {
             try {
                 $newFollowupDateTime = Carbon::parse($validated['followup_date']);
@@ -71,6 +79,8 @@ class LeadFollowupService
                     'followup_date' => $newFollowupDateTime,
                     'status' => 'Pending',
                     'notes' => $validated['notes'] ?? $followup->notes,
+                    'tagged_user_id' => $primaryTaggedId,
+                    'tagged_user_ids' => $taggedUserIds ?? $followup->tagged_user_ids,
                     'rescheduled_from_id' => $followup->id,
                     'original_followup_date' => $followup->original_followup_date ?: $followup->followup_date,
                 ]);
@@ -94,6 +104,12 @@ class LeadFollowupService
         if (isset($validated['status'])) $updateData['status'] = $validated['status'];
         if (isset($validated['notes'])) $updateData['notes'] = $validated['notes'];
         if (isset($validated['type'])) $updateData['type'] = $validated['type'];
+        if (array_key_exists('tagged_user_ids', $validated)) {
+            $updateData['tagged_user_ids'] = $taggedUserIds;
+            $updateData['tagged_user_id'] = $primaryTaggedId;
+        } elseif (array_key_exists('tagged_user_id', $validated)) {
+            $updateData['tagged_user_id'] = $validated['tagged_user_id'] ?: null;
+        }
         if (isset($validated['followup_date'])) {
             try { $updateData['followup_date'] = Carbon::parse($validated['followup_date']); } catch (\Exception $e) {}
         }

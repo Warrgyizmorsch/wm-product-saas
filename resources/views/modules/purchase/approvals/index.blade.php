@@ -309,10 +309,10 @@
             $('#prApprovalFullViewLink').attr('href', '#');
             prDrawer.show();
 
-            $.get('/purchase/requisitions/' + id + '/detail-partial', function (data) {
+            $.get("{{ url('purchase/requisitions') }}/" + id + '/detail-partial', function (data) {
                 $('#prApprovalDrawerLoading').hide();
                 $('#prApprovalDrawerBody').html(data).show();
-                $('#prApprovalFullViewLink').attr('href', '/purchase/requisitions/' + id);
+                $('#prApprovalFullViewLink').attr('href', "{{ url('purchase/requisitions') }}/" + id);
                 $('[data-bs-toggle="tooltip"]', '#prApprovalDrawerBody').each(function () {
                     new bootstrap.Tooltip(this);
                 });

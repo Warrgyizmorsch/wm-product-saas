@@ -89,16 +89,6 @@
 @section('content')
     <div class="row">
         <div class="col-12">
-            <!-- Toast Notifications -->
-            @if ($errors->any())
-                <div class="alert alert-danger mb-3">
-                    <ul class="mb-0">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
 
             <!-- Zoho / Odoo Style Flat Form Sheet -->
             <div class="card border-0 shadow-sm p-4 p-md-5 bg-white">
@@ -128,7 +118,7 @@
                     </div>
 
                     <!-- Supplier Method Selector in Zoho style -->
-                    <div class="custom-radio-group mb-4">
+                    <div class="custom-radio-group mb-4 supplier-method-container">
                         <span class="custom-radio-label">{{ __('inventory.supplier_method') }} <span class="text-danger">*</span></span>
                         <x-ui.radio name="supplier_method" value="buy" :label="__('inventory.buy')" :checked="old('supplier_method', 'buy') === 'buy'" />
                         <x-ui.radio name="supplier_method" value="manufacture" :label="__('inventory.manufacture')" :checked="old('supplier_method') === 'manufacture'" />
@@ -139,21 +129,21 @@
                         <div class="col-lg-6 border-end">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-2"></i>{{ __('inventory.primary_details') }}</h6>
                             
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.item_name')" name="name" required="true" placeholder="Enter Product/Service Name" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.item_name')" name="name" :value="old('name')" required="true" placeholder="Enter Product/Service Name" :errorText="$errors->first('name')" />
 
                             <div class="single-item-only">
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.sku')" name="sku" required="true" placeholder="Enter Unique SKU Code" />
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.sku')" name="sku" :value="old('sku')" required="true" placeholder="Enter Unique SKU Code" :errorText="$errors->first('sku')" />
                             </div>
 
-                            <x-ui.odoo-form-ui type="select" :label="__('inventory.unit')" name="uom_id" required="true">
-                                <option value="" selected disabled>{{ __('inventory.select_unit') }}</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.unit')" name="uom_id" required="true" :errorText="$errors->first('uom_id')">
+                                <option value="" disabled {{ old('uom_id') ? '' : 'selected' }}>{{ __('inventory.select_unit') }}</option>
                                 @foreach($uoms as $uom)
-                                    <option value="{{ $uom->id }}" data-uom-category="{{ strtolower($uom->category ?? 'goods') }}">{{ $uom->name }} ({{ $uom->code }})</option>
+                                    <option value="{{ $uom->id }}" data-uom-category="{{ strtolower($uom->category ?? 'goods') }}" {{ old('uom_id') == $uom->id ? 'selected' : '' }}>{{ $uom->name }} ({{ $uom->code }})</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="select" :label="__('inventory.material_type')" name="type" required="true">
-                                <option value="finished_good" {{ old('type') === 'finished_good' ? 'selected' : '' }}>{{ __('inventory.finished_good_std') }}</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.material_type')" name="type" required="true" :errorText="$errors->first('type')">
+                                <option value="finished_good" {{ old('type', 'finished_good') === 'finished_good' ? 'selected' : '' }}>{{ __('inventory.finished_good_std') }}</option>
                                 <option value="semi_finished" {{ old('type') === 'semi_finished' ? 'selected' : '' }}>{{ __('inventory.semi_finished_comp') }}</option>
                                 <option value="raw_material" {{ old('type') === 'raw_material' ? 'selected' : '' }}>{{ __('inventory.raw_material_purch') }}</option>
                                 <option value="component" {{ old('type', 'component') === 'component' ? 'selected' : '' }}>{{ __('inventory.component_spare') }}</option>
@@ -161,18 +151,18 @@
                             </x-ui.odoo-form-ui>
 
                             <div class="physical-goods-only">
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.brand')" name="brand" placeholder="e.g. Apple, Nike" />
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.brand')" name="brand" :value="old('brand')" placeholder="e.g. Apple, Nike" :errorText="$errors->first('brand')" />
                                 
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.manufacturer')" name="manufacturer" placeholder="Manufacturer Name" />
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.manufacturer')" name="manufacturer" :value="old('manufacturer')" placeholder="Manufacturer Name" :errorText="$errors->first('manufacturer')" />
                                 
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.mpn')" name="mpn" placeholder="Manufacturer Part Number" />
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.mpn')" name="mpn" :value="old('mpn')" placeholder="Manufacturer Part Number" :errorText="$errors->first('mpn')" />
 
                                 <div class="border-top pt-3 mt-3">
                                     <h6 class="fw-bold text-primary mb-3"><i class="feather-hash me-2"></i>{{ __('inventory.identifiers') }}</h6>
-                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.barcode')" name="barcode" placeholder="Barcode (EAN/UPC)" />
-                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.upc')" name="upc" placeholder="Universal Product Code" />
-                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.ean')" name="ean" placeholder="European Article Number" />
-                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.isbn')" name="isbn" placeholder="International Standard Book Number" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.barcode')" name="barcode" :value="old('barcode')" placeholder="Barcode (EAN/UPC)" :errorText="$errors->first('barcode')" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.upc')" name="upc" :value="old('upc')" placeholder="Universal Product Code" :errorText="$errors->first('upc')" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.ean')" name="ean" :value="old('ean')" placeholder="European Article Number" :errorText="$errors->first('ean')" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.isbn')" name="isbn" :value="old('isbn')" placeholder="International Standard Book Number" :errorText="$errors->first('isbn')" />
                                 </div>
                             </div>
                         </div>
@@ -181,48 +171,48 @@
                         <div class="col-lg-6">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-dollar-sign me-2"></i>{{ __('inventory.sales_purchase_info') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" inputType="number" step="0.01" placeholder="Selling Price (₹)" required="true" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" :value="old('selling_price')" inputType="number" step="0.01" placeholder="Selling Price (₹)" :errorText="$errors->first('selling_price')" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" required="true">
-                                <option value="" selected disabled>Select Sales Account</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" required="true" :errorText="$errors->first('sales_account')">
+                                <option value="" disabled {{ old('sales_account') ? '' : 'selected' }}>Select Sales Account</option>
                                 @forelse($salesAccounts as $acc)
-                                    <option value="{{ $acc->name }}">{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                    <option value="{{ $acc->name }}" {{ old('sales_account') === $acc->name ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
                                 @empty
-                                    <option value="Sales Income">Sales Income Account</option>
-                                    <option value="General Income">General Income Account</option>
-                                    <option value="Interest Income">Interest Income Account</option>
+                                    <option value="Sales Income" {{ old('sales_account') === 'Sales Income' ? 'selected' : '' }}>Sales Income Account</option>
+                                    <option value="General Income" {{ old('sales_account') === 'General Income' ? 'selected' : '' }}>General Income Account</option>
+                                    <option value="Interest Income" {{ old('sales_account') === 'Interest Income' ? 'selected' : '' }}>Interest Income Account</option>
                                 @endforelse
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" inputType="number" step="0.01" placeholder="Purchase Cost (₹)" required="true" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" :value="old('cost_price')" inputType="number" step="0.01" placeholder="Purchase Cost (₹)" :errorText="$errors->first('cost_price')" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" required="true">
-                                <option value="" selected disabled>Select Purchase Account</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" required="true" :errorText="$errors->first('purchase_account')">
+                                <option value="" disabled {{ old('purchase_account') ? '' : 'selected' }}>Select Purchase Account</option>
                                 @forelse($purchaseAccounts as $acc)
-                                    <option value="{{ $acc->name }}">{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                    <option value="{{ $acc->name }}" {{ old('purchase_account') === $acc->name ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
                                 @empty
-                                    <option value="Cost of Goods Sold">Cost of Goods Sold (COGS)</option>
-                                    <option value="Purchases">Purchases Expense Account</option>
-                                    <option value="Job Costs">Job Costs Expense Account</option>
+                                    <option value="Cost of Goods Sold" {{ old('purchase_account') === 'Cost of Goods Sold' ? 'selected' : '' }}>Cost of Goods Sold (COGS)</option>
+                                    <option value="Purchases" {{ old('purchase_account') === 'Purchases' ? 'selected' : '' }}>Purchases Expense Account</option>
+                                    <option value="Job Costs" {{ old('purchase_account') === 'Job Costs' ? 'selected' : '' }}>Job Costs Expense Account</option>
                                 @endforelse
                             </x-ui.odoo-form-ui>
 
                             <div class="border-top pt-3 mt-3">
                                 <h6 class="fw-bold text-primary mb-3"><i class="feather-percent me-2"></i>{{ __('inventory.taxation_preferred_vendor') }}</h6>
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.hsn_sac_code')" name="hsn_sac" placeholder="e.g. 8471 (HSN) or 9983 (SAC)" />
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.hsn_sac_code')" name="hsn_sac" :value="old('hsn_sac')" placeholder="e.g. 8471 (HSN) or 9983 (SAC)" :errorText="$errors->first('hsn_sac')" />
 
-                                <x-ui.odoo-form-ui type="select" :label="__('inventory.gst_rate')" name="gst_rate">
-                                    <option value="0">GST @ 0% (Exempt)</option>
-                                    <option value="5">GST @ 5%</option>
-                                    <option value="12">GST @ 12%</option>
-                                    <option value="18" selected>GST @ 18%</option>
-                                    <option value="28">GST @ 28%</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('inventory.gst_rate')" name="gst_rate" :errorText="$errors->first('gst_rate')">
+                                    <option value="0" {{ old('gst_rate') == '0' ? 'selected' : '' }}>GST @ 0% (Exempt)</option>
+                                    <option value="5" {{ old('gst_rate') == '5' ? 'selected' : '' }}>GST @ 5%</option>
+                                    <option value="12" {{ old('gst_rate') == '12' ? 'selected' : '' }}>GST @ 12%</option>
+                                    <option value="18" {{ old('gst_rate', '18') == '18' ? 'selected' : '' }}>GST @ 18%</option>
+                                    <option value="28" {{ old('gst_rate') == '28' ? 'selected' : '' }}>GST @ 28%</option>
                                 </x-ui.odoo-form-ui>
 
-                                <x-ui.odoo-form-ui type="select" :label="__('inventory.preferred_vendor')" name="preferred_vendor_id" searchable="true">
+                                <x-ui.odoo-form-ui type="select" :label="__('inventory.preferred_vendor')" name="preferred_vendor_id" searchable="true" :errorText="$errors->first('preferred_vendor_id')">
                                     <option value="">{{ __('inventory.select_preferred_vendor') }}</option>
                                     @foreach($vendors as $vendor)
-                                        <option value="{{ $vendor->id }}">{{ $vendor->name }}</option>
+                                        <option value="{{ $vendor->id }}" {{ old('preferred_vendor_id') == $vendor->id ? 'selected' : '' }}>{{ $vendor->name }}</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
@@ -265,18 +255,18 @@
                         
                         <div class="row g-4 fs-13 text-dark">
                             <div class="col-lg-6 border-end">
-                                <x-ui.odoo-form-ui type="select" label="Inventory Account" name="inventory_account" required="true">
-                                    <option value="" selected disabled>Select Inventory Account</option>
+                                <x-ui.odoo-form-ui type="select" label="Inventory Account" name="inventory_account" required="true" :errorText="$errors->first('inventory_account')">
+                                    <option value="" disabled {{ old('inventory_account') ? '' : 'selected' }}>Select Inventory Account</option>
                                     @forelse($inventoryAccounts as $acc)
-                                        <option value="{{ $acc->name }}">{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                        <option value="{{ $acc->name }}" {{ old('inventory_account') === $acc->name ? 'selected' : '' }}>{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
                                     @empty
-                                        <option value="Inventory Asset">Inventory Asset Account</option>
-                                        <option value="Raw Materials Stock">Raw Materials Stock</option>
-                                        <option value="Finished Goods Stock">Finished Goods Stock</option>
+                                        <option value="Inventory Asset" {{ old('inventory_account') === 'Inventory Asset' ? 'selected' : '' }}>Inventory Asset Account</option>
+                                        <option value="Raw Materials Stock" {{ old('inventory_account') === 'Raw Materials Stock' ? 'selected' : '' }}>Raw Materials Stock</option>
+                                        <option value="Finished Goods Stock" {{ old('inventory_account') === 'Finished Goods Stock' ? 'selected' : '' }}>Finished Goods Stock</option>
                                     @endforelse
                                 </x-ui.odoo-form-ui>
 
-                                <x-ui.odoo-form-ui type="input" label="Reorder Point" name="reorder_point" inputType="number" placeholder="Alert limit when stock falls below" />
+                                <x-ui.odoo-form-ui type="input" label="Reorder Point" name="reorder_point" :value="old('reorder_point')" inputType="number" placeholder="Alert limit when stock falls below" :errorText="$errors->first('reorder_point')" />
 
                                 <x-ui.odoo-form-ui type="select" label="Inventory Valuation Method" name="inventory_valuation_method" required="true">
                                     <option value="FIFO" selected>FIFO (First-In, First-Out)</option>
@@ -404,7 +394,7 @@
                     <!-- Additional Notes -->
                     <div class="border-top pt-4 mt-4">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-edit-3 me-2"></i>Description / Item Notes</h6>
-                        <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="description" rows="3" placeholder="Enter internal specifications, item descriptions or notes..."></x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="description" rows="3" placeholder="Enter internal specifications, item descriptions or notes..." :value="old('description')" :errorText="$errors->first('description')"></x-ui.odoo-form-ui>
                     </div>
 
                     <!-- Action buttons footer -->
@@ -461,6 +451,22 @@
                 }
             }
 
+            function setFieldRequired(fieldName, isRequired) {
+                const $input = $(`input[name="${fieldName}"]`);
+                $input.prop('required', isRequired);
+
+                const $label = $input.closest('.odoo-form-group').find('.odoo-form-label');
+                if (isRequired) {
+                    $label.css('color', '#dc3545');
+                    if ($label.find('.text-danger').length === 0) {
+                        $label.append(' <span class="text-danger">*</span>');
+                    }
+                } else {
+                    $label.css('color', '');
+                    $label.find('.text-danger').remove();
+                }
+            }
+
             function toggleSections() {
                 const itemType = $('input[name="item_type"]:checked').val();
                 const variationType = $('input[name="variation_type"]:checked').val();
@@ -472,6 +478,7 @@
                     hsnLabel.html('SAC Code');
                     $('input[name="hsn_sac"]').attr('placeholder', 'e.g. 9983 (SAC)');
                     $('.physical-goods-only').hide();
+                    $('.supplier-method-container').hide();
                     $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').hide();
                     $('select[name="type"]').val('service').trigger('change').closest('.odoo-form-group').hide();
                     $('#inventorySection').hide();
@@ -482,6 +489,7 @@
                     hsnLabel.html('HSN Code');
                     $('input[name="hsn_sac"]').attr('placeholder', 'e.g. 8471 (HSN)');
                     $('.physical-goods-only').show();
+                    $('.supplier-method-container').show();
                     $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').show();
                     $('select[name="type"]').closest('.odoo-form-group').show();
                     $('.variant-stock-col').show();

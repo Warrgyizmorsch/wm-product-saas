@@ -108,12 +108,12 @@ class SalesOrderService
             if (!empty($data['quotation_id'])) {
                 $quotation = Quotation::find($data['quotation_id']);
                 if ($quotation) {
-                    $quotation->update(['status' => 'Converted']);
+                    $quotation->update(['status' => 'Won']);
                     if ($quotation->lead_id) {
                         $lead = Lead::find($quotation->lead_id);
                         if ($lead) {
                             $lead->update([
-                                'status' => 'Converted',
+                                'status' => 'Won',
                                 'is_customer' => true,
                             ]);
                         }

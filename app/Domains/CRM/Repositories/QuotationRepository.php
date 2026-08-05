@@ -54,7 +54,7 @@ class QuotationRepository
             ->where('is_current', true);
 
         if (empty($filters['status']) && empty($filters['search'])) {
-            $query->whereIn('status', ['Accepted', 'Converted']);
+            $query->whereIn('status', ['Accepted', 'Converted', 'Won']);
         }
 
         if (!empty($filters['search'])) {

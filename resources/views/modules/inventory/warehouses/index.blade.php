@@ -141,7 +141,7 @@
                 $('#warehouseFormCard').find('.card-title').html('<i class="feather-edit me-2 text-primary"></i>' + transEditWarehouse);
                 
                 // Update Form Action and Method
-                $('#warehouseForm').attr('action', `/inventory/warehouses/${id}`);
+                $('#warehouseForm').attr('action', `{{ url('inventory/warehouses') }}/${id}`);
                 $('#methodContainer').html('@method("PUT")');
 
                 // Populate Fields

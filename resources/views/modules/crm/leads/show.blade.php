@@ -31,12 +31,13 @@
                         </h4>
                         
                         @php
+                            $statusKey = $lead->status === 'Converted' ? 'Won' : ($lead->status ?: 'New');
                             $statusClass = 'bg-soft-primary text-primary';
-                            if($lead->status === 'Qualified') $statusClass = 'bg-soft-teal text-teal';
-                            elseif($lead->status === 'Won') $statusClass = 'bg-soft-success text-success';
-                            elseif($lead->status === 'Lost') $statusClass = 'bg-soft-danger text-danger';
+                            if($statusKey === 'Qualified') $statusClass = 'bg-soft-teal text-teal';
+                            elseif($statusKey === 'Won') $statusClass = 'bg-soft-success text-success';
+                            elseif($statusKey === 'Lost') $statusClass = 'bg-soft-danger text-danger';
                         @endphp
-                        <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ $lead->status ? __('crm.statuses.' . $lead->status) : __('crm.statuses.New') }}</span>
+                        <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ __('crm.statuses.' . $statusKey) }}</span>
                         @if($lead->segment && $lead->segment !== 'Select an Option')
                             <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span>
                         @endif
@@ -518,18 +519,7 @@
 
                                                  <div class="zoho-field-row">
                                                      <div class="zoho-field-label">{{ __('crm.lead_owner') }}</div>
-                                                     <div class="zoho-field-value text-primary fw-bold" style="width: 100%; max-width: 250px;">
-                                                         <form action="{{ route('crm.leads.updateOwner', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
-                                                             @csrf
-                                                             @method('PATCH')
-                                                             <select class="form-select odoo-select2 owner-select" name="lead_owner_id" style="border-radius:0;">
-                                                                 <option value="">{{ __('crm.select_owner_unassigned') }}</option>
-                                                                 @foreach($users as $user)
-                                                                     <option value="{{ $user->id }}" @selected($lead->lead_owner_id == $user->id)>{{ $user->name }}</option>
-                                                                 @endforeach
-                                                             </select>
-                                                         </form>
-                                                     </div>
+                                                     <div class="zoho-field-value text-dark fw-bold">{{ $lead->owner?->name ?: 'Unassigned' }}</div>
                                                  </div>
                                                  <div class="zoho-field-row">
                                                      <div class="zoho-field-label">{{ __('crm.contact_person') }}</div>
@@ -1100,6 +1090,13 @@
                                                                     <span>
                                                                         <i class="feather-user fs-9 me-1"></i>by {{ $lead->owner?->name ?: 'System' }} &bull; Scheduled: {{ $item->followup_date->format('d M Y, h:i A') }}
                                                                     </span>
+                                                                    @if($item->taggedUsers->isNotEmpty())
+                                                                        @foreach($item->taggedUsers as $tUser)
+                                                                            <span class="badge bg-soft-info text-info fs-10 px-2 py-1 border border-info border-opacity-25" title="Tagged User">
+                                                                                <i class="feather-at-sign me-1"></i>Tagged: <strong>{{ $tUser->name }}</strong>
+                                                                            </span>
+                                                                        @endforeach
+                                                                    @endif
                                                                     @if($item->status !== 'Pending')
                                                                         <span class="text-muted ms-auto fs-10">
                                                                             <i class="feather-clock fs-9 me-1 text-primary"></i>Status Updated: <strong class="text-dark">{{ $item->updated_at->format('d M Y, h:i A') }}</strong>
@@ -1111,28 +1108,13 @@
                                                                 @if($item->status === 'Pending')
                                                                     <div class="activity-footer-actions d-flex gap-2 mt-3 d-print-none">
                                                                         <!-- Connected -->
-                                                                        <form action="{{ route('crm.followups.update', $item->id) }}" method="POST" class="d-inline">
-                                                                            @csrf
-                                                                            @method('PUT')
-                                                                            <input type="hidden" name="status" value="Completed">
-                                                                            <x-ui.button type="submit" variant="soft-success" size="sm" icon="feather-phone-call">Connected</x-ui.button>
-                                                                        </form>
+                                                                        <x-ui.button type="button" variant="soft-success" size="sm" icon="feather-phone-call" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">Connected</x-ui.button>
 
                                                                         <!-- Not Connected -->
-                                                                        <form action="{{ route('crm.followups.update', $item->id) }}" method="POST" class="d-inline">
-                                                                            @csrf
-                                                                            @method('PUT')
-                                                                            <input type="hidden" name="status" value="Not Connected">
-                                                                            <x-ui.button type="submit" variant="soft-warning" size="sm" icon="feather-phone-off">Not Connected</x-ui.button>
-                                                                        </form>
+                                                                        <x-ui.button type="button" variant="soft-warning" size="sm" icon="feather-phone-off" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">Not Connected</x-ui.button>
 
                                                                         <!-- Cancelled -->
-                                                                        <form action="{{ route('crm.followups.update', $item->id) }}" method="POST" class="d-inline">
-                                                                            @csrf
-                                                                            @method('PUT')
-                                                                            <input type="hidden" name="status" value="Cancelled">
-                                                                            <x-ui.button type="submit" variant="soft-danger" size="sm" icon="feather-x-circle">Cancelled</x-ui.button>
-                                                                        </form>
+                                                                        <x-ui.button type="button" variant="soft-danger" size="sm" icon="feather-x-circle" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">Cancelled</x-ui.button>
 
                                                                         <!-- Reschedule -->
                                                                         <x-ui.button type="button" variant="soft-primary" size="sm" icon="feather-refresh-cw" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">Reschedule</x-ui.button>
@@ -1141,8 +1123,72 @@
                                                             </div>
                                                         </div>
 
-                                                        <!-- Reschedule Modal using x-ui.modal component -->
                                                         @if($item->status === 'Pending')
+                                                            @php
+                                                                $currentTaggedIds = $item->taggedUsers->pluck('id')->toArray();
+                                                            @endphp
+
+                                                            <!-- Status Modal: Connected / Completed -->
+                                                            <x-ui.modal
+                                                                :id="'statusModal_' . $item->id . '_Completed'"
+                                                                title="Update Activity: Mark as Connected"
+                                                                size="md"
+                                                                :centered="true"
+                                                                :formAction="route('crm.followups.update', $item->id)"
+                                                                formMethod="PUT"
+                                                                submitText="Save &amp; Mark Connected"
+                                                                :closeText="__('crm.cancel')"
+                                                            >
+                                                                <input type="hidden" name="status" value="Completed">
+                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                    @foreach($users as $u)
+                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" label="Notes / Discussion Summary" name="notes" rows="3" placeholder="Enter notes or discussion outcome...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                            </x-ui.modal>
+
+                                                            <!-- Status Modal: Not Connected -->
+                                                            <x-ui.modal
+                                                                :id="'statusModal_' . $item->id . '_NotConnected'"
+                                                                title="Update Activity: Mark as Not Connected"
+                                                                size="md"
+                                                                :centered="true"
+                                                                :formAction="route('crm.followups.update', $item->id)"
+                                                                formMethod="PUT"
+                                                                submitText="Save Status"
+                                                                :closeText="__('crm.cancel')"
+                                                            >
+                                                                <input type="hidden" name="status" value="Not Connected">
+                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                    @foreach($users as $u)
+                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" label="Notes / Reason" name="notes" rows="3" placeholder="Reason / notes...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                            </x-ui.modal>
+
+                                                            <!-- Status Modal: Cancelled -->
+                                                            <x-ui.modal
+                                                                :id="'statusModal_' . $item->id . '_Cancelled'"
+                                                                title="Update Activity: Cancel Activity"
+                                                                size="md"
+                                                                :centered="true"
+                                                                :formAction="route('crm.followups.update', $item->id)"
+                                                                formMethod="PUT"
+                                                                submitText="Confirm Cancel"
+                                                                :closeText="__('crm.cancel')"
+                                                            >
+                                                                <input type="hidden" name="status" value="Cancelled">
+                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                    @foreach($users as $u)
+                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" label="Cancellation Note" name="notes" rows="3" placeholder="Reason for cancellation...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                            </x-ui.modal>
+
+                                                            <!-- Reschedule Modal -->
                                                             <x-ui.modal
                                                                 :id="'rescheduleModal_' . $item->id"
                                                                 title="Reschedule Activity"
@@ -1159,17 +1205,13 @@
                                                                     {{ __('crm.activity_types.' . $item->type) ?? $item->type }}
                                                                     &bull; Current: <strong>{{ $item->followup_date->format('d M Y, h:i A') }}</strong>
                                                                 </p>
-                                                                <div class="mb-3 text-start">
-                                                                    <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">New Date &amp; Time</label>
-                                                                    <div class="input-group input-group-sm">
-                                                                        <span class="input-group-text bg-light"><i class="feather-calendar fs-11 text-muted"></i></span>
-                                                                        <input type="text" class="form-control form-control-sm reschedule-datepicker" name="followup_date" required autocomplete="off" placeholder="Pick new date &amp; time">
-                                                                    </div>
-                                                                </div>
-                                                                <div class="mb-1 text-start">
-                                                                    <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Note (optional)</label>
-                                                                    <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Reason for rescheduling...">{{ $item->notes }}</textarea>
-                                                                </div>
+                                                                <x-ui.odoo-form-ui type="input" inputType="text" label="New Date & Time" name="followup_date" class="reschedule-datepicker" :required="true" autocomplete="off" placeholder="Pick new date & time" />
+                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                    @foreach($users as $u)
+                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" label="Note (optional)" name="notes" rows="2" placeholder="Reason for rescheduling...">{{ $item->notes }}</x-ui.odoo-form-ui>
                                                             </x-ui.modal>
                                                         @endif
                                                     @endforeach
@@ -1512,14 +1554,18 @@
                                                 <div class="mb-3">
                                                      <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.quotation_status') }}</label>
                                                      @php
-                                                         $activeQuoBadgeClass = 'bg-soft-secondary text-secondary';
-                                                         if ($activeQuotation->status === 'Quotation Sent' || $activeQuotation->status === 'Sent') $activeQuoBadgeClass = 'bg-soft-info text-info';
-                                                         elseif ($activeQuotation->status === 'Accepted' || $activeQuotation->status === 'Approved') $activeQuoBadgeClass = 'bg-soft-success text-success';
-                                                         elseif ($activeQuotation->status === 'Rejected') $activeQuoBadgeClass = 'bg-soft-danger text-danger';
-                                                         elseif ($activeQuotation->status === 'Pending Approval') $activeQuoBadgeClass = 'bg-soft-warning text-warning';
-                                                         elseif ($activeQuotation->status === 'Quotation Rework') $activeQuoBadgeClass = 'bg-soft-warning text-warning';
-                                                     @endphp
-                                                     <div class="fw-semibold"><span class="badge {{ $activeQuoBadgeClass }}">{{ __('crm.quotation_statuses.' . $activeQuotation->status) ?? $activeQuotation->status }}</span></div>
+                                                          $activeQuoBadgeClass = 'bg-soft-secondary text-secondary';
+                                                          if ($activeQuotation->status === 'Quotation Sent' || $activeQuotation->status === 'Sent') $activeQuoBadgeClass = 'bg-soft-info text-info';
+                                                          elseif ($activeQuotation->status === 'Accepted' || $activeQuotation->status === 'Approved' || $activeQuotation->status === 'Won' || $activeQuotation->status === 'Converted') $activeQuoBadgeClass = 'bg-soft-success text-success';
+                                                          elseif ($activeQuotation->status === 'Rejected') $activeQuoBadgeClass = 'bg-soft-danger text-danger';
+                                                          elseif ($activeQuotation->status === 'Pending Approval') $activeQuoBadgeClass = 'bg-soft-warning text-warning';
+                                                          elseif ($activeQuotation->status === 'Quotation Rework') $activeQuoBadgeClass = 'bg-soft-warning text-warning';
+
+                                                          $quoStatusText = \Illuminate\Support\Facades\Lang::has('crm.quotation_statuses.' . $activeQuotation->status) 
+                                                              ? __('crm.quotation_statuses.' . $activeQuotation->status) 
+                                                              : ($activeQuotation->status === 'Converted' ? __('crm.quotation_statuses.Converted') : $activeQuotation->status);
+                                                      @endphp
+                                                      <div class="fw-semibold"><span class="badge {{ $activeQuoBadgeClass }}">{{ $quoStatusText }}</span></div>
                                                  </div>
                                             </div>
                                         </div>
@@ -1671,45 +1717,42 @@
         <input type="hidden" name="status" value="Completed">
         <input type="hidden" name="followup_date" value="{{ date('Y-m-d H:i') }}">
         
-        <div class="mb-3 text-start">
-            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">{{ __('crm.interaction_type') }}</label>
-            <select class="form-select form-select-sm fw-semibold text-dark" name="type_select" onchange="this.form.type.value = this.value">
-                <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
-                <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
-                <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
-                <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
-            </select>
-        </div>
-        <div class="mb-3 text-start">
-            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">{{ __('crm.notes_summary') }}</label>
-            <textarea name="notes" class="form-control form-control-sm text-dark" rows="4" required :placeholder="__('crm.notes_summary_placeholder')"></textarea>
-        </div>
+        <x-ui.odoo-form-ui type="select" :label="__('crm.interaction_type')" name="type_select" onchange="this.form.type.value = this.value">
+            <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
+            <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
+            <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
+            <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+            @foreach($users as $u)
+                <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_summary')" name="notes" rows="4" :required="true" :placeholder="__('crm.notes_summary_placeholder')" />
     </x-ui.modal>
 
     <!-- Schedule Activity Modal -->
     <x-ui.modal id="modalScheduleActivity" :title="__('crm.schedule_next_activity')" :centered="true" :formAction="route('crm.leads.followups.store', $lead->id)" formMethod="POST" :submitText="__('crm.schedule')" :closeText="__('crm.cancel')">
         <input type="hidden" name="status" value="Pending">
         
-        <div class="mb-3 text-start">
-            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">{{ __('crm.activity_type') }}</label>
-            <select class="form-select form-select-sm fw-semibold text-dark" name="type" required>
-                <option value="Call">{{ __('crm.activity_types.Call') }}</option>
-                <option value="Email">{{ __('crm.activity_types.Email') }}</option>
-                <option value="Meeting">{{ __('crm.activity_types.Meeting') }}</option>
-                <option value="Demo">{{ __('crm.activity_types.Demo') }}</option>
-            </select>
-        </div>
-        <div class="mb-3 text-start">
-            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">{{ __('crm.due_date_time') }}</label>
-            <div class="input-group input-group-sm">
-                <span class="input-group-text bg-light"><i class="feather-calendar fs-11 text-muted"></i></span>
-                <input type="text" class="form-control form-control-sm text-dark" name="followup_date" id="inline_activity_datepicker" required autocomplete="off">
-            </div>
-        </div>
-        <div class="mb-3 text-start">
-            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">{{ __('crm.description_plan') }}</label>
-            <textarea name="notes" class="form-control form-control-sm text-dark" rows="4" :placeholder="__('crm.activity_plan_placeholder')"></textarea>
-        </div>
+        <x-ui.odoo-form-ui type="select" :label="__('crm.activity_type')" name="type" :required="true">
+            <option value="Call">{{ __('crm.activity_types.Call') }}</option>
+            <option value="Email">{{ __('crm.activity_types.Email') }}</option>
+            <option value="Meeting">{{ __('crm.activity_types.Meeting') }}</option>
+            <option value="Demo">{{ __('crm.activity_types.Demo') }}</option>
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="input" inputType="text" :label="__('crm.due_date_time')" name="followup_date" id="inline_activity_datepicker" :required="true" autocomplete="off" />
+
+        <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+            @foreach($users as $u)
+                <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui type="textarea" :label="__('crm.description_plan')" name="notes" rows="4" :placeholder="__('crm.activity_plan_placeholder')" />
     </x-ui.modal>
 @endsection
 

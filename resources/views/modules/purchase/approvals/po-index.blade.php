@@ -263,10 +263,10 @@
             $('#poApprovalFullViewLink').attr('href', '#');
             poDrawer.show();
 
-            $.get('/purchase/orders/' + id + '/po-detail-partial', function (data) {
+            $.get("{{ url('purchase/orders') }}/" + id + '/po-detail-partial', function (data) {
                 $('#poApprovalDrawerLoading').hide();
                 $('#poApprovalDrawerBody').html(data).show();
-                $('#poApprovalFullViewLink').attr('href', '/purchase/orders/' + id);
+                $('#poApprovalFullViewLink').attr('href', "{{ url('purchase/orders') }}/" + id);
                 $('[data-bs-toggle="tooltip"]', '#poApprovalDrawerBody').each(function () {
                     new bootstrap.Tooltip(this);
                 });
