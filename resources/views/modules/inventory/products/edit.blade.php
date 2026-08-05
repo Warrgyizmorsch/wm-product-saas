@@ -393,7 +393,7 @@
                                                 <label class="fs-12 fw-bold text-dark mb-1">Options (Type option value and press Enter or Comma)</label>
                                                 <div class="tag-input-container">
                                                     <span class="tags-wrapper">
-                                                        @foreach($attr['values'] ?? [] as $optVal)
+                                                        @foreach(($attr['values'] ?? $attr['options'] ?? []) as $optVal)
                                                             <span class="tag-badge" data-val="{{ $optVal }}">
                                                                 {{ $optVal }} <span class="remove-tag">&times;</span>
                                                                 <input type="hidden" name="attributes[{{ $idx }}][options][]" value="{{ $optVal }}">
@@ -668,8 +668,13 @@
                 }
             }
 
-            // Initial trigger on load
+            // Initial trigger on load: render the matrix with existing saved variants
             generateMatrix();
+
+            // Auto-update matrix when product name changes
+            $(document).on('input', 'input[name="name"]', function() {
+                generateMatrix();
+            });
         });
     </script>
     @endif

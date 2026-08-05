@@ -64,6 +64,7 @@
                 ['label' => __('purchase.purchase_orders'), 'route' => 'purchase.orders.index'],
                 ['label' => __('purchase.pending_grns'), 'route' => 'purchase.grns.pending'],
                 ['label' => __('purchase.all_goods_receipts'), 'route' => 'purchase.grns.index'],
+                ['label' => 'Landed Cost Vouchers', 'route' => 'purchase.landed-costs.index'],
                 ['label' => __('purchase.vendor_bills'), 'route' => 'purchase.bills.index'],
                 ['label' => __('purchase.vendor_payments'), 'route' => 'purchase.payments.index'],
             ]],

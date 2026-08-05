@@ -62,7 +62,13 @@ class ProductService
                 'track_serial_number' => $isService ? false : !empty($validated['track_serial_number']),
                 'track_batch' => $isService ? false : !empty($validated['track_batch']),
                 'inventory_valuation_method' => $validated['inventory_valuation_method'] ?? 'FIFO',
-                'attributes_config' => $validated['attributes'] ?? null,
+                'attributes_config' => !empty($validated['attributes'])
+                    ? array_values(array_filter(array_map(function($attr) {
+                        $name = trim($attr['name'] ?? '');
+                        $options = array_values(array_filter(array_map('trim', $attr['options'] ?? $attr['values'] ?? [])));
+                        return ($name && !empty($options)) ? ['name' => $name, 'values' => array_unique($options)] : null;
+                    }, $validated['attributes'])))
+                    : null,
                 'supplier_method' => $validated['supplier_method'] ?? 'buy',
             ]);
 

@@ -9,6 +9,8 @@ use App\Domains\Purchase\Controllers\PurchaseAdvancePaymentController;
 use App\Domains\Purchase\Controllers\VendorBillController;
 use App\Domains\Purchase\Controllers\VendorPaymentController;
 
+use App\Domains\Purchase\Controllers\LandedCostController;
+
 Route::prefix('purchase')
     ->as('purchase.')
     ->group(function (): void {
@@ -47,6 +49,10 @@ Route::prefix('purchase')
         Route::post('grns/{grn}/approve', [GoodsReceiptNoteController::class, 'approve'])->name('grns.approve');
         Route::get('grns/{grn}/download', [GoodsReceiptNoteController::class, 'downloadPdf'])->name('grns.download');
         Route::resource('grns', GoodsReceiptNoteController::class);
+
+        Route::get('landed-costs/get-grn-items', [LandedCostController::class, 'getGrnItems'])->name('landed-costs.get-grn-items');
+        Route::post('landed-costs/{landed_cost}/post', [LandedCostController::class, 'post'])->name('landed-costs.post');
+        Route::resource('landed-costs', LandedCostController::class);
 
         Route::post('bills/{bill}/apply-advance', [VendorBillController::class, 'applyAdvance'])->name('bills.apply-advance');
         Route::resource('bills', VendorBillController::class);
