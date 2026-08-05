@@ -511,6 +511,182 @@
                 }
             }
 
+            // ── Attribute Name select: show/hide custom input ──────────────────
+            $(document).on('change', '.attribute-name-select', function() {
+                const isCustom = $(this).val() === 'Custom';
+                const inputCustom = $(this).siblings('.attribute-custom-name');
+                inputCustom.toggle(isCustom).prop('required', isCustom);
+
+                const cardIndex = $(this).closest('.attribute-card').attr('data-index');
+                if (isCustom) {
+                    $(this).removeAttr('name');
+                    inputCustom.attr('name', `attributes[${cardIndex}][name]`);
+                } else {
+                    $(this).attr('name', `attributes[${cardIndex}][name]`);
+                    inputCustom.removeAttr('name');
+                }
+                generateMatrix();
+            });
+
+            $(document).on('input', '.attribute-custom-name', function() {
+                generateMatrix();
+            });
+
+            // ── Tag input: add tag on Enter or Comma ───────────────────────────
+            $(document).on('keydown', '.tag-input', function(e) {
+                if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    const val = $(this).val().trim().replace(/,/g, '');
+                    if (val) {
+                        const wrapper = $(this).siblings('.tags-wrapper');
+                        const cardIndex = $(this).closest('.attribute-card').attr('data-index');
+
+                        let exists = false;
+                        wrapper.find('.tag-badge').each(function() {
+                            if ($(this).attr('data-val').toLowerCase() === val.toLowerCase()) {
+                                exists = true;
+                            }
+                        });
+
+                        if (!exists) {
+                            wrapper.append(`
+                                <span class="tag-badge" data-val="${val}">
+                                    ${val} <span class="remove-tag">&times;</span>
+                                    <input type="hidden" name="attributes[${cardIndex}][options][]" value="${val}">
+                                </span>
+                            `);
+                            generateMatrix();
+                        }
+                        $(this).val('');
+                    }
+                }
+            });
+
+            // ── Remove tag ─────────────────────────────────────────────────────
+            $(document).on('click', '.remove-tag', function() {
+                $(this).closest('.tag-badge').remove();
+                generateMatrix();
+            });
+
+            // ── Add Attribute row ──────────────────────────────────────────────
+            $('#addAttributeBtn').on('click', function() {
+                const html = `
+                    <div class="attribute-card" data-index="${attributeIndex}">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <label class="fs-12 fw-bold text-dark mb-1">Attribute Name</label>
+                                <select name="attributes[${attributeIndex}][name]" class="form-select form-select-sm attribute-name-select" style="border-radius: 0;">
+                                    <option value="Size">Size</option>
+                                    <option value="Color">Color</option>
+                                    <option value="Material">Material</option>
+                                    <option value="Style">Style</option>
+                                    <option value="Custom">Custom...</option>
+                                </select>
+                                <input type="text" class="form-control form-control-sm attribute-custom-name mt-1" placeholder="Custom Attribute Name" style="display: none; border-radius: 0;">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="fs-12 fw-bold text-dark mb-1">Options (Type option value and press Enter or Comma)</label>
+                                <div class="tag-input-container">
+                                    <span class="tags-wrapper"></span>
+                                    <input type="text" class="tag-input" placeholder="e.g. Small, Medium, Large">
+                                </div>
+                            </div>
+                            <div class="col-md-1 text-center mt-3 mt-md-0">
+                                <button type="button" class="btn btn-sm btn-soft-danger remove-attribute-btn"><i class="feather-trash-2"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                $('#attributesContainer').append(html);
+                attributeIndex++;
+                generateMatrix();
+            });
+
+            // ── Remove Attribute row ───────────────────────────────────────────
+            $(document).on('click', '.remove-attribute-btn', function() {
+                $(this).closest('.attribute-card').remove();
+                generateMatrix();
+            });
+
+            // ── Dynamic Combination Matrix (Cartesian Product) ─────────────────
+            function generateMatrix() {
+                const attributes = [];
+                $('#attributesContainer .attribute-card').each(function() {
+                    const selectVal = $(this).find('.attribute-name-select').val();
+                    const name = selectVal === 'Custom'
+                        ? $(this).find('.attribute-custom-name').val().trim()
+                        : selectVal;
+                    const options = [];
+
+                    $(this).find('.tag-badge').each(function() {
+                        options.push($(this).attr('data-val'));
+                    });
+
+                    if (name && options.length > 0) {
+                        attributes.push({ name: name, options: options });
+                    }
+                });
+
+                if (attributes.length === 0) {
+                    $('#variantsMatrixContainer').hide();
+                    return;
+                }
+
+                const cartesian = (sets) => {
+                    return sets.reduce((acc, set) => {
+                        return acc.flatMap(x => set.map(y => [...x, y]));
+                    }, [[]]);
+                };
+
+                const optionSets = attributes.map(a => a.options);
+                const combinations = cartesian(optionSets);
+
+                const parentName = $('input[name="name"]').val().trim() || 'Product';
+                const defaultSellingPrice = $('input[name="selling_price"]').val() || '';
+                const defaultCostPrice = $('input[name="cost_price"]').val() || '';
+
+                const tbody = $('#variantsMatrixBody');
+                tbody.empty();
+
+                combinations.forEach((combo, index) => {
+                    const comboTextParts = combo.map((val, idx) => `${attributes[idx].name}: ${val}`);
+                    const comboString = comboTextParts.join(', ');
+                    const autoSku = combo.join('-').toUpperCase().replace(/\s+/g, '');
+
+                    const rowHtml = `
+                        <tr>
+                            <td class="fw-semibold text-dark">
+                                <span class="badge bg-soft-primary text-primary me-2">Variant #${index + 1}</span>
+                                <span>${parentName} (${comboString})</span>
+                                <input type="hidden" name="variants[${index}][attributes]" value="${comboString}">
+                            </td>
+                            <td>
+                                <input type="text" name="variants[${index}][sku]" value="${autoSku}" class="form-control form-control-sm py-1 fw-semibold" required style="border-radius: 0; min-width: 140px;">
+                            </td>
+                            <td>
+                                <input type="number" step="0.01" name="variants[${index}][selling_price]" value="${defaultSellingPrice}" class="form-control form-control-sm py-1" style="border-radius: 0; min-width: 100px;">
+                            </td>
+                            <td>
+                                <input type="number" step="0.01" name="variants[${index}][cost_price]" value="${defaultCostPrice}" class="form-control form-control-sm py-1" style="border-radius: 0; min-width: 100px;">
+                            </td>
+                            <td class="variant-stock-col">
+                                <input type="number" step="0.01" name="variants[${index}][opening_stock]" value="0" class="form-control form-control-sm py-1" style="border-radius: 0; min-width: 80px;">
+                            </td>
+                            <td>
+                                <input type="number" step="0.01" name="variants[${index}][reorder_point]" value="0" class="form-control form-control-sm py-1" style="border-radius: 0; min-width: 80px;">
+                            </td>
+                        </tr>
+                    `;
+                    tbody.append(rowHtml);
+                });
+
+                if (combinations.length > 0 && combinations[0].length > 0) {
+                    $('#variantsMatrixContainer').show();
+                } else {
+                    $('#variantsMatrixContainer').hide();
+                }
+            }
+
             // Execute on initial page load
             toggleSections();
         });
