@@ -61,6 +61,12 @@
 @endsection
 
 @section('content')
+
+    {{-- ── MES Operator Console Workflow Guidance Component ── --}}
+    <x-ui.workflow-guide title="What's Next?">
+        Review your assigned operation tasks below. Accept task assignments and click <span class="badge bg-soft-primary text-primary border border-primary-subtle fw-semibold">Execute</span> to open the operation execution console and start production.
+    </x-ui.workflow-guide>
+
     <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
 
         {{-- Metrics Summary --}}

@@ -46,7 +46,8 @@
                         >
                             <option value="">{{ __('production.select_released_production_order') }}</option>
                             @foreach($orders as $order)
-                                <option value="{{ $order->id }}" {{ old('production_order_id') == $order->id ? 'selected' : '' }}>
+                                <option value="{{ $order->id }}"
+                                    {{ (old('production_order_id', request('production_order_id')) == $order->id) ? 'selected' : '' }}>
                                     {{ $order->order_number }} — {{ $order->product->name ?? 'N/A' }}
                                     ({{ ucfirst(str_replace('_', ' ', $order->status)) }})
                                 </option>

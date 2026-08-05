@@ -1,10 +1,10 @@
 @props([
-    'id' => null,
+    'id'    => null,
     'title' => 'Action Execute Successfully',
-    'type' => 'success',
+    'type'  => 'success',
     'position' => 'top-end',
     'delay' => 3000,
-    'auto' => false,
+    'auto'  => false,
 ])
 
 @if(!$auto)

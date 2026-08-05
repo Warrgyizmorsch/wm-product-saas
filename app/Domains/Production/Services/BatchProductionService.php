@@ -40,7 +40,7 @@ class BatchProductionService
                 }
             }
 
-            $batchNumber = $this->batchNumberService->generateNextNumber($tenantId);
+            $batchNumber = $this->batchNumberService->generateNextNumber($tenantId, $order ?? $orderId);
 
             $batch = ProductionBatch::create([
                 'tenant_id' => $tenantId,

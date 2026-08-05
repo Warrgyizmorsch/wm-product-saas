@@ -105,6 +105,8 @@ class ProductionWipService
                 'created_by' => $userId,
             ]);
 
+            $this->reconcileOrderWipCards($order->id);
+
             return $wip;
         });
     }
@@ -1156,10 +1158,47 @@ class ProductionWipService
     }
 
     /**
+     * Reconcile unbatched Main Order WIP card available quantity against active batch planned allocations.
+     */
+    public function reconcileOrderWipCards(int $orderId): void
+    {
+        $order = ProductionOrder::find($orderId);
+        if (!$order) {
+            return;
+        }
+
+        $mainWip = ProductionWip::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $orderId)
+            ->whereNull('production_batch_id')
+            ->first();
+
+        if (!$mainWip) {
+            return;
+        }
+
+        $sumBatchPlanned = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $orderId)
+            ->whereNotIn('status', ['cancelled'])
+            ->sum('planned_quantity');
+
+        $unallocatedQty = max(0.0000, (float) $order->quantity_ordered - (float) $sumBatchPlanned);
+
+        $newStatus = ($unallocatedQty <= 0) ? 'completed' : ($mainWip->status === 'completed' ? 'active' : $mainWip->status);
+
+        $mainWip->update([
+            'available_quantity' => $unallocatedQty,
+            'quantity'           => $unallocatedQty,
+            'status'             => $newStatus,
+        ]);
+    }
+
+    /**
      * Get Work-Center aggregate summaries for a production order using fast DB selectRaw queries.
      */
     public function getWorkCenterWipSummaries(int $tenantId, int $orderId, ?int $workCenterId = null): \Illuminate\Support\Collection
     {
+        $this->reconcileOrderWipCards($orderId);
+
         $query = ProductionWip::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId);
 

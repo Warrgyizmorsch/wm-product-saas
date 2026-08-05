@@ -74,51 +74,56 @@
             ]],
         ],
         __('ui.production') => [
-            ['label' => __('production.production_engineering'), 'icon' => 'feather-cpu', 'url' => '#', 'children' => [
-                ['label' => __('production.bom'), 'route' => 'production.boms.index'],
-                ['label' => __('production.routing'), 'route' => 'production.routing.index'],
-                ['label' => __('production.work_centers'), 'route' => 'production.work-centers.index'],
-                ['label' => __('production.machines'), 'route' => 'production.machines.index'],
-            ]],
-            ['label' => __('production.production_planning'), 'icon' => 'feather-calendar', 'url' => '#', 'children' => [
-                ['label' => __('production.production_planning'), 'route' => 'production.plans.index'],
-                ['label' => __('production.scheduling_sidebar'), 'route' => 'production.schedules.index'],
-                ['label' => __('production.capacity_planning_sidebar'), 'route' => 'production.capacity.index'],
-                ['label' => __('production.shifts_sidebar'), 'route' => 'production.shifts.index'],
+            // ── 1. Production Masters (Setup & Configuration) ──────────────────
+            ['label' => 'Production Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
+                ['label' => __('production.bom'),          'route' => 'production.boms.index'],
+                ['label' => __('production.routing'),       'route' => 'production.routing.index'],
+                ['label' => __('production.work_centers'),  'route' => 'production.work-centers.index'],
+                ['label' => __('production.machines'),      'route' => 'production.machines.index'],
+                ['label' => 'Operator Skills',              'route' => 'production.operator-skills.index'],
+                ['label' => 'Quality Plans',                'route' => 'production.quality-plans.index'],
+                ['label' => __('production.shifts_sidebar'),    'route' => 'production.shifts.index'],
                 ['label' => __('production.calendars_sidebar'), 'route' => 'production.calendars.index'],
             ]],
-            ['label' => 'Production Execution', 'icon' => 'feather-play-circle', 'url' => '#', 'children' => [
-                ['label' => 'Production Orders', 'route' => 'production.orders.index'],
-                ['label' => 'Work-in-Progress (WIP)', 'route' => 'production.wip.index'],
+
+            // ── 2. Production Orders (Step 1: Create & Release) ───────────────
+            ['label' => 'Production Orders', 'icon' => 'feather-play-circle', 'route' => 'production.orders.index'],
+
+            // ── 3. Scheduling (Step 2: Plan Operations) ───────────────────────
+            ['label' => 'Scheduling', 'icon' => 'feather-calendar', 'url' => '#', 'children' => [
+                ['label' => 'Production Schedules', 'route' => 'production.schedules.index'],
+                ['label' => 'Calendar View',         'route' => 'production.schedules.calendar'],
             ]],
+
+            // ── 4. Work-in-Progress (Step 3: Track Execution) ─────────────────
+            ['label' => 'Work-in-Progress (WIP)', 'icon' => 'feather-layers', 'route' => 'production.wip.index'],
+
+            // ── 5. Shop Floor — MES (Step 4: Execute on Floor) ───────────────
             ['label' => 'Shop Floor (MES)', 'icon' => 'feather-activity', 'url' => '#', 'children' => [
-                ['label' => 'Shop Floor Dashboard', 'route' => 'production.mes.dashboard'],
-                ['label' => 'MES Operator Console', 'route' => 'production.mes.operator.dashboard'],
-                ['label' => 'Operator Skills', 'route' => 'production.operator-skills.index'],
-                ['label' => 'Barcode Scanner', 'route' => 'production.mes.scanner.index'],
-                ['label' => 'Lot Traceability', 'route' => 'production.mes.traceability.index'],
-                ['label' => 'Production Scan Logs', 'route' => 'production.scan-logs.index'],
-                ['label' => 'Event Timeline', 'route' => 'production.mes.timeline.index'],
+                ['label' => 'Shop Floor Dashboard',   'route' => 'production.mes.dashboard'],
+                ['label' => 'MES Operator Console',   'route' => 'production.mes.operator.dashboard'],
+                ['label' => 'Work Center Monitor',    'route' => 'production.mes.work-centers.index'],
+                ['label' => 'Machine Monitor',        'route' => 'production.mes.machines.index'],
+                ['label' => 'Barcode Scanner',        'route' => 'production.mes.scanner.index'],
             ]],
+
+            // ── 6. Quality Management ──────────────────────────────────────────
             ['label' => 'Quality Management', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
-                ['label' => 'Quality Dashboard', 'route' => 'production.quality.dashboard'],
-                ['label' => 'Quality Plans', 'route' => 'production.quality-plans.index'],
-                ['label' => 'Quality Inspections', 'route' => 'production.inspections.index'],
-                ['label' => 'NCR', 'route' => 'production.ncrs.index'],
-                ['label' => 'CAPA', 'route' => 'production.capas.index'],
-                ['label' => 'Rework Orders', 'route' => 'production.rework.index'],
-                ['label' => 'Scrap Disposals', 'route' => 'production.scrap.index'],
-                ['label' => 'Deviations & Waivers', 'route' => 'production.deviations.index'],
+                ['label' => 'Quality Dashboard',    'route' => 'production.quality.dashboard'],
+                ['label' => 'Quality Inspections',  'route' => 'production.inspections.index'],
+                ['label' => 'NCR',                  'route' => 'production.ncrs.index'],
+                ['label' => 'CAPA',                 'route' => 'production.capas.index'],
+                ['label' => 'Rework Orders',        'route' => 'production.rework.index'],
+                ['label' => 'Scrap Disposals',      'route' => 'production.scrap.index'],
             ]],
+
+            // ── 7. Manufacturing Intelligence ──────────────────────────────────
             ['label' => 'Manufacturing Intelligence', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => [
-                ['label' => 'Executive Dashboard', 'route' => 'production.intelligence.dashboard'],
-                ['label' => 'Live Andon Board', 'route' => 'production.intelligence.andon'],
-                ['label' => 'Historical Analytics', 'route' => 'production.intelligence.analytics'],
-                ['label' => 'Manufacturing Reports', 'route' => 'production.intelligence.reports.index'],
-                ['label' => 'KPI Targets', 'route' => 'production.kpi-targets.index'],
-                ['label' => 'Alert Configuration', 'route' => 'production.intelligence.alerts.index'],
+                ['label' => 'Executive Dashboard',    'route' => 'production.intelligence.dashboard'],
+                ['label' => 'Live Andon Board',       'route' => 'production.intelligence.andon'],
+                ['label' => 'Historical Analytics',   'route' => 'production.intelligence.analytics'],
+                ['label' => 'Manufacturing Reports',  'route' => 'production.intelligence.reports.index'],
             ]],
-            ['label' => 'Track Status', 'icon' => 'feather-trending-up', 'route' => 'production.track-status'],
         ],
         'HRMS' => [
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],

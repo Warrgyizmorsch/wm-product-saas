@@ -40,7 +40,8 @@ class MesController extends Controller
         ])
             ->where('tenant_id', $tenantId)
             ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS])
-            ->orderBy('created_at', 'desc')
+            ->orderBy('scheduled_at', 'asc')
+            ->orderBy('id', 'asc')
             ->get();
 
         // Running operations (for stopwatch timer block countdowns)
