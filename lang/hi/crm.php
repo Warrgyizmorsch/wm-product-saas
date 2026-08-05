@@ -36,6 +36,7 @@ return [
         'New' => 'नया (New)',
         'Qualified' => 'योग्य (Qualified)',
         'Won' => 'जीता (Won)',
+        'Converted' => 'जीता (Won)',
         'Lost' => 'खोया (Lost)',
     ],
     'priorities' => [
@@ -330,6 +331,8 @@ return [
         'Accepted' => 'स्वीकृत',
         'Rejected' => 'अस्वीकृत',
         'Quotation Rework' => 'कोटेशन पुनः कार्य',
+        'Converted' => 'बिक्री आदेश में परिवर्तित (Won)',
+        'Won' => 'जीता (Won)',
     ],
     'save_changes' => 'बदलाव सहेजें',
     'customer_account' => 'ग्राहक / खाता',

@@ -37,7 +37,8 @@ return [
         'Follow-up Scheduled' => 'Насрочено проследяване',
         'Contacted' => 'Свързан',
         'Qualified' => 'Квалифициран',
-        'Converted' => 'Конвертиран',
+        'Won' => 'Спечелена (Won)',
+        'Converted' => 'Спечелена (Won)',
         'Lost' => 'Загубен',
     ],
     'priorities' => [
@@ -332,6 +333,8 @@ return [
         'Accepted' => 'Приета',
         'Rejected' => 'Отхвърлена',
         'Quotation Rework' => 'За преработка',
+        'Converted' => 'Преобразувана в поръчка (Won)',
+        'Won' => 'Спечелена (Won)',
     ],
     'save_changes' => 'Запази промените',
     'customer_account' => 'Клиент / Акаунт',

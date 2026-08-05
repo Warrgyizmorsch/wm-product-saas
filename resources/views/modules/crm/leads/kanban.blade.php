@@ -100,6 +100,22 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <h5 class="fw-bold text-dark mb-0 me-2">Pipeline Kanban</h5>
         <div class="d-flex align-items-center flex-wrap gap-2">
+            <!-- Outside Search Box (HRMS Style) -->
+            <form method="GET" action="{{ route('crm.leads.kanban') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 240px;">
+                @foreach(request()->except(['search', 'page']) as $k => $v)
+                    @if(is_scalar($v) && $v !== '')
+                        <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                    @endif
+                @endforeach
+                <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
+                <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('crm.search_placeholder_leads') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                @if(request('search'))
+                    <a href="{{ route('crm.leads.kanban', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
+                        <i class="feather-x fs-12"></i>
+                    </a>
+                @endif
+            </form>
+
             <!-- Icon View Switcher (Common System Component) -->
             <x-ui.view-switcher />
 
@@ -331,7 +347,7 @@
                 recalculateTotals();
 
                 // AJAX Update Status in DB
-                fetch(`/crm/leads/${leadId}/status`, {
+                fetch(`{{ url('crm/leads') }}/${leadId}/status`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -400,7 +416,7 @@
     // ── Star Rating: Update Priority via AJAX ──
     window.updateLeadPriority = function(leadId, priority, el) {
         var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        fetch('/crm/leads/' + leadId + '/priority', {
+        fetch("{{ url('crm/leads') }}/" + leadId + '/priority', {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',

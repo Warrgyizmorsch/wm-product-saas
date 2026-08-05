@@ -757,7 +757,7 @@
          */
         function changeWarehouse(itemId, select) {
             const warehouseId = select.value;
-            const url = `/sales/material-requirements/items/${itemId}/warehouse`;
+            const url = `{{ url('sales/material-requirements/items') }}/${itemId}/warehouse`;
 
             $.ajax({
                 url:    url,
@@ -790,7 +790,7 @@
             updateReserveAvailableFromQty(itemId, avail);
 
             $.ajax({
-                url:    `/sales/material-requirements/items/${itemId}/warehouse`,
+                url:    `{{ url('sales/material-requirements/items') }}/${itemId}/warehouse`,
                 method: 'POST',
                 data:   { _token: '{{ csrf_token() }}', warehouse_id: select.value },
                 success: function (response) {

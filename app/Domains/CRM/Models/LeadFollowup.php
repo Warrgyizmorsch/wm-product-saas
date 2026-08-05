@@ -17,6 +17,8 @@ class LeadFollowup extends Model
         'type',
         'status',
         'notes',
+        'tagged_user_id',
+        'tagged_user_ids',
         'rescheduled_from_id',
         'original_followup_date',
     ];
@@ -24,7 +26,31 @@ class LeadFollowup extends Model
     protected $casts = [
         'followup_date' => 'datetime',
         'original_followup_date' => 'datetime',
+        'tagged_user_ids' => 'array',
     ];
+
+    /**
+     * Get all users tagged on this followup/activity (multi-select & single select compatible).
+     */
+    public function getTaggedUsersAttribute()
+    {
+        $ids = is_array($this->tagged_user_ids) ? array_filter($this->tagged_user_ids) : [];
+        if (empty($ids) && $this->tagged_user_id) {
+            $ids = [$this->tagged_user_id];
+        }
+        if (empty($ids)) {
+            return collect();
+        }
+        return \App\Models\User::whereIn('id', $ids)->get();
+    }
+
+    /**
+     * Get the user tagged on this followup/activity.
+     */
+    public function taggedUser(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'tagged_user_id');
+    }
 
     /**
      * Get the lead that owns the followup.

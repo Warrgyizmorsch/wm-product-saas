@@ -38,7 +38,8 @@ class LeadActivityController extends Controller
             ->get();
 
         $leads = Lead::where('tenant_id', $tenantId)->orderBy('company_name')->get();
+        $users = \App\Models\User::orderBy('name')->get();
 
-        return view('modules.crm.activities.index', compact('followups', 'leads', 'view', 'startDate', 'monthStart', 'monthEnd'));
+        return view('modules.crm.activities.index', compact('followups', 'leads', 'users', 'view', 'startDate', 'monthStart', 'monthEnd'));
     }
 }

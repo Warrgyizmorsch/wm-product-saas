@@ -20,14 +20,17 @@ class LeadFollowupController extends Controller
 
         $validated = $request->validate([
             'followup_date' => 'required|string',
-            'type' => 'required|string|in:Call,Email,Meeting,Demo',
+            'type' => 'required|string|in:Call,Email,Meeting,Demo,Task',
             'status' => 'required|string|in:Pending,Completed,Not Connected,Cancelled,Rescheduled',
             'notes' => 'nullable|string',
+            'tagged_user_id' => 'nullable|exists:users,id',
+            'tagged_user_ids' => 'nullable|array',
+            'tagged_user_ids.*' => 'nullable|exists:users,id',
         ]);
 
         $this->followupService->storeFollowup($lead, $validated);
 
-        return redirect()->route('crm.leads.show', $lead->id)->with('success', 'Follow-up successfully scheduled/logged!');
+        return redirect()->back()->with('success', 'Follow-up successfully scheduled/logged!');
     }
 
     public function update(Request $request, LeadFollowup $followup)
@@ -37,23 +40,25 @@ class LeadFollowupController extends Controller
         $validated = $request->validate([
             'status' => 'nullable|string|in:Pending,Completed,Not Connected,Cancelled,Rescheduled',
             'notes' => 'nullable|string',
-            'type' => 'nullable|string|in:Call,Email,Meeting,Demo',
+            'type' => 'nullable|string|in:Call,Email,Meeting,Demo,Task',
             'followup_date' => 'nullable|string',
+            'tagged_user_id' => 'nullable|exists:users,id',
+            'tagged_user_ids' => 'nullable|array',
+            'tagged_user_ids.*' => 'nullable|exists:users,id',
             'is_reschedule' => 'nullable|boolean',
         ]);
 
         $msg = $this->followupService->updateOrReschedule($followup, $validated, $request->boolean('is_reschedule'));
 
-        return redirect()->route('crm.leads.show', $followup->lead_id)->with('success', $msg);
+        return redirect()->back()->with('success', $msg);
     }
 
     public function destroy(LeadFollowup $followup)
     {
         $this->authorize('update', $followup->lead);
-        $leadId = $followup->lead_id;
 
         $this->followupService->deleteFollowup($followup);
 
-        return redirect()->route('crm.leads.show', $leadId)->with('success', 'Follow-up successfully deleted!');
+        return redirect()->back()->with('success', 'Follow-up successfully deleted!');
     }
 }

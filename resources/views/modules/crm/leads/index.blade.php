@@ -33,6 +33,22 @@
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                 <h5 class="fw-bold text-dark mb-0">{{ __('crm.leads_listing') }}</h5>
                 <div class="d-flex align-items-center flex-wrap gap-2">
+                    <!-- Outside Search Box (HRMS Style) -->
+                    <form method="GET" action="{{ route('crm.leads.index') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 240px;">
+                        @foreach(request()->except(['search', 'page']) as $k => $v)
+                            @if(is_scalar($v) && $v !== '')
+                                <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                            @endif
+                        @endforeach
+                        <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
+                        <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="{{ __('crm.search_placeholder_leads') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                        @if(request('search'))
+                            <a href="{{ route('crm.leads.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
+                                <i class="feather-x fs-12"></i>
+                            </a>
+                        @endif
+                    </form>
+
                     <x-ui.view-switcher />
                     <x-ui.sort-dropdown :label="__('crm.sort')">
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'desc' ? 'active' : '' }}">
@@ -94,6 +110,15 @@
                                     <option value="Qualified" {{ request('status') === 'Qualified' ? 'selected' : '' }}>{{ __('crm.statuses.Qualified') }}</option>
                                     <option value="Won" {{ request('status') === 'Won' ? 'selected' : '' }}>{{ __('crm.statuses.Won') }}</option>
                                     <option value="Lost" {{ request('status') === 'Lost' ? 'selected' : '' }}>{{ __('crm.statuses.Lost') }}</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Lead Owner</label>
+                                <x-ui.odoo-form-ui type="select" name="lead_owner_id">
+                                    <option value="">All Lead Owners</option>
+                                    @foreach($users as $u)
+                                        <option value="{{ $u->id }}" {{ (string)request('lead_owner_id') === (string)$u->id ? 'selected' : '' }}>{{ $u->name }} ({{ $u->email }})</option>
+                                    @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3">
@@ -190,13 +215,14 @@
                             <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
                                 <input type="checkbox" class="form-check-input">
                             </th>
-                            <th style="width: 11%; background-color: #e8ecf1 !important;">{{ __('crm.call_date_time') }}</th>
-                            <th style="width: 20%; background-color: #e8ecf1 !important;">{{ __('crm.lead_company') }}</th>
-                            <th style="width: 18%; background-color: #e8ecf1 !important;">{{ __('crm.phone_email') }}</th>
-                            <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.value_est_sale') }}</th>
-                            <th style="width: 18%; background-color: #e8ecf1 !important;">Details</th>
-                            <th style="width: 9%; background-color: #e8ecf1 !important;">Quotation</th>
-                            <th style="width: 9%; background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
+                            <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('crm.call_date_time') }}</th>
+                            <th style="width: 17%; background-color: #e8ecf1 !important;">{{ __('crm.lead_company') }}</th>
+                            <th style="width: 13%; background-color: #e8ecf1 !important;">Lead Owner</th>
+                            <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('crm.phone_email') }}</th>
+                            <th style="width: 11%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.value_est_sale') }}</th>
+                            <th style="width: 16%; background-color: #e8ecf1 !important;">Details</th>
+                            <th style="width: 8%; background-color: #e8ecf1 !important;">Quotation</th>
+                            <th style="width: 8%; background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
                             <th style="width: 3%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                         </tr>
                     </thead>
@@ -235,6 +261,18 @@
                                         @endif
                                     </div>
                                     <span class="text-muted fs-11"><i class="feather-user me-1 fs-10 text-primary"></i>{{ $lead->contact_person ?: 'N/A' }}</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <img src="https://ui-avatars.com/api/?name={{ urlencode($lead->owner?->name ?: 'Unassigned') }}&background=1e40af&color=ffffff&size=64&bold=true" 
+                                             alt="{{ $lead->owner?->name ?: 'Lead Owner' }}" 
+                                             class="rounded-circle me-2 border shadow-xs" 
+                                             style="width: 28px; height: 28px; object-fit: cover;">
+                                        <div>
+                                            <span class="d-block fw-semibold text-dark fs-12" style="line-height: 1.2;">{{ $lead->owner?->name ?: 'Unassigned' }}</span>
+                                            <span class="text-muted fs-10 d-block">{{ $lead->owner?->email ?: '—' }}</span>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
                                     @if ($lead->phone)
@@ -593,7 +631,7 @@
         window.updateLeadPriority = function(leadId, priority, el) {
             var csrfToken = $('meta[name="csrf-token"]').attr('content');
             $.ajax({
-                url: '/crm/leads/' + leadId + '/priority',
+                url: "{{ url('crm/leads') }}/" + leadId + '/priority',
                 type: 'PATCH',
                 headers: {
                     'X-CSRF-TOKEN': csrfToken,

@@ -17,7 +17,7 @@ class LeadRepository
      */
     public function getPaginatedLeads(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Lead::query()->with('quotations');
+        $query = Lead::query()->with(['quotations', 'owner']);
 
         // Search Keywords
         if (!empty($filters['search'])) {
@@ -60,6 +60,10 @@ class LeadRepository
 
             if (!empty($filters['status'])) {
                 $query->where('status', $filters['status']);
+            }
+
+            if (!empty($filters['lead_owner_id'])) {
+                $query->where('lead_owner_id', $filters['lead_owner_id']);
             }
 
             if (!empty($filters['quotation_status'])) {
@@ -109,7 +113,7 @@ class LeadRepository
      */
     public function getLeadDetails(Lead $lead, ?int $activeQuotationId = null): array
     {
-        $lead->load(['followups', 'histories.user', 'leadDocuments']);
+        $lead->load(['followups.taggedUser', 'histories.user', 'leadDocuments']);
 
         $customer = null;
         if ($lead->email) {

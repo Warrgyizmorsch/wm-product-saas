@@ -270,12 +270,23 @@
                     });
                 @endphp
 
-                <div class="calendar-day-cell {{ !$isCurrentMonth ? 'other-month' : '' }} {{ $isToday ? 'is-today' : '' }}">
+                <div class="calendar-day-cell {{ !$isCurrentMonth ? 'other-month' : '' }} {{ $isToday ? 'is-today' : '' }}" 
+                     onclick="openScheduleModalForDate('{{ $dateStr }}', event)" 
+                     style="cursor: pointer;" 
+                     title="Click date to schedule activity">
                     <div class="d-flex align-items-center justify-content-between mb-1">
                         <span class="day-number-badge">{{ $currentDay->day }}</span>
-                        @if($isToday)
-                            <span class="badge bg-primary fs-10 px-1.5 py-0.5">Today</span>
-                        @endif
+                        <div class="d-flex align-items-center gap-1">
+                            @if($isToday)
+                                <span class="badge bg-primary fs-10 px-1.5 py-0.5">Today</span>
+                            @endif
+                            <button type="button" class="btn btn-xs btn-soft-primary p-0 d-inline-flex align-items-center justify-content-center" 
+                                    style="width: 20px; height: 20px; border-radius: 50%;" 
+                                    title="Schedule activity on {{ $currentDay->format('d M Y') }}"
+                                    onclick="openScheduleModalForDate('{{ $dateStr }}', event)">
+                                <i class="feather-plus fs-10"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="activities-list flex-fill">
@@ -316,7 +327,7 @@
                                     };
                                 }
                             @endphp
-                            <a href="{{ route('crm.leads.show', $f->lead_id) }}" class="activity-pill {{ $badgeClass }}" title="{{ $f->type }}: {{ $f->lead?->company_name }} — {{ $f->notes ?: 'Scheduled Follow-up' }} [Status: {{ $f->status ?: 'Pending' }}]">
+                            <a href="{{ route('crm.leads.show', $f->lead_id) }}" class="activity-pill {{ $badgeClass }}" title="{{ $f->type }}: {{ $f->lead?->company_name }} — {{ $f->notes ?: 'Scheduled Follow-up' }} [Status: {{ $f->status ?: 'Pending' }}]" onclick="event.stopPropagation();">
                                 <span class="d-flex align-items-center text-truncate">
                                     <i class="{{ $iconClass }} me-1 opacity-85"></i>
                                     <span class="text-truncate">{{ $f->lead?->company_name ?: 'Lead #'.$f->lead_id }}</span>
@@ -342,35 +353,65 @@
 >
     <form action="#" method="POST" id="quickScheduleForm">
         @csrf
-        <div class="mb-3">
-            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">SELECT LEAD <span class="text-danger">*</span></label>
-            <x-ui.odoo-form-ui type="select" name="lead_id" id="modal_lead_id" required="true">
-                <option value="">— Select Lead —</option>
-                @foreach($leads as $lead)
-                    <option value="{{ $lead->id }}">{{ $lead->company_name }} ({{ $lead->contact_name ?: 'No Contact' }})</option>
-                @endforeach
-            </x-ui.odoo-form-ui>
-        </div>
+        <input type="hidden" name="status" value="Pending">
 
-        <div class="mb-3">
-            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">ACTIVITY TYPE <span class="text-danger">*</span></label>
-            <x-ui.odoo-form-ui type="select" name="type" required="true">
-                <option value="Call">Scheduled Call</option>
-                <option value="Meeting">Meeting / Demo</option>
-                <option value="Email">Send Email / Proposal</option>
-                <option value="Task">General Task</option>
-            </x-ui.odoo-form-ui>
-        </div>
+        <x-ui.odoo-form-ui 
+            type="select" 
+            label="Select Lead" 
+            name="lead_id" 
+            id="modal_lead_id" 
+            :required="true" 
+            :searchable="true" 
+            :errorText="$errors->first('lead_id')"
+        >
+            <option value="">— Select Lead —</option>
+            @foreach($leads as $lead)
+                <option value="{{ $lead->id }}">{{ $lead->company_name }} ({{ $lead->contact_name ?: 'No Contact' }})</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
 
-        <div class="mb-3">
-            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">DUE DATE & TIME <span class="text-danger">*</span></label>
-            <x-ui.odoo-form-ui type="input" name="followup_date" inputType="datetime-local" :value="now()->addDay()->format('Y-m-d\TH:i')" required="true" />
-        </div>
+        <x-ui.odoo-form-ui 
+            type="select" 
+            label="Activity Type" 
+            name="type" 
+            :required="true"
+            :errorText="$errors->first('type')"
+        >
+            <option value="Call">Scheduled Call</option>
+            <option value="Meeting">Meeting / Demo</option>
+            <option value="Email">Send Email / Proposal</option>
+            <option value="Task">General Task</option>
+        </x-ui.odoo-form-ui>
 
-        <div class="mb-3">
-            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">DESCRIPTION / PLAN</label>
-            <x-ui.odoo-form-ui type="textarea" name="notes" placeholder="Enter activity description or discussion plan..." rows="4" />
-        </div>
+        <x-ui.odoo-form-ui 
+            type="input" 
+            inputType="datetime-local" 
+            label="Due Date & Time" 
+            name="followup_date" 
+            :value="now()->addDay()->format('Y-m-d\TH:i')" 
+            :required="true"
+            :errorText="$errors->first('followup_date')"
+        />
+
+        <x-ui.odoo-form-ui 
+            type="select" 
+            label="Tag Persons" 
+            name="tagged_user_ids[]" 
+            :multiple="true" 
+            :searchable="true"
+        >
+            @foreach($users as $u)
+                <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+
+        <x-ui.odoo-form-ui 
+            type="textarea" 
+            label="Description / Plan" 
+            name="notes" 
+            placeholder="Enter activity description or discussion plan..." 
+            rows="4" 
+        />
 
         <div class="d-flex gap-2 justify-content-end mt-4 pt-3 border-top">
             <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">CANCEL</button>
@@ -382,16 +423,40 @@
 
 @push('scripts')
 <script>
+    function openScheduleModalForDate(dateStr, event) {
+        if (event) {
+            event.stopPropagation();
+        }
+        const dateInput = document.querySelector('#scheduleActivityModal input[name="followup_date"]');
+        if (dateInput) {
+            dateInput.value = dateStr + 'T09:00';
+        }
+        const modalEl = document.getElementById('scheduleActivityModal');
+        if (modalEl) {
+            const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            bsModal.show();
+        }
+    }
+
     document.getElementById('quickScheduleForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const leadId = document.getElementById('modal_lead_id').value;
+        const leadSelect = document.getElementById('modal_lead_id');
+        const leadId = leadSelect ? leadSelect.value : '';
+
         if (!leadId) {
-            alert('Please select a lead first!');
-            return;
+            e.preventDefault();
+            leadSelect.classList.add('is-invalid');
+            leadSelect.focus();
+            return false;
         }
 
-        this.action = `/crm/leads/${leadId}/followups`;
-        this.submit();
+        leadSelect.classList.remove('is-invalid');
+        this.action = `{{ url('crm/leads') }}/${leadId}/followups`;
+    });
+
+    document.getElementById('modal_lead_id')?.addEventListener('change', function() {
+        if (this.value) {
+            this.classList.remove('is-invalid');
+        }
     });
 </script>
 @endpush

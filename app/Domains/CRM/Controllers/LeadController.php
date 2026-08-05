@@ -35,12 +35,13 @@ class LeadController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $filters = $request->only([
-            'search', 'duplicates_only', 'priority', 'segment', 'status', 'quotation_status', 'start_date', 'end_date', 'date_from', 'date_to', 'sort_by', 'sort_order'
+            'search', 'duplicates_only', 'priority', 'segment', 'status', 'lead_owner_id', 'quotation_status', 'start_date', 'end_date', 'date_from', 'date_to', 'sort_by', 'sort_order'
         ]);
 
         $leads = $this->leadRepo->getPaginatedLeads($filters, 10);
         $this->duplicateService->annotateDuplicates($leads->items(), $tenantId);
         $quotations = $this->quotationService->latest();
+        $users = \App\Models\User::orderBy('name')->get();
 
         $statusCounts = Lead::query()
             ->where('tenant_id', $tenantId)
@@ -58,7 +59,7 @@ class LeadController extends Controller
         $this->duplicateService->annotateDuplicates($allTenantLeads, $tenantId);
         $duplicatesCount = $allTenantLeads->where('is_duplicate', true)->count();
 
-        return view('modules.crm.leads.index', compact('leads', 'quotations', 'statusCounts', 'totalLeadsCount', 'duplicatesCount'));
+        return view('modules.crm.leads.index', compact('leads', 'quotations', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users'));
     }
 
     public function kanban(Request $request)
