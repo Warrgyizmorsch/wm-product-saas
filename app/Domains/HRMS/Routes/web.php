@@ -71,11 +71,20 @@ Route::prefix('hrms')
         // Attendance Management
         Route::prefix('attendance')->group(function (): void {
             Route::get('/', [AttendanceController::class, 'index'])->name('attendance.index');
+            Route::get('/create', [AttendanceController::class, 'create'])->name('attendance.create');
+            Route::post('/store-manual', [AttendanceController::class, 'storeManual'])->name('attendance.store-manual');
             Route::post('/check-in', [AttendanceController::class, 'checkIn'])->name('attendance.check-in');
             Route::post('/{attendance}/check-out', [AttendanceController::class, 'checkOut'])->name('attendance.check-out');
             Route::post('/{attendance}/break-in', [AttendanceController::class, 'breakIn'])->name('attendance.break-in');
             Route::post('/{attendance}/break-out', [AttendanceController::class, 'breakOut'])->name('attendance.break-out');
             Route::get('/employee/{employee}', [AttendanceController::class, 'getEmployeeLogs'])->name('attendance.employee-logs');
+            Route::get('/date/{date}', [AttendanceController::class, 'getDateLogs'])->name('attendance.date-logs');
+            Route::delete('/date/{date}', [AttendanceController::class, 'destroyDate'])->name('attendance.destroy-date');
+            
+            // Import / Export
+            Route::post('/import', [AttendanceController::class, 'import'])->name('attendance.import');
+            Route::get('/export', [AttendanceController::class, 'export'])->name('attendance.export');
+            Route::get('/import/template', [AttendanceController::class, 'downloadTemplate'])->name('attendance.import.template');
         });
 
         // Employee Management

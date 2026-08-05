@@ -82,15 +82,7 @@ class LeaveStructureController extends Controller
             'code' => 'required|max:50',
             'color' => 'nullable|string|max:20',
             'type' => 'required|in:paid,unpaid',
-            'unit' => 'required|in:days,hours',
             'quota' => 'required|numeric|min:0',
-            'carry_forward' => 'required|boolean',
-            'max_carry_forward' => 'nullable|numeric|min:0',
-            'encashable' => 'required|boolean',
-            'max_encashable' => 'nullable|numeric|min:0',
-            'encashment_rate' => 'nullable|numeric|min:0',
-            'min_encashment' => 'nullable|numeric|min:0',
-            'encashment_calc_type' => 'nullable|string',
             'status' => 'required',
         ]);
 
@@ -102,15 +94,7 @@ class LeaveStructureController extends Controller
             'code' => $request->code,
             'color' => $request->color ?: '#3b82f6',
             'type' => $request->type,
-            'unit' => $request->unit,
             'quota' => $request->quota,
-            'carry_forward' => $request->boolean('carry_forward'),
-            'max_carry_forward' => $request->max_carry_forward,
-            'encashable' => $request->boolean('encashable'),
-            'max_encashable' => $request->max_encashable,
-            'encashment_rate' => $request->encashment_rate,
-            'min_encashment' => $request->min_encashment,
-            'encashment_calc_type' => $request->encashment_calc_type ?: 'gross_salary',
             'status' => $status,
         ]);
 
@@ -124,15 +108,7 @@ class LeaveStructureController extends Controller
             'code' => 'required|max:50',
             'color' => 'nullable|string|max:20',
             'type' => 'required|in:paid,unpaid',
-            'unit' => 'required|in:days,hours',
             'quota' => 'required|numeric|min:0',
-            'carry_forward' => 'required|boolean',
-            'max_carry_forward' => 'nullable|numeric|min:0',
-            'encashable' => 'required|boolean',
-            'max_encashable' => 'nullable|numeric|min:0',
-            'encashment_rate' => 'nullable|numeric|min:0',
-            'min_encashment' => 'nullable|numeric|min:0',
-            'encashment_calc_type' => 'nullable|string',
             'status' => 'required',
         ]);
 
@@ -143,15 +119,7 @@ class LeaveStructureController extends Controller
             'code' => $request->code,
             'color' => $request->color ?: '#3b82f6',
             'type' => $request->type,
-            'unit' => $request->unit,
             'quota' => $request->quota,
-            'carry_forward' => $request->boolean('carry_forward'),
-            'max_carry_forward' => $request->max_carry_forward,
-            'encashable' => $request->boolean('encashable'),
-            'max_encashable' => $request->max_encashable,
-            'encashment_rate' => $request->encashment_rate,
-            'min_encashment' => $request->min_encashment,
-            'encashment_calc_type' => $request->encashment_calc_type ?: 'gross_salary',
             'status' => $status,
         ]);
 

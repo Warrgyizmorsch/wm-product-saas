@@ -151,7 +151,7 @@ class OvertimeRequestApiController extends Controller
 
         $requestModel = $this->overtimeRepository->storeOvertimeRequest($validated, $request);
 
-        return $this->sendSuccess($requestModel, 'Overtime request submitted successfully', 211);
+        return $this->sendSuccess($requestModel, 'Overtime request submitted successfully', 201);
     }
 
     public function approveRequest(Request $request, mixed $id): JsonResponse

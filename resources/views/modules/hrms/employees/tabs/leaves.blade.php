@@ -148,7 +148,7 @@
     @php
         $empLeaveRequests = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
         $empLeaveEncashments = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
-        $allLeaveTypes    = $employee->leavePlan ? $employee->leavePlan->types : \App\Domains\HRMS\Models\LeaveType::where('is_active', true)->orderBy('name')->get();
+        $allLeaveTypes    = $employee->leavePlan ? $employee->leavePlan->types->where('status', true) : \App\Domains\HRMS\Models\LeaveType::where('status', true)->orderBy('name')->get();
     @endphp
 
     <div class="row g-4">

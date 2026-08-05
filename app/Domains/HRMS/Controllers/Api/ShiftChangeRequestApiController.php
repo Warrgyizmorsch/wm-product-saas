@@ -145,7 +145,7 @@ class ShiftChangeRequestApiController extends Controller
 
         $requestModel = $this->shiftChangeRepository->storeShiftChangeRequest($validated, $request);
 
-        return $this->sendSuccess($requestModel, 'Shift Change request submitted successfully', 211);
+        return $this->sendSuccess($requestModel, 'Shift Change request submitted successfully', 201);
     }
 
     public function approveRequest(Request $request, mixed $id): JsonResponse
