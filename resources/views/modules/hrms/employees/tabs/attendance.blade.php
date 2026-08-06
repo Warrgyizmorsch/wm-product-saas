@@ -127,9 +127,11 @@
                                                 <span class="badge bg-soft-dark text-slate border-0 fs-10 rounded-pill">{{ $log->formatted_location_type }}</span>
                                             @endif
                                         </td>
-                                        <td class="text-muted fs-13">{{ \Carbon\Carbon::parse($log->check_in)->format('h:i A') }}</td>
                                         <td class="text-muted fs-13">
-                                            {{ $log->check_out ? \Carbon\Carbon::parse($log->check_out)->format('h:i A') : 'Active' }}
+                                            {{ ($log->check_in && !in_array($log->status, ['absent', 'on_leave'])) ? \Carbon\Carbon::parse($log->check_in)->format('h:i A') : '-' }}
+                                        </td>
+                                        <td class="text-muted fs-13">
+                                            {{ ($log->check_out && !in_array($log->status, ['absent', 'on_leave'])) ? \Carbon\Carbon::parse($log->check_out)->format('h:i A') : '-' }}
                                         </td>
                                         <td class="fs-13">
                                             @if($log->breaks->isNotEmpty())

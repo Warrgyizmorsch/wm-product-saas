@@ -184,8 +184,26 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         $adhocComponents = \App\Domains\HRMS\Models\EmployeeAdhocComponent::where('employee_id', $employee->id)->get();
         $penalties = \App\Domains\HRMS\Models\EmployeePenalty::where('employee_id', $employee->id)->get();
 
+        // Initialize missing leave balances for active types in the employee's assigned leave plan
+        if ($employee->leavePlan) {
+            foreach ($employee->leavePlan->types()->where('status', true)->get() as $lt) {
+                \App\Domains\HRMS\Models\LeaveBalance::firstOrCreate([
+                    'tenant_id'     => $employee->tenant_id,
+                    'company_id'    => $employee->company_id,
+                    'employee_id'   => $employee->id,
+                    'leave_type_id' => $lt->id,
+                ], [
+                    'allocated' => floatval($lt->quota),
+                    'used'      => 0.0,
+                ]);
+            }
+        }
+
         // Leave balances (allowances) for the assigned leave plan
         $leaveAllowances = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)
+            ->whereHas('leaveType', function ($query) {
+                $query->where('status', true);
+            })
             ->with('leaveType')
             ->get();
 
