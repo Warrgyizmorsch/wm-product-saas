@@ -4,6 +4,8 @@ namespace App\Domains\CRM\Controllers;
 
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\LeadDocument;
+use App\Domains\CRM\Models\CrmAccount;
+use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Repositories\LeadRepository;
 use App\Domains\CRM\Services\LeadService;
 use App\Domains\CRM\Services\LeadDuplicateService;
@@ -50,10 +52,11 @@ class LeadController extends Controller
             ->pluck('aggregate', 'status')
             ->toArray();
 
-        $totalLeadsCount = Lead::query()->where('tenant_id', $tenantId)->count();
+        $totalLeadsCount = Lead::query()->where('tenant_id', $tenantId)->whereNull('deleted_at')->count();
 
         $allTenantLeads = Lead::query()
             ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
             ->select(['id', 'email', 'phone'])
             ->get();
         $this->duplicateService->annotateDuplicates($allTenantLeads, $tenantId);
@@ -128,20 +131,181 @@ class LeadController extends Controller
 
     public function checkDuplicate(Request $request): JsonResponse
     {
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
-        $matchedLead = $this->duplicateService->checkBothMatch(
-            $tenantId, $request->input('email'), $request->input('phone'), $request->input('lead_id') ? (int)$request->input('lead_id') : null
-        );
+        $tenantId  = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+        $rawGstin  = trim((string)$request->input('gstin', ''));
+        $rawPhone  = trim((string)$request->input('phone', ''));
+        $rawEmail  = strtolower(trim((string)$request->input('email', '')));
+        $company   = trim((string)$request->input('company_name', ''));
+        $excludeLeadId = $request->input('lead_id') ? (int)$request->input('lead_id') : null;
 
-        if ($matchedLead) {
+        $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone);
+
+        $account = null;
+        $matchedBy = null;
+
+        // 1. Check CrmAccount by GSTIN
+        if (!empty($rawGstin)) {
+            $account = CrmAccount::where('tenant_id', $tenantId)->where('gstin', $rawGstin)->first();
+            if ($account) $matchedBy = 'GSTIN (' . $rawGstin . ')';
+        }
+
+        // 2. Check CrmAccount by Phone (cleaned & raw)
+        if (!$account && (!empty($cleanPhone) || !empty($rawPhone))) {
+            $account = CrmAccount::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($cleanPhone, $rawPhone) {
+                    if (!empty($rawPhone)) {
+                        $q->where('phone', 'like', "%{$rawPhone}%");
+                    }
+                    if (!empty($cleanPhone) && strlen($cleanPhone) >= 5) {
+                        $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"]);
+                    }
+                    $q->orWhereHas('contacts', function ($cq) use ($cleanPhone, $rawPhone) {
+                        if (!empty($rawPhone)) {
+                            $cq->where('phone', 'like', "%{$rawPhone}%")->orWhere('mobile', 'like', "%{$rawPhone}%");
+                        }
+                        if (!empty($cleanPhone) && strlen($cleanPhone) >= 5) {
+                            $cq->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"])
+                               ->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(mobile, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"]);
+                        }
+                    });
+                })->first();
+            if ($account) $matchedBy = 'Phone Number (' . ($rawPhone ?: $cleanPhone) . ')';
+        }
+
+        // 3. Check CrmAccount by Email
+        if (!$account && !empty($rawEmail)) {
+            $account = CrmAccount::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($rawEmail) {
+                    $q->whereRaw('LOWER(email) = ?', [$rawEmail])
+                      ->orWhereHas('contacts', fn($cq) => $cq->whereRaw('LOWER(email) = ?', [$rawEmail]));
+                })->first();
+            if ($account) $matchedBy = 'Email Address (' . $rawEmail . ')';
+        }
+
+        // 4. Check CrmAccount by Company Name
+        if (!$account && !empty($company) && strlen($company) >= 3) {
+            $cleanCompany = trim(preg_replace('/(pvt|ltd|private|limited|inc|corp|co)/i', '', $company));
+            if (!empty($cleanCompany)) {
+                $account = CrmAccount::where('tenant_id', $tenantId)
+                    ->where('name', 'like', "%{$cleanCompany}%")
+                    ->first();
+                if ($account) $matchedBy = 'Company Name (' . $account->name . ')';
+            }
+        }
+
+        // 5. If no CrmAccount found, check Customer Master (`customers` table)
+        if (!$account) {
+            $custMatch = null;
+            $custMatchedBy = null;
+
+            if (!empty($rawGstin)) {
+                $custMatch = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->where('gstin', $rawGstin)->first();
+                if ($custMatch) $custMatchedBy = 'GSTIN (' . $rawGstin . ')';
+            }
+
+            if (!$custMatch && !empty($rawEmail)) {
+                $custMatch = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->whereRaw('LOWER(email) = ?', [$rawEmail])->first();
+                if ($custMatch) $custMatchedBy = 'Customer Email (' . $rawEmail . ')';
+            }
+
+            if (!$custMatch && (!empty($cleanPhone) || !empty($rawPhone))) {
+                $custMatch = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($cleanPhone, $rawPhone) {
+                        if (!empty($rawPhone)) $q->where('phone', 'like', "%{$rawPhone}%");
+                        if (!empty($cleanPhone) && strlen($cleanPhone) >= 5) {
+                            $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"]);
+                        }
+                    })->first();
+                if ($custMatch) $custMatchedBy = 'Customer Phone (' . ($rawPhone ?: $cleanPhone) . ')';
+            }
+
+            if (!$custMatch && !empty($company) && strlen($company) >= 3) {
+                $custMatch = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->where('name', 'like', "%{$company}%")->first();
+                if ($custMatch) $custMatchedBy = 'Customer Name (' . $custMatch->name . ')';
+            }
+
+            if ($custMatch) {
+                // Auto sync CrmAccount for this customer
+                $account = CrmAccount::where('customer_id', $custMatch->id)->first();
+                if (!$account) {
+                    $account = CrmAccount::create([
+                        'tenant_id'   => $tenantId,
+                        'customer_id' => $custMatch->id,
+                        'name'        => $custMatch->name,
+                        'email'       => $custMatch->email,
+                        'phone'       => $custMatch->phone,
+                        'status'      => 'active',
+                        'owner_id'    => auth()->id(),
+                    ]);
+                }
+                $matchedBy = $custMatchedBy;
+            }
+        }
+
+        if ($account) {
+            $account->load(['contacts', 'deals']);
             return response()->json([
-                'is_duplicate' => true,
-                'lead' => $matchedLead,
-                'message' => "Duplicate Lead Found! Lead #{$matchedLead->id} ({$matchedLead->company_name}) has the exact same Email AND Phone number.",
+                'matched'            => true,
+                'matched_by'         => $matchedBy,
+                'match_key'          => 'account_' . $account->id . '_' . md5($matchedBy),
+                'account_id'         => $account->id,
+                'account_name'       => $account->name,
+                'account_number'     => $account->account_number,
+                'gstin'              => $account->gstin ?: 'N/A',
+                'email'              => $account->email ?: 'N/A',
+                'phone'              => $account->phone ?: 'N/A',
+                'lifetime_revenue'   => number_format($account->lifetime_revenue, 2),
+                'open_deals_count'   => $account->open_deals_count,
+                'last_purchase_date' => $account->last_purchase_date ? $account->last_purchase_date->format('Y-m-d') : 'No purchases yet',
+                'primary_contact'    => $account->primaryContact ? $account->primaryContact->name : ($account->contacts->first() ? $account->contacts->first()->name : 'N/A'),
             ]);
         }
 
-        return response()->json(['is_duplicate' => false, 'lead' => null, 'message' => 'No duplicate found.']);
+        // 6. Check Lead-to-Lead match in `leads` table
+        $leadQuery = Lead::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at');
+
+        if ($excludeLeadId) {
+            $leadQuery->where('id', '!=', $excludeLeadId);
+        }
+
+        $matchedLead = null;
+        $leadMatchedBy = null;
+
+        if (!empty($rawGstin)) {
+            $matchedLead = (clone $leadQuery)->where('gstin', $rawGstin)->first();
+            if ($matchedLead) $leadMatchedBy = 'GSTIN (' . $rawGstin . ')';
+        }
+
+        if (!$matchedLead && !empty($rawEmail)) {
+            $matchedLead = (clone $leadQuery)->whereRaw('LOWER(email) = ?', [$rawEmail])->first();
+            if ($matchedLead) $leadMatchedBy = 'Lead Email (' . $rawEmail . ')';
+        }
+
+        if (!$matchedLead && (!empty($cleanPhone) || !empty($rawPhone))) {
+            $matchedLead = (clone $leadQuery)
+                ->where(function ($q) use ($cleanPhone, $rawPhone) {
+                    if (!empty($rawPhone)) $q->where('phone', 'like', "%{$rawPhone}%");
+                    if (!empty($cleanPhone) && strlen($cleanPhone) >= 5) {
+                        $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"]);
+                    }
+                })->first();
+            if ($matchedLead) $leadMatchedBy = 'Lead Phone (' . ($rawPhone ?: $cleanPhone) . ')';
+        }
+
+        if ($matchedLead) {
+            return response()->json([
+                'matched'      => false,
+                'is_duplicate' => true,
+                'matched_by'   => $leadMatchedBy,
+                'match_key'    => 'lead_' . $matchedLead->id . '_' . md5($leadMatchedBy),
+                'lead'         => $matchedLead,
+                'message'      => "Duplicate Lead Found! Lead #{$matchedLead->id} ({$matchedLead->company_name}) has matching " . $leadMatchedBy,
+            ]);
+        }
+
+        return response()->json(['matched' => false, 'is_duplicate' => false]);
     }
 
     public function qualify(Lead $lead): RedirectResponse
@@ -342,7 +506,11 @@ class LeadController extends Controller
     {
         $rules = [
             'lead_owner_id' => 'nullable|exists:users,id',
-            'company_name' => 'required|string|max:255',
+            'company_name' => 'nullable|string|max:255',
+            'company_email' => 'nullable|email|max:255',
+            'company_phone' => 'nullable|string|regex:/^[0-9]+$/',
+            'gstin' => 'nullable|string|max:100',
+            'lead_type' => 'nullable|string|in:b2b,b2c',
             'contact_person' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|regex:/^[0-9]+$/',

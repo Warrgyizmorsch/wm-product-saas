@@ -19,28 +19,31 @@ class LeadDuplicateService
         foreach ($leads as $lead) {
             $matchingIds = [];
 
-            if (!empty($lead->email) && !empty($lead->phone)) {
-                $e = strtolower(trim($lead->email));
-                $p = preg_replace('/[^0-9]/', '', $lead->phone);
+            $e = !empty($lead->email) ? strtolower(trim($lead->email)) : null;
+            $p = !empty($lead->phone) ? preg_replace('/[^0-9]/', '', $lead->phone) : null;
 
-                if (strlen($p) >= 7) {
-                    // Match ONLY IF BOTH Email AND Phone match
-                    $matchingIds = Lead::query()
-                        ->where('tenant_id', $tenantId)
-                        ->whereNull('deleted_at')
-                        ->where('id', '!=', $lead->id)
-                        ->whereRaw('LOWER(email) = ?', [$e])
-                        ->whereRaw("REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', '') LIKE ?", ["%{$p}%"])
-                        ->pluck('id')
-                        ->toArray();
-                }
+            if ($e || ($p && strlen($p) >= 5)) {
+                $matchingIds = Lead::query()
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->where('id', '!=', $lead->id)
+                    ->where(function ($q) use ($e, $p) {
+                        if ($e) {
+                            $q->whereRaw('LOWER(email) = ?', [$e]);
+                        }
+                        if ($p && strlen($p) >= 5) {
+                            $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$p}%"]);
+                        }
+                    })
+                    ->pluck('id')
+                    ->toArray();
             }
 
             if (!empty($matchingIds)) {
                 $firstMatchId = min($matchingIds);
                 $lead->is_duplicate = true;
                 $lead->duplicate_of_id = $firstMatchId;
-                $lead->duplicate_reason = 'Email & Phone';
+                $lead->duplicate_reason = ($e ? 'Email' : '') . ($e && $p ? ' / ' : '') . ($p ? 'Phone' : '');
                 $lead->duplicate_count = count($matchingIds);
             } else {
                 $lead->is_duplicate = false;

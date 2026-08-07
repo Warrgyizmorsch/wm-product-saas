@@ -10,6 +10,10 @@ use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
+use App\Domains\CRM\Models\CrmAccount;
+use App\Domains\CRM\Models\CrmContact;
+use App\Domains\CRM\Models\CrmDeal;
+
 class LeadRepository
 {
     /**
@@ -31,22 +35,14 @@ class LeadRepository
             });
         }
 
-        // Duplicates Only Filter (Requires BOTH Email AND Phone match)
+        // Duplicates Only Filter (Tenant-wise & Non-deleted Only)
         if (!empty($filters['duplicates_only']) && $filters['duplicates_only'] === '1') {
-            $query->whereNotNull('email')
-                ->whereNotNull('phone')
-                ->where('email', '!=', '')
-                ->where('phone', '!=', '')
-                ->whereIn(DB::raw("CONCAT(LOWER(email), '_', REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''))"), function ($sub) {
-                    $sub->select(DB::raw("CONCAT(LOWER(email), '_', REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''))"))
-                        ->from('leads')
-                        ->whereNotNull('email')
-                        ->whereNotNull('phone')
-                        ->where('email', '!=', '')
-                        ->where('phone', '!=', '')
-                        ->whereNull('deleted_at')
-                        ->groupBy(DB::raw("CONCAT(LOWER(email), '_', REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''))"))
-                        ->havingRaw('COUNT(*) > 1');
+            $tenantId = tenant_id() ?? 1;
+            $query->where('tenant_id', $tenantId)
+                ->whereNull('deleted_at')
+                ->where(function ($q) {
+                    $q->whereNotNull('email')->where('email', '!=', '')
+                      ->orWhereNotNull('phone')->where('phone', '!=', '');
                 });
             $query->orderByRaw("LOWER(email) ASC, phone ASC, id ASC");
         } else {
@@ -137,19 +133,109 @@ class LeadRepository
     }
 
     /**
-     * Qualify lead and log event.
+     * Qualify lead and automatically convert to CrmAccount, CrmContact, and CrmDeal.
      */
     public function qualifyLead(Lead $lead): bool
     {
         $oldStatus = $lead->status;
-        $updated = $lead->update(['status' => 'Qualified']);
+        $tenantId = $lead->tenant_id ?? (tenant_id() ?? 1);
+        $companyName = $lead->company_name ?: ($lead->contact_person ?: 'Qualified Lead Client');
+        $email = $lead->email;
+        $phone = $lead->phone;
+
+        // 1. Find or Create CrmAccount
+        $account = null;
+        if ($lead->crm_account_id) {
+            $account = CrmAccount::find($lead->crm_account_id);
+        }
+        if (!$account && $email) {
+            $account = CrmAccount::where('tenant_id', $tenantId)->where('email', $email)->first();
+        }
+        if (!$account && $phone) {
+            $account = CrmAccount::where('tenant_id', $tenantId)->where('phone', $phone)->first();
+        }
+        if (!$account && $companyName) {
+            $account = CrmAccount::where('tenant_id', $tenantId)->where('name', 'like', "%{$companyName}%")->first();
+        }
+
+        if (!$account) {
+            $account = CrmAccount::create([
+                'tenant_id'     => $tenantId,
+                'name'          => $companyName,
+                'email'         => $email,
+                'phone'         => $phone,
+                'industry_type' => $lead->industry_type,
+                'city'          => $lead->city,
+                'state'         => $lead->state,
+                'country'       => $lead->country,
+                'street'        => $lead->address,
+                'status'        => 'active',
+                'owner_id'      => $lead->lead_owner_id ?: (auth()->id() ?: 1),
+            ]);
+        }
+
+        // 2. Find or Create CrmContact
+        $contact = null;
+        $contactName = $lead->contact_person ?: $companyName;
+        if ($contactName) {
+            $contact = CrmContact::where('crm_account_id', $account->id)->where('name', $contactName)->first();
+            if (!$contact && $email) {
+                $contact = CrmContact::where('crm_account_id', $account->id)->where('email', $email)->first();
+            }
+            if (!$contact) {
+                $contact = CrmContact::create([
+                    'tenant_id'      => $tenantId,
+                    'crm_account_id' => $account->id,
+                    'name'           => $contactName,
+                    'role'           => 'Primary Contact',
+                    'email'          => $email,
+                    'phone'          => $phone,
+                    'mobile'         => $phone,
+                    'is_primary'     => $account->contacts()->count() === 0,
+                    'status'         => 'active',
+                ]);
+            }
+        }
+
+        // 3. Find or Create CrmDeal
+        $deal = null;
+        if ($lead->crm_deal_id) {
+            $deal = CrmDeal::find($lead->crm_deal_id);
+        }
+        if (!$deal) {
+            $dealTitle = $lead->requirement 
+                ? (strlen($lead->requirement) > 40 ? substr($lead->requirement, 0, 40) . '...' : $lead->requirement) 
+                : ($companyName . ' - Opportunity');
+
+            $deal = CrmDeal::create([
+                'tenant_id'       => $tenantId,
+                'crm_account_id'  => $account->id,
+                'crm_contact_id'  => $contact ? $contact->id : null,
+                'title'           => $dealTitle,
+                'estimated_value' => $lead->expected_amount ?: 0.00,
+                'stage'           => 'Qualification',
+                'closing_date'    => $lead->expected_sale_date ?: now()->addDays(30),
+                'lead_source'     => $lead->source ?: 'Qualified Lead',
+                'probability'     => 40,
+                'owner_id'        => $lead->lead_owner_id ?: (auth()->id() ?: 1),
+            ]);
+        }
+
+        // 4. Update Lead Record with Account, Contact, Deal references & Status
+        $updated = $lead->update([
+            'status'         => 'Qualified',
+            'crm_account_id' => $account->id,
+            'crm_contact_id' => $contact ? $contact->id : null,
+            'crm_deal_id'    => $deal->id,
+            'converted_at'   => now(),
+        ]);
 
         LeadHistory::logEvent(
             $lead,
             'status_updated',
             $oldStatus,
             'Qualified',
-            'Lead verified and marked as Genuine Qualified Lead.'
+            "Lead verified & converted into Account #{$account->account_number} and Deal #{$deal->deal_number}"
         );
 
         return $updated;

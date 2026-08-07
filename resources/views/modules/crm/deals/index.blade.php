@@ -1,0 +1,351 @@
+@extends('layouts.duralux')
+
+@section('title', 'Deals | SaaS ERP')
+@section('page-title', 'Deals Pipeline')
+@section('breadcrumb', 'Deals')
+
+@section('page-actions')
+    <x-ui.button href="{{ route('crm.deals.create') }}" variant="primary" icon="feather-plus">
+        Add New Deal
+    </x-ui.button>
+@endsection
+
+@push('styles')
+<style>
+    /* Zoho/Odoo CRM Status Filter Tabs */
+    .crm-status-tabs-wrapper {
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #e2e8f0;
+        background-color: #ffffff;
+        border-radius: 4px 4px 0 0;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+    .crm-status-tab {
+        display: inline-flex;
+        align-items: center;
+        padding: 10px 16px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #64748b;
+        text-decoration: none;
+        white-space: nowrap;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -1px;
+        transition: all 0.2s ease;
+    }
+    .crm-status-tab:hover {
+        color: var(--bs-primary);
+        background-color: color-mix(in srgb, var(--bs-primary) 6%, transparent);
+    }
+    .crm-status-tab.active {
+        color: var(--bs-primary);
+        border-bottom-color: var(--bs-primary);
+        background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent);
+    }
+    .crm-status-tab--won.active {
+        color: #10b981;
+        border-bottom-color: #10b981;
+        background-color: rgba(16, 185, 129, 0.08);
+    }
+    .crm-status-tab--lost.active {
+        color: #ef4444;
+        border-bottom-color: #ef4444;
+        background-color: rgba(239, 68, 68, 0.08);
+    }
+
+    .table-deal-row:hover {
+        background-color: #f8fafc !important;
+    }
+</style>
+@endpush
+
+@section('content')
+
+    @php
+        $sortBy = request('sort_by', 'id');
+        $sortOrder = request('sort_order', 'desc');
+    @endphp
+
+    <div class="erp-single-panel">
+        @if ($errors->any())
+            <div class="alert alert-danger mb-3 alert-dismissible fade show fs-12 py-2" role="alert">
+                <ul class="mb-0 ps-3 text-start">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
+            </div>
+        @endif
+
+        {{-- 1. Header: Title & Actions --}}
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <h5 class="fw-bold text-dark mb-0">Deals Listing</h5>
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <!-- Outside Search Box (HRMS Style) -->
+                <form method="GET" action="{{ route('crm.deals.index') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 260px;">
+                    @foreach(request()->except(['search', 'page']) as $k => $v)
+                        @if(is_scalar($v) && $v !== '')
+                            <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                        @endif
+                    @endforeach
+                    <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
+                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="Search by deal #, title, company, contact..." value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                    @if(request('search'))
+                        <a href="{{ route('crm.deals.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
+                            <i class="feather-x fs-12"></i>
+                        </a>
+                    @endif
+                </form>
+
+                <x-ui.view-switcher />
+
+                <x-ui.sort-dropdown label="Sort">
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>Latest Deals</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'title', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'title' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>Title (A - Z)</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'estimated_value', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'estimated_value' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>Highest Deal Value</span>
+                    </a>
+                </x-ui.sort-dropdown>
+
+                <form method="GET" action="{{ route('crm.deals.index') }}" class="d-inline">
+                    <x-ui.filter label="Filter" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Keywords</label>
+                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Search title or company..." value="{{ request('search') }}" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Pipeline Stage</label>
+                            <x-ui.odoo-form-ui type="select" name="stage">
+                                <option value="">All Stages</option>
+                                <option value="Qualification" {{ request('stage') === 'Qualification' ? 'selected' : '' }}>Qualification</option>
+                                <option value="Needs Analysis" {{ request('stage') === 'Needs Analysis' ? 'selected' : '' }}>Needs Analysis</option>
+                                <option value="Proposal" {{ request('stage') === 'Proposal' ? 'selected' : '' }}>Proposal</option>
+                                <option value="Negotiation" {{ request('stage') === 'Negotiation' ? 'selected' : '' }}>Negotiation</option>
+                                <option value="Won" {{ request('stage') === 'Won' ? 'selected' : '' }}>Won</option>
+                                <option value="Lost" {{ request('stage') === 'Lost' ? 'selected' : '' }}>Lost</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Created From</label>
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') }}" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Created To</label>
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') }}" />
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                            <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-light border">Reset</a>
+                            <button type="submit" class="btn btn-xs btn-primary" style="background-color: #1e40af; border-color: #1e40af;">Apply Filters</button>
+                        </div>
+                    </x-ui.filter>
+                </form>
+            </div>
+        </div>
+
+
+
+        {{-- 2. Stage Filter Tabs (Exact like Lead listing) --}}
+        <div class="crm-status-tabs-wrapper mb-3 overflow-auto">
+            <a href="{{ request()->fullUrlWithQuery(['stage' => null, 'page' => null]) }}" class="crm-status-tab {{ empty($stage) ? 'active' : '' }}">
+                ALL ({{ $stageCounts['all'] ?? 0 }})
+            </a>
+            <a href="{{ request()->fullUrlWithQuery(['stage' => 'Qualification', 'page' => null]) }}" class="crm-status-tab {{ $stage === 'Qualification' ? 'active' : '' }}">
+                QUALIFICATION ({{ $stageCounts['Qualification'] ?? 0 }})
+            </a>
+            <a href="{{ request()->fullUrlWithQuery(['stage' => 'Needs Analysis', 'page' => null]) }}" class="crm-status-tab {{ $stage === 'Needs Analysis' ? 'active' : '' }}">
+                NEEDS ANALYSIS ({{ $stageCounts['Needs Analysis'] ?? 0 }})
+            </a>
+            <a href="{{ request()->fullUrlWithQuery(['stage' => 'Proposal', 'page' => null]) }}" class="crm-status-tab {{ $stage === 'Proposal' ? 'active' : '' }}">
+                PROPOSAL ({{ $stageCounts['Proposal'] ?? 0 }})
+            </a>
+            <a href="{{ request()->fullUrlWithQuery(['stage' => 'Negotiation', 'page' => null]) }}" class="crm-status-tab {{ $stage === 'Negotiation' ? 'active' : '' }}">
+                NEGOTIATION ({{ $stageCounts['Negotiation'] ?? 0 }})
+            </a>
+            <a href="{{ request()->fullUrlWithQuery(['stage' => 'Won', 'page' => null]) }}" class="crm-status-tab crm-status-tab--won {{ $stage === 'Won' ? 'active' : '' }}">
+                WON ({{ $stageCounts['Won'] ?? 0 }})
+            </a>
+            <a href="{{ request()->fullUrlWithQuery(['stage' => 'Lost', 'page' => null]) }}" class="crm-status-tab crm-status-tab--lost {{ $stage === 'Lost' ? 'active' : '' }}">
+                LOST ({{ $stageCounts['Lost'] ?? 0 }})
+            </a>
+        </div>
+
+        {{-- 3. Data Table --}}
+        <div class="card border-0 shadow-sm bg-white overflow-hidden" style="border-radius: 4px;">
+            <div class="table-responsive">
+                <table class="table odoo-table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 140px; background-color: #e8ecf1 !important;">DEAL #</th>
+                            <th style="width: 22%; background-color: #e8ecf1 !important;">PROJECT / DEAL TITLE</th>
+                            <th style="width: 22%; background-color: #e8ecf1 !important;">COMPANY / CONTACT PERSON</th>
+                            <th style="width: 14%; background-color: #e8ecf1 !important;">PHONE / EMAIL</th>
+                            <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end">ESTIMATED VALUE (₹)</th>
+                            <th style="width: 14%; background-color: #e8ecf1 !important;">CLOSING DATE & STATUS</th>
+                            <th style="width: 10%; background-color: #e8ecf1 !important;">STAGE</th>
+                            <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="fs-13 text-dark">
+                        @forelse($deals as $deal)
+                            @php
+                                $normalizedStage = $deal->stage;
+                                if ($normalizedStage === 'Closed Won') $normalizedStage = 'Won';
+                                if ($normalizedStage === 'Closed Lost') $normalizedStage = 'Lost';
+                                if ($normalizedStage === 'New') $normalizedStage = 'Qualification';
+                                if ($normalizedStage === 'Qualified') $normalizedStage = 'Needs Analysis';
+
+                                $stageColors = [
+                                    'Qualification'  => 'info',
+                                    'Needs Analysis' => 'primary',
+                                    'Proposal'       => 'warning',
+                                    'Negotiation'    => 'purple',
+                                    'Won'            => 'success',
+                                    'Lost'           => 'danger',
+                                ];
+                                $badgeColor = $stageColors[$normalizedStage] ?? 'secondary';
+
+                                // Check closing date status
+                                $isOverdue = false;
+                                $isClosingToday = false;
+                                if ($deal->closing_date && !in_array($normalizedStage, ['Won', 'Lost'])) {
+                                    $closingDate = \Illuminate\Support\Carbon::parse($deal->closing_date)->startOfDay();
+                                    $today = \Illuminate\Support\Carbon::today();
+                                    if ($closingDate->isToday()) {
+                                        $isClosingToday = true;
+                                    } elseif ($closingDate->isPast()) {
+                                        $isOverdue = true;
+                                    }
+                                }
+
+                                $contactName = $deal->contact ? $deal->contact->name : ($deal->account ? $deal->account->primaryContact?->name : null);
+                                $phone = $deal->contact?->phone ?: ($deal->account?->phone ?: null);
+                                $email = $deal->contact?->email ?: ($deal->account?->email ?: null);
+                            @endphp
+                            <tr class="table-deal-row">
+                                <td class="font-monospace fw-bold">
+                                    <a href="{{ route('crm.deals.show', $deal) }}" class="text-primary text-decoration-none hover-underline fs-13">
+                                        {{ $deal->deal_number ?: ('DL-' . str_pad($deal->id, 5, '0', STR_PAD_LEFT)) }}
+                                    </a>
+                                    <div class="text-muted fs-11 mt-0.5 font-sans fw-normal" title="Deal Creation Date">
+                                        <i class="feather-clock me-1 text-primary"></i>Created: {{ $deal->created_at ? $deal->created_at->format('d/m/Y') : 'N/A' }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <a href="{{ route('crm.deals.show', $deal) }}" class="fw-bold text-dark text-decoration-none hover-primary d-block" style="line-height: 1.3;">
+                                        {{ $deal->title }}
+                                    </a>
+                                    @if($deal->lead_source)
+                                        <div class="text-muted fs-11 mt-0.5"><i class="feather-globe me-1 text-primary"></i>{{ $deal->lead_source }}</div>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($deal->account)
+                                        <a href="{{ route('crm.accounts.show', $deal->account) }}" class="fw-bold text-dark text-decoration-none d-block">
+                                            <i class="feather-briefcase me-1 text-primary"></i>{{ $deal->account->name }}
+                                        </a>
+                                    @else
+                                        <span class="fw-semibold text-dark">—</span>
+                                    @endif
+
+                                    @if($contactName)
+                                        <span class="text-muted fs-11 d-block"><i class="feather-user me-1 text-muted"></i>{{ $contactName }}</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($phone)
+                                        <span class="d-block text-dark fw-semibold"><i class="feather-phone fs-11 me-1 text-primary"></i>{{ $phone }}</span>
+                                    @endif
+                                    @if ($email)
+                                        <span class="text-muted fs-11 d-block text-truncate" style="max-width: 160px;" title="{{ $email }}">
+                                            <i class="feather-mail fs-11 me-1 text-muted"></i>{{ $email }}
+                                        </span>
+                                    @endif
+                                    @if (!$phone && !$email)
+                                        <span class="text-muted fs-11">—</span>
+                                    @endif
+                                </td>
+                                <td class="text-end fw-bold text-success fs-14">
+                                    ₹{{ number_format($deal->actual_value ?: $deal->estimated_value, 2) }}
+                                </td>
+                                <td>
+                                    @if($deal->closing_date)
+                                        <div class="fw-semibold text-dark fs-12">
+                                            <i class="feather-calendar me-1 text-muted"></i>{{ \Illuminate\Support\Carbon::parse($deal->closing_date)->format('d M Y') }}
+                                        </div>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+
+                                    @if($isOverdue)
+                                        <span class="badge bg-danger text-white px-2 py-0.5 mt-1 fs-10 fw-bold">
+                                            <i class="feather-alert-triangle me-1"></i>Overdue Followup
+                                        </span>
+                                    @elseif($isClosingToday)
+                                        <span class="badge bg-warning text-dark px-2 py-0.5 mt-1 fs-10 fw-bold">
+                                            <i class="feather-clock me-1"></i>Closing Today
+                                        </span>
+                                    @elseif($normalizedStage === 'Won')
+                                        <span class="badge bg-soft-success text-success px-2 py-0.5 mt-1 fs-10 fw-bold">
+                                            <i class="feather-check-circle me-1"></i>Deal Closed
+                                        </span>
+                                    @elseif($normalizedStage === 'Lost')
+                                        <span class="badge bg-soft-danger text-danger px-2 py-0.5 mt-1 fs-10 fw-bold">
+                                            <i class="feather-x-circle me-1"></i>Deal Lost
+                                        </span>
+                                    @else
+                                        <span class="badge bg-soft-info text-info px-2 py-0.5 mt-1 fs-10 fw-semibold">
+                                            Followup Active
+                                        </span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <span class="badge bg-soft-{{ $badgeColor }} text-{{ $badgeColor }} border border-{{ $badgeColor }}-subtle px-2.5 py-1 fw-bold">
+                                        {{ $normalizedStage }}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-3">
+                                    <div class="d-inline-flex gap-1 justify-content-end align-items-center">
+                                        <x-ui.icon-btn href="{{ route('crm.deals.show', $deal) }}" variant="soft-primary" icon="feather-eye" title="View Deal" />
+                                        <x-ui.icon-btn href="{{ route('crm.deals.edit', $deal) }}" variant="soft-info" icon="feather-edit" title="Edit Deal" />
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="feather-folder fs-1 text-muted d-block mb-2"></i>
+                                    No deals found matching your criteria.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Footer (Exact Lead Listing Pagination) -->
+            @if($deals->hasPages())
+                <div class="p-3 border-top bg-light-50 d-flex justify-content-between align-items-center">
+                    <span class="text-muted fs-12">
+                        Showing {{ $deals->firstItem() }} to {{ $deals->lastItem() }} of {{ $deals->total() }} deals
+                    </span>
+                    <div>
+                        {{ $deals->appends(request()->query())->links() }}
+                    </div>
+                </div>
+            @endif
+        </div>
+    </div>
+@endsection

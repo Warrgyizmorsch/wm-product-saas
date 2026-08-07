@@ -246,7 +246,7 @@
                                 <td>
                                     <div class="d-flex align-items-center flex-wrap gap-1">
                                         <span class="fw-bold text-dark">{{ $lead->company_name }}</span>
-                                        <span class="text-muted fw-semibold fs-11">#{{ $lead->id }}</span>
+                                        <span class="badge bg-light text-primary border font-monospace px-1.5 py-0.5 fs-11">{{ $lead->lead_number ?: ('LD-' . str_pad($lead->id, 4, '0', STR_PAD_LEFT)) }}</span>
                                         @if(!empty($lead->is_duplicate) && (request('duplicates_only') === '1' || request('sort_by') === 'duplicates'))
                                             <span class="duplicate-indicator ms-1" 
                                                   data-bs-toggle="tooltip" 
@@ -432,7 +432,7 @@
                                                 <form action="{{ route('crm.leads.destroy', $lead->id) }}" method="POST" id="deleteLeadForm_{{ $lead->id }}">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Reject & Delete Lead', message: 'Are you sure you want to reject & delete lead &quot;{{ addslashes($lead->company_name) }}&quot; (#{{ $lead->id }}) permanently?', variant: 'danger', confirmText: 'Reject & Delete', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
+                                                    <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Reject & Delete Lead', message: 'Are you sure you want to reject & delete lead &quot;{{ addslashes($lead->company_name) }}&quot; ({{ $lead->lead_number ?: ('LD-' . str_pad($lead->id, 4, '0', STR_PAD_LEFT)) }}) permanently?', variant: 'danger', confirmText: 'Reject & Delete', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
                                                         <i class="feather-x-circle me-2 text-danger fs-12"></i>Reject & Delete Lead
                                                     </button>
                                                 </form>
@@ -444,7 +444,7 @@
                                                 <form action="{{ route('crm.leads.destroy', $lead->id) }}" method="POST" id="deleteLeadForm_{{ $lead->id }}">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Delete Lead', message: 'Are you sure you want to delete lead &quot;{{ addslashes($lead->company_name) }}&quot; (#{{ $lead->id }}) permanently?', variant: 'danger', confirmText: 'Delete Lead', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
+                                                    <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Delete Lead', message: 'Are you sure you want to delete lead &quot;{{ addslashes($lead->company_name) }}&quot; ({{ $lead->lead_number ?: ('LD-' . str_pad($lead->id, 4, '0', STR_PAD_LEFT)) }}) permanently?', variant: 'danger', confirmText: 'Delete Lead', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
                                                         <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Lead
                                                     </button>
                                                 </form>

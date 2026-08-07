@@ -1,6 +1,8 @@
 <?php
 
 use App\Domains\CRM\Controllers\CustomerController;
+use App\Domains\CRM\Controllers\CrmAccountController;
+use App\Domains\CRM\Controllers\CrmDealController;
 use App\Domains\CRM\Controllers\LeadController;
 use App\Domains\CRM\Controllers\LeadFollowupController;
 use App\Domains\CRM\Controllers\LeadActivityController;
@@ -10,6 +12,26 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('crm')
     ->as('crm.')
     ->group(function (): void {
+        // CRM Accounts Routes
+        Route::get('accounts', [CrmAccountController::class, 'index'])->name('accounts.index');
+        Route::get('accounts/create', [CrmAccountController::class, 'create'])->name('accounts.create');
+        Route::post('accounts', [CrmAccountController::class, 'store'])->name('accounts.store');
+        Route::get('accounts/{account}', [CrmAccountController::class, 'show'])->name('accounts.show');
+        Route::get('accounts/{account}/edit', [CrmAccountController::class, 'edit'])->name('accounts.edit');
+        Route::put('accounts/{account}', [CrmAccountController::class, 'update'])->name('accounts.update');
+        Route::post('accounts/{account}/contacts', [CrmAccountController::class, 'storeContact'])->name('accounts.contacts.store');
+        Route::delete('accounts/{account}', [CrmAccountController::class, 'destroy'])->name('accounts.destroy');
+
+        // CRM Deals Routes
+        Route::get('deals', [CrmDealController::class, 'index'])->name('deals.index');
+        Route::get('deals/kanban', [CrmDealController::class, 'kanban'])->name('deals.kanban');
+        Route::get('deals/create', [CrmDealController::class, 'create'])->name('deals.create');
+        Route::post('deals', [CrmDealController::class, 'store'])->name('deals.store');
+        Route::get('deals/{deal}', [CrmDealController::class, 'show'])->name('deals.show');
+        Route::get('deals/{deal}/edit', [CrmDealController::class, 'edit'])->name('deals.edit');
+        Route::put('deals/{deal}', [CrmDealController::class, 'update'])->name('deals.update');
+        Route::patch('deals/{deal}/stage', [CrmDealController::class, 'updateStage'])->name('deals.updateStage');
+        Route::delete('deals/{deal}', [CrmDealController::class, 'destroy'])->name('deals.destroy');
         Route::get('leads/create', [LeadController::class, 'create'])
             ->name('leads.create');
         Route::get('leads', [LeadController::class, 'index'])

@@ -14,6 +14,12 @@ class Customer extends BaseModel
         'name',
         'email',
         'phone',
+        'gstin',
         'status',
     ];
+
+    public function crmAccount()
+    {
+        return $this->hasOne(CrmAccount::class, 'customer_id');
+    }
 }

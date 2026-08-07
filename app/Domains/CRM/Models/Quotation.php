@@ -28,6 +28,8 @@ class Quotation extends BaseModel
     protected $fillable = [
         'tenant_id',
         'lead_id',        // Links this quotation to a specific lead (not just email)
+        'crm_account_id',
+        'crm_deal_id',
         'parent_id',      // Root parent quotation ID
         'revision_number',// Revision count (0 = original, 1 = R1, etc)
         'is_current',     // Active current revision status
@@ -88,6 +90,26 @@ class Quotation extends BaseModel
     public function lead(): BelongsTo
     {
         return $this->belongsTo(Lead::class);
+    }
+
+    public function crmAccount(): BelongsTo
+    {
+        return $this->belongsTo(CrmAccount::class, 'crm_account_id');
+    }
+
+    public function account(): BelongsTo
+    {
+        return $this->crmAccount();
+    }
+
+    public function crmDeal(): BelongsTo
+    {
+        return $this->belongsTo(CrmDeal::class, 'crm_deal_id');
+    }
+
+    public function deal(): BelongsTo
+    {
+        return $this->crmDeal();
     }
 
     public function items(): HasMany
