@@ -32,6 +32,7 @@ Route::prefix('crm')
         Route::put('deals/{deal}', [CrmDealController::class, 'update'])->name('deals.update');
         Route::patch('deals/{deal}/stage', [CrmDealController::class, 'updateStage'])->name('deals.updateStage');
         Route::delete('deals/{deal}', [CrmDealController::class, 'destroy'])->name('deals.destroy');
+        Route::post('deals/{deal}/documents', [CrmDealController::class, 'uploadDocuments'])->name('deals.documents.upload');
         Route::get('leads/create', [LeadController::class, 'create'])
             ->name('leads.create');
         Route::get('leads', [LeadController::class, 'index'])

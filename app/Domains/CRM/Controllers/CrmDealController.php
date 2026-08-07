@@ -83,7 +83,7 @@ class CrmDealController extends Controller
             }
         }
 
-        $deals = $query->orderBy('id', 'desc')->paginate(15);
+        $deals = $query->orderBy('id', 'desc')->paginate(100);
 
         return view('modules.crm.deals.index', compact('deals', 'search', 'stage', 'stageCounts', 'dateFrom', 'dateTo'));
     }
@@ -362,5 +362,41 @@ class CrmDealController extends Controller
     {
         $deal->delete();
         return redirect()->route('crm.deals.index')->with('success', 'Deal deleted successfully.');
+    }
+
+    public function uploadDocuments(Request $request, CrmDeal $deal): RedirectResponse
+    {
+        $request->validate([
+            'documents' => 'required',
+            'documents.*' => 'file|max:10240'
+        ]);
+
+        $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
+            ->orWhere(function($q) use ($deal) {
+                if ($deal->crm_account_id) {
+                    $q->where('crm_account_id', $deal->crm_account_id);
+                }
+            })
+            ->first();
+
+        if (!$linkedLead) {
+            $tenantId = tenant_id() ?? 1;
+            $linkedLead = \App\Domains\CRM\Models\Lead::create([
+                'tenant_id'      => $tenantId,
+                'company_name'   => $deal->account ? $deal->account->name : $deal->title,
+                'contact_person' => $deal->contact ? $deal->contact->name : 'N/A',
+                'phone'          => $deal->contact?->phone ?: $deal->account?->phone,
+                'email'          => $deal->contact?->email ?: $deal->account?->email,
+                'requirement'    => $deal->title,
+                'crm_account_id' => $deal->crm_account_id,
+                'crm_contact_id' => $deal->crm_contact_id,
+                'crm_deal_id'    => $deal->id,
+                'status'         => 'Qualified',
+            ]);
+        }
+
+        app(\App\Domains\CRM\Services\LeadService::class)->uploadDocuments($linkedLead, $request->file('documents'));
+
+        return redirect()->back()->with('success', 'Document uploaded successfully!');
     }
 }
