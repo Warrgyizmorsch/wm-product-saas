@@ -312,7 +312,7 @@ class LeadController extends Controller
     {
         $this->authorize('update', $lead);
         $this->leadRepo->qualifyLead($lead);
-        return redirect()->back()->with('success', "Lead #{$lead->id} ({$lead->company_name}) successfully qualified as Genuine Lead!");
+        return redirect()->back()->with('success', "Lead #{$lead->id} successfully converted to Account & Deal and status updated to Won!");
     }
 
     public function trackStatus()
@@ -419,7 +419,7 @@ class LeadController extends Controller
         }
 
         if (!$res['success']) {
-            return redirect()->back()->withErrors(['status' => $res['message']]);
+            return redirect()->back()->withErrors(['status' => $res['message']])->with('error', $res['message']);
         }
 
         return redirect()->back()->with('success', $res['message']);
@@ -504,15 +504,17 @@ class LeadController extends Controller
 
     private function getLeadValidationRules(Request $request): array
     {
+        $isB2B = $request->input('lead_type', 'b2b') === 'b2b';
+
         $rules = [
             'lead_owner_id' => 'nullable|exists:users,id',
-            'company_name' => 'nullable|string|max:255',
-            'company_email' => 'nullable|email|max:255',
+            'company_name' => $isB2B ? 'required|string|max:255' : 'nullable|string|max:255',
+            'company_email' => $isB2B ? 'required|email|max:255' : 'nullable|email|max:255',
             'company_phone' => 'nullable|string|regex:/^[0-9]+$/',
             'gstin' => 'nullable|string|max:100',
             'lead_type' => 'nullable|string|in:b2b,b2c',
-            'contact_person' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
+            'contact_person' => $isB2B ? 'nullable|string|max:255' : 'required|string|max:255',
+            'email' => $isB2B ? 'nullable|email|max:255' : 'required|email|max:255',
             'phone' => 'nullable|string|regex:/^[0-9]+$/',
             'additional_contacts' => 'nullable|array',
             'additional_contacts.*.name' => 'nullable|string|max:255',
@@ -552,6 +554,12 @@ class LeadController extends Controller
     private function getLeadValidationMessages(): array
     {
         return [
+            'company_name.required' => 'Company Name is required for B2B (Business Client) leads.',
+            'company_email.required' => 'Company Email is required for B2B (Business Client) leads.',
+            'company_email.email' => 'Please enter a valid email address for Company Email.',
+            'contact_person.required' => 'Contact Person is required for B2C (Individual Customer) leads.',
+            'email.required' => 'Contact Email is required for B2C (Individual Customer) leads.',
+            'email.email' => 'Please enter a valid email address for Contact Email.',
             'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
             'additional_contact_phone.regex' => 'Additional contact phone number must contain digits/numbers only (no special characters or letters).',
             'additional_contacts.*.phone.regex' => 'Additional contact phone number must contain digits/numbers only (no special characters or letters).',

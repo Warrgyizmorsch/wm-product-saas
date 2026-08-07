@@ -37,20 +37,26 @@ class SalesOrderController extends Controller
     {
         $this->authorize('create', SalesOrder::class);
 
+        $prefillQuotation = null;
+        if ($request->has('quotation_id')) {
+            $prefillQuotation = Quotation::query()
+                ->with(['items.product', 'lead', 'crmAccount', 'crmDeal.account', 'crmDeal.contact'])
+                ->find($request->input('quotation_id'));
+
+            if ($prefillQuotation) {
+                // Ensure customer object & ID are resolved/synced for the quotation
+                $prefillCustomer = $prefillQuotation->customer;
+            }
+        }
+
         $customers = Customer::query()->orderBy('name')->get();
         $products = Product::query()->where('status', 'active')->get();
         $salesReps = User::query()->orderBy('name')->get();
         
         $quotations = Quotation::query()
             ->where('is_current', true)
-            ->whereIn('status', ['Approved', 'Accepted'])
             ->latest()
             ->get();
-
-        $prefillQuotation = null;
-        if ($request->has('quotation_id')) {
-            $prefillQuotation = Quotation::query()->with('items.product')->find($request->input('quotation_id'));
-        }
 
         $warehouses = Warehouse::query()->orderBy('name')->get();
 

@@ -74,10 +74,30 @@ class QuotationController extends Controller
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
 
-        $nextQuotationNumber = $this->quotationService->getNextQuotationNumber();
+        $prefilledItems = [];
+        if ($selectedLead) {
+            $rawItems = $selectedLead->product_items ?: [];
+            if (empty($rawItems) && !empty($selectedLead->product_ids)) {
+                foreach ($selectedLead->product_ids as $pid) {
+                    $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
+                }
+            }
+            foreach ($rawItems as $it) {
+                if (empty($it['product_id'])) continue;
+                $productObj = Product::find($it['product_id']);
+                if ($productObj) {
+                    $prefilledItems[] = [
+                        'product_id' => $productObj->id,
+                        'quantity'   => floatval($it['quantity'] ?? 1),
+                        'price'      => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
+                        'tax_rate'   => floatval($productObj->gst_rate ?: 18),
+                    ];
+                }
+            }
+        }
 
         return view('modules.crm.quotations.create', compact(
-            'selectedDeal', 'selectedLead', 'selectedAccount', 'accounts', 'deals', 'leads', 'users', 'products', 'nextQuotationNumber'
+            'selectedDeal', 'selectedLead', 'selectedAccount', 'accounts', 'deals', 'leads', 'users', 'products', 'nextQuotationNumber', 'prefilledItems'
         ));
     }
 
@@ -114,8 +134,31 @@ class QuotationController extends Controller
         }
 
         $quotation = $this->quotationService->create($validated, $request->input('items', []));
-        $leadId = $validated['lead_id'] ?? null;
+        $dealId = $validated['crm_deal_id'] ?? $request->input('crm_deal_id') ?? $quotation->crm_deal_id ?? null;
+        $leadId = $validated['lead_id'] ?? $request->input('lead_id') ?? $quotation->lead_id ?? null;
+
+        if (!$dealId && $leadId) {
+            $leadObj = Lead::find($leadId);
+            if ($leadObj && $leadObj->crm_deal_id) {
+                $dealId = $leadObj->crm_deal_id;
+            }
+        }
+
+        if (!$leadId && $dealId) {
+            $dealObj = CrmDeal::find($dealId);
+            if ($dealObj) {
+                $leadObj = Lead::where('crm_deal_id', $dealObj->id)->first();
+                if ($leadObj) {
+                    $leadId = $leadObj->id;
+                }
+            }
+        }
+
         $this->quotationService->handleQuotationStatusChange($quotation, $validated['status'], $leadId);
+
+        if ($dealId) {
+            return redirect()->route('crm.deals.show', ['deal' => $dealId, 'quotation_id' => $quotation->id])->with('success', 'Quotation successfully created!');
+        }
 
         if ($leadId && ($lead = Lead::find($leadId))) {
             \App\Domains\CRM\Models\LeadHistory::logEvent(
@@ -125,7 +168,7 @@ class QuotationController extends Controller
             return redirect()->route('crm.leads.show', ['lead' => $leadId, 'view_quotation' => 1])->with('success', 'Quotation successfully created!');
         }
 
-        return redirect()->route('crm.quotations.show', $quotation->id)->with('success', 'Quotation successfully created!');
+        return redirect()->route('crm.deals.index')->with('success', 'Quotation successfully created!');
     }
 
     public function show(int $id): View
@@ -174,6 +217,8 @@ class QuotationController extends Controller
 
         $validated = $request->validate([
             'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
+            'crm_account_id'      => ['nullable', 'integer', 'exists:crm_accounts,id'],
+            'crm_deal_id'         => ['nullable', 'integer', 'exists:crm_deals,id'],
             'sales_person_id'     => ['nullable', 'exists:users,id'],
             'quotation_number'    => ['required', 'string', 'max:255'],
             'quotation_date'      => ['required', 'date'],
@@ -219,14 +264,37 @@ class QuotationController extends Controller
         }
 
         $newQuotation = $this->quotationService->update($quotation, $validated, $request->input('items', []));
-        $leadId = $validated['lead_id'] ?? null;
+        $dealId = $validated['crm_deal_id'] ?? $request->input('crm_deal_id') ?? $newQuotation->crm_deal_id ?? $quotation->crm_deal_id ?? null;
+        $leadId = $validated['lead_id'] ?? $request->input('lead_id') ?? $newQuotation->lead_id ?? $quotation->lead_id ?? null;
+
+        if (!$dealId && $leadId) {
+            $leadObj = Lead::find($leadId);
+            if ($leadObj && $leadObj->crm_deal_id) {
+                $dealId = $leadObj->crm_deal_id;
+            }
+        }
+
+        if (!$leadId && $dealId) {
+            $dealObj = CrmDeal::find($dealId);
+            if ($dealObj) {
+                $leadObj = Lead::where('crm_deal_id', $dealObj->id)->first();
+                if ($leadObj) {
+                    $leadId = $leadObj->id;
+                }
+            }
+        }
+
         $this->quotationService->handleQuotationStatusChange($newQuotation, $validated['status'], $leadId);
+
+        if ($dealId) {
+            return redirect()->route('crm.deals.show', ['deal' => $dealId, 'quotation_id' => $newQuotation->id])->with('success', 'Quotation successfully updated!');
+        }
 
         if ($leadId) {
             return redirect()->route('crm.leads.show', ['lead' => $leadId, 'view_quotation' => 1])->with('success', 'Quotation successfully updated!');
         }
 
-        return redirect()->route('crm.quotations.show', $newQuotation->id)->with('success', 'Quotation successfully updated!');
+        return redirect()->route('crm.deals.index')->with('success', 'Quotation successfully updated!');
     }
 
     public function updateStatus(Request $request, int $id): RedirectResponse

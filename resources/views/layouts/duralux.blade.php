@@ -403,20 +403,20 @@
         function showAppToast(type, message) {
             if (typeof Swal === 'undefined' || !message) return;
 
-            Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
+                Swal.mixin({
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
                 timer: 5000,
-                timerProgressBar: true,
-                didOpen: function (toast) {
-                    toast.addEventListener('mouseenter', Swal.stopTimer);
-                    toast.addEventListener('mouseleave', Swal.resumeTimer);
-                }
-            }).fire({
+                    timerProgressBar: true,
+                    didOpen: function (toast) {
+                        toast.addEventListener('mouseenter', Swal.stopTimer);
+                        toast.addEventListener('mouseleave', Swal.resumeTimer);
+                    }
+                }).fire({
                 icon: type,
-                title: message
-            });
+                    title: message
+                });
         }
     </script>
 

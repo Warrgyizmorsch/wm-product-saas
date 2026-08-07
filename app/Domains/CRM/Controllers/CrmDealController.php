@@ -227,7 +227,29 @@ class CrmDealController extends Controller
         $histories = $linkedLead ? $linkedLead->histories : collect();
         $leadDocuments = $linkedLead ? $linkedLead->leadDocuments : collect();
 
-        return view('modules.crm.deals.show', compact('deal', 'nextQuotationNumber', 'products', 'users', 'prevDeal', 'nextDeal', 'activeQuotation', 'linkedLead', 'followups', 'histories', 'leadDocuments'));
+        $prefilledDealItems = [];
+        if ($linkedLead) {
+            $rawItems = $linkedLead->product_items ?: [];
+            if (empty($rawItems) && !empty($linkedLead->product_ids)) {
+                foreach ($linkedLead->product_ids as $pid) {
+                    $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
+                }
+            }
+            foreach ($rawItems as $it) {
+                if (empty($it['product_id'])) continue;
+                $productObj = \App\Domains\Inventory\Models\Product::find($it['product_id']);
+                if ($productObj) {
+                    $prefilledDealItems[] = [
+                        'product_id' => $productObj->id,
+                        'quantity'   => floatval($it['quantity'] ?? 1),
+                        'unit_price' => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
+                        'tax_rate'   => floatval($productObj->gst_rate ?: 18),
+                    ];
+                }
+            }
+        }
+
+        return view('modules.crm.deals.show', compact('deal', 'nextQuotationNumber', 'products', 'users', 'prevDeal', 'nextDeal', 'activeQuotation', 'linkedLead', 'followups', 'histories', 'leadDocuments', 'prefilledDealItems'));
     }
 
     public function edit(CrmDeal $deal): View
@@ -281,7 +303,7 @@ class CrmDealController extends Controller
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal updated successfully.');
     }
 
-    public function updateStage(Request $request, CrmDeal $deal): JsonResponse
+    public function updateStage(Request $request, CrmDeal $deal)
     {
         $validated = $request->validate([
             'stage'        => 'required|string|in:Qualification,Needs Analysis,Proposal,Negotiation,Won,Lost,Closed Won,Closed Lost,New,Qualified',
@@ -297,10 +319,14 @@ class CrmDealController extends Controller
         if ($stage === 'Won') {
             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
             if (!$hasAcceptedQuote) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.'
-                ], 422);
+                $errMsg = 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.';
+                if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $errMsg
+                    ], 422);
+                }
+                return redirect()->route('crm.deals.show', $deal->id)->with('error', $errMsg);
             }
         }
 
@@ -319,11 +345,17 @@ class CrmDealController extends Controller
             'close_reason' => $validated['close_reason'] ?? $deal->close_reason,
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Deal stage updated successfully.',
-            'deal'    => $deal
-        ]);
+        $msg = "Deal stage updated to {$stage} successfully!";
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'deal'    => $deal
+            ]);
+        }
+
+        return redirect()->route('crm.deals.show', $deal->id)->with('success', $msg);
     }
 
     public function destroy(CrmDeal $deal): RedirectResponse
