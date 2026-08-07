@@ -61,6 +61,8 @@ class AccountingChartOfAccountsSeeder extends Seeder
             ['code' => '1020', 'name' => 'Bank Account', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'current_asset', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1100', 'name' => 'Accounts Receivable', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'current_asset', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1200', 'name' => 'Inventory', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'current_asset', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
+            ['code' => '1300', 'name' => 'Security Deposits', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'security_deposit', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
+            ['code' => '1400', 'name' => 'Loans & Advances', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'loans_advances', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1500', 'name' => 'Fixed Assets', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'fixed_asset', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1510', 'name' => 'Accumulated Depreciation', 'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => 'fixed_asset', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '1000'],
 
@@ -72,13 +74,13 @@ class AccountingChartOfAccountsSeeder extends Seeder
             ['code' => '2200', 'name' => 'Customer Advances', 'type' => ChartOfAccount::TYPE_LIABILITY, 'subtype' => 'current_liability', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '2000'],
 
             // Equity
-            ['code' => '3010', 'name' => "Owner's Capital", 'type' => ChartOfAccount::TYPE_EQUITY, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
-            ['code' => '3020', 'name' => 'Retained Earnings', 'type' => ChartOfAccount::TYPE_EQUITY, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
+            ['code' => '3010', 'name' => "Owner's Capital", 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'capital', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
+            ['code' => '3020', 'name' => 'Retained Earnings', 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'reserves_surplus', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
 
             // Income
-            ['code' => '4010', 'name' => 'Sales Revenue', 'type' => ChartOfAccount::TYPE_INCOME, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
-            ['code' => '4020', 'name' => 'Service Revenue', 'type' => ChartOfAccount::TYPE_INCOME, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
-            ['code' => '4900', 'name' => 'Other Income', 'type' => ChartOfAccount::TYPE_INCOME, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
+            ['code' => '4010', 'name' => 'Sales Revenue', 'type' => ChartOfAccount::TYPE_INCOME, 'subtype' => 'direct_income', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
+            ['code' => '4020', 'name' => 'Service Revenue', 'type' => ChartOfAccount::TYPE_INCOME, 'subtype' => 'direct_income', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
+            ['code' => '4900', 'name' => 'Other Income', 'type' => ChartOfAccount::TYPE_INCOME, 'subtype' => 'indirect_income', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
 
             // Expenses
             ['code' => '5010', 'name' => 'Cost of Goods Sold', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'cogs', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],

@@ -27,6 +27,62 @@ class ChartOfAccount extends BaseModel
         self::TYPE_EXPENSE,
     ];
 
+    public const SUBTYPE_CURRENT_ASSET = 'current_asset';
+    public const SUBTYPE_FIXED_ASSET = 'fixed_asset';
+    public const SUBTYPE_SECURITY_DEPOSIT = 'security_deposit';
+    public const SUBTYPE_LOANS_ADVANCES = 'loans_advances';
+    public const SUBTYPE_CURRENT_LIABILITY = 'current_liability';
+    public const SUBTYPE_LONG_TERM_LIABILITY = 'long_term_liability';
+    public const SUBTYPE_CAPITAL = 'capital';
+    public const SUBTYPE_RESERVES_SURPLUS = 'reserves_surplus';
+    public const SUBTYPE_DIRECT_INCOME = 'direct_income';
+    public const SUBTYPE_INDIRECT_INCOME = 'indirect_income';
+    public const SUBTYPE_COGS = 'cogs';
+    public const SUBTYPE_OPERATING_EXPENSE = 'operating_expense';
+
+    /**
+     * Valid subtypes per top-level type.
+     */
+    public const SUBTYPES_BY_TYPE = [
+        self::TYPE_ASSET => [
+            self::SUBTYPE_CURRENT_ASSET,
+            self::SUBTYPE_FIXED_ASSET,
+            self::SUBTYPE_SECURITY_DEPOSIT,
+            self::SUBTYPE_LOANS_ADVANCES,
+        ],
+        self::TYPE_LIABILITY => [
+            self::SUBTYPE_CURRENT_LIABILITY,
+            self::SUBTYPE_LONG_TERM_LIABILITY,
+        ],
+        self::TYPE_EQUITY => [
+            self::SUBTYPE_CAPITAL,
+            self::SUBTYPE_RESERVES_SURPLUS,
+        ],
+        self::TYPE_INCOME => [
+            self::SUBTYPE_DIRECT_INCOME,
+            self::SUBTYPE_INDIRECT_INCOME,
+        ],
+        self::TYPE_EXPENSE => [
+            self::SUBTYPE_COGS,
+            self::SUBTYPE_OPERATING_EXPENSE,
+        ],
+    ];
+
+    public const SUBTYPE_LABELS = [
+        self::SUBTYPE_CURRENT_ASSET => 'Current Asset',
+        self::SUBTYPE_FIXED_ASSET => 'Fixed Asset',
+        self::SUBTYPE_SECURITY_DEPOSIT => 'Security & Deposits',
+        self::SUBTYPE_LOANS_ADVANCES => 'Loans & Advances',
+        self::SUBTYPE_CURRENT_LIABILITY => 'Current Liability',
+        self::SUBTYPE_LONG_TERM_LIABILITY => 'Long-term Liability',
+        self::SUBTYPE_CAPITAL => 'Capital',
+        self::SUBTYPE_RESERVES_SURPLUS => 'Reserves & Surplus',
+        self::SUBTYPE_DIRECT_INCOME => 'Direct Income',
+        self::SUBTYPE_INDIRECT_INCOME => 'Indirect Income',
+        self::SUBTYPE_COGS => 'Cost of Goods Sold',
+        self::SUBTYPE_OPERATING_EXPENSE => 'Operating Expense',
+    ];
+
     public const BALANCE_DEBIT = 'debit';
     public const BALANCE_CREDIT = 'credit';
 
@@ -65,6 +121,14 @@ class ChartOfAccount extends BaseModel
     public function journalEntries(): HasMany
     {
         return $this->hasMany(JournalEntry::class, 'chart_of_account_id');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function allSubtypes(): array
+    {
+        return array_values(array_unique(array_merge(...array_values(self::SUBTYPES_BY_TYPE))));
     }
 
     public function isDebitNormal(): bool

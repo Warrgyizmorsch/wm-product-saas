@@ -82,6 +82,7 @@
                                     data-code="{{ $account->code }}"
                                     data-name="{{ $account->name }}"
                                     data-type="{{ $account->type }}"
+                                    data-subtype="{{ $account->subtype }}"
                                     data-normal-balance="{{ $account->normal_balance }}"
                                     data-parent-id="{{ $account->parent_id }}"
                                     data-description="{{ $account->description }}"
@@ -152,6 +153,18 @@
             </div>
         </div>
 
+        <x-ui.select label="Subtype" name="subtype" id="coaSubtype" :options="[]">
+            <option value="">— None —</option>
+            @foreach (\App\Domains\Accounting\Models\ChartOfAccount::SUBTYPES_BY_TYPE as $type => $subtypes)
+                @foreach ($subtypes as $subtype)
+                    <option value="{{ $subtype }}" data-type="{{ $type }}"
+                            {{ old('subtype', $editingAccount?->subtype) === $subtype ? 'selected' : '' }}>
+                        {{ \App\Domains\Accounting\Models\ChartOfAccount::SUBTYPE_LABELS[$subtype] }}
+                    </option>
+                @endforeach
+            @endforeach
+        </x-ui.select>
+
         <x-ui.select label="Parent Account" name="parent_id" id="coaParentId"
                      :options="['' => 'None (top level)'] + collect($parentOptions)->mapWithKeys(fn ($o) => [$o['account']->id => $o['label']])->all()"
                      :selected="old('parent_id', $editingAccount?->parent_id)" />
@@ -174,6 +187,22 @@
     <script>
         $(document).ready(function() {
             const coaModal = document.getElementById('chartOfAccountModal');
+            const subtypeSelect = document.getElementById('coaSubtype');
+            const subtypeOptions = Array.from(subtypeSelect.options).filter(opt => opt.value !== '');
+
+            function filterSubtypes(type, valueToSelect) {
+                subtypeOptions.forEach(opt => {
+                    opt.hidden = opt.dataset.type !== type;
+                });
+
+                const desired = valueToSelect || '';
+                const stillValid = desired === '' || subtypeOptions.some(opt => opt.value === desired && opt.dataset.type === type);
+                subtypeSelect.value = stillValid ? desired : '';
+            }
+
+            $('#coaType').on('change', function () {
+                filterSubtypes(this.value, '');
+            });
 
             coaModal.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
@@ -194,6 +223,7 @@
                 $('#coaCode').val(data.code);
                 $('#coaName').val(data.name);
                 $('#coaType').val(data.type);
+                filterSubtypes(data.type, data.subtype || '');
                 $('#coaNormalBalance').val(data.normalBalance);
                 $('#coaParentId').val(data.parentId || '');
                 $('#coaDescription').val(data.description);
@@ -210,7 +240,10 @@
                 $(coaModal).find('form')[0].reset();
                 $('#coaAccountId').val('');
                 $('#coaSystemNotice').hide();
+                filterSubtypes($('#coaType').val(), '');
             });
+
+            filterSubtypes($('#coaType').val(), $('#coaSubtype').val());
 
             @if ($errors->any())
                 new bootstrap.Modal(coaModal).show();
