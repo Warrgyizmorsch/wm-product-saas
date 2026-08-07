@@ -349,7 +349,11 @@
                                             <!-- Entity Scope -->
                                             <div class="col-md-6 col-12">
                                                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_scope') }}" name="company_id" select2-selector="default" id="{{ $typeKey === 'attendance_rules' ? 'sel_company_id' : 'company_id_' . $typeKey }}">
-                                                    <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
+                                                    @if($typeKey === 'attendance_rules')
+                                                        <option value="" disabled selected>-- Select a Company (Required) --</option>
+                                                    @else
+                                                        <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
+                                                    @endif
                                                     @foreach($companies as $company)
                                                         <option value="{{ $company->id }}" {{ (($typeKey === 'attendance_rules' ? request('company_id') : ($rule ? $rule->company_id : null)) == $company->id) ? 'selected' : '' }}>
                                                             {{ $company->company_name }}
@@ -573,31 +577,54 @@
                                                               <span class="text-muted fs-11 d-block ms-4 ps-1">Allow check-in and check-out logs to sync from biometric devices.</span>
                                                           </div>
                                                           <div>
-                                                              <x-ui.checkbox name="office_web" id="office_web" label="Enable Web/Mobile App Check-In (Geofenced)" onchange="toggleOfficeGeofenceFields()" />
-                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Allow check-in via the button when inside the office geofence.</span>
+                                                              <x-ui.checkbox name="office_web" id="office_web" label="Enable Web/Mobile App Check-In" onchange="toggleOfficeGeofenceFields()" />
+                                                              <span class="text-muted fs-11 d-block ms-4 ps-1">Allow employees to check in/out via the web portal or mobile app.</span>
+
+                                                              {{-- Sub-options shown when office_web is enabled --}}
+                                                              <div class="ms-4 ps-1 mt-3 d-none d-flex flex-column gap-3" id="office_geofence_fields">
+
+                                                                  {{-- Geofence toggle --}}
+                                                                  <div>
+                                                                      <x-ui.checkbox name="office_geofence" id="office_geofence" label="Require Location Coordinate Capture" onchange="toggleOfficeCoordinateFields()" />
+                                                                      <span class="text-muted fs-11 d-block ms-4 ps-1">Only allow check-in when employee is within the office geofence radius.</span>
+
+                                                                      {{-- Lat/Lng/Radius shown when office_geofence is enabled --}}
+                                                                      <div class="row g-3 mt-1 align-items-end d-none" id="office_coordinate_fields">
+                                                                          <div class="col-md-3">
+                                                                              <label class="form-label fs-12 text-muted mb-1">Office Latitude</label>
+                                                                              <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="e.g. 37.7749">
+                                                                          </div>
+                                                                          <div class="col-md-3">
+                                                                              <label class="form-label fs-12 text-muted mb-1">Office Longitude</label>
+                                                                              <input type="text" name="office_longitude" id="office_longitude" class="form-control fs-12" placeholder="e.g. -122.4194">
+                                                                          </div>
+                                                                          <div class="col-md-3">
+                                                                              <label class="form-label fs-12 text-muted mb-1">Allowed Radius (Meters)</label>
+                                                                              <input type="number" name="office_radius" id="office_radius" class="form-control fs-12" value="100" min="1">
+                                                                          </div>
+                                                                          <div class="col-md-3">
+                                                                              <button type="button" class="btn btn-sm btn-soft-primary w-100 d-flex align-items-center justify-content-center gap-1" style="height: 38px; border-radius: 4px;" onclick="detectCurrentCoordinates(event)">
+                                                                                  <i class="feather-map-pin"></i> Detect Location
+                                                                              </button>
+                                                                          </div>
+                                                                      </div>
+                                                                  </div>
+
+                                                                  {{-- Live tracking toggle --}}
+                                                                  <div>
+                                                                      <x-ui.checkbox name="office_tracking" id="office_tracking" label="Enable Live Location Tracking During Shift" onchange="toggleOfficeTrackingMinutes()" />
+                                                                      <span class="text-muted fs-11 d-block ms-4 ps-1">Periodically log employee GPS coordinates while checked in at the office.</span>
+                                                                      <div class="ms-4 ps-1 mt-2 d-none" id="office_tracking_minutes_wrap">
+                                                                          <label class="form-label fs-12 text-muted mb-1">Tracking Interval (Minutes)</label>
+                                                                          <input type="number" name="office_tracking_minutes" id="office_tracking_minutes" class="form-control fs-12" style="max-width: 160px;" value="15" min="1" max="120" placeholder="e.g. 15">
+                                                                          <span class="text-muted fs-11 d-block mt-1">Location will be recorded every N minutes during an active shift.</span>
+                                                                      </div>
+                                                                  </div>
+
+                                                              </div>
                                                           </div>
                                                       </div>
-
-                                                       <div class="row g-3 mt-2 px-2 align-items-end d-none" id="office_geofence_fields">
-                                                           <div class="col-md-3">
-                                                               <label class="form-label fs-12 text-muted mb-1">Office Latitude</label>
-                                                               <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="e.g. 37.7749">
-                                                           </div>
-                                                           <div class="col-md-3">
-                                                               <label class="form-label fs-12 text-muted mb-1">Office Longitude</label>
-                                                               <input type="text" name="office_longitude" id="office_longitude" class="form-control fs-12" placeholder="e.g. -122.4194">
-                                                           </div>
-                                                           <div class="col-md-3">
-                                                               <label class="form-label fs-12 text-muted mb-1">Allowed Range (Radius in Meters)</label>
-                                                               <input type="number" name="office_radius" id="office_radius" class="form-control fs-12" value="50" min="1">
-                                                           </div>
-                                                           <div class="col-md-3">
-                                                               <button type="button" class="btn btn-sm btn-soft-primary w-100 d-flex align-items-center justify-content-center gap-1" style="height: 38px; border-radius: 4px;" onclick="detectCurrentCoordinates(event)">
-                                                                   <i class="feather-map-pin"></i> Detect Location
-                                                               </button>
-                                                           </div>
-                                                       </div>
-                                                  </div>
+                                                 </div>
 
                                                   <!-- WFH Rules -->
                                                   <div class="col-12 border-bottom pb-4 mb-4">
@@ -629,7 +656,9 @@
                                                                   <p class="mb-0 text-dark" style="line-height: 1.6;">
                                                                       Track new coordinates if the employee moves more than 
                                                                       <input type="number" name="wfh_tracking_meters" id="wfh_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                      meters from the last/first check-in coordinates.
+                                                                      meters from the last/first check-in coordinates, and fetch every
+                                                                      <input type="number" name="wfh_tracking_minutes" id="wfh_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="15" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                      minutes.
                                                                   </p>
                                                               </div>
                                                           </div>
@@ -662,7 +691,9 @@
                                                                   <p class="mb-0 text-dark" style="line-height: 1.6;">
                                                                       Track new coordinates if the employee moves more than 
                                                                       <input type="number" name="site_tracking_meters" id="site_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
-                                                                      meters from the last/first check-in coordinates.
+                                                                      meters from the last/first check-in coordinates, and fetch every
+                                                                      <input type="number" name="site_tracking_minutes" id="site_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="15" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                      minutes.
                                                                   </p>
                                                               </div>
                                                           </div>
@@ -1180,21 +1211,26 @@
                     if (rule) {
                         document.getElementById('office_biometric').checked = !!rule.office_biometric;
                         document.getElementById('office_web').checked = !!rule.office_web;
+                        document.getElementById('office_geofence').checked = !!rule.office_geofence;
                         document.getElementById('office_latitude').value = rule.office_latitude || '';
                         document.getElementById('office_longitude').value = rule.office_longitude || '';
-                        document.getElementById('office_radius').value = rule.office_radius || 50;
+                        document.getElementById('office_radius').value = rule.office_radius || 100;
+                        document.getElementById('office_tracking').checked = !!rule.office_tracking;
+                        document.getElementById('office_tracking_minutes').value = rule.office_tracking_minutes || 15;
 
                         document.getElementById('wfh_location').checked = !!rule.wfh_location;
                         document.getElementById('wfh_selfie').checked = !!rule.wfh_selfie;
                         document.getElementById('wfh_geofence').checked = !!rule.wfh_geofence;
                         document.getElementById('wfh_tracking').checked = !!rule.wfh_tracking;
                         document.getElementById('wfh_tracking_meters').value = rule.wfh_tracking_meters || 50;
+                        document.getElementById('wfh_tracking_minutes').value = rule.wfh_tracking_minutes || 15;
 
                         document.getElementById('site_location').checked = !!rule.site_location;
                         document.getElementById('site_selfie').checked = !!rule.site_selfie;
                         document.getElementById('site_geofence').checked = !!rule.site_geofence;
                         document.getElementById('site_tracking').checked = !!rule.site_tracking;
                         document.getElementById('site_tracking_meters').value = rule.site_tracking_meters || 50;
+                        document.getElementById('site_tracking_minutes').value = rule.site_tracking_minutes || 15;
 
                         if ($('#sel_status').length) {
                             var statusVal = rule.status ? '1' : '0';
@@ -1204,21 +1240,26 @@
                         // Reset to defaults
                         document.getElementById('office_biometric').checked = false;
                         document.getElementById('office_web').checked = false;
+                        document.getElementById('office_geofence').checked = false;
                         document.getElementById('office_latitude').value = '';
                         document.getElementById('office_longitude').value = '';
-                        document.getElementById('office_radius').value = 50;
+                        document.getElementById('office_radius').value = 100;
+                        document.getElementById('office_tracking').checked = false;
+                        document.getElementById('office_tracking_minutes').value = 15;
 
                         document.getElementById('wfh_location').checked = false;
                         document.getElementById('wfh_selfie').checked = false;
                         document.getElementById('wfh_geofence').checked = false;
                         document.getElementById('wfh_tracking').checked = false;
                         document.getElementById('wfh_tracking_meters').value = 50;
+                        document.getElementById('wfh_tracking_minutes').value = 15;
 
                         document.getElementById('site_location').checked = false;
                         document.getElementById('site_selfie').checked = false;
                         document.getElementById('site_geofence').checked = false;
                         document.getElementById('site_tracking').checked = false;
                         document.getElementById('site_tracking_meters').value = 50;
+                        document.getElementById('site_tracking_minutes').value = 15;
 
                         if ($('#sel_status').length) {
                             $('#sel_status').val('1').trigger('change.select2');
@@ -1227,8 +1268,42 @@
                     toggleTrackingThreshold('wfh');
                     toggleTrackingThreshold('site');
                     toggleOfficeGeofenceFields();
+                    toggleOfficeCoordinateFields();
+                    toggleOfficeTrackingMinutes();
                 }
             });
+        };
+
+        // Toggle the tracking minutes input for Office location tracking
+        window.toggleOfficeTrackingMinutes = function() {
+            const enabled = document.getElementById('office_tracking').checked;
+            const wrap = document.getElementById('office_tracking_minutes_wrap');
+            if (wrap) wrap.classList.toggle('d-none', !enabled);
+        };
+
+        // Toggle the coordinate fields when office_geofence checkbox changes
+        window.toggleOfficeCoordinateFields = function() {
+            const enabled = document.getElementById('office_geofence') && document.getElementById('office_geofence').checked;
+            const fields = document.getElementById('office_coordinate_fields');
+            if (fields) fields.classList.toggle('d-none', !enabled);
+        };
+
+        // Toggle sub-options (geofence + tracking) when office_web checkbox changes
+        window.toggleOfficeGeofenceFields = function() {
+            const enabled = document.getElementById('office_web').checked;
+            const panel = document.getElementById('office_geofence_fields');
+            if (panel) {
+                panel.classList.toggle('d-none', !enabled);
+                // If web check-in gets disabled, reset sub-options
+                if (!enabled) {
+                    const geofence = document.getElementById('office_geofence');
+                    if (geofence) geofence.checked = false;
+                    toggleOfficeCoordinateFields();
+                    const tracking = document.getElementById('office_tracking');
+                    if (tracking) tracking.checked = false;
+                    toggleOfficeTrackingMinutes();
+                }
+            }
         };
 
         // Geolocation Coordinates Detection Logic
