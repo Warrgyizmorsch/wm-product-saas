@@ -29,9 +29,9 @@ return new class extends Migration
         Schema::create('permissions', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
-            $table->string('module')->index();
-            $table->string('entity')->nullable()->index();
-            $table->string('action')->index();
+            $table->string('module', 50)->index();
+            $table->string('entity', 50)->nullable()->index();
+            $table->string('action', 50)->index();
             $table->boolean('is_system')->default(true);
             $table->text('description')->nullable();
             $table->timestamps();
