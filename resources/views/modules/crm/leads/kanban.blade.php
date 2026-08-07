@@ -219,7 +219,7 @@
                             };
                             $kStarLabels = [1 => 'Low', 2 => 'Medium', 3 => 'High', 4 => 'Urgent'];
                         @endphp
-                        <div class="kanban-card" draggable="true" data-lead-id="{{ $lead->id }}" data-company-name="{{ addslashes($lead->company_name) }}" data-is-qualified="{{ $lead->is_qualified ? '1' : '0' }}" data-amount="{{ $expAmt }}">
+                        <div class="kanban-card" draggable="true" data-lead-id="{{ $lead->id }}" data-company-name="{{ addslashes($lead->company_name) }}" data-has-account-deal="{{ (($lead->crm_account_id && $lead->crm_deal_id) || $lead->is_customer || $lead->status === 'Won') ? '1' : '0' }}" data-is-qualified="{{ $lead->is_qualified ? '1' : '0' }}" data-amount="{{ $expAmt }}">
                             <!-- Lead Title & Value -->
                             <div class="d-flex align-items-start justify-content-between mb-1.5">
                                 <a href="{{ route('crm.leads.show', $lead->id) }}" class="fw-bold text-dark fs-13 hover-underline text-truncate me-2" style="max-width: 190px;" title="{{ $lead->company_name }}">
@@ -289,6 +289,66 @@
         let originalParent = null;
         let originalNextSibling = null;
 
+        function notifyKanbanUser(type, message) {
+            // 1. Try global confirmAction modal popup on error if available
+            if ((type === 'error' || type === 'danger') && typeof confirmAction === 'function') {
+                confirmAction({
+                    title: 'Action Blocked',
+                    message: message,
+                    variant: 'warning',
+                    confirmText: 'Got It'
+                });
+            }
+
+            // 2. Create instant guaranteed top-right Toast element
+            let container = document.getElementById('kanbanGuaranteedToastContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'kanbanGuaranteedToastContainer';
+                container.style.cssText = 'position: fixed; top: 25px; right: 25px; z-index: 999999; display: flex; flex-direction: column; gap: 10px; pointer-events: none;';
+                document.body.appendChild(container);
+            }
+
+            const toast = document.createElement('div');
+            const isError = type === 'error' || type === 'danger';
+            const bgColor = isError ? '#dc2626' : '#16a34a';
+            const iconClass = isError ? 'feather-x-circle' : 'feather-check-circle';
+
+            toast.style.cssText = `
+                background-color: ${bgColor};
+                color: #ffffff;
+                padding: 12px 18px;
+                border-radius: 8px;
+                font-family: system-ui, -apple-system, sans-serif;
+                font-size: 13px;
+                font-weight: 600;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 280px;
+                max-width: 420px;
+                pointer-events: auto;
+                opacity: 0;
+                transform: translateY(-15px) scale(0.95);
+                transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            `;
+
+            toast.innerHTML = `<i class="feather ${iconClass}" style="font-size: 18px; flex-shrink: 0;"></i> <span style="line-height: 1.4;">${message}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0) scale(1)';
+            });
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-10px) scale(0.95)';
+                setTimeout(() => toast.remove(), 250);
+            }, 4500);
+        }
+
         // Drag Start & End
         document.querySelectorAll('.kanban-card').forEach(card => {
             card.addEventListener('dragstart', function (e) {
@@ -327,17 +387,26 @@
                 const newStatus = targetCol.getAttribute('data-status');
                 const leadId = draggedCard.getAttribute('data-lead-id');
                 const companyName = draggedCard.getAttribute('data-company-name') || ('Lead #' + leadId);
-                const isQualified = draggedCard.getAttribute('data-is-qualified') === '1';
+                const hasAccountDeal = draggedCard.getAttribute('data-has-account-deal') === '1';
 
-                // Guard 1: Client-Side Instant Qualification Guard for Direct Conversion
-                if (newStatus === 'Won' && !isQualified) {
+                // Guard: Direct Won conversion blocked if Account & Deal not created yet
+                if (newStatus === 'Won' && !hasAccountDeal) {
+                    // Revert card immediately to original column box!
+                    if (originalNextSibling) {
+                        originalParent.insertBefore(draggedCard, originalNextSibling);
+                    } else {
+                        originalParent.appendChild(draggedCard);
+                    }
+                    recalculateTotals();
+
+                    // Open Warning Modal Alert
                     confirmAction({
-                        title: 'Action Blocked: Qualification Required',
-                        message: 'Lead "' + companyName + '" (# ' + leadId + ') cannot be marked directly as "Won" because it is not Qualified yet! Please qualify the lead first.',
+                        title: 'Action Blocked: Account & Deal Required',
+                        message: 'Lead "' + companyName + '" cannot be marked as Won directly because Account & Deal have not been created yet! Please click "CONVERT TO ACCOUNT & DEAL" first.',
                         variant: 'warning',
                         confirmText: 'Got It'
                     });
-                    return;
+                    return false;
                 }
 
                 // Append card temporarily to new column
@@ -352,15 +421,21 @@
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify({ status: newStatus })
                 })
                 .then(async res => {
-                    const data = await res.json();
+                    let data = {};
+                    try {
+                        data = await res.json();
+                    } catch(e) {
+                        data = { success: false, message: 'Cannot mark as Won. Account & Deal conversion required first!' };
+                    }
 
                     if (!res.ok || data.success === false) {
-                        // Revert card immediately to original column!
+                        // Revert card immediately back to its original column box!
                         if (originalNextSibling) {
                             originalParent.insertBefore(draggedCard, originalNextSibling);
                         } else {
@@ -368,17 +443,21 @@
                         }
                         recalculateTotals();
 
-                        // Display instant warning modal
+                        const errMsg = data.message || 'Cannot mark as Won. Account & Deal conversion required first!';
                         confirmAction({
-                            title: 'Status Change Reverted',
-                            message: data.message || 'Unable to update lead status. Action has been reverted.',
-                            variant: 'danger',
+                            title: 'Action Blocked',
+                            message: errMsg,
+                            variant: 'warning',
                             confirmText: 'Got It'
                         });
+                        showAppToast('error', errMsg);
+                    } else {
+                        // Display Common Component Toaster Success Message!
+                        showAppToast('success', data.message || 'Lead status updated successfully!');
                     }
                 })
                 .catch(err => {
-                    // Revert card immediately on network error
+                    // Revert card immediately back to its original column box on error!
                     if (originalNextSibling) {
                         originalParent.insertBefore(draggedCard, originalNextSibling);
                     } else {
@@ -387,9 +466,9 @@
                     recalculateTotals();
 
                     confirmAction({
-                        title: 'Network Error',
-                        message: 'Failed to communicate with server. Lead status update was reverted.',
-                        variant: 'danger',
+                        title: 'Action Blocked',
+                        message: 'Cannot mark as Won. Account & Deal conversion required first!',
+                        variant: 'warning',
                         confirmText: 'Got It'
                     });
                 });

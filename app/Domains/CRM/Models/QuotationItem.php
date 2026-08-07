@@ -31,6 +31,11 @@ class QuotationItem extends Model
         'amount' => 'decimal:2',
     ];
 
+    public function getTotalPriceAttribute(): float
+    {
+        return (float) ($this->attributes['amount'] ?? ($this->quantity * $this->unit_price));
+    }
+
     public function quotation(): BelongsTo
     {
         return $this->belongsTo(Quotation::class);

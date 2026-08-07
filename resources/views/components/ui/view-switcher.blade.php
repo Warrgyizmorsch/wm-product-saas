@@ -1,3 +1,41 @@
+@props([
+    'listRoute' => null,
+    'kanbanRoute' => null,
+    'calendarRoute' => null,
+    'showCalendar' => null,
+])
+
+@php
+    $isDealContext = request()->routeIs('crm.deals.*') || request()->is('crm/deals*');
+    $isLeadContext = request()->routeIs('crm.leads.*') || request()->is('crm/leads*');
+    $isAccountContext = request()->routeIs('crm.accounts.*') || request()->is('crm/accounts*');
+
+    if ($listRoute) {
+        $finalListRoute = $listRoute;
+    } elseif ($isDealContext) {
+        $finalListRoute = route('crm.deals.index');
+    } elseif ($isAccountContext) {
+        $finalListRoute = route('crm.accounts.index');
+    } else {
+        $finalListRoute = route('crm.leads.index');
+    }
+
+    if ($kanbanRoute) {
+        $finalKanbanRoute = $kanbanRoute;
+    } elseif ($isDealContext) {
+        $finalKanbanRoute = route('crm.deals.kanban');
+    } else {
+        $finalKanbanRoute = route('crm.leads.kanban');
+    }
+
+    $finalCalRoute = $calendarRoute ?? route('crm.activities.index');
+    $shouldShowCalendar = $showCalendar ?? (!$isDealContext);
+
+    $isListActive = request()->routeIs('crm.leads.index') || request()->routeIs('crm.deals.index') || request()->routeIs('crm.accounts.index');
+    $isKanbanActive = request()->routeIs('crm.leads.kanban') || request()->routeIs('crm.deals.kanban');
+    $isCalActive = request()->routeIs('crm.activities.index');
+@endphp
+
 @once
     @push('styles')
         <style>
@@ -26,13 +64,15 @@
 @endonce
 
 <div class="d-flex align-items-center me-2" style="gap: 6px;">
-    <a href="{{ route('crm.leads.index') }}" class="action-dropdown-btn {{ request()->routeIs('crm.leads.index') ? 'active' : '' }}" title="List View" data-bs-toggle="tooltip">
+    <a href="{{ $finalListRoute }}" class="action-dropdown-btn {{ $isListActive ? 'active' : '' }}" title="List View" data-bs-toggle="tooltip">
         <i class="feather-list"></i>
     </a>
-    <a href="{{ route('crm.leads.kanban') }}" class="action-dropdown-btn {{ request()->routeIs('crm.leads.kanban') ? 'active' : '' }}" title="Pipeline Kanban" data-bs-toggle="tooltip">
+    <a href="{{ $finalKanbanRoute }}" class="action-dropdown-btn {{ $isKanbanActive ? 'active' : '' }}" title="Pipeline Kanban" data-bs-toggle="tooltip">
         <i class="feather-grid"></i>
     </a>
-    <a href="{{ route('crm.activities.index') }}" class="action-dropdown-btn {{ request()->routeIs('crm.activities.index') ? 'active' : '' }}" title="Activity Calendar" data-bs-toggle="tooltip">
-        <i class="feather-calendar"></i>
-    </a>
+    @if($shouldShowCalendar)
+        <a href="{{ $finalCalRoute }}" class="action-dropdown-btn {{ $isCalActive ? 'active' : '' }}" title="Activity Calendar" data-bs-toggle="tooltip">
+            <i class="feather-calendar"></i>
+        </a>
+    @endif
 </div>

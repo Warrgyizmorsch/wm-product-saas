@@ -127,15 +127,25 @@
                 <div class="tab-content" id="itemDetailsTabsContent">
                     <!-- Tab 1: Overview -->
                     <div class="tab-pane fade show active" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
+                        @php
+                            $getAccountDisplay = function($accValue) {
+                                if (!$accValue) return '—';
+                                if (is_numeric($accValue)) {
+                                    $coa = \App\Domains\Accounting\Models\ChartOfAccount::find($accValue);
+                                    return $coa ? ($coa->code ? $coa->code . ' - ' . $coa->name : $coa->name) : $accValue;
+                                }
+                                return $accValue;
+                            };
+                        @endphp
                         <div class="row g-4 fs-13 text-dark">
                             <!-- Left Column: Attributes & Details -->
                             <div class="col-lg-6 border-end">
-                                <h6 class="fw-bold text-primary mb-3">{{ __('inventory.item_specifications') }}</h6>
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-2"></i>{{ __('inventory.item_specifications') }}</h6>
                                 
                                 <table class="table table-borderless align-middle mb-4">
                                     <tbody>
                                         <tr>
-                                            <td class="text-muted" style="width: 140px;">{{ __('inventory.unit_of_measure') }}</td>
+                                            <td class="text-muted" style="width: 160px;">{{ __('inventory.unit_of_measure') }}</td>
                                             <td class="fw-semibold">{{ $product->uom ? $product->uom->name . ' (' . $product->uom->code . ')' : '—' }}</td>
                                         </tr>
                                         @php
@@ -158,6 +168,14 @@
                                             </td>
                                         </tr>
                                         <tr>
+                                            <td class="text-muted">Supplier Method</td>
+                                            <td class="fw-semibold text-capitalize">{{ $product->supplier_method ?: 'Buy' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Planning Type</td>
+                                            <td class="fw-semibold text-capitalize">{{ $product->planning_type ?: 'Stock' }}</td>
+                                        </tr>
+                                        <tr>
                                             <td class="text-muted">{{ __('inventory.brand') }}</td>
                                             <td class="fw-semibold">{{ $product->brand ?: '—' }}</td>
                                         </tr>
@@ -172,11 +190,59 @@
                                     </tbody>
                                 </table>
 
-                                <h6 class="fw-bold text-primary mb-3">{{ __('inventory.barcode_identifiers') }}</h6>
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-box me-2"></i>Inventory & Tracking Settings</h6>
                                 <table class="table table-borderless align-middle mb-4">
                                     <tbody>
                                         <tr>
-                                            <td class="text-muted" style="width: 140px;">{{ __('inventory.barcode') }}</td>
+                                            <td class="text-muted" style="width: 160px;">Inventory Account</td>
+                                            <td class="fw-semibold text-dark">{{ $getAccountDisplay($product->inventory_account) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Valuation Method</td>
+                                            <td class="fw-semibold">{{ $product->inventory_valuation_method ?: 'FIFO' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Reorder Point</td>
+                                            <td class="fw-semibold">
+                                                @if($product->reorder_point)
+                                                    {{ number_format($product->reorder_point, 0) }} {{ $product->uom ? $product->uom->code : 'pcs' }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Opening Stock</td>
+                                            <td class="fw-semibold">
+                                                @if($product->opening_stock)
+                                                    {{ number_format($product->opening_stock, 0) }} {{ $product->uom ? $product->uom->code : 'pcs' }} 
+                                                    <span class="text-muted font-monospace fs-11">(@ ₹{{ number_format($product->opening_stock_rate, 2) }}/unit)</span>
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Tracking Mode</td>
+                                            <td>
+                                                <div class="d-flex gap-2">
+                                                    <span class="badge {{ $product->track_batch ? 'bg-soft-success text-success' : 'bg-soft-secondary text-muted' }} fs-11">
+                                                        Batch Tracking: {{ $product->track_batch ? 'Enabled' : 'Disabled' }}
+                                                    </span>
+                                                    <span class="badge {{ $product->track_serial_number ? 'bg-soft-success text-success' : 'bg-soft-secondary text-muted' }} fs-11">
+                                                        Serial Tracking: {{ $product->track_serial_number ? 'Enabled' : 'Disabled' }}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-hash me-2"></i>{{ __('inventory.barcode_identifiers') }}</h6>
+                                <table class="table table-borderless align-middle mb-4">
+                                    <tbody>
+                                        <tr>
+                                            <td class="text-muted" style="width: 160px;">{{ __('inventory.barcode') }}</td>
                                             <td class="fw-semibold font-monospace">{{ $product->barcode ?: '—' }}</td>
                                         </tr>
                                         <tr>
@@ -195,23 +261,23 @@
                                 </table>
 
                                 @if($product->description)
-                                    <h6 class="fw-bold text-primary mb-2">{{ __('inventory.description_notes') }}</h6>
+                                    <h6 class="fw-bold text-primary mb-2"><i class="feather-file-text me-2"></i>{{ __('inventory.description_notes') }}</h6>
                                     <p class="text-muted bg-light p-3 rounded" style="white-space: pre-wrap;">{{ $product->description }}</p>
                                 @endif
                             </div>
 
                             <!-- Right Column: Financial & Physical details -->
                             <div class="col-lg-6">
-                                <h6 class="fw-bold text-primary mb-3">{{ __('inventory.sales_purchase_info') }}</h6>
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-dollar-sign me-2"></i>{{ __('inventory.sales_purchase_info') }}</h6>
                                 <table class="table table-borderless align-middle mb-4">
                                     <tbody>
                                         <tr>
-                                            <td class="text-muted" style="width: 140px;">{{ __('inventory.selling_price') }}</td>
+                                            <td class="text-muted" style="width: 160px;">{{ __('inventory.selling_price') }}</td>
                                             <td class="fw-bold text-success">₹{{ number_format($product->selling_price, 2) }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.sales_account') }}</td>
-                                            <td class="fw-semibold">{{ $product->sales_account ?: '—' }}</td>
+                                            <td class="fw-semibold text-dark">{{ $getAccountDisplay($product->sales_account) }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.purchase_cost') }}</td>
@@ -219,7 +285,7 @@
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.purchase_account') }}</td>
-                                            <td class="fw-semibold">{{ $product->purchase_account ?: '—' }}</td>
+                                            <td class="fw-semibold text-dark">{{ $getAccountDisplay($product->purchase_account) }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.hsn_sac_code') }}</td>
@@ -236,11 +302,11 @@
                                     </tbody>
                                 </table>
 
-                                <h6 class="fw-bold text-primary mb-3">{{ __('inventory.dimensions_weight') }}</h6>
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-maximize me-2"></i>{{ __('inventory.dimensions_weight') }}</h6>
                                 <table class="table table-borderless align-middle mb-4">
                                     <tbody>
                                         <tr>
-                                            <td class="text-muted" style="width: 140px;">{{ __('inventory.dimensions_lwh') }}</td>
+                                            <td class="text-muted" style="width: 160px;">{{ __('inventory.dimensions_lwh') }}</td>
                                             <td class="fw-semibold">
                                                 @if($product->length || $product->width || $product->height)
                                                     {{ $product->length ?: 0 }} x {{ $product->width ?: 0 }} x {{ $product->height ?: 0 }} {{ $product->dimension_unit }}
@@ -261,40 +327,8 @@
                                         </tr>
                                     </tbody>
                                 </table>
-
-                                @if($product->item_type === 'Goods')
-                                    <h6 class="fw-bold text-primary mb-3">{{ __('inventory.tracking_control') }}</h6>
-                                    <table class="table table-borderless align-middle">
-                                        <tbody>
-                                            <tr>
-                                                <td class="text-muted" style="width: 140px;">{{ __('inventory.valuation_method') }}</td>
-                                                <td>
-                                                    <span class="badge bg-soft-primary text-primary px-2 py-0.5 text-uppercase">
-                                                        {{ $product->inventory_valuation_method ?? 'FIFO' }}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="text-muted">{{ __('inventory.track_serials') }}</td>
-                                                <td>
-                                                    <span class="badge {{ $product->track_serial_number ? 'bg-soft-success text-success' : 'bg-soft-secondary text-secondary' }} px-2 py-0.5">
-                                                        {{ $product->track_serial_number ? __('inventory.yes') : __('inventory.no') }}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="text-muted">{{ __('inventory.track_batches') }}</td>
-                                                <td>
-                                                    <span class="badge {{ $product->track_batch ? 'bg-soft-success text-success' : 'bg-soft-secondary text-secondary' }} px-2 py-0.5">
-                                                        {{ $product->track_batch ? __('inventory.yes') : __('inventory.no') }}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                @endif
+                            </div>
                         </div>
-                    </div>
                     </div> <!-- Close Tab 1: Overview Pane -->
 
                     <!-- Tab 2: Warehouse Stock -->

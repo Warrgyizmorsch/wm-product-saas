@@ -55,13 +55,13 @@
                                 <label class="fw-bold text-dark mb-2 d-block fs-13"><i class="feather-layers me-1 text-primary"></i> Customer Type (Lead Segment):</label>
                                 <div class="d-flex gap-4">
                                     <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="lead_type" id="lead_type_b2b" value="b2b" checked onchange="toggleLeadType('b2b')">
+                                        <input class="form-check-input" type="radio" name="lead_type" id="lead_type_b2b" value="b2b" {{ old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b' ? 'checked' : '' }} onchange="toggleLeadType('b2b')">
                                         <label class="form-check-label fw-bold text-dark cursor-pointer" for="lead_type_b2b">
                                             🏢 B2B (Business Client)
                                         </label>
                                     </div>
                                     <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="lead_type" id="lead_type_b2c" value="b2c" onchange="toggleLeadType('b2c')">
+                                        <input class="form-check-input" type="radio" name="lead_type" id="lead_type_b2c" value="b2c" {{ old('lead_type', $lead->lead_type) === 'b2c' ? 'checked' : '' }} onchange="toggleLeadType('b2c')">
                                         <label class="form-check-label fw-bold text-dark cursor-pointer" for="lead_type_b2c">
                                             👤 B2C (Individual Customer)
                                         </label>
@@ -73,17 +73,17 @@
                             
                             <x-ui.odoo-form-ui type="input" :label="__('crm.call_date')" name="call_date" id="call_date_picker" :value="old('call_date', $lead->call_date ? $lead->call_date->format('Y-m-d h:i A') : date('Y-m-d h:i A'))" required="true" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" id="company_name_input" :value="old('company_name', $lead->company_name)" :placeholder="__('crm.company_name')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" id="company_name_input" :value="old('company_name', $lead->company_name)" :placeholder="__('crm.company_name')" :required="old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b'" :errorText="$errors->first('company_name')" />
 
-                            <x-ui.odoo-form-ui type="input" label="GSTIN / Tax No." name="gstin" id="gstin_input" :value="old('gstin', $lead->gstin ?? '')" placeholder="e.g. 27AAAAA0000A1Z5" />
+                            <x-ui.odoo-form-ui type="input" label="GSTIN / Tax No." name="gstin" id="gstin_input" :value="old('gstin', $lead->gstin ?? '')" placeholder="e.g. 27AAAAA0000A1Z5" :errorText="$errors->first('gstin')" />
 
-                            <x-ui.odoo-form-ui type="input" label="Company Email" name="company_email" id="company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" placeholder="company@office.com" />
+                            <x-ui.odoo-form-ui type="input" label="Company Email" name="company_email" id="company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" placeholder="company@office.com" :required="old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b'" :errorText="$errors->first('company_email')" />
 
-                            <x-ui.odoo-form-ui type="input" label="Company Phone" name="company_phone" id="company_phone_input" :value="old('company_phone', $lead->company_phone ?? '')" placeholder="Company Landline / Phone" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                            <x-ui.odoo-form-ui type="input" label="Company Phone" name="company_phone" id="company_phone_input" :value="old('company_phone', $lead->company_phone ?? '')" placeholder="Company Landline / Phone" oninput="this.value = this.value.replace(/[^0-9]/g, '')" :errorText="$errors->first('company_phone')" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_person')" name="contact_person" id="contact_person_input" :value="old('contact_person', $lead->contact_person)" :placeholder="__('crm.contact_person')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_person')" name="contact_person" id="contact_person_input" :value="old('contact_person', $lead->contact_person)" :placeholder="__('crm.contact_person')" :required="old('lead_type', $lead->lead_type) === 'b2c'" :errorText="$errors->first('contact_person')" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" id="email_input" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" id="email_input" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" :required="old('lead_type', $lead->lead_type) === 'b2c'" :errorText="$errors->first('email')" />
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" id="phone_input" :value="old('phone', $lead->phone)" :placeholder="__('crm.contact_phone')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
 
@@ -679,16 +679,67 @@
             });
 
             window.toggleLeadType = function(type) {
-                var fieldNames = ['company_name', 'gstin', 'company_email', 'company_phone'];
-                fieldNames.forEach(function(name) {
+                var isB2B = (type === 'b2b');
+
+                // 1. Handle Company Fields visibility
+                var companyFieldNames = ['company_name', 'gstin', 'company_email', 'company_phone'];
+                companyFieldNames.forEach(function(name) {
                     var input = document.querySelector('[name="' + name + '"]');
                     if (input) {
                         var group = input.closest('.odoo-form-group') || input.closest('.mb-3') || input.parentElement;
                         if (group) {
-                            if (type === 'b2c') {
-                                group.style.setProperty('display', 'none', 'important');
-                            } else {
+                            if (isB2B) {
                                 group.style.setProperty('display', 'flex', 'important');
+                            } else {
+                                group.style.setProperty('display', 'none', 'important');
+                            }
+                        }
+                    }
+                });
+
+                // 2. Company Name & Company Email are REQUIRED in B2B mode, OPTIONAL in B2C mode
+                ['company_name', 'company_email'].forEach(function(fieldName) {
+                    var inputEl = document.querySelector('[name="' + fieldName + '"]');
+                    if (inputEl) {
+                        var labelEl = inputEl.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+                        if (isB2B) {
+                            inputEl.setAttribute('required', 'required');
+                            if (labelEl) {
+                                labelEl.style.setProperty('color', '#dc3545', 'important');
+                                if (!labelEl.querySelector('.text-danger')) {
+                                    labelEl.innerHTML = labelEl.innerHTML.trim() + ' <span class="text-danger">*</span>';
+                                }
+                            }
+                        } else {
+                            inputEl.removeAttribute('required');
+                            if (labelEl) {
+                                labelEl.style.removeProperty('color');
+                                var star = labelEl.querySelector('.text-danger');
+                                if (star) star.remove();
+                            }
+                        }
+                    }
+                });
+
+                // 3. Contact Person & Contact Email are REQUIRED in B2C mode, OPTIONAL in B2B mode
+                ['contact_person', 'email'].forEach(function(fieldName) {
+                    var inputEl = document.querySelector('[name="' + fieldName + '"]');
+                    if (inputEl) {
+                        var labelEl = inputEl.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+                        if (!isB2B) {
+                            inputEl.setAttribute('required', 'required');
+                            if (labelEl) {
+                                labelEl.style.setProperty('color', '#dc3545', 'important');
+                                if (!labelEl.querySelector('.text-danger')) {
+                                    labelEl.innerHTML = labelEl.innerHTML.trim() + ' <span class="text-danger">*</span>';
+                                }
+                            }
+                        } else {
+                            inputEl.removeAttribute('required');
+                            if (labelEl) {
+                                labelEl.style.removeProperty('color');
+                                var star = labelEl.querySelector('.text-danger');
+                                if (star) star.remove();
                             }
                         }
                     }
