@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('production_boms', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->string('bom_number');
+            $table->string('bom_number', 100);
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
-            $table->string('version')->default('1.0.0');
+            $table->string('version', 20)->default('1.0.0');
             $table->integer('revision')->default(0);
             $table->date('effective_date');
             $table->date('expiry_date')->nullable();
