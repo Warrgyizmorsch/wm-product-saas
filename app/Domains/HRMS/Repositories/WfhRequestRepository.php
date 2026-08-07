@@ -112,6 +112,8 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
             'duration'          => $validated['duration'] ?? 1.0,
             'notified_contacts' => $validated['notified_contacts'] ?? null,
             'reason'            => $validated['reason'],
+            'wfh_latitude'      => $validated['wfh_latitude'] ?? null,
+            'wfh_longitude'     => $validated['wfh_longitude'] ?? null,
             'attachment_path'   => $attachmentPath,
             'status'            => 'pending',
             'current_level'     => '1',

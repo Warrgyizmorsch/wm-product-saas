@@ -1332,7 +1332,7 @@
                     return duration;
                 }
 
-                @if($errors->any())
+                @if($errors->any() && !$errors->has('location') && !$errors->has('selfie'))
                     setTimeout(function() {
                         var modalEl = document.getElementById('empApplyLeaveModal');
                         if (modalEl) {

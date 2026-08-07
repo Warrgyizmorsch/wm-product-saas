@@ -20,6 +20,12 @@ class Attendance extends BaseModel
         'status',
         'total_work_hours',
         'total_break_hours',
+        'check_in_latitude',
+        'check_in_longitude',
+        'check_out_latitude',
+        'check_out_longitude',
+        'check_in_selfie_path',
+        'check_out_selfie_path',
     ];
 
     protected $casts = [
@@ -99,5 +105,10 @@ class Attendance extends BaseModel
             return 'On-Site';
         }
         return $loc;
+    }
+
+    public function locationLogs(): HasMany
+    {
+        return $this->hasMany(AttendanceLocationLog::class, 'attendance_id');
     }
 }

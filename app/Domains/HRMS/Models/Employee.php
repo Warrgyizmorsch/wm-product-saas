@@ -40,6 +40,8 @@ class Employee extends BaseModel
         'probation_end_date',
         'confirmation_date',
         'office',
+        'wfh_latitude',
+        'wfh_longitude',
         'gender',
         'marital_status',
         'diet_preference',

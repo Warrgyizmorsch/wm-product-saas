@@ -85,8 +85,8 @@ class AttendanceController extends Controller
             $statsByDate = collect();
             if ($dates->isNotEmpty()) {
                 $statsByDate = Attendance::whereIn('date', $dates->pluck('date'))
-                    ->selectRaw('date, status, COUNT(*) as count')
-                    ->groupBy('date', 'status')
+                    ->selectRaw('date, status, location_type, COUNT(*) as count')
+                    ->groupBy('date', 'status', 'location_type')
                     ->get()
                     ->groupBy(function($item) {
                         return $item->date->format('Y-m-d');
@@ -165,16 +165,71 @@ class AttendanceController extends Controller
     {
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
+            'latitude'    => 'nullable|numeric|between:-90,90',
+            'longitude'   => 'nullable|numeric|between:-180,180',
+            'selfie'      => 'nullable|string',
         ]);
 
-        $this->attendanceRepository->checkIn($validated['employee_id']);
+        try {
+            $this->attendanceRepository->checkIn(
+                $validated['employee_id'],
+                $validated['latitude'] ?? null,
+                $validated['longitude'] ?? null,
+                $request->input('selfie')
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $activeTab = 'attendance';
+            $hasWfh = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $validated['employee_id'])
+                ->where('status', 'approved')
+                ->whereDate('start_date', '<=', \Carbon\Carbon::today()->format('Y-m-d'))
+                ->whereDate('end_date', '>=', \Carbon\Carbon::today()->format('Y-m-d'))
+                ->exists();
+
+            if ($hasWfh) {
+                $activeTab = 'wfh';
+            }
+
+            return redirect()->back()
+                ->withErrors($e->validator)
+                ->withInput()
+                ->with('active_tab', $activeTab);
+        }
 
         return redirect()->back()->with('success', 'Clocked in successfully!');
     }
 
     public function checkOut(Request $request, Attendance $attendance)
     {
-        $this->attendanceRepository->checkOut($attendance->id);
+        $validated = $request->validate([
+            'latitude'    => 'nullable|numeric|between:-90,90',
+            'longitude'   => 'nullable|numeric|between:-180,180',
+            'selfie'      => 'nullable|string',
+        ]);
+
+        try {
+            $this->attendanceRepository->checkOut(
+                $attendance->id,
+                $validated['latitude'] ?? null,
+                $validated['longitude'] ?? null,
+                $request->input('selfie')
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $activeTab = 'attendance';
+            $hasWfh = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $attendance->employee_id)
+                ->where('status', 'approved')
+                ->whereDate('start_date', '<=', \Carbon\Carbon::today()->format('Y-m-d'))
+                ->whereDate('end_date', '>=', \Carbon\Carbon::today()->format('Y-m-d'))
+                ->exists();
+
+            if ($hasWfh) {
+                $activeTab = 'wfh';
+            }
+
+            return redirect()->back()
+                ->withErrors($e->validator)
+                ->withInput()
+                ->with('active_tab', $activeTab);
+        }
 
         return redirect()->back()->with('success', 'Clocked out successfully!');
     }
@@ -183,12 +238,20 @@ class AttendanceController extends Controller
     {
         $this->attendanceRepository->breakIn($attendance->id);
 
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['status' => 'success', 'message' => 'Break started successfully.']);
+        }
+
         return redirect()->back()->with('success', 'Break started successfully!');
     }
 
     public function breakOut(Request $request, Attendance $attendance)
     {
         $this->attendanceRepository->breakOut($attendance->id);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['status' => 'success', 'message' => 'Break ended successfully.']);
+        }
 
         return redirect()->back()->with('success', 'Break ended successfully!');
     }
@@ -1043,5 +1106,22 @@ class AttendanceController extends Controller
         }
 
         return redirect()->back()->with('success', $msg);
+    }
+
+    public function trackLocation(Request $request)
+    {
+        $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'latitude'    => 'required|numeric|between:-90,90',
+            'longitude'   => 'required|numeric|between:-180,180',
+        ]);
+
+        $result = $this->attendanceRepository->trackLocation(
+            (int) $validated['employee_id'],
+            (float) $validated['latitude'],
+            (float) $validated['longitude']
+        );
+
+        return response()->json($result);
     }
 }

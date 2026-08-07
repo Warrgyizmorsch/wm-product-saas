@@ -405,6 +405,26 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
                     </div>
+
+                    <div class="mb-3">
+                        <div class="card bg-light border p-3 rounded-3 shadow-sm">
+                            <div class="fw-bold text-dark fs-12 mb-2"><i class="feather-map-pin me-1 text-primary"></i> WFH Target Coordinates</div>
+                            <div class="row g-2">
+                                <div class="col-md-5">
+                                    <x-ui.odoo-form-ui type="input" label="WFH Latitude" name="wfh_latitude" id="wfh_req_latitude" placeholder="e.g. 37.774900" class="odoo-underline-input" />
+                                </div>
+                                <div class="col-md-5">
+                                    <x-ui.odoo-form-ui type="input" label="WFH Longitude" name="wfh_longitude" id="wfh_req_longitude" placeholder="e.g. -122.419400" class="odoo-underline-input" />
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btn_detect_wfh_req_loc" style="height: 31px; font-size: 11px;">
+                                        <i class="feather-compass"></i> Detect
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted fs-11 mt-1">If WFH geofencing is enabled, checking in will require matching these coordinates.</small>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer border-top py-3 d-flex justify-content-end gap-2">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.wfh.discard') }}</button>
@@ -469,3 +489,66 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const setupWfhRequestCoords = () => {
+        if (typeof $ === 'undefined') {
+            setTimeout(setupWfhRequestCoords, 100);
+            return;
+        }
+
+        $('#btn_detect_wfh_req_loc').on('click', function() {
+            const btn = $(this);
+            const originalHtml = btn.html();
+            
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser.');
+                return;
+            }
+
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Det.');
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    $('#wfh_req_latitude').val(position.coords.latitude.toFixed(8));
+                    $('#wfh_req_longitude').val(position.coords.longitude.toFixed(8));
+                    btn.prop('disabled', false).html(originalHtml);
+                },
+                function(error) {
+                    let errorMsg = 'Unable to retrieve location.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        errorMsg = 'Permission denied. Please allow location access.';
+                    }
+                    alert(errorMsg);
+                    btn.prop('disabled', false).html(originalHtml);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+    };
+
+    setupWfhRequestCoords();
+});
+</script>@endpush
+
+@push('styles')
+<style>
+    .btn-outline-primary {
+        border-color: var(--bs-primary) !important;
+        color: var(--bs-primary) !important;
+        background-color: transparent !important;
+        transition: all 0.2s ease-in-out;
+    }
+    .btn-outline-primary:hover,
+    .btn-outline-primary:focus,
+    .btn-outline-primary:active,
+    .btn-outline-primary.active,
+    .btn-outline-primary.show {
+        background-color: var(--bs-primary) !important;
+        border-color: var(--bs-primary) !important;
+        color: #ffffff !important;
+    }
+</style>
+@endpush

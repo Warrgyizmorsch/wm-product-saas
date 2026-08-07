@@ -8,9 +8,9 @@ interface AttendanceRepositoryInterface
 {
     public function getEmployeeTodayAttendance(int $employeeId): ?Attendance;
 
-    public function checkIn(int $employeeId): Attendance;
+    public function checkIn(int $employeeId, ?float $latitude = null, ?float $longitude = null, ?string $selfiePath = null): Attendance;
 
-    public function checkOut(int $attendanceId): Attendance;
+    public function checkOut(int $attendanceId, ?float $latitude = null, ?float $longitude = null, ?string $selfiePath = null): Attendance;
 
     public function breakIn(int $attendanceId);
 
@@ -19,4 +19,6 @@ interface AttendanceRepositoryInterface
     public function getEmployeeAttendanceLogs(int $employeeId);
 
     public function getAllAttendanceLogs(array $filters);
+
+    public function trackLocation(int $employeeId, float $latitude, float $longitude): array;
 }

@@ -80,6 +80,7 @@ Route::prefix('hrms')
             Route::get('/employee/{employee}', [AttendanceController::class, 'getEmployeeLogs'])->name('attendance.employee-logs');
             Route::get('/date/{date}', [AttendanceController::class, 'getDateLogs'])->name('attendance.date-logs');
             Route::delete('/date/{date}', [AttendanceController::class, 'destroyDate'])->name('attendance.destroy-date');
+            Route::post('/track-location', [AttendanceController::class, 'trackLocation'])->name('attendance.track-location');
             
             // Import / Export
             Route::post('/import', [AttendanceController::class, 'import'])->name('attendance.import');

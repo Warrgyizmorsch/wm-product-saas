@@ -17,9 +17,12 @@ class AttendanceRule extends BaseModel
         // Office Settings
         'office_biometric',
         'office_web',
+        'office_geofence',
         'office_latitude',
         'office_longitude',
         'office_radius',
+        'office_tracking',
+        'office_tracking_minutes',
 
         // WFH Settings
         'wfh_location',
@@ -27,6 +30,7 @@ class AttendanceRule extends BaseModel
         'wfh_geofence',
         'wfh_tracking',
         'wfh_tracking_meters',
+        'wfh_tracking_minutes',
 
         // On-Site Settings
         'site_location',
@@ -34,6 +38,7 @@ class AttendanceRule extends BaseModel
         'site_geofence',
         'site_tracking',
         'site_tracking_meters',
+        'site_tracking_minutes',
         
         'status',
     ];
@@ -41,17 +46,22 @@ class AttendanceRule extends BaseModel
     protected $casts = [
         'office_biometric' => 'boolean',
         'office_web' => 'boolean',
+        'office_geofence' => 'boolean',
         'office_radius' => 'integer',
+        'office_tracking' => 'boolean',
+        'office_tracking_minutes' => 'integer',
         'wfh_location' => 'boolean',
         'wfh_selfie' => 'boolean',
         'wfh_geofence' => 'boolean',
         'wfh_tracking' => 'boolean',
         'wfh_tracking_meters' => 'integer',
+        'wfh_tracking_minutes' => 'integer',
         'site_location' => 'boolean',
         'site_selfie' => 'boolean',
         'site_geofence' => 'boolean',
         'site_tracking' => 'boolean',
         'site_tracking_meters' => 'integer',
+        'site_tracking_minutes' => 'integer',
         'status' => 'boolean',
     ];
 

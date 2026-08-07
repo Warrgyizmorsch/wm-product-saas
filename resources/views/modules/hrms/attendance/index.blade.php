@@ -171,7 +171,9 @@
                                     $dayStats = $statsByDate->get($dStr, collect());
                                     $presentCount = $dayStats->where('status', 'present')->sum('count');
                                     $lateCount = $dayStats->where('status', 'late')->sum('count');
-                                    $wfhCount = $dayStats->where('status', 'wfh')->sum('count');
+                                    $wfhCount = $dayStats->filter(function($item) {
+                                        return $item->status === 'wfh' || strtolower($item->location_type) === 'wfh';
+                                    })->sum('count');
                                     $absentCount = $dayStats->where('status', 'absent')->sum('count');
                                     $leaveCount = $dayStats->where('status', 'on_leave')->sum('count');
                                     $overtimeCount = \App\Domains\HRMS\Models\OvertimeRequest::where('date', $dStr)->where('status', 'approved')->count();

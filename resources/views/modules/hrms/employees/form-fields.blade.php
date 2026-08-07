@@ -211,6 +211,25 @@
                     <option value="onsite" @selected($fieldValue('office') === 'onsite')>On-Site (Client/Project)</option>
                 </x-ui.odoo-form-ui>
             </div>
+            <!-- WFH Coordinates -->
+            <div class="col-12" id="{{ $prefix }}_wfh_coordinates_section" style="display: {{ $fieldValue('office') === 'wfh' ? 'block' : 'none' }};">
+                <div class="card bg-light border p-3 rounded-3 mb-1 shadow-sm">
+                    <div class="fw-bold text-dark fs-12 mb-2"><i class="feather-map-pin me-1 text-primary"></i> WFH Geofence Coordinates</div>
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <x-ui.odoo-form-ui type="input" label="WFH Latitude" name="wfh_latitude" id="{{ $prefix }}_wfh_latitude" :value="$fieldValue('wfh_latitude', $isEdit && isset($employee) ? $employee->wfh_latitude : '')" placeholder="e.g. 37.774900" :errorText="$errors->first('wfh_latitude')" />
+                        </div>
+                        <div class="col-md-5">
+                            <x-ui.odoo-form-ui type="input" label="WFH Longitude" name="wfh_longitude" id="{{ $prefix }}_wfh_longitude" :value="$fieldValue('wfh_longitude', $isEdit && isset($employee) ? $employee->wfh_longitude : '')" placeholder="e.g. -122.419400" :errorText="$errors->first('wfh_longitude')" />
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="button" class="btn btn-outline-primary btn-sm w-100" id="{{ $prefix }}_btn_detect_wfh_loc" style="height: 31px; font-size: 11px;">
+                                <i class="feather-compass"></i> Detect
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="employee-modal-section-title">{{ __('hrms.employees.contact_compliance') }}</div>
@@ -310,3 +329,74 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // We use a self-executing or delayed block to ensure jQuery and DOM are ready
+    const setupCoordinatesToggle = () => {
+        if (typeof $ === 'undefined') {
+            setTimeout(setupCoordinatesToggle, 100);
+            return;
+        }
+
+        const prefix = "{{ $prefix }}";
+        const officeSelect = $('#' + prefix + '_office');
+        const coordSection = $('#' + prefix + '_wfh_coordinates_section');
+        
+        if (!officeSelect.length) return;
+
+        // Toggle handler
+        const toggleSection = () => {
+            if (officeSelect.val() === 'wfh') {
+                coordSection.slideDown();
+            } else {
+                coordSection.slideUp();
+                // Clear inputs if switching away from WFH to avoid stale coordinates
+                $('#' + prefix + '_wfh_latitude').val('');
+                $('#' + prefix + '_wfh_longitude').val('');
+            }
+        };
+
+        officeSelect.on('change', toggleSection);
+
+        // Initial setup
+        if (officeSelect.val() === 'wfh') {
+            coordSection.show();
+        } else {
+            coordSection.hide();
+        }
+
+        // Location Detection handler
+        $('#' + prefix + '_btn_detect_wfh_loc').on('click', function() {
+            const btn = $(this);
+            const originalHtml = btn.html();
+            
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser.');
+                return;
+            }
+
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Det.');
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    $('#' + prefix + '_wfh_latitude').val(position.coords.latitude.toFixed(8));
+                    $('#' + prefix + '_wfh_longitude').val(position.coords.longitude.toFixed(8));
+                    btn.prop('disabled', false).html(originalHtml);
+                },
+                function(error) {
+                    let errorMsg = 'Unable to retrieve location.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        errorMsg = 'Permission denied. Please allow location access.';
+                    }
+                    alert(errorMsg);
+                    btn.prop('disabled', false).html(originalHtml);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+    };
+
+    setupCoordinatesToggle();
+});
+</script>

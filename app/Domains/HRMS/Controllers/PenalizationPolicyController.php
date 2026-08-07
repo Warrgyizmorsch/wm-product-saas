@@ -179,27 +179,35 @@ class PenalizationPolicyController extends Controller
     public function saveAttendanceRule(Request $request)
     {
         $validated = $request->validate([
-            'company_id' => 'required|integer|exists:companies,id',
-            'business_unit_id' => 'nullable|integer|exists:business_units,id',
-            'branch_id' => 'nullable|integer|exists:branches,id',
-            'office_latitude' => 'nullable|string',
-            'office_longitude' => 'nullable|string',
-            'office_radius' => 'required|integer|min:1',
-            'wfh_tracking_meters' => 'required|integer|min:1',
-            'site_tracking_meters' => 'required|integer|min:1',
-            'status' => 'required',
+            'company_id'             => 'required|integer|exists:companies,id',
+            'business_unit_id'       => 'nullable|integer|exists:business_units,id',
+            'branch_id'              => 'nullable|integer|exists:branches,id',
+            'office_latitude'        => 'nullable|string',
+            'office_longitude'       => 'nullable|string',
+            'office_radius'          => 'required|integer|min:1',
+            'office_tracking_minutes'=> 'nullable|integer|min:1|max:120',
+            'wfh_tracking_meters'    => 'required|integer|min:1',
+            'wfh_tracking_minutes'   => 'nullable|integer|min:1|max:120',
+            'site_tracking_meters'   => 'required|integer|min:1',
+            'site_tracking_minutes'  => 'nullable|integer|min:1|max:120',
+            'status'                 => 'required',
         ]);
 
-        $validated['office_biometric'] = $request->has('office_biometric');
-        $validated['office_web'] = $request->has('office_web');
-        $validated['wfh_location'] = $request->has('wfh_location');
-        $validated['wfh_selfie'] = $request->has('wfh_selfie');
-        $validated['wfh_geofence'] = $request->has('wfh_geofence');
-        $validated['wfh_tracking'] = $request->has('wfh_tracking');
-        $validated['site_location'] = $request->has('site_location');
-        $validated['site_selfie'] = $request->has('site_selfie');
-        $validated['site_geofence'] = false;
-        $validated['site_tracking'] = $request->has('site_tracking');
+        $validated['office_biometric']       = $request->has('office_biometric');
+        $validated['office_web']             = $request->has('office_web');
+        $validated['office_geofence']        = $request->has('office_geofence');
+        $validated['office_tracking']        = $request->has('office_tracking');
+        $validated['office_tracking_minutes']= $request->input('office_tracking_minutes', 15);
+        $validated['wfh_location']           = $request->has('wfh_location');
+        $validated['wfh_selfie']             = $request->has('wfh_selfie');
+        $validated['wfh_geofence']           = $request->has('wfh_geofence');
+        $validated['wfh_tracking']           = $request->has('wfh_tracking');
+        $validated['wfh_tracking_minutes']   = $request->input('wfh_tracking_minutes', 15);
+        $validated['site_location']          = $request->has('site_location');
+        $validated['site_selfie']            = $request->has('site_selfie');
+        $validated['site_geofence']          = false;
+        $validated['site_tracking']          = $request->has('site_tracking');
+        $validated['site_tracking_minutes']  = $request->input('site_tracking_minutes', 15);
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 

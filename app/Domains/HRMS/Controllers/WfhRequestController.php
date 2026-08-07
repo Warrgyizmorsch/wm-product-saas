@@ -35,6 +35,8 @@ class WfhRequestController extends Controller
             'start_date_type'     => 'required|string|in:full_day,first_half,second_half',
             'end_date_type'       => 'required|string|in:full_day,first_half,second_half',
             'reason'              => 'required|string|max:1000',
+            'wfh_latitude'        => 'nullable|numeric|between:-90,90',
+            'wfh_longitude'       => 'nullable|numeric|between:-180,180',
             'attachment'          => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
             'notified_contacts'   => 'nullable|array',
             'notified_contacts.*' => 'exists:employees,id',

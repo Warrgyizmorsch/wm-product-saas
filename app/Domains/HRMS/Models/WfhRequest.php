@@ -21,6 +21,8 @@ class WfhRequest extends BaseModel
         'end_date_type',
         'notified_contacts',
         'reason',
+        'wfh_latitude',
+        'wfh_longitude',
         'status',
         'current_level',
         'approved_by',
