@@ -74,7 +74,6 @@
             ]],
         ],
         __('ui.production') => [
-            // ── 1. Production Masters (Setup & Configuration) ──────────────────
             ['label' => 'Production Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
                 ['label' => __('production.bom'),          'route' => 'production.boms.index'],
                 ['label' => __('production.routing'),       'route' => 'production.routing.index'],
@@ -85,20 +84,12 @@
                 ['label' => __('production.shifts_sidebar'),    'route' => 'production.shifts.index'],
                 ['label' => __('production.calendars_sidebar'), 'route' => 'production.calendars.index'],
             ]],
-
-            // ── 2. Production Orders (Step 1: Create & Release) ───────────────
             ['label' => 'Production Orders', 'icon' => 'feather-play-circle', 'route' => 'production.orders.index'],
-
-            // ── 3. Scheduling (Step 2: Plan Operations) ───────────────────────
             ['label' => 'Scheduling', 'icon' => 'feather-calendar', 'url' => '#', 'children' => [
                 ['label' => 'Production Schedules', 'route' => 'production.schedules.index'],
                 ['label' => 'Calendar View',         'route' => 'production.schedules.calendar'],
             ]],
-
-            // ── 4. Work-in-Progress (Step 3: Track Execution) ─────────────────
             ['label' => 'Work-in-Progress (WIP)', 'icon' => 'feather-layers', 'route' => 'production.wip.index'],
-
-            // ── 5. Shop Floor — MES (Step 4: Execute on Floor) ───────────────
             ['label' => 'Shop Floor (MES)', 'icon' => 'feather-activity', 'url' => '#', 'children' => [
                 ['label' => 'Shop Floor Dashboard',   'route' => 'production.mes.dashboard'],
                 ['label' => 'MES Operator Console',   'route' => 'production.mes.operator.dashboard'],
@@ -106,8 +97,6 @@
                 ['label' => 'Machine Monitor',        'route' => 'production.mes.machines.index'],
                 ['label' => 'Barcode Scanner',        'route' => 'production.mes.scanner.index'],
             ]],
-
-            // ── 6. Quality Management ──────────────────────────────────────────
             ['label' => 'Quality Management', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quality Dashboard',    'route' => 'production.quality.dashboard'],
                 ['label' => 'Quality Inspections',  'route' => 'production.inspections.index'],
@@ -116,8 +105,6 @@
                 ['label' => 'Rework Orders',        'route' => 'production.rework.index'],
                 ['label' => 'Scrap Disposals',      'route' => 'production.scrap.index'],
             ]],
-
-            // ── 7. Manufacturing Intelligence ──────────────────────────────────
             ['label' => 'Manufacturing Intelligence', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => [
                 ['label' => 'Executive Dashboard',    'route' => 'production.intelligence.dashboard'],
                 ['label' => 'Live Andon Board',       'route' => 'production.intelligence.andon'],
@@ -179,15 +166,34 @@
         <div class="navbar-content">
             <ul class="nxl-navbar">
                 @foreach ($modules as $caption => $items)
-                    <li class="nxl-item nxl-caption">
-                        <label>{{ $caption }}</label>
+                    @php $modSlug = Str::slug($caption); @endphp
+                    <li class="nxl-item nxl-caption premium-module-header" data-module="{{ $modSlug }}" onclick="toggleModuleSidebar('{{ $modSlug }}', this)">
+                        <div class="premium-module-header-content">
+                            <span class="premium-module-header-title">{{ strtoupper($caption) }}</span>
+                            <span class="premium-module-accordion-btn">
+                                <span class="premium-module-arrow-container">
+                                    <i class="feather-chevron-right premium-module-arrow"></i>
+                                </span>
+                            </span>
+                        </div>
                     </li>
                     @foreach ($items as $item)
                         @php
-                            $href = isset($item['route']) ? route($item['route']) : $item['url'];
-                            $hasChildren = isset($item['children']);
+                            $href = isset($item['route']) ? route($item['route']) : ($item['url'] ?? '#');
+                            $hasChildren = isset($item['children']) && !empty($item['children']);
+                            $isItemActive = isset($item['route']) && request()->routeIs($item['route']);
+                            $hasActiveChild = false;
+
+                            if ($hasChildren) {
+                                foreach ($item['children'] as $c) {
+                                    if (is_array($c) && isset($c['route']) && request()->routeIs($c['route'])) {
+                                        $hasActiveChild = true;
+                                        break;
+                                    }
+                                }
+                            }
                         @endphp
-                        <li class="nxl-item {{ $hasChildren ? 'nxl-hasmenu' : '' }} {{ isset($item['route']) && request()->routeIs($item['route']) ? 'active' : '' }}">
+                        <li class="nxl-item {{ $hasChildren ? 'nxl-hasmenu' : '' }} {{ ($isItemActive || $hasActiveChild) ? 'active nxl-trigger' : '' }} premium-module-child module-{{ $modSlug }}">
                             <a href="{{ $hasChildren ? 'javascript:void(0);' : $href }}" class="nxl-link">
                                 <span class="nxl-micon"><i class="{{ $item['icon'] }}"></i></span>
                                 <span class="nxl-mtext">{{ $item['label'] }}</span>
@@ -201,8 +207,9 @@
                                         @php
                                             $child = is_array($child) ? $child : ['label' => $child];
                                             $childHref = isset($child['route']) ? route($child['route']) : ($child['url'] ?? '#');
+                                            $childActive = isset($child['route']) && request()->routeIs($child['route']);
                                         @endphp
-                                        <li class="nxl-item">
+                                        <li class="nxl-item {{ $childActive ? 'active' : '' }}">
                                             <a class="nxl-link" href="{{ $childHref }}">{{ $child['label'] }}</a>
                                         </li>
                                     @endforeach
@@ -223,3 +230,278 @@
         </div>
     </div>
 </nav>
+
+{{-- PREMIUM SIDEBAR ACCORDION & TIMELINE DESIGN SYSTEM --}}
+<style>
+:root {
+    --sidebar-primary: var(--bs-primary, #3B82F6);
+    --sidebar-primary-hover: var(--bs-primary, #2563EB);
+    --sidebar-text: #475569;
+    --sidebar-heading: #64748b;
+    --sidebar-muted: #94a3b8;
+}
+
+.nxl-navigation .nxl-navbar a {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    border: 1px solid transparent;
+}
+
+/* Hover Link */
+.nxl-navigation .nxl-navbar li:hover > a {
+    color: var(--bs-primary) !important;
+    transform: translateX(4px);
+    background: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.08) !important;
+    border-radius: 10px;
+}
+
+/* Hover Icon & Arrow */
+.nxl-navigation .nxl-navbar li:hover > a .nxl-micon i,
+.nxl-navigation .nxl-navbar li:hover > a .nxl-arrow i {
+    color: var(--bs-primary) !important;
+    transition: color 0.25s ease;
+}
+
+/* Active Main Item Link (Soft Light Primary Background + Primary Text) */
+.nxl-navigation .nxl-navbar > li.active > a,
+.nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a {
+    background: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.12) !important;
+    color: var(--bs-primary) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(var(--bs-primary-rgb, 59, 130, 246), 0.22) !important;
+    box-shadow: 0 2px 8px rgba(var(--bs-primary-rgb, 59, 130, 246), 0.08) !important;
+}
+
+/* Active Main Item Icon, Arrow, and Text */
+.nxl-navigation .nxl-navbar > li.active > a .nxl-micon,
+.nxl-navigation .nxl-navbar > li.active > a .nxl-micon i,
+.nxl-navigation .nxl-navbar > li.active > a .nxl-mtext,
+.nxl-navigation .nxl-navbar > li.active > a .nxl-arrow,
+.nxl-navigation .nxl-navbar > li.active > a .nxl-arrow i,
+.nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-micon,
+.nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-micon i,
+.nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-mtext,
+.nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-arrow i {
+    color: var(--bs-primary) !important;
+    font-weight: 700 !important;
+}
+
+/* Module Headers */
+.premium-module-header {
+    cursor: pointer;
+    user-select: none;
+    padding: 22px 24px 10px 24px !important;
+    background: transparent !important;
+    border: none !important;
+    display: block !important;
+}
+
+.premium-module-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.premium-module-header-title {
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--sidebar-heading) !important;
+    transition: color 0.25s ease;
+}
+
+.premium-module-header:hover .premium-module-header-title {
+    color: var(--bs-primary) !important;
+}
+
+.premium-module-accordion-btn {
+    color: var(--sidebar-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s ease;
+}
+
+.premium-module-header:hover .premium-module-accordion-btn {
+    color: var(--bs-primary);
+}
+
+/* Chevron */
+.premium-module-arrow-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.premium-module-arrow {
+    font-size: 13px !important;
+}
+
+.premium-module-header .premium-module-arrow-container {
+    transform: rotate(90deg) !important;
+}
+
+.premium-module-header.collapsed .premium-module-arrow-container {
+    transform: rotate(0deg) !important;
+}
+
+/* Timeline */
+.nxl-navigation .nxl-submenu {
+    position: relative;
+    padding-left: 20px !important;
+    margin-left: 32px !important;
+    margin-top: 6px !important;
+    margin-bottom: 8px !important;
+    border-left: 1.5px dashed rgba(var(--bs-primary-rgb, 59, 130, 246), 0.4) !important;
+    transition: border-color 0.3s ease;
+    background: transparent !important;
+}
+
+.nxl-navigation .nxl-navbar li:hover > .nxl-submenu {
+    border-left-color: var(--bs-primary) !important;
+}
+
+.nxl-navigation .nxl-navbar li.active > .nxl-submenu {
+    border-left-color: var(--bs-primary) !important;
+}
+
+/* Timeline Nodes */
+.nxl-navigation .nxl-submenu li {
+    position: relative;
+    list-style: none !important;
+}
+
+.nxl-navigation .nxl-submenu li::before {
+    content: "";
+    position: absolute;
+    left: -21px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.45);
+    border: 1.5px solid #fff;
+    transition: all 0.25s ease;
+    z-index: 5;
+}
+
+.nxl-navigation .nxl-submenu li:hover::before {
+    background-color: var(--bs-primary) !important;
+    transform: translateY(-50%) scale(1.5);
+    box-shadow: 0 0 10px var(--bs-primary);
+}
+
+.nxl-navigation .nxl-submenu li.active::before {
+    background-color: var(--bs-primary) !important;
+    transform: translateY(-50%) scale(1.5) !important;
+    box-shadow: 0 0 8px rgba(var(--bs-primary-rgb, 59, 130, 246), 0.6) !important;
+}
+
+.nxl-navigation .nxl-submenu li a::before {
+    display: none !important;
+}
+
+/* Submenu Links */
+.nxl-navigation .nxl-submenu .nxl-link {
+    transition: all 0.2s ease !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--sidebar-text) !important;
+    padding: 8px 10px !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+.nxl-navigation .nxl-submenu .nxl-link:hover {
+    padding-left: 12px !important;
+    color: var(--bs-primary) !important;
+    transform: none !important;
+}
+
+/* Active Submenu Item (Soft Light Primary Background + Primary Text) */
+.nxl-navigation .nxl-submenu li.active > .nxl-link {
+    background: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.15) !important;
+    color: var(--bs-primary) !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    padding-left: 12px !important;
+    border: 1px solid rgba(var(--bs-primary-rgb, 59, 130, 246), 0.22) !important;
+}
+
+/* Nested Submenus */
+.nxl-navigation .nxl-submenu .nxl-submenu {
+    border-left: 1.5px dashed var(--sidebar-timeline) !important;
+    padding-left: 15px !important;
+    margin-left: 15px !important;
+}
+
+.nxl-navigation .navbar-content .nxl-submenu .nxl-link {
+    margin-left: 0 !important;
+}
+</style>
+
+{{-- Accordion Expanded State Persistence Script --}}
+<script>
+function toggleModuleSidebar(moduleName, headerEl) {
+    const isCollapsed = headerEl.classList.contains('collapsed');
+    
+    if (typeof jQuery !== 'undefined') {
+        const $ = jQuery;
+        const $header = $(headerEl);
+        const $children = $('.premium-module-child.module-' + moduleName);
+        
+        if (isCollapsed) {
+            $header.removeClass('collapsed');
+            $children.stop(true, true).slideDown(250);
+            localStorage.setItem('wm_sidebar_module_' + moduleName, 'expanded');
+        } else {
+            $header.addClass('collapsed');
+            $children.stop(true, true).slideUp(250);
+            localStorage.setItem('wm_sidebar_module_' + moduleName, 'collapsed');
+        }
+    } else {
+        const children = document.querySelectorAll('.premium-module-child.module-' + moduleName);
+        if (isCollapsed) {
+            headerEl.classList.remove('collapsed');
+            children.forEach(c => c.style.display = 'block');
+            localStorage.setItem('wm_sidebar_module_' + moduleName, 'expanded');
+        } else {
+            headerEl.classList.add('collapsed');
+            children.forEach(c => c.style.display = 'none');
+            localStorage.setItem('wm_sidebar_module_' + moduleName, 'collapsed');
+        }
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    const headers = document.querySelectorAll('.premium-module-header');
+    
+    headers.forEach(function (header) {
+        const moduleName = header.getAttribute('data-module');
+        const savedState = localStorage.getItem('wm_sidebar_module_' + moduleName);
+        const children = document.querySelectorAll('.premium-module-child.module-' + moduleName);
+        
+        let hasActiveChild = false;
+        children.forEach(function (child) {
+            if (child.classList.contains('active') || child.querySelector('.active') !== null) {
+                hasActiveChild = true;
+            }
+        });
+        
+        if (hasActiveChild) {
+            header.classList.remove('collapsed');
+            children.forEach(c => c.style.display = 'block');
+            localStorage.setItem('wm_sidebar_module_' + moduleName, 'expanded');
+        } else if (savedState === 'collapsed') {
+            header.classList.add('collapsed');
+            children.forEach(c => c.style.display = 'none');
+        } else {
+            header.classList.remove('collapsed');
+            children.forEach(c => c.style.display = 'block');
+        }
+    });
+});
+</script>
