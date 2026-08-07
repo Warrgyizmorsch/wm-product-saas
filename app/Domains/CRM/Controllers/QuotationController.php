@@ -5,6 +5,8 @@ namespace App\Domains\CRM\Controllers;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\Customer;
+use App\Domains\CRM\Models\CrmAccount;
+use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Repositories\QuotationRepository;
 use App\Domains\CRM\Services\QuotationService;
 use App\Domains\Inventory\Models\Product;
@@ -44,9 +46,39 @@ class QuotationController extends Controller
         return view('modules.crm.quotations.detail-partial', compact('quotation'));
     }
 
-    public function create()
+    public function create(Request $request): View
     {
-        abort(404);
+        $this->authorize('create', Quotation::class);
+        $tenantId = tenant_id() ?? 1;
+
+        $dealId = $request->input('deal_id');
+        $leadId = $request->input('lead_id');
+        $accountId = $request->input('account_id');
+
+        $selectedDeal = $dealId ? CrmDeal::with(['account', 'contact'])->find($dealId) : null;
+        $selectedLead = $leadId ? Lead::find($leadId) : null;
+        $selectedAccount = $accountId ? CrmAccount::find($accountId) : ($selectedDeal ? $selectedDeal->account : null);
+
+        if (!$selectedLead && $selectedDeal) {
+            $selectedLead = Lead::where('crm_deal_id', $selectedDeal->id)->first();
+            if (!$selectedLead && $selectedDeal->crm_account_id) {
+                $selectedLead = Lead::where('crm_account_id', $selectedDeal->crm_account_id)->latest()->first();
+            }
+        } elseif (!$selectedLead && $selectedAccount) {
+            $selectedLead = Lead::where('crm_account_id', $selectedAccount->id)->latest()->first();
+        }
+
+        $accounts = CrmAccount::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $deals = CrmDeal::where('tenant_id', $tenantId)->orderBy('title')->get();
+        $leads = Lead::where('tenant_id', $tenantId)->orderBy('id', 'desc')->get();
+        $users = User::orderBy('name')->get();
+        $products = Product::sellable()->with('parent')->orderBy('name')->get();
+
+        $nextQuotationNumber = $this->quotationService->getNextQuotationNumber();
+
+        return view('modules.crm.quotations.create', compact(
+            'selectedDeal', 'selectedLead', 'selectedAccount', 'accounts', 'deals', 'leads', 'users', 'products', 'nextQuotationNumber'
+        ));
     }
 
     public function store(Request $request): RedirectResponse
@@ -55,6 +87,8 @@ class QuotationController extends Controller
 
         $validated = $request->validate([
             'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
+            'crm_account_id'      => ['nullable', 'integer', 'exists:crm_accounts,id'],
+            'crm_deal_id'         => ['nullable', 'integer', 'exists:crm_deals,id'],
             'sales_person_id'     => ['nullable', 'exists:users,id'],
             'quotation_number'    => ['required', 'string', 'max:255'],
             'quotation_date'      => ['required', 'date'],
@@ -113,9 +147,23 @@ class QuotationController extends Controller
         return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
     }
 
-    public function edit(int $id)
+    public function edit(int $id): View
     {
-        abort(404);
+        $quotation = $this->quotationRepo->find($id);
+        if (!$quotation) abort(404, 'Quotation not found.');
+        $this->authorize('update', $quotation);
+
+        $quotation->load(['items.product', 'deal', 'account', 'lead']);
+
+        $nextRevisionNumber = ($quotation->revision_number ?? 0) + 1;
+        $rawNum = $quotation->getRawOriginal('quotation_number');
+        $baseNum = explode('-R', $rawNum)[0];
+        $newQuotationNumber = $baseNum . '-R' . $nextRevisionNumber;
+
+        $products = Product::sellable()->with('parent')->orderBy('name')->get();
+        $users = User::orderBy('name')->get();
+
+        return view('modules.crm.quotations.edit', compact('quotation', 'nextRevisionNumber', 'newQuotationNumber', 'products', 'users'));
     }
 
     public function update(Request $request, int $id): RedirectResponse
@@ -158,6 +206,18 @@ class QuotationController extends Controller
             $validated['lead_id'] = $quotation->lead_id;
         }
 
+        if ($request->filled('crm_deal_id')) {
+            $validated['crm_deal_id'] = (int) $request->input('crm_deal_id');
+        } elseif ($quotation->crm_deal_id) {
+            $validated['crm_deal_id'] = $quotation->crm_deal_id;
+        }
+
+        if ($request->filled('crm_account_id')) {
+            $validated['crm_account_id'] = (int) $request->input('crm_account_id');
+        } elseif ($quotation->crm_account_id) {
+            $validated['crm_account_id'] = $quotation->crm_account_id;
+        }
+
         $newQuotation = $this->quotationService->update($quotation, $validated, $request->input('items', []));
         $leadId = $validated['lead_id'] ?? null;
         $this->quotationService->handleQuotationStatusChange($newQuotation, $validated['status'], $leadId);
@@ -181,7 +241,7 @@ class QuotationController extends Controller
 
         $newStatus = $validated['status'];
         if ($newStatus !== $quotation->status) {
-            if (in_array($newStatus, ['Quotation Sent', 'Accepted']) && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Accepted'])) {
+            if (in_array($newStatus, ['Quotation Sent', 'Sent', 'Accepted']) && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted'])) {
                 return back()->withErrors(['status' => 'A quotation must be Approved before it can be Sent or Accepted.']);
             }
             if ($newStatus === 'Approved' && $quotation->status !== 'Approved') {

@@ -53,6 +53,25 @@
             
             <!-- Right-side Action Buttons -->
             <div class="d-flex align-items-center gap-2 flex-wrap">
+                @if($lead->crm_account_id)
+                    <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2.5 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                        <i class="feather-briefcase me-1"></i> View Account
+                    </a>
+                    @if($lead->crm_deal_id)
+                        <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="btn btn-xs btn-soft-success fw-bold py-1 px-2.5 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                            <i class="feather-git-branch me-1"></i> View Deal
+                        </a>
+                    @endif
+                @elseif($lead->status === 'Qualified')
+                    <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST" class="d-inline m-0 p-0">
+                        @csrf
+                        @method('PATCH')
+                        <x-ui.button type="submit" variant="warning" size="xs" icon="feather-user-check" class="text-dark fw-bold py-1 px-2.5 rounded shadow-sm">
+                            CONVERT TO ACCOUNT & DEAL
+                        </x-ui.button>
+                    </form>
+                @endif
+
                 <!-- Send Email Button -->
                 @if ($lead->email)
                     <a href="mailto:{{ $lead->email }}" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-sm d-inline-flex align-items-center text-white" style="background-color: #1e40af; border-color: #1e40af; font-family: 'Inter', sans-serif; font-size: 11px;">
@@ -501,14 +520,6 @@
                                     <div class="card-body p-3">
                                         <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
                                             <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="font-family: 'Inter', sans-serif; border-bottom: none;">{{ __('crm.lead_information') }}</h5>
-                                            @if($lead->status === 'Qualified' && !$activeQuotation && !request()->has('create_quotation'))
-                                                <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline m-0 p-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-xs btn-success text-white fw-bold px-2 py-0.5 d-inline-flex align-items-center shadow-sm text-uppercase" style="font-size: 10px; border-radius: 3px; background-color: #16a34a; border-color: #16a34a; white-space: nowrap; line-height: 1.4;">
-                                                        <i class="feather-shuffle me-1 fs-9"></i> {{ __('crm.convert_to_quotation') }}
-                                                    </button>
-                                                </form>
-                                            @endif
                                         </div>
                                         <div class="row g-0">
                                             <div class="col-md-6 pe-md-4">

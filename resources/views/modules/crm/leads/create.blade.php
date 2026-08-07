@@ -50,17 +50,42 @@
                     <div class="row g-4 mb-4 fs-13 text-dark">
                         <!-- Left Column: Scheduling, Company, Contact, and Address Details -->
                         <div class="col-lg-6 border-end">
+                            <!-- B2B vs B2C Segment Toggle -->
+                            <div class="mb-4 p-3 bg-soft-primary rounded-3 border border-primary-subtle shadow-2xs">
+                                <label class="fw-bold text-dark mb-2 d-block fs-13"><i class="feather-layers me-1 text-primary"></i> Customer Type (Lead Segment):</label>
+                                <div class="d-flex gap-4">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="lead_type" id="lead_type_b2b" value="b2b" checked onchange="toggleLeadType('b2b')">
+                                        <label class="form-check-label fw-bold text-dark cursor-pointer" for="lead_type_b2b">
+                                            🏢 B2B (Business Client)
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="lead_type" id="lead_type_b2c" value="b2c" onchange="toggleLeadType('b2c')">
+                                        <label class="form-check-label fw-bold text-dark cursor-pointer" for="lead_type_b2c">
+                                            👤 B2C (Individual Customer)
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
                             <h6 class="fw-bold text-primary mb-3">{{ __('crm.call_contact_information') }}</h6>
                             
                             <x-ui.odoo-form-ui type="input" :label="__('crm.call_date')" name="call_date" id="call_date_picker" :value="old('call_date', $lead->call_date ? $lead->call_date->format('Y-m-d h:i A') : date('Y-m-d h:i A'))" required="true" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" :value="old('company_name', $lead->company_name)" required="true" :placeholder="__('crm.company_name')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" id="company_name_input" :value="old('company_name', $lead->company_name)" :placeholder="__('crm.company_name')" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_person')" name="contact_person" :value="old('contact_person', $lead->contact_person)" :placeholder="__('crm.contact_person')" />
+                            <x-ui.odoo-form-ui type="input" label="GSTIN / Tax No." name="gstin" id="gstin_input" :value="old('gstin', $lead->gstin ?? '')" placeholder="e.g. 27AAAAA0000A1Z5" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" />
+                            <x-ui.odoo-form-ui type="input" label="Company Email" name="company_email" id="company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" placeholder="company@office.com" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $lead->phone)" :placeholder="__('crm.contact_phone')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                            <x-ui.odoo-form-ui type="input" label="Company Phone" name="company_phone" id="company_phone_input" :value="old('company_phone', $lead->company_phone ?? '')" placeholder="Company Landline / Phone" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_person')" name="contact_person" id="contact_person_input" :value="old('contact_person', $lead->contact_person)" :placeholder="__('crm.contact_person')" />
+
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" id="email_input" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" />
+
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" id="phone_input" :value="old('phone', $lead->phone)" :placeholder="__('crm.contact_phone')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('crm.lead_owner')" name="lead_owner_id">
                                 <option value="">{{ __('crm.select_owner_unassigned') }}</option>
@@ -551,7 +576,182 @@
                 $(this).closest('.addl-contact-card').remove();
                 updateContactNumbersAndNames();
             });
+
+            // --- B2B vs B2C Context-Aware & Dismissal-Smart Duplicate Check Engine ---
+            const dismissedMatchKeys = new Set();
+            let currentActiveMatchKey = null;
+
+            function performDuplicateCheck(blurredFieldName) {
+                const leadType = $('input[name="lead_type"]:checked').val() || 'b2b';
+
+                let gstin = '';
+                let phone = '';
+                let email = '';
+                let companyName = '';
+
+                if (leadType === 'b2b') {
+                    // In B2B mode, check ONLY using Company fields (Ignore Contact Person fields)
+                    const b2bFields = ['company_name', 'gstin', 'company_email', 'company_phone', 'company_name_input', 'gstin_input'];
+                    if (blurredFieldName && !b2bFields.includes(blurredFieldName)) {
+                        return; // Do NOT check duplicates for Contact Person fields in B2B mode
+                    }
+
+                    companyName = ($('input[name="company_name"]').val() || $('#company_name_input').val() || '').trim();
+                    gstin = ($('input[name="gstin"]').val() || $('#gstin_input').val() || '').trim();
+                    email = ($('input[name="company_email"]').val() || '').trim();
+                    phone = ($('input[name="company_phone"]').val() || '').trim();
+                } else {
+                    // In B2C mode, check ONLY using Individual Person Contact fields
+                    const b2cFields = ['contact_person', 'email', 'contact_email', 'phone', 'contact_phone', 'email_input', 'phone_input'];
+                    if (blurredFieldName && !b2cFields.includes(blurredFieldName)) {
+                        return; // Ignore company fields in B2C mode
+                    }
+
+                    companyName = ($('input[name="contact_person"]').val() || '').trim();
+                    email = ($('input[name="email"], input[name="contact_email"]').val() || $('#email_input').val() || '').trim();
+                    phone = ($('input[name="phone"], input[name="contact_phone"]').val() || $('#phone_input').val() || '').trim();
+                }
+
+                if (!gstin && !phone && !email && !companyName) {
+                    return;
+                }
+
+                $.ajax({
+                    url: '{{ route("crm.leads.checkDuplicate") }}',
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        lead_type: leadType,
+                        gstin: gstin,
+                        phone: phone,
+                        email: email,
+                        company_name: companyName
+                    },
+                    success: function(res) {
+                        if (res.matched || res.is_duplicate) {
+                            const matchKey = res.match_key || (res.matched ? ('acc_' + res.account_id + '_' + res.matched_by) : ('lead_' + (res.lead ? res.lead.id : '') + '_' + res.matched_by));
+
+                            // If user has already closed/dismissed this exact match notification, DO NOT show it again!
+                            if (dismissedMatchKeys.has(matchKey)) {
+                                return;
+                            }
+
+                            currentActiveMatchKey = matchKey;
+
+                            if (res.matched) {
+                                $('#dupMatchedByText').text(res.matched_by);
+                                $('#dupAccountNameText').text(res.account_name + ' (' + res.account_number + ')');
+                                $('#dupAccountGstinText').text(res.gstin);
+                                $('#dupAccountPhoneText').text(res.phone);
+                                $('#dupAccountRevenueText').text('₹' + res.lifetime_revenue);
+                                $('#dupAccountDealsText').text(res.open_deals_count + ' Open Deals');
+                                $('#dupAccountLastPurchaseText').text(res.last_purchase_date);
+                                
+                                $('#dupViewAccountBtn').attr('href', '/crm/accounts/' + res.account_id);
+                                $('#dupCreateDealBtn').attr('href', '/crm/deals/create?account_id=' + res.account_id);
+                                
+                                $('#duplicateAccountModal').modal('show');
+                            } else if (res.is_duplicate) {
+                                $('#dupMatchedByText').text(res.matched_by || 'Email / Phone');
+                                $('#dupAccountNameText').text(res.lead ? res.lead.company_name : 'Existing Lead');
+                                $('#dupAccountGstinText').text('Lead #' + (res.lead ? res.lead.id : ''));
+                                $('#dupAccountPhoneText').text(res.lead ? res.lead.phone : 'N/A');
+                                $('#dupAccountRevenueText').text(res.message || 'Duplicate Lead Found');
+                                $('#dupAccountDealsText').text('Open Lead');
+                                $('#dupAccountLastPurchaseText').text(res.lead ? res.lead.created_at : 'N/A');
+
+                                $('#dupViewAccountBtn').attr('href', '/crm/leads/' + (res.lead ? res.lead.id : ''));
+                                $('#dupCreateDealBtn').attr('href', '/crm/leads/' + (res.lead ? res.lead.id : ''));
+                                
+                                $('#duplicateAccountModal').modal('show');
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Track modal close/dismissal so the same duplicate match isn't repeatedly shown
+            $('#duplicateAccountModal').on('hidden.bs.modal', function() {
+                if (currentActiveMatchKey) {
+                    dismissedMatchKeys.add(currentActiveMatchKey);
+                    currentActiveMatchKey = null;
+                }
+            });
+
+            window.toggleLeadType = function(type) {
+                var fieldNames = ['company_name', 'gstin', 'company_email', 'company_phone'];
+                fieldNames.forEach(function(name) {
+                    var input = document.querySelector('[name="' + name + '"]');
+                    if (input) {
+                        var group = input.closest('.odoo-form-group') || input.closest('.mb-3') || input.parentElement;
+                        if (group) {
+                            if (type === 'b2c') {
+                                group.style.setProperty('display', 'none', 'important');
+                            } else {
+                                group.style.setProperty('display', 'flex', 'important');
+                            }
+                        }
+                    }
+                });
+            };
+
+            $(document).on('change click', 'input[name="lead_type"]', function() {
+                window.toggleLeadType($(this).val());
+            });
+
+            // Initial trigger on load
+            var initialLeadType = $('input[name="lead_type"]:checked').val() || 'b2b';
+            window.toggleLeadType(initialLeadType);
+
+            // Trigger duplicate check ONLY on simple field blur (when focus leaves the input box)
+            $(document).on('blur', '#gstin_input, #phone_input, #email_input, #company_name_input, input[name="gstin"], input[name="phone"], input[name="email"], input[name="company_name"], input[name="company_email"], input[name="company_phone"], input[name="contact_person"], input[name="contact_email"], input[name="contact_phone"]', function() {
+                const fieldName = $(this).attr('name') || $(this).attr('id');
+                performDuplicateCheck(fieldName);
+            });
         });
     </script>
+
+    <!-- Modal: Duplicate Account Found Alert -->
+    <div class="modal fade" id="duplicateAccountModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered border-0">
+            <div class="modal-content shadow-lg rounded-3 border-0">
+                <div class="modal-header bg-warning-subtle text-warning-emphasis border-bottom">
+                    <h5 class="modal-title fw-bold text-dark d-flex align-items-center">
+                        <i class="feather-alert-triangle me-2 text-warning fs-4"></i>Existing Customer Found!
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted fs-13 mb-3">
+                        System detected an existing customer account matching <strong id="dupMatchedByText" class="text-dark"></strong>. To prevent duplicate data, you can create a <strong>New Deal #2</strong> directly under this Account.
+                    </p>
+
+                    <div class="card border border-light-subtle rounded-3 p-3 bg-light mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold text-primary mb-0" id="dupAccountNameText">Company Name</h6>
+                            <span class="badge bg-white text-dark border font-monospace" id="dupAccountGstinText">GSTIN</span>
+                        </div>
+                        <div class="row g-2 fs-12 text-muted mt-1">
+                            <div class="col-6">
+                                <span><i class="feather-dollar-sign me-1 text-success"></i>Revenue: <strong id="dupAccountRevenueText" class="text-success">₹0.00</strong></span>
+                            </div>
+                            <div class="col-6">
+                                <span><i class="feather-layers me-1 text-info"></i>Active: <strong id="dupAccountDealsText" class="text-dark">0 Deals</strong></span>
+                            </div>
+                            <div class="col-12 mt-1">
+                                <span><i class="feather-calendar me-1 text-primary"></i>Last Purchase: <strong id="dupAccountLastPurchaseText" class="text-dark">N/A</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Ignore & Continue</button>
+                    <a href="#" id="dupViewAccountBtn" class="btn btn-soft-primary" target="_blank">View Account</a>
+                    <a href="#" id="dupCreateDealBtn" class="btn btn-warning fw-bold px-3"><i class="feather-plus me-1"></i>Create New Deal</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <x-ui.master-modals :masters="['product']" />
 @endpush

@@ -3,6 +3,16 @@
         <div class="bg-white px-4 pt-3 pb-0 rounded shadow-sm border-bottom">
             <ul class="nav nav-tabs nav-tabs-line nav-tabs-primary border-0 fs-13" style="margin-bottom: -1px;">
                 <li class="nav-item">
+                    <a class="nav-link pb-3 px-3 @if(Route::is('crm.accounts.*')) active fw-bold text-primary border-bottom border-primary border-2 @else text-muted border-0 @endif" href="{{ route('crm.accounts.index') }}">
+                        <i class="feather-briefcase me-1"></i> Accounts
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link pb-3 px-3 @if(Route::is('crm.deals.*')) active fw-bold text-primary border-bottom border-primary border-2 @else text-muted border-0 @endif" href="{{ route('crm.deals.kanban') }}">
+                        <i class="feather-git-branch me-1"></i> Deals
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link pb-3 px-3 @if(Route::is('crm.customers.*')) active fw-bold text-primary border-bottom border-primary border-2 @else text-muted border-0 @endif" href="{{ route('crm.customers.index') }}">
                         <i class="feather-users me-1"></i> Customers
                     </a>

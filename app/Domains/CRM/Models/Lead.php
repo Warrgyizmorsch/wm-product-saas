@@ -25,18 +25,33 @@ class Lead extends Model
             if (empty($lead->lead_owner_id) && auth()->check()) {
                 $lead->lead_owner_id = auth()->id();
             }
+            if (empty($lead->lead_number)) {
+                $tenantId = $lead->tenant_id ?? (tenant_id() ?? 1);
+                $year = date('Y');
+                $count = static::where('tenant_id', $tenantId)->whereYear('created_at', $year)->count() + 1;
+                $lead->lead_number = 'LD-' . $year . '-' . str_pad((string)$count, 4, '0', STR_PAD_LEFT);
+            }
         });
     }
 
     protected $fillable = [
         'tenant_id',
+        'lead_number',
         'lead_owner_id',
         'call_date',
         'company_name',
+        'company_email',
+        'company_phone',
+        'gstin',
+        'lead_type',
         'contact_person',
         'email',
         'phone',
         'requirement',
+        'crm_account_id',
+        'crm_contact_id',
+        'crm_deal_id',
+        'converted_at',
         'expected_amount',
         'expected_sale_date',
         'source',
@@ -156,5 +171,20 @@ class Lead extends Model
             if ($customer) return $customer;
         }
         return null;
+    }
+
+    public function crmAccount(): BelongsTo
+    {
+        return $this->belongsTo(CrmAccount::class, 'crm_account_id');
+    }
+
+    public function crmContact(): BelongsTo
+    {
+        return $this->belongsTo(CrmContact::class, 'crm_contact_id');
+    }
+
+    public function crmDeal(): BelongsTo
+    {
+        return $this->belongsTo(CrmDeal::class, 'crm_deal_id');
     }
 }
