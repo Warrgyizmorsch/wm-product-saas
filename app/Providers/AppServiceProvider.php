@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Core\Tenant\TenantContext;
 use App\Support\Tenancy;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
@@ -194,6 +195,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Some hosts (older MySQL/MariaDB, or MyISAM as the effective engine) cap
+        // index keys at 1000 bytes; utf8mb4 string(255) unique columns (e.g.
+        // users.email) exceed that. 191 chars * 4 bytes = 764 bytes, safely under it.
+        Schema::defaultStringLength(191);
+
         // ── Cross-module morph map (Journal.reference_type/reference_id) ───────
         // Journal::reference() is a real morphTo(); these short, stable keys are
         // what gets stored in reference_type, never the FQCN. Using morphMap()
