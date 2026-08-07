@@ -214,11 +214,36 @@
                                         <div class="row g-4 fs-13 text-dark">
                                             <!-- Left Column: Contact Info, Products, Pricing, Requirements -->
                                             <div class="col-md-6 border-end">
+                                                 <!-- B2B vs B2C Segment Toggle -->
+                                                 <div class="mb-3 p-3 bg-soft-primary rounded-3 border border-primary-subtle shadow-2xs">
+                                                     <label class="fw-bold text-dark mb-2 d-block fs-13"><i class="feather-layers me-1 text-primary"></i> Customer Type (Lead Segment):</label>
+                                                     <div class="d-flex gap-4">
+                                                         <div class="form-check form-check-inline">
+                                                             <input class="form-check-input" type="radio" name="lead_type" id="edit_lead_type_b2b" value="b2b" {{ old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b' ? 'checked' : '' }} onchange="toggleLeadType('b2b')">
+                                                             <label class="form-check-label fw-bold text-dark cursor-pointer" for="edit_lead_type_b2b">
+                                                                 🏢 B2B (Business Client)
+                                                             </label>
+                                                         </div>
+                                                         <div class="form-check form-check-inline">
+                                                             <input class="form-check-input" type="radio" name="lead_type" id="edit_lead_type_b2c" value="b2c" {{ old('lead_type', $lead->lead_type) === 'b2c' ? 'checked' : '' }} onchange="toggleLeadType('b2c')">
+                                                             <label class="form-check-label fw-bold text-dark cursor-pointer" for="edit_lead_type_b2c">
+                                                                 👤 B2C (Individual Customer)
+                                                             </label>
+                                                         </div>
+                                                     </div>
+                                                 </div>
+
                                                 <h6 class="fw-bold text-primary mb-3">{{ __('crm.company_contact_info') }}</h6>
                                                 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.call_date')" name="call_date" id="lead_call_date_picker" :value="old('call_date', $lead->call_date ? $lead->call_date->format('Y-m-d h:i A') : '')" required="true" :errorText="$errors->first('call_date')" />
 
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" :value="old('company_name', $lead->company_name)" required="true" :placeholder="__('crm.company_name')" :errorText="$errors->first('company_name')" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" id="edit_company_name_input" :value="old('company_name', $lead->company_name)" :placeholder="__('crm.company_name')" :errorText="$errors->first('company_name')" />
+
+                                                <x-ui.odoo-form-ui type="input" label="GSTIN / Tax No." name="gstin" id="edit_gstin_input" :value="old('gstin', $lead->gstin ?? '')" placeholder="e.g. 27AAAAA0000A1Z5" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Company Email" name="company_email" id="edit_company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" placeholder="company@office.com" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Company Phone" name="company_phone" id="edit_company_phone_input" :value="old('company_phone', $lead->company_phone ?? '')" placeholder="Company Landline / Phone" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.contact_person')" name="contact_person" :value="old('contact_person', $lead->contact_person)" :placeholder="__('crm.contact_person')" :errorText="$errors->first('contact_person')" />
 
@@ -523,21 +548,39 @@
                                         </div>
                                         <div class="row g-0">
                                             <div class="col-md-6 pe-md-4">
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.company_name') }}</div>
-                                                    <div class="zoho-field-value text-dark fw-bold">{{ $lead->company_name }}</div>
-                                                </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.company_name') }}</div>
+                                                     <div class="zoho-field-value text-dark fw-bold">{{ $lead->company_name ?: '—' }}</div>
+                                                 </div>
 
                                                  <div class="zoho-field-row">
-                                                     <div class="zoho-field-label">{{ __('crm.lead_owner') }}</div>
-                                                     <div class="zoho-field-value text-dark fw-bold">{{ $lead->owner?->name ?: 'Unassigned' }}</div>
+                                                     <div class="zoho-field-label">GSTIN / Tax No.</div>
+                                                     <div class="zoho-field-value text-dark fw-semibold">{{ $lead->gstin ?: '—' }}</div>
                                                  </div>
+
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">Company Email</div>
+                                                     <div class="zoho-field-value">
+                                                         @if($lead->company_email)
+                                                             <a href="mailto:{{ $lead->company_email }}" class="text-primary hover-underline">{{ $lead->company_email }}</a>
+                                                         @else
+                                                             —
+                                                         @endif
+                                                     </div>
+                                                 </div>
+
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">Company Phone</div>
+                                                     <div class="zoho-field-value text-dark">{{ $lead->company_phone ?: '—' }}</div>
+                                                 </div>
+
                                                  <div class="zoho-field-row">
                                                      <div class="zoho-field-label">{{ __('crm.contact_person') }}</div>
-                                                     <div class="zoho-field-value text-dark">{{ $lead->contact_person ?: '—' }}</div>
+                                                     <div class="zoho-field-value text-dark fw-semibold">{{ $lead->contact_person ?: '—' }}</div>
                                                  </div>
+
                                                  <div class="zoho-field-row">
-                                                     <div class="zoho-field-label">{{ __('crm.email') }}</div>
+                                                     <div class="zoho-field-label">Contact Email</div>
                                                      <div class="zoho-field-value">
                                                          @if($lead->email)
                                                              <a href="mailto:{{ $lead->email }}" class="text-primary hover-underline">{{ $lead->email }}</a>
@@ -546,9 +589,15 @@
                                                          @endif
                                                      </div>
                                                  </div>
+
                                                  <div class="zoho-field-row">
-                                                     <div class="zoho-field-label">{{ __('crm.contact_phone') }}</div>
+                                                     <div class="zoho-field-label">Contact Phone</div>
                                                      <div class="zoho-field-value text-dark">{{ $lead->phone ?: '—' }}</div>
+                                                 </div>
+
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.lead_owner') }}</div>
+                                                     <div class="zoho-field-value text-dark fw-bold">{{ $lead->owner?->name ?: 'Unassigned' }}</div>
                                                  </div>
 
                                                  @php
@@ -591,16 +640,20 @@
                                                  <div class="zoho-field-row">
                                                      <div class="zoho-field-label">{{ __('crm.lead_status') }}</div>
                                                      <div class="zoho-field-value text-primary fw-bold" style="width: 100%; max-width: 250px;">
-                                                         <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
-                                                             @csrf
-                                                             @method('PATCH')
-                                                             <select class="form-select odoo-select2 status-select" name="status" style="border-radius:0;">
-                                                                 <option value="New" @selected($lead->status === 'New' || !$lead->status)>{{ __('crm.statuses.New') }}</option>
-                                                                 <option value="Qualified" @selected($lead->status === 'Qualified')>{{ __('crm.statuses.Qualified') }}</option>
-                                                                 <option value="Won" @selected($lead->status === 'Won')>{{ __('crm.statuses.Won') }}</option>
-                                                                 <option value="Lost" @selected($lead->status === 'Lost')>{{ __('crm.statuses.Lost') }}</option>
-                                                             </select>
-                                                         </form>
+                                                         @if($lead->status === 'Won' || $lead->is_customer)
+                                                             <span class="badge bg-soft-success text-success px-2.5 py-1 fs-12 fw-bold"><i class="feather-check-circle me-1"></i>Won</span>
+                                                         @else
+                                                             <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
+                                                                 @csrf
+                                                                 @method('PATCH')
+                                                                 <select class="form-select odoo-select2 status-select" name="status" onchange="this.form.submit()" style="border-radius:0;">
+                                                                     <option value="New" @selected($lead->status === 'New' || !$lead->status)>{{ __('crm.statuses.New') }}</option>
+                                                                     <option value="Qualified" @selected($lead->status === 'Qualified')>{{ __('crm.statuses.Qualified') }}</option>
+                                                                     <option value="Won" @selected($lead->status === 'Won')>{{ __('crm.statuses.Won') }}</option>
+                                                                     <option value="Lost" @selected($lead->status === 'Lost')>{{ __('crm.statuses.Lost') }}</option>
+                                                                 </select>
+                                                             </form>
+                                                         @endif
                                                      </div>
                                                  </div>
                                                  <div class="zoho-field-row">
@@ -2912,6 +2965,37 @@
             $(document).on('click', '#showAdditionalContactsRepeaterContainer .remove-contact-btn', function() {
                 $(this).closest('.addl-contact-card').remove();
                 updateShowContactNumbersAndNames();
+            window.toggleLeadType = function(type) {
+                var fieldNames = ['company_name', 'gstin', 'company_email', 'company_phone'];
+                fieldNames.forEach(function(name) {
+                    var inputs = document.querySelectorAll('[name="' + name + '"]');
+                    inputs.forEach(function(input) {
+                        var group = input.closest('.odoo-form-group') || input.closest('.mb-3') || input.parentElement;
+                        if (group) {
+                            if (type === 'b2c') {
+                                group.style.setProperty('display', 'none', 'important');
+                            } else {
+                                group.style.setProperty('display', 'flex', 'important');
+                            }
+                        }
+                    });
+                });
+            };
+
+            $(document).on('change click', 'input[name="lead_type"]', function() {
+                window.toggleLeadType($(this).val());
+            });
+
+            // Initial trigger on load
+            var currentLeadType = $('input[name="lead_type"]:checked').val() || 'b2b';
+            window.toggleLeadType(currentLeadType);
+
+            // Auto submit form on status change (handles both native and Select2 dropdowns)
+            $(document).on('change change.select2', '.status-select', function() {
+                var form = $(this).closest('form');
+                if (form.length) {
+                    form[0].submit();
+                }
             });
         });
 

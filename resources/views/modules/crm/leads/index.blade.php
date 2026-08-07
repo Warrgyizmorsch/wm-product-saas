@@ -375,7 +375,7 @@
                                             <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 @method('PATCH')
-                                                <select name="status" class="form-control status-select" data-select2-selector="status" style="width: 150px;">
+                                                <select name="status" class="form-control status-select" data-select2-selector="status" onchange="this.form.submit()" style="width: 150px;">
                                                     @foreach(['New', 'Qualified', 'Won', 'Lost'] as $statusOption)
                                                         @php
                                                             $bgClass = 'bg-primary';
@@ -724,6 +724,12 @@
                     $('#leadsTable tbody').append(
                         '<tr class="no-search-results"><td colspan="9" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>' + noResultsText + '</td></tr>'
                     );
+                }
+            // Auto submit form when status is changed from dropdown
+            $(document).on('change change.select2', '.status-select', function() {
+                var form = $(this).closest('form');
+                if (form.length) {
+                    form[0].submit();
                 }
             });
         });

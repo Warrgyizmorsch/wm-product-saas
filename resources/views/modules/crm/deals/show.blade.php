@@ -261,8 +261,61 @@
     }
     .table.odoo-table td {
         padding: 10px 12px;
-        vertical-align: middle;
+        vertical-align: top;
         border-bottom: 1px solid #f1f5f9;
+    }
+
+    /* Odoo Table Input Underlines (Referenced from Lead Quotations) */
+    .table.odoo-table .odoo-table-input {
+        border: none !important;
+        border-bottom: 1px solid #cbd5e1 !important;
+        background: transparent !important;
+        border-radius: 0 !important;
+        padding: 4px 2px !important;
+        width: 100%;
+        font-size: 13px !important;
+        transition: border-color 0.2s ease-in-out;
+    }
+    .table.odoo-table .odoo-table-input:hover {
+        border-bottom-color: #94a3b8 !important;
+    }
+    .table.odoo-table .odoo-table-input:focus {
+        border-bottom-color: var(--bs-primary) !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Borderless Select2 theme custom override for Odoo Table */
+    .table.odoo-table .select2-container--bootstrap-5 .select2-selection {
+        border: none !important;
+        border-bottom: 1px solid #ced4da !important;
+        border-radius: 0 !important;
+        background-color: transparent !important;
+        padding-left: 2px !important;
+        height: auto !important;
+        min-height: 28px !important;
+        box-shadow: none !important;
+    }
+    .table.odoo-table .select2-container--bootstrap-5 .select2-selection:focus,
+    .table.odoo-table .select2-container--bootstrap-5.select2-container--focus .select2-selection {
+        border-bottom-color: var(--bs-primary) !important;
+        box-shadow: none !important;
+    }
+    .table.odoo-table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        padding-left: 0 !important;
+        font-size: 13px !important;
+        color: #212529 !important;
+        line-height: 26px !important;
+    }
+
+    /* Hide number input spinners for clean right alignment */
+    .table.odoo-table input[type="number"]::-webkit-outer-spin-button,
+    .table.odoo-table input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+    }
+    .table.odoo-table input[type="number"] {
+        -moz-appearance: textfield !important;
     }
 </style>
 @endpush
@@ -340,7 +393,7 @@
                         </span>
                         
                         @if($deal->account)
-                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">
+                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold text-truncate d-inline-block align-middle ms-1" style="max-width: 180px;" title="{{ $deal->account->name }}">
                                 <i class="feather-briefcase me-1"></i>{{ $deal->account->name }}
                             </span>
                         @endif
@@ -449,12 +502,17 @@
             </div>
         </div>
 
-        <!-- Flash Messages -->
+        <!-- Flash Toast Messages -->
         @if(session('success'))
-            <div class="alert alert-success alert-dismissible fade show fs-13 py-2 px-3 m-3 mb-0" role="alert">
-                <i class="feather-check-circle me-2"></i>{{ session('success') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.5rem;"></button>
-            </div>
+            <x-ui.toast :auto="true" title="{{ session('success') }}" type="success" delay="5000" />
+        @endif
+
+        @if(session('error'))
+            <x-ui.toast :auto="true" title="{{ session('error') }}" type="error" delay="6000" />
+        @endif
+
+        @if($errors->any())
+            <x-ui.toast :auto="true" title="{{ $errors->first() }}" type="error" delay="6000" />
         @endif
 
         <!-- ==================== TWO-COLUMN FLEX CONTENT ==================== -->
@@ -468,6 +526,11 @@
                         <li class="nav-item">
                             <a href="#sectionDealInfo" class="nav-link active">
                                 <i class="feather-info fs-13 text-muted"></i> Deal Information
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionDealProducts" class="nav-link">
+                                <i class="feather-box fs-13 text-muted"></i> Products & Quantities
                             </a>
                         </li>
                         <li class="nav-item">
@@ -595,13 +658,13 @@
                                 </div>
                             </div>
                             <div class="col-md-3 col-sm-6 d-flex">
-                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100">
-                                    <div class="deal-metric-icon bg-soft-purple text-purple">
+                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100 overflow-hidden" style="min-width: 0;">
+                                    <div class="deal-metric-icon bg-soft-purple text-purple flex-shrink-0">
                                         <i class="feather-briefcase"></i>
                                     </div>
-                                    <div class="min-w-0 flex-grow-1">
+                                    <div class="min-w-0 flex-grow-1 overflow-hidden">
                                         <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Account / Customer</span>
-                                        <span class="fs-14 fw-extrabold text-dark text-truncate d-block">{{ $deal->account ? $deal->account->name : 'N/A' }}</span>
+                                        <span class="fs-13 fw-extrabold text-dark text-truncate d-block" title="{{ $deal->account ? $deal->account->name : 'N/A' }}">{{ $deal->account ? $deal->account->name : 'N/A' }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -617,7 +680,7 @@
                                     <div class="col-md-6 pe-md-4">
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">Deal Title</div>
-                                            <div class="zoho-field-value text-dark fw-bold">{{ $deal->title }}</div>
+                                            <div class="zoho-field-value text-dark fw-bold text-break">{{ $deal->title }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
@@ -627,9 +690,9 @@
 
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">Account (Company)</div>
-                                            <div class="zoho-field-value text-dark fw-bold">
+                                            <div class="zoho-field-value text-dark fw-bold text-break">
                                                 @if($deal->account)
-                                                    <a href="{{ route('crm.accounts.show', $deal->account) }}" class="text-primary hover-underline">{{ $deal->account->name }}</a>
+                                                    <a href="{{ route('crm.accounts.show', $deal->account) }}" class="text-primary hover-underline text-break" title="{{ $deal->account->name }}">{{ $deal->account->name }}</a>
                                                 @else
                                                     —
                                                 @endif
@@ -648,20 +711,6 @@
                                     </div>
 
                                     <div class="col-md-6 ps-md-4">
-                                        <div class="zoho-field-row">
-                                            <div class="zoho-field-label">Pipeline Stage</div>
-                                            <div class="zoho-field-value text-primary fw-bold" style="width: 100%; max-width: 240px;">
-                                                <select class="form-select odoo-select2 status-select" name="stage" style="border-radius:0;" onchange="submitDealStage(this.value)">
-                                                    <option value="Qualification" @selected($deal->stage === 'Qualification' || $deal->stage === 'New')>Qualification (10%)</option>
-                                                    <option value="Needs Analysis" @selected($deal->stage === 'Needs Analysis' || $deal->stage === 'Qualified')>Needs Analysis (30%)</option>
-                                                    <option value="Proposal" @selected($deal->stage === 'Proposal')>Proposal (60%)</option>
-                                                    <option value="Negotiation" @selected($deal->stage === 'Negotiation')>Negotiation (80%)</option>
-                                                    <option value="Won" @selected($deal->stage === 'Won' || $deal->stage === 'Closed Won')>Won (100%)</option>
-                                                    <option value="Lost" @selected($deal->stage === 'Lost' || $deal->stage === 'Closed Lost')>Lost (0%)</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">Closing Probability</div>
                                             <div class="zoho-field-value text-info fw-bold">{{ $deal->probability }}%</div>
@@ -685,6 +734,75 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Deal Interested Products & Quantities Section -->
+                        @if($linkedLead && (!empty($linkedLead->product_items) || !empty($linkedLead->product_ids)))
+                            @php
+                                $rawItems = $linkedLead->product_items ?: [];
+                                if (empty($rawItems) && !empty($linkedLead->product_ids)) {
+                                    foreach ($linkedLead->product_ids as $pid) {
+                                        $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
+                                    }
+                                }
+                                $pIds = array_column($rawItems, 'product_id');
+                                $dealProductsMap = \App\Domains\Inventory\Models\Product::whereIn('id', $pIds)->get()->keyBy('id');
+                            @endphp
+                            @if($dealProductsMap->isNotEmpty())
+                                <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionDealProducts">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
+                                            <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0">
+                                                <i class="feather-box text-primary me-1.5"></i>Interested Products & Quantities for Deal
+                                            </h5>
+                                            <span class="badge bg-soft-primary text-primary fs-11 fw-semibold">{{ count($rawItems) }} Product(s) Selected</span>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered align-middle mb-0 fs-13">
+                                                <thead class="table-light text-muted">
+                                                    <tr>
+                                                        <th>Product / Item Name</th>
+                                                        <th>SKU</th>
+                                                        <th class="text-center">Quantity</th>
+                                                        <th class="text-end">Unit Price (₹)</th>
+                                                        <th class="text-end">Total Estimated Value (₹)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @php $grandProductTotal = 0; @endphp
+                                                    @foreach($rawItems as $item)
+                                                        @php
+                                                            $pObj = $dealProductsMap->get($item['product_id']);
+                                                            if (!$pObj) continue;
+                                                            $pQty = floatval($item['quantity'] ?? 1);
+                                                            $pPrice = floatval($pObj->selling_price ?: $pObj->unit_cost ?: 0);
+                                                            $lineVal = $pQty * $pPrice;
+                                                            $grandProductTotal += $lineVal;
+                                                        @endphp
+                                                        <tr>
+                                                            <td class="fw-bold text-dark">
+                                                                <a href="{{ route('inventory.products.show', $pObj) }}" class="text-dark hover-underline" target="_blank">{{ $pObj->name }}</a>
+                                                            </td>
+                                                            <td class="font-monospace text-muted">{{ $pObj->sku }}</td>
+                                                            <td class="text-center fw-bold text-primary">{{ number_format($pQty, 0) }} {{ $pObj->uom ? $pObj->uom->code : 'Pcs' }}</td>
+                                                            <td class="text-end">₹{{ number_format($pPrice, 2) }}</td>
+                                                            <td class="text-end fw-bold text-success">₹{{ number_format($lineVal, 2) }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                                @if($grandProductTotal > 0)
+                                                    <tfoot class="table-light fw-bold">
+                                                        <tr>
+                                                            <td colspan="4" class="text-end text-uppercase fs-12">Total Deal Product Value:</td>
+                                                            <td class="text-end text-success fs-14">₹{{ number_format($grandProductTotal, 2) }}</td>
+                                                        </tr>
+                                                    </tfoot>
+                                                @endif
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        @endif
 
                         <!-- CUSTOMER ACCOUNT & CONTACT QUICK CARD -->
                         <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionCustomerCard">
@@ -807,21 +925,21 @@
                                         <div class="border-top pt-4">
                                             <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
                                             <div class="table-responsive">
-                                                <table class="table odoo-table align-middle" id="itemsTable">
+                                                <x-ui.odoo-form-ui type="table" id="itemsTable">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 45%;">Product Description</th>
-                                                            <th class="text-end" style="width: 12%;">Qty</th>
-                                                            <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
+                                                            <th style="width: 38%;">Product Description</th>
+                                                            <th class="text-end" style="width: 10%;">Qty</th>
+                                                            <th class="text-end" style="width: 18%;">Unit Price (₹)</th>
                                                             <th class="text-end" style="width: 12%;">Taxes (%)</th>
-                                                            <th class="text-end" style="width: 16%;">Amount</th>
+                                                            <th class="text-end pe-3" style="width: 17%;">Amount</th>
                                                             <th class="text-center" style="width: 5%;"></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         <!-- Dynamically generated rows -->
                                                     </tbody>
-                                                </table>
+                                                </x-ui.odoo-form-ui>
                                             </div>
                                             <div class="mt-2.5">
                                                 <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
@@ -834,7 +952,7 @@
                                         <div class="row mt-4 pt-3 border-top text-dark fs-13">
                                             <div class="col-md-8">
                                                 <div class="pe-md-4">
-                                                    <x-ui.odoo-form-ui type="textarea" label="Terms & Conditions" name="terms_conditions" rows="3" :errorText="$errors->first('terms_conditions')">{{ old('terms_conditions') }}</x-ui.odoo-form-ui>
+                                                    <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions') !!}</x-ui.odoo-form-ui>
                                                     <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" rows="2" placeholder="Notes for internal view..." :errorText="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
                                                 </div>
                                             </div>
@@ -914,21 +1032,21 @@
                                         <div class="border-top pt-4">
                                             <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
                                             <div class="table-responsive">
-                                                <table class="table odoo-table align-middle" id="itemsTable">
+                                                <x-ui.odoo-form-ui type="table" id="itemsTable">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 45%;">Product Description</th>
-                                                            <th class="text-end" style="width: 12%;">Qty</th>
-                                                            <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
+                                                            <th style="width: 38%;">Product Description</th>
+                                                            <th class="text-end" style="width: 10%;">Qty</th>
+                                                            <th class="text-end" style="width: 18%;">Unit Price (₹)</th>
                                                             <th class="text-end" style="width: 12%;">Taxes (%)</th>
-                                                            <th class="text-end" style="width: 16%;">Amount</th>
+                                                            <th class="text-end pe-3" style="width: 17%;">Amount</th>
                                                             <th class="text-center" style="width: 5%;"></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         <!-- Dynamically generated rows -->
                                                     </tbody>
-                                                </table>
+                                                </x-ui.odoo-form-ui>
                                             </div>
                                             <div class="mt-2.5">
                                                 <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
@@ -941,7 +1059,7 @@
                                         <div class="row mt-4 pt-3 border-top text-dark fs-13">
                                             <div class="col-md-8">
                                                 <div class="pe-md-4">
-                                                    <x-ui.odoo-form-ui type="textarea" label="Terms & Conditions" name="terms_conditions" rows="3" :errorText="$errors->first('terms_conditions')">{{ old('terms_conditions', $activeQuotation->terms_conditions) }}</x-ui.odoo-form-ui>
+                                                    <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions', $activeQuotation->terms_conditions) !!}</x-ui.odoo-form-ui>
                                                     <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" rows="2" placeholder="Notes for internal view..." :errorText="$errors->first('notes')">{{ old('notes', $activeQuotation->notes) }}</x-ui.odoo-form-ui>
                                                 </div>
                                             </div>
@@ -1099,7 +1217,7 @@
                                                         <td class="text-end font-monospace fw-bold">{{ $item->quantity }}</td>
                                                         <td class="text-end font-monospace">₹{{ number_format($item->unit_price, 2) }}</td>
                                                         <td class="text-end font-monospace">{{ $item->tax_rate }}%</td>
-                                                        <td class="text-end font-monospace fw-bold text-success">₹{{ number_format($item->total_price, 2) }}</td>
+                                                        <td class="text-end font-monospace fw-bold text-success">₹{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
                                                     </tr>
                                                 @empty
                                                     <tr>
@@ -1127,7 +1245,7 @@
                                             </div>
                                             <div class="d-flex justify-content-between py-1 border-bottom">
                                                 <span class="text-muted">Tax Amount:</span>
-                                                <span class="fw-bold">₹{{ number_format($activeQuotation->tax_amount ?? 0, 2) }}</span>
+                                                <span class="fw-bold">₹{{ number_format($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0, 2) }}</span>
                                             </div>
                                             <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1">
                                                 <span class="fw-bold text-dark">Grand Total:</span>
@@ -1417,31 +1535,31 @@
             function getRowHtml(index, selectedId = '') {
                 return `
                     <tr class="item-row" data-row-id="${index}">
-                        <td class="ps-3">
+                        <td class="ps-2">
                             <select name="items[${index}][product_id]" class="odoo-table-select odoo-select2 item-name-input erp-premium-select" required data-master="product" style="width:100%;">
                                 ${buildProductOptions(selectedId)}
                             </select>
                             <div class="description-container mt-2" id="desc-container-${index}" style="display: none;">
-                                <textarea name="items[${index}][description]" class="form-control odoo-table-input" placeholder="Scope details / custom specifications..."></textarea>
+                                <textarea name="items[${index}][description]" class="form-control odoo-table-input" placeholder="Scope details / custom specifications..." rows="2"></textarea>
                             </div>
                             <a href="javascript:void(0)" class="toggle-desc-btn text-primary fs-11 mt-1 d-inline-block" data-row-id="${index}">
                                 <i class="feather-plus me-1"></i>Add Description
                             </a>
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="max-width: 80px; margin-left: auto; text-align: right;">
+                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="max-width: 120px; margin-left: auto; text-align: right;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="max-width: 80px; margin-left: auto; text-align: right;">
+                            <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
                         </td>
-                        <td class="text-end fw-bold text-dark amount-display pe-3">
+                        <td class="text-end fw-bold text-dark amount-display pe-3" style="font-size: 13px; padding-top: 8px;">
                             ₹0.00
                         </td>
-                        <td class="text-center">
-                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn mt-1">
+                        <td class="text-center" style="padding-top: 6px;">
+                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn">
                                 <i class="feather-trash-2"></i>
                             </button>
                         </td>
@@ -1545,7 +1663,8 @@
 
             const hasCreateQ = @json(request()->has('create_quotation') || old('form_type') === 'quotation_create');
             const hasEditQ = @json(request()->has('edit_quotation') || old('form_type') === 'quotation_edit');
-            const existingItems = @json(old('items') ?: (isset($activeQuotation) ? $activeQuotation->items : []));
+            const prefilledDealItems = @json($prefilledDealItems ?? []);
+            const existingItems = @json(old('items') ?: (request()->has('create_quotation') && !empty($prefilledDealItems) ? $prefilledDealItems : (isset($activeQuotation) ? $activeQuotation->items : [])));
 
             if (hasCreateQ || hasEditQ) {
                 if (existingItems && existingItems.length > 0) {
@@ -1677,6 +1796,14 @@
                 }
             });
         });
+
+        window.submitDealStage = function(stage) {
+            var form = $('#dealStageForm');
+            if (form.length) {
+                $('#dealStageInput').val(stage);
+                form.submit();
+            }
+        };
     </script>
     @endpush
 @endsection

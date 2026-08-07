@@ -224,48 +224,41 @@ class LeadService
      */
     public function updateLeadStatus(Lead $lead, string $newStatus): array
     {
+        $oldStatus = $lead->status ?: 'New';
+
+        // Permanent Lock Check: Once a lead is Won, it can NEVER be changed to any other status
+        if (($oldStatus === 'Won' || $lead->is_customer) && $newStatus !== 'Won') {
+            return [
+                'success' => false,
+                'message' => 'Lead status is Won and permanently locked. Status cannot be changed.'
+            ];
+        }
+
+        if ($oldStatus === $newStatus) {
+            return ['success' => true, 'message' => "Lead status is already {$newStatus}."];
+        }
+
         $updateData = ['status' => $newStatus];
-        $message = 'Lead status successfully updated!';
+        $message = "Lead status updated to {$newStatus}.";
 
-        if ($newStatus === 'Lost' && $lead->is_customer) {
-            $updateData['is_customer'] = false;
-            $customer = $lead->getCustomer();
-            if ($customer) {
-                $customer->update(['status' => 'inactive']);
+        if ($newStatus === 'Lost') {
+            if ($lead->is_customer) {
+                $updateData['is_customer'] = false;
+                $customer = $lead->getCustomer();
+                if ($customer) {
+                    $customer->update(['status' => 'inactive']);
+                }
             }
-            $message = 'Lead status updated to Lost and linked customer record deactivated.';
-        } elseif ($newStatus === 'Won' && !$lead->is_customer) {
-            if (!$lead->is_qualified) {
+            $message = 'Lead status updated to Lost.';
+        } elseif ($newStatus === 'Won') {
+            if (!$lead->crm_account_id || !$lead->crm_deal_id) {
                 return [
                     'success' => false,
-                    'message' => "Lead #{$lead->id} ({$lead->company_name}) cannot be marked as Won directly because it is not Qualified yet. Please Qualify the lead first!"
+                    'message' => 'Cannot mark as Won. Account & Deal conversion required first!'
                 ];
             }
-
-            $hasAcceptedQuotation = $lead->getQuotations()->where('status', 'Accepted')->isNotEmpty();
-            if (!$hasAcceptedQuotation) {
-                return [
-                    'success' => false,
-                    'message' => 'This lead cannot be marked as Won because there is no accepted quotation.'
-                ];
-            }
-
-            $customer = $lead->getCustomer();
-            if ($customer) {
-                $customer->update(['status' => 'active']);
-                $message = 'Lead successfully marked as Won and Customer record activated!';
-            } else {
-                Customer::create([
-                    'tenant_id' => $lead->tenant_id,
-                    'name' => $lead->company_name ?: ($lead->contact_person ?: 'Won Lead'),
-                    'email' => $lead->email,
-                    'phone' => $lead->phone,
-                    'status' => 'active',
-                ]);
-                $message = 'Lead successfully marked as Won and Customer record created!';
-            }
-
             $updateData['is_customer'] = true;
+            $message = 'Lead marked as Won.';
         }
 
         $oldStatus = $lead->status ?: 'New';
