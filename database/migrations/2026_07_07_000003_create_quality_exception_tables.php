@@ -14,8 +14,8 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('version')->default('1.0');
-            $table->string('status')->default('draft'); // draft | submitted | approved | archived
-            $table->string('type'); // product | product_category | process | work_center
+            $table->string('status', 30)->default('draft'); // draft | submitted | approved | archived
+            $table->string('type', 30); // product | product_category | process | work_center
             $table->unsignedBigInteger('product_id')->nullable();
             $table->unsignedBigInteger('product_category_id')->nullable();
             $table->unsignedBigInteger('work_center_id')->nullable();
@@ -61,8 +61,8 @@ return new class extends Migration
             $table->unsignedBigInteger('quality_plan_id');
             $table->foreign('quality_plan_id', 'pqi_qp_fk')->references('id')->on('production_quality_plans')->cascadeOnDelete();
 
-            $table->string('stage'); // incoming | in_process | final
-            $table->string('status')->default('draft'); // draft | submitted | approved | closed
+            $table->string('stage', 30); // incoming | in_process | final
+            $table->string('status', 30)->default('draft'); // draft | submitted | approved | closed
             $table->string('result')->default('passed'); // passed | failed | partial
             
             $table->unsignedBigInteger('production_order_id')->nullable();
@@ -118,8 +118,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('ncr_number')->unique();
-            $table->string('category'); // material | process | machine | human_error
-            $table->string('status')->default('open'); // open | under_review | disposition | closed
+            $table->string('category', 30); // material | process | machine | human_error
+            $table->string('status', 30)->default('open'); // open | under_review | disposition | closed
             $table->string('disposition_type')->nullable(); // use_as_is | scrap | rework | return_to_supplier
             
             $table->unsignedBigInteger('quality_inspection_id')->nullable();

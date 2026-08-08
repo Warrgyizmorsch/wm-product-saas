@@ -1,0 +1,52 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+
+          script: |
+            cd /home/londonstreetstor/public_html/astra-erp.londonstreetstore.com
+
+            echo "Maintenance Mode..."
+            php artisan down || true
+
+            echo "Updating Code..."
+            git fetch origin
+            git reset --hard origin/production
+
+            echo "Installing Composer..."
+            composer install --no-dev --optimize-autoloader --no-interaction
+
+            echo "Storage Link..."
+            php artisan storage:link || true
+
+            echo "Running Migrations..."
+            php artisan migrate 
+
+            echo "Running Seeder..."
+            php artisan db:seed || true
+
+            echo "Optimizing..."
+            php artisan optimize:clear
+            php artisan optimize
+
+            echo "Restart Queue..."
+            php artisan queue:restart || true
+
+            php artisan up
+
+            echo "Deployment Completed Successfully"
