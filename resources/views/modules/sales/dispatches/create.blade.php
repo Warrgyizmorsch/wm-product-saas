@@ -142,15 +142,15 @@
                         <x-ui.odoo-form-ui type="table" id="dispatchItemsTable">
                             <thead class="table-light fs-11 text-uppercase fw-bold text-muted">
                                 <tr>
-                                    <th style="width: 28%;" class="ps-3">Product Details</th>
-                                    <th style="width: 22%;">Warehouse Location</th>
+                                    <th style="width: 26%;" class="ps-3">Product Details</th>
+                                    <th style="width: 20%;">Warehouse Location</th>
                                     <th class="text-end mr-col" style="width: 7%;">Ordered</th>
                                     <th class="text-end mr-col" style="width: 7%;">Available</th>
                                     <th class="text-end mr-col" style="width: 7%;">Reserved</th>
                                     <th class="text-end mr-col" style="width: 7%;">Dispatched</th>
                                     <th class="text-end mr-col" style="width: 7%;">Remaining</th>
-                                    <th class="text-end pe-3" style="width: 15%;">Dispatch Qty</th>
-                                    <th class="text-center direct-col" style="width: 5%; display: none;">Action</th>
+                                    <th class="text-end pe-2" style="width: 14%;">Dispatch Qty</th>
+                                    <th class="text-center" style="width: 5%;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="dispatchItemsBody" class="fs-13">
@@ -540,7 +540,7 @@
                             <td class="text-end fw-semibold text-info mr-col align-top reserved-qty-cell">${item.quantity_reserved}</td>
                             <td class="text-end fw-bold mr-col align-top ${item.already_dispatched > 0 ? 'text-warning' : 'text-muted'}">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-primary mr-col align-top">${item.remaining_qty}</td>
-                            <td class="text-end pe-3 align-top">
+                            <td class="text-end pe-2 align-top">
                                 <input type="hidden" name="items[${index}][quantity_ordered]" value="${item.quantity_ordered}">
                                 <input
                                     type="number"
@@ -553,6 +553,11 @@
                                     required
                                 >
                                 <div class="qty-error-msg text-danger fs-11 fw-semibold text-end mt-1 d-none">Dispatch Qty must be greater than 0.</div>
+                            </td>
+                            <td class="text-center align-top pe-2">
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 remove-dispatch-row-btn" title="Remove line item from this dispatch">
+                                    <i class="feather-trash-2 fs-15"></i>
+                                </button>
                             </td>
                         </tr>`;
                 }
@@ -642,6 +647,21 @@
 
             return !hasError;
         }
+
+        $(document).on('click', '.remove-dispatch-row-btn, .remove-row-btn', function () {
+            const $tr = $(this).closest('tr');
+            $tr.remove();
+
+            const remainingRows = itemsBody.querySelectorAll('tr:not(#emptyItemsRow)');
+            itemsHint.textContent = `${remainingRows.length} item(s) available to dispatch.`;
+
+            if (remainingRows.length === 0) {
+                itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="9" class="text-center py-4 text-muted fs-12"><i class="feather-info me-1"></i>No items selected in this dispatch order.</td></tr>';
+                setSaveButtonsDisabled(true);
+            } else {
+                checkAllDispatchRowsValidation();
+            }
+        });
 
         $(document).on('input change keyup', '.dispatch-qty-input', function() {
             checkAllDispatchRowsValidation();
