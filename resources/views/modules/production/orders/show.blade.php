@@ -113,16 +113,6 @@
         @endif
 
         @if($order->isReleased() || $order->isInProgress())
-            {{-- Complete Order Button --}}
-            <form method="POST" action="{{ route('production.orders.complete', $order->id) }}"
-                onsubmit="return confirmFormSubmit(event, '{{ __('production.confirm_complete_order') }}', { title: 'Complete Production Order', variant: 'success', confirmButtonText: 'Complete' });"
-                class="d-inline">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1.5">
-                    <i class="feather-check-circle"></i> {{ __('production.complete_order') }}
-                </button>
-            </form>
-
             @if($order->schedules->isEmpty())
                 {{-- Generate Schedule Button --}}
                 <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal"
@@ -133,6 +123,18 @@
 
             {{-- Grouped Actions Dropdown --}}
             <x-ui.action-dropdown id="headerActionsDropdown">
+                <li>
+                    <form method="POST" action="{{ route('production.orders.complete', $order->id) }}"
+                        onsubmit="return confirmFormSubmit(event, '{{ __('production.confirm_complete_order') }}', { title: 'Complete Production Order', variant: 'success', confirmButtonText: 'Complete' });">
+                        @csrf
+                        <button type="submit" class="dropdown-item py-1.5 fs-12 text-success">
+                            <i class="feather-check-circle me-2 text-success fs-12"></i>{{ __('production.complete_order') }}
+                        </button>
+                    </form>
+                </li>
+                <li>
+                    <hr class="dropdown-divider my-1">
+                </li>
                 <li>
                     <a href="javascript:void(0)" class="dropdown-item py-1.5 fs-12" data-bs-toggle="modal"
                         data-bs-target="#progressModal">
@@ -219,7 +221,7 @@
                     class="fw-bold text-primary text-decoration-underline">Operations Routing Tab</a> to begin execution.
             @else
                 Order released. Click <a href="javascript:void(0)" class="fw-bold text-primary text-decoration-underline"
-                    data-bs-toggle="modal" data-bs-target="#scheduleModal">Generate Schedule</a> to plan work centers.
+                    data-bs-toggle="modal" data-bs-target="#scheduleModal">Plan & Schedule Order</a> to plan work centers.
             @endif
         @elseif($order->isInProgress())
             Production is active on shop floor. Track live progress in <a href="?tab=vtab-wip"
@@ -1014,17 +1016,19 @@
                         @if($order->requisitionSlips && $order->requisitionSlips->isNotEmpty())
                             @php
                                 $latestSlip = $order->requisitionSlips->last();
-                                $slipBadge = match ($latestSlip->status) {
-                                    'pending' => 'bg-soft-warning text-warning border-warning',
-                                    'approved' => 'bg-soft-primary text-primary border-primary',
-                                    'issued', 'completed' => 'bg-soft-success text-success border-success',
-                                    default => 'bg-soft-secondary text-secondary'
+                                $latestStatusLower = strtolower($latestSlip->status ?? 'pending');
+                                $slipBadge = match (true) {
+                                    in_array($latestStatusLower, ['fully issued', 'completed', 'issued']) => 'bg-soft-success text-success border-success',
+                                    in_array($latestStatusLower, ['partially issued', 'partial', 'reserved']) => 'bg-soft-warning text-warning border-warning',
+                                    $latestStatusLower === 'approved' => 'bg-soft-primary text-primary border-primary',
+                                    default => 'bg-soft-warning text-warning border-warning'
                                 };
-                                $slipStatusText = match ($latestSlip->status) {
-                                    'pending' => 'Pending Store Release',
-                                    'approved' => 'Approved - Store Preparing Material',
-                                    'issued', 'completed' => 'Issued to Shop Floor',
-                                    default => ucfirst($latestSlip->status)
+                                $slipStatusText = match (true) {
+                                    in_array($latestStatusLower, ['fully issued', 'completed', 'issued']) => 'Fully Issued',
+                                    in_array($latestStatusLower, ['partially issued', 'partial']) => 'Partially Issued',
+                                    $latestStatusLower === 'reserved' => 'Reserved in Store',
+                                    $latestStatusLower === 'approved' => 'Approved - Store Preparing Material',
+                                    default => 'Pending Store Release'
                                 };
                             @endphp
                             <div
@@ -1080,6 +1084,9 @@
                                             if ($res->quantity_issued >= $res->quantity_planned && $res->quantity_planned > 0) {
                                                 $lineStatusBadge = 'bg-soft-success text-success';
                                                 $lineStatusText = 'Issued';
+                                            } elseif ($res->quantity_issued > 0) {
+                                                $lineStatusBadge = 'bg-soft-warning text-warning';
+                                                $lineStatusText = 'Partially Issued';
                                             } elseif ($res->quantity_reserved >= $res->quantity_planned && $res->quantity_planned > 0) {
                                                 $lineStatusBadge = 'bg-soft-info text-info';
                                                 $lineStatusText = 'Reserved in Store';
@@ -1831,7 +1838,9 @@
                         @php
                             $slips = $order->requisitionSlips;
                             $totalSlips = $slips->count();
-                            $pendingSlips = $slips->where('status', 'pending')->count();
+                            $pendingSlips = $slips->filter(function ($s) {
+                                return strtolower($s->status ?? '') === 'pending';
+                            })->count();
                             $allPrs = collect();
                             foreach ($slips as $s) {
                                 foreach ($s->purchaseRequisitions as $pr) {
@@ -1897,11 +1906,16 @@
                                             </td>
                                             <td class="text-muted">{{ $slip->requisition_date }}</td>
                                             <td>
-                                                @if($slip->status === 'completed')
+                                                @php
+                                                    $stLower = strtolower($slip->status ?? 'pending');
+                                                @endphp
+                                                @if(in_array($stLower, ['fully issued', 'completed', 'issued']))
                                                     <span
-                                                        class="badge bg-soft-success text-success text-uppercase">{{ __('production.completed') }}</span>
-                                                @elseif($slip->status === 'partial')
-                                                    <span class="badge bg-soft-warning text-warning text-uppercase">Partial</span>
+                                                        class="badge bg-soft-success text-success text-uppercase">Fully Issued</span>
+                                                @elseif(in_array($stLower, ['partially issued', 'partial', 'reserved']))
+                                                    <span class="badge bg-soft-warning text-warning text-uppercase">{{ $stLower === 'reserved' ? 'Reserved' : 'Partially Issued' }}</span>
+                                                @elseif($stLower === 'approved')
+                                                    <span class="badge bg-soft-primary text-primary text-uppercase">Approved</span>
                                                 @else
                                                     <span class="badge bg-soft-danger text-danger text-uppercase">Pending</span>
                                                 @endif

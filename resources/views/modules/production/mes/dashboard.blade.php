@@ -351,6 +351,23 @@
 @endsection
 
 @section('content')
+
+    {{-- ── Shop Floor (MES) Workflow Guidance Component ── --}}
+    <x-ui.workflow-guide title="What's Next?">
+        @if(isset($activeSchedules) && $activeSchedules->count() > 0)
+            @php $firstOrder = $activeSchedules->first()->order; @endphp
+            Shop floor operations execution is active. You can assign operators to specific operations from the 
+            @if($firstOrder)
+                <a href="{{ route('production.orders.show', ['order' => $firstOrder->id, 'tab' => 'vtab-operations']) }}" class="fw-bold text-primary text-decoration-underline">Production Order Operations tab</a>
+            @else
+                <a href="{{ route('production.orders.index') }}" class="fw-bold text-primary text-decoration-underline">Production Order Operations tab</a>
+            @endif
+            to allocate operators for live tracking. Operators can also view assigned tasks in the <a href="{{ route('production.mes.operator.dashboard') }}" class="fw-bold text-primary text-decoration-underline">MES Operator Console</a>.
+        @else
+            No active schedules on the shop floor. Release confirmed schedules from <a href="{{ route('production.schedules.index') }}" class="fw-bold text-primary text-decoration-underline">Production Schedules</a> and assign operators under the <a href="{{ route('production.orders.index') }}" class="fw-bold text-primary text-decoration-underline">Production Order Operations tab</a> to begin execution.
+        @endif
+    </x-ui.workflow-guide>
+
     <div class="erp-single-panel bg-transparent border-0 p-0">
 
         <div class="row g-4">
@@ -381,7 +398,7 @@
                         <div class="card-header bg-light border-bottom border-light p-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
                             <div>
                                 <h6 class="fw-bold text-dark mb-1 fs-14">
-                                    <span class="text-primary">{{ $order->order_number ?? '' }}</span>
+                                    <a href="{{ route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-operations']) }}" class="text-primary fw-bold text-decoration-underline" title="Assign operators under Operations tab">{{ $order->order_number ?? '' }}</a>
                                     <span class="mx-1 text-muted">&middot;</span>
                                     {{ $order->product->name ?? 'Unknown Product' }}
                                 </h6>
