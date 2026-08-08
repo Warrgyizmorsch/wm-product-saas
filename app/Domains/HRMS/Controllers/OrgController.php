@@ -31,11 +31,13 @@ class OrgController extends Controller
             'legal_name' => 'required|max:255',
             'email' => 'required|email|max:255',
             'phone' => 'nullable|max:50',
-            'website' => 'nullable|url|max:255',
-            'tax_id' => 'nullable|max:100',
+            'website' => 'nullable|max:255',
+            'gst_number' => 'nullable|max:255',
+            'pan_number' => 'nullable|max:255',
+            'cin_number' => 'nullable|max:255',
+            'registration_number' => 'nullable|max:255',
             'currency' => 'required|max:10',
-            'timezone' => 'required|max:50',
-            'fiscal_year_start' => 'required|max:20',
+            'time_zone' => 'required|max:50',
             'address' => 'nullable|max:500',
             'city' => 'nullable|max:100',
             'state' => 'nullable|max:100',
@@ -43,6 +45,9 @@ class OrgController extends Controller
             'postal_code' => 'nullable|max:20',
             'status' => 'required',
         ]);
+
+        $validated['timezone'] = $validated['time_zone'];
+        unset($validated['time_zone']);
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
         $this->orgRepository->storeCompany($validated);
@@ -57,11 +62,13 @@ class OrgController extends Controller
             'legal_name' => 'required|max:255',
             'email' => 'required|email|max:255',
             'phone' => 'nullable|max:50',
-            'website' => 'nullable|url|max:255',
-            'tax_id' => 'nullable|max:100',
+            'website' => 'nullable|max:255',
+            'gst_number' => 'nullable|max:255',
+            'pan_number' => 'nullable|max:255',
+            'cin_number' => 'nullable|max:255',
+            'registration_number' => 'nullable|max:255',
             'currency' => 'required|max:10',
-            'timezone' => 'required|max:50',
-            'fiscal_year_start' => 'required|max:20',
+            'time_zone' => 'required|max:50',
             'address' => 'nullable|max:500',
             'city' => 'nullable|max:100',
             'state' => 'nullable|max:100',
@@ -69,6 +76,9 @@ class OrgController extends Controller
             'postal_code' => 'nullable|max:20',
             'status' => 'required',
         ]);
+
+        $validated['timezone'] = $validated['time_zone'];
+        unset($validated['time_zone']);
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
         $this->orgRepository->updateCompany($company, $validated);
@@ -127,19 +137,27 @@ class OrgController extends Controller
     public function storeBranch(Request $request)
     {
         $validated = $request->validate([
-            'business_unit_id' => 'required|exists:business_units,id',
+            'company_id' => 'required_without:business_unit_id|nullable|exists:companies,id',
+            'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
             'city' => 'nullable|max:100',
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
-            'timezone' => 'required|max:50',
-            'manager_id' => 'nullable|exists:employees,id',
+            'manager_employee_id' => 'nullable|exists:employees,id',
+            'phone' => 'nullable|max:20',
+            'email' => 'nullable|email|max:255',
+            'address' => 'nullable|max:500',
+            'postal_code' => 'nullable|max:20',
             'status' => 'required',
         ]);
 
-        $bu = BusinessUnit::find($request->business_unit_id);
-        $validated['company_id'] = $bu ? $bu->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
+        if ($request->filled('business_unit_id')) {
+            $bu = BusinessUnit::find($request->business_unit_id);
+            $validated['company_id'] = $bu ? $bu->company_id : $request->company_id;
+        } else {
+            $validated['company_id'] = $request->company_id;
+        }
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->storeBranch($validated);
@@ -150,19 +168,27 @@ class OrgController extends Controller
     public function updateBranch(Request $request, Branch $branch)
     {
         $validated = $request->validate([
-            'business_unit_id' => 'required|exists:business_units,id',
+            'company_id' => 'required_without:business_unit_id|nullable|exists:companies,id',
+            'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
             'city' => 'nullable|max:100',
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
-            'timezone' => 'required|max:50',
-            'manager_id' => 'nullable|exists:employees,id',
+            'manager_employee_id' => 'nullable|exists:employees,id',
+            'phone' => 'nullable|max:20',
+            'email' => 'nullable|email|max:255',
+            'address' => 'nullable|max:500',
+            'postal_code' => 'nullable|max:20',
             'status' => 'required',
         ]);
 
-        $bu = BusinessUnit::find($request->business_unit_id);
-        $validated['company_id'] = $bu ? $bu->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
+        if ($request->filled('business_unit_id')) {
+            $bu = BusinessUnit::find($request->business_unit_id);
+            $validated['company_id'] = $bu ? $bu->company_id : $request->company_id;
+        } else {
+            $validated['company_id'] = $request->company_id;
+        }
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->updateBranch($branch, $validated);
@@ -180,17 +206,30 @@ class OrgController extends Controller
     public function storeDepartment(Request $request)
     {
         $validated = $request->validate([
-            'branch_id' => 'required|exists:branches,id',
+            'company_id' => 'required_without_all:business_unit_id,branch_id|nullable|exists:companies,id',
+            'business_unit_id' => 'required_without_all:company_id,branch_id|nullable|exists:business_units,id',
+            'branch_id' => 'required_without_all:company_id,business_unit_id|nullable|exists:branches,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
             'head_employee_id' => 'nullable|exists:employees,id',
             'parent_department_id' => 'nullable|exists:departments,id',
+            'description' => 'nullable',
             'status' => 'required',
         ]);
 
-        $branch = Branch::find($request->branch_id);
-        $validated['company_id'] = $branch ? $branch->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
-        $validated['business_unit_id'] = $branch ? $branch->business_unit_id : null;
+        if ($request->filled('branch_id')) {
+            $branch = Branch::find($request->branch_id);
+            $validated['business_unit_id'] = $branch ? $branch->business_unit_id : $request->business_unit_id;
+            $validated['company_id'] = $branch ? $branch->company_id : $request->company_id;
+        } elseif ($request->filled('business_unit_id')) {
+            $bu = BusinessUnit::find($request->business_unit_id);
+            $validated['company_id'] = $bu ? $bu->company_id : $request->company_id;
+            $validated['branch_id'] = null;
+        } else {
+            $validated['company_id'] = $request->company_id;
+            $validated['business_unit_id'] = null;
+            $validated['branch_id'] = null;
+        }
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->storeDepartment($validated);
@@ -201,17 +240,30 @@ class OrgController extends Controller
     public function updateDepartment(Request $request, Department $department)
     {
         $validated = $request->validate([
-            'branch_id' => 'required|exists:branches,id',
+            'company_id' => 'required_without_all:business_unit_id,branch_id|nullable|exists:companies,id',
+            'business_unit_id' => 'required_without_all:company_id,branch_id|nullable|exists:business_units,id',
+            'branch_id' => 'required_without_all:company_id,business_unit_id|nullable|exists:branches,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
             'head_employee_id' => 'nullable|exists:employees,id',
             'parent_department_id' => 'nullable|exists:departments,id',
+            'description' => 'nullable',
             'status' => 'required',
         ]);
 
-        $branch = Branch::find($request->branch_id);
-        $validated['company_id'] = $branch ? $branch->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
-        $validated['business_unit_id'] = $branch ? $branch->business_unit_id : null;
+        if ($request->filled('branch_id')) {
+            $branch = Branch::find($request->branch_id);
+            $validated['business_unit_id'] = $branch ? $branch->business_unit_id : $request->business_unit_id;
+            $validated['company_id'] = $branch ? $branch->company_id : $request->company_id;
+        } elseif ($request->filled('business_unit_id')) {
+            $bu = BusinessUnit::find($request->business_unit_id);
+            $validated['company_id'] = $bu ? $bu->company_id : $request->company_id;
+            $validated['branch_id'] = null;
+        } else {
+            $validated['company_id'] = $request->company_id;
+            $validated['business_unit_id'] = null;
+            $validated['branch_id'] = null;
+        }
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->updateDepartment($department, $validated);
@@ -231,7 +283,7 @@ class OrgController extends Controller
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
-            'level' => 'required|max:50',
+            'level' => 'nullable|max:50',
             'status' => 'required',
         ]);
 
@@ -246,7 +298,7 @@ class OrgController extends Controller
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
-            'level' => 'required|max:50',
+            'level' => 'nullable|max:50',
             'status' => 'required',
         ]);
 

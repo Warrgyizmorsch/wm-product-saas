@@ -267,7 +267,68 @@
                     if (form) {
                         form.action = '/hrms/org/department/update/' + dept.id;
                     }
+
+                    // Perform initial toggle for edit modal values
+                    toggleDeptParentRequirements('edit_dept_company_id', 'edit_dept_bu_id', 'edit_dept_branch_id');
                 });
+            });
+
+            function toggleDeptParentRequirements(companySelectId, buSelectId, branchSelectId) {
+                let companySelect = document.getElementById(companySelectId);
+                let buSelect = document.getElementById(buSelectId);
+                let branchSelect = document.getElementById(branchSelectId);
+                if (!companySelect || !buSelect || !branchSelect) return;
+
+                let companyVal = companySelect.value;
+                let buVal = buSelect.value;
+                let branchVal = branchSelect.value;
+
+                let companyLabel = companySelect.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+                let buLabel = buSelect.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+                let branchLabel = branchSelect.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+
+                function clearRequired(select, label) {
+                    select.removeAttribute('required');
+                    if (label) {
+                        label.style.removeProperty('color');
+                        let asterisk = label.querySelector('.text-danger');
+                        if (asterisk) asterisk.remove();
+                    }
+                }
+
+                function setRequired(select, label) {
+                    select.setAttribute('required', 'required');
+                    if (label) {
+                        label.style.color = '#dc3545';
+                        if (!label.querySelector('.text-danger')) {
+                            label.innerHTML += ' <span class="text-danger">*</span>';
+                        }
+                    }
+                }
+
+                if (companyVal || buVal || branchVal) {
+                    clearRequired(companySelect, companyLabel);
+                    clearRequired(buSelect, buLabel);
+                    clearRequired(branchSelect, branchLabel);
+                } else {
+                    setRequired(branchSelect, branchLabel);
+                    clearRequired(companySelect, companyLabel);
+                    clearRequired(buSelect, buLabel);
+                }
+            }
+
+            $(document).on('change change.select2', '#add_dept_company_id, #add_dept_business_unit_id, #add_dept_branch_id', function() {
+                toggleDeptParentRequirements('add_dept_company_id', 'add_dept_business_unit_id', 'add_dept_branch_id');
+            });
+            $(document).on('change change.select2', '#edit_dept_company_id, #edit_dept_bu_id, #edit_dept_branch_id', function() {
+                toggleDeptParentRequirements('edit_dept_company_id', 'edit_dept_bu_id', 'edit_dept_branch_id');
+            });
+
+            $('#addDeptModal').on('shown.bs.modal', function() {
+                toggleDeptParentRequirements('add_dept_company_id', 'add_dept_business_unit_id', 'add_dept_branch_id');
+            });
+            $('#editDeptModal').on('shown.bs.modal', function() {
+                toggleDeptParentRequirements('edit_dept_company_id', 'edit_dept_bu_id', 'edit_dept_branch_id');
             });
         }
 

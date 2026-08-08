@@ -66,7 +66,7 @@
 <div class="hrms-section-title">{{ __('hrms.org.contact_and_status') }}</div>
 <div class="row g-3">
     <div class="col-lg-6">
-        <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.email') }}" name="email" id="{{ $prefix }}_email" inputType="email" placeholder="{{ __('hrms.org.email') }}" :errorText="$errors->first('email')" />
+        <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.email') }}" name="email" id="{{ $prefix }}_email" inputType="email" :required="true" placeholder="{{ __('hrms.org.email') }}" :errorText="$errors->first('email')" />
     </div>
     <div class="col-lg-6">
         <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.phone') }}" name="phone" id="{{ $prefix }}_phone" placeholder="{{ __('hrms.org.phone') }}" :errorText="$errors->first('phone')" />

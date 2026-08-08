@@ -93,12 +93,17 @@ class SalaryStructureController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50',
             'type' => 'required|in:earning,deduction',
+            'calculation_type' => 'nullable|string|max:50',
             'is_adhoc' => 'required|boolean',
             'status' => 'required|boolean',
             'description' => 'nullable|string',
         ];
 
         $validated = $request->validate($rules);
+
+        if (empty($validated['calculation_type'])) {
+            $validated['calculation_type'] = 'fixed';
+        }
 
         if (!empty($validated['pay_group_id'])) {
             $payGroup = PayGroup::find($validated['pay_group_id']);
@@ -124,12 +129,18 @@ class SalaryStructureController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50',
             'type' => 'required|in:earning,deduction',
+            'calculation_type' => 'nullable|string|max:50',
             'is_adhoc' => 'required|boolean',
             'status' => 'required|boolean',
             'description' => 'nullable|string',
         ];
 
         $validated = $request->validate($rules);
+
+        if (empty($validated['calculation_type'])) {
+            $validated['calculation_type'] = 'fixed';
+        }
+
         $this->salaryStructureRepository->updateComponent($salaryComponent, $validated);
 
         $redirectUrl = route('hrms.salary-structure.index');

@@ -235,7 +235,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             ->withQueryString();
         $attendancePenalty = $employee->attendancePenalty;
         $attendancePenalties = \App\Domains\HRMS\Models\AttendancePenalty::where('status', true)->get();
-        $empAttendances = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->with('breaks')->orderBy('date', 'desc')->get();
+        $empAttendances = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->with(['breaks', 'locationLogs'])->orderBy('date', 'desc')->get();
         $todayAttendance = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->where('date', \Carbon\Carbon::today()->format('Y-m-d'))->first();
 
         $isAdminUser = true;

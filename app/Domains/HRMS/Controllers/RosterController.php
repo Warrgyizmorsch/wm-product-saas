@@ -35,14 +35,15 @@ class RosterController extends Controller
             'code'                  => 'required|string|max:50|unique:production_shifts,code',
             'start_time'            => 'required|date_format:H:i',
             'end_time'              => 'required|date_format:H:i',
+            'break_minutes'         => 'nullable|integer|min:0',
             'grace_period_minutes'  => 'nullable|integer|min:0',
             'overtime_allowed'      => 'nullable|boolean',
             'active'                => 'nullable|boolean',
             'description'           => 'nullable|string',
         ]);
 
-        $validated['overtime_allowed'] = $request->has('overtime_allowed');
-        $validated['active']           = $request->has('active');
+        $validated['overtime_allowed'] = ($request->overtime_allowed === '1' || $request->overtime_allowed === 1 || $request->overtime_allowed === true);
+        $validated['active']           = ($request->active === '1' || $request->active === 1 || $request->active === true);
 
         $this->rosterRepository->storeShift($validated);
 
@@ -58,14 +59,15 @@ class RosterController extends Controller
             'code'                 => ['required', 'string', 'max:50', Rule::unique('production_shifts', 'code')->ignore($shift->id)],
             'start_time'           => 'required',
             'end_time'             => 'required',
+            'break_minutes'        => 'nullable|integer|min:0',
             'grace_period_minutes' => 'nullable|integer|min:0',
             'overtime_allowed'     => 'nullable|boolean',
             'active'               => 'nullable|boolean',
             'description'          => 'nullable|string',
         ]);
 
-        $validated['overtime_allowed'] = $request->has('overtime_allowed');
-        $validated['active']           = $request->has('active');
+        $validated['overtime_allowed'] = ($request->overtime_allowed === '1' || $request->overtime_allowed === 1 || $request->overtime_allowed === true);
+        $validated['active']           = ($request->active === '1' || $request->active === 1 || $request->active === true);
 
         $this->rosterRepository->updateShift($shift, $validated);
 

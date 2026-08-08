@@ -31,6 +31,9 @@ use App\Domains\HRMS\Models\LeaveBalance;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\LeaveEncashment;
 use App\Domains\HRMS\Models\AttendanceRule;
+use App\Domains\HRMS\Models\Attendance;
+use App\Domains\HRMS\Models\AttendanceBreak;
+use App\Domains\HRMS\Models\AttendanceLocationLog;
 use App\Domains\HRMS\Models\WfhRequest;
 use App\Domains\HRMS\Models\ShiftChangeRequest;
 use App\Domains\HRMS\Models\OvertimeRequest;
@@ -77,6 +80,11 @@ class HrmsDemoSeeder extends Seeder
         DB::table('leave_types')->truncate();
         DB::table('leave_plans')->truncate();
         DB::table('companies')->truncate();
+        DB::table('attendance_location_logs')->truncate();
+        DB::table('attendance_breaks')->truncate();
+        DB::table('attendances')->truncate();
+        DB::table('attendance_rules')->truncate();
+        DB::table('production_shifts')->truncate();
 
         Schema::enableForeignKeyConstraints();
 
@@ -405,10 +413,13 @@ class HrmsDemoSeeder extends Seeder
         foreach ($shiftsData as $idx => $sData) {
             $shiftObj = ProductionShift::create([
                 'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
                 'name' => $sData['name'],
                 'code' => $sData['code'],
                 'start_time' => $sData['start_time'],
                 'end_time' => $sData['end_time'],
+                'break_minutes' => 30,
+                'overtime_allowed' => ($idx % 2 === 0),
                 'active' => true,
             ]);
             if ($idx === 0) {
@@ -534,6 +545,15 @@ class HrmsDemoSeeder extends Seeder
             'end_date' => '2022-03-31',
             'job_description' => 'Managed end-to-end recruitment pipelines, resolved employee grievances, and oversaw employee benefits program.',
         ]);
+        EmployeeEmploymentHistory::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employeeHR->id,
+            'company_name' => 'Apex Solutions Ltd',
+            'designation' => 'HR Executive',
+            'start_date' => '2015-06-01',
+            'end_date' => '2017-12-30',
+            'job_description' => 'Handled payroll processing, employee onboarding, leaves administration, and performance appraisal tracking.',
+        ]);
 
         EmployeeEmploymentHistory::create([
             'tenant_id' => $tenant->id,
@@ -544,12 +564,43 @@ class HrmsDemoSeeder extends Seeder
             'end_date' => '2025-12-31',
             'job_description' => 'Assisted senior welders in manufacturing vehicle chassis, followed precision drawings, and maintained safety logs.',
         ]);
+        EmployeeEmploymentHistory::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employeeOperator->id,
+            'company_name' => 'Steelcraft Industries',
+            'designation' => 'Junior Fitter',
+            'start_date' => '2021-03-10',
+            'end_date' => '2023-11-25',
+            'job_description' => 'Operated heavy machinery, adjusted machine settings, and performed basic welding repairs on pipeline connections.',
+        ]);
+
+        EmployeeEmploymentHistory::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employeeLead->id,
+            'company_name' => 'Schneider Electric',
+            'designation' => 'Production Supervisor',
+            'start_date' => '2020-05-15',
+            'end_date' => '2023-12-20',
+            'job_description' => 'Managed shop floor production lines, optimized resource scheduling, conducted regular safety drills, and audited product batches.',
+        ]);
+        EmployeeEmploymentHistory::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employeeLead->id,
+            'company_name' => 'Bosch India Pvt Ltd',
+            'designation' => 'Production Assistant Engineer',
+            'start_date' => '2016-08-01',
+            'end_date' => '2020-04-30',
+            'job_description' => 'Assisted in plant production runs, prepared operational performance dashboards, and troubleshot mechanical issues.',
+        ]);
 
         // Attendance Penalization History (12 Penalties)
         $penaltiesData = [
             ['emp' => $employeeOperator, 'date' => '2026-06-15', 'rule' => 'late_arrival', 'amount' => 0.50, 'status' => 'processed', 'month' => '2026-06', 'remarks' => 'Arrived at 09:45 AM (Grace period ended at 08:15 AM)'],
+            ['emp' => $employeeOperator, 'date' => '2026-07-25', 'rule' => 'missing_swipe', 'amount' => 1.00, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Forgot to swipe out at shift end.'],
             ['emp' => $employeeLead, 'date' => '2026-06-18', 'rule' => 'late_arrival', 'amount' => 0.25, 'status' => 'processed', 'month' => '2026-06', 'remarks' => 'Late arrival by 22 minutes due to traffic.'],
+            ['emp' => $employeeLead, 'date' => '2026-07-22', 'rule' => 'early_exit', 'amount' => 0.50, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Left early before core hours completed.'],
             ['emp' => $employeeHR, 'date' => '2026-06-22', 'rule' => 'early_exit', 'amount' => 0.50, 'status' => 'processed', 'month' => '2026-06', 'remarks' => 'Early exit without approved gate pass.'],
+            ['emp' => $employeeHR, 'date' => '2026-07-20', 'rule' => 'late_arrival', 'amount' => 0.25, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Late arrival due to heavy rainfall.'],
             ['emp' => $employeesList[3], 'date' => '2026-07-02', 'rule' => 'late_arrival', 'amount' => 0.25, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Late arrival by 18 minutes.'],
             ['emp' => $employeesList[4], 'date' => '2026-07-03', 'rule' => 'missing_swipe', 'amount' => 1.00, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Missing evening out-swipe.'],
             ['emp' => $employeesList[5], 'date' => '2026-07-05', 'rule' => 'late_arrival', 'amount' => 0.50, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Third consecutive late arrival.'],
@@ -868,7 +919,7 @@ class HrmsDemoSeeder extends Seeder
             'notes' => 'Spare laptop in IT storage.',
         ]);
 
-        Asset::create([
+        $assetHPElite = Asset::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatElectronics->id,
@@ -904,7 +955,7 @@ class HrmsDemoSeeder extends Seeder
             'notes' => 'Unassigned monitor in IT lab.',
         ]);
 
-        Asset::create([
+        $assetMobile = Asset::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatElectronics->id,
@@ -940,7 +991,7 @@ class HrmsDemoSeeder extends Seeder
             'notes' => 'Docking station available for request.',
         ]);
 
-        Asset::create([
+        $assetChair = Asset::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatPeripherals->id,
@@ -993,7 +1044,7 @@ class HrmsDemoSeeder extends Seeder
             'notes' => 'Call center wireless headset.',
         ]);
 
-        Asset::create([
+        $assetToolKit = Asset::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatSafety->id,
@@ -1029,7 +1080,7 @@ class HrmsDemoSeeder extends Seeder
             'notes' => 'Quality audit tablet.',
         ]);
 
-        Asset::create([
+        $assetDellLaptop2 = Asset::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatElectronics->id,
@@ -1048,7 +1099,7 @@ class HrmsDemoSeeder extends Seeder
             'notes' => 'Assigned for shop floor reporting.',
         ]);
 
-        Asset::create([
+        $assetDellMonitor2 = Asset::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatElectronics->id,
@@ -1082,6 +1133,79 @@ class HrmsDemoSeeder extends Seeder
             'condition' => 'new',
             'status' => 'available',
             'notes' => 'Backup welding helmet.',
+        ]);
+
+        // Seed Asset Allocations
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetLaptop->id,
+            'employee_id' => $employeeHR->id,
+            'allocated_at' => '2025-05-15',
+            'allocation_condition' => 'good',
+            'notes' => 'Assigned for HR administration use.',
+        ]);
+
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetWeldingMask->id,
+            'employee_id' => $employeeOperator->id,
+            'allocated_at' => '2026-02-10',
+            'allocation_condition' => 'new',
+            'notes' => 'Assigned welder mask.',
+        ]);
+
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetHPElite->id,
+            'employee_id' => $employeeLead->id,
+            'allocated_at' => '2026-01-20',
+            'allocation_condition' => 'good',
+            'notes' => 'Assigned to production lead.',
+        ]);
+
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetMobile->id,
+            'employee_id' => $employeeOperator->id,
+            'allocated_at' => '2026-05-05',
+            'allocation_condition' => 'good',
+            'notes' => 'Shift manager communication phone.',
+        ]);
+
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetChair->id,
+            'employee_id' => $employeeHR->id,
+            'allocated_at' => '2025-11-25',
+            'allocation_condition' => 'good',
+            'notes' => 'Office desk chair.',
+        ]);
+
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetToolKit->id,
+            'employee_id' => $employeeOperator->id,
+            'allocated_at' => '2026-01-12',
+            'allocation_condition' => 'good',
+            'notes' => 'Maintenance toolset.',
+        ]);
+
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetDellLaptop2->id,
+            'employee_id' => $employeeLead->id,
+            'allocated_at' => '2026-03-05',
+            'allocation_condition' => 'good',
+            'notes' => 'Assigned for shop floor reporting.',
+        ]);
+
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetDellMonitor2->id,
+            'employee_id' => $employeeLead->id,
+            'allocated_at' => '2026-04-15',
+            'allocation_condition' => 'good',
+            'notes' => 'Secondary monitor assigned.',
         ]);
 
 
@@ -1310,6 +1434,54 @@ class HrmsDemoSeeder extends Seeder
             'file_path' => 'uploads/documents/employees/mba_degree_sophia.pdf',
             'file_type' => 'application/pdf',
             'file_size' => 458000,
+            'status' => 'approved',
+            'has_expiry' => false,
+            'expiry_date' => null,
+            'requested_by_id' => $adminUser->id,
+        ]);
+
+        Document::create([
+            'tenant_id' => $tenant->id,
+            'documentable_type' => Employee::class,
+            'documentable_id' => $employeeHR->id,
+            'name' => 'Passport Copy (Front & Back)',
+            'description' => 'Government issued passport document for international identity validation.',
+            'file_name' => 'passport_sophia.pdf',
+            'file_path' => 'uploads/documents/employees/passport_sophia.pdf',
+            'file_type' => 'application/pdf',
+            'file_size' => 285000,
+            'status' => 'approved',
+            'has_expiry' => true,
+            'expiry_date' => '2030-10-15',
+            'requested_by_id' => $adminUser->id,
+        ]);
+
+        Document::create([
+            'tenant_id' => $tenant->id,
+            'documentable_type' => Employee::class,
+            'documentable_id' => $employeeLead->id,
+            'name' => 'Aadhaar Card Copy',
+            'description' => 'Govt issued resident card for regional address and identity check.',
+            'file_name' => 'aadhaar_rajesh.pdf',
+            'file_path' => 'uploads/documents/employees/aadhaar_rajesh.pdf',
+            'file_type' => 'application/pdf',
+            'file_size' => 195000,
+            'status' => 'approved',
+            'has_expiry' => false,
+            'expiry_date' => null,
+            'requested_by_id' => $adminUser->id,
+        ]);
+
+        Document::create([
+            'tenant_id' => $tenant->id,
+            'documentable_type' => Employee::class,
+            'documentable_id' => $employeeLead->id,
+            'name' => 'B.Tech Mechanical Degree Certificate',
+            'description' => 'Official engineering qualification certificate from technical university.',
+            'file_name' => 'btech_mechanical_rajesh.pdf',
+            'file_path' => 'uploads/documents/employees/btech_mechanical_rajesh.pdf',
+            'file_type' => 'application/pdf',
+            'file_size' => 380000,
             'status' => 'approved',
             'has_expiry' => false,
             'expiry_date' => null,
@@ -1573,6 +1745,118 @@ class HrmsDemoSeeder extends Seeder
                 'status' => 'rejected',
                 'rejection_reason' => 'Not pre-approved by shift lead.',
             ]);
+        }
+
+        // 4. Seed Default Attendance Rule for the Company
+        AttendanceRule::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'office_biometric' => false,
+            'office_web' => true,
+            'office_geofence' => true,
+            'office_latitude' => '28.61390000',
+            'office_longitude' => '77.20900000',
+            'office_radius' => 200,
+            'office_tracking' => true,
+            'office_tracking_minutes' => 15,
+            'wfh_location' => true,
+            'wfh_selfie' => true,
+            'wfh_geofence' => true,
+            'wfh_tracking' => true,
+            'wfh_tracking_meters' => 150,
+            'wfh_tracking_minutes' => 15,
+            'site_location' => true,
+            'site_selfie' => true,
+            'site_geofence' => false,
+            'site_tracking' => true,
+            'site_tracking_meters' => 100,
+            'site_tracking_minutes' => 15,
+            'status' => true,
+        ]);
+
+        // 5. Seed Attendance Logs, Breaks, and Location Tracking Logs for the last 10 days
+        $today = \Carbon\Carbon::now();
+        for ($dayOffset = 9; $dayOffset >= 0; $dayOffset--) {
+            $date = (clone $today)->subDays($dayOffset);
+            
+            // Skip weekends for a more realistic dataset
+            if ($date->isWeekend()) {
+                continue;
+            }
+            
+            foreach ($seederEmployees as $emp) {
+                // Determine check-in and check-out times based on shift or defaults
+                $checkin = (clone $date)->setTime(9, rand(0, 20), rand(0, 59));
+                $checkout = (clone $date)->setTime(18, rand(0, 15), rand(0, 59));
+                
+                // Location type matches the employee's work mode
+                $locationType = $emp->office ?: 'office';
+                
+                // Let's vary the status (some present, some late)
+                $status = 'present';
+                if ($checkin->format('H:i:s') > '09:15:00') {
+                    $status = 'late';
+                }
+                
+                // Calculate hours
+                $workHours = 8.5 + (rand(-30, 30) / 60.0);
+                
+                // Set coordinates near the designated WFH/office geofence
+                $lat = null;
+                $lng = null;
+                if ($locationType === 'office') {
+                    // Near New Delhi Connaught Place (Office coordinates 28.6139, 77.2090)
+                    $lat = 28.6139 + (rand(-50, 50) / 100000.0);
+                    $lng = 77.2090 + (rand(-50, 50) / 100000.0);
+                } elseif ($locationType === 'wfh') {
+                    // Near employee's WFH coordinates (default to 28.6200, 77.2200 if not configured)
+                    $baseLat = $emp->wfh_latitude ? (float)$emp->wfh_latitude : 28.6200;
+                    $baseLng = $emp->wfh_longitude ? (float)$emp->wfh_longitude : 77.2200;
+                    $lat = $baseLat + (rand(-30, 30) / 100000.0);
+                    $lng = $baseLng + (rand(-30, 30) / 100000.0);
+                } else {
+                    // Onsite: arbitrary location near Mumbai
+                    $lat = 19.0760 + (rand(-100, 100) / 100000.0);
+                    $lng = 72.8777 + (rand(-100, 100) / 100000.0);
+                }
+                
+                $attendance = Attendance::create([
+                    'tenant_id' => $tenant->id,
+                    'employee_id' => $emp->id,
+                    'date' => $date->format('Y-m-d'),
+                    'check_in' => $checkin,
+                    'check_out' => $checkout,
+                    'location_type' => $locationType,
+                    'status' => $status,
+                    'total_work_hours' => $workHours,
+                    'total_break_hours' => 0.75, // 45 mins break
+                    'check_in_latitude' => $lat,
+                    'check_in_longitude' => $lng,
+                    'check_out_latitude' => $lat ? $lat + (rand(-5, 5) / 100000.0) : null,
+                    'check_out_longitude' => $lng ? $lng + (rand(-5, 5) / 100000.0) : null,
+                ]);
+                
+                // Add a break for every attendance
+                AttendanceBreak::create([
+                    'attendance_id' => $attendance->id,
+                    'break_in' => (clone $date)->setTime(13, rand(0, 10), 0),
+                    'break_out' => (clone $date)->setTime(13, rand(40, 55), 0),
+                    'duration_minutes' => 45,
+                ]);
+                
+                // Seed 15-minute intermediate location tracking logs (e.g. 4 logs per day)
+                if ($lat && $lng) {
+                    for ($hourOffset = 10; $hourOffset <= 16; $hourOffset += 2) {
+                        AttendanceLocationLog::create([
+                            'tenant_id' => $tenant->id,
+                            'attendance_id' => $attendance->id,
+                            'latitude' => $lat + (rand(-10, 10) / 100000.0),
+                            'longitude' => $lng + (rand(-10, 10) / 100000.0),
+                            'created_at' => (clone $date)->setTime($hourOffset, rand(0, 59), 0),
+                        ]);
+                    }
+                }
+            }
         }
     }
 }

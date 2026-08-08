@@ -1,3 +1,9 @@
+@push('styles')
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+@endpush
+@push('scripts')
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+@endpush
 <div class="tab-pane fade {{ $activeTabName === 'wfh' ? 'show active' : '' }}" id="wfh-pane" role="tabpanel" aria-labelledby="wfh-tab">
     @php
         $wfhTotalCount = $empWfhRequests->count();
@@ -409,18 +415,27 @@
                     <div class="mb-3">
                         <div class="card bg-light border p-3 rounded-3 shadow-sm">
                             <div class="fw-bold text-dark fs-12 mb-2"><i class="feather-map-pin me-1 text-primary"></i> WFH Target Coordinates</div>
-                            <div class="row g-2">
-                                <div class="col-md-5">
-                                    <x-ui.odoo-form-ui type="input" label="WFH Latitude" name="wfh_latitude" id="wfh_req_latitude" placeholder="e.g. 37.774900" class="odoo-underline-input" />
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-4">
+                                    <x-ui.odoo-form-ui type="input" label="WFH Latitude" name="wfh_latitude" id="wfh_req_latitude" placeholder="e.g. 28.6139" class="odoo-underline-input" />
                                 </div>
-                                <div class="col-md-5">
-                                    <x-ui.odoo-form-ui type="input" label="WFH Longitude" name="wfh_longitude" id="wfh_req_longitude" placeholder="e.g. -122.419400" class="odoo-underline-input" />
+                                <div class="col-md-4">
+                                    <x-ui.odoo-form-ui type="input" label="WFH Longitude" name="wfh_longitude" id="wfh_req_longitude" placeholder="e.g. 77.2090" class="odoo-underline-input" />
                                 </div>
-                                <div class="col-md-2 d-flex align-items-end">
-                                    <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btn_detect_wfh_req_loc" style="height: 31px; font-size: 11px;">
-                                        <i class="feather-compass"></i> Detect
-                                    </button>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="d-flex gap-2 w-100">
+                                        <button type="button" class="btn btn-primary btn-sm flex-fill" id="btn_detect_wfh_req_loc" style="font-size: 11px;">
+                                            <i class="feather-crosshair me-1"></i>Detect
+                                        </button>
+                                        <button type="button" class="btn btn-light-brand btn-sm flex-fill" id="btn_toggle_wfh_req_map" style="font-size: 11px;" onclick="toggleWfhReqMap()">
+                                            <i class="feather-map me-1"></i>Map
+                                        </button>
+                                    </div>
                                 </div>
+                            </div>
+                            <div class="position-relative mt-3" id="wfh_req_map_wrap" style="display: none;">
+                                <input type="text" id="wfh_req_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="Search address or subarea (Press Enter)...">
+                                <div id="wfh_req_map_picker" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #ced4da; z-index: 1;"></div>
                             </div>
                             <small class="form-text text-muted fs-11 mt-1">If WFH geofencing is enabled, checking in will require matching these coordinates.</small>
                         </div>
@@ -492,11 +507,187 @@
 
 @push('scripts')
 <script>
-document.addEventListener("DOMContentLoaded", function() {
+const runWfhReqSetup = () => {
+    let reqWfhMap = null;
+    let reqWfhMarker = null;
+
+    const initWfhReqMapPicker = () => {
+        if (typeof L === 'undefined') {
+            setTimeout(initWfhReqMapPicker, 100);
+            return;
+        }
+
+        const mapContainerId = 'wfh_req_map_picker';
+        const latInput = $('#wfh_req_latitude');
+        const lngInput = $('#wfh_req_longitude');
+        
+        if (!document.getElementById(mapContainerId)) return;
+
+        let initialLat = parseFloat(latInput.val()) || 28.6139; // Default center
+        let initialLng = parseFloat(lngInput.val()) || 77.2090;
+        
+        if (reqWfhMap) {
+            setTimeout(() => {
+                reqWfhMap.invalidateSize();
+            }, 300);
+            return;
+        }
+
+        reqWfhMap = L.map(mapContainerId).setView([initialLat, initialLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(reqWfhMap);
+
+        reqWfhMarker = L.marker([initialLat, initialLng], { draggable: true }).addTo(reqWfhMap);
+
+        // Update inputs on marker drag
+        reqWfhMarker.on('dragend', function(e) {
+            const position = reqWfhMarker.getLatLng();
+            latInput.val(position.lat.toFixed(8));
+            lngInput.val(position.lng.toFixed(8));
+        });
+
+        // Update marker and inputs on map click
+        reqWfhMap.on('click', function(e) {
+            reqWfhMarker.setLatLng(e.latlng);
+            latInput.val(e.latlng.lat.toFixed(8));
+            lngInput.val(e.latlng.lng.toFixed(8));
+        });
+
+        // Update map when inputs change manually
+        const updateMapFromInputs = () => {
+            const lat = parseFloat(latInput.val());
+            const lng = parseFloat(lngInput.val());
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const latlng = [lat, lng];
+                reqWfhMarker.setLatLng(latlng);
+                reqWfhMap.setView(latlng, reqWfhMap.getZoom());
+            }
+        };
+
+        latInput.on('input', updateMapFromInputs);
+        lngInput.on('input', updateMapFromInputs);
+
+        // Address Search Geocoding logic
+        const searchInput = $('#wfh_req_map_search');
+
+        const performSearch = () => {
+            const query = searchInput.val();
+            if (!query) return;
+
+            searchInput.prop('disabled', true).attr('placeholder', 'Searching...');
+            
+            // Use ArcGIS World Geocoding Service (Free public lookup) for high accuracy address/subarea search
+            fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query)}&maxLocations=1`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.candidates && data.candidates.length > 0) {
+                        const lat = parseFloat(data.candidates[0].location.y);
+                        const lng = parseFloat(data.candidates[0].location.x);
+                        
+                        latInput.val(lat.toFixed(8));
+                        lngInput.val(lng.toFixed(8));
+
+                        if (reqWfhMap && reqWfhMarker) {
+                            reqWfhMarker.setLatLng([lat, lng]);
+                            reqWfhMap.setView([lat, lng], 15);
+                        }
+                        searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
+                    } else {
+                        // Fallback to OSM Nominatim
+                        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+                            .then(res2 => res2.json())
+                            .then(data2 => {
+                                if (data2 && data2.length > 0) {
+                                    const lat = parseFloat(data2[0].lat);
+                                    const lng = parseFloat(data2[0].lon);
+                                    
+                                    latInput.val(lat.toFixed(8));
+                                    lngInput.val(lng.toFixed(8));
+
+                                    if (reqWfhMap && reqWfhMarker) {
+                                        reqWfhMarker.setLatLng([lat, lng]);
+                                        reqWfhMap.setView([lat, lng], 15);
+                                    }
+                                } else {
+                                    alert("Location not found. Please try a different query.");
+                                }
+                                searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
+                            })
+                            .catch(err => {
+                                alert("Location not found. Please try a different query.");
+                                searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
+                            });
+                    }
+                })
+                .catch(err => {
+                    console.error("Geocoding error:", err);
+                    searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
+                });
+        };
+
+        searchInput.on('keypress', function(e) {
+            if (e.which === 13) {
+                e.preventDefault();
+                performSearch();
+            }
+        });
+
+        setTimeout(() => {
+            reqWfhMap.invalidateSize();
+        }, 300);
+    };
+
     const setupWfhRequestCoords = () => {
         if (typeof $ === 'undefined') {
             setTimeout(setupWfhRequestCoords, 100);
             return;
+        }
+
+        // Toggle map open/close
+        window.toggleWfhReqMap = function() {
+            const mapWrap = document.getElementById('wfh_req_map_wrap');
+            const toggleBtn = document.getElementById('btn_toggle_wfh_req_map');
+            if (!mapWrap) return;
+            const isVisible = mapWrap.style.display !== 'none';
+            if (isVisible) {
+                mapWrap.style.display = 'none';
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = '<i class="feather-map me-1"></i>Map';
+                    toggleBtn.classList.remove('btn-secondary');
+                    toggleBtn.classList.add('btn-soft-secondary');
+                }
+            } else {
+                mapWrap.style.display = 'block';
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = '<i class="feather-x me-1"></i>Hide Map';
+                    toggleBtn.classList.remove('btn-soft-secondary');
+                    toggleBtn.classList.add('btn-secondary');
+                }
+                setTimeout(initWfhReqMapPicker, 150);
+            }
+        };
+
+        // Initialize/invalidate on modal show — only reset search, don't auto-show map
+        const modalEl = document.getElementById('empApplyWfhModal');
+        if (modalEl) {
+            modalEl.addEventListener('shown.bs.modal', function() {
+                const searchInput = $('#wfh_req_map_search');
+                if (searchInput.length) {
+                    searchInput.val('');
+                    searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
+                }
+                // Reset map visibility
+                const mapWrap = document.getElementById('wfh_req_map_wrap');
+                const toggleBtn = document.getElementById('btn_toggle_wfh_req_map');
+                if (mapWrap) mapWrap.style.display = 'none';
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = '<i class="feather-map me-1"></i>Map';
+                    toggleBtn.classList.remove('btn-secondary');
+                    toggleBtn.classList.add('btn-soft-secondary');
+                }
+            });
         }
 
         $('#btn_detect_wfh_req_loc').on('click', function() {
@@ -512,8 +703,28 @@ document.addEventListener("DOMContentLoaded", function() {
 
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    $('#wfh_req_latitude').val(position.coords.latitude.toFixed(8));
-                    $('#wfh_req_longitude').val(position.coords.longitude.toFixed(8));
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    $('#wfh_req_latitude').val(lat.toFixed(8));
+                    $('#wfh_req_longitude').val(lng.toFixed(8));
+                    
+                    if (reqWfhMap && reqWfhMarker) {
+                        reqWfhMarker.setLatLng([lat, lng]);
+                        reqWfhMap.setView([lat, lng], 15);
+                    } else {
+                        // Auto-open map to show detected location
+                        const mapWrap = document.getElementById('wfh_req_map_wrap');
+                        if (mapWrap && mapWrap.style.display === 'none') {
+                            window.toggleWfhReqMap();
+                            setTimeout(() => {
+                                if (reqWfhMap && reqWfhMarker) {
+                                    reqWfhMarker.setLatLng([lat, lng]);
+                                    reqWfhMap.setView([lat, lng], 15);
+                                }
+                            }, 600);
+                        }
+                    }
+                    
                     btn.prop('disabled', false).html(originalHtml);
                 },
                 function(error) {
@@ -530,7 +741,13 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 
     setupWfhRequestCoords();
-});
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runWfhReqSetup);
+} else {
+    runWfhReqSetup();
+}
 </script>@endpush
 
 @push('styles')
