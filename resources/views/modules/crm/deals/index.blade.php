@@ -75,6 +75,18 @@
     .table-responsive::-webkit-scrollbar {
         display: none;
     }
+
+    /* Select2 status selector matching Lead listing */
+    .select2-container--bootstrap-5 .select2-selection--single {
+        padding: 2px 8px;
+        height: auto;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .status-select + .select2-container {
+        min-width: 140px !important;
+        width: 140px !important;
+    }
 </style>
 @endpush
 
@@ -211,7 +223,7 @@
                         <th style="width: 15%; background-color: #e8ecf1 !important;">PHONE / EMAIL</th>
                         <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">EST. VALUE (₹)</th>
                         <th style="width: 13%; background-color: #e8ecf1 !important;">CLOSING DATE & STATUS</th>
-                        <th style="width: 6%; background-color: #e8ecf1 !important;">STAGE</th>
+                        <th style="width: 12%; background-color: #e8ecf1 !important;">STAGE</th>
                         <th style="width: 4%; background-color: #e8ecf1 !important;" class="text-end pe-3">ACTIONS</th>
                     </tr>
                 </thead>
@@ -332,9 +344,38 @@
                                 @endif
                             </td>
                             <td>
-                                <span class="badge bg-soft-{{ $badgeColor }} text-{{ $badgeColor }} border border-{{ $badgeColor }}-subtle px-2.5 py-1 fw-bold">
-                                    {{ $normalizedStage }}
-                                </span>
+                                @if ($normalizedStage === 'Won')
+                                    <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 fw-bold">
+                                        <i class="feather-check-circle me-1"></i>Won
+                                    </span>
+                                @elseif ($normalizedStage === 'Lost')
+                                    <span class="badge bg-soft-danger text-danger px-2.5 py-1 fs-11 fw-bold">
+                                        <i class="feather-x-circle me-1"></i>Lost
+                                    </span>
+                                @else
+                                    <div class="d-flex flex-column gap-1">
+                                        <form action="{{ route('crm.deals.updateStage', $deal->id) }}" method="POST" class="d-inline">
+                                            @csrf
+                                            @method('PATCH')
+                                            <select name="stage" class="form-control status-select" data-select2-selector="status" onchange="this.form.submit()" style="width: 145px;">
+                                                @foreach(['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost'] as $stageOption)
+                                                    @php
+                                                        $bgClass = 'bg-info';
+                                                        if ($stageOption === 'Qualification') $bgClass = 'bg-info';
+                                                        elseif ($stageOption === 'Needs Analysis') $bgClass = 'bg-primary';
+                                                        elseif ($stageOption === 'Proposal') $bgClass = 'bg-warning';
+                                                        elseif ($stageOption === 'Negotiation') $bgClass = 'bg-teal';
+                                                        elseif ($stageOption === 'Won') $bgClass = 'bg-success';
+                                                        elseif ($stageOption === 'Lost') $bgClass = 'bg-danger';
+                                                    @endphp
+                                                    <option value="{{ $stageOption }}" data-bg="{{ $bgClass }}" {{ $normalizedStage === $stageOption ? 'selected' : '' }}>
+                                                        {{ $stageOption }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </form>
+                                    </div>
+                                @endif
                             </td>
                             <td class="text-end pe-3">
                                 <x-ui.action-dropdown :viewUrl="route('crm.deals.show', $deal)">
@@ -370,3 +411,15 @@
     </div>
 @endsection
 
+@push('scripts')
+<script>
+    $(function () {
+        $(document).on('change change.select2', '.status-select, .stage-select', function() {
+            var form = $(this).closest('form');
+            if (form.length) {
+                form[0].submit();
+            }
+        });
+    });
+</script>
+@endpush

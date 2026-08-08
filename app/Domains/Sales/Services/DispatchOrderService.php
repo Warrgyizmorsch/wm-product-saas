@@ -169,6 +169,46 @@ class DispatchOrderService
                             'available_qty' => max(0.0, (float) $whStock->quantity - $newReserved),
                         ]);
                     }
+
+                    // Fulfill active StockReservation records in stock_reservations table
+                    if ($consumeReserved > 0) {
+                        $reservations = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+                            ->where('product_id', $item->product_id)
+                            ->where('status', 'Active')
+                            ->where(function ($q) use ($dispatch, $mrItem) {
+                                if ($mrItem) {
+                                    $q->where('reference_item_id', $mrItem->id)
+                                      ->orWhere(function($q2) use ($mrItem) {
+                                          $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement'])
+                                             ->where('reference_id', $mrItem->material_requirement_id);
+                                      });
+                                }
+                                if ($dispatch->material_requirement_id) {
+                                    $q->orWhere(function($q2) use ($dispatch) {
+                                        $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement'])
+                                           ->where('reference_id', $dispatch->material_requirement_id);
+                                    });
+                                }
+                            })
+                            ->get();
+
+                        $qtyToFulfill = $consumeReserved;
+                        foreach ($reservations as $res) {
+                            if ($qtyToFulfill <= 0) break;
+
+                            $resQty = (float) $res->reserved_qty;
+                            if ($resQty <= $qtyToFulfill) {
+                                $qtyToFulfill -= $resQty;
+                                $res->update([
+                                    'reserved_qty' => 0,
+                                    'status' => 'Completed',
+                                ]);
+                            } else {
+                                $res->decrement('reserved_qty', $qtyToFulfill);
+                                $qtyToFulfill = 0;
+                            }
+                        }
+                    }
                 }
 
                 $snRaw = $item->serial_numbers ?? '';
@@ -185,9 +225,53 @@ class DispatchOrderService
                 );
 
                 $item->update(['status' => 'Dispatched']);
+
+                if ($mrItem) {
+                    $mrOrdered = (float)($mrItem->quantity_ordered > 0 ? $mrItem->quantity_ordered : $mrItem->quantity);
+                    $mrDispatched = (float)$mrItem->dispatched_qty;
+                    $mrReserved = (float)$mrItem->quantity_reserved;
+
+                    if ($mrDispatched >= $mrOrdered) {
+                        $mrItem->update(['status' => 'Dispatched']);
+                    } elseif ($mrDispatched > 0) {
+                        $mrItem->update(['status' => 'Partially Dispatched']);
+                    } elseif ($mrReserved >= $mrOrdered) {
+                        $mrItem->update(['status' => 'Reserved']);
+                    } elseif ($mrReserved > 0) {
+                        $mrItem->update(['status' => 'Partially Reserved']);
+                    } else {
+                        $mrItem->update(['status' => 'Pending']);
+                    }
+                }
             }
 
             $dispatch->update(['status' => 'Dispatched']);
+
+            // Update linked Material Requirement document status
+            if ($dispatch->materialRequirement) {
+                $mr = $dispatch->materialRequirement;
+                $allFullyDispatched = true;
+                $anyDispatchedOrReserved = false;
+
+                foreach ($mr->items as $mi) {
+                    $mOrdered = (float)($mi->quantity_ordered > 0 ? $mi->quantity_ordered : $mi->quantity);
+                    $mDispatched = (float)$mi->dispatched_qty;
+                    $mReserved = (float)$mi->quantity_reserved;
+
+                    if ($mDispatched < $mOrdered) {
+                        $allFullyDispatched = false;
+                    }
+                    if ($mDispatched > 0 || $mReserved > 0) {
+                        $anyDispatchedOrReserved = true;
+                    }
+                }
+
+                if ($allFullyDispatched) {
+                    $mr->update(['status' => 'Dispatched']);
+                } elseif ($anyDispatchedOrReserved) {
+                    $mr->update(['status' => 'Processing']);
+                }
+            }
 
             // Update linked Sales Order status
             if ($dispatch->salesOrder) {

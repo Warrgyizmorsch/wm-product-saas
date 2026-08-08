@@ -259,7 +259,7 @@ class BatchProductionService
                 ->where('production_batch_id', $batch->id)
                 ->exists();
 
-            if ($hasProgress || $hasWipTx || (float)$batch->actual_quantity > 0) {
+            if ($hasProgress || $hasWipTx || (float) $batch->actual_quantity > 0) {
                 throw new \InvalidArgumentException("Batch #{$batch->batch_number} has already started production or has recorded progress and cannot be cancelled.");
             }
 

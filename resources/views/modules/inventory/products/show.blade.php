@@ -698,7 +698,7 @@
                                         </tr>
                                     </thead>
                                     <tbody class="fs-13 text-dark">
-                                        @forelse($product->stockReservations as $res)
+                                        @forelse($product->stockReservations->where('status', 'Active') as $res)
                                             <tr>
                                                 <td>{{ $res->created_at->format('Y-m-d h:i A') }}</td>
                                                 <td>

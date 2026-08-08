@@ -182,7 +182,9 @@ class ProductionScheduleController extends Controller
                 'released_by' => auth()->id(),
             ]);
 
-            return redirect()->back()->with('success', "Released to the shop floor! Visit Shop Floor (MES) to see operations.");
+            return redirect()
+                ->route('production.mes.dashboard')
+                ->with('success', "Schedule [{$schedule->schedule_number}] released to the shop floor successfully!");
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

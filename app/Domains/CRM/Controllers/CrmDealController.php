@@ -326,7 +326,7 @@ class CrmDealController extends Controller
                         'message' => $errMsg
                     ], 422);
                 }
-                return redirect()->route('crm.deals.show', $deal->id)->with('error', $errMsg);
+                return redirect()->back()->with('error', $errMsg);
             }
         }
 
@@ -355,7 +355,7 @@ class CrmDealController extends Controller
             ]);
         }
 
-        return redirect()->route('crm.deals.show', $deal->id)->with('success', $msg);
+        return redirect()->back()->with('success', $msg);
     }
 
     public function destroy(CrmDeal $deal): RedirectResponse

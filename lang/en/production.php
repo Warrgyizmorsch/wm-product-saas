@@ -718,7 +718,7 @@ return [
     'manual_scheduling' => 'Manual Scheduling — Coming Soon',
     'scheduling_info_heading' => 'How Scheduling Works',
     'scheduling_info_body' => 'The scheduling engine will automatically:<br>• Calculate planned start and finish times for each operation based on routing sequence.<br>• Assign operations to their configured Work Centers and Machines.<br>• Validate machine availability and work center eligibility.<br>• Alert you to any capacity overloads or conflicts.',
-    'generate_schedule' => 'Generate Schedule',
+    'generate_schedule' => 'Plan & Schedule Order',
     'schedule_details' => 'Schedule Details (:number)',
     'total_operations' => 'Total Operations',
     'remaining' => 'Remaining',
