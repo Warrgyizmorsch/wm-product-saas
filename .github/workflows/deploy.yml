@@ -13,8 +13,8 @@ jobs:
       - name: Deploy to Server
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: server.warrgyizmorsch.com
-          username: londonstreetstor
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
 
@@ -35,10 +35,10 @@ jobs:
             php artisan storage:link || true
 
             echo "Running Migrations..."
-            php artisan migrate --force
+            php artisan migrate 
 
             echo "Running Seeder..."
-            php artisan db:seed --force || true
+            php artisan db:seed || true
 
             echo "Optimizing..."
             php artisan optimize:clear
