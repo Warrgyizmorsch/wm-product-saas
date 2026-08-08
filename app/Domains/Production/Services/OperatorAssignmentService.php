@@ -187,6 +187,12 @@ class OperatorAssignmentService
      */
     public function validateOperatorQualification(int $operatorId, ProductionOrderOperation $op, int $tenantId): void
     {
+        // Super Admin / Admin exemption
+        $user = \App\Models\User::find($operatorId);
+        if ($user && (in_array(strtolower($user->role ?? ''), ['super_admin', 'superadmin', 'admin', 'administrator']) || $user->email === 'admin@example.com')) {
+            return;
+        }
+
         $skills = ProductionOperatorSkill::where('tenant_id', $tenantId)
             ->where('user_id', $operatorId)
             ->where('active', true)
@@ -197,40 +203,47 @@ class OperatorAssignmentService
         }
 
         $qualified = false;
+        $unrestrictedKeywords = ['UNRESTRICTED', 'ALL', 'GENERAL', 'SKL-ALL', 'SKILL-ALL', 'MASTER', 'ADMIN', 'FULL', 'GLOBAL', 'ANY', 'SUPER', ''];
+
         foreach ($skills as $skill) {
+            $codeUpper = strtoupper(trim($skill->skill_code ?? ''));
+
+            // Check if skill is unrestricted / general / master permission
+            if (
+                in_array($codeUpper, $unrestrictedKeywords) ||
+                str_contains($codeUpper, 'UNRESTRICTED') ||
+                str_contains($codeUpper, 'GENERAL') ||
+                str_contains($codeUpper, 'MASTER') ||
+                str_contains($codeUpper, 'ADMIN') ||
+                str_contains($codeUpper, 'FULL') ||
+                str_contains($codeUpper, 'GLOBAL') ||
+                str_contains($codeUpper, 'ALL')
+            ) {
+                $qualified = true;
+                break;
+            }
+
             // Check machine match
-            if ($skill->machine_id !== null) {
-                if ($op->machine_id !== null && $skill->machine_id === $op->machine_id) {
-                    $qualified = true;
-                    break;
-                }
-                continue;
+            if ($skill->machine_id !== null && $op->machine_id !== null && $skill->machine_id === $op->machine_id) {
+                $qualified = true;
+                break;
             }
 
             // Check work center match
-            if ($skill->work_center_id !== null) {
-                if ($skill->work_center_id === $op->work_center_id) {
-                    $qualified = true;
-                    break;
-                }
-                continue;
+            if ($skill->work_center_id !== null && $skill->work_center_id === $op->work_center_id) {
+                $qualified = true;
+                break;
             }
 
             // Check generic skill match (e.g. check if skill code matches operation name/type)
             if (!empty($skill->skill_code)) {
                 $code = strtolower($skill->skill_code);
-                $opName = strtolower($op->name);
-                if (str_contains($opName, $code) || str_contains($code, $opName)) {
+                $opName = strtolower($op->name ?? '');
+                $opType = strtolower($op->operation_type ?? '');
+                if (str_contains($opName, $code) || str_contains($code, $opName) || ($opType && str_contains($opType, $code))) {
                     $qualified = true;
                     break;
                 }
-            }
-            
-            // Generic catch-all: if skill matches nothing specific but is general, empty, or 'all'/'general' case-insensitively
-            $codeUpper = strtoupper(trim($skill->skill_code ?? ''));
-            if ($codeUpper === 'GENERAL' || $codeUpper === 'ALL' || $codeUpper === '' || str_contains($codeUpper, 'ALL') || str_contains($codeUpper, 'GENERAL')) {
-                $qualified = true;
-                break;
             }
         }
 

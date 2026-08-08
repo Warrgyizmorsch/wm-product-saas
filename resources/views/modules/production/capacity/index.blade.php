@@ -103,7 +103,7 @@
                     const workCenterName= button.getAttribute('data-op-wc-name');
                     const wcId          = button.getAttribute('data-op-wc-id');
 
-                    rescheduleModal.querySelector('form').action = `/production/capacity/${opId}/reschedule`;
+                    rescheduleModal.querySelector('form').action = `{{ url('production/capacity') }}/${opId}/reschedule`;
                     document.getElementById('reschedule-op-title').textContent =
                         `{{ __('production.js_sequence_label') }} ${opSeq} ({{ __('production.js_work_center_label') }}: ${workCenterName})`;
                     document.getElementById('planned_start').value =
@@ -130,7 +130,7 @@
                     const container = document.getElementById('suggestions-container');
                     container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">{{ __('production.js_calculating_slots') }}</p></div>';
 
-                    fetch(`/production/capacity/${opId}/suggest`)
+                    fetch(`{{ url('production/capacity') }}/${opId}/suggest`)
                         .then(r => r.json())
                         .then(data => {
                             container.innerHTML = '';
@@ -169,7 +169,7 @@
 
                                 document.querySelectorAll('.apply-suggestion-btn').forEach(btn => {
                                     btn.addEventListener('click', function () {
-                                        fetch(`/production/capacity/${this.getAttribute('data-op-id')}/reschedule`, {
+                                        fetch(`{{ url('production/capacity') }}/${this.getAttribute('data-op-id')}/reschedule`, {
                                             method: 'POST',
                                             headers: {
                                                 'Content-Type': 'application/json',

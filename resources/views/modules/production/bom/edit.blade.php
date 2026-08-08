@@ -163,8 +163,8 @@
                                                         </select>
                                                         <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
                                                             <div class="d-flex gap-1 align-items-center">
-                                                                <template x-if="item.child_bom_id">
-                                                                    <a :href="'/production/boms/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1 fs-9 text-nowrap">
+                                                                 <template x-if="item.child_bom_id">
+                                                                    <a :href="'{{ url('production/boms') }}/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1 fs-9 text-nowrap">
                                                                         <i class="feather-eye"></i> {{ __('production.view') }}
                                                                     </a>
                                                                 </template>
@@ -174,7 +174,7 @@
                                                             </div>
                                                             <div class="d-flex gap-1">
                                                                 <template x-if="item.child_bom_id">
-                                                                    <form :action="'/production/boms/' + item.child_bom_id + '/create-revision'" method="POST" target="_blank" class="d-inline">
+                                                                    <form :action="'{{ url('production/boms') }}/' + item.child_bom_id + '/create-revision'" method="POST" target="_blank" class="d-inline">
                                                                         @csrf
                                                                         <button type="submit" class="btn btn-xs btn-soft-warning py-0.5 px-1 fs-9 text-nowrap">
                                                                             <i class="feather-copy"></i> {{ __('production.revise') }}
@@ -360,7 +360,7 @@
                         return;
                     }
                     item.child_bom_loading = true;
-                    fetch('/production/boms/check-child/' + item.material_id)
+                    fetch('{{ url('production/boms/check-child') }}/' + item.material_id)
                         .then(res => res.json())
                         .then(data => {
                             item.child_bom_status = data.status;
@@ -509,7 +509,7 @@
                         return;
                     }
                     this.loadingOperations = true;
-                    fetch('/production/routing/' + this.selectedRoutingId + '/operations')
+                    fetch('{{ url('production/routing') }}/' + this.selectedRoutingId + '/operations')
                         .then(res => res.json())
                         .then(data => {
                             this.operations = data;

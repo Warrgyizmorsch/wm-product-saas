@@ -50,22 +50,22 @@
             Click <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold">START OPERATION</span> below to begin shop floor execution.
         @elseif($op->status === 'completed')
             @if($isFinalOp)
-                Operation complete. This was the final routing operation for Order <strong class="text-dark">{{ $order->order_number }}</strong>. Finished goods production can now be transferred into the warehouse from the <a href="/production/wip?search={{ $order->order_number }}" class="fw-bold text-primary text-decoration-underline">WIP Tracking Page</a>.
+                Operation complete. This was the final routing operation for Order <strong class="text-dark">{{ $order->order_number }}</strong>. Finished goods production can now be transferred into the warehouse from the <a href="{{ url('production/wip') }}?search={{ $order->order_number }}" class="fw-bold text-primary text-decoration-underline">WIP Tracking Page</a>.
             @else
                 Operation complete. The WIP batch and completed output have transitioned to the next routing operation.
             @endif
         @else
             @if(strtolower($order->production_mode ?? '') === 'batch')
-                Create or select the required production batch below and log progress for that batch. Any rejected or scrapped quantities will automatically move under Quality Control (<a href="/production/quality/rework" class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a href="/production/quality/scrap" class="fw-bold text-primary text-decoration-underline">Scrap Management</a>). Once completed with rework/scrap decomposition, the WIP batch will transition to the next operation.
+                Create or select the required production batch below and log progress for that batch. Any rejected or scrapped quantities will automatically move under Quality Control (<a href="{{ url('production/quality/rework') }}" class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap Management</a>). Once completed with rework/scrap decomposition, the WIP batch will transition to the next operation.
             @elseif(strtolower($order->production_mode ?? '') === 'serial')
-                Scan or select serial numbers below to log progress. Any rejected or scrapped units will automatically move under Quality Control (<a href="/production/quality/rework" class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a href="/production/quality/scrap" class="fw-bold text-primary text-decoration-underline">Scrap Management</a>).
+                Scan or select serial numbers below to log progress. Any rejected or scrapped units will automatically move under Quality Control (<a href="{{ url('production/quality/rework') }}" class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap Management</a>).
             @else
-                Log completed output or progress below. Any rejected or scrapped quantities will automatically move under Quality Control (<a href="/production/quality/rework" class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a href="/production/quality/scrap" class="fw-bold text-primary text-decoration-underline">Scrap Management</a>).
+                Log completed output or progress below. Any rejected or scrapped quantities will automatically move under Quality Control (<a href="{{ url('production/quality/rework') }}" class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap Management</a>).
             @endif
 
             @if($isFinalOp)
                 <div class="mt-1.5 fs-12 text-dark">
-                    <i class="feather-check-circle me-1 text-primary"></i><strong>Final Operation Note:</strong> Upon completing this final routing operation, finished goods production can be moved from WIP into the warehouse directly from the <a href="/production/wip?search={{ $order->order_number }}" class="fw-bold text-primary text-decoration-underline">Work-in-Progress (WIP) Tracking Page</a> for Order <strong>{{ $order->order_number }}</strong>.
+                    <i class="feather-check-circle me-1 text-primary"></i><strong>Final Operation Note:</strong> Upon completing this final routing operation, finished goods production can be moved from WIP into the warehouse directly from the <a href="{{ url('production/wip') }}?search={{ $order->order_number }}" class="fw-bold text-primary text-decoration-underline">Work-in-Progress (WIP) Tracking Page</a> for Order <strong>{{ $order->order_number }}</strong>.
                 </div>
             @endif
         @endif

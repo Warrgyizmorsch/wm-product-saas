@@ -335,13 +335,14 @@
 
                 loadMachinesForOperation(index) {
                     const op = this.operations[index];
-                    fetch(`/production/machines/by-work-center/${op.work_center_id}`)
+                    fetch(`{{ url('production/machines/by-work-center') }}/${op.work_center_id}`)
                         .then(res => res.json())
                         .then(data => {
                             op.availableMachines = data;
+                            this.$nextTick(() => this.initAllOperationSelects());
                         })
                         .catch(err => console.error('Failed to load machines:', err));
-                }
+                },
             }
         }
     </script>

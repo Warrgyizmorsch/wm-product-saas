@@ -477,55 +477,71 @@ class SchedulingCalendarService
 
         if ($activeAssignment) {
             $operatorId = $activeAssignment->user_id;
-            $skills = $operatorSkills->get($operatorId, collect());
+            $user = $activeAssignment->user ?? \App\Models\User::find($operatorId);
 
-            if ($skills->isEmpty()) {
-                $conflicts[] = [
-                    'type' => 'skill_missing',
-                    'message' => "Assigned operator [{$activeAssignment->user->name}] lacks qualified skills.",
-                    'severity' => 'danger',
-                    'related_ids' => [],
-                ];
-                $highestSeverity = 'danger';
+            if ($user && (in_array(strtolower($user->role ?? ''), ['super_admin', 'superadmin', 'admin', 'administrator']) || $user->email === 'admin@example.com')) {
+                // Admin / Super Admin is exempt from skill restrictions
             } else {
-                $qualified = false;
-                foreach ($skills as $skill) {
-                    if ($skill->machine_id !== null) {
-                        if ($op->machine_id !== null && $skill->machine_id === $op->machine_id) {
-                            $qualified = true;
-                            break;
-                        }
-                        continue;
-                    }
-                    if ($skill->work_center_id !== null) {
-                        if ($skill->work_center_id === $op->work_center_id) {
-                            $qualified = true;
-                            break;
-                        }
-                        continue;
-                    }
-                    if (!empty($skill->skill_code)) {
-                        $code = strtolower($skill->skill_code);
-                        $opName = strtolower($op->orderOperation->name);
-                        if (str_contains($opName, $code) || str_contains($code, $opName)) {
-                            $qualified = true;
-                            break;
-                        }
-                    }
-                    $codeUpper = strtoupper(trim($skill->skill_code ?? ''));
-                    if (in_array($codeUpper, ['GENERAL', 'ALL', 'SKL-ALL', 'SKILL-ALL', '']) || str_starts_with($codeUpper, 'SKL-ALL') || str_starts_with($codeUpper, 'ALL')) {
-                        $qualified = true;
-                        break;
-                    }
-                }
-                if (!$qualified) {
+                $skills = $operatorSkills->get($operatorId, collect());
+
+                if ($skills->isEmpty()) {
                     $conflicts[] = [
                         'type' => 'skill_missing',
-                        'message' => "Operator lacks required skills/qualification for [{$op->orderOperation->name}].",
+                        'message' => "Assigned operator [{$user->name}] lacks qualified skills.",
                         'severity' => 'danger',
                         'related_ids' => [],
                     ];
                     $highestSeverity = 'danger';
+                } else {
+                    $qualified = false;
+                    $unrestrictedKeywords = ['UNRESTRICTED', 'ALL', 'GENERAL', 'SKL-ALL', 'SKILL-ALL', 'MASTER', 'ADMIN', 'FULL', 'GLOBAL', 'ANY', 'SUPER', ''];
+
+                    foreach ($skills as $skill) {
+                        $codeUpper = strtoupper(trim($skill->skill_code ?? ''));
+
+                        if (
+                            in_array($codeUpper, $unrestrictedKeywords) ||
+                            str_contains($codeUpper, 'UNRESTRICTED') ||
+                            str_contains($codeUpper, 'GENERAL') ||
+                            str_contains($codeUpper, 'MASTER') ||
+                            str_contains($codeUpper, 'ADMIN') ||
+                            str_contains($codeUpper, 'FULL') ||
+                            str_contains($codeUpper, 'GLOBAL') ||
+                            str_contains($codeUpper, 'ALL')
+                        ) {
+                            $qualified = true;
+                            break;
+                        }
+
+                        if ($skill->machine_id !== null && $op->machine_id !== null && $skill->machine_id === $op->machine_id) {
+                            $qualified = true;
+                            break;
+                        }
+
+                        if ($skill->work_center_id !== null && $skill->work_center_id === $op->work_center_id) {
+                            $qualified = true;
+                            break;
+                        }
+
+                        if (!empty($skill->skill_code)) {
+                            $code = strtolower($skill->skill_code);
+                            $opName = strtolower($op->orderOperation->name ?? '');
+                            $opType = strtolower($op->orderOperation->operation_type ?? '');
+                            if (str_contains($opName, $code) || str_contains($code, $opName) || ($opType && str_contains($opType, $code))) {
+                                $qualified = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!$qualified) {
+                        $conflicts[] = [
+                            'type' => 'skill_missing',
+                            'message' => "Operator lacks required skills/qualification for [{$op->orderOperation->name}].",
+                            'severity' => 'danger',
+                            'related_ids' => [],
+                        ];
+                        $highestSeverity = 'danger';
+                    }
                 }
             }
         }

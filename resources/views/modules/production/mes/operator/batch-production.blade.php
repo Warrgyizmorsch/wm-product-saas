@@ -440,7 +440,7 @@
     function openTransferModal(wipId, batchId, batchNumber, fromOpId, toOpId, nextOpName, readyQty) {
         let form = document.getElementById('wipTransferModal').querySelector('form');
         if (form) {
-            form.action = '/production/wip/' + wipId + '/transfer';
+            form.action = '{{ url('production/wip') }}/' + wipId + '/transfer';
 
             let batchInput = form.querySelector('input[name="production_batch_id"]');
             if (!batchInput) {
