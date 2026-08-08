@@ -1759,7 +1759,7 @@
 
                     if ($documentNoResultsRow.length) {
                         $documentTbody.append($documentNoResultsRow);
-                        $documentNoResultsRow.toggleClass('d-none', visibleCount > 0);
+                        $documentNoResultsRow.toggleClass('d-none', !(visibleCount === 0 && $documentRows.length > 0));
                     }
                 }
 
@@ -1827,7 +1827,7 @@
 
                     if ($assignedAssetNoResultsRow.length) {
                         $assignedAssetTbody.append($assignedAssetNoResultsRow);
-                        $assignedAssetNoResultsRow.toggleClass('d-none', visibleCount > 0);
+                        $assignedAssetNoResultsRow.toggleClass('d-none', !(visibleCount === 0 && $assignedAssetRows.length > 0));
                     }
                 }
 
@@ -1897,7 +1897,7 @@
 
                     if ($assetRequestNoResultsRow.length) {
                         $assetRequestTbody.append($assetRequestNoResultsRow);
-                        $assetRequestNoResultsRow.toggleClass('d-none', visibleCount > 0);
+                        $assetRequestNoResultsRow.toggleClass('d-none', !(visibleCount === 0 && $assetRequestRows.length > 0));
                     }
                 }
 

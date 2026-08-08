@@ -298,7 +298,79 @@
                     if (form) {
                         form.action = '/hrms/org/branch/update/' + branch.id;
                     }
+
+                    // Perform initial toggle for edit modal values
+                    toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
                 });
+            });
+
+            function toggleBranchParentRequirements(companySelectId, buSelectId) {
+                let companySelect = document.getElementById(companySelectId);
+                let buSelect = document.getElementById(buSelectId);
+                if (!companySelect || !buSelect) return;
+
+                let companyVal = companySelect.value;
+                let buVal = buSelect.value;
+
+                let companyLabel = companySelect.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+                let buLabel = buSelect.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+
+                if (companyVal) {
+                    buSelect.removeAttribute('required');
+                    if (buLabel) {
+                        buLabel.style.removeProperty('color');
+                        let asterisk = buLabel.querySelector('.text-danger');
+                        if (asterisk) asterisk.remove();
+                    }
+                    companySelect.removeAttribute('required');
+                    if (companyLabel) {
+                        companyLabel.style.removeProperty('color');
+                        let asterisk = companyLabel.querySelector('.text-danger');
+                        if (asterisk) asterisk.remove();
+                    }
+                } else if (buVal) {
+                    companySelect.removeAttribute('required');
+                    if (companyLabel) {
+                        companyLabel.style.removeProperty('color');
+                        let asterisk = companyLabel.querySelector('.text-danger');
+                        if (asterisk) asterisk.remove();
+                    }
+                    buSelect.removeAttribute('required');
+                    if (buLabel) {
+                        buLabel.style.removeProperty('color');
+                        let asterisk = buLabel.querySelector('.text-danger');
+                        if (asterisk) asterisk.remove();
+                    }
+                } else {
+                    // Default to requiring business unit if both are empty
+                    buSelect.setAttribute('required', 'required');
+                    if (buLabel) {
+                        buLabel.style.color = '#dc3545';
+                        if (!buLabel.querySelector('.text-danger')) {
+                            buLabel.innerHTML += ' <span class="text-danger">*</span>';
+                        }
+                    }
+                    companySelect.removeAttribute('required');
+                    if (companyLabel) {
+                        companyLabel.style.removeProperty('color');
+                        let asterisk = companyLabel.querySelector('.text-danger');
+                        if (asterisk) asterisk.remove();
+                    }
+                }
+            }
+
+            $(document).on('change change.select2', '#add_branch_company_id, #add_branch_business_unit_id', function() {
+                toggleBranchParentRequirements('add_branch_company_id', 'add_branch_business_unit_id');
+            });
+            $(document).on('change change.select2', '#edit_branch_company_id, #edit_branch_bu_id', function() {
+                toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
+            });
+
+            $('#addBranchModal').on('shown.bs.modal', function() {
+                toggleBranchParentRequirements('add_branch_company_id', 'add_branch_business_unit_id');
+            });
+            $('#editBranchModal').on('shown.bs.modal', function() {
+                toggleBranchParentRequirements('edit_branch_company_id', 'edit_branch_bu_id');
             });
         }
 

@@ -118,7 +118,7 @@
                         
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date</label>
-                            <x-ui.odoo-form-ui type="input" inputType="date" name="date" value="{{ $filters['date'] ?? \Carbon\Carbon::today()->format('Y-m-d') }}" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" name="date" value="{{ request('date') }}" />
                         </div>
 
                         <div class="mb-3">
@@ -174,9 +174,16 @@
                                     $wfhCount = $dayStats->filter(function($item) {
                                         return $item->status === 'wfh' || strtolower($item->location_type) === 'wfh';
                                     })->sum('count');
+                                    $halfDayCount = $dayStats->where('status', 'half_day')->sum('count');
                                     $absentCount = $dayStats->where('status', 'absent')->sum('count');
                                     $leaveCount = $dayStats->where('status', 'on_leave')->sum('count');
-                                    $overtimeCount = \App\Domains\HRMS\Models\OvertimeRequest::where('date', $dStr)->where('status', 'approved')->count();
+                                    $overtimeCount = \App\Domains\HRMS\Models\Attendance::where('date', $dStr)
+                                        ->whereIn('employee_id', function($q) use ($dStr) {
+                                            $q->select('employee_id')
+                                              ->from('overtime_requests')
+                                              ->where('date', $dStr)
+                                              ->where('status', 'approved');
+                                        })->count();
                                 @endphp
                                 <tr>
                                     <td class="ps-4 fw-bold text-dark fs-13">
@@ -190,8 +197,8 @@
                                             <span class="badge bg-soft-warning text-warning px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'late')">
                                                 Late: {{ $lateCount }}
                                             </span>
-                                            <span class="badge bg-soft-info text-info px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'wfh')">
-                                                WFH: {{ $wfhCount }}
+                                            <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer; background-color: rgba(111, 66, 193, 0.1); color: #6f42c1 !important;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'half_day')">
+                                                Half Day: {{ $halfDayCount }}
                                             </span>
                                             <span class="badge bg-soft-danger text-danger px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'absent')">
                                                 Absent: {{ $absentCount }}
@@ -211,7 +218,7 @@
                                                 variant="soft-primary" 
                                                 icon="feather-eye" 
                                                 title="View Daily Attendance Logs" 
-                                                onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}')" 
+                                                onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'all')" 
                                             />
 
                                             <!-- Edit Manual Entry -->
@@ -256,16 +263,23 @@
                                     $log = $employee->attendances->first();
                                     $dStr = $filters['date'] ?? today()->format('Y-m-d');
                                     
-                                    // Query counts for this employee on the selected date
-                                    $allAttendances = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->where('date', $dStr)->get();
+                                    // Query counts for this employee across all dates
+                                    $allAttendances = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->get();
                                     $presentCount = $allAttendances->where('status', 'present')->count();
                                     $lateCount = $allAttendances->where('status', 'late')->count();
                                     $wfhCount = $allAttendances->where(function($item) {
                                         return $item->status === 'wfh' || strtolower($item->location_type) === 'wfh';
                                     })->count();
+                                    $halfDayCount = $allAttendances->where('status', 'half_day')->count();
                                     $absentCount = $allAttendances->where('status', 'absent')->count();
                                     $leaveCount = $allAttendances->where('status', 'on_leave')->count();
-                                    $overtimeCount = \App\Domains\HRMS\Models\OvertimeRequest::where('employee_id', $employee->id)->where('date', $dStr)->where('status', 'approved')->count();
+                                    $overtimeCount = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)
+                                        ->whereIn('date', function($q) use ($employee) {
+                                            $q->select('date')
+                                              ->from('overtime_requests')
+                                              ->where('employee_id', $employee->id)
+                                              ->where('status', 'approved');
+                                        })->count();
                                 @endphp
                                 <tr>
                                     <!-- Employee Details -->
@@ -296,8 +310,8 @@
                                             <span class="badge bg-soft-warning text-warning px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'late')">
                                                 Late: {{ $lateCount }}
                                             </span>
-                                            <span class="badge bg-soft-info text-info px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'wfh')">
-                                                WFH: {{ $wfhCount }}
+                                            <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer; background-color: rgba(111, 66, 193, 0.1); color: #6f42c1 !important;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'half_day')">
+                                                Half Day: {{ $halfDayCount }}
                                             </span>
                                             <span class="badge bg-soft-danger text-danger px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'absent')">
                                                 Absent: {{ $absentCount }}
@@ -319,7 +333,7 @@
                                                 variant="soft-primary" 
                                                 icon="feather-eye" 
                                                 title="View Attendance History" 
-                                                onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}')" 
+                                                onclick="openAttendanceLogs('{{ $employee->id }}', '{{ addslashes($employee->display_name) }}', '{{ $employee->employee_id }}', 'all')" 
                                             />
                                             <!-- Edit Manual Entry -->
                                             <x-ui.icon-btn 
@@ -419,7 +433,8 @@
                 'wfh': 'WFH',
                 'absent': 'Absent',
                 'on_leave': 'Leave',
-                'overtime': 'Overtime'
+                'overtime': 'Overtime',
+                'half_day': 'Half Day'
             };
             const statusLabel = formatMap[filterStatus] || filterStatus;
             filterTitleSuffix = ` (${statusLabel})`;
@@ -475,6 +490,9 @@
                         }
                         if (filterStatus === 'on_leave') {
                             return log.status_raw === 'on_leave';
+                        }
+                        if (filterStatus === 'half_day') {
+                            return log.status_raw === 'half_day';
                         }
                         if (filterStatus === 'overtime') {
                             return log.has_overtime === true;
@@ -540,7 +558,8 @@
                 'wfh': 'WFH',
                 'absent': 'Absent',
                 'on_leave': 'Leave',
-                'overtime': 'Overtime'
+                'overtime': 'Overtime',
+                'half_day': 'Half Day'
             };
             const statusLabel = formatMap[filterStatus] || filterStatus;
             filterTitleSuffix = ` (${statusLabel})`;
@@ -595,6 +614,9 @@
                         if (filterStatus === 'on_leave') {
                             return log.status_raw === 'on_leave';
                         }
+                        if (filterStatus === 'half_day') {
+                            return log.status_raw === 'half_day';
+                        }
                         if (filterStatus === 'overtime') {
                             return log.has_overtime === true;
                         }
@@ -619,14 +641,14 @@
                         tr.innerHTML = `
                             <td>
                                 <span class="fw-bold text-dark d-block fs-13 mb-0">${log.employee_name}</span>
+                                ${locationBadge}
                             </td>
                             <td class="text-muted text-nowrap">${log.check_in}</td>
                             <td class="text-muted text-nowrap">${log.check_out}</td>
                             <td>${log.breaks}</td>
                             <td class="fw-semibold text-dark text-nowrap">${log.work_hours}</td>
                             <td>
-                                <div class="${locationBadge ? 'mb-1' : ''}">${log.status}</div>
-                                ${locationBadge}
+                                <div>${log.status}</div>
                             </td>
                         `;
                         tbody.appendChild(tr);
@@ -644,6 +666,20 @@
                 document.getElementById('drawerLoader').classList.add('d-none');
                 document.getElementById('drawerContent').classList.remove('d-none');
             });
+    }
+
+    function submitCleanForm(form) {
+        if (!form) return;
+        const inputs = form.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            if (input.name && (input.value === null || input.value === undefined || input.value.trim() === '')) {
+                input.disabled = true;
+            }
+            if (input.name === 'sort' && input.value === 'name_asc') {
+                input.disabled = true;
+            }
+        });
+        form.submit();
     }
 
     function switchView(viewName) {
@@ -664,21 +700,39 @@
                 pageInput.value = '1';
             }
             
-            form.submit();
+            submitCleanForm(form);
         } else {
             window.location.href = "{{ route('hrms.attendance.index') }}?view=" + viewName;
         }
     }
 
     function applySort(val) {
+        const form = document.getElementById('attendanceFilterForm');
         document.getElementById('attendanceSortInput').value = val;
-        document.getElementById('attendanceFilterForm').submit();
+        submitCleanForm(form);
     }
 
     // Live Search with Debounce and Focus cursor position restore
     document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('attendanceFilterForm');
         const searchInput = document.querySelector('input[name="search"]');
-        if (searchInput) {
+        
+        // Clean empty parameters on direct form submit (e.g. clicking Apply button)
+        if (form) {
+            form.addEventListener('submit', function() {
+                const inputs = form.querySelectorAll('input, select');
+                inputs.forEach(input => {
+                    if (input.name && (input.value === null || input.value === undefined || input.value.trim() === '')) {
+                        input.disabled = true;
+                    }
+                    if (input.name === 'sort' && input.value === 'name_asc') {
+                        input.disabled = true;
+                    }
+                });
+            });
+        }
+
+        if (searchInput && form) {
             // Autofocus and place cursor at the end if there is a value
             if (searchInput.value.length > 0) {
                 searchInput.focus();
@@ -691,7 +745,7 @@
             searchInput.addEventListener('input', function() {
                 clearTimeout(timeout);
                 timeout = setTimeout(() => {
-                    document.getElementById('attendanceFilterForm').submit();
+                    submitCleanForm(form);
                 }, 500); // 500ms debounce
             });
         }
