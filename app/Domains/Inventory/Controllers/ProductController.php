@@ -482,6 +482,7 @@ class ProductController extends Controller
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $productId = $request->input('product_id');
         $warehouseId = $request->input('warehouse_id');
+        $mrItemId = $request->input('material_requirement_item_id');
 
         if (!$productId || !$warehouseId) {
             return response()->json(['success' => false, 'message' => 'Missing product or warehouse ID'], 400);
@@ -492,20 +493,45 @@ class ProductController extends Controller
             ->where('warehouse_id', $warehouseId)
             ->first();
 
-        $reserved = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+        $totalReservedInWh = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
             ->where('status', 'Active')
             ->sum('reserved_qty');
 
+        $itemReservedQty = 0;
+        if ($mrItemId) {
+            $mrItem = \App\Domains\Sales\Models\MaterialRequirementItem::find($mrItemId);
+            if ($mrItem) {
+                $res = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+                    ->where('product_id', $productId)
+                    ->where('warehouse_id', $warehouseId)
+                    ->where(function($q) use ($mrItem) {
+                        $q->where(function($q2) use ($mrItem) {
+                            $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement'])
+                               ->where('reference_id', $mrItem->material_requirement_id);
+                        })->orWhere('reference_item_id', $mrItem->id);
+                    })
+                    ->where('status', 'Active')
+                    ->sum('reserved_qty');
+
+                $itemReservedQty = (float)$res;
+
+                if ($itemReservedQty <= 0 && (int)($mrItem->warehouse_id ?: 1) === (int)$warehouseId) {
+                    $itemReservedQty = (float)$mrItem->quantity_reserved;
+                }
+            }
+        }
+
         $physicalQty = (float)($stock?->quantity ?? 0);
-        $reservedQty = (float)$reserved;
+        $reservedQty = (float)$totalReservedInWh;
         $availableQty = max(0, $physicalQty - $reservedQty);
 
         return response()->json([
             'success' => true,
             'physical_qty' => $physicalQty,
             'reserved_qty' => $reservedQty,
+            'item_reserved_qty' => $itemReservedQty,
             'available_qty' => $availableQty,
         ]);
     }

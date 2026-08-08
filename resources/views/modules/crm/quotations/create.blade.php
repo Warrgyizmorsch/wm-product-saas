@@ -163,7 +163,7 @@
 
                             <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" required="true">
                                 <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
-                                <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Send for Approval (Pending Approval)</option>
+                                <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Sent for Approval</option>
                             </x-ui.odoo-form-ui>
                         </div>
                     </div>

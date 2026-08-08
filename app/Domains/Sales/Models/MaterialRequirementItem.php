@@ -94,6 +94,46 @@ class MaterialRequirementItem extends Model
         return $this->hasMany(DispatchOrderItem::class, 'material_requirement_item_id');
     }
 
+    public function getDispatchedQtyAttribute(): float
+    {
+        return (float) $this->dispatchItems()
+            ->whereHas('dispatchOrder', function ($q) {
+                $q->where('status', '!=', 'Cancelled');
+            })
+            ->sum('quantity_dispatched');
+    }
+
+    public function getPendingQtyAttribute(): float
+    {
+        $ordered = (float) ($this->quantity_ordered > 0 ? $this->quantity_ordered : $this->quantity);
+        return max(0.0, $ordered - $this->dispatched_qty - (float) $this->quantity_reserved);
+    }
+
+    public function getRemainingPrQtyAttribute(): float
+    {
+        $prRaised = (float) ($this->quantity_pr_raised ?? 0);
+        return max(0.0, $this->pending_qty - $prRaised);
+    }
+
+    public function getCalculatedStatusAttribute(): string
+    {
+        $ordered = (float) ($this->quantity_ordered > 0 ? $this->quantity_ordered : $this->quantity);
+        $dispatched = $this->dispatched_qty;
+        $reserved = (float) $this->quantity_reserved;
+
+        if ($dispatched >= $ordered) {
+            return 'Dispatched';
+        } elseif ($dispatched > 0) {
+            return 'Partially Dispatched';
+        } elseif ($reserved >= $ordered) {
+            return 'Reserved';
+        } elseif ($reserved > 0) {
+            return 'Partially Reserved';
+        }
+
+        return $this->status ?: 'Pending';
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $item) {

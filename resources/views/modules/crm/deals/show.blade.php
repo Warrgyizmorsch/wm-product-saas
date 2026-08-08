@@ -1006,7 +1006,7 @@
 
                                                 <x-ui.odoo-form-ui type="select" label="Initial Status" name="status" :required="true" :errorText="$errors->first('status')">
                                                      <option value="Draft" @selected(old('status') === 'Draft')>Draft</option>
-                                                     <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Pending Approval</option>
+                                                     <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Sent for Approval</option>
                                                  </x-ui.odoo-form-ui>
                                             </div>
                                         </div>
@@ -1113,7 +1113,7 @@
 
                                                 <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true" :errorText="$errors->first('status')">
                                                      <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
-                                                     <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>Pending Approval</option>
+                                                     <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>Sent for Approval</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                         </div>

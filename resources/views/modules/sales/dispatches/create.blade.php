@@ -16,6 +16,13 @@
             table-layout: fixed;
             width: 100% !important;
         }
+        #dispatchItemsTable th {
+            white-space: nowrap !important;
+            padding-left: 6px !important;
+            padding-right: 6px !important;
+            font-size: 11px !important;
+            vertical-align: middle !important;
+        }
         #dispatchItemsTable td {
             vertical-align: top !important;
         }
@@ -133,17 +140,17 @@
 
                     <div class="table-responsive border rounded bg-white">
                         <x-ui.odoo-form-ui type="table" id="dispatchItemsTable">
-                            <thead class="table-light fs-12">
+                            <thead class="table-light fs-11 text-uppercase fw-bold text-muted">
                                 <tr>
-                                    <th style="width: 45%;" class="ps-3">Product Details</th>
-                                    <th style="width: 30%;">Warehouse Location</th>
-                                    <th class="text-end mr-col" style="width: 8%;">Ordered</th>
-                                    <th class="text-end mr-col" style="width: 8%;">Available</th>
-                                    <th class="text-end mr-col" style="width: 8%;">Reserved</th>
-                                    <th class="text-end mr-col" style="width: 8%;">Dispatched</th>
-                                    <th class="text-end mr-col" style="width: 8%;">Remaining</th>
-                                    <th class="text-end" style="width: 18%;">Dispatch Qty</th>
-                                    <th class="text-center direct-col" style="width: 7%; display: none;">Action</th>
+                                    <th style="width: 28%;" class="ps-3">Product Details</th>
+                                    <th style="width: 22%;">Warehouse Location</th>
+                                    <th class="text-end mr-col" style="width: 7%;">Ordered</th>
+                                    <th class="text-end mr-col" style="width: 7%;">Available</th>
+                                    <th class="text-end mr-col" style="width: 7%;">Reserved</th>
+                                    <th class="text-end mr-col" style="width: 7%;">Dispatched</th>
+                                    <th class="text-end mr-col" style="width: 7%;">Remaining</th>
+                                    <th class="text-end pe-3" style="width: 15%;">Dispatch Qty</th>
+                                    <th class="text-center direct-col" style="width: 5%; display: none;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="dispatchItemsBody" class="fs-13">
@@ -527,10 +534,10 @@
                                 <strong class="text-dark fs-13">${escapeHtml(item.product_name || 'Unknown product')}</strong>
                                 ${item.product_sku ? `<small class="d-block text-muted font-monospace fs-11">SKU: ${escapeHtml(item.product_sku)}</small>` : ''}
                             </td>
-                            <td class="align-top"><select name="items[${index}][warehouse_id]" class="form-select odoo-table-select odoo-select2">${options}</select></td>
+                            <td class="align-top"><select name="items[${index}][warehouse_id]" class="form-select odoo-table-select odoo-select2 item-warehouse-select">${options}</select></td>
                             <td class="text-end fw-semibold mr-col align-top">${item.quantity_ordered}</td>
-                            <td class="text-end fw-semibold text-success mr-col align-top">${item.available_qty ?? 0}</td>
-                            <td class="text-end fw-semibold text-info mr-col align-top">${item.quantity_reserved}</td>
+                            <td class="text-end fw-semibold text-success mr-col align-top avail-qty-cell">${item.available_qty ?? 0}</td>
+                            <td class="text-end fw-semibold text-info mr-col align-top reserved-qty-cell">${item.quantity_reserved}</td>
                             <td class="text-end fw-bold mr-col align-top ${item.already_dispatched > 0 ? 'text-warning' : 'text-muted'}">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-primary mr-col align-top">${item.remaining_qty}</td>
                             <td class="text-end pe-3 align-top">
@@ -563,43 +570,96 @@
             return element.innerHTML;
         }
 
-        $(document).on('input change', '.dispatch-qty-input', function() {
-            const val = parseFloat($(this).val());
-            const max = parseFloat($(this).data('max')) || Infinity;
-            const $cell = $(this).closest('td');
+        function validateDispatchRow($tr) {
+            const $qtyInput = $tr.find('.dispatch-qty-input');
+            if (!$qtyInput.length) return true;
+
+            const val = parseFloat($qtyInput.val());
+            const remainingMax = parseFloat($qtyInput.data('max')) || Infinity;
+            const $availCell = $tr.find('.avail-qty-cell');
+            const $reservedCell = $tr.find('.reserved-qty-cell');
+
+            const avail = $availCell.length ? (parseFloat($availCell.text().trim()) || 0) : 0;
+            const reserved = $reservedCell.length ? (parseFloat($reservedCell.text().trim()) || 0) : 0;
+            const totalUsableStock = reserved + avail;
+
+            const $cell = $qtyInput.closest('td');
             let $error = $cell.find('.qty-error-msg');
 
             if (!$error.length) {
-                $error = $('<div class="qty-error-msg text-danger fs-11 fw-semibold text-end mt-1">Dispatch Qty must be greater than 0.</div>');
+                $error = $('<div class="qty-error-msg text-danger fs-11 fw-semibold text-end mt-1"></div>');
                 $cell.append($error);
             }
 
             if (isNaN(val) || val <= 0) {
-                $(this).css('border-bottom-color', '#ef4444');
+                $qtyInput.css('border-bottom-color', '#ef4444');
                 $error.text('Dispatch Qty must be greater than 0.').removeClass('d-none');
-                setSaveButtonsDisabled(true);
-            } else if (val > max) {
-                $(this).css('border-bottom-color', '#ef4444');
-                $error.text(`Cannot exceed remaining quantity (${max}).`).removeClass('d-none');
+                return false;
+            }
+
+            if ($availCell.length && totalUsableStock <= 0) {
+                $qtyInput.css('border-bottom-color', '#ef4444');
+                $error.text('No stock available in selected warehouse (Reserved: 0, Available: 0).').removeClass('d-none');
+                return false;
+            }
+
+            if ($availCell.length && val > totalUsableStock) {
+                $qtyInput.css('border-bottom-color', '#ef4444');
+                $error.text(`Dispatch Qty (${val}) exceeds total stock in selected warehouse (Total: ${totalUsableStock} = ${reserved} reserved + ${avail} available).`).removeClass('d-none');
+                return false;
+            }
+
+            if (val > remainingMax) {
+                $qtyInput.css('border-bottom-color', '#ef4444');
+                $error.text(`Cannot exceed remaining order quantity (${remainingMax}).`).removeClass('d-none');
+                return false;
+            }
+
+            $qtyInput.css('border-bottom-color', '#cbd5e1');
+            $error.addClass('d-none');
+            return true;
+        }
+
+        function checkAllDispatchRowsValidation() {
+            let hasError = false;
+            let rowCount = 0;
+
+            $('#dispatchItemsBody tr').each(function() {
+                if ($(this).find('.dispatch-qty-input').length) {
+                    rowCount++;
+                    const isValid = validateDispatchRow($(this));
+                    if (!isValid) {
+                        hasError = true;
+                    }
+                }
+            });
+
+            if (rowCount === 0) {
                 setSaveButtonsDisabled(true);
             } else {
-                $(this).css('border-bottom-color', '#cbd5e1');
-                $error.addClass('d-none');
-                setSaveButtonsDisabled(false);
+                setSaveButtonsDisabled(hasError);
             }
+
+            return !hasError;
+        }
+
+        $(document).on('input change keyup', '.dispatch-qty-input', function() {
+            checkAllDispatchRowsValidation();
         });
 
         document.getElementById('dispatchForm').addEventListener('submit', event => {
             const mode = document.querySelector('input[name="dispatch_mode"]:checked').value;
             if (mode === 'mr' && (!deliveryOrderId.value || !itemsBody.querySelector('input[name$="[quantity]"]'))) {
                 event.preventDefault();
-                alert('Select a material requirement with at least one dispatch item before saving.');
-                return;
+                return false;
             }
             if (mode === 'direct' && !itemsBody.querySelector('select[name$="[product_id]"]')) {
                 event.preventDefault();
-                alert('Please add at least one product line item to dispatch.');
-                return;
+                return false;
+            }
+            if (!checkAllDispatchRowsValidation()) {
+                event.preventDefault();
+                return false;
             }
         });
 
@@ -761,6 +821,49 @@
         document.getElementById('fastBarcodeScanBtn')?.addEventListener('click', function(e) {
             e.preventDefault();
             handleDispatchBarcodeScan();
+        });
+
+        // Auto-update Available & Reserved Stock quantity when Warehouse or Product is changed in Dispatch table
+        $(document).on('change change.select2', 'select[name$="[warehouse_id]"], select[name$="[product_id]"]', function() {
+            const $tr = $(this).closest('tr');
+            const warehouseId = $tr.find('select[name$="[warehouse_id]"]').val();
+            let productId = $tr.find('input[name$="[product_id]"]').val() || $tr.find('select[name$="[product_id]"]').val();
+            let mrItemId = $tr.find('input[name$="[material_requirement_item_id]"]').val();
+            const $availCell = $tr.find('.avail-qty-cell');
+            const $reservedCell = $tr.find('.reserved-qty-cell');
+
+            if (!productId || !warehouseId) return;
+
+            $.ajax({
+                url: "{{ route('inventory.products.stockCheck') }}",
+                type: "GET",
+                data: {
+                    product_id: productId,
+                    warehouse_id: warehouseId,
+                    material_requirement_item_id: mrItemId || null
+                },
+                success: function(response) {
+                    if (response && response.success) {
+                        const avail = parseInt(response.available_qty) || 0;
+                        const itemReserved = parseInt(response.item_reserved_qty) || 0;
+
+                        if ($availCell.length) {
+                            $availCell.text(avail);
+                            $availCell.removeClass('text-success text-danger');
+                            $availCell.addClass(avail > 0 ? 'text-success' : 'text-danger');
+                        }
+
+                        if ($reservedCell.length) {
+                            $reservedCell.text(itemReserved);
+                        }
+
+                        checkAllDispatchRowsValidation();
+                    }
+                },
+                error: function(err) {
+                    console.error('Failed to update stock for warehouse:', err);
+                }
+            });
         });
     </script>
 @endpush

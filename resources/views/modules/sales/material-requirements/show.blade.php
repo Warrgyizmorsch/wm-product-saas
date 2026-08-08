@@ -167,8 +167,9 @@
 
         $totalOrdered = (float)$delivery->items->sum(fn($i) => (float)($i->quantity_ordered > 0 ? $i->quantity_ordered : $i->quantity));
         $totalReserved = (float)$delivery->items->sum('quantity_reserved');
-        $totalPending = max(0, $totalOrdered - $totalReserved);
-        $fulfillmentRate = $totalOrdered > 0 ? round(($totalReserved / $totalOrdered) * 100) : 0;
+        $totalDispatched = (float)$delivery->items->sum(fn($i) => (float)$i->dispatched_qty);
+        $totalPending = max(0, $totalOrdered - $totalDispatched - $totalReserved);
+        $fulfillmentRate = $totalOrdered > 0 ? round((($totalReserved + $totalDispatched) / $totalOrdered) * 100) : 0;
 
         $statusStep = match($delivery->status) {
             'Draft', 'Pending' => 1,
@@ -194,9 +195,13 @@
 
                     {{-- Quick KPI summary pills --}}
                     <div class="d-flex align-items-center gap-3 fs-12 text-muted ms-1">
-                        <span><i class="feather-package text-primary me-1"></i>Order: <strong class="text-dark">{{ (int)$totalOrdered }} Units</strong></span>
-                        <span><i class="feather-check-circle text-success me-1"></i>Reserved: <strong class="text-success">{{ (int)$totalReserved }} Units</strong> <small class="text-muted">({{ $fulfillmentRate }}%)</small></span>
-                        <span><i class="feather-clock text-warning me-1"></i>Pending: <strong class="{{ $totalPending > 0 ? 'text-warning' : 'text-muted' }}">{{ (int)$totalPending }} Units</strong></span>
+                        <span><i class="feather-package text-primary me-1"></i>Order: <strong class="text-dark">{{ (int)$delivery->total_ordered_qty }} Units</strong></span>
+                        <span><i class="feather-check-circle text-success me-1"></i>Reserved: <strong class="text-success">{{ (int)$delivery->total_reserved_qty }} Units</strong></span>
+                        @if($delivery->total_dispatched_qty > 0)
+                            <span><i class="feather-truck text-info me-1"></i>Dispatched: <strong class="text-info">{{ (int)$delivery->total_dispatched_qty }} Units</strong></span>
+                        @endif
+                        <span><i class="feather-clock text-warning me-1"></i>Pending: <strong class="{{ $delivery->total_pending_qty > 0 ? 'text-warning' : 'text-muted' }}">{{ (int)$delivery->total_pending_qty }} Units</strong></span>
+                        <span class="badge bg-soft-primary text-primary px-2 py-0.5 font-monospace fs-11">{{ $delivery->fulfillment_rate }}% Fulfilled</span>
                     </div>
                 </div>
 
@@ -286,21 +291,23 @@
                                     @php
                                         $method      = strtolower($item->product?->supplier_method ?? 'buy');
                                         $isService   = $item->product?->item_type === 'Service';
-                                        $orderedQty  = (float)($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
-                                        $reservedQty = (float)$item->quantity_reserved;
-                                        $pendingQty  = max(0, $orderedQty - $reservedQty);
-                                        $availableQty= (float)($item->available_qty ?? 0);
-                                        $isLocked    = in_array($delivery->status, ['Dispatched', 'Delivered', 'Cancelled']);
+                                        $orderedQty    = (float)($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
+                                        $reservedQty   = (float)$item->quantity_reserved;
+                                        $dispatchedQty = $item->dispatched_qty;
+                                        $pendingQty    = $item->pending_qty;
+                                        $availableQty  = (float)($item->available_qty ?? 0);
+                                        $isLocked      = in_array($delivery->status, ['Dispatched', 'Delivered', 'Cancelled']);
+                                        $displayStatus = $item->calculated_status;
 
                                         $lineBadge = 'secondary';
-                                        if (in_array($item->status, ['Reserved', 'Ready']))  $lineBadge = 'success';
-                                        elseif ($item->status === 'Waiting Purchase')         $lineBadge = 'warning';
-                                        elseif ($item->status === 'Partially PR Raised')      $lineBadge = 'info';
-                                        elseif ($item->status === 'Waiting Production')       $lineBadge = 'danger';
-                                        elseif ($item->status === 'Partially Reserved')       $lineBadge = 'info';
-                                        elseif ($item->status === 'Picked')                   $lineBadge = 'primary';
-                                        elseif ($item->status === 'Packed')                   $lineBadge = 'info';
-                                        elseif (in_array($item->status, ['Dispatched','Delivered'])) $lineBadge = 'dark';
+                                        if (in_array($displayStatus, ['Reserved', 'Ready']))  $lineBadge = 'success';
+                                        elseif ($displayStatus === 'Waiting Purchase')         $lineBadge = 'warning';
+                                        elseif ($displayStatus === 'Partially PR Raised')      $lineBadge = 'info';
+                                        elseif ($displayStatus === 'Waiting Production')       $lineBadge = 'danger';
+                                        elseif (in_array($displayStatus, ['Partially Reserved', 'Partially Dispatched'])) $lineBadge = 'info';
+                                        elseif ($displayStatus === 'Picked')                   $lineBadge = 'primary';
+                                        elseif ($displayStatus === 'Packed')                   $lineBadge = 'info';
+                                        elseif (in_array($displayStatus, ['Dispatched','Delivered'])) $lineBadge = 'dark';
                                     @endphp
                                     <tr>
                                         {{-- Product --}}
@@ -375,7 +382,7 @@
                                         {{-- Line Status --}}
                                         <td class="text-center">
                                             <x-ui.badge :soft="true" :variant="$lineBadge" class="fs-11 px-2.5 py-1 fw-semibold">
-                                                {{ $item->status }}
+                                                {{ $displayStatus }}
                                             </x-ui.badge>
                                         </td>
 
@@ -384,19 +391,20 @@
                                             @if (!$isLocked)
                                                 <div class="d-flex flex-column align-items-center gap-1">
                                                     @if ($pendingQty > 0)
-                                                        @if ($availableQty > 0)
+                                                        {{-- Reserve Button (always rendered in wrapper so JS can toggle display dynamically on warehouse change) --}}
+                                                        <div id="reserve-btn-wrap-{{ $item->id }}" class="w-100 {{ $availableQty > 0 ? '' : 'd-none' }}" style="{{ $availableQty > 0 ? '' : 'display: none;' }}">
                                                             <button
                                                                 type="button"
                                                                 class="btn btn-sm btn-soft-primary px-2 py-1 fs-11 fw-bold w-100"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#reserveModal-{{ $item->id }}"
                                                             ><i class="feather-archive me-1"></i>Reserve</button>
-                                                        @endif
+                                                        </div>
 
                                                         @if ($method === 'buy')
                                                             @php
                                                                 $prRaised = (float)($item->quantity_pr_raised ?? 0);
-                                                                $remainingPrQty = max(0, $pendingQty - $prRaised);
+                                                                $remainingPrQty = $item->remaining_pr_qty;
                                                             @endphp
 
                                                             @if ($item->status === 'Waiting Purchase' || ($prRaised > 0 && $remainingPrQty <= 0))
@@ -468,7 +476,8 @@
             $isService    = $item->product?->item_type === 'Service';
             $orderedQty   = (float)($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
             $reservedQty  = (float)$item->quantity_reserved;
-            $pendingQty   = max(0, $orderedQty - $reservedQty);
+            $dispatchedQty= $item->dispatched_qty;
+            $pendingQty   = $item->pending_qty;
             $availableQty = (float)($item->available_qty ?? 0);
             $shortageQty  = max(0, $pendingQty - $availableQty);
         @endphp
@@ -567,7 +576,7 @@
 
             @php
                 $prRaised = (float)($item->quantity_pr_raised ?? 0);
-                $remainingPrQty = max(0, $pendingQty - $prRaised);
+                $remainingPrQty = $item->remaining_pr_qty;
             @endphp
 
             @if ($method === 'buy' && $item->status !== 'Waiting Purchase' && $remainingPrQty > 0)
@@ -804,11 +813,21 @@
         }
 
         /**
-         * Shared helper — updates available label + max of qty input in reserve modal.
+         * Shared helper — updates available label + max of qty input in reserve modal + toggles reserve button.
          */
         function updateReserveAvailableFromQty(itemId, avail) {
             $(`#reserve-modal-avail-${itemId}`).text(avail);
             $(`#available-qty-${itemId}`).text(avail);
+
+            // Dynamically show or hide the Reserve button based on stock in selected warehouse
+            const $reserveWrap = $(`#reserve-btn-wrap-${itemId}`);
+            if ($reserveWrap.length) {
+                if (avail > 0) {
+                    $reserveWrap.removeClass('d-none').show();
+                } else {
+                    $reserveWrap.addClass('d-none').hide();
+                }
+            }
 
             const ordered = parseInt($(`#reserve-modal-avail-${itemId}`).closest('.modal').find('.fs-16.text-dark').first().text()) || 0;
             const $availCell = $(`#available-qty-${itemId}`);
@@ -816,14 +835,16 @@
             $availCell.addClass(avail >= ordered ? 'text-success' : 'text-danger');
 
             const $input = $(`#reserve-qty-input-${itemId}`);
-            const pendingAttr = parseInt($input.data('pending')) || 0;
-            const maxVal = Math.min(pendingAttr, avail);
-            $input.attr('max', maxVal);
-            $input.val(maxVal > 0 ? maxVal : '');
-            $(`#reserve-max-label-${itemId}`).text(maxVal);
+            if ($input.length) {
+                const pendingAttr = parseInt($input.data('pending')) || 0;
+                const maxVal = Math.min(pendingAttr, avail);
+                $input.attr('max', maxVal);
+                $input.val(maxVal > 0 ? maxVal : '');
+                $(`#reserve-max-label-${itemId}`).text(maxVal);
 
-            $input.removeClass('is-invalid');
-            $(`#reserve-qty-error-${itemId}`).text('').css('display', 'none');
+                $input.removeClass('is-invalid');
+                $(`#reserve-qty-error-${itemId}`).text('').css('display', 'none');
+            }
         }
 
         // Prevent default HTML5 validation tooltip so custom red text error message is displayed
@@ -881,7 +902,7 @@
             @foreach ($delivery->items as $item)
                 @php
                     $orderedQty2 = (float)($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
-                    $pendingQty2 = max(0, $orderedQty2 - (float)$item->quantity_reserved);
+                    $pendingQty2 = (int)$item->pending_qty;
                 @endphp
                 $('#reserve-qty-input-{{ $item->id }}').data('pending', {{ (int)$pendingQty2 }});
             @endforeach

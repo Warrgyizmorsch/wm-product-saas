@@ -39,4 +39,31 @@ class MaterialRequirement extends BaseModel
     {
         return $this->hasMany(MaterialRequirementItem::class, 'material_requirement_id');
     }
+
+    public function getTotalOrderedQtyAttribute(): float
+    {
+        return (float) $this->items->sum(fn($i) => (float)($i->quantity_ordered > 0 ? $i->quantity_ordered : $i->quantity));
+    }
+
+    public function getTotalReservedQtyAttribute(): float
+    {
+        return (float) $this->items->sum('quantity_reserved');
+    }
+
+    public function getTotalDispatchedQtyAttribute(): float
+    {
+        return (float) $this->items->sum('dispatched_qty');
+    }
+
+    public function getTotalPendingQtyAttribute(): float
+    {
+        return max(0.0, $this->total_ordered_qty - $this->total_dispatched_qty - $this->total_reserved_qty);
+    }
+
+    public function getFulfillmentRateAttribute(): float
+    {
+        $ordered = $this->total_ordered_qty;
+        if ($ordered <= 0) return 0.0;
+        return round((($this->total_dispatched_qty + $this->total_reserved_qty) / $ordered) * 100, 1);
+    }
 }
