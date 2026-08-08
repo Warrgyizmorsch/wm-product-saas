@@ -7,6 +7,8 @@
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 @endpush
 
 @push('scripts')
@@ -584,29 +586,37 @@
                                                               <div class="ms-4 ps-1 mt-3 d-none d-flex flex-column gap-3" id="office_geofence_fields">
 
                                                                   {{-- Geofence toggle --}}
-                                                                  <div>
                                                                       <x-ui.checkbox name="office_geofence" id="office_geofence" label="Require Location Coordinate Capture" onchange="toggleOfficeCoordinateFields()" />
                                                                       <span class="text-muted fs-11 d-block ms-4 ps-1">Only allow check-in when employee is within the office geofence radius.</span>
 
                                                                       {{-- Lat/Lng/Radius shown when office_geofence is enabled --}}
-                                                                      <div class="row g-3 mt-1 align-items-end d-none" id="office_coordinate_fields">
-                                                                          <div class="col-md-3">
-                                                                              <label class="form-label fs-12 text-muted mb-1">Office Latitude</label>
-                                                                              <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="e.g. 37.7749">
-                                                                          </div>
-                                                                          <div class="col-md-3">
-                                                                              <label class="form-label fs-12 text-muted mb-1">Office Longitude</label>
-                                                                              <input type="text" name="office_longitude" id="office_longitude" class="form-control fs-12" placeholder="e.g. -122.4194">
-                                                                          </div>
-                                                                          <div class="col-md-3">
-                                                                              <label class="form-label fs-12 text-muted mb-1">Allowed Radius (Meters)</label>
-                                                                              <input type="number" name="office_radius" id="office_radius" class="form-control fs-12" value="100" min="1">
-                                                                          </div>
-                                                                          <div class="col-md-3">
-                                                                              <button type="button" class="btn btn-sm btn-soft-primary w-100 d-flex align-items-center justify-content-center gap-1" style="height: 38px; border-radius: 4px;" onclick="detectCurrentCoordinates(event)">
-                                                                                  <i class="feather-map-pin"></i> Detect Location
-                                                                              </button>
-                                                                          </div>
+                                                                      <div class="row g-2 mt-1 align-items-end d-none" id="office_coordinate_fields">
+                                                                           <div class="col-md-3">
+                                                                               <label class="form-label fs-12 text-muted mb-1">Office Latitude</label>
+                                                                               <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="e.g. 28.6139">
+                                                                           </div>
+                                                                           <div class="col-md-3">
+                                                                               <label class="form-label fs-12 text-muted mb-1">Office Longitude</label>
+                                                                               <input type="text" name="office_longitude" id="office_longitude" class="form-control fs-12" placeholder="e.g. 77.2090">
+                                                                           </div>
+                                                                           <div class="col-md-3">
+                                                                               <label class="form-label fs-12 text-muted mb-1">Allowed Radius (m)</label>
+                                                                               <input type="number" name="office_radius" id="office_radius" class="form-control fs-12" value="100" min="1">
+                                                                           </div>
+                                                                           <div class="col-md-3 d-flex align-items-end">
+                                                                               <div class="d-flex gap-2 w-100">
+                                                                                   <button type="button" class="btn btn-sm btn-primary flex-fill" onclick="detectCurrentCoordinates(event)" style="font-size: 11px;">
+                                                                                       <i class="feather-crosshair me-1"></i>Detect
+                                                                                   </button>
+                                                                                   <button type="button" class="btn btn-sm btn-light-brand flex-fill" id="btn_toggle_office_map" onclick="toggleOfficeMap()" style="font-size: 11px;">
+                                                                                       <i class="feather-map me-1"></i>Map
+                                                                                   </button>
+                                                                               </div>
+                                                                           </div>
+                                                                           <div class="position-relative mt-3 w-100" id="office_map_container_wrap" style="display: none;">
+                                                                               <input type="text" id="office_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="Search address or subarea (Press Enter)...">
+                                                                               <div id="office_map_picker" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #ced4da; z-index: 1;"></div>
+                                                                           </div>
                                                                       </div>
                                                                   </div>
 
@@ -1281,11 +1291,181 @@
             if (wrap) wrap.classList.toggle('d-none', !enabled);
         };
 
+        let officeMapObj = null;
+        let officeMarkerObj = null;
+
+        const initOfficeMapPicker = () => {
+            if (typeof L === 'undefined') {
+                setTimeout(initOfficeMapPicker, 100);
+                return;
+            }
+
+            const mapContainerId = 'office_map_picker';
+            const latInput = document.getElementById('office_latitude');
+            const lngInput = document.getElementById('office_longitude');
+            
+            if (!document.getElementById(mapContainerId)) return;
+
+            let initialLat = parseFloat(latInput.value) || 28.6139; // Default center
+            let initialLng = parseFloat(lngInput.value) || 77.2090;
+
+            if (officeMapObj) {
+                setTimeout(() => {
+                    officeMapObj.invalidateSize();
+                }, 200);
+                return;
+            }
+
+            officeMapObj = L.map(mapContainerId).setView([initialLat, initialLng], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(officeMapObj);
+
+            officeMarkerObj = L.marker([initialLat, initialLng], { draggable: true }).addTo(officeMapObj);
+
+            // Update inputs on marker drag
+            officeMarkerObj.on('dragend', function(e) {
+                const position = officeMarkerObj.getLatLng();
+                latInput.value = position.lat.toFixed(6);
+                lngInput.value = position.lng.toFixed(6);
+            });
+
+            // Update marker and inputs on map click
+            officeMapObj.on('click', function(e) {
+                officeMarkerObj.setLatLng(e.latlng);
+                latInput.value = e.latlng.lat.toFixed(6);
+                lngInput.value = e.latlng.lng.toFixed(6);
+            });
+
+            // Update map when inputs change manually
+            const updateMapFromInputs = () => {
+                const lat = parseFloat(latInput.value);
+                const lng = parseFloat(lngInput.value);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    const latlng = [lat, lng];
+                    officeMarkerObj.setLatLng(latlng);
+                    officeMapObj.setView(latlng, officeMapObj.getZoom());
+                }
+            };
+
+            latInput.addEventListener('input', updateMapFromInputs);
+            lngInput.addEventListener('input', updateMapFromInputs);
+
+            // Address Search Geocoding logic
+            const searchInput = document.getElementById('office_map_search');
+
+            const performSearch = () => {
+                const query = searchInput.value;
+                if (!query) return;
+
+                searchInput.disabled = true;
+                searchInput.placeholder = 'Searching...';
+
+                // ArcGIS World Geocoding (primary — high accuracy for streets, subareas, landmarks)
+                fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query)}&maxLocations=1`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.candidates && data.candidates.length > 0) {
+                            const lat = parseFloat(data.candidates[0].location.y);
+                            const lng = parseFloat(data.candidates[0].location.x);
+
+                            latInput.value = lat.toFixed(6);
+                            lngInput.value = lng.toFixed(6);
+
+                            if (officeMapObj && officeMarkerObj) {
+                                officeMarkerObj.setLatLng([lat, lng]);
+                                officeMapObj.setView([lat, lng], 15);
+                            }
+                            searchInput.disabled = false;
+                            searchInput.placeholder = 'Search address or subarea (Press Enter)...';
+                        } else {
+                            // Fallback to OSM Nominatim
+                            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+                                .then(res2 => res2.json())
+                                .then(data2 => {
+                                    if (data2 && data2.length > 0) {
+                                        const lat = parseFloat(data2[0].lat);
+                                        const lng = parseFloat(data2[0].lon);
+
+                                        latInput.value = lat.toFixed(6);
+                                        lngInput.value = lng.toFixed(6);
+
+                                        if (officeMapObj && officeMarkerObj) {
+                                            officeMarkerObj.setLatLng([lat, lng]);
+                                            officeMapObj.setView([lat, lng], 15);
+                                        }
+                                    } else {
+                                        alert("Location not found. Please try a different query.");
+                                    }
+                                    searchInput.disabled = false;
+                                    searchInput.placeholder = 'Search address or subarea (Press Enter)...';
+                                })
+                                .catch(() => {
+                                    alert("Location not found. Please try a different query.");
+                                    searchInput.disabled = false;
+                                    searchInput.placeholder = 'Search address or subarea (Press Enter)...';
+                                });
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Geocoding error:", err);
+                        searchInput.disabled = false;
+                        searchInput.placeholder = 'Search address or subarea (Press Enter)...';
+                    });
+            };
+
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    performSearch();
+                }
+            });
+
+            setTimeout(() => {
+                if (officeMapObj) officeMapObj.invalidateSize();
+            }, 300);
+        };
+
         // Toggle the coordinate fields when office_geofence checkbox changes
         window.toggleOfficeCoordinateFields = function() {
             const enabled = document.getElementById('office_geofence') && document.getElementById('office_geofence').checked;
             const fields = document.getElementById('office_coordinate_fields');
+            const mapWrap = document.getElementById('office_map_container_wrap');
+            const toggleBtn = document.getElementById('btn_toggle_office_map');
+            
             if (fields) fields.classList.toggle('d-none', !enabled);
+            // Always hide map when toggling coordinate fields — user must click "Pick on Map" to open
+            if (mapWrap) mapWrap.style.display = 'none';
+            if (toggleBtn) {
+                toggleBtn.innerHTML = '<i class="feather-map me-1"></i>Map';
+                toggleBtn.classList.remove('btn-secondary');
+                toggleBtn.classList.add('btn-soft-secondary');
+            }
+        };
+
+        // Pick on Map toggle button handler
+        window.toggleOfficeMap = function() {
+            const mapWrap = document.getElementById('office_map_container_wrap');
+            const toggleBtn = document.getElementById('btn_toggle_office_map');
+            if (!mapWrap) return;
+            const isVisible = mapWrap.style.display !== 'none';
+            if (isVisible) {
+                mapWrap.style.display = 'none';
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = '<i class="feather-map me-1"></i>Map';
+                    toggleBtn.classList.remove('btn-secondary');
+                    toggleBtn.classList.add('btn-soft-secondary');
+                }
+            } else {
+                mapWrap.style.display = 'block';
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = '<i class="feather-x me-1"></i>Close Map';
+                    toggleBtn.classList.remove('btn-soft-secondary');
+                    toggleBtn.classList.add('btn-secondary');
+                }
+                setTimeout(initOfficeMapPicker, 150);
+            }
         };
 
         // Toggle sub-options (geofence + tracking) when office_web checkbox changes
@@ -1319,8 +1499,16 @@
 
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    $('#office_latitude').val(position.coords.latitude.toFixed(6));
-                    $('#office_longitude').val(position.coords.longitude.toFixed(6));
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    $('#office_latitude').val(lat.toFixed(6));
+                    $('#office_longitude').val(lng.toFixed(6));
+                    
+                    if (officeMapObj && officeMarkerObj) {
+                        officeMarkerObj.setLatLng([lat, lng]);
+                        officeMapObj.setView([lat, lng], 15);
+                    }
+                    
                     $btn.prop('disabled', false).html(originalText);
                     showAppToast('success', 'Location coordinates detected successfully!');
                 },

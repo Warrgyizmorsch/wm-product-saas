@@ -842,7 +842,21 @@
                             <div class="card-body p-3">
                                 <h6 class="fs-12 text-muted fw-bold text-uppercase mb-2"><i class="feather-file-text me-1 text-primary"></i>Deal Notes & Requirements Description</h6>
                                 <div class="p-3 bg-light rounded text-dark fs-13" style="min-height: 50px;">
-                                    {{ $deal->notes ?: 'No specific internal notes or requirements description added.' }}
+                                    @php
+                                        $leadRequirement = !empty($linkedLead?->requirement) ? $linkedLead->requirement : ($deal->notes ?: $deal->title);
+                                    @endphp
+                                    @if(!empty($leadRequirement))
+                                        <div class="fw-semibold text-dark fs-13">
+                                            {{ $leadRequirement }}
+                                        </div>
+                                        @if(!empty($deal->notes) && $deal->notes !== $leadRequirement)
+                                            <div class="text-muted fs-12 mt-2 pt-2 border-top">
+                                                <strong>Internal Notes:</strong> {{ $deal->notes }}
+                                            </div>
+                                        @endif
+                                    @else
+                                        <span class="text-muted">No specific internal notes or requirements description added.</span>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -850,27 +864,103 @@
                         <!-- Documents Card -->
                         <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionDocuments">
                             <div class="card-body p-3">
-                                <h5 class="fs-13 text-dark fw-bold mb-3"><i class="feather-paperclip me-1.5"></i>Attached Documents & Files</h5>
-                                <div class="row g-3">
-                                    @forelse($leadDocuments as $doc)
-                                        <div class="col-md-4">
-                                            <div class="p-2.5 border rounded bg-white d-flex align-items-center justify-content-between">
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <i class="feather-file-text text-primary fs-20"></i>
-                                                    <div>
-                                                        <div class="fw-bold text-dark fs-12 text-truncate" style="max-width: 150px;">{{ $doc->file_name }}</div>
-                                                        <span class="text-muted fs-10">{{ strtoupper($doc->file_type) }}</span>
+                                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-folder me-2 text-primary"></i>Attached Documents & Files</h6>
+                                    <form action="{{ route('crm.deals.documents.upload', $deal->id) }}" method="POST" enctype="multipart/form-data" class="m-0 p-0" id="dealDocUploadForm">
+                                        @csrf
+                                        <button type="button" class="btn btn-xs btn-primary fw-bold" onclick="document.getElementById('dealDocInput').click();" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-upload me-1"></i> Upload</button>
+                                        <input type="file" name="documents[]" id="dealDocInput" onchange="if (this.files &amp;&amp; this.files.length > 0) { document.getElementById('dealDocUploadForm').submit(); }" multiple style="display: none;">
+                                    </form>
+                                </div>
+
+                                @if($leadDocuments->isEmpty())
+                                    <div class="text-center py-4 border border-dashed rounded bg-light-subtle">
+                                        <i class="feather-file-text fs-24 text-muted mb-1 d-block opacity-50"></i>
+                                        <div class="text-muted fs-12">No documents attached yet for this deal.</div>
+                                    </div>
+                                @else
+                                    <div class="row g-3">
+                                        @foreach($leadDocuments as $document)
+                                            @php
+                                                $ext = strtolower(pathinfo($document->file_name, PATHINFO_EXTENSION) ?: $document->file_type);
+                                                $fileTypeCategory = 'other';
+
+                                                if (in_array($ext, ['xlsx', 'xls', 'csv'])) {
+                                                    $fileTypeCategory = 'excel';
+                                                } elseif ($ext === 'pdf') {
+                                                    $fileTypeCategory = 'pdf';
+                                                } elseif (in_array($ext, ['doc', 'docx'])) {
+                                                    $fileTypeCategory = 'word';
+                                                } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'])) {
+                                                    $fileTypeCategory = 'image';
+                                                } elseif (in_array($ext, ['zip', 'rar', '7z', 'tar', 'gz'])) {
+                                                    $fileTypeCategory = 'archive';
+                                                }
+                                            @endphp
+                                            <div class="col-md-6">
+                                                <div class="p-3 border rounded-3 d-flex align-items-center justify-content-between h-100 shadow-2xs" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
+                                                    <div class="d-flex align-items-center overflow-hidden me-2" style="gap: 12px;">
+                                                        <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px;">
+                                                            @if($fileTypeCategory === 'excel')
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#107C41"/>
+                                                                    <path d="M10.5 9L16.5 18L10.5 27H14.25L18 21.375L21.75 27H25.5L19.5 18L25.5 9H21.75L18 14.625L14.25 9H10.5Z" fill="white"/>
+                                                                </svg>
+                                                            @elseif($fileTypeCategory === 'word')
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#185ABD"/>
+                                                                    <path d="M9 9L12.75 27H15.75L18 17.25L20.25 27H23.25L27 9H23.7L21.45 20.7L19.05 9H16.95L14.55 20.7L12.3 9H9Z" fill="white"/>
+                                                                </svg>
+                                                            @elseif($fileTypeCategory === 'pdf')
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#E11D48"/>
+                                                                    <text x="50%" y="58%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="12" font-weight="900" font-family="'Inter', sans-serif" letter-spacing="0.5">PDF</text>
+                                                                </svg>
+                                                            @elseif($fileTypeCategory === 'image')
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#0891B2"/>
+                                                                    <circle cx="13" cy="13" r="3" fill="white"/>
+                                                                    <path d="M7.5 27L14.25 18.75L18.75 24.75L24 16.5L28.5 27H7.5Z" fill="white"/>
+                                                                </svg>
+                                                            @elseif($fileTypeCategory === 'archive')
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#D97706"/>
+                                                                    <path d="M18 6V21M18 21L12 15M18 21L24 15M9 27H27" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                </svg>
+                                                            @else
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#475569"/>
+                                                                    <path d="M10.5 9H25.5M10.5 15H25.5M10.5 21H19.5M10.5 27H16.5" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                                                                </svg>
+                                                            @endif
+                                                        </div>
+                                                        <div class="overflow-hidden">
+                                                            <a href="{{ route('crm.leads.documents.view', $document->id) }}" target="_blank" class="fw-bold text-dark text-decoration-none hover-primary fs-12 text-truncate d-block mb-1" title="Click to view file: {{ $document->file_name }}">
+                                                                {{ $document->file_name }}
+                                                            </a>
+                                                            <div class="text-muted fs-11 d-flex align-items-center gap-1.5 flex-wrap">
+                                                                <span class="badge bg-white text-secondary border px-1.5 py-0.5 text-uppercase fw-semibold" style="font-size: 9px; border-color: #cbd5e1 !important;">{{ strtoupper($ext) }}</span>
+                                                                <span>{{ round($document->size / 1024, 2) }} KB</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                                        <a href="{{ route('crm.leads.documents.download', $document->id) }}" class="btn btn-xs btn-soft-success rounded-circle p-0 d-inline-flex align-items-center justify-content-center border" style="width: 30px; height: 30px; border-color: #bbf7d0 !important;" title="Download Document">
+                                                            <i class="feather-download fs-13 text-success"></i>
+                                                        </a>
+                                                        <form action="{{ route('crm.leads.documents.delete', $document->id) }}" method="POST" class="m-0 p-0" id="deleteDocForm_{{ $document->id }}">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="button" class="btn btn-xs btn-soft-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center border" style="width: 30px; height: 30px; border-color: #fecdd3 !important;" title="Delete Document" onclick="confirmAction({ title: 'Delete Document', message: 'Are you sure you want to delete this document?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteDocForm_{{ $document->id }}').submit(); })">
+                                                                <i class="feather-trash-2 fs-13 text-danger"></i>
+                                                            </button>
+                                                        </form>
                                                     </div>
                                                 </div>
-                                                <a href="{{ Storage::url($doc->file_path) }}" target="_blank" class="btn btn-xs btn-light border">
-                                                    <i class="feather-download"></i>
-                                                </a>
                                             </div>
-                                        </div>
-                                    @empty
-                                        <div class="col-12 text-center py-3 text-muted fs-12">No documents attached yet.</div>
-                                    @endforelse
-                                </div>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -1469,36 +1559,240 @@
                                     <div class="tab-pane fade" id="subtab-interactions" role="tabpanel">
                                         <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
                                             <h5 class="fw-bold text-dark fs-14 mb-0">Interactions / Scheduled Activities</h5>
-                                            @if($linkedLead)
-                                                <a href="{{ route('crm.leads.show', $linkedLead) }}#followups" class="btn btn-xs text-white fw-bold px-3 py-1.5" style="background-color: #2b304a;">
-                                                    <i class="feather-calendar me-1"></i>SCHEDULE ACTIVITY
-                                                </a>
-                                            @endif
+                                            <button type="button" class="btn btn-xs text-white fw-bold px-3 py-1.5" style="background-color: #2b304a;" data-bs-toggle="modal" data-bs-target="#modalScheduleActivity">
+                                                <i class="feather-calendar me-1"></i>SCHEDULE ACTIVITY
+                                            </button>
                                         </div>
 
-                                        @if($followups->isEmpty())
-                                            <div class="text-center py-5 text-muted border rounded bg-light-50" style="background-color: #f8fafc;">
-                                                <i class="feather-calendar fs-30 mb-2 d-block text-muted opacity-50"></i>
-                                                <div class="fw-bold text-dark fs-13">No activities scheduled yet.</div>
-                                                <div class="fs-11 text-muted">Click "Schedule Activity" to add one.</div>
+                                        @php
+                                            $groupedFollowups = $followups->reject(function($item) {
+                                                return $item->status === 'Rescheduled' && $item->rescheduledTo->isNotEmpty();
+                                            })->groupBy(function($item) {
+                                                return $item->followup_date->format('d/m/Y');
+                                            });
+                                        @endphp
+
+                                        @if($groupedFollowups->isEmpty())
+                                            <div class="text-center py-5 text-muted border border-dashed rounded-3 bg-light fs-12" style="border-color:#cbd5e1!important;">
+                                                <i class="feather-calendar fs-28 d-block mb-2 opacity-40"></i>
+                                                <span class="fw-semibold">No activities scheduled yet.</span><br>
+                                                <span class="fs-11">Click &ldquo;Schedule Activity&rdquo; to add one.</span>
                                             </div>
                                         @else
-                                            <div class="d-flex flex-column gap-2">
-                                                @foreach($followups as $f)
-                                                    <div class="p-3 border rounded bg-white shadow-2xs">
-                                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                                            <div class="d-flex align-items-center gap-2">
-                                                                <span class="badge bg-soft-primary text-primary border font-monospace fs-11">{{ $f->interaction_type ?: 'Call' }}</span>
-                                                                <span class="fw-bold text-dark fs-13">{{ $f->summary ?: 'Follow-up' }}</span>
-                                                            </div>
-                                                            <span class="text-muted fs-11"><i class="feather-clock me-1"></i>{{ \Illuminate\Support\Carbon::parse($f->followup_date)->format('d/m/Y h:i A') }}</span>
-                                                        </div>
-                                                        @if($f->remarks)
-                                                            <div class="text-muted fs-12 mt-1">{{ $f->remarks }}</div>
-                                                        @endif
+                                            @foreach($groupedFollowups as $date => $items)
+                                                @php
+                                                    $hasNotConnected = $items->contains(fn($i) => $i->status === 'Not Connected');
+                                                    $hasCancelled    = $items->contains(fn($i) => $i->status === 'Cancelled');
+                                                    $hasCompleted    = $items->contains(fn($i) => $i->status === 'Completed');
+                                                    $hasRescheduled  = $items->contains(fn($i) => $i->status === 'Rescheduled');
+
+                                                    $dateBadgeBg     = '#eff6ff';
+                                                    $dateBadgeColor  = '#1d4ed8';
+                                                    $dateBadgeBorder = '#93c5fd';
+
+                                                    if ($hasNotConnected) {
+                                                        $dateBadgeBg     = '#fff7ed';
+                                                        $dateBadgeColor  = '#c2410c';
+                                                        $dateBadgeBorder = '#fdba74';
+                                                    } elseif ($hasCancelled) {
+                                                        $dateBadgeBg     = '#fef2f2';
+                                                        $dateBadgeColor  = '#b91c1c';
+                                                        $dateBadgeBorder = '#fca5a5';
+                                                    } elseif ($hasCompleted) {
+                                                        $dateBadgeBg     = '#f0fdf4';
+                                                        $dateBadgeColor  = '#15803d';
+                                                        $dateBadgeBorder = '#86efac';
+                                                    } elseif ($hasRescheduled) {
+                                                        $dateBadgeBg     = '#faf5ff';
+                                                        $dateBadgeColor  = '#6b21a8';
+                                                        $dateBadgeBorder = '#d8b4fe';
+                                                    }
+                                                @endphp
+
+                                                <!-- Date Header -->
+                                                <div class="activity-date-group mb-3">
+                                                    <div class="activity-date-badge mb-2" style="background: {{ $dateBadgeBg }}; color: {{ $dateBadgeColor }}; border: 1px solid {{ $dateBadgeBorder }}; font-weight: 700;">
+                                                        <i class="feather-calendar fs-10 me-1"></i>{{ $date }}
                                                     </div>
-                                                @endforeach
-                                            </div>
+
+                                                    @foreach($items as $item)
+                                                        @php
+                                                            $actIcon = 'feather-phone-call';
+                                                            $actIconBg = 'bg-soft-primary';
+                                                            $actIconColor = 'text-primary';
+                                                            if($item->type === 'Email')   { $actIcon = 'feather-mail';    $actIconBg = 'bg-soft-warning'; $actIconColor = 'text-warning'; }
+                                                            elseif($item->type === 'Meeting') { $actIcon = 'feather-users';  $actIconBg = 'bg-soft-purple';  $actIconColor = 'text-purple'; }
+                                                            elseif($item->type === 'Demo')    { $actIcon = 'feather-monitor'; $actIconBg = 'bg-soft-danger';  $actIconColor = 'text-danger'; }
+
+                                                            $statusBadgeClass = 'bg-primary text-white';
+                                                            $statusLabel = 'Pending';
+                                                            if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = 'Connected'; }
+                                                            elseif($item->status === 'Not Connected') { $statusBadgeClass = 'bg-warning text-white'; $statusLabel = 'Not Connected'; }
+                                                            elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-danger text-white'; $statusLabel = 'Cancelled'; }
+                                                            elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-purple text-white'; $statusLabel = 'Rescheduled'; }
+                                                        @endphp
+
+                                                        <div class="activity-card mb-2">
+                                                            <div class="activity-card-inner">
+
+                                                                <!-- Top row: Icon + Type + Time + Status -->
+                                                                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                                                    <div class="activity-type-icon {{ $actIconBg }} {{ $actIconColor }} flex-shrink-0">
+                                                                        <i class="{{ $actIcon }}"></i>
+                                                                    </div>
+                                                                    <span class="fw-bold text-dark fs-13">{{ __('crm.activity_types.' . $item->type) ?? $item->type }}</span>
+                                                                    <span class="activity-time-chip"><i class="feather-clock fs-9 me-1"></i>{{ $item->followup_date->format('h:i A') }}</span>
+                                                                    <span class="badge rounded-pill {{ $statusBadgeClass }} px-2.5 py-1 fs-10 fw-semibold" @if($item->status !== 'Pending') title="Status updated on {{ $item->updated_at->format('d/m/Y h:i A') }}" @endif>{{ $statusLabel }}</span>
+
+                                                                    @php
+                                                                        $lastRescheduledDate = $item->rescheduledFrom?->followup_date;
+                                                                    @endphp
+                                                                    @if($lastRescheduledDate)
+                                                                        <span class="badge bg-soft-info text-info border border-info border-opacity-25 px-2 py-1 fs-10 fw-semibold ms-auto" title="Rescheduled from {{ $lastRescheduledDate->format('d/m/Y h:i A') }}">
+                                                                            <i class="feather-refresh-cw me-1 fs-9"></i>Rescheduled from {{ $lastRescheduledDate->format('d/m/Y h:i A') }}
+                                                                        </span>
+                                                                    @endif
+                                                                </div>
+
+                                                                <!-- Notes -->
+                                                                @if($item->notes)
+                                                                    <div class="activity-notes">
+                                                                        {{ $item->notes }}
+                                                                    </div>
+                                                                @endif
+
+                                                                <!-- Attribution -->
+                                                                <div class="activity-by mt-1 d-flex align-items-center flex-wrap gap-2">
+                                                                    <span>
+                                                                        <i class="feather-user fs-9 me-1"></i>by {{ $deal->owner?->name ?: ($linkedLead?->owner?->name ?: 'System') }} &bull; Scheduled: {{ $item->followup_date->format('d M Y, h:i A') }}
+                                                                    </span>
+                                                                    @if($item->taggedUsers->isNotEmpty())
+                                                                        @foreach($item->taggedUsers as $tUser)
+                                                                            <span class="badge bg-soft-info text-info fs-10 px-2 py-1 border border-info border-opacity-25" title="Tagged User">
+                                                                                <i class="feather-at-sign me-1"></i>Tagged: <strong>{{ $tUser->name }}</strong>
+                                                                            </span>
+                                                                        @endforeach
+                                                                    @endif
+                                                                    @if($item->status !== 'Pending')
+                                                                        <span class="text-muted ms-auto fs-10">
+                                                                            <i class="feather-clock fs-9 me-1 text-primary"></i>Status Updated: <strong class="text-dark">{{ $item->updated_at->format('d M Y, h:i A') }}</strong>
+                                                                        </span>
+                                                                    @endif
+                                                                </div>
+
+                                                                <!-- Action Buttons — horizontal row at bottom, only for Pending -->
+                                                                @if($item->status === 'Pending')
+                                                                    <div class="activity-footer-actions d-flex gap-2 mt-3 d-print-none">
+                                                                        <!-- Connected -->
+                                                                        <x-ui.button type="button" variant="soft-success" size="sm" icon="feather-phone-call" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">Connected</x-ui.button>
+
+                                                                        <!-- Not Connected -->
+                                                                        <x-ui.button type="button" variant="soft-warning" size="sm" icon="feather-phone-off" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">Not Connected</x-ui.button>
+
+                                                                        <!-- Cancelled -->
+                                                                        <x-ui.button type="button" variant="soft-danger" size="sm" icon="feather-x-circle" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">Cancelled</x-ui.button>
+
+                                                                        <!-- Reschedule -->
+                                                                        <x-ui.button type="button" variant="soft-primary" size="sm" icon="feather-refresh-cw" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">Reschedule</x-ui.button>
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+
+                                                        @if($item->status === 'Pending')
+                                                            @php
+                                                                $currentTaggedIds = $item->taggedUsers->pluck('id')->toArray();
+                                                            @endphp
+
+                                                            <!-- Status Modal: Connected / Completed -->
+                                                            <x-ui.modal
+                                                                :id="'statusModal_' . $item->id . '_Completed'"
+                                                                title="Update Activity: Mark as Connected"
+                                                                size="md"
+                                                                :centered="true"
+                                                                :formAction="route('crm.followups.update', $item->id)"
+                                                                formMethod="PUT"
+                                                                submitText="Save &amp; Mark Connected"
+                                                                :closeText="__('crm.cancel')"
+                                                            >
+                                                                <input type="hidden" name="status" value="Completed">
+                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                    @foreach($users as $u)
+                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" label="Notes / Discussion Summary" name="notes" rows="3" placeholder="Enter notes or discussion outcome...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                            </x-ui.modal>
+
+                                                            <!-- Status Modal: Not Connected -->
+                                                            <x-ui.modal
+                                                                :id="'statusModal_' . $item->id . '_NotConnected'"
+                                                                title="Update Activity: Mark as Not Connected"
+                                                                size="md"
+                                                                :centered="true"
+                                                                :formAction="route('crm.followups.update', $item->id)"
+                                                                formMethod="PUT"
+                                                                submitText="Save Status"
+                                                                :closeText="__('crm.cancel')"
+                                                            >
+                                                                <input type="hidden" name="status" value="Not Connected">
+                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                    @foreach($users as $u)
+                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" label="Notes / Reason" name="notes" rows="3" placeholder="Reason / notes...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                            </x-ui.modal>
+
+                                                            <!-- Status Modal: Cancelled -->
+                                                            <x-ui.modal
+                                                                :id="'statusModal_' . $item->id . '_Cancelled'"
+                                                                title="Update Activity: Cancel Activity"
+                                                                size="md"
+                                                                :centered="true"
+                                                                :formAction="route('crm.followups.update', $item->id)"
+                                                                formMethod="PUT"
+                                                                submitText="Confirm Cancel"
+                                                                :closeText="__('crm.cancel')"
+                                                            >
+                                                                <input type="hidden" name="status" value="Cancelled">
+                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                    @foreach($users as $u)
+                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" label="Cancellation Note" name="notes" rows="3" placeholder="Reason for cancellation...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                            </x-ui.modal>
+
+                                                            <!-- Reschedule Modal -->
+                                                            <x-ui.modal
+                                                                :id="'rescheduleModal_' . $item->id"
+                                                                title="Reschedule Activity"
+                                                                size="md"
+                                                                :centered="true"
+                                                                :formAction="route('crm.followups.update', $item->id)"
+                                                                formMethod="PUT"
+                                                                :submitText="'Confirm Reschedule'"
+                                                                :closeText="__('crm.cancel')"
+                                                            >
+                                                                <input type="hidden" name="is_reschedule" value="1">
+                                                                <p class="text-muted fs-11 mb-3">
+                                                                    <i class="{{ $actIcon }} me-1"></i>
+                                                                    {{ __('crm.activity_types.' . $item->type) ?? $item->type }}
+                                                                    &bull; Current: <strong>{{ $item->followup_date->format('d M Y, h:i A') }}</strong>
+                                                                </p>
+                                                                <x-ui.odoo-form-ui type="input" inputType="datetime-local" label="New Date & Time" name="followup_date" :required="true" />
+                                                                <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                                                                    @foreach($users as $u)
+                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                                <x-ui.odoo-form-ui type="textarea" label="Note (optional)" name="notes" rows="2" placeholder="Reason for rescheduling...">{{ $item->notes }}</x-ui.odoo-form-ui>
+                                                            </x-ui.modal>
+                                                        @endif
+                                                    @endforeach
+                                                </div>
+                                            @endforeach
                                         @endif
                                     </div>
 
@@ -1511,6 +1805,30 @@
             </div>
         </div>
     </div>
+
+    <!-- Schedule Activity Modal -->
+    @if(isset($linkedLead))
+        <x-ui.modal id="modalScheduleActivity" :title="__('crm.schedule_next_activity')" :centered="true" :formAction="route('crm.leads.followups.store', $linkedLead->id)" formMethod="POST" :submitText="__('crm.schedule')" :closeText="__('crm.cancel')">
+            <input type="hidden" name="status" value="Pending">
+            
+            <x-ui.odoo-form-ui type="select" :label="__('crm.activity_type')" name="type" :required="true">
+                <option value="Call">{{ __('crm.activity_types.Call') }}</option>
+                <option value="Email">{{ __('crm.activity_types.Email') }}</option>
+                <option value="Meeting">{{ __('crm.activity_types.Meeting') }}</option>
+                <option value="Demo">{{ __('crm.activity_types.Demo') }}</option>
+            </x-ui.odoo-form-ui>
+
+            <x-ui.odoo-form-ui type="input" inputType="datetime-local" :label="__('crm.due_date_time')" name="followup_date" id="deal_activity_datepicker" :required="true" />
+
+            <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
+                @foreach($users as $u)
+                    <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                @endforeach
+            </x-ui.odoo-form-ui>
+
+            <x-ui.odoo-form-ui type="textarea" :label="__('crm.description_plan')" name="notes" rows="4" :placeholder="__('crm.activity_plan_placeholder')" />
+        </x-ui.modal>
+    @endif
 
     @push('scripts')
     <script>
@@ -1769,6 +2087,57 @@
                 }
             });
 
+            // Tab state persistence logic
+            var activeTabKey = 'deal_active_tab_' + {{ $deal->id }};
+            var activeSubTabKey = 'deal_active_subtab_' + {{ $deal->id }};
+
+            // Check URL Hash first if present
+            var hash = window.location.hash;
+            if (hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
+                localStorage.setItem(activeTabKey, 'timeline-tab');
+                if (hash === '#subtab-interactions') {
+                    localStorage.setItem(activeSubTabKey, 'subtab-interactions-tab');
+                } else if (hash === '#subtab-history') {
+                    localStorage.setItem(activeSubTabKey, 'subtab-history-tab');
+                }
+            } else if (hash === '#overview' || hash === '#overview-pane') {
+                localStorage.setItem(activeTabKey, 'overview-tab');
+            } else if (hash === '#quotations' || hash === '#quotations-pane') {
+                localStorage.setItem(activeTabKey, 'quotations-tab');
+            } else if (hash === '#salesorders' || hash === '#salesorders-pane') {
+                localStorage.setItem(activeTabKey, 'salesorders-tab');
+            }
+
+            // Restore saved tab from localStorage
+            var savedTabId = localStorage.getItem(activeTabKey);
+            if (savedTabId && $('#' + savedTabId).length) {
+                setTimeout(function() {
+                    var mainTabEl = document.getElementById(savedTabId);
+                    if (mainTabEl) {
+                        bootstrap.Tab.getOrCreateInstance(mainTabEl).show();
+                    }
+                    
+                    if (savedTabId === 'timeline-tab') {
+                        var savedSubTabId = localStorage.getItem(activeSubTabKey) || 'subtab-interactions-tab';
+                        var subTabEl = document.getElementById(savedSubTabId);
+                        if (subTabEl) {
+                            bootstrap.Tab.getOrCreateInstance(subTabEl).show();
+                        }
+                    }
+                }, 50);
+            }
+
+            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], a[data-bs-toggle="tab"]', function (e) {
+                if (e.target.id) {
+                    if (['overview-tab', 'timeline-tab', 'quotations-tab', 'salesorders-tab'].includes(e.target.id)) {
+                        localStorage.setItem(activeTabKey, e.target.id);
+                    } else if (['subtab-history-tab', 'subtab-interactions-tab'].includes(e.target.id)) {
+                        localStorage.setItem(activeSubTabKey, e.target.id);
+                        localStorage.setItem(activeTabKey, 'timeline-tab');
+                    }
+                }
+            });
+
             // Perform scroll once top tab is fully shown
             $('#zohoDealTabs button[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {
                 if (pendingScrollTarget) {
@@ -1795,6 +2164,19 @@
                     }
                 }
             });
+
+            const dealDocUploadBtn = $('#dealDocUploadBtn');
+            const dealDocInput = $('#dealDocInput');
+
+            dealDocUploadBtn.on('click', function() {
+                dealDocInput.trigger('click');
+            });
+
+            dealDocInput.on('change', function() {
+                if (this.files.length > 0) {
+                    $(this).closest('form').submit();
+                }
+            });
         });
 
         window.submitDealStage = function(stage) {
@@ -1805,5 +2187,96 @@
             }
         };
     </script>
+    @endpush
+
+    @push('styles')
+    <style>
+        .daterangepicker {
+            z-index: 99999 !important;
+        }
+
+        .activity-date-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #475569;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .activity-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #ffffff;
+            transition: box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .activity-card:hover {
+            box-shadow: 0 4px 16px rgba(30,64,175,0.07);
+            border-color: #bfdbfe;
+        }
+        .activity-card-inner {
+            padding: 12px 14px;
+        }
+
+        .activity-type-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            margin-top: 2px;
+        }
+
+        .activity-time-chip {
+            display: inline-flex;
+            align-items: center;
+            font-size: 10px;
+            font-weight: 600;
+            color: #64748b;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 2px 8px;
+        }
+
+        .activity-notes {
+            font-size: 12px;
+            font-weight: 500;
+            color: #334155;
+            background: #f8fafc;
+            border-left: 3px solid #93c5fd;
+            border-radius: 0 6px 6px 0;
+            padding: 5px 10px;
+            margin: 6px 0;
+            font-style: italic;
+            line-height: 1.5;
+        }
+        .activity-card--done .activity-notes {
+            border-left-color: #86efac;
+        }
+
+        .activity-by {
+            font-size: 10px;
+            color: #94a3b8;
+            font-weight: 500;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+        }
+
+        .activity-footer-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding-top: 10px;
+            border-top: 1px dashed #e2e8f0;
+        }
+    </style>
     @endpush
 @endsection

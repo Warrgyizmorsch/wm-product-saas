@@ -804,10 +804,10 @@
                                     <div class="card-body p-3">
                                         <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
                                             <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-folder me-2 text-primary"></i>{{ __('crm.lead_documents') }}</h6>
-                                            <form action="{{ route('crm.leads.documents.upload', $lead->id) }}" method="POST" enctype="multipart/form-data" class="m-0 p-0">
+                                            <form action="{{ route('crm.leads.documents.upload', $lead->id) }}" method="POST" enctype="multipart/form-data" class="m-0 p-0" id="leadDocUploadForm">
                                                 @csrf
-                                                <button type="button" class="btn btn-xs btn-primary fw-bold" id="leadDocUploadBtn" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-upload me-1"></i> {{ __('crm.upload') }}</button>
-                                                <input type="file" name="documents[]" id="leadDocInput" multiple hidden>
+                                                <button type="button" class="btn btn-xs btn-primary fw-bold" onclick="document.getElementById('leadDocInput').click();" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-upload me-1"></i> {{ __('crm.upload') }}</button>
+                                                <input type="file" name="documents[]" id="leadDocInput" onchange="if (this.files &amp;&amp; this.files.length > 0) { document.getElementById('leadDocUploadForm').submit(); }" multiple style="display: none;">
                                             </form>
                                         </div>
 
@@ -1808,7 +1808,7 @@
             <option value="Demo">{{ __('crm.activity_types.Demo') }}</option>
         </x-ui.odoo-form-ui>
 
-        <x-ui.odoo-form-ui type="input" inputType="text" :label="__('crm.due_date_time')" name="followup_date" id="inline_activity_datepicker" :required="true" autocomplete="off" />
+        <x-ui.odoo-form-ui type="input" inputType="datetime-local" :label="__('crm.due_date_time')" name="followup_date" id="inline_activity_datepicker" :required="true" />
 
         <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
             @foreach($users as $u)
@@ -1832,6 +1832,10 @@
         }
         .terms-conditions-content p:last-child {
             margin-bottom: 0 !important;
+        }
+
+        .daterangepicker {
+            z-index: 99999 !important;
         }
 
         /* Zoho CRM Inspired Premium Styles */
@@ -2385,12 +2389,20 @@
             var activeTabKey = 'lead_active_tab_' + {{ $lead->id }};
             var activeSubTabKey = 'lead_active_subtab_' + {{ $lead->id }};
             
-            // Check query parameters first
-            var urlParams = new URLSearchParams(window.location.search);
-            var hasParam = urlParams.has('create_quotation') || 
-                           urlParams.has('edit_quotation') || 
-                           urlParams.has('view_quotation') || 
-                           urlParams.has('edit_lead');
+            // Check URL Hash first if present
+            var hash = window.location.hash;
+            if (hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
+                localStorage.setItem(activeTabKey, 'timeline-tab');
+                if (hash === '#subtab-interactions') {
+                    localStorage.setItem(activeSubTabKey, 'subtab-interactions-tab');
+                } else if (hash === '#subtab-history') {
+                    localStorage.setItem(activeSubTabKey, 'subtab-history-tab');
+                }
+            } else if (hash === '#overview' || hash === '#overview-pane') {
+                localStorage.setItem(activeTabKey, 'overview-tab');
+            } else if (hash === '#quotation' || hash === '#quotation-pane') {
+                localStorage.setItem(activeTabKey, 'quotation-tab');
+            }
 
             if (hasParam) {
                 // If loaded with parameters, set active tab in localStorage
@@ -2406,17 +2418,21 @@
                     window.history.replaceState({path: cleanUrl}, '', cleanUrl);
                 }
             } else {
-                // If clean load, restore tab from localStorage
+                // Restore tab from localStorage
                 var savedTabId = localStorage.getItem(activeTabKey);
                 if (savedTabId && $('#' + savedTabId).length) {
                     setTimeout(function() {
-                        $('#' + savedTabId).tab('show');
+                        var mainTabEl = document.getElementById(savedTabId);
+                        if (mainTabEl) {
+                            bootstrap.Tab.getOrCreateInstance(mainTabEl).show();
+                        }
                         
                         // If it's timeline tab, also restore the subtab
                         if (savedTabId === 'timeline-tab') {
-                            var savedSubTabId = localStorage.getItem(activeSubTabKey);
-                            if (savedSubTabId && $('#' + savedSubTabId).length) {
-                                $('#' + savedSubTabId).tab('show');
+                            var savedSubTabId = localStorage.getItem(activeSubTabKey) || 'subtab-interactions-tab';
+                            var subTabEl = document.getElementById(savedSubTabId);
+                            if (subTabEl) {
+                                bootstrap.Tab.getOrCreateInstance(subTabEl).show();
                             }
                         }
                     }, 50);
@@ -2489,22 +2505,20 @@
                 }
             });
 
-            // Handle scroll after tab transition finishes, or reset to top if manual switch
-            $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-                // Save active tab state in localStorage on change
+            // Handle scroll after tab transition finishes, and save active tab state in localStorage
+            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], a[data-bs-toggle="tab"]', function (e) {
                 if (e.target.id) {
                     if (e.target.id === 'overview-tab' || e.target.id === 'timeline-tab' || e.target.id === 'quotation-tab') {
                         localStorage.setItem(activeTabKey, e.target.id);
                     } else if (e.target.id === 'subtab-history-tab' || e.target.id === 'subtab-interactions-tab') {
                         localStorage.setItem(activeSubTabKey, e.target.id);
+                        localStorage.setItem(activeTabKey, 'timeline-tab');
                     }
                 }
 
                 if (scrollTargetOnTabShown) {
                     scrollToElement(scrollTargetOnTabShown);
                     scrollTargetOnTabShown = null;
-                } else {
-                    $('#zohoMainScrollable').scrollTop(0);
                 }
             });
 
@@ -2516,18 +2530,6 @@
             // Auto submit owner forms when changed in Select2 owner selector
             $('.owner-select').on('change', function() {
                 $(this).closest('form').submit();
-            });
-
-            // Initialize inline activity datepicker inside modal
-            $('#inline_activity_datepicker').daterangepicker({
-                singleDatePicker: true,
-                timePicker: true,
-                timePickerIncrement: 5,
-                parentEl: '#modalScheduleActivity',
-                drops: 'auto',
-                locale: {
-                    format: 'YYYY-MM-DD hh:mm A'
-                }
             });
 
             // Initialize reschedule datepickers when their modal opens

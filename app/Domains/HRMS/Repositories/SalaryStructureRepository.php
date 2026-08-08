@@ -187,12 +187,12 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
 
             if (isset($validated['components']) && is_array($validated['components'])) {
                 foreach ($validated['components'] as $componentId => $itemData) {
-                    if (isset($itemData['enabled']) && $itemData['enabled']) {
+                    if (isset($itemData['calculation_type']) && $itemData['calculation_type'] !== 'not_included') {
                         SalaryStructureItem::create([
                             'salary_structure_id' => $salaryStructure->id,
                             'salary_component_id' => $componentId,
-                            'calculation_type' => $itemData['calculation_type'] ?? 'fixed',
-                            'amount_percentage' => $itemData['amount_percentage'] ?? 0,
+                            'calculation_type' => $itemData['calculation_type'],
+                            'value' => $itemData['value'] ?? 0,
                         ]);
                     }
                 }
@@ -218,12 +218,12 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
 
             if (isset($validated['components']) && is_array($validated['components'])) {
                 foreach ($validated['components'] as $componentId => $itemData) {
-                    if (isset($itemData['enabled']) && $itemData['enabled']) {
+                    if (isset($itemData['calculation_type']) && $itemData['calculation_type'] !== 'not_included') {
                         SalaryStructureItem::create([
                             'salary_structure_id' => $salaryStructure->id,
                             'salary_component_id' => $componentId,
-                            'calculation_type' => $itemData['calculation_type'] ?? 'fixed',
-                            'amount_percentage' => $itemData['amount_percentage'] ?? 0,
+                            'calculation_type' => $itemData['calculation_type'],
+                            'value' => $itemData['value'] ?? 0,
                         ]);
                     }
                 }

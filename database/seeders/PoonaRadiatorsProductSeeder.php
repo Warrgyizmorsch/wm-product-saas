@@ -34,26 +34,12 @@ class PoonaRadiatorsProductSeeder extends Seeder
         $userId = $user?->id ?? 1;
 
         DB::transaction(function () use ($tenantId, $userId) {
-            $this->command->info('Seeding Accounting Chart of Accounts...');
             $accounts = $this->ensureChartOfAccounts($tenantId);
-
-            $this->command->info('Seeding Units of Measurement (UOMs)...');
             $uoms = $this->ensureUoms($tenantId);
-
-            $this->command->info('Seeding Warehouses...');
             $warehouses = $this->ensureWarehouses($tenantId);
-
-            $this->command->info('Seeding Poona Radiators Products (Raw Materials, Sub-Assemblies, Finished Goods)...');
             $products = $this->seedProducts($tenantId, $uoms, $accounts);
-
-            $this->command->info('Seeding Stock Balances and Initial Stock Transactions...');
             $this->seedInitialStock($tenantId, $products, $warehouses);
-
-            $this->command->info('Seeding Manufacturing Bill of Materials (BOM)...');
-            $this->seedBillOfMaterials($tenantId, $products, $uoms, $userId);
         });
-
-        $this->command->info('Poona Radiators End-to-End Product, BOM, Inventory & Accounting Seeder completed successfully!');
     }
 
     /**
@@ -260,7 +246,7 @@ class PoonaRadiatorsProductSeeder extends Seeder
             'sub_core' => [
                 'name' => 'Radiator Aluminum Core Sub-Assembly (Brazed Matrix)',
                 'sku' => 'PR-SUB-CORE-750',
-                'type' => 'component',
+                'type' => 'semi_finished',
                 'planning_type' => 'manufacture',
                 'uom_id' => $uoms['Pcs'],
                 'cost_price' => 11400.00,
@@ -379,105 +365,6 @@ class PoonaRadiatorsProductSeeder extends Seeder
                     'unit_cost' => $rate,
                     'total_value' => $totalValue,
                     'balance_qty' => $qty,
-                ]
-            );
-        }
-    }
-
-    /**
-     * Seed Multi-Level Manufacturing Bill of Materials (BOM) for Radiator Assembly.
-     */
-    private function seedBillOfMaterials(int $tenantId, array $products, array $uoms, int $userId): void
-    {
-        // ── LEVEL 1 BOM: Radiator Core Sub-Assembly ──
-        $subCoreProduct = $products['sub_core']['model'];
-
-        $coreBom = ProductionBom::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_number' => 'BOM-SUB-CORE-01'],
-            [
-                'bom_name' => 'BOM - Radiator Aluminum Core Sub-Assembly',
-                'bom_type' => 'manufacturing',
-                'usage_context' => 'manufacturing',
-                'product_id' => $subCoreProduct->id,
-                'base_quantity' => 1.00,
-                'base_uom_id' => $uoms['Pcs'],
-                'version' => '1.0',
-                'revision' => 0,
-                'revision_reason' => 'Standard OEM Production Release',
-                'effective_date' => now(),
-                'status' => 'approved',
-                'notes' => 'Primary furnace brazing BOM for aluminum cooling core matrix.',
-                'created_by' => $userId,
-            ]
-        );
-
-        // Core BOM Raw Material Ingredients:
-        $coreMaterials = [
-            ['key' => 'rm_fin', 'qty' => 8.50, 'uom' => 'Kg', 'scrap' => 2.00, 'seq' => 1],
-            ['key' => 'rm_tube', 'qty' => 32.00, 'uom' => 'Mtr', 'scrap' => 1.50, 'seq' => 2],
-            ['key' => 'rm_flux', 'qty' => 1.20, 'uom' => 'Kg', 'scrap' => 0.50, 'seq' => 3],
-        ];
-
-        foreach ($coreMaterials as $mat) {
-            ProductionBomItem::updateOrCreate(
-                [
-                    'tenant_id' => $tenantId,
-                    'bom_id' => $coreBom->id,
-                    'material_id' => $products[$mat['key']]['model']->id,
-                ],
-                [
-                    'quantity' => $mat['qty'],
-                    'uom_id' => $uoms[$mat['uom']],
-                    'material_scrap_percentage' => $mat['scrap'],
-                    'sequence' => $mat['seq'],
-                    'notes' => 'Raw material consumed during tube-fin assembly & CAB brazing.',
-                ]
-            );
-        }
-
-        // ── LEVEL 2 BOM: Heavy Duty Finished Radiator Assembly ──
-        $fgRadiatorProduct = $products['fg_radiator']['model'];
-
-        $fgBom = ProductionBom::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_number' => 'BOM-FG-RAD-750'],
-            [
-                'bom_name' => 'BOM - Heavy Duty Aluminum Radiator Assembly (PR-RAD-750)',
-                'bom_type' => 'manufacturing',
-                'usage_context' => 'manufacturing',
-                'product_id' => $fgRadiatorProduct->id,
-                'base_quantity' => 1.00,
-                'base_uom_id' => $uoms['Pcs'],
-                'version' => '1.0',
-                'revision' => 0,
-                'revision_reason' => 'Final Finished Good Assembly BOM for 500 kVA Genset/Commercial OEM',
-                'effective_date' => now(),
-                'status' => 'approved',
-                'notes' => 'Final assembly BOM including core, header plates, and brass inlet/outlet nozzles.',
-                'created_by' => $userId,
-            ]
-        );
-
-        // FG Radiator Assembly Component Ingredients:
-        $fgMaterials = [
-            ['key' => 'sub_core', 'qty' => 1.00, 'uom' => 'Pcs', 'scrap' => 0.00, 'seq' => 1, 'child_bom' => $coreBom->id],
-            ['key' => 'rm_plate', 'qty' => 2.00, 'uom' => 'Pcs', 'scrap' => 0.00, 'seq' => 2, 'child_bom' => null],
-            ['key' => 'rm_nozzle', 'qty' => 2.00, 'uom' => 'Pcs', 'scrap' => 0.00, 'seq' => 3, 'child_bom' => null],
-        ];
-
-        foreach ($fgMaterials as $mat) {
-            ProductionBomItem::updateOrCreate(
-                [
-                    'tenant_id' => $tenantId,
-                    'bom_id' => $fgBom->id,
-                    'material_id' => $products[$mat['key']]['model']->id,
-                ],
-                [
-                    'child_bom_id' => $mat['child_bom'],
-                    'quantity' => $mat['qty'],
-                    'uom_id' => $uoms[$mat['uom']],
-                    'material_scrap_percentage' => $mat['scrap'],
-                    'sequence' => $mat['seq'],
-                    'notes' => 'Component required for final radiator tank fitting and pressure leak test.',
                 ]
             );
         }
