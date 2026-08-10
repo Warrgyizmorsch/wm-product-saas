@@ -8,6 +8,8 @@ use App\Domains\HRMS\Models\LeaveType;
 use App\Domains\HRMS\Models\AttendancePenalty;
 use Illuminate\Http\Request;
 
+use App\Models\Tenant;
+
 class PenalizationPolicyController extends Controller
 {
     public function index(Request $request)
@@ -32,7 +34,23 @@ class PenalizationPolicyController extends Controller
         $branches = \App\Domains\HRMS\Models\Branch::all();
         $attendanceRules = \App\Domains\HRMS\Models\AttendanceRule::with(['company', 'businessUnit', 'branch'])->get();
 
-        return view('modules.hrms.penalization-policy.index', compact('companies', 'leaveTypes', 'rules', 'selectedType', 'businessUnits', 'branches', 'attendanceRules'));
+        // Retrieve current tenant settings for overtime
+        $tenantSettings = [
+            'auto_overtime_threshold_hours' => '',
+            'overtime_rate_multiplier'      => '',
+            'min_overtime_request_hours'    => '',
+        ];
+        $user = auth()->user();
+        if ($user && $user->tenant_id) {
+            $tenant = Tenant::find($user->tenant_id);
+            if ($tenant && is_array($tenant->settings)) {
+                $tenantSettings['auto_overtime_threshold_hours'] = isset($tenant->settings['auto_overtime_threshold_hours']) ? $tenant->settings['auto_overtime_threshold_hours'] : '';
+                $tenantSettings['overtime_rate_multiplier']      = isset($tenant->settings['overtime_rate_multiplier']) ? $tenant->settings['overtime_rate_multiplier'] : '';
+                $tenantSettings['min_overtime_request_hours']    = isset($tenant->settings['min_overtime_request_hours']) ? $tenant->settings['min_overtime_request_hours'] : '';
+            }
+        }
+
+        return view('modules.hrms.penalization-policy.index', compact('companies', 'leaveTypes', 'rules', 'selectedType', 'businessUnits', 'branches', 'attendanceRules', 'tenantSettings'));
     }
 
     public function store(Request $request)

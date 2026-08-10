@@ -111,4 +111,43 @@ class Attendance extends BaseModel
     {
         return $this->hasMany(AttendanceLocationLog::class, 'attendance_id');
     }
+
+    protected static function booted()
+    {
+        static::saved(function ($attendance) {
+            if ($attendance->employee_id && $attendance->check_out && (float)$attendance->total_work_hours > 0) {
+                try {
+                    $employee = $attendance->employee;
+                    if ($employee) {
+                        $dateStr = $attendance->date instanceof \Carbon\Carbon 
+                            ? $attendance->date->toDateString() 
+                            : \Carbon\Carbon::parse($attendance->date)->toDateString();
+
+                        $shift = $employee->resolveShiftForDate($dateStr);
+                        $expectedHours = 8.0;
+                        if ($shift) {
+                            $startTime = \Carbon\Carbon::parse($dateStr . ' ' . $shift->start_time);
+                            $endTime = \Carbon\Carbon::parse($dateStr . ' ' . $shift->end_time);
+                            if ($endTime->lessThan($startTime)) {
+                                $endTime->addDay();
+                            }
+                            $shiftDurationMinutes = $startTime->diffInMinutes($endTime) - ($shift->break_minutes ?? 0);
+                            $expectedHours = max(0, $shiftDurationMinutes / 60);
+                        }
+                        
+                        $extraHours = max(0.0, (float)$attendance->total_work_hours - $expectedHours);
+                        if ($extraHours > 0) {
+                            $overtimeRepo = app(\App\Domains\HRMS\Repositories\OvertimeRequestRepositoryInterface::class);
+                            $overtimeRepo->processAutoOvertime($employee, $dateStr, $extraHours);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('Failed to process auto overtime on attendance saved', [
+                        'attendance_id' => $attendance->id,
+                        'error'         => $e->getMessage()
+                    ]);
+                }
+            }
+        });
+    }
 }

@@ -392,6 +392,47 @@
             opacity: 0.68;
             pointer-events: none;
         }
+        
+        /* Dropdown options styles matching common UI elements */
+        .status-dropdown-menu {
+            min-width: 100px !important;
+            width: 100px !important;
+            padding: 4px 0 !important;
+            border: 1px solid #ced4da !important;
+            border-radius: 4px !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        }
+        .status-dropdown-menu .dropdown-item {
+            color: #334155 !important;
+            font-size: 12px !important;
+            padding: 6px 10px !important;
+            transition: all 0.15s ease-in-out !important;
+            background: transparent !important;
+        }
+        /* Hover and focus states - use dark gray (#333a4d) matching Odoo/ERP theme */
+        .status-dropdown-menu .dropdown-item:hover,
+        .status-dropdown-menu .dropdown-item:focus,
+        .status-dropdown-menu .dropdown-item:active,
+        .status-dropdown-menu .dropdown-item.active {
+            background-color: #333a4d !important;
+            color: #ffffff !important;
+        }
+        .status-dropdown-menu .dropdown-item.text-success {
+            color: #10b981 !important;
+        }
+        .status-dropdown-menu .dropdown-item.text-danger {
+            color: #ef4444 !important;
+        }
+        .status-dropdown-menu .dropdown-item.text-success:hover,
+        .status-dropdown-menu .dropdown-item.text-success:focus,
+        .status-dropdown-menu .dropdown-item.text-success:active {
+            color: #ffffff !important;
+        }
+        .status-dropdown-menu .dropdown-item.text-danger:hover,
+        .status-dropdown-menu .dropdown-item.text-danger:focus,
+        .status-dropdown-menu .dropdown-item.text-danger:active {
+            color: #ffffff !important;
+        }
     </style>
 
     <div class="employee-page">
@@ -543,11 +584,38 @@
                                     <td>{{ $employee->designation?->name ?? 'Not assigned' }}</td>
                                     <td>{{ $employee->company?->company_name ?? 'Not assigned' }}</td>
                                     <td>
-                                        @if($employee->status)
-                                            <x-ui.badge variant="success" soft>Active</x-ui.badge>
-                                        @else
-                                            <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
-                                        @endif
+                                        <div class="dropdown d-inline-block">
+                                            <span class="dropdown-toggle fw-bold employee-status-toggle" 
+                                                  id="statusDropdown_{{ $employee->id }}" 
+                                                  data-bs-toggle="dropdown" 
+                                                  aria-expanded="false" 
+                                                  style="cursor: pointer; border-bottom: 1px solid #ced4da; padding-bottom: 2px; font-size: 13px;
+                                                         color: {{ $employee->status ? '#10b981' : '#ef4444' }};">
+                                                {{ $employee->status ? 'Active' : 'Inactive' }}
+                                            </span>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm status-dropdown-menu" aria-labelledby="statusDropdown_{{ $employee->id }}" style="z-index: 1050;">
+                                                <li>
+                                                    <button type="button" class="dropdown-item change-status-btn fw-bold text-success d-flex align-items-center justify-content-between" 
+                                                            data-employee-id="{{ $employee->id }}" 
+                                                            data-status="1">
+                                                        Active
+                                                        @if($employee->status)
+                                                            <i class="feather feather-check ms-2"></i>
+                                                        @endif
+                                                    </button>
+                                                </li>
+                                                <li>
+                                                    <button type="button" class="dropdown-item change-status-btn fw-bold text-danger d-flex align-items-center justify-content-between" 
+                                                            data-employee-id="{{ $employee->id }}" 
+                                                            data-status="0">
+                                                        Inactive
+                                                        @if(!$employee->status)
+                                                            <i class="feather feather-check ms-2"></i>
+                                                        @endif
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
                                     </td>
                                     <td class="text-end">
                                         <x-ui.action-dropdown>
@@ -758,6 +826,25 @@
         </div>
     </div>
 
+    <!-- STATUS CONFIRMATION MODAL -->
+    <div class="modal fade" id="statusConfirmModal" tabindex="-1" aria-labelledby="statusConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 8px;">
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-3 text-warning">
+                        <i class="feather feather-alert-triangle" style="font-size: 48px;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-dark mb-2" id="statusConfirmModalLabel">Deactivate Employee?</h5>
+                    <p class="text-muted fs-13 mb-4">Are you sure you want to change this employee's status to Inactive? They will be excluded from active rosters, attendance sheets, and asset assignments.</p>
+                    <div class="d-flex justify-content-center gap-3">
+                        <button type="button" class="btn btn-light border px-4 fw-bold text-uppercase fs-11" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger px-4 fw-bold text-uppercase fs-11" id="confirmStatusBtn">Yes, Inactivate</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const businessUnits = @json($businessUnitsJson);
@@ -772,10 +859,11 @@
             const addEmployeeModal = document.getElementById('addEmployeeModal');
             const editEmployeeModal = document.getElementById('editEmployeeModal');
             const importEmployeeModal = document.getElementById('importEmployeeModal');
+            const statusConfirmModal = document.getElementById('statusConfirmModal');
 
             let syncFilterDepartments;
 
-            [addEmployeeModal, editEmployeeModal, importEmployeeModal].forEach(function (modal) {
+            [addEmployeeModal, editEmployeeModal, importEmployeeModal, statusConfirmModal].forEach(function (modal) {
                 if (modal && modal.parentElement !== document.body) {
                     document.body.appendChild(modal);
                 }
@@ -1484,6 +1572,123 @@
                     $('#edit_leave_transition_options').addClass('d-none');
                 }
             });
+
+            // Handle Employee Status Dropdown Change
+            function sendUpdateStatusRequest(employeeId, status, toggleBtn, dropdownContainer) {
+                if (toggleBtn.hasClass('is-loading')) return;
+                toggleBtn.addClass('is-loading');
+
+                var url = `/hrms/employees/${employeeId}/update-status`;
+
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        status: status
+                    },
+                    success: function(response) {
+                        toggleBtn.removeClass('is-loading');
+                        if (response.success) {
+                            // Update toggle text and color
+                            if (status == '1') {
+                                toggleBtn.text('Active').css('color', '#10b981');
+                            } else {
+                                toggleBtn.text('Inactive').css('color', '#ef4444');
+                            }
+
+                            // Update active checks in dropdown items
+                            dropdownContainer.find('.change-status-btn').each(function() {
+                                var item = $(this);
+                                item.find('.feather-check').remove();
+                                if (item.data('status') == status) {
+                                    item.append('<i class="feather feather-check ms-2"></i>');
+                                }
+                            });
+
+                            showToast(response.message || 'Employee status updated successfully.', 'success');
+                        } else {
+                            showToast(response.message || 'Failed to update employee status.', 'error');
+                        }
+                    },
+                    error: function(xhr) {
+                        toggleBtn.removeClass('is-loading');
+                        var errMsg = 'Failed to update employee status.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errMsg = xhr.responseJSON.message;
+                        }
+                        showToast(errMsg, 'error');
+                    }
+                });
+            }
+
+            $(document).on('click', '.change-status-btn', function(e) {
+                e.preventDefault();
+                var btn = $(this);
+                var employeeId = btn.data('employee-id');
+                var status = btn.data('status');
+                var dropdownContainer = btn.closest('.dropdown');
+                var toggleBtn = dropdownContainer.find('.employee-status-toggle');
+
+                if (status == '0') {
+                    // Show confirmation modal for deactivating
+                    $('#confirmStatusBtn')
+                        .data('employee-id', employeeId)
+                        .data('status', status)
+                        .data('btn-ref', btn);
+                    bootstrap.Modal.getOrCreateInstance(statusConfirmModal).show();
+                } else {
+                    // Instantly activate without confirmation
+                    sendUpdateStatusRequest(employeeId, status, toggleBtn, dropdownContainer);
+                }
+            });
+
+            $(document).on('click', '#confirmStatusBtn', function() {
+                var confirmBtn = $(this);
+                var employeeId = confirmBtn.data('employee-id');
+                var status = confirmBtn.data('status');
+                var triggerBtn = confirmBtn.data('btn-ref');
+                var dropdownContainer = triggerBtn.closest('.dropdown');
+                var toggleBtn = dropdownContainer.find('.employee-status-toggle');
+
+                bootstrap.Modal.getOrCreateInstance(statusConfirmModal).hide();
+                sendUpdateStatusRequest(employeeId, status, toggleBtn, dropdownContainer);
+            });
+
+            function showToast(message, type = 'success') {
+                $('.floating-toast').remove();
+                
+                let bgColor = type === 'success' ? '#10b981' : '#ef4444';
+                let iconClass = type === 'success' ? 'feather-check-circle' : 'feather-alert-circle';
+                
+                let toastHtml = `
+                    <div class="floating-toast border shadow-lg py-3 px-4 rounded d-flex align-items-center gap-3 text-white" 
+                         style="position: fixed; top: 20px; right: 20px; z-index: 10000; min-width: 300px; background-color: ${bgColor}; border-color: ${bgColor}; font-size: 13px; font-weight: 600; opacity: 0; transform: translateY(-20px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);">
+                        <i class="feather ${iconClass} fs-5 text-white"></i>
+                        <div>${message}</div>
+                    </div>
+                `;
+                
+                $('body').append(toastHtml);
+                let toast = $('.floating-toast');
+                
+                setTimeout(function() {
+                    toast.css({
+                        'opacity': '1',
+                        'transform': 'translateY(0)'
+                    });
+                }, 50);
+                
+                setTimeout(function() {
+                    toast.css({
+                        'opacity': '0',
+                        'transform': 'translateY(-20px)'
+                    });
+                    setTimeout(function() {
+                        toast.remove();
+                    }, 300);
+                }, 3000);
+            }
         });
     </script>
 @endsection

@@ -1,5 +1,40 @@
 <div class="tab-pane fade {{ $activeTabName === 'leaves' ? 'show active' : '' }}" id="leaves-pane" role="tabpanel" aria-labelledby="leaves-tab">
+    <style>
+        .sub-tab-nav {
+            border-bottom: 1.5px solid #e2e8f0;
+            gap: 16px;
+            display: flex;
+            align-items: center;
+            padding-left: 0;
+            margin-bottom: 0;
+            list-style: none;
+        }
+        .sub-tab-nav .nav-link {
+            border: none !important;
+            border-bottom: 2px solid transparent !important;
+            background: transparent !important;
+            color: #64748b !important;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 8px 2px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-transform: uppercase;
+        }
+        .sub-tab-nav .nav-link:hover {
+            color: var(--bs-primary) !important;
+            border-bottom-color: #cbd5e1 !important;
+        }
+        .sub-tab-nav .nav-link.active {
+            color: var(--bs-primary) !important;
+            border-bottom-color: var(--bs-primary) !important;
+            font-weight: 700;
+        }
+    </style>
     @php
+        $activeSubtab = request('subtab', 'apps');
         $formatLeaveRulePoints = static function (?array $rules = null): array {
             if (empty($rules)) {
                 return [];
@@ -253,7 +288,7 @@
             <!-- ABOVE THE CARD: Search, Sort, Filter Row -->
             <div class="d-flex align-items-center justify-content-end mb-3 gap-2 flex-wrap">
                 {{-- Leave Apps Toolbar --}}
-                <div id="leaveAppsToolbar" class="d-flex align-items-center gap-2">
+                <div id="leaveAppsToolbar" class="d-flex align-items-center gap-2 {{ $activeSubtab !== 'apps' ? 'd-none' : '' }}">
                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background:#f1f5f9; min-width: 180px; max-width: 240px; height: 38px; border-color: #e2e8f0 !important;">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                         <input type="text" id="empLeaveAppSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search..." style="box-shadow: none; height: 32px;" autocomplete="off">
@@ -305,7 +340,7 @@
                 </div>
 
                 {{-- Leave Encashments Toolbar --}}
-                <div id="leaveEncashmentsToolbar" class="d-flex align-items-center gap-2 d-none">
+                <div id="leaveEncashmentsToolbar" class="d-flex align-items-center gap-2 {{ $activeSubtab !== 'encashments' ? 'd-none' : '' }}">
                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background:#f1f5f9; min-width: 180px; max-width: 240px; height: 38px; border-color: #e2e8f0 !important;">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                         <input type="text" id="empLeaveEncSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search..." style="box-shadow: none; height: 32px;" autocomplete="off">
@@ -358,56 +393,53 @@
             <!-- MAIN CARD BOX -->
             <div class="card-custom">
                 <div class="card-custom-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    {{-- Left: Title + Count Badge --}}
-                    <div class="d-flex align-items-center gap-2">
-                        <div id="leaveAppsHeaderTitle" class="d-flex align-items-center gap-2">
-                            <h5 class="card-custom-title mb-0">
-                                <i class="feather-calendar text-primary me-1"></i> Leave Applications &amp; History
-                            </h5>
-                            <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1 fs-11 fw-bold" id="empLeaveRequestsCountBadge">
-                                {{ $empLeaveRequests->count() }} Applications
-                            </span>
-                        </div>
-                        <div id="leaveEncashmentsHeaderTitle" class="d-flex align-items-center gap-2 d-none">
-                            <h5 class="card-custom-title mb-0">
-                                <i class="feather-dollar-sign text-primary me-1"></i> Leave Encashments
-                            </h5>
-                            <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1 fs-11 fw-bold" id="empLeaveEncashCountBadge">
-                                {{ $empLeaveEncashments->count() }} Encashments
-                            </span>
-                        </div>
-                    </div>
+                    {{-- Left: Sub-tabs navigation --}}
+                    <ul class="sub-tab-nav border-0" id="leaveSubTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button type="button" class="nav-link {{ $activeSubtab === 'apps' ? 'active' : '' }} change-tab-btn" id="btn-show-apps" data-target="apps">
+                                <i class="feather-calendar"></i> Leave Applications
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button type="button" class="nav-link {{ $activeSubtab === 'encashments' ? 'active' : '' }} change-tab-btn" id="btn-show-encashments" data-target="encashments">
+                                <i class="feather-dollar-sign"></i> Leave Encashments
+                            </button>
+                        </li>
+                    </ul>
 
-                    {{-- Right: Toggle Button --}}
-                    <div>
-                        <button type="button" id="btnToggleLeaveView" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" style="font-size:11px;padding:7px 14px;border-radius:6px;">
-                            <span id="toggleBtnLabel"><i class="feather-dollar-sign me-1"></i> ENCASHMENT DETAILS</span>
-                        </button>
+                    {{-- Right: Count Badge matching active view --}}
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1.5 fs-11 fw-bold {{ $activeSubtab !== 'apps' ? 'd-none' : '' }}" id="empLeaveRequestsCountBadge">
+                            {{ $empLeaveRequests->count() }} Applications
+                        </span>
+                        <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1.5 fs-11 fw-bold {{ $activeSubtab !== 'encashments' ? 'd-none' : '' }}" id="empLeaveEncashCountBadge">
+                            {{ $empLeaveEncashments->count() }} Encashments
+                        </span>
                     </div>
                 </div>
                 <div class="card-body p-0">
 
                     <!-- 1. LEAVE APPLICATIONS VIEW -->
-                    <div id="leaveApplicationsViewContainer">
+                    <div id="leaveApplicationsViewContainer" class="{{ $activeSubtab !== 'apps' ? 'd-none' : '' }}">
 
                         @if(!isset($empLeaveRequests) || $empLeaveRequests->isEmpty())
                             <div class="p-5 text-center text-muted">
                                 <i class="feather-calendar fs-24 text-secondary d-block mb-2"></i>
-                                {{ __('hrms.leave.no_applications_submitted') }}
+                                        {{ __('hrms.leave.no_applications_submitted') }}
                             </div>
                         @else
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0" id="leaveAppTable" style="table-layout: fixed; width: 100%;">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 26%;">Leave Type</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 22%;">Period</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">Days</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 20%;">Status</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">File</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 14%;">Action</th>
-                                        </tr>
-                                    </thead>
+                                     <thead class="table-light">
+                                         <tr>
+                                             <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 20%;">Leave Type</th>
+                                             <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 20%;">Period</th>
+                                             <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">Days</th>
+                                             <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 14%;">Status</th>
+                                             <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">File</th>
+                                             <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 28%;">Action</th>
+                                         </tr>
+                                     </thead>
                                     <tbody>
                                         @foreach($empLeaveRequests as $req)
                                             @php
@@ -511,15 +543,15 @@
                                                 </td>
                                                 <td class="text-center" style="white-space: nowrap;">
                                                     @if($req->attachment_path)
-                                                        <a href="{{ asset('storage/'.$req->attachment_path) }}" target="_blank" class="text-primary text-decoration-none" onclick="event.stopPropagation();">
+                                                        <a href="{{ asset('storage/'.$req->attachment_path) }}" target="_blank" class="text-primary text-decoration-none" onclick="event.stopPropagation();" title="Attachment">
                                                             <i class="feather-paperclip fs-14"></i>
                                                         </a>
                                                     @else
                                                         <span class="text-muted fs-13">—</span>
                                                     @endif
                                                 </td>
-                                                <td class="text-end pe-3" style="white-space: nowrap; min-width:110px;">
-                                                    <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
+                                                <td class="text-end pe-3" style="white-space: nowrap; min-width: 220px;">
+                                                    <div class="d-flex align-items-center justify-content-end gap-2 flex-nowrap">
                                                         {{-- Eye / detail button --}}
                                                         <button type="button"
                                                             class="btn btn-sm open-leave-detail"
@@ -529,6 +561,43 @@
                                                             style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">
                                                             <i class="feather-eye fs-14"></i>
                                                         </button>
+
+                                                        {{-- Status Dropdown for Admin --}}
+                                                        @if($isAdmin && $req->status !== 'cancelled')
+                                                            <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative" onclick="event.stopPropagation();">
+                                                                <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm text-white" 
+                                                                        type="button" 
+                                                                        data-bs-toggle="dropdown" 
+                                                                        data-bs-boundary="viewport"
+                                                                        aria-expanded="false" 
+                                                                        style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 110px; border: none;" 
+                                                                        title="Change Status">
+                                                                    <span>{{ $statusBadge['lbl'] }}</span>
+                                                                </button>
+                                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 130px; border-radius: 8px; background: #ffffff; z-index: 1050;">
+                                                                    @php
+                                                                        $actionsList = [
+                                                                            'pending' => __('hrms.leave.app.status_pending'),
+                                                                            'approved' => __('hrms.leave.app.status_approved'),
+                                                                            'rejected' => __('hrms.leave.app.status_rejected'),
+                                                                            'unauthorized' => __('hrms.leave.app.status_unauthorized'),
+                                                                            'unpaid' => __('hrms.leave.app.status_unpaid')
+                                                                        ];
+                                                                    @endphp
+                                                                    @foreach($actionsList as $actionKey => $actionLabel)
+                                                                        <li>
+                                                                            <form action="{{ route('hrms.leaves.update-status', $req->id) }}" method="POST" class="m-0">
+                                                                                @csrf
+                                                                                <input type="hidden" name="action" value="{{ $actionKey }}">
+                                                                                <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === $actionKey ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $req->status === $actionKey ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                                    <span>{{ $actionLabel }}</span>
+                                                                                </button>
+                                                                            </form>
+                                                                        </li>
+                                                                    @endforeach
+                                                                </ul>
+                                                            </div>
+                                                        @endif
 
                                                         {{-- Unified Withdraw / Cancellation Delete button --}}
                                                         @if($req->canWithdraw())
@@ -545,11 +614,6 @@
                                                                     title="Request Cancellation"
                                                                     onclick="event.stopPropagation(); openLeaveCancellationModal({{ $req->id }}, '{{ route('hrms.leaves.request-cancellation', $req->id) }}')"
                                                                     style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                                <i class="feather-trash-2 fs-14"></i>
-                                                            </button>
-                                                        @else
-                                                            <button type="button" class="btn btn-sm btn-light border disabled" 
-                                                                    style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled onclick="event.stopPropagation();">
                                                                 <i class="feather-trash-2 fs-14"></i>
                                                             </button>
                                                         @endif
@@ -579,7 +643,7 @@
                     </div>
 
                     <!-- 2. LEAVE ENCASHMENTS VIEW -->
-                    <div id="leaveEncashmentsViewContainer" class="d-none">
+                    <div id="leaveEncashmentsViewContainer" class="{{ $activeSubtab !== 'encashments' ? 'd-none' : '' }}">
                         @if(!isset($empLeaveEncashments) || $empLeaveEncashments->isEmpty())
                             <div class="p-5 text-center text-muted">
                                 <i class="feather-dollar-sign fs-24 text-secondary d-block mb-2"></i>
@@ -1039,31 +1103,80 @@
                     width: '100%'
                 });
 
-                // Toggle view between Leave Applications and Leave Encashments in Employee Profile
-                $(document).on('click', '#btnToggleLeaveView', function () {
-                    var isEncashmentHidden = $('#leaveEncashmentsViewContainer').hasClass('d-none');
-                    if (isEncashmentHidden) {
+                // Toggle view between Leave Applications and Leave Encashments in Employee Profile via sub-tabs
+                $(document).on('click', '.change-tab-btn', function () {
+                    var tabBtn = $(this);
+                    if (tabBtn.hasClass('active')) return;
+
+                    // Swap active states on subtab buttons
+                    $('.change-tab-btn').removeClass('active');
+                    tabBtn.addClass('active');
+
+                    var target = tabBtn.data('target');
+
+                    // Save active sub-tab state to localStorage and sync with URL query parameters
+                    localStorage.setItem('emp_active_subtab_{{ $employee->id }}', target);
+                    if (history.replaceState) {
+                        var url = new URL(window.location.href);
+                        url.searchParams.set('tab', 'leaves');
+                        url.searchParams.set('subtab', target);
+                        history.replaceState(null, null, url.href);
+                    }
+
+                    if (target === 'encashments') {
+                        // Hide leaves views
                         $('#leaveApplicationsViewContainer').addClass('d-none');
-                        $('#leaveAppsHeaderTitle').addClass('d-none');
+                        $('#empLeaveRequestsCountBadge').addClass('d-none');
+                        $('#leaveAppsToolbar').addClass('d-none');
+
+                        // Show encashments views
+                        $('#leaveEncashmentsViewContainer').removeClass('d-none');
+                        $('#empLeaveEncashCountBadge').removeClass('d-none');
+                        $('#leaveEncashmentsToolbar').removeClass('d-none');
+                    } else {
+                        // Hide encashments views
+                        $('#leaveEncashmentsViewContainer').addClass('d-none');
+                        $('#empLeaveEncashCountBadge').addClass('d-none');
+                        $('#leaveEncashmentsToolbar').addClass('d-none');
+
+                        // Show leaves views
+                        $('#leaveApplicationsViewContainer').removeClass('d-none');
+                        $('#empLeaveRequestsCountBadge').removeClass('d-none');
+                        $('#leaveAppsToolbar').removeClass('d-none');
+                    }
+                });
+
+                // Auto-restore active sub-tab on page load
+                (function restoreActiveLeaveSubtab() {
+                    var urlParams = new URLSearchParams(window.location.search);
+                    var initialSubtab = urlParams.get('subtab') || localStorage.getItem('emp_active_subtab_{{ $employee->id }}') || 'apps';
+                    
+                    if (initialSubtab === 'encashments') {
+                        // Toggle encashment view active state programmatically
+                        $('.change-tab-btn').removeClass('active');
+                        $('#btn-show-encashments').addClass('active');
+                        
+                        $('#leaveApplicationsViewContainer').addClass('d-none');
+                        $('#empLeaveRequestsCountBadge').addClass('d-none');
                         $('#leaveAppsToolbar').addClass('d-none');
 
                         $('#leaveEncashmentsViewContainer').removeClass('d-none');
-                        $('#leaveEncashmentsHeaderTitle').removeClass('d-none');
+                        $('#empLeaveEncashCountBadge').removeClass('d-none');
                         $('#leaveEncashmentsToolbar').removeClass('d-none');
-
-                        $('#toggleBtnLabel').html('<i class="feather-list me-1"></i> LEAVE APPLICATIONS');
                     } else {
+                        // Default to applications view
+                        $('.change-tab-btn').removeClass('active');
+                        $('#btn-show-apps').addClass('active');
+
                         $('#leaveEncashmentsViewContainer').addClass('d-none');
-                        $('#leaveEncashmentsHeaderTitle').addClass('d-none');
+                        $('#empLeaveEncashCountBadge').addClass('d-none');
                         $('#leaveEncashmentsToolbar').addClass('d-none');
 
                         $('#leaveApplicationsViewContainer').removeClass('d-none');
-                        $('#leaveAppsHeaderTitle').removeClass('d-none');
+                        $('#empLeaveRequestsCountBadge').removeClass('d-none');
                         $('#leaveAppsToolbar').removeClass('d-none');
-
-                        $('#toggleBtnLabel').html('<i class="feather-dollar-sign me-1"></i> ENCASHMENT DETAILS');
                     }
-                });
+                })();
 
                 // Client-side Leave Application filtering/search/sorting
                 var empLeaveAppSortMode = 'date_desc';

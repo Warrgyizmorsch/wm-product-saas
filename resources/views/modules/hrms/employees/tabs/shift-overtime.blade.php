@@ -1,4 +1,41 @@
 <div class="tab-pane fade {{ in_array($activeTabName, ['shift_overtime', 'shift-overtime']) ? 'show active' : '' }}" id="shift-overtime-pane" role="tabpanel" aria-labelledby="shift-overtime-tab">
+    <style>
+        .sub-tab-nav {
+            border-bottom: 1.5px solid #e2e8f0;
+            gap: 16px;
+            display: flex;
+            align-items: center;
+            padding-left: 0;
+            margin-bottom: 0;
+            list-style: none;
+        }
+        .sub-tab-nav .nav-link {
+            border: none !important;
+            border-bottom: 2px solid transparent !important;
+            background: transparent !important;
+            color: #64748b !important;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 8px 2px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-transform: uppercase;
+        }
+        .sub-tab-nav .nav-link:hover {
+            color: var(--bs-primary) !important;
+            border-bottom-color: #cbd5e1 !important;
+        }
+        .sub-tab-nav .nav-link.active {
+            color: var(--bs-primary) !important;
+            border-bottom-color: var(--bs-primary) !important;
+            font-weight: 700;
+        }
+    </style>
+    @php
+        $activeShiftSubtab = request('shift_subtab', 'shift');
+    @endphp
     <div class="row g-4">
         <!-- LEFT COLUMN: Current Shift & Weekly Pattern Details -->
         <div class="col-lg-4 col-12 shift-left-col">
@@ -88,7 +125,7 @@
             <!-- ABOVE THE CARD: Search, Sort, Filter Row -->
             <div class="d-flex align-items-center justify-content-end mb-3 gap-2 flex-wrap">
                 {{-- Shift Apps Toolbar --}}
-                <div id="shiftAppsToolbar" class="d-flex align-items-center gap-2">
+                <div id="shiftAppsToolbar" class="d-flex align-items-center gap-2 {{ $activeShiftSubtab !== 'shift' ? 'd-none' : '' }}">
                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background:#f1f5f9; min-width: 180px; max-width: 240px; height: 38px; border-color: #e2e8f0 !important;">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                         <input type="text" id="empShiftAppSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search..." style="box-shadow: none; height: 32px;" autocomplete="off">
@@ -132,7 +169,7 @@
                 </div>
 
                 {{-- Overtime Apps Toolbar --}}
-                <div id="overtimeAppsToolbar" class="d-flex align-items-center gap-2 d-none">
+                <div id="overtimeAppsToolbar" class="d-flex align-items-center gap-2 {{ $activeShiftSubtab !== 'overtime' ? 'd-none' : '' }}">
                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background:#f1f5f9; min-width: 180px; max-width: 240px; height: 38px; border-color: #e2e8f0 !important;">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                         <input type="text" id="empOvertimeAppSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search..." style="box-shadow: none; height: 32px;" autocomplete="off">
@@ -183,43 +220,33 @@
             <!-- MAIN CARD BOX -->
             <div class="card-custom">
                 <div class="card-custom-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    {{-- Left: Sub-tabs navigation --}}
+                    <ul class="sub-tab-nav border-0" id="shiftOvertimeSubTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button type="button" class="nav-link {{ $activeShiftSubtab === 'shift' ? 'active' : '' }} change-shift-tab-btn" id="btn-show-shift-apps" data-target="shift">
+                                <i class="feather-git-pull-request"></i> Shift Requests
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button type="button" class="nav-link {{ $activeShiftSubtab === 'overtime' ? 'active' : '' }} change-shift-tab-btn" id="btn-show-overtime-apps" data-target="overtime">
+                                <i class="feather-clock"></i> Overtime Requests
+                            </button>
+                        </li>
+                    </ul>
+
+                    {{-- Right: Count Badge matching active view --}}
                     <div class="d-flex align-items-center gap-2">
-                        <!-- Shift Change Title -->
-                        <div id="shiftAppsHeaderTitle" class="d-flex align-items-center gap-2">
-                            <h5 class="card-custom-title mb-0">
-                                <i class="feather-git-pull-request text-primary me-1.5"></i> {{ __('hrms.shift_change.title') }}
-                            </h5>
-                            <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1 fs-11 ms-1 fw-bold">
-                                {{ $empShiftChangeRequests->count() }} {{ $empShiftChangeRequests->count() === 1 ? __('hrms.wfh.application') : __('hrms.wfh.applications') }}
-                            </span>
-                        </div>
-                        <!-- Overtime Title -->
-                        <div id="overtimeAppsHeaderTitle" class="d-flex align-items-center gap-2 d-none">
-                            <h5 class="card-custom-title mb-0">
-                                <i class="feather-clock text-primary me-1.5"></i> {{ __('hrms.overtime.title') }}
-                            </h5>
-                            <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1 fs-11 ms-1 fw-bold">
-                                {{ $empOvertimeRequests->count() }} {{ $empOvertimeRequests->count() === 1 ? __('hrms.wfh.application') : __('hrms.wfh.applications') }}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center">
-                        <!-- View Toggle Button -->
-                        <x-ui.button 
-                            type="button" 
-                            id="btnToggleShiftOvertimeView" 
-                            variant="soft-primary" 
-                            size="sm" 
-                            class="fw-bold text-uppercase" 
-                            style="font-size: 11px;"
-                        >
-                            <span id="toggleShiftOvertimeBtnLabel"><i class="feather-clock me-1"></i> {{ __('hrms.shift_change.overtime_details') }}</span>
-                        </x-ui.button>
+                        <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1.5 fs-11 fw-bold {{ $activeShiftSubtab !== 'shift' ? 'd-none' : '' }}" id="empShiftRequestsCountBadge">
+                            {{ $empShiftChangeRequests->count() }} Shift Requests
+                        </span>
+                        <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1.5 fs-11 fw-bold {{ $activeShiftSubtab !== 'overtime' ? 'd-none' : '' }}" id="empOvertimeRequestsCountBadge">
+                            {{ $empOvertimeRequests->count() }} Overtime Requests
+                        </span>
                     </div>
                 </div>
                 <div class="card-body p-0">
                      <!-- 1. SHIFT APPLICATIONS VIEW -->
-                    <div id="shiftApplicationsViewContainer">
+                    <div id="shiftApplicationsViewContainer" class="{{ $activeShiftSubtab !== 'shift' ? 'd-none' : '' }}">
                         <div>
                             <table class="table table-hover align-middle mb-0" id="shiftAppTable" style="width:100%; table-layout: fixed;">
                                 <thead class="table-light">
@@ -243,12 +270,37 @@
                                                 <span class="badge text-uppercase fs-10" style="background-color: {{ $req->type === 'permanent' ? 'rgba(25, 135, 84, 0.1)' : ($req->type === 'recurring' ? 'rgba(13, 110, 253, 0.1)' : 'rgba(108, 117, 125, 0.1)') }}; color: {{ $req->type === 'permanent' ? '#198754' : ($req->type === 'recurring' ? '#0d6efd' : '#6c757d') }};">
                                                     {{ __('hrms.shift_change.type_' . $req->type) }}
                                                 </span>
-                                                @if($req->type === 'recurring' && is_array($req->recurring_days))
+                                                @if($req->type === 'recurring' && $req->recurring_days)
                                                     @php
-                                                        $dayNames = is_array(__('hrms.days')) ? __('hrms.days') : [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat'];
-                                                        $mapped = array_map(fn($d) => $dayNames[$d] ?? '', $req->recurring_days);
+                                                        $recurringDays = $req->recurring_days;
+                                                        if (is_string($recurringDays)) {
+                                                            $recurringDays = json_decode($recurringDays, true) ?: explode(',', $recurringDays);
+                                                        }
+                                                        $dayNames = [
+                                                            0 => 'Sun',
+                                                            1 => 'Mon',
+                                                            2 => 'Tue',
+                                                            3 => 'Wed',
+                                                            4 => 'Thu',
+                                                            5 => 'Fri',
+                                                            6 => 'Sat'
+                                                        ];
+                                                        $mapped = [];
+                                                        if (is_array($recurringDays)) {
+                                                            foreach ($recurringDays as $d) {
+                                                                $dVal = trim((string)$d);
+                                                                if ($dVal !== '') {
+                                                                    $dInt = (int)$dVal;
+                                                                    if (isset($dayNames[$dInt])) {
+                                                                        $mapped[] = $dayNames[$dInt];
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                     @endphp
-                                                    <div class="fs-10 text-muted mt-1 fw-medium" style="max-width: 120px; line-height: 1.2;">{{ implode(', ', $mapped) }}</div>
+                                                    @if(!empty($mapped))
+                                                        <div class="fs-10 text-muted mt-1 fw-medium" style="max-width: 120px; line-height: 1.2;">{{ implode(', ', $mapped) }}</div>
+                                                    @endif
                                                 @endif
                                             </td>
                                             <td>
@@ -347,7 +399,7 @@
                         </div>
                     </div>
                     <!-- 2. OVERTIME APPLICATIONS VIEW -->
-                    <div id="overtimeApplicationsViewContainer" class="d-none">
+                    <div id="overtimeApplicationsViewContainer" class="{{ $activeShiftSubtab !== 'overtime' ? 'd-none' : '' }}">
                         <div>
                             <table class="table table-hover align-middle mb-0" id="overtimeAppTable" style="width:100%; table-layout: fixed;">
                                 <thead class="table-light">

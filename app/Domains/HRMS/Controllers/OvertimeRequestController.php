@@ -125,8 +125,11 @@ class OvertimeRequestController extends Controller
     public function updateSettings(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'auto_overtime_threshold_hours' => 'required|numeric|min:0',
-            'min_overtime_request_hours'    => 'required|numeric|min:0.5',
+            'auto_overtime_threshold_hours' => 'required_without:min_overtime_request_hours|nullable|numeric|min:0',
+            'min_overtime_request_hours'    => 'required_without:auto_overtime_threshold_hours|nullable|numeric|min:0.5',
+        ], [
+            'auto_overtime_threshold_hours.required_without' => 'Either the Auto Overtime Threshold Hours or the Minimum Overtime Request Hours must be specified.',
+            'min_overtime_request_hours.required_without' => 'Either the Auto Overtime Threshold Hours or the Minimum Overtime Request Hours must be specified.',
         ]);
         $validated['overtime_rate_multiplier'] = 1.0;
 

@@ -169,8 +169,9 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         }
 
         // Optional: Check if check-in is late relative to shift
-        if ($employee && $employee->shift) {
-            $shiftStartStr = $employee->shift->start_time; // e.g. "09:00:00"
+        $resolvedShift = $employee ? $employee->resolveShiftForDate($today) : null;
+        if ($resolvedShift) {
+            $shiftStartStr = $resolvedShift->start_time; // e.g. "09:00:00"
             $nowTime = Carbon::now();
             $shiftStart = Carbon::parse($today . ' ' . $shiftStartStr);
 

@@ -305,9 +305,9 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         $tenant = Tenant::find($user->tenant_id);
         if ($tenant) {
             $currentSettings = $tenant->settings ?: [];
-            $currentSettings['auto_overtime_threshold_hours'] = (float) ($settings['auto_overtime_threshold_hours'] ?? 0.0);
-            $currentSettings['overtime_rate_multiplier']      = (float) ($settings['overtime_rate_multiplier'] ?? 1.5);
-            $currentSettings['min_overtime_request_hours']    = (float) ($settings['min_overtime_request_hours'] ?? 0.5);
+            $currentSettings['auto_overtime_threshold_hours'] = (isset($settings['auto_overtime_threshold_hours']) && $settings['auto_overtime_threshold_hours'] !== '' && $settings['auto_overtime_threshold_hours'] !== null) ? (float) $settings['auto_overtime_threshold_hours'] : null;
+            $currentSettings['overtime_rate_multiplier']      = (isset($settings['overtime_rate_multiplier']) && $settings['overtime_rate_multiplier'] !== '' && $settings['overtime_rate_multiplier'] !== null) ? (float) $settings['overtime_rate_multiplier'] : 1.5;
+            $currentSettings['min_overtime_request_hours']    = (isset($settings['min_overtime_request_hours']) && $settings['min_overtime_request_hours'] !== '' && $settings['min_overtime_request_hours'] !== null) ? (float) $settings['min_overtime_request_hours'] : null;
             $tenant->update(['settings' => $currentSettings]);
             return true;
         }
@@ -319,7 +319,12 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
     {
         $tenant = Tenant::find($employee->tenant_id);
         $settings = $tenant ? ($tenant->settings ?: []) : [];
-        $threshold = (float) ($settings['auto_overtime_threshold_hours'] ?? 0.0);
+
+        if (!isset($settings['auto_overtime_threshold_hours']) || $settings['auto_overtime_threshold_hours'] === '' || $settings['auto_overtime_threshold_hours'] === null) {
+            return null;
+        }
+
+        $threshold = (float) $settings['auto_overtime_threshold_hours'];
 
         // If auto overtime threshold is 0.0 or less, auto-overtime generation is disabled.
         if ($threshold <= 0.0) {
