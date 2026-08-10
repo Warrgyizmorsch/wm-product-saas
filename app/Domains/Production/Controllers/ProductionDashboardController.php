@@ -64,9 +64,9 @@ class ProductionDashboardController extends Controller
             'approved'         => ($rawReqCounts['Approved'] ?? 0) + ($rawReqCounts['reserved'] ?? 0),
         ];
 
-        // 4. "Ready to Start" Production Orders (Released/In Progress with Store Material Issued)
+        // 4. "Ready to Start" Production Orders (Active Orders with Store Material Issued)
         $allActiveOrders = ProductionOrder::where('tenant_id', $tenantId)
-            ->whereIn('status', ['released', 'in_progress'])
+            ->whereNotIn('status', ['completed', 'closed', 'cancelled'])
             ->with(['product', 'requisitionSlips', 'schedules', 'operations.operatorAssignments'])
             ->orderByDesc('id')
             ->get();

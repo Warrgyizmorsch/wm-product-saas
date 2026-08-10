@@ -438,7 +438,9 @@ class ProductionPlanController extends Controller
             if (!$item->material) continue;
 
             $reqQty = $item->quantity * $multiplier;
-            $availQty = StockService::getAvailableStock($item->material_id, $warehouseId);
+            $availQty = (float) \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                ->where('product_id', $item->material_id)
+                ->sum('available_qty');
             $forProdQty = max(0.0, $reqQty - $availQty);
             $rate = convert_from_base((float) ($item->material->unit_cost ?? 0.0));
             $amount = convert_from_base($reqQty * (float) ($item->material->unit_cost ?? 0.0));

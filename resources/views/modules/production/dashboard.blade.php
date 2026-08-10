@@ -108,7 +108,7 @@
                         <span class="fs-12 text-muted">Material Issued Orders</span>
                     </div>
                     <p class="fs-11 text-muted mb-0">
-                        Orders with store material fully or partially issued. Planners & operators can start execution immediately.
+                        Orders with store material fully or partially issued. Planners can review order details to release order & plan schedule.
                     </p>
                 </div>
             </div>
@@ -157,6 +157,9 @@
 
         {{-- ── 2. Ready To Start Production Alert Banner ───────────────────────── --}}
         @if($readyToStartCount > 0)
+            @php
+                $firstReadyOrder = $readyToStartOrders->first();
+            @endphp
             <div class="ready-start-banner p-3 mb-4 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <div class="d-flex align-items-center gap-3">
                     <div class="avatar-md bg-success text-white rounded-circle d-flex align-items-center justify-content-center fs-20">
@@ -164,17 +167,28 @@
                     </div>
                     <div>
                         <h6 class="fw-bold text-success-emphasis mb-1">
-                            <i class="feather-zap me-1"></i>{{ $readyToStartCount }} Production Order(s) Ready to Execute!
+                            <i class="feather-box me-1"></i>
+                            @if($readyToStartCount === 1)
+                                Store Material Issued for Order #{{ $firstReadyOrder->order_number }}!
+                            @else
+                                {{ $readyToStartCount }} Production Order(s) with Store Material Issued!
+                            @endif
                         </h6>
                         <span class="fs-13 text-dark">
-                            Store material has been issued for these orders. Planners can schedule work centers or operators can begin execution on MES.
+                            Raw materials have been issued by the store department. Planners can review order details, release the order, and proceed with scheduling.
                         </span>
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <a href="{{ route('production.mes.dashboard') }}" class="btn btn-sm btn-success px-3 fw-bold">
-                        <i class="feather-play me-1"></i>Go to Shop Floor (MES)
-                    </a>
+                    @if($firstReadyOrder)
+                        <a href="{{ route('production.orders.show', $firstReadyOrder->id) }}" class="btn btn-sm btn-success px-3 fw-bold shadow-sm">
+                            <i class="feather-arrow-right-circle me-1"></i>View Production Order Details
+                        </a>
+                    @else
+                        <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-success px-3 fw-bold shadow-sm">
+                            <i class="feather-list me-1"></i>View Production Orders
+                        </a>
+                    @endif
                 </div>
             </div>
         @endif
