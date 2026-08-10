@@ -3,11 +3,11 @@
 @section('title', __('purchase.edit_draft') . " {$grn->grn_number} | SaaS ERP")
 @section('page-title', __('purchase.edit_draft') . " " . __('purchase.goods_receipt_note'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.orders.index') }}">{{ __('ui.purchase') }}</a> &gt; <a href="{{ route('purchase.grns.index') }}">{{ __('purchase.goods_receipt_notes') }}</a> &gt; {{ __('purchase.edit') }} {{ $grn->grn_number }}
+    <a href="{{ route('grns.index') }}">{{ __('purchase.goods_receipt_notes') }}</a> &gt; {{ __('purchase.edit') }} {{ $grn->grn_number }}
 @endsection
 
 @section('page-actions')
-    <a href="{{ route('purchase.grns.show', $grn->id) }}" class="btn btn-light border fs-12">
+    <a href="{{ route('grns.show', $grn->id) }}" class="btn btn-light border fs-12">
         <i class="feather-arrow-left me-2"></i>{{ __('purchase.back_to_view') }}
     </a>
 @endsection
@@ -19,7 +19,7 @@
     <div class="row text-dark">
         <div class="col-12">
 
-            <form action="{{ route('purchase.grns.update', $grn->id) }}" method="POST" id="grnEditForm">
+            <form action="{{ route('grns.update', $grn->id) }}" method="POST" id="grnEditForm">
                 @csrf
                 @method('PUT')
 

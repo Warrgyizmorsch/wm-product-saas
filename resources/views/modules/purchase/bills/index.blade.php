@@ -31,6 +31,25 @@
 @section('content')
 
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        <!-- Tab navigation for Vendor Bills & Pending GRNs -->
+        <ul class="nav nav-tabs nav-tabs-custom mb-4" id="billsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link active fw-bold position-relative py-2 px-3" href="{{ route('purchase.bills.index') }}">
+                    <i class="feather-file-text me-2 text-primary"></i>All Vendor Bills
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link text-muted fw-bold position-relative py-2 px-3" href="{{ route('purchase.bills.pending') }}">
+                    <i class="feather-clock text-warning me-2"></i>Pending Bills (Unbilled GRNs)
+                    @if(($pendingGrnsCount ?? 0) > 0)
+                        <x-ui.badge :soft="true" variant="danger" class="ms-2 fs-11 fw-bold">{{ $pendingGrnsCount }}</x-ui.badge>
+                    @else
+                        <x-ui.badge :soft="true" variant="secondary" class="ms-2 fs-11 fw-bold">0</x-ui.badge>
+                    @endif
+                </a>
+            </li>
+        </ul>
+
         <!-- Header Title & Common Filter -->
         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
             <div>
@@ -72,16 +91,16 @@
             <x-ui.odoo-form-ui type="table" id="billsTable">
                 <thead>
                     <tr>
-                        <th style="width: 11%">{{ __('purchase.bill_number') }}</th>
-                        <th style="width: 11%">{{ __('purchase.vendor_invoice_no') }}</th>
-                        <th style="width: 15%">{{ __('purchase.supplier_vendor') }}</th>
-                        <th style="width: 8%">{{ __('purchase.bill_date') }}</th>
-                        <th style="width: 8%">{{ __('purchase.due_date') }}</th>
-                        <th style="width: 9%" class="text-center">{{ __('purchase.status') }}</th>
-                        <th style="width: 9%" class="text-end">{{ __('purchase.grand_total') }}</th>
-                        <th style="width: 9%" class="text-end">{{ __('purchase.paid_amount') }}</th>
-                        <th style="width: 9%" class="text-end">{{ __('purchase.due_amount') }}</th>
-                        <th style="width: 11%" class="text-end">{{ __('purchase.actions') }}</th>
+                        <th style="width: 12%">{{ __('purchase.bill_number') }}</th>
+                        <th style="width: 12%">{{ __('purchase.vendor_invoice_no') }}</th>
+                        <th style="width: 16%">{{ __('purchase.supplier_vendor') }}</th>
+                        <th style="width: 9%">{{ __('purchase.bill_date') }}</th>
+                        <th style="width: 9%">{{ __('purchase.due_date') }}</th>
+                        <th style="width: 10%" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="width: 10%" class="text-end">{{ __('purchase.grand_total') }}</th>
+                        <th style="width: 10%" class="text-end">{{ __('purchase.paid_amount') }}</th>
+                        <th style="width: 10%" class="text-end">{{ __('purchase.due_amount') }}</th>
+                        <th style="width: 12%" class="text-end">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

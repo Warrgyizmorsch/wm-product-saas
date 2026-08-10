@@ -47,8 +47,8 @@ class GoodsReceiptNoteService
 
             foreach ($validated['items'] as $item) {
                 $qtyReceived = (float)$item['received_qty'];
-                $qtyAccepted = (float)($item['accepted_qty'] ?? $qtyReceived);
                 $qtyRejected = (float)($item['rejected_qty'] ?? 0);
+                $qtyAccepted = max(0.0, $qtyReceived - $qtyRejected);
 
                 $poItem = PurchaseOrderItem::findOrFail($item['purchase_order_item_id']);
 

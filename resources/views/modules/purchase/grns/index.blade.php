@@ -35,10 +35,10 @@
 
 @section('page-actions')
     <div class="d-flex gap-2 flex-wrap">
-        <x-ui.button href="{{ route('purchase.grns.pending') }}" variant="warning" icon="feather-clock" class="text-dark fw-semibold">
+        <x-ui.button href="{{ route('grns.pending') }}" variant="warning" icon="feather-clock" class="text-dark fw-semibold">
             {{ __('purchase.pending_goods_receipts') }}
         </x-ui.button>
-        <x-ui.button href="{{ route('purchase.grns.create') }}" variant="primary" icon="feather-plus">
+        <x-ui.button href="{{ route('grns.create') }}" variant="primary" icon="feather-plus">
             {{ __('purchase.new_goods_receipt') }}
         </x-ui.button>
     </div>
@@ -56,7 +56,7 @@
             </div>
 
             <!-- Common Filter Panel -->
-            <form method="GET" action="{{ route('purchase.grns.index') }}" class="d-inline">
+            <form method="GET" action="{{ route('grns.index') }}" class="d-inline">
                 <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
 
@@ -86,7 +86,7 @@
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('purchase.grns.index') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                        <a href="{{ route('grns.index') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
                         <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
@@ -104,8 +104,9 @@
                         <th style="width: 14%">{{ __('purchase.warehouse') }}</th>
                         <th style="width: 12%">{{ __('purchase.receipt_date') }}</th>
                         <th style="width: 10%" class="text-center">{{ __('purchase.received_qty') }}</th>
-                        <th style="width: 10%" class="text-center">{{ __('purchase.status') }}</th>
-                        <th style="width: 12%">{{ __('purchase.created_by') }}</th>
+                        <th style="width: 10%" class="text-center">STORE STATUS</th>
+                        <th style="width: 11%" class="text-center">BILLING STATUS</th>
+                        <th style="width: 10%">{{ __('purchase.created_by') }}</th>
                         <th style="width: 12%" class="text-end">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
@@ -120,10 +121,18 @@
                                 default => 'bg-soft-secondary text-secondary',
                             };
                             $displayStatus = in_array($grn->status, ['Approved', 'Completed']) ? 'Approved' : $grn->status;
+                            $bStatus = $grn->billing_status;
+                            $bClass = match($bStatus) {
+                                'Pending Bill' => 'bg-soft-warning text-warning border-warning-subtle',
+                                'Billed' => 'bg-soft-info text-info border-info-subtle',
+                                'Partially Paid' => 'bg-soft-primary text-primary border-primary-subtle',
+                                'Paid' => 'bg-soft-success text-success border-success-subtle',
+                                default => 'bg-soft-secondary text-secondary border-secondary-subtle',
+                            };
                         @endphp
                         <tr>
                             <td class="ps-4 fw-bold font-monospace">
-                                <a href="{{ route('purchase.grns.show', $grn->id) }}" class="text-primary">
+                                <a href="{{ route('grns.show', $grn->id) }}" class="text-primary">
                                     {{ $grn->grn_number }}
                                 </a>
                             </td>
@@ -153,16 +162,30 @@
                             <td class="text-center">
                                 <x-ui.status-badge :status="$grn->status" size="sm" />
                             </td>
+                            <td class="text-center">
+                                @if(in_array($grn->status, ['Approved', 'Completed']))
+                                    <span class="badge {{ $bClass }} border px-2 py-1 fw-bold fs-11">
+                                        {{ $bStatus }}
+                                    </span>
+                                @else
+                                    <span class="text-muted fs-11">—</span>
+                                @endif
+                            </td>
                             <td>
                                 <div class="fs-12 fw-semibold text-dark">{{ $grn->creator?->name ?? __('purchase.system') }}</div>
                                 <div class="fs-11 text-muted">{{ $grn->created_at->format('d-M H:i') }}</div>
                             </td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
-                                    <a href="{{ route('purchase.grns.show', $grn->id) }}" class="action-icon-btn view-btn" title="{{ __('purchase.view_details') }}" data-bs-toggle="tooltip">
+                                    @if(in_array($grn->status, ['Approved', 'Completed']) && $bStatus === 'Pending Bill')
+                                        <a href="{{ route('purchase.bills.create', ['grn_id' => $grn->id]) }}" class="action-icon-btn view-btn" title="Create Vendor Bill" data-bs-toggle="tooltip">
+                                            <i class="feather feather-file-text text-success"></i>
+                                        </a>
+                                    @endif
+                                    <a href="{{ route('grns.show', $grn->id) }}" class="action-icon-btn view-btn" title="{{ __('purchase.view_details') }}" data-bs-toggle="tooltip">
                                         <i class="feather feather-eye"></i>
                                     </a>
-                                    <a href="{{ route('purchase.grns.download', $grn->id) }}" class="action-icon-btn download-btn" title="{{ __('purchase.download_pdf') }}" data-bs-toggle="tooltip">
+                                    <a href="{{ route('grns.download', $grn->id) }}" class="action-icon-btn download-btn" title="{{ __('purchase.download_pdf') }}" data-bs-toggle="tooltip">
                                         <i class="feather feather-download"></i>
                                     </a>
                                 </div>

@@ -42,7 +42,7 @@
                 <span class="fs-13 text-muted">
                     {{ __('purchase.supplier_vendor') }}:&nbsp;<strong class="text-dark">{{ $bill->vendor?->name }}</strong>
                     @if($bill->goodsReceiptNote)
-                        &nbsp;·&nbsp;GRN:&nbsp;<a href="{{ route('purchase.grns.show', $bill->goodsReceiptNote->id) }}" class="fw-semibold text-primary">{{ $bill->goodsReceiptNote->grn_number }}</a>
+                        &nbsp;·&nbsp;GRN:&nbsp;<a href="{{ route('grns.show', $bill->goodsReceiptNote->id) }}" class="fw-semibold text-primary">{{ $bill->goodsReceiptNote->grn_number }}</a>
                     @endif
                 </span>
             </div>
