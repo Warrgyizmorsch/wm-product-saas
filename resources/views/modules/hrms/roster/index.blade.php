@@ -95,6 +95,46 @@
             border-bottom: 2px solid var(--bs-primary) !important;
         }
 
+        /* ── Shifts Table: Consistent Font Sizes ── */
+        #shiftsTable thead th {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+            color: #475569 !important;
+            vertical-align: middle !important;
+        }
+        #shiftsTable tbody td {
+            font-size: 13px !important;
+            color: #334155 !important;
+            vertical-align: middle !important;
+        }
+        /* Row number */
+        #shiftsTable tbody .shift-index-cell {
+            font-size: 13px !important;
+            color: #94a3b8 !important;
+            font-weight: 500 !important;
+        }
+        /* Shift name — bold primary text */
+        #shiftsTable tbody .shift-name-label {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: #0f172a !important;
+        }
+        /* Shift code — small muted mono */
+        #shiftsTable tbody .shift-code-label {
+            font-size: 11px !important;
+            color: #94a3b8 !important;
+        }
+        /* Timing column — monospace */
+        #shiftsTable tbody .font-monospace {
+            font-size: 13px !important;
+        }
+        /* Company name */
+        #shiftsTable tbody .text-muted {
+            font-size: 12px !important;
+        }
+
         /* Responsive Grid & Size constraints to fit within 90% viewports */
         .roster-grid-table {
             table-layout: fixed !important;
@@ -327,11 +367,6 @@
 
 @section('content')
     <div class="settings-container">
-        <!-- Left Subsidebar Column -->
-        <div class="settings-sidebar-col">
-            @include('modules.hrms.partials.settings-sidebar')
-        </div>
-
         <!-- Right Content Column -->
         <div class="settings-content-col flex-grow-1">
 
@@ -370,10 +405,10 @@
                                             <x-slot name="headerAction">
                                                  <div class="d-flex align-items-center gap-2 flex-wrap">
                                                      <!-- Search Input -->
-                                                     <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftSearchForm" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 240px; height: 38px;">
+                                                     <form method="GET" action="{{ route('hrms.roster.index') }}" class="d-flex align-items-center bg-light border rounded px-3 py-1 m-0" style="min-width: 240px; height: 36px !important; box-sizing: border-box !important;">
                                                          <input type="hidden" name="tab" value="shifts">
                                                          <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                                         <input type="text" name="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.roster.search_shifts') }}" value="{{ $shiftSearch }}" style="box-shadow: none; height: 32px; outline: none;">
+                                                         <input type="text" name="shift_search" class="w-100 border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.roster.search_shifts') }}" value="{{ $shiftSearch }}" style="box-shadow: none; height: 100%; outline: none;">
                                                      </form>
 
                                                      <!-- Sort Dropdown -->
@@ -2092,3 +2127,5 @@
         });
     </script>
 @endsection
+
+@include('modules.hrms.partials.settings-sidebar')

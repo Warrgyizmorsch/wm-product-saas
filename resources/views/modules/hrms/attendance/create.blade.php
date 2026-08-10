@@ -6,7 +6,7 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
-        <x-ui.button href="{{ route('hrms.attendance.index') }}{{ isset($employee) ? '?view=employee' : '' }}" variant="light" icon="feather-arrow-left">
+        <x-ui.button href="{{ route('hrms.attendance.index', isset($employee) ? array_merge(['view' => 'employee'], request()->except(['employee_id', 'date', 'view'])) : request()->except(['employee_id', 'date', 'view'])) }}" variant="light" icon="feather-arrow-left">
             Back to Attendance
         </x-ui.button>
     </div>
@@ -129,6 +129,7 @@
                 <form method="POST" action="{{ route('hrms.attendance.store-manual') }}">
                     @csrf
                     <input type="hidden" name="employee_id" value="{{ $employee->id }}">
+                    <input type="hidden" name="redirect_url" value="{{ route('hrms.attendance.index', array_merge(['view' => 'employee'], request()->except(['employee_id', 'date', 'view']))) }}">
                     
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
@@ -213,7 +214,7 @@
                     
                     <!-- Submit Toolbar -->
                     <div class="card-footer bg-transparent border-top p-4 d-flex justify-content-end gap-3">
-                        <x-ui.button href="{{ route('hrms.attendance.index') }}?view=employee" variant="light" class="border fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Cancel</x-ui.button>
+                        <x-ui.button href="{{ route('hrms.attendance.index', array_merge(['view' => 'employee'], request()->except(['employee_id', 'date', 'view']))) }}" variant="light" class="border fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Cancel</x-ui.button>
                         <x-ui.button type="submit" variant="primary" class="fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Save Attendance Logs</x-ui.button>
                     </div>
                 </form>
@@ -228,6 +229,7 @@
                     <form method="POST" action="{{ route('hrms.attendance.store-manual') }}">
                         @csrf
                         <input type="hidden" name="date" value="{{ $date }}">
+                        <input type="hidden" name="redirect_url" value="{{ route('hrms.attendance.index', request()->except(['employee_id', 'date', 'view'])) }}">
                         
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0">
@@ -323,7 +325,7 @@
                         
                         <!-- Submit Toolbar -->
                         <div class="card-footer bg-transparent border-top p-4 d-flex justify-content-end gap-3">
-                            <x-ui.button href="{{ route('hrms.attendance.index') }}" variant="light" class="border fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Cancel</x-ui.button>
+                            <x-ui.button href="{{ route('hrms.attendance.index', request()->except(['employee_id', 'date', 'view'])) }}" variant="light" class="border fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Cancel</x-ui.button>
                             <x-ui.button type="submit" variant="primary" class="fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Save Attendance Logs</x-ui.button>
                         </div>
                     </form>
@@ -572,7 +574,9 @@
         const dateInput = document.getElementById('attendance_date');
         if (dateInput) {
             dateInput.addEventListener('change', function() {
-                window.location.href = `{{ route('hrms.attendance.create') }}?date=${this.value}`;
+                const url = new URL(window.location.href);
+                url.searchParams.set('date', this.value);
+                window.location.href = url.toString();
             });
         }
     });

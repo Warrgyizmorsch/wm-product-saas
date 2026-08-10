@@ -321,6 +321,11 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         $settings = $tenant ? ($tenant->settings ?: []) : [];
         $threshold = (float) ($settings['auto_overtime_threshold_hours'] ?? 0.0);
 
+        // If auto overtime threshold is 0.0 or less, auto-overtime generation is disabled.
+        if ($threshold <= 0.0) {
+            return null;
+        }
+
         if ($extraHours >= $threshold) {
             // Deduplication: Skip auto overtime if a request already exists for this employee on this date
             $exists = OvertimeRequest::where('employee_id', $employee->id)

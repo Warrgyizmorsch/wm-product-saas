@@ -38,9 +38,16 @@ class LeaveEncashmentController extends Controller
         }
 
         $frequency = $encashRules['frequency'] ?? 'anytime';
-        if (!$this->isValidEncashmentMonth(Carbon::now(), $frequency)) {
+        $periods = $this->getCyclePeriods($employee, Carbon::now(), $frequency);
+
+        if (!$periods['is_valid_month']) {
             $freqLabel = ucfirst(str_replace('_', ' ', $frequency));
             return redirect()->back()->with('error', __('hrms.leave.encashment_app.invalid_month', ['name' => $leaveType->name, 'frequency' => $freqLabel]));
+        }
+
+        if (!$this->isWithinFrequencyLimits($employee->id, $leaveType->id, $periods['start'], $periods['end'], $frequency)) {
+            $freqLabel = ucfirst(str_replace('_', ' ', $frequency));
+            return redirect()->back()->with('error', "You have already submitted an encashment request in the current {$freqLabel} period.");
         }
 
         $maxPerRequest = floatval($encashRules['max_days_per_request'] ?? 999.0);
@@ -222,5 +229,68 @@ class LeaveEncashmentController extends Controller
         $filename = 'leave_encashments_' . now()->format('Y-m-d') . '.xlsx';
 
         return XlsxHelper::export($headers, $data, $filename);
+    }
+
+    private function isWithinFrequencyLimits(int $employeeId, int $leaveTypeId, Carbon $start, Carbon $end, string $frequency): bool
+    {
+        if ($frequency === 'anytime' || $frequency === 'any_time') {
+            return true;
+        }
+
+        $exists = LeaveEncashment::where('employee_id', $employeeId)
+            ->where('leave_type_id', $leaveTypeId)
+            ->whereIn('status', ['pending', 'approved'])
+            ->whereBetween('created_at', [$start, $end])
+            ->exists();
+
+        return !$exists;
+    }
+
+    private function getCyclePeriods(Employee $employee, Carbon $now, string $frequency): array
+    {
+        $startDate = null;
+        if ($employee && $employee->leavePlan && $employee->leavePlan->effective_from) {
+            $startDate = Carbon::parse($employee->leavePlan->effective_from);
+        } else {
+            $startDate = Carbon::create($now->year, 1, 1, 0, 0, 0);
+        }
+
+        $diffInYears = $startDate->diffInYears($now);
+        $cycleStart = $startDate->copy()->addYears($diffInYears);
+        if ($cycleStart->isAfter($now)) {
+            $cycleStart->subYear();
+        }
+
+        $elapsedMonths = $cycleStart->diffInMonths($now);
+
+        $periodStart = $cycleStart->copy();
+        $periodEnd = $cycleStart->copy()->addYear()->subSecond();
+        $isValidMonth = true;
+
+        if ($frequency === 'monthly') {
+            $periodStart = $cycleStart->copy()->addMonths($elapsedMonths);
+            $periodEnd = $periodStart->copy()->addMonth()->subSecond();
+            $isValidMonth = true;
+        } elseif ($frequency === 'quarterly') {
+            $quarterIndex = floor($elapsedMonths / 3);
+            $periodStart = $cycleStart->copy()->addMonths($quarterIndex * 3);
+            $periodEnd = $periodStart->copy()->addMonths(3)->subSecond();
+            $isValidMonth = ($elapsedMonths % 3) === 2;
+        } elseif ($frequency === 'half_yearly') {
+            $halfIndex = floor($elapsedMonths / 6);
+            $periodStart = $cycleStart->copy()->addMonths($halfIndex * 6);
+            $periodEnd = $periodStart->copy()->addMonths(6)->subSecond();
+            $isValidMonth = ($elapsedMonths % 6) === 5;
+        } elseif ($frequency === 'yearly') {
+            $periodStart = $cycleStart->copy();
+            $periodEnd = $cycleStart->copy()->addYear()->subSecond();
+            $isValidMonth = ($elapsedMonths % 12) === 11;
+        }
+
+        return [
+            'start' => $periodStart,
+            'end' => $periodEnd,
+            'is_valid_month' => $isValidMonth,
+        ];
     }
 }
