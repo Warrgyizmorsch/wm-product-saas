@@ -36,7 +36,7 @@ class ProductionBomService
 
         $bomNumber = trim($dto->bom_number ?? '');
         if (empty($bomNumber) || $bomNumber === 'AUTO') {
-            $bomNumber = $this->numberService->generateNextNumber($tenantId);
+            $bomNumber = $this->numberService->generateNextNumber($tenantId, null, $dto->product_id);
         } else {
             if (!$this->numberService->validateNumber($bomNumber, $tenantId)) {
                 throw new InvalidArgumentException("BOM number format is invalid. Use alphanumeric characters, hyphens, underscores or slashes.");

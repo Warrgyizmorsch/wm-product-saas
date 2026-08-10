@@ -274,6 +274,9 @@
                                 <a href="{{ route('production.boms.show', $bom->id) }}" class="fw-bold text-primary hover-primary">
                                     {{ $bom->bom_number }}
                                 </a>
+                                <div class="fs-11 text-primary font-monospace fw-semibold">
+                                    v{{ $bom->version ?: '1.0' }}@if(isset($bom->revision) && $bom->revision > 0) <span class="text-muted fw-normal">(Rev {{ $bom->revision }})</span>@endif
+                                </div>
                             </td>
                             <td>
                                 <span class="fw-semibold text-dark">{{ $bom->bom_name ?: 'N/A' }}</span>

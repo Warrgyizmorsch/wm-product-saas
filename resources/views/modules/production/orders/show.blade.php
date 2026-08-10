@@ -84,13 +84,28 @@
         </x-ui.button>
 
         @if($order->isDraft())
-            {{-- Release Order Button --}}
-            <form method="POST" action="{{ route('production.orders.release', $order->id) }}" class="d-inline">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1.5">
-                    <i class="feather-play-circle"></i> {{ __('production.release_order') }}
-                </button>
-            </form>
+            @php
+                $latestSlip = $order->requisitionSlips->last();
+                $slipStatusLower = strtolower($latestSlip?->status ?? '');
+                $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
+            @endphp
+
+            @if($hasIssuedMaterial)
+                {{-- Release Order Button (Enabled) --}}
+                <form method="POST" action="{{ route('production.orders.release', $order->id) }}" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1.5">
+                        <i class="feather-play-circle"></i> {{ __('production.release_order') }}
+                    </button>
+                </form>
+            @else
+                {{-- Release Order Button (Disabled until store issues raw materials) --}}
+                <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Material issue required: Store must issue raw materials (fully or partially) before releasing order to shopfloor.">
+                    <button type="button" class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1.5 opacity-65" disabled>
+                        <i class="feather-lock"></i> {{ __('production.release_order') }}
+                    </button>
+                </span>
+            @endif
 
             {{-- Grouped Header Actions Dropdown --}}
             <x-ui.action-dropdown id="headerActionsDropdownDraft">
