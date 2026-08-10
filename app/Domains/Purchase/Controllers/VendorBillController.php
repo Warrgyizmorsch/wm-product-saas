@@ -20,8 +20,44 @@ class VendorBillController extends Controller
 
     public function index(Request $request)
     {
-        $bills = $this->billRepo->getPaginatedBills($request->all(), 10);
-        return view('modules.purchase.bills.index', compact('bills'));
+        $tenantId = require_tenant_id();
+        $bills = $this->billRepo->getPaginatedBills($request->all(), 15);
+
+        $pendingGrnsCount = GoodsReceiptNote::where('tenant_id', $tenantId)
+            ->whereIn('status', ['Approved', 'Completed'])
+            ->whereDoesntHave('vendorBills', function ($q) {
+                $q->where('status', '!=', 'Cancelled');
+            })
+            ->count();
+
+        return view('modules.purchase.bills.index', compact('bills', 'pendingGrnsCount'));
+    }
+
+    public function pendingGrns(Request $request)
+    {
+        $tenantId = require_tenant_id();
+
+        $query = GoodsReceiptNote::where('tenant_id', $tenantId)
+            ->whereIn('status', ['Approved', 'Completed'])
+            ->whereDoesntHave('vendorBills', function ($q) {
+                $q->where('status', '!=', 'Cancelled');
+            })
+            ->with(['purchaseOrder', 'vendor', 'warehouse', 'items']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('grn_number', 'like', "%{$search}%")
+                  ->orWhereHas('vendor', fn($vq) => $vq->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('purchaseOrder', fn($pq) => $pq->where('purchase_order_number', 'like', "%{$search}%"));
+            });
+        }
+
+        $pendingGrns = $query->latest()->paginate(15);
+
+        $pendingGrnsCount = $pendingGrns->total();
+
+        return view('modules.purchase.bills.pending', compact('pendingGrns', 'pendingGrnsCount'));
     }
 
     public function create(Request $request)

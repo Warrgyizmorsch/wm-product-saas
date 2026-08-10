@@ -41,9 +41,9 @@
         ],
         __('ui.supply_chain') => [
             ['label' => 'Store', 'icon' => 'feather-archive', 'url' => '#', 'children' => [
-                ['label' => 'Material Requirements', 'route' => 'sales.material-requirements.index'],
-                ['label' => 'Material Requests (Prod)', 'route' => 'sales.material-requests.index'],
-                ['label' => 'Dispatch Orders', 'route' => 'sales.dispatches.index'],
+                ['label' => 'Material Requirements', 'route' => 'inventory.material-requirements.index'],
+                ['label' => 'Material Requests (Prod)', 'route' => 'inventory.material-requests.index'],
+                ['label' => 'Dispatch Orders', 'route' => 'inventory.dispatches.index'],
             ]],
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => [
                 ['label' => __('inventory.products'), 'route' => 'inventory.products.index'],
@@ -64,11 +64,15 @@
                 ['label' => __('purchase.pending_pr_items'), 'route' => 'purchase.requisitions.pending-items'],
                 ['label' => __('purchase.rfqs'), 'route' => 'purchase.rfqs.index'],
                 ['label' => __('purchase.purchase_orders'), 'route' => 'purchase.orders.index'],
-                ['label' => __('purchase.pending_grns'), 'route' => 'purchase.grns.pending'],
-                ['label' => __('purchase.all_goods_receipts'), 'route' => 'purchase.grns.index'],
                 ['label' => 'Landed Cost Vouchers', 'route' => 'purchase.landed-costs.index'],
+                ['label' => 'Pending Bills', 'route' => 'purchase.bills.pending'],
                 ['label' => __('purchase.vendor_bills'), 'route' => 'purchase.bills.index'],
                 ['label' => __('purchase.vendor_payments'), 'route' => 'purchase.payments.index'],
+            ]],
+            ['label' => 'GRN (Goods Receipts)', 'icon' => 'feather-package', 'url' => '#', 'children' => [
+                ['label' => __('purchase.pending_grns'), 'route' => 'grns.pending'],
+                ['label' => __('purchase.all_goods_receipts'), 'route' => 'grns.index'],
+                ['label' => 'New Goods Receipt', 'route' => 'grns.create'],
             ]],
             ['label' => 'Purchase Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'PR Approvals', 'route' => 'purchase.pr-approvals.index'],

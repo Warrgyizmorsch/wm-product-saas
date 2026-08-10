@@ -63,7 +63,7 @@
                         <div class="d-flex flex-wrap gap-1 pt-1">
                             @foreach($voucher->receipts as $receipt)
                                 @if($receipt->goodsReceiptNote)
-                                    <a href="{{ route('purchase.grns.show', $receipt->goods_receipt_note_id) }}" class="badge bg-light text-primary border px-2.5 py-1.5 font-monospace text-decoration-none">
+                                    <a href="{{ route('grns.show', $receipt->goods_receipt_note_id) }}" class="badge bg-light text-primary border px-2.5 py-1.5 font-monospace text-decoration-none">
                                         <i class="feather-truck me-1"></i>{{ $receipt->goodsReceiptNote->grn_number }}
                                     </a>
                                 @endif

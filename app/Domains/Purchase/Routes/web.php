@@ -44,19 +44,36 @@ Route::prefix('purchase')
         Route::match(['get', 'post'], 'orders/create', [PurchaseOrderController::class, 'create'])->name('orders.create');
         Route::resource('orders', PurchaseOrderController::class);
 
-        Route::get('grns/pending', [GoodsReceiptNoteController::class, 'indexPending'])->name('grns.pending');
-        Route::get('grns/get-po-items/{po}', [GoodsReceiptNoteController::class, 'getPurchaseOrderItems'])->name('grns.get-po-items');
-        Route::post('grns/{grn}/approve', [GoodsReceiptNoteController::class, 'approve'])->name('grns.approve');
-        Route::get('grns/{grn}/download', [GoodsReceiptNoteController::class, 'downloadPdf'])->name('grns.download');
-        Route::resource('grns', GoodsReceiptNoteController::class);
-
         Route::get('landed-costs/get-grn-items', [LandedCostController::class, 'getGrnItems'])->name('landed-costs.get-grn-items');
         Route::post('landed-costs/{landed_cost}/post', [LandedCostController::class, 'post'])->name('landed-costs.post');
         Route::resource('landed-costs', LandedCostController::class);
 
+        Route::get('bills/pending', [VendorBillController::class, 'pendingGrns'])->name('bills.pending');
         Route::post('bills/{bill}/apply-advance', [VendorBillController::class, 'applyAdvance'])->name('bills.apply-advance');
         Route::resource('bills', VendorBillController::class);
         Route::resource('payments', VendorPaymentController::class);
         Route::resource('advances', PurchaseAdvancePaymentController::class);
         Route::resource('advance-payments', PurchaseAdvancePaymentController::class);
+    });
+
+// Standalone Top-Level GRN Routes (/grns/...)
+Route::prefix('grns')
+    ->as('grns.')
+    ->group(function (): void {
+        Route::get('pending', [GoodsReceiptNoteController::class, 'indexPending'])->name('pending');
+        Route::get('get-po-items/{po}', [GoodsReceiptNoteController::class, 'getPurchaseOrderItems'])->name('get-po-items');
+        Route::post('{grn}/approve', [GoodsReceiptNoteController::class, 'approve'])->name('approve');
+        Route::get('{grn}/download', [GoodsReceiptNoteController::class, 'downloadPdf'])->name('download');
+        Route::resource('/', GoodsReceiptNoteController::class)->parameters(['' => 'grn']);
+    });
+
+// Alias routes for purchase.grns.* backward compatibility
+Route::prefix('purchase/grns')
+    ->as('purchase.grns.')
+    ->group(function (): void {
+        Route::get('pending', fn() => redirect()->route('grns.pending'))->name('pending');
+        Route::get('get-po-items/{po}', [GoodsReceiptNoteController::class, 'getPurchaseOrderItems'])->name('get-po-items');
+        Route::post('{grn}/approve', [GoodsReceiptNoteController::class, 'approve'])->name('approve');
+        Route::get('{grn}/download', [GoodsReceiptNoteController::class, 'downloadPdf'])->name('download');
+        Route::resource('/', GoodsReceiptNoteController::class)->parameters(['' => 'grn']);
     });

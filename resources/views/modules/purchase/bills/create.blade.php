@@ -58,17 +58,17 @@
                     <input type="hidden" name="goods_receipt_note_id" value="{{ $selectedGrn->id }}">
                     <input type="hidden" name="purchase_order_id" value="{{ $selectedGrn->purchase_order_id }}">
 
-                    <!-- Top Action & Pipeline Bar -->
+                    <!-- Top Header Bar & Status Pipeline -->
                     <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom flex-wrap gap-3">
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="d-flex gap-2">
-                                <x-ui.button type="submit" variant="primary" size="sm" icon="feather-check-circle" style="background-color: #714B67; border-color: #714B67;">
-                                    {{ __('purchase.post_bill_to_gl') }}
-                                </x-ui.button>
-                                <x-ui.button href="{{ route('purchase.grns.show', $selectedGrn->id) }}" variant="light" size="sm">
-                                    {{ __('purchase.cancel') }}
-                                </x-ui.button>
-                            </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-soft-warning text-warning fw-bold px-3 py-1.5 fs-12 border border-warning-subtle">
+                                <i class="feather-clock me-1"></i>Draft Bill
+                            </span>
+                            @if($selectedGrn)
+                                <span class="badge bg-soft-success text-success fs-12 fw-semibold px-3 py-1.5 rounded-pill">
+                                    <i class="feather-check-circle me-1"></i>Source GRN: {{ $selectedGrn->grn_number }} @if($selectedGrn->purchaseOrder) (PO: {{ $selectedGrn->purchaseOrder->purchase_order_number }}) @endif
+                                </span>
+                            @endif
                         </div>
 
                         <!-- Status Pipeline -->
@@ -78,14 +78,9 @@
                         </div>
                     </div>
 
-                    <!-- Title & Source Document Banner -->
+                    <!-- Title Banner -->
                     <div class="mb-4">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                            <h3 class="fw-bold text-dark mb-0">Draft Vendor Bill</h3>
-                            <span class="badge bg-soft-success text-success fs-12 fw-semibold px-3 py-1.5 rounded-pill">
-                                <i class="feather-check-circle me-1"></i>Source GRN: {{ $selectedGrn->grn_number }} @if($selectedGrn->purchaseOrder) (PO: {{ $selectedGrn->purchaseOrder->purchase_order_number }}) @endif
-                            </span>
-                        </div>
+                        <h3 class="fw-bold text-dark mb-1">Draft Vendor Bill</h3>
                         <p class="text-muted fs-12 mb-0">Generate vendor invoice record and post stock liability directly to accounting ledger.</p>
                     </div>
 
@@ -94,13 +89,21 @@
                         <div class="col-md-6 border-end pe-md-4">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-1"></i>Vendor &amp; Invoice Info</h6>
 
-                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_vendor') }}" name="vendor_id" required="true" :errorText="$errors->first('vendor_id')">
-                                @foreach($vendors as $vendor)
-                                    <option value="{{ $vendor->id }}" @selected(old('vendor_id', $selectedGrn->vendor_id) == $vendor->id)>
-                                        {{ $vendor->name }}
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
+                            @if($selectedGrn)
+                                <input type="hidden" name="vendor_id" value="{{ $selectedGrn->vendor_id }}">
+                                <div class="mb-3">
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('purchase.supplier_vendor') }}" name="vendor_display_name" :value="$selectedGrn->vendor?->name ?? 'N/A'" readonly="true" />
+                                    <small class="text-muted fs-11 mt-1 d-block"><i class="feather-lock me-1 text-primary"></i>Vendor is locked from Source Goods Receipt Note ({{ $selectedGrn->grn_number }})</small>
+                                </div>
+                            @else
+                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_vendor') }}" name="vendor_id" required="true" :errorText="$errors->first('vendor_id')">
+                                    @foreach($vendors as $vendor)
+                                        <option value="{{ $vendor->id }}" @selected(old('vendor_id') == $vendor->id)>
+                                            {{ $vendor->name }}
+                                        </option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            @endif
 
                             <x-ui.odoo-form-ui type="input" label="{{ __('purchase.vendor_invoice_bill_no') }}" name="vendor_invoice_number" :value="old('vendor_invoice_number', $selectedGrn->challan_number)" placeholder="e.g. INV-98765" :errorText="$errors->first('vendor_invoice_number')" />
                         </div>
@@ -183,6 +186,17 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Bottom Action Control Bar (Post Bill & Cancel at bottom) -->
+                    <div class="d-flex justify-content-between align-items-center mt-5 pt-3 border-top flex-wrap gap-2">
+                        <x-ui.button href="{{ route('purchase.bills.pending') }}" variant="light" icon="feather-arrow-left" class="border fw-semibold">
+                            {{ __('purchase.cancel') }}
+                        </x-ui.button>
+
+                        <x-ui.button type="submit" variant="primary" icon="feather-check-circle" class="fw-bold px-4 py-2 text-white shadow-sm" style="background-color: #714B67; border-color: #714B67;">
+                            {{ __('purchase.post_bill_to_gl') }}
+                        </x-ui.button>
                     </div>
 
                 </form>
