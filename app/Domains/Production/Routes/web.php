@@ -39,12 +39,16 @@ use App\Domains\Production\Controllers\ShiftController;
 use App\Domains\Production\Controllers\WipController;
 use App\Domains\Production\Controllers\WorkCenterController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
+use App\Domains\Production\Controllers\ProductionDashboardController;
 use App\Domains\Production\Controllers\ProductionImportExportController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('production')
     ->as('production.')
     ->group(function (): void {
+
+        // ── Main Dashboard ────────────────────────────────────────────────────
+        Route::get('dashboard', [ProductionDashboardController::class, 'index'])->name('dashboard');
 
         // ── Import/Export (Centralized Master Data) ───────────────────────────
         Route::get('import-export/download-template/{type}', [ProductionImportExportController::class, 'downloadTemplate'])
