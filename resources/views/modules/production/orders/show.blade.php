@@ -236,6 +236,27 @@
         @endif
     </x-ui.workflow-guide>
 
+    @php
+        $latestSlip = $order->requisitionSlips->last();
+        $slipStatusLower = strtolower($latestSlip?->status ?? '');
+        $isPartiallyIssued = in_array($slipStatusLower, ['partially issued', 'partial']);
+    @endphp
+
+    @if($isPartiallyIssued)
+        <div class="alert alert-warning border border-warning shadow-sm mb-3 d-flex align-items-center justify-content-between gap-3 rounded-3 p-3" role="alert">
+            <div class="d-flex align-items-center gap-2">
+                <i class="feather-alert-circle fs-18 text-warning-emphasis"></i>
+                <div>
+                    <strong class="text-warning-emphasis">Store Material Partially Issued:</strong>
+                    <span class="fs-13 text-dark">Raw materials for this Production Order have been partially issued by the store. Track issued and remaining items under <a href="?tab=vtab-procurement" class="fw-bold text-dark text-decoration-underline">Procurement & Requisitions</a>.</span>
+                </div>
+            </div>
+            <a href="?tab=vtab-procurement" class="btn btn-sm btn-warning text-dark fw-bold px-3 shadow-sm">
+                View Material Status
+            </a>
+        </div>
+    @endif
+
     <div class="erp-single-panel bg-white">
 
         {{-- ── Header Identity Row ──────────────────────────────────────────── --}}

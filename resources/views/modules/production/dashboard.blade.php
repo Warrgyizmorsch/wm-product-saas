@@ -155,12 +155,12 @@
             </div>
         </div>
 
-        {{-- ── 2. Ready To Start Production Alert Banner ───────────────────────── --}}
-        @if($readyToStartCount > 0)
+        {{-- ── 2. Production Alert Banners (Fully Issued, Partially Issued, Pending Store Request) ── --}}
+        @if($fullyIssuedCount > 0)
             @php
-                $firstReadyOrder = $readyToStartOrders->first();
+                $firstFullyOrder = $fullyIssuedOrders->first();
             @endphp
-            <div class="ready-start-banner p-3 mb-4 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="ready-start-banner p-3 mb-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <div class="d-flex align-items-center gap-3">
                     <div class="avatar-md bg-success text-white rounded-circle d-flex align-items-center justify-content-center fs-20">
                         <i class="feather-check-circle"></i>
@@ -168,24 +168,98 @@
                     <div>
                         <h6 class="fw-bold text-success-emphasis mb-1">
                             <i class="feather-box me-1"></i>
-                            @if($readyToStartCount === 1)
-                                Store Material Issued for Order #{{ $firstReadyOrder->order_number }}!
+                            @if($fullyIssuedCount === 1)
+                                Store Material Fully Issued for Order #{{ $firstFullyOrder->order_number }}!
                             @else
-                                {{ $readyToStartCount }} Production Order(s) with Store Material Issued!
+                                {{ $fullyIssuedCount }} Production Order(s) - Store Material Fully Issued!
                             @endif
                         </h6>
                         <span class="fs-13 text-dark">
-                            Raw materials have been issued by the store department. Planners can review order details, release the order, and proceed with scheduling.
+                            Raw materials have been fully issued by store. Planners can review order details, release the order, and proceed with scheduling.
                         </span>
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    @if($firstReadyOrder)
-                        <a href="{{ route('production.orders.show', $firstReadyOrder->id) }}" class="btn btn-sm btn-success px-3 fw-bold shadow-sm">
+                    @if($firstFullyOrder)
+                        <a href="{{ route('production.orders.show', $firstFullyOrder->id) }}" class="btn btn-sm btn-success px-3 fw-bold shadow-sm">
                             <i class="feather-arrow-right-circle me-1"></i>View Production Order Details
                         </a>
                     @else
                         <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-success px-3 fw-bold shadow-sm">
+                            <i class="feather-list me-1"></i>View Production Orders
+                        </a>
+                    @endif
+                </div>
+            </div>
+        @endif
+
+        @if($partiallyIssuedCount > 0)
+            @php
+                $firstPartialOrder = $partiallyIssuedOrders->first();
+            @endphp
+            <div class="card border border-warning border-opacity-75 bg-soft-warning p-3 mb-3 shadow-sm d-flex flex-row flex-wrap align-items-center justify-content-between gap-3 rounded-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="avatar-md bg-warning text-white rounded-circle d-flex align-items-center justify-content-center fs-20">
+                        <i class="feather-alert-circle"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-warning-emphasis mb-1">
+                            <i class="feather-alert-triangle me-1"></i>
+                            @if($partiallyIssuedCount === 1)
+                                Store Material Partially Issued for Order #{{ $firstPartialOrder->order_number }}!
+                            @else
+                                {{ $partiallyIssuedCount }} Production Order(s) - Store Material Partially Issued!
+                            @endif
+                        </h6>
+                        <span class="fs-13 text-dark">
+                            Store raw materials have been partially issued for this order. Remaining required materials are still pending store fulfillment.
+                        </span>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    @if($firstPartialOrder)
+                        <a href="{{ route('production.orders.show', ['order' => $firstPartialOrder->id, 'tab' => 'vtab-procurement']) }}" class="btn btn-sm btn-warning text-dark px-3 fw-bold shadow-sm">
+                            <i class="feather-arrow-right-circle me-1"></i>View Order & Material Status
+                        </a>
+                    @else
+                        <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-warning text-dark px-3 fw-bold shadow-sm">
+                            <i class="feather-list me-1"></i>View Production Orders
+                        </a>
+                    @endif
+                </div>
+            </div>
+        @endif
+
+        @if($pendingStoreCount > 0)
+            @php
+                $firstPendingStoreOrder = $pendingStoreOrders->first();
+            @endphp
+            <div class="card border border-info border-opacity-50 bg-soft-info p-3 mb-3 shadow-sm d-flex flex-row flex-wrap align-items-center justify-content-between gap-3 rounded-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="avatar-md bg-info text-white rounded-circle d-flex align-items-center justify-content-center fs-20">
+                        <i class="feather-send"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-info-emphasis mb-1">
+                            <i class="feather-file-text me-1"></i>
+                            @if($pendingStoreCount === 1)
+                                Store Material Request Sent for Order #{{ $firstPendingStoreOrder->order_number }}!
+                            @else
+                                {{ $pendingStoreCount }} Production Order(s) - Store Material Request Sent!
+                            @endif
+                        </h6>
+                        <span class="fs-13 text-dark">
+                            Material requisition request has been sent to the store department. The store team can process and issue raw materials for this order.
+                        </span>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    @if($firstPendingStoreOrder)
+                        <a href="{{ route('production.orders.show', $firstPendingStoreOrder->id) }}" class="btn btn-sm btn-info text-white px-3 fw-bold shadow-sm">
+                            <i class="feather-arrow-right-circle me-1"></i>View Production Order Details
+                        </a>
+                    @else
+                        <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-info text-white px-3 fw-bold shadow-sm">
                             <i class="feather-list me-1"></i>View Production Orders
                         </a>
                     @endif
@@ -326,7 +400,7 @@
                                                 in_array($slipStatusLower, ['fully issued', 'completed', 'issued']) => ['variant' => 'success', 'label' => 'Material Issued — Ready', 'icon' => 'feather-check-circle'],
                                                 in_array($slipStatusLower, ['partially issued', 'partial']) => ['variant' => 'warning', 'label' => 'Partially Issued — Partial Ready', 'icon' => 'feather-alert-circle'],
                                                 $slipStatusLower === 'approved' || $slipStatusLower === 'reserved' => ['variant' => 'primary', 'label' => 'Store Preparing Material', 'icon' => 'feather-clock'],
-                                                $slipStatusLower === 'pending' || $slipStatusLower === 'pending store release' => ['variant' => 'danger', 'label' => 'Pending Store Release', 'icon' => 'feather-loader'],
+                                                $slipStatusLower === 'pending' || $slipStatusLower === 'pending store release' => ['variant' => 'info', 'label' => 'Store Request Sent (Pending Store)', 'icon' => 'feather-send'],
                                                 default => ['variant' => 'secondary', 'label' => 'No Requisition Raised', 'icon' => 'feather-file-text'],
                                             };
 
