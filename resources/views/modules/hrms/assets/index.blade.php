@@ -165,11 +165,6 @@
 
 @section('content')
     <div class="settings-container">
-        <!-- Left Subsidebar Column -->
-        <div class="settings-sidebar-col">
-            @include('modules.hrms.partials.settings-sidebar')
-        </div>
-
         <!-- Right Content Column -->
         <div class="settings-content-col flex-grow-1">
 
@@ -1601,3 +1596,5 @@
         }
     </script>
 @endpush
+
+@include('modules.hrms.partials.settings-sidebar')

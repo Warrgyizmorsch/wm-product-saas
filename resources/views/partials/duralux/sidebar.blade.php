@@ -115,13 +115,20 @@
             ]],
         ],
         'HRMS' => [
+            ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
+                ['label' => 'Org Structure', 'route' => 'hrms.org.index'],
+                ['label' => 'Salary Structure', 'route' => 'hrms.salary-structure.index'],
+                ['label' => 'Leave Structure', 'route' => 'hrms.leave-structure.index'],
+                ['label' => 'Shift Roster', 'route' => 'hrms.roster.index'],
+                ['label' => 'Penalization Policy', 'route' => 'hrms.penalization-policy.index'],
+                ['label' => 'Asset Management', 'route' => 'hrms.assets.index'],
+            ]],
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
             ['label' => 'Attendance', 'icon' => 'feather-clock', 'route' => 'hrms.attendance.index'],
             ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
             ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#'],
-            ['label' => 'Setting', 'icon' => 'feather-settings', 'route' => 'hrms.org.index'],
         ],
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [

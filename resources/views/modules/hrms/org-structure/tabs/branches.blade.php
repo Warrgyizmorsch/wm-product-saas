@@ -5,14 +5,14 @@
             <x-slot name="headerAction">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <!-- Search Form -->
-                    <form method="GET" action="{{ route('hrms.org.index') }}" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 240px;">
+                    <form method="GET" action="{{ route('hrms.org.index') }}" class="d-flex align-items-center bg-light border rounded px-3 py-1 m-0" style="min-width: 240px; height: 36px !important; box-sizing: border-box !important;">
                         <input type="hidden" name="tab" value="branches">
                         <input type="hidden" name="br_company_id" value="{{ $filters['br_company_id'] }}">
                         <input type="hidden" name="br_business_unit_id" value="{{ $filters['br_business_unit_id'] }}">
                         <input type="hidden" name="br_status" value="{{ $filters['br_status'] }}">
                         <input type="hidden" name="br_sort" value="{{ $filters['br_sort'] }}">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                        <input type="text" name="br_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.org.search_branch') }}" value="{{ $filters['br_search'] }}" style="box-shadow: none; height: 32px;">
+                        <input type="text" name="br_search" class="w-100 border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.org.search_branch') }}" value="{{ $filters['br_search'] }}" style="box-shadow: none; height: 100%; outline: none;">
                     </form>
 
                     <!-- Sort Dropdown -->

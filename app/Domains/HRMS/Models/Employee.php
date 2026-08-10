@@ -353,6 +353,9 @@ class Employee extends BaseModel
                     } elseif ($accrualFrequency === 'quarterly') {
                         $quartersPassed = floor($monthsPassed / 3.0);
                         $oldAccruedQuota = ($oldType->quota / 4.0) * $quartersPassed;
+                    } elseif ($accrualFrequency === 'half_yearly') {
+                        $halfYearsPassed = floor($monthsPassed / 6.0);
+                        $oldAccruedQuota = ($oldType->quota / 2.0) * $halfYearsPassed;
                     } elseif ($accrualFrequency === 'yearly') {
                         $oldAccruedQuota = ($monthsPassed >= 12) ? floatval($oldType->quota) : 0.0;
                     } else {

@@ -99,7 +99,7 @@
             border-radius: 8px !important;
             padding: 8px 16px 8px 40px !important;
             font-size: 13px !important;
-            height: 40px !important;
+            height: 36px !important;
             width: 100% !important;
             outline: none !important;
             transition: all 0.2s ease-in-out !important;
@@ -174,19 +174,79 @@
         .plan-item:hover:not(.active) {
             background-color: #f8fafc !important;
         }
+
+        /* ═══════════════════════════════════════════════════
+         * STICKY MASTER-DETAIL LAYOUT
+         * Card header = always visible at top
+         * Left col (Pay Groups) = always visible, scrolls independently
+         * Right col (Details) = scrolls independently
+         * ═══════════════════════════════════════════════════ */
+        @media (min-width: 768px) {
+
+            /* 1. Make the card a fixed-height viewport container */
+            #payGroupMasterCard {
+                display: flex !important;
+                flex-direction: column !important;
+                height: calc(100vh - 160px) !important; /* 160px = navbar + page-header */
+                overflow: hidden !important;
+            }
+
+            /* 2. Sticky card header — always at top, never scrolls */
+            #payGroupMasterCard > .card-header {
+                flex-shrink: 0 !important;
+                position: relative !important;   /* reset any theme absolute */
+                z-index: 10 !important;
+                background-color: #fff !important;
+                border-bottom: 1px solid #e5e7eb !important;
+            }
+
+            /* 3. Card body fills remaining height and becomes a flex row */
+            #payGroupMasterCard > .card-body {
+                flex: 1 1 0 !important;
+                overflow: hidden !important;
+                padding: 0 !important;
+                display: flex !important;
+            }
+
+            /* 4. The row inside must fill full height */
+            #payGroupMasterCard > .card-body > .row {
+                flex: 1 1 0 !important;
+                margin: 0 !important;
+                min-height: 0 !important;
+                width: 100% !important;
+            }
+
+            /* 5. Left column — fixed width, scrolls its own content */
+            #payGroupStickyCol {
+                flex-shrink: 0 !important;
+                overflow-y: auto !important;
+                height: 100% !important;
+                border-right: 1px solid #e5e7eb !important;
+            }
+
+            /* Remove old max-height from the list container */
+            #payGroupsListContainer {
+                max-height: none !important;
+                min-height: unset !important;
+                overflow-y: visible !important;
+            }
+
+            /* 6. Right column — grows to fill, scrolls its own content */
+            #payGroupDetailCol {
+                flex: 1 1 0 !important;
+                overflow-y: auto !important;
+                height: 100% !important;
+                min-width: 0 !important;
+            }
+        }
     </style>
 
     <div class="settings-container">
-        <!-- Left Subsidebar Column -->
-        <div class="settings-sidebar-col">
-            @include('modules.hrms.partials.settings-sidebar')
-        </div>
-
         <!-- Right Content Column -->
         <div class="settings-content-col flex-grow-1">
 
             <div class="col-12">
-                <x-ui.card title="{{ __('hrms.salary.pay_groups') }}" bodyClass="p-0" stretch>
+                <x-ui.card title="{{ __('hrms.salary.pay_groups') }}" bodyClass="p-0" stretch id="payGroupMasterCard">
                     <x-slot name="headerAction">
                         <form method="GET" action="{{ route('hrms.salary-structure.index') }}" id="payGroupFilterForm" class="d-flex align-items-center gap-2 m-0">
                             <!-- Hidden inputs for pagination/tabs state -->
@@ -241,9 +301,9 @@
                     </x-slot>
                     <div class="row g-0">
                         <!-- LEFT COLUMN: ALL PAY GROUPS LIST -->
-                        <div class="col-md-4 col-12 border-end">
+                        <div class="col-md-4 col-12 border-end" id="payGroupStickyCol">
 
-                            <div class="list-group list-group-flush rounded-0" id="payGroupsListContainer" style="min-height: 400px; max-height: 600px; overflow-y: auto;">
+                            <div class="list-group list-group-flush rounded-0" id="payGroupsListContainer">
                                 @forelse($payGroups as $pg)
                                     @php
                                         $isActive = $selectedPayGroup && $selectedPayGroup->id === $pg->id;
@@ -271,7 +331,7 @@
                         </div>
 
                         <!-- RIGHT COLUMN: SELECTED PAY GROUP DETAILS & CONFIGURATION TABS -->
-                        <div class="col-md-8 col-12">
+                        <div class="col-md-8 col-12" id="payGroupDetailCol">
                             @if($selectedPayGroup)
                                 <div class="p-4">
                                     <!-- Selected Pay Group Details -->
@@ -640,4 +700,6 @@
     </script>
     @endpush
 @endsection
+
+@include('modules.hrms.partials.settings-sidebar')
 

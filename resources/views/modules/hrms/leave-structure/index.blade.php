@@ -141,7 +141,7 @@
             border-radius: 8px !important;
             padding: 8px 16px 8px 40px !important;
             font-size: 13px !important;
-            height: 40px !important;
+            height: 36px !important;
             width: 100% !important;
             outline: none !important;
             transition: all 0.2s ease-in-out !important;
@@ -164,6 +164,71 @@
         }
         .plan-item:hover:not(.active) {
             background-color: #f8fafc !important;
+        }
+
+        /* ═══════════════════════════════════════════════════
+         * STICKY MASTER-DETAIL LAYOUT
+         * Card header = always visible at top
+         * Left col (Leave Plans) = always visible, scrolls independently
+         * Right col (Details) = scrolls independently
+         * ═══════════════════════════════════════════════════ */
+        @media (min-width: 768px) {
+
+            /* 1. Make the card a fixed-height viewport container */
+            #leavePlanMasterCard {
+                display: flex !important;
+                flex-direction: column !important;
+                height: calc(100vh - 160px) !important;
+                overflow: hidden !important;
+            }
+
+            /* 2. Card header — always at top, never scrolls */
+            #leavePlanMasterCard > .card-header {
+                flex-shrink: 0 !important;
+                position: relative !important;
+                z-index: 10 !important;
+                background-color: #fff !important;
+                border-bottom: 1px solid #e5e7eb !important;
+            }
+
+            /* 3. Card body fills remaining height as a flex row */
+            #leavePlanMasterCard > .card-body {
+                flex: 1 1 0 !important;
+                overflow: hidden !important;
+                padding: 0 !important;
+                display: flex !important;
+            }
+
+            /* 4. Inner row fills full height */
+            #leavePlanMasterCard > .card-body > .row {
+                flex: 1 1 0 !important;
+                margin: 0 !important;
+                min-height: 0 !important;
+                width: 100% !important;
+            }
+
+            /* 5. Left column — scrolls its own content */
+            #leavePlanStickyCol {
+                flex-shrink: 0 !important;
+                overflow-y: auto !important;
+                height: 100% !important;
+                border-right: 1px solid #e5e7eb !important;
+            }
+
+            /* Remove old max-height from list container */
+            #leavePlansListContainer {
+                max-height: none !important;
+                min-height: unset !important;
+                overflow-y: visible !important;
+            }
+
+            /* 6. Right column — grows to fill, scrolls independently */
+            #leavePlanDetailCol {
+                flex: 1 1 0 !important;
+                overflow-y: auto !important;
+                height: 100% !important;
+                min-width: 0 !important;
+            }
         }
 
         /* Leave rules configuration inline input fields styling */
@@ -216,16 +281,11 @@
     </style>
 
     <div class="settings-container">
-        <!-- Sidebar Column -->
-        <div class="settings-sidebar-col">
-            @include('modules.hrms.partials.settings-sidebar')
-        </div>
-
         <!-- Content Column -->
         <div class="settings-content-col">
 
             <div class="col-12">
-                <x-ui.card title="{{ __('hrms.leave.leave_plans') }}" bodyClass="p-0" stretch>
+                <x-ui.card title="{{ __('hrms.leave.leave_plans') }}" bodyClass="p-0" stretch id="leavePlanMasterCard">
                     <x-slot name="headerAction">
                         <form method="GET" action="{{ route('hrms.leave-structure.index') }}" id="leavePlanFilterForm" class="d-flex align-items-center gap-2 m-0">
                             <!-- Hidden inputs for pagination/plan state -->
@@ -279,9 +339,9 @@
 
                     <div class="row g-0">
                         <!-- LEFT COLUMN: ALL PLANS NAMES ONLY -->
-                        <div class="col-md-4 col-12 border-end">
+                        <div class="col-md-4 col-12 border-end" id="leavePlanStickyCol">
 
-                            <div class="list-group list-group-flush rounded-0" id="leavePlansListContainer" style="min-height: 400px; max-height: 600px; overflow-y: auto;">
+                            <div class="list-group list-group-flush rounded-0" id="leavePlansListContainer">
                                 @forelse($leavePlans as $plan)
                                     @php
                                         $isActive = ($selectedPlan && $selectedPlan->id === $plan->id) || (!$selectedPlan && $loop->first);
@@ -308,7 +368,7 @@
                         </div>
 
                         <!-- RIGHT COLUMN: SELECTED PLAN DETAILS & LEAVE TYPES TABLE -->
-                        <div class="col-md-8 col-12" id="activePlanDetailsContainer">
+                        <div class="col-md-8 col-12" id="leavePlanDetailCol">
                             @if($selectedPlan)
                                 <input type="hidden" id="lt_sort_value" value="{{ $ltSort }}">
                                 <input type="hidden" id="lt_type_value" value="{{ $ltType }}">
@@ -862,18 +922,13 @@
                                                         </label>
                                                     </div>
                                                 </div>
-                                                <div class="row align-items-center">
-                                                    <div class="col-sm-4 text-muted">{{ __('hrms.leave.yearly_quota') }}:</div>
-                                                    <div class="col-sm-8 d-flex align-items-center gap-2">
-                                                        <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer me-3">
-                                                            <input type="radio" name="accrual_quota_type" value="fixed" class="form-check-input me-2" checked> 
-                                                            <input type="number" id="accrual_quota_value" class="odoo-table-input text-center d-inline-block mx-1" style="width: 70px;" value="12"> {{ __('hrms.leave.days') }}
-                                                        </label>
-                                                        <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer">
-                                                            <input type="radio" name="accrual_quota_type" value="unlimited" class="form-check-input me-2"> {{ __('hrms.leave.unlimited') }}
-                                                        </label>
-                                                    </div>
-                                                </div>
+                                                 <div class="row align-items-center">
+                                                     <div class="col-sm-4 text-muted">{{ __('hrms.leave.yearly_quota') }}:</div>
+                                                     <div class="col-sm-8 d-flex align-items-center gap-2">
+                                                         <input type="number" id="accrual_quota_value" class="odoo-table-input text-center d-inline-block mx-1" style="width: 70px; background-color: #f1f5f9; cursor: not-allowed;" value="12" readonly> 
+                                                         <span>{{ __('hrms.leave.days') }}</span>
+                                                     </div>
+                                                 </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1577,8 +1632,7 @@
 
                 // Load state into UI
                 $(`input[name="accrual_calculate_in"][value="${rules.accrual?.calculate_in || 'days'}"]`).prop('checked', true);
-                $(`input[name="accrual_quota_type"][value="${rules.accrual?.quota_type || 'fixed'}"]`).prop('checked', true);
-                $('#accrual_quota_value').val(rules.accrual?.quota_value !== undefined ? rules.accrual.quota_value : typeQuota);
+                $('#accrual_quota_value').val(typeQuota);
                 $(`input[name="accrual_rate"][value="${rules.accrual?.rate || 'immediate'}"]`).prop('checked', true);
                 
                 // Attendance details loading
@@ -1724,7 +1778,7 @@
                 let data = {
                     accrual: {
                         calculate_in: $('input[name="accrual_calculate_in"]:checked').val(),
-                        quota_type: $('input[name="accrual_quota_type"]:checked').val(),
+                        quota_type: 'fixed',
                         quota_value: parseFloat($('#accrual_quota_value').val()) || 0,
                         rate: $('input[name="accrual_rate"]:checked').val(),
                         attendance_earn: parseFloat($('#accrual_attendance_earn').val()) || 1,
@@ -2131,3 +2185,5 @@
         })();
     </script>
 @endsection
+
+@include('modules.hrms.partials.settings-sidebar')
