@@ -76,6 +76,7 @@
             ]],
         ],
         __('ui.production') => [
+            ['label' => 'Production Dashboard', 'icon' => 'feather-grid', 'route' => 'production.dashboard'],
             ['label' => 'Production Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
                 ['label' => __('production.bom'),          'route' => 'production.boms.index'],
                 ['label' => __('production.routing'),       'route' => 'production.routing.index'],
