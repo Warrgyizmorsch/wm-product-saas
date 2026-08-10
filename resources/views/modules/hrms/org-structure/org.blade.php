@@ -153,11 +153,6 @@
     </style>
 
     <div class="settings-container">
-        <!-- Left Subsidebar Column -->
-        <div class="settings-sidebar-col">
-            @include('modules.hrms.partials.settings-sidebar')
-        </div>
-
         <!-- Right Content Column -->
         <div class="settings-content-col flex-grow-1">
             <div class="tab-content" id="settingsSubSidebarContent">
@@ -846,3 +841,5 @@
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
 @endpush
+
+@include('modules.hrms.partials.settings-sidebar')

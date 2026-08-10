@@ -71,4 +71,32 @@ class GoodsReceiptNote extends BaseModel
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
+
+    public function vendorBill(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(VendorBill::class, 'goods_receipt_note_id')->where('status', '!=', 'Cancelled')->latestOfMany();
+    }
+
+    public function vendorBills(): HasMany
+    {
+        return $this->hasMany(VendorBill::class, 'goods_receipt_note_id');
+    }
+
+    public function getBillingStatusAttribute(): string
+    {
+        $bill = $this->vendorBill;
+        if (!$bill) {
+            return 'Pending Bill';
+        }
+
+        if ($bill->status === 'Paid') {
+            return 'Paid';
+        }
+
+        if ($bill->status === 'Partially Paid') {
+            return 'Partially Paid';
+        }
+
+        return 'Billed';
+    }
 }

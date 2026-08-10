@@ -12,6 +12,9 @@ use App\Domains\Inventory\Controllers\StockTransactionController;
 use App\Domains\Inventory\Controllers\InventoryReportController;
 use App\Domains\Inventory\Controllers\BarcodeController;
 use App\Domains\Inventory\Controllers\StockReservationController;
+use App\Domains\Sales\Controllers\MaterialRequirementController;
+use App\Domains\Sales\Controllers\MaterialRequestController;
+use App\Domains\Sales\Controllers\DispatchOrderController;
 
 Route::prefix('inventory')
     ->as('inventory.')
@@ -75,6 +78,43 @@ Route::prefix('inventory')
         // Stock Reservations
         Route::get('reservations', [StockReservationController::class, 'index'])->name('reservations.index');
         Route::post('reservations/{reservation}/release', [StockReservationController::class, 'release'])->name('reservations.release');
+
+        // Material Requirements Routes (/inventory/material-requirements)
+        Route::get('material-requirements', [MaterialRequirementController::class, 'index'])->name('material-requirements.index');
+        Route::get('material-requirements/create', [MaterialRequirementController::class, 'create'])->name('material-requirements.create');
+        Route::post('material-requirements', [MaterialRequirementController::class, 'store'])->name('material-requirements.store');
+        Route::get('material-requirements/{delivery}', [MaterialRequirementController::class, 'show'])->name('material-requirements.show');
+        Route::post('material-requirements/{delivery}/ship', [MaterialRequirementController::class, 'ship'])->name('material-requirements.ship');
+        Route::post('material-requirements/{delivery}/cancel', [MaterialRequirementController::class, 'cancel'])->name('material-requirements.cancel');
+
+        Route::post('material-requirements/items/{itemId}/warehouse', [MaterialRequirementController::class, 'updateWarehouse'])->name('material-requirements.update-warehouse');
+        Route::post('material-requirements/items/{itemId}/reserve', [MaterialRequirementController::class, 'reserveQty'])->name('material-requirements.reserve-qty');
+        Route::post('material-requirements/items/{itemId}/indent', [MaterialRequirementController::class, 'mockIndent'])->name('material-requirements.mock-indent');
+        Route::post('material-requirements/items/{itemId}/mo', [MaterialRequirementController::class, 'mockMo'])->name('material-requirements.mock-mo');
+        Route::post('material-requirements/{delivery}/picking', [MaterialRequirementController::class, 'startPicking'])->name('material-requirements.picking');
+        Route::post('material-requirements/{delivery}/pack', [MaterialRequirementController::class, 'pack'])->name('material-requirements.pack');
+        Route::post('material-requirements/{delivery}/dispatch', [MaterialRequirementController::class, 'dispatch'])->name('material-requirements.dispatch');
+        Route::post('material-requirements/{delivery}/dispatch-order', [MaterialRequirementController::class, 'storeDispatchOrder'])->name('material-requirements.dispatch-order.store');
+        Route::post('material-requirements/{delivery}/deliver', [MaterialRequirementController::class, 'deliver'])->name('material-requirements.deliver');
+
+        // Material Requests (Prod) Routes (/inventory/material-requests)
+        Route::get('material-requests', [MaterialRequestController::class, 'index'])->name('material-requests.index');
+        Route::get('material-requests/{id}', [MaterialRequestController::class, 'show'])->name('material-requests.show');
+        Route::post('material-requests/items/{id}/reserve', [MaterialRequestController::class, 'reserve'])->name('material-requests.reserve');
+        Route::post('material-requests/items/{id}/issue', [MaterialRequestController::class, 'issue'])->name('material-requests.issue');
+        Route::post('material-requests/items/{id}/create-pr', [MaterialRequestController::class, 'createPurchaseRequisition'])->name('material-requests.create-pr');
+        Route::post('material-requests/{id}/bulk-action', [MaterialRequestController::class, 'bulkAction'])->name('material-requests.bulk-action');
+
+        // Dispatch Orders Routes (/inventory/dispatches)
+        Route::get('dispatches', [DispatchOrderController::class, 'index'])->name('dispatches.index');
+        Route::get('dispatches/create', [DispatchOrderController::class, 'create'])->name('dispatches.create');
+        Route::post('dispatches', [DispatchOrderController::class, 'store'])->name('dispatches.store');
+        Route::get('dispatches/material-requirements', [DispatchOrderController::class, 'pendingMaterialRequirements'])->name('dispatches.pending-mr');
+        Route::get('dispatches/available-serials', [DispatchOrderController::class, 'getAvailableSerials'])->name('dispatches.available-serials');
+        Route::get('dispatches/available-batches', [DispatchOrderController::class, 'getAvailableBatches'])->name('dispatches.available-batches');
+        Route::get('dispatches/warehouse/{warehouse}/address', [DispatchOrderController::class, 'warehouseAddress'])->name('dispatches.warehouse-address');
+        Route::get('dispatches/{dispatch}', [DispatchOrderController::class, 'show'])->name('dispatches.show');
+        Route::post('dispatches/{dispatch}/confirm', [DispatchOrderController::class, 'confirm'])->name('dispatches.confirm');
     });
 
 Route::post('products/quick-create', [ProductController::class, 'quickCreate'])

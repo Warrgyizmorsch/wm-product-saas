@@ -111,6 +111,73 @@
             transform: translateX(2px);
         }
 
+        /* Force hidden panes truly invisible — overrides any layout overflow leakage */
+        .policy-details-pane.d-none {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            height: 0 !important;
+            overflow: hidden !important;
+        }
+
+        /* ═══════════════════════════════════════════════════
+         * STICKY MASTER-DETAIL LAYOUT
+         * Card header = always visible at top
+         * Left col (Policy Types) = always visible, scrolls independently
+         * Right col (Policy Form) = scrolls independently
+         * ═══════════════════════════════════════════════════ */
+        @media (min-width: 768px) {
+
+            /* 1. Fixed-height card container */
+            #penalizationMasterCard {
+                display: flex !important;
+                flex-direction: column !important;
+                height: calc(100vh - 160px) !important;
+                overflow: hidden !important;
+            }
+
+            /* 2. Card header — always visible, never scrolls */
+            #penalizationMasterCard > .card-header {
+                flex-shrink: 0 !important;
+                position: relative !important;
+                z-index: 10 !important;
+                background-color: #fff !important;
+                border-bottom: 1px solid #e5e7eb !important;
+            }
+
+            /* 3. Card body fills remaining height as a flex row */
+            #penalizationMasterCard > .card-body {
+                flex: 1 1 0 !important;
+                overflow: hidden !important;
+                padding: 0 !important;
+                display: flex !important;
+            }
+
+            /* 4. Inner row fills full height */
+            #penalizationMasterCard > .card-body > .row {
+                flex: 1 1 0 !important;
+                margin: 0 !important;
+                min-height: 0 !important;
+                width: 100% !important;
+            }
+
+            /* 5. Left column — scrolls its own content */
+            #penalizationLeftCol {
+                flex-shrink: 0 !important;
+                overflow-y: auto !important;
+                height: 100% !important;
+                border-right: 1px solid #e5e7eb !important;
+            }
+
+            /* 6. Right column — grows to fill, scrolls independently */
+            #penalizationDetailCol {
+                flex: 1 1 0 !important;
+                overflow-y: auto !important;
+                height: 100% !important;
+                min-width: 0 !important;
+            }
+        }
+
         /* HRMS theme form controls */
         .form-label {
             font-size: 12.5px !important;
@@ -264,21 +331,22 @@
     </style>
 
     <div class="settings-container">
-        <!-- Sidebar Column -->
-        <div class="settings-sidebar-col">
-            @include('modules.hrms.partials.settings-sidebar')
-        </div>
-
         <!-- Content Column -->
         <div class="settings-content-col">
 
             <!-- Single Outer Card spanning full width -->
             <div class="col-12">
-                <x-ui.card title="{{ __('hrms.penalization.title') }}" subtitle="{{ __('hrms.penalization.subtitle') }}" bodyClass="p-0" stretch>
+                <x-ui.card title="{{ __('hrms.penalization.title') }}" subtitle="{{ __('hrms.penalization.subtitle') }}" bodyClass="p-0" stretch id="penalizationMasterCard">
+                    <x-slot:headerAction>
+                        <button type="button" id="btnSavePolicyGlobal" class="btn btn-primary btn-sm d-flex align-items-center gap-2" style="font-size: 12px; font-weight: 600; letter-spacing: 0.04em;">
+                            <i class="feather-save" style="font-size: 14px;"></i>
+                            {{ __('hrms.penalization.save_policy') }}
+                        </button>
+                    </x-slot:headerAction>
                     <div class="row g-0">
                         <!-- LEFT COLUMN: RULES CATEGORIES ONLY -->
-                        <div class="col-md-3 col-12 border-end">
-                            <div class="list-group list-group-flush rounded-0" style="min-height: 400px;">
+                        <div class="col-md-3 col-12 border-end" id="penalizationLeftCol">
+                            <div class="list-group list-group-flush rounded-0">
                                 @php
                                     $policyTypes = [
                                         'late_arrival' => [__('hrms.penalization.late_arrival'), 'feather-clock'],
@@ -313,7 +381,7 @@
                         </div>
 
                         <!-- RIGHT COLUMN: SELECTED POLICY FORM DETAILED WORKSPACE -->
-                        <div class="col-md-9 col-12">
+                        <div class="col-md-9 col-12" id="penalizationDetailCol">
                             @foreach($policyTypes as $typeKey => $typeData)
                                 @php
                                     $isPaneActive = ($selectedType === $typeKey);
@@ -322,7 +390,7 @@
                                     $val = $rule ? floatval($rule->penalty_value) : 0.5;
                                     $statusVal = $rule ? ($rule->status ? '1' : '0') : '1';
                                 @endphp
-                                <div class="policy-details-pane {{ $isPaneActive ? '' : 'd-none' }}" id="policy-details-{{ $typeKey }}">
+                                <div class="policy-details-pane" id="policy-details-{{ $typeKey }}" style="{{ $isPaneActive ? '' : 'display:none;' }}">
                                     <form action="{{ $typeKey === 'attendance_rules' ? route('hrms.attendance-rules.save') : route('hrms.penalization-policy.store') }}" method="POST" class="p-4">
                                         @csrf
                                         <input type="hidden" name="rule_type" value="{{ $typeKey }}">
@@ -583,7 +651,7 @@
                                                               <span class="text-muted fs-11 d-block ms-4 ps-1">Allow employees to check in/out via the web portal or mobile app.</span>
 
                                                               {{-- Sub-options shown when office_web is enabled --}}
-                                                              <div class="ms-4 ps-1 mt-3 d-none d-flex flex-column gap-3" id="office_geofence_fields">
+                                                              <div class="ms-4 ps-1 mt-3 flex-column gap-3" id="office_geofence_fields" style="display:none;">
 
                                                                   {{-- Geofence toggle --}}
                                                                       <x-ui.checkbox name="office_geofence" id="office_geofence" label="Require Location Coordinate Capture" onchange="toggleOfficeCoordinateFields()" />
@@ -712,12 +780,6 @@
                                               @endif
                                           </div>
 
-                                         <!-- Save Footer Button -->
-                                         <div class="border-top pt-3 d-flex justify-content-end">
-                                             <x-ui.button type="submit" variant="primary" icon="feather-save">
-                                                 {{ $typeKey === 'attendance_rules' ? 'Save Rules' : __('hrms.penalization.save_policy') }}
-                                             </x-ui.button>
-                                         </div>
                                      </form>
                                  </div>
                              @endforeach
@@ -731,6 +793,19 @@
     @push('scripts')
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+
+            // ── SINGLE GLOBAL SAVE BUTTON ──────────────────────────────────
+            // Finds whichever policy-details pane is currently visible and
+            // programmatically submits its <form>, which has the correct action URL.
+            document.getElementById('btnSavePolicyGlobal').addEventListener('click', function() {
+                var activePane = document.querySelector('.policy-details-pane:not([style*="display:none"])');
+                if (activePane) {
+                    var form = activePane.querySelector('form');
+                    if (form) form.submit();
+                }
+            });
+            // ──────────────────────────────────────────────────────────────
+
             // Close Select2 dropdowns when any parent scrollable container scrolls
             document.addEventListener('scroll', function(e) {
                 if (e.target && e.target.classList && e.target.classList.contains('table-responsive')) {
@@ -798,8 +873,8 @@
                 clicked.find('span').removeClass('text-dark').addClass('text-primary');
 
                 // Toggle visibility of target details pane
-                $('.policy-details-pane').addClass('d-none');
-                $(targetPaneId).removeClass('d-none');
+                $('.policy-details-pane').each(function() { this.style.display = 'none'; });
+                document.getElementById(targetPaneId.replace('#', '')).style.display = 'block';
                 initPolicyPaneSelects(targetPaneId);
 
                 // Update URL history parameters to persist select focus on reload
@@ -1724,3 +1799,5 @@
     </script>
     @endpush
 @endsection
+
+@include('modules.hrms.partials.settings-sidebar')

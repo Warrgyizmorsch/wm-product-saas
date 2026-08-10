@@ -47,16 +47,20 @@ class PoonaRadiatorsProductionSeeder extends Seeder
         DB::table('production_cost_adjustments')->truncate();
         DB::table('production_event_timelines')->truncate();
         DB::table('production_scrap_disposals')->truncate();
+        DB::table('production_order_scraps')->truncate();
         DB::table('production_rework_operations')->truncate();
         DB::table('production_rework_orders')->truncate();
+        DB::table('production_order_reworks')->truncate();
         DB::table('production_capas')->truncate();
         DB::table('production_ncrs')->truncate();
+        DB::table('production_deviations')->truncate();
         DB::table('production_quality_inspection_results')->truncate();
         DB::table('production_quality_inspections')->truncate();
         DB::table('production_quality_plan_parameters')->truncate();
         DB::table('production_quality_plans')->truncate();
         DB::table('production_scan_logs')->truncate();
         DB::table('production_serial_numbers')->truncate();
+        DB::table('production_lot_traces')->truncate();
         DB::table('production_batch_genealogies')->truncate();
         DB::table('production_batches')->truncate();
         DB::table('production_operator_assignment_logs')->truncate();
@@ -64,6 +68,12 @@ class PoonaRadiatorsProductionSeeder extends Seeder
         DB::table('production_operator_skills')->truncate();
         DB::table('production_schedule_operations')->truncate();
         DB::table('production_schedules')->truncate();
+        DB::table('production_requisition_slip_items')->truncate();
+        DB::table('production_requisition_slips')->truncate();
+        DB::table('purchase_requisition_items')->truncate();
+        DB::table('purchase_requisitions')->truncate();
+        DB::table('production_order_requests')->truncate();
+        DB::table('production_order_issue_batches')->truncate();
         DB::table('production_order_issues')->truncate();
         DB::table('production_order_receipts')->truncate();
         DB::table('production_order_progress_logs')->truncate();
@@ -518,7 +528,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'material_id' => $rmFin->id,
             'quantity' => 8.50,
             'uom_id' => $kg->id,
-            'material_scrap_percentage' => 2.00,
+            'material_scrap_percentage' => 0.00,
             'sequence' => 1,
             'notes' => 'Corrugated cooling fin matrix requirement.',
         ]);
@@ -529,7 +539,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'material_id' => $rmTube->id,
             'quantity' => 32.00,
             'uom_id' => $mtr->id,
-            'material_scrap_percentage' => 1.50,
+            'material_scrap_percentage' => 0.00,
             'sequence' => 2,
             'notes' => 'Flat oval coolant tube extrusions.',
         ]);
@@ -540,7 +550,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'material_id' => $rmFlux->id,
             'quantity' => 1.20,
             'uom_id' => $kg->id,
-            'material_scrap_percentage' => 0.50,
+            'material_scrap_percentage' => 0.00,
             'sequence' => 3,
             'notes' => 'Nocolok flux powder for furnace brazing.',
         ]);
@@ -641,7 +651,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'setup_time_minutes' => 30.0,
             'processing_time_minutes' => 12.0,
             'machine_cost_rate' => 110.0,
-            'expected_yield_percentage' => 98.5,
+            'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 5.0,
             'transfer_lag_minutes' => 10,
@@ -659,7 +669,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'setup_time_minutes' => 20.0,
             'processing_time_minutes' => 15.0,
             'machine_cost_rate' => 160.0,
-            'expected_yield_percentage' => 99.0,
+            'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 5.0,
             'transfer_lag_minutes' => 15,
@@ -677,7 +687,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'setup_time_minutes' => 45.0,
             'processing_time_minutes' => 25.0,
             'machine_cost_rate' => 180.0,
-            'expected_yield_percentage' => 97.5,
+            'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 5.0,
             'transfer_lag_minutes' => 20,
@@ -715,7 +725,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'setup_time_minutes' => 15.0,
             'processing_time_minutes' => 10.0,
             'machine_cost_rate' => 115.0,
-            'expected_yield_percentage' => 99.5,
+            'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 2.0,
             'transfer_lag_minutes' => 5,
@@ -733,7 +743,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'setup_time_minutes' => 20.0,
             'processing_time_minutes' => 18.0,
             'machine_cost_rate' => 125.0,
-            'expected_yield_percentage' => 98.0,
+            'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 2.0,
             'transfer_lag_minutes' => 10,
@@ -751,7 +761,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'setup_time_minutes' => 25.0,
             'processing_time_minutes' => 15.0,
             'machine_cost_rate' => 105.0,
-            'expected_yield_percentage' => 99.0,
+            'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 2.0,
             'transfer_lag_minutes' => 10,

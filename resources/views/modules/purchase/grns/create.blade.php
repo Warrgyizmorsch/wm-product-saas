@@ -5,7 +5,7 @@
 @section('breadcrumb', __('ui.purchase') . ' / ' . __('purchase.goods_receipt_notes') . ' / ' . __('purchase.create'))
 
 @section('page-actions')
-    <x-ui.button href="{{ route('purchase.grns.index') }}" variant="light" icon="feather-arrow-left" class="border">
+    <x-ui.button href="{{ route('grns.index') }}" variant="light" icon="feather-arrow-left" class="border">
         {{ __('purchase.back_to_grns') }}
     </x-ui.button>
 @endsection
@@ -19,7 +19,7 @@
         <div class="col-12">
             <!-- Toast Notifications -->
 
-            <form action="{{ route('purchase.grns.store') }}" method="POST" id="grnCreateForm">
+            <form action="{{ route('grns.store') }}" method="POST" id="grnCreateForm">
                 @csrf
 
                 <!-- Single Card Odoo Sheet Layout -->
@@ -211,7 +211,7 @@
                 return;
             }
 
-            var url = "{{ route('purchase.grns.get-po-items', ':poId') }}".replace(':poId', poId);
+            var url = "{{ route('grns.get-po-items', ':poId') }}".replace(':poId', poId);
             
             $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div>{{ __('purchase.js_loading_po_items') }}</td></tr>');
 

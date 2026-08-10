@@ -30,10 +30,10 @@
 
 @section('page-actions')
     <div class="d-flex gap-2 flex-wrap">
-        <x-ui.button href="{{ route('purchase.grns.index') }}" variant="light" icon="feather-list" class="border">
+        <x-ui.button href="{{ route('grns.index') }}" variant="light" icon="feather-list" class="border">
             {{ __('purchase.all_goods_receipts') }}
         </x-ui.button>
-        <x-ui.button href="{{ route('purchase.grns.create') }}" variant="primary" icon="feather-plus" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
+        <x-ui.button href="{{ route('grns.create') }}" variant="primary" icon="feather-plus" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
             {{ __('purchase.new_goods_receipt') }}
         </x-ui.button>
     </div>
@@ -55,7 +55,7 @@
             </div>
 
             <!-- Common Filter Component -->
-            <form method="GET" action="{{ route('purchase.grns.pending') }}" class="d-inline">
+            <form method="GET" action="{{ route('grns.pending') }}" class="d-inline">
                 <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
                     <div class="mb-3">
@@ -63,7 +63,7 @@
                         <x-ui.odoo-form-ui type="input" name="search" placeholder="{{ __('purchase.search_po_vendor_placeholder') }}" value="{{ request('search') }}" />
                     </div>
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('purchase.grns.pending') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                        <a href="{{ route('grns.pending') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
                         <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
@@ -118,7 +118,7 @@
                                 <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ __('purchase.status_' . strtolower(str_replace(' ', '_', $order->status))) }}</span>
                             </td>
                             <td class="text-end">
-                                <a href="{{ route('purchase.grns.create', ['po_id' => $order->id]) }}" class="action-icon-btn grn-btn" title="{{ __('purchase.create_grn') }}" data-bs-toggle="tooltip">
+                                <a href="{{ route('grns.create', ['po_id' => $order->id]) }}" class="action-icon-btn grn-btn" title="{{ __('purchase.create_grn') }}" data-bs-toggle="tooltip">
                                     <i class="feather feather-plus-circle"></i>
                                 </a>
                             </td>

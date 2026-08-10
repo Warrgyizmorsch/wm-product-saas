@@ -73,7 +73,7 @@
             border-radius: 8px !important;
             padding: 8px 16px 8px 40px !important;
             font-size: 13px !important;
-            height: 40px !important;
+            height: 36px !important;
             width: 100% !important;
             outline: none !important;
             transition: all 0.2s ease-in-out !important;
@@ -93,11 +93,6 @@
 
 @section('content')
     <div class="settings-container">
-        <!-- Sidebar Column -->
-        <div class="settings-sidebar-col">
-            @include('modules.hrms.partials.settings-sidebar')
-        </div>
-
         <!-- Content Column -->
         <div class="settings-content-col">
 
@@ -411,3 +406,5 @@
     </script>
     @endpush
 @endsection
+
+@include('modules.hrms.partials.settings-sidebar')

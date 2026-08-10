@@ -3,23 +3,23 @@
 @section('title', __('purchase.grn') . " {$grn->grn_number} | SaaS ERP")
 @section('page-title', __('purchase.grn_details'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.orders.index') }}">{{ __('ui.purchase') }}</a> &gt; <a href="{{ route('purchase.grns.index') }}">{{ __('purchase.goods_receipt_notes') }}</a> &gt; {{ $grn->grn_number }}
+    <a href="{{ route('grns.index') }}">{{ __('purchase.goods_receipt_notes') }}</a> &gt; {{ $grn->grn_number }}
 @endsection
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-0">
-        <a href="{{ route('purchase.grns.index') }}" class="action-dropdown-btn me-2" title="{{ __('purchase.back_to_grns') }}" data-bs-toggle="tooltip">
+        <a href="{{ route('grns.index') }}" class="action-dropdown-btn me-2" title="{{ __('purchase.back_to_grns') }}" data-bs-toggle="tooltip">
             <i class="feather feather-arrow-left"></i>
         </a>
-        <a href="{{ route('purchase.grns.download', $grn->id) }}" class="action-dropdown-btn me-2" title="{{ __('purchase.download_pdf') }}" data-bs-toggle="tooltip">
+        <a href="{{ route('grns.download', $grn->id) }}" class="action-dropdown-btn me-2" title="{{ __('purchase.download_pdf') }}" data-bs-toggle="tooltip">
             <i class="feather feather-download"></i>
         </a>
 
         @if($grn->status === 'Draft')
-            <x-ui.button href="{{ route('purchase.grns.edit', $grn->id) }}" variant="warning" icon="feather-edit" class="me-2">
+            <x-ui.button href="{{ route('grns.edit', $grn->id) }}" variant="warning" icon="feather-edit" class="me-2">
                 {{ __('purchase.edit_draft') }}
             </x-ui.button>
-            <form action="{{ route('purchase.grns.approve', $grn->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('purchase.confirm_grn_approval') }}')">
+            <form action="{{ route('grns.approve', $grn->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('purchase.confirm_grn_approval') }}')">
                 @csrf
                 <x-ui.button type="submit" variant="success" icon="feather-check-circle" class="text-white">
                     {{ __('purchase.approve_update_stock') }}
@@ -228,8 +228,19 @@
                                 'Cancelled' => 'bg-soft-danger text-danger',
                                 default => 'bg-soft-secondary text-secondary',
                             };
+                            $bStatus = $grn->billing_status;
+                            $bClass = match($bStatus) {
+                                'Pending Bill' => 'bg-soft-warning text-warning border-warning-subtle',
+                                'Billed' => 'bg-soft-info text-info border-info-subtle',
+                                'Partially Paid' => 'bg-soft-primary text-primary border-primary-subtle',
+                                'Paid' => 'bg-soft-success text-success border-success-subtle',
+                                default => 'bg-soft-secondary text-secondary border-secondary-subtle',
+                            };
                         @endphp
-                        <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $statusLabel }}</span>
+                        <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11 me-2">Store: {{ $statusLabel }}</span>
+                        @if(in_array($grn->status, ['Approved', 'Completed']))
+                            <span class="badge {{ $bClass }} border px-2.5 py-1 fw-bold fs-11">Bill: {{ $bStatus }}</span>
+                        @endif
                     </div>
 
 
@@ -295,8 +306,10 @@
                                              $ordQty = $items->sum('ordered_qty') > 0 ? $items->sum('ordered_qty') : $poQty;
                                              $prevRecQty = $items->sum('previous_received_qty') > 0 ? $items->sum('previous_received_qty') : max(0, $poPrevRec);
                                              $rate = (float)($first->unit_rate ?: ($first->purchaseOrderItem?->rate ?? 0));
-                                             $accQty = $items->sum('accepted_qty');
-                                             $tot = $items->sum('total_amount') > 0 ? $items->sum('total_amount') : round($accQty * $rate, 2);
+                                             $recQty = $items->sum('received_qty');
+                                             $rejQty = $items->sum('rejected_qty');
+                                             $accQty = max(0, $recQty - $rejQty);
+                                             $tot = round($accQty * $rate, 2);
 
                                              return (object) [
                                                  'id' => $first->id,
@@ -304,8 +317,8 @@
                                                  'product_id' => $first->product_id,
                                                  'ordered_qty' => $ordQty,
                                                  'previous_received_qty' => $prevRecQty,
-                                                 'received_qty' => $items->sum('received_qty'),
-                                                 'rejected_qty' => $items->sum('rejected_qty'),
+                                                 'received_qty' => $recQty,
+                                                 'rejected_qty' => $rejQty,
                                                  'accepted_qty' => $accQty,
                                                  'unit_rate' => $rate,
                                                  'total_amount' => $tot,

@@ -259,7 +259,7 @@ class AttendanceController extends Controller
     public function getEmployeeLogs(\App\Domains\HRMS\Models\Employee $employee)
     {
         $logs = Attendance::where('employee_id', $employee->id)
-            ->with('breaks')
+            ->with(['breaks', 'locationLogs'])
             ->orderBy('date', 'desc')
             ->get();
 
@@ -314,6 +314,7 @@ class AttendanceController extends Controller
                 }
 
                 return [
+                    'id' => $log->id,
                     'date' => $log->date->format('M d, Y'),
                     'location_type' => $log->formatted_location_type,
                     'check_in' => ($log->check_in && !$isAbsentOrLeave) ? \Carbon\Carbon::parse($log->check_in)->format('h:i A') : '-',
@@ -323,6 +324,17 @@ class AttendanceController extends Controller
                     'status' => $statusBadge,
                     'status_raw' => $status,
                     'has_overtime' => in_array($log->date->format('Y-m-d'), $approvedOvertimeDates),
+                    'check_in_latitude' => $log->check_in_latitude,
+                    'check_in_longitude' => $log->check_in_longitude,
+                    'check_out_latitude' => $log->check_out_latitude,
+                    'check_out_longitude' => $log->check_out_longitude,
+                    'check_in_selfie_url' => $log->check_in_selfie_path ? asset('storage/' . $log->check_in_selfie_path) : null,
+                    'check_out_selfie_url' => $log->check_out_selfie_path ? asset('storage/' . $log->check_out_selfie_path) : null,
+                    'location_logs' => $log->locationLogs->map(fn($l) => [
+                        'lat' => (float)$l->latitude,
+                        'lng' => (float)$l->longitude,
+                        'time' => $l->created_at ? $l->created_at->format('h:i A') : ''
+                    ])->toArray(),
                 ];
             }),
         ]);
@@ -331,7 +343,7 @@ class AttendanceController extends Controller
     public function getDateLogs($date)
     {
         $logs = Attendance::where('date', $date)
-            ->with(['employee.department', 'breaks'])
+            ->with(['employee.department', 'breaks', 'locationLogs'])
             ->get();
 
         $approvedOvertimeEmployeeIds = \App\Domains\HRMS\Models\OvertimeRequest::where('date', $date)
@@ -405,6 +417,7 @@ class AttendanceController extends Controller
                 }
 
                 return [
+                    'id' => $log->id,
                     'employee_name' => $log->employee?->display_name ?? 'Unknown',
                     'employee_code' => $log->employee?->employee_id ?? 'Unknown',
                     'department' => $log->employee?->department?->name ?? 'No Department',
@@ -416,6 +429,17 @@ class AttendanceController extends Controller
                     'status' => $statusBadge,
                     'status_raw' => $status,
                     'has_overtime' => in_array($log->employee_id, $approvedOvertimeEmployeeIds),
+                    'check_in_latitude' => $log->check_in_latitude,
+                    'check_in_longitude' => $log->check_in_longitude,
+                    'check_out_latitude' => $log->check_out_latitude,
+                    'check_out_longitude' => $log->check_out_longitude,
+                    'check_in_selfie_url' => $log->check_in_selfie_path ? asset('storage/' . $log->check_in_selfie_path) : null,
+                    'check_out_selfie_url' => $log->check_out_selfie_path ? asset('storage/' . $log->check_out_selfie_path) : null,
+                    'location_logs' => $log->locationLogs->map(fn($l) => [
+                        'lat' => (float)$l->latitude,
+                        'lng' => (float)$l->longitude,
+                        'time' => $l->created_at ? $l->created_at->format('h:i A') : ''
+                    ])->toArray(),
                 ];
             }),
         ]);
@@ -633,8 +657,16 @@ class AttendanceController extends Controller
                 $count++;
             }
 
+            $redirectUrl = $request->input('redirect_url');
+            if (!empty($redirectUrl)) {
+                $host = parse_url($redirectUrl, PHP_URL_HOST);
+                if (!$host || $host === $request->getHost()) {
+                    return redirect($redirectUrl)->with('success', "Manually updated attendance.");
+                }
+            }
+
             return redirect()->route('hrms.attendance.index', ['view' => 'employee'])
-                ->with('success', "Manually updated attendance for {$count} date(s) of " . \App\Domains\HRMS\Models\Employee::find($employeeId)->display_name . ".");
+                ->with('success', "Manually updated attendance.");
         }
 
         $validated = $request->validate([
@@ -784,8 +816,16 @@ class AttendanceController extends Controller
             $count++;
         }
 
+        $redirectUrl = $request->input('redirect_url');
+        if (!empty($redirectUrl)) {
+            $host = parse_url($redirectUrl, PHP_URL_HOST);
+            if (!$host || $host === $request->getHost()) {
+                return redirect($redirectUrl)->with('success', "Manually updated attendance.");
+            }
+        }
+
         return redirect()->route('hrms.attendance.index', ['date' => $dateStr])
-            ->with('success', "Manually updated attendance for {$count} employee(s).");
+            ->with('success', "Manually updated attendance.");
     }
 
     public function destroyDate($date)
@@ -796,7 +836,7 @@ class AttendanceController extends Controller
             $attendance->delete();
         }
 
-        return redirect()->back()->with('success', 'Attendance logs deleted successfully for ' . \Carbon\Carbon::parse($date)->format('M d, Y') . '.');
+        return redirect()->back()->with('success', 'Attendance logs deleted successfully.');
     }
 
     public function export(Request $request)
@@ -1098,7 +1138,7 @@ class AttendanceController extends Controller
 
         fclose($handle);
 
-        $msg = "Imported {$successCount} attendance logs successfully.";
+        $msg = "Attendance logs imported successfully.";
         if (count($skippedRows) > 0) {
             return redirect()->back()
                 ->with('success', $msg)

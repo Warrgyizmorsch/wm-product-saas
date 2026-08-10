@@ -31,6 +31,9 @@
 @endsection
 
 @section('content')
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
 <div class="container-fluid px-4 py-4">
 
     @if(session('success'))
@@ -226,7 +229,7 @@
                                                 variant="soft-warning" 
                                                 icon="feather-edit" 
                                                 title="Edit Attendance" 
-                                                href="{{ route('hrms.attendance.create', ['date' => $dStr]) }}" 
+                                                href="{{ route('hrms.attendance.create', array_merge(['date' => $dStr], request()->query())) }}" 
                                             />
 
                                             <!-- Delete All logs for the date -->
@@ -340,7 +343,7 @@
                                                 variant="soft-warning" 
                                                 icon="feather-edit-2" 
                                                 title="Edit Employee Attendance Logs" 
-                                                href="{{ route('hrms.attendance.create') }}?employee_id={{ $employee->id }}" 
+                                                href="{{ route('hrms.attendance.create', array_merge(['employee_id' => $employee->id], request()->query())) }}" 
                                             />
                                         </div>
                                     </td>
@@ -379,7 +382,7 @@
 </div>
 
 <!-- Dynamic Detailed logs Drawer -->
-<x-ui.drawer id="attendanceDetailDrawer" title="Attendance History" position="end" style="width: 650px; max-width: 95vw;">
+<x-ui.drawer id="attendanceDetailDrawer" title="Attendance History" position="end" style="width: 800px; max-width: 95vw;">
     <!-- Loading Spinner -->
     <div id="drawerLoader" class="text-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
@@ -393,8 +396,8 @@
             <span class="text-muted fs-11" id="drawerEmployeeCodeContainer">Employee ID: <code class="fw-bold fs-12" id="drawerEmployeeCode">Code</code></span>
         </div>
         
-        <div class="table-responsive">
-            <table class="table table-hover align-middle fs-12 mb-0">
+        <div class="table-responsive" style="overflow-x: hidden;">
+            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 11px;">
                 <thead class="bg-light text-uppercase fs-9 tracking-wider">
                     <tr id="drawerTableHeaderRow">
                         <th>Date & Location</th>
@@ -418,6 +421,10 @@
 </x-ui.drawer>
 
 <script>
+    // Global references for drawer logs and map
+    window.currentDrawerLogs = [];
+    window.activeRowMap = null;
+
     // 1. Open Employee Historical Logs (triggered in Employee view)
     function openAttendanceLogs(employeeId, employeeName, employeeCode, filterStatus = 'all') {
         // Trigger Bootstrap Offcanvas
@@ -452,12 +459,19 @@
             <th>Breaks</th>
             <th>Hours</th>
             <th>Status</th>
+            <th class="text-end pe-3">Details</th>
         `;
 
         // Reset loader/view
         document.getElementById('drawerLoader').classList.remove('d-none');
         document.getElementById('drawerContent').classList.add('d-none');
         document.getElementById('drawerTableBody').innerHTML = '';
+        
+        // Destroy existing map if any
+        if (window.activeRowMap) {
+            window.activeRowMap.remove();
+            window.activeRowMap = null;
+        }
         
         bsOffcanvas.show();
         
@@ -501,6 +515,8 @@
                     });
                 }
                 
+                window.currentDrawerLogs = logs;
+                
                 if (logs.length > 0) {
                     logs.forEach(log => {
                         const tr = document.createElement('tr');
@@ -525,11 +541,86 @@
                             <td>${log.breaks}</td>
                             <td class="fw-semibold text-dark text-nowrap">${log.work_hours}</td>
                             <td>${log.status}</td>
+                            <td class="text-end pe-3">
+                                <button type="button" class="btn erp-icon-btn erp-icon-btn--primary btn-sm toggle-details-btn" onclick="toggleAttendanceRowDetails(this, '${log.id}')">
+                                    <i class="feather-chevron-down fs-14"></i>
+                                </button>
+                            </td>
                         `;
+                        
+                        // Collapsible details row
+                        const detailsTr = document.createElement('tr');
+                        detailsTr.id = `details-row-${log.id}`;
+                        detailsTr.className = 'attendance-details-row d-none bg-light';
+                        detailsTr.innerHTML = `
+                            <td colspan="7" class="p-0">
+                                <div style="padding: 12px; max-width: 100%; overflow-x: hidden;">
+                                     <div class="row g-2">
+                                         <!-- Check In -->
+                                         <div class="col-sm-6 col-12">
+                                              <div class="card shadow-sm border rounded-3 p-3 bg-white h-100">
+                                                   <div class="d-flex align-items-center gap-2 mb-2">
+                                                        <div class="avatar-sm bg-soft-success text-success rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
+                                                            <i class="feather-log-in fs-11"></i>
+                                                        </div>
+                                                        <span class="fw-bold text-dark fs-12">Check In Details</span>
+                                                   </div>
+                                                   <div class="mb-2">
+                                                        <span class="text-muted fs-10 d-block">TIME & COORDINATES</span>
+                                                        <span class="fw-semibold text-dark fs-12">${log.check_in}</span>
+                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_in_latitude ? 'Lat: ' + parseFloat(log.check_in_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_in_longitude).toFixed(6) : 'No coordinates'}</span>
+                                                   </div>
+                                                   <div>
+                                                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                                                        <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
+                                                            ${log.check_in_selfie_url ? `<img src="${log.check_in_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>`}
+                                                        </div>
+                                                   </div>
+                                              </div>
+                                         </div>
+                                         <!-- Check Out -->
+                                         <div class="col-sm-6 col-12">
+                                              <div class="card shadow-sm border rounded-3 p-3 bg-white h-100">
+                                                   <div class="d-flex align-items-center gap-2 mb-2">
+                                                        <div class="avatar-sm bg-soft-danger text-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
+                                                            <i class="feather-log-out fs-11"></i>
+                                                        </div>
+                                                        <span class="fw-bold text-dark fs-12">Check Out Details</span>
+                                                   </div>
+                                                   <div class="mb-2">
+                                                        <span class="text-muted fs-10 d-block">TIME & COORDINATES</span>
+                                                        <span class="fw-semibold text-dark fs-12">${log.check_out}</span>
+                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : 'No coordinates'}</span>
+                                                   </div>
+                                                   <div>
+                                                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                                                        <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
+                                                            ${log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>`}
+                                                        </div>
+                                                   </div>
+                                              </div>
+                                         </div>
+                                     </div>
+                                     
+                                     <!-- Map -->
+                                     <div class="mt-2">
+                                          <span class="text-muted fs-10 text-uppercase fw-semibold d-block mb-1">Location Map</span>
+                                          <div class="position-relative w-100" id="map-wrap-${log.id}" style="display: none; overflow: hidden; border-radius: 8px;">
+                                               <div id="map-${log.id}" class="attendance-row-map" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
+                                          </div>
+                                          <div id="map-none-${log.id}" class="alert alert-light border text-center fs-11 py-2.5 mb-0">
+                                               <i class="feather-map-pin text-muted fs-14 d-block mb-0.5"></i> No location coordinates captured for check-in or check-out.
+                                          </div>
+                                     </div>
+                                </div>
+                            </td>
+                        `;
+                        
                         tbody.appendChild(tr);
+                        tbody.appendChild(detailsTr);
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No attendance logs found matching this filter.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No attendance logs found matching this filter.</td></tr>';
                 }
                 
                 document.getElementById('drawerLoader').classList.add('d-none');
@@ -537,7 +628,7 @@
             })
             .catch(error => {
                 console.error('Error loading attendance logs:', error);
-                document.getElementById('drawerTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-4 text-danger">Failed to load logs. Please try again.</td></tr>';
+                document.getElementById('drawerTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-danger">Failed to load logs. Please try again.</td></tr>';
                 document.getElementById('drawerLoader').classList.add('d-none');
                 document.getElementById('drawerContent').classList.remove('d-none');
             });
@@ -575,12 +666,19 @@
             <th>Breaks</th>
             <th>Hours</th>
             <th>Status</th>
+            <th class="text-end pe-3">Details</th>
         `;
 
         // Reset loader/view
         document.getElementById('drawerLoader').classList.remove('d-none');
         document.getElementById('drawerContent').classList.add('d-none');
         document.getElementById('drawerTableBody').innerHTML = '';
+        
+        // Destroy existing map if any
+        if (window.activeRowMap) {
+            window.activeRowMap.remove();
+            window.activeRowMap = null;
+        }
         
         bsOffcanvas.show();
         
@@ -624,6 +722,8 @@
                     });
                 }
                 
+                window.currentDrawerLogs = logs;
+                
                 if (logs.length > 0) {
                     logs.forEach(log => {
                         const tr = document.createElement('tr');
@@ -650,11 +750,86 @@
                             <td>
                                 <div>${log.status}</div>
                             </td>
+                            <td class="text-end pe-3">
+                                <button type="button" class="btn erp-icon-btn erp-icon-btn--primary btn-sm toggle-details-btn" onclick="toggleAttendanceRowDetails(this, '${log.id}')">
+                                    <i class="feather-chevron-down fs-14"></i>
+                                </button>
+                            </td>
                         `;
+                        
+                        // Collapsible details row
+                        const detailsTr = document.createElement('tr');
+                        detailsTr.id = `details-row-${log.id}`;
+                        detailsTr.className = 'attendance-details-row d-none bg-light';
+                        detailsTr.innerHTML = `
+                            <td colspan="7" class="p-0">
+                                <div style="padding: 12px; max-width: 100%; overflow-x: hidden;">
+                                     <div class="row g-2">
+                                         <!-- Check In -->
+                                         <div class="col-sm-6 col-12">
+                                              <div class="card shadow-sm border rounded-3 p-3 bg-white h-100">
+                                                   <div class="d-flex align-items-center gap-2 mb-2">
+                                                        <div class="avatar-sm bg-soft-success text-success rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
+                                                            <i class="feather-log-in fs-11"></i>
+                                                        </div>
+                                                        <span class="fw-bold text-dark fs-12">Check In Details</span>
+                                                   </div>
+                                                   <div class="mb-2">
+                                                        <span class="text-muted fs-10 d-block">TIME & COORDINATES</span>
+                                                        <span class="fw-semibold text-dark fs-12">${log.check_in}</span>
+                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_in_latitude ? 'Lat: ' + parseFloat(log.check_in_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_in_longitude).toFixed(6) : 'No coordinates'}</span>
+                                                   </div>
+                                                   <div>
+                                                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                                                        <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
+                                                            ${log.check_in_selfie_url ? `<img src="${log.check_in_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>`}
+                                                        </div>
+                                                   </div>
+                                              </div>
+                                         </div>
+                                         <!-- Check Out -->
+                                         <div class="col-sm-6 col-12">
+                                              <div class="card shadow-sm border rounded-3 p-3 bg-white h-100">
+                                                   <div class="d-flex align-items-center gap-2 mb-2">
+                                                        <div class="avatar-sm bg-soft-danger text-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">
+                                                            <i class="feather-log-out fs-11"></i>
+                                                        </div>
+                                                        <span class="fw-bold text-dark fs-12">Check Out Details</span>
+                                                   </div>
+                                                   <div class="mb-2">
+                                                        <span class="text-muted fs-10 d-block">TIME & COORDINATES</span>
+                                                        <span class="fw-semibold text-dark fs-12">${log.check_out}</span>
+                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : 'No coordinates'}</span>
+                                                   </div>
+                                                   <div>
+                                                        <span class="text-muted fs-10 d-block mb-1">SELFIE</span>
+                                                        <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
+                                                            ${log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> None</span>`}
+                                                        </div>
+                                                   </div>
+                                              </div>
+                                         </div>
+                                     </div>
+                                     
+                                     <!-- Map -->
+                                     <div class="mt-2">
+                                          <span class="text-muted fs-10 text-uppercase fw-semibold d-block mb-1">Location Map</span>
+                                          <div class="position-relative w-100" id="map-wrap-${log.id}" style="display: none; overflow: hidden; border-radius: 8px;">
+                                               <div id="map-${log.id}" class="attendance-row-map" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
+                                          </div>
+                                          <div id="map-none-${log.id}" class="alert alert-light border text-center fs-11 py-2.5 mb-0">
+                                               <i class="feather-map-pin text-muted fs-14 d-block mb-0.5"></i> No location coordinates captured for check-in or check-out.
+                                          </div>
+                                     </div>
+                                </div>
+                            </td>
+                        `;
+                        
                         tbody.appendChild(tr);
+                        tbody.appendChild(detailsTr);
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No attendance logs found matching this filter.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No attendance logs found matching this filter.</td></tr>';
                 }
                 
                 document.getElementById('drawerLoader').classList.add('d-none');
@@ -662,10 +837,163 @@
             })
             .catch(error => {
                 console.error('Error loading attendance logs:', error);
-                document.getElementById('drawerTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-4 text-danger">Failed to load logs. Please try again.</td></tr>';
+                document.getElementById('drawerTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-danger">Failed to load logs. Please try again.</td></tr>';
                 document.getElementById('drawerLoader').classList.add('d-none');
                 document.getElementById('drawerContent').classList.remove('d-none');
             });
+    }
+
+    // Toggle details row collapse/expand
+    function toggleAttendanceRowDetails(btn, logId) {
+        const detailsRow = document.getElementById(`details-row-${logId}`);
+        if (!detailsRow) return;
+        
+        const isHidden = detailsRow.classList.contains('d-none');
+        
+        // Close all other detail rows
+        document.querySelectorAll('.attendance-details-row').forEach(row => {
+            row.classList.add('d-none');
+        });
+        
+        // Reset all chevron icons
+        document.querySelectorAll('.toggle-details-btn i').forEach(icon => {
+            icon.className = 'feather-chevron-down fs-14';
+        });
+        
+        // Destroy existing map
+        if (window.activeRowMap) {
+            window.activeRowMap.remove();
+            window.activeRowMap = null;
+        }
+        
+        if (isHidden) {
+            // Show this details row
+            detailsRow.classList.remove('d-none');
+            btn.querySelector('i').className = 'feather-chevron-up fs-14';
+            
+            // Find current data in window.currentDrawerLogs
+            if (window.currentDrawerLogs) {
+                const log = window.currentDrawerLogs.find(l => String(l.id) === String(logId));
+                if (log) {
+                    initializeRowMap(logId, log);
+                }
+            }
+        }
+    }
+
+    // Initialize Leaflet Map for a specific details row
+    function initializeRowMap(logId, log) {
+        const checkinLat = parseFloat(log.check_in_latitude);
+        const checkinLng = parseFloat(log.check_in_longitude);
+        const checkoutLat = parseFloat(log.check_out_latitude);
+        const checkoutLng = parseFloat(log.check_out_longitude);
+        const locationLogs = log.location_logs || [];
+        
+        const hasCheckin = checkinLat && checkinLng && checkinLat !== 0 && checkinLng !== 0;
+        const hasCheckout = checkoutLat && checkoutLng && checkoutLat !== 0 && checkoutLng !== 0;
+        const hasLogs = locationLogs.length > 0;
+        
+        const mapWrap = document.getElementById(`map-wrap-${logId}`);
+        const mapNone = document.getElementById(`map-none-${logId}`);
+        
+        if (hasCheckin || hasCheckout || hasLogs) {
+            if (mapWrap) mapWrap.style.display = 'block';
+            if (mapNone) mapNone.style.display = 'none';
+            
+            setTimeout(() => {
+                const mapEl = document.getElementById(`map-${logId}`);
+                if (!mapEl) return;
+                
+                // Base map set to center on check-in or India by default
+                const defaultCenter = hasCheckin ? [checkinLat, checkinLng] : [20.5937, 78.9629];
+                const map = L.map(`map-${logId}`).setView(defaultCenter, 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
+                
+                const markersGroup = L.featureGroup().addTo(map);
+                const pathLatLngs = [];
+                
+                // 1. Add Check-In Marker (Green)
+                if (hasCheckin) {
+                    const checkinLatLng = [checkinLat, checkinLng];
+                    pathLatLngs.push(checkinLatLng);
+                    const checkinIcon = L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    });
+                    L.marker(checkinLatLng, { icon: checkinIcon })
+                        .addTo(markersGroup)
+                        .bindPopup(`<b>Check In Point</b><br>Lat: ${checkinLat.toFixed(6)}<br>Lng: ${checkinLng.toFixed(6)}`);
+                }
+                
+                // 2. Add intermediate tracking location logs (Blue circles)
+                if (hasLogs) {
+                    locationLogs.forEach(locLog => {
+                        if (locLog.lat && locLog.lng) {
+                            const logLatLng = [parseFloat(locLog.lat), parseFloat(locLog.lng)];
+                            pathLatLngs.push(logLatLng);
+                            L.circleMarker(logLatLng, {
+                                radius: 5,
+                                fillColor: '#3b82f6',
+                                color: '#ffffff',
+                                weight: 1.5,
+                                opacity: 1,
+                                fillOpacity: 0.8
+                            }).addTo(markersGroup)
+                              .bindPopup(`<b>Tracking Log</b><br>Time: ${locLog.time}<br>Lat: ${logLatLng[0].toFixed(6)}<br>Lng: ${logLatLng[1].toFixed(6)}`);
+                        }
+                    });
+                }
+                
+                // 3. Add Check-Out Marker (Red)
+                if (hasCheckout) {
+                    const checkoutLatLng = [checkoutLat, checkoutLng];
+                    pathLatLngs.push(checkoutLatLng);
+                    const checkoutIcon = L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    });
+                    L.marker(checkoutLatLng, { icon: checkoutIcon })
+                        .addTo(markersGroup)
+                        .bindPopup(`<b>Check Out Point</b><br>Lat: ${checkoutLat.toFixed(6)}<br>Lng: ${checkoutLng.toFixed(6)}`);
+                }
+                
+                // 4. Indigo Path Connecting Line
+                if (pathLatLngs.length >= 2) {
+                    L.polyline(pathLatLngs, {
+                        color: '#4f46e5',
+                        weight: 3,
+                        opacity: 0.8,
+                        dashArray: '6, 6',
+                        lineJoin: 'round'
+                    }).addTo(markersGroup);
+                }
+                
+                window.activeRowMap = map;
+                
+                map.invalidateSize();
+                if (pathLatLngs.length > 0) {
+                    if (pathLatLngs.length >= 2) {
+                        map.fitBounds(markersGroup.getBounds(), { padding: [20, 20] });
+                    } else {
+                        map.setView(pathLatLngs[0], 14);
+                    }
+                }
+            }, 150);
+        } else {
+            if (mapWrap) mapWrap.style.display = 'none';
+            if (mapNone) mapNone.style.display = 'block';
+        }
     }
 
     function submitCleanForm(form) {
@@ -747,6 +1075,16 @@
                 timeout = setTimeout(() => {
                     submitCleanForm(form);
                 }, 500); // 500ms debounce
+            });
+        }
+
+        const drawerEl = document.getElementById('attendanceDetailDrawer');
+        if (drawerEl) {
+            drawerEl.addEventListener('hide.bs.offcanvas', function () {
+                if (window.activeRowMap) {
+                    window.activeRowMap.remove();
+                    window.activeRowMap = null;
+                }
             });
         }
     });
