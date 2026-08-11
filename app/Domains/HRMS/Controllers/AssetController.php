@@ -213,7 +213,7 @@ class AssetController extends Controller
             return redirect()->back()->withErrors(['quantity' => 'Could not find that many allocated units for this employee.']);
         }
 
-        return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_returned'));
+        return redirect()->back()->with('success', __('hrms.assets.success_returned'));
     }
 
     public function updateItem(Request $request, AssetItem $assetItem): RedirectResponse
@@ -341,12 +341,12 @@ class AssetController extends Controller
     public function rejectRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
     {
         $validated = $request->validate([
-            'admin_notes' => 'required|string|max:1000',
+            'admin_notes' => 'nullable|string|max:1000',
         ]);
 
         $assetRequest->update([
             'status'      => 'rejected',
-            'admin_notes' => $validated['admin_notes'],
+            'admin_notes' => $validated['admin_notes'] ?? 'Withdrawn by employee.',
         ]);
 
         return redirect()->back()->with('success', 'Asset request rejected successfully.');

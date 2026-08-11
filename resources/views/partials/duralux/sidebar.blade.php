@@ -129,7 +129,14 @@
                 ['label' => 'Asset Management', 'route' => 'hrms.assets.index'],
             ]],
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
-            ['label' => 'Attendance', 'icon' => 'feather-clock', 'route' => 'hrms.attendance.index'],
+            ['label' => 'Assets', 'icon' => 'feather-package', 'url' => '#', 'children' => [
+                ['label' => 'Employees Assets', 'route' => 'hrms.assets-module.index'],
+                ['label' => 'My Assets', 'route' => 'hrms.assets-module.my-assets'],
+            ]],
+            ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#', 'children' => [
+                ['label' => 'Admin Attendance', 'route' => 'hrms.attendance.index'],
+                ['label' => 'My Attendance', 'route' => 'hrms.attendance.myAttendance'],
+            ]],
             ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],

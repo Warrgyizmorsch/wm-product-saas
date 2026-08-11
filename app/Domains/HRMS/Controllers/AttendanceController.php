@@ -161,6 +161,140 @@ class AttendanceController extends Controller
         ));
     }
 
+    public function myAttendance(Request $request)
+    {
+        $user = auth()->user();
+
+        $employee = \App\Domains\HRMS\Models\Employee::where('user_id', $user->id)
+            ->with(['department', 'designation'])
+            ->firstOrFail();
+
+        $date = $request->input('date');
+        $status = $request->input('status');
+        $sort = $request->input('sort', 'date_desc');
+        $search = $request->input('search');
+
+        $monthFilter = $request->input('month');
+        if (!$request->has('month') && !$request->has('date')) {
+            $monthFilter = now()->format('Y-m');
+        }
+
+        $query = Attendance::where('employee_id', $employee->id)
+            ->with('breaks');
+
+        // Search filter
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('location_type', 'like', "%{$search}%")
+                  ->orWhere('status', 'like', "%{$search}%")
+                  ->orWhere('date', 'like', "%{$search}%");
+
+                // Parse month prefixes, names, and year/day integers for advanced date searching
+                $cleanSearch = str_replace([',', '.'], '', strtolower(trim($search)));
+                $tokens = array_filter(explode(' ', $cleanSearch));
+                
+                $monthsNames = [
+                    1 => 'january', 2 => 'february', 3 => 'march', 4 => 'april',
+                    5 => 'may', 6 => 'june', 7 => 'july', 8 => 'august',
+                    9 => 'september', 10 => 'october', 11 => 'november', 12 => 'december'
+                ];
+
+                $matchedMonths = [];
+                $yearNum = null;
+                $dayNum = null;
+
+                foreach ($tokens as $token) {
+                    if (is_numeric($token)) {
+                        $val = (int)$token;
+                        if ($val > 1000 && $val < 3000) {
+                            $yearNum = $val;
+                        } elseif ($val >= 1 && $val <= 31) {
+                            $dayNum = $val;
+                        }
+                    } else {
+                        // Check if token matches prefix of any month (either full month name or 3-letter abbreviation)
+                        foreach ($monthsNames as $num => $name) {
+                            if (str_starts_with($name, $token) || str_starts_with(substr($name, 0, 3), $token)) {
+                                $matchedMonths[] = $num;
+                            }
+                        }
+                    }
+                }
+
+                $matchedMonths = array_unique($matchedMonths);
+
+                if (!empty($matchedMonths)) {
+                    $q->orWhere(function($sub) use ($matchedMonths, $yearNum, $dayNum) {
+                        $sub->where(function($monthSub) use ($matchedMonths) {
+                            foreach ($matchedMonths as $mNum) {
+                                $monthSub->orWhereMonth('date', $mNum);
+                            }
+                        });
+                        if ($yearNum) {
+                            $sub->whereYear('date', $yearNum);
+                        }
+                        if ($dayNum) {
+                            $sub->whereDay('date', $dayNum);
+                        }
+                    });
+                }
+            });
+        }
+
+        // Date filter
+        if ($date) {
+            $query->whereDate('date', $date);
+        }
+
+        // Month filter
+        if ($monthFilter) {
+            $parts = explode('-', $monthFilter);
+            if (count($parts) === 2) {
+                $query->whereYear('date', $parts[0])
+                      ->whereMonth('date', $parts[1]);
+            }
+        }
+
+        // Status filter
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        // Sorting
+        switch ($sort) {
+            case 'date_asc':
+                $query->orderBy('date', 'asc');
+                break;
+
+            case 'checkin_asc':
+                $query->orderBy('check_in', 'asc');
+                break;
+
+            case 'checkin_desc':
+                $query->orderBy('check_in', 'desc');
+                break;
+
+            default:
+                $query->orderBy('date', 'desc');
+                break;
+        }
+
+        $attendances = $query->get();
+
+        return view(
+            'modules.hrms.attendance.myAttendance',
+            compact(
+                'employee',
+                'attendances',
+                'date',
+                'status',
+                'sort',
+                'search',
+                'monthFilter'
+            )
+        );
+    }
+
     public function checkIn(Request $request)
     {
         $validated = $request->validate([
