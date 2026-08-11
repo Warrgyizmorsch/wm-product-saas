@@ -212,8 +212,8 @@
         });
 
         // Generic Quick Create Master Dropdown handler (Supports Single & Multiselect)
-        function handleQuickCreateSelect(select) {
-            var val = select.val();
+        function handleQuickCreateSelect(select, overrideVal) {
+            var val = overrideVal || select.val();
             var isAddNew = false;
 
             if (Array.isArray(val)) {
@@ -223,16 +223,24 @@
             }
 
             if (isAddNew) {
-                // Get master from select attr first, then fallback to selected option attr
-                var master = select.attr('data-master') || select.find('option[value="__ADD_NEW__"]').attr('data-master');
+                // Get master from select attr first, then fallback to selected option attr, then fallback by element ID
+                var master = select.attr('data-master') 
+                    || select.data('master') 
+                    || select.find('option[value="__ADD_NEW__"]').attr('data-master')
+                    || (select.attr('id') === 'crm_contact_id' ? 'contact' : null);
+
                 if (!master) return;
 
                 var modalId = 'quickCreateModal_' + master;
-                var modalEl = document.getElementById(modalId);
-                if (modalEl) {
-                    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                    modal.show();
-                    $(modalEl).data('trigger-select', select);
+                var modalEl = $('#' + modalId);
+                if (modalEl.length) {
+                    if (typeof modalEl.modal === 'function') {
+                        modalEl.modal('show');
+                    } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        var modal = bootstrap.Modal.getOrCreateInstance(modalEl[0]);
+                        modal.show();
+                    }
+                    modalEl.data('trigger-select', select);
                 }
                 
                 if (Array.isArray(val)) {
@@ -251,9 +259,41 @@
 
         // Select2 select event (fires when user picks from Select2 dropdown)
         $(document).on('select2:select', 'select', function (e) {
-            if (e.params && e.params.data && e.params.data.id === '__ADD_NEW__') {
-                handleQuickCreateSelect($(this));
+            var selectedId = (e && e.params && e.params.data) ? e.params.data.id : null;
+            if (selectedId === '__ADD_NEW__') {
+                handleQuickCreateSelect($(this), '__ADD_NEW__');
             }
+        });
+
+        // Dynamic Additional Contacts Repeater inside Quick Create Contact Modal
+        var modalContactIdx = 0;
+        $(document).on('click', '#modalAddContactRowBtn', function (e) {
+            e.preventDefault();
+            modalContactIdx++;
+            var newCard = $(`
+                <div class="border rounded-3 p-2 bg-light position-relative modal-contact-row">
+                    <button type="button" class="btn btn-link text-danger p-0 position-absolute top-0 end-0 me-2 mt-1 remove-modal-contact-row" title="Remove Contact">
+                        <i class="feather-trash-2 fs-12"></i>
+                    </button>
+                    <div class="row g-2 pe-3 align-items-center">
+                        <div class="col-md-4">
+                            <input type="text" name="additional_contacts[${modalContactIdx}][name]" class="form-control form-control-sm" placeholder="e.g. Jane Doe">
+                        </div>
+                        <div class="col-md-4">
+                            <input type="tel" name="additional_contacts[${modalContactIdx}][phone]" class="form-control form-control-sm" placeholder="e.g. +91 9876543211">
+                        </div>
+                        <div class="col-md-4">
+                            <input type="email" name="additional_contacts[${modalContactIdx}][email]" class="form-control form-control-sm" placeholder="e.g. jane.doe@gmail.com">
+                        </div>
+                    </div>
+                </div>
+            `);
+            $('#modalAdditionalContactsContainer').append(newCard);
+        });
+
+        $(document).on('click', '.remove-modal-contact-row', function (e) {
+            e.preventDefault();
+            $(this).closest('.modal-contact-row').remove();
         });
 
         // Ensure button[form] works across all browsers/shells
@@ -312,8 +352,12 @@
                 success: function (response) {
                     submitBtn.prop('disabled', false);
                     if (response.id && response.name) {
-                        var modal = bootstrap.Modal.getInstance(modalEl[0]);
-                        modal.hide();
+                        if (typeof modalEl.modal === 'function') {
+                            modalEl.modal('hide');
+                        } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            var modal = bootstrap.Modal.getInstance(modalEl[0]);
+                            if (modal) modal.hide();
+                        }
 
                         // Clear inputs
                         inputs.each(function () {

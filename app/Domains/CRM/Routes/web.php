@@ -20,6 +20,8 @@ Route::prefix('crm')
         Route::get('accounts/{account}/edit', [CrmAccountController::class, 'edit'])->name('accounts.edit');
         Route::put('accounts/{account}', [CrmAccountController::class, 'update'])->name('accounts.update');
         Route::post('accounts/{account}/contacts', [CrmAccountController::class, 'storeContact'])->name('accounts.contacts.store');
+        Route::get('accounts/{account}/contacts-list', [CrmAccountController::class, 'getContactsList'])->name('accounts.contactsList');
+        Route::post('contacts/quick-create', [CrmAccountController::class, 'quickStoreContact'])->name('contacts.quick-create');
         Route::delete('accounts/{account}', [CrmAccountController::class, 'destroy'])->name('accounts.destroy');
 
         // CRM Deals Routes
