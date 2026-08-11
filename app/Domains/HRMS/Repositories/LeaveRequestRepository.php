@@ -316,36 +316,34 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
     {
         $action = $validated['action'];
         $comment = $validated['rejection_reason'] ?? null;
+        $oldStatus = $leaveRequest->status;
 
-        if ($action === 'approved') {
-            $leaveRequest->update([
-                'status' => 'approved',
-                'rejection_reason' => null,
-            ]);
+        if ($oldStatus === $action) {
+            return true;
+        }
 
+        // Perform database status update
+        $leaveRequest->update([
+            'status' => $action,
+            'rejection_reason' => ($action === 'rejected') ? $comment : null,
+        ]);
+
+        // Adjust employee leave balance if approval state changes
+        if ($oldStatus === 'approved' && $action !== 'approved') {
+            $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
+                ->where('leave_type_id', $leaveRequest->leave_type_id)
+                ->first();
+
+            if ($balance) {
+                $balance->decrement('used', floatval($leaveRequest->duration));
+            }
+        } elseif ($oldStatus !== 'approved' && $action === 'approved') {
             $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
                 ->where('leave_type_id', $leaveRequest->leave_type_id)
                 ->first();
 
             if ($balance) {
                 $balance->increment('used', floatval($leaveRequest->duration));
-            }
-        } elseif ($action === 'rejected') {
-            $oldStatus = $leaveRequest->status;
-
-            $leaveRequest->update([
-                'status' => 'rejected',
-                'rejection_reason' => $comment,
-            ]);
-
-            if ($oldStatus === 'approved') {
-                $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
-                    ->where('leave_type_id', $leaveRequest->leave_type_id)
-                    ->first();
-
-                if ($balance) {
-                    $balance->decrement('used', floatval($leaveRequest->duration));
-                }
             }
         }
 

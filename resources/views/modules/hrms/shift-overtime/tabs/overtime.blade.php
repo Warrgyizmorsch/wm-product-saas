@@ -1,21 +1,5 @@
 <div class="tab-pane fade @if($activeTab === 'overtime') show active @endif" id="overtime-pane" role="tabpanel" aria-labelledby="overtime-pane-tab">
-    {{-- Policy Overview Info Block (Admins) --}}
-    @if($isAdmin)
-        <div class="card border-0 shadow-sm mb-4 bg-light">
-            <div class="card-body py-3 px-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
-                <div class="d-flex align-items-center gap-2">
-                    <i class="feather-info text-primary fs-4"></i>
-                    <div>
-                        <h6 class="fw-bold mb-0 text-dark">{{ __('hrms.overtime.title') }}</h6>
-                        <p class="text-muted fs-11 mb-0">Threshold: <strong>{{ number_format($tenantSettings['auto_overtime_threshold_hours'] ?? 0.0, 1) }} hours</strong> (auto-approved on punch)</p>
-                    </div>
-                </div>
-                <button type="button" class="btn btn-primary btn-sm rounded text-uppercase fw-bold" data-bs-toggle="modal" data-bs-target="#overtimeSettingsModal">
-                    {{ __('hrms.overtime.modify_policies') }}
-                </button>
-            </div>
-        </div>
-    @endif
+
 
     {{-- Overtime Table --}}
     <div class="card border-0 shadow-sm rounded-3">
@@ -262,36 +246,7 @@
     </div>
 </div>
 
-{{-- Overtime Settings Modal --}}
-@if($isAdmin)
-    <div class="modal fade" id="overtimeSettingsModal" tabindex="-1" aria-labelledby="overtimeSettingsModalLabel" aria-hidden="true" data-bs-backdrop="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow">
-                <form action="{{ route('hrms.overtime.update-settings') }}" method="POST">
-                    @csrf
-                    <div class="modal-header border-bottom py-3">
-                        <h5 class="modal-title fw-bold" id="overtimeSettingsModalLabel">{{ __('hrms.overtime.policy_config') }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-4">
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('hrms.overtime.threshold_hours') }}" name="auto_overtime_threshold_hours" id="ot_policy_threshold" :required="true" class="odoo-underline-input" step="0.5" min="0" value="{{ $tenantSettings['auto_overtime_threshold_hours'] ?? 0.0 }}" />
-                            <div class="form-text text-muted">{{ __('hrms.overtime.threshold_help') }}</div>
-                        </div>
-                        <div class="mb-3 mt-4">
-                            <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('hrms.overtime.min_request_hours') }}" name="min_overtime_request_hours" id="ot_policy_min_request" :required="true" class="odoo-underline-input" step="0.5" min="0.5" value="{{ $tenantSettings['min_overtime_request_hours'] ?? 0.5 }}" />
-                            <div class="form-text text-muted">{{ __('hrms.overtime.min_request_help') }}</div>
-                        </div>
-                    </div>
-                    <div class="modal-footer border-top py-3">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.overtime.close') }}</button>
-                        <button type="submit" class="btn btn-primary">{{ __('hrms.common.save_changes') }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-@endif
+
 
 {{-- Decision Forms --}}
 <form id="shiftDecisionForm" action="" method="POST" style="display: none;">

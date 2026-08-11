@@ -407,4 +407,4 @@
     @endpush
 @endsection
 
-@include('modules.hrms.partials.settings-sidebar')
+@include('modules.hrms.partials.hrms-settings-helpers')

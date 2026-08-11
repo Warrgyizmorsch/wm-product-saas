@@ -353,5 +353,23 @@ class EmployeeController extends Controller
 
         return redirect()->back()->with('success', $msg);
     }
+
+    public function updateStatus(Request $request, Employee $employee)
+    {
+        $validated = $request->validate([
+            'status' => 'required|boolean',
+        ]);
+
+        $employee->update(['status' => $validated['status']]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Employee status updated successfully.',
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Employee status updated successfully.');
+    }
 }
 

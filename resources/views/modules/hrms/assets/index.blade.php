@@ -260,13 +260,13 @@
                 let rowHtml = `
                     <tr>
                         <td class="py-2 px-3 text-start">
-                            <input type="text" name="units[0][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required>
+                            <input type="text" name="units[0][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required>
                         </td>
                         <td class="py-2">
-                            <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN-XXXX">
+                            <input type="text" name="units[0][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN-XXXX">
                         </td>
                         <td class="py-2" style="min-width: 120px;">
-                            <select name="units[0][condition]" class="form-select form-select-sm" required>
+                            <select name="units[0][condition]" class="odoo-table-select" required>
                                 <option value="good">Good</option>
                                 <option value="new">New</option>
                                 <option value="fair">Fair</option>
@@ -366,13 +366,13 @@
                             var rowHtml = `<tr>
                                 <td class="py-2 px-3 text-start">
                                     <input type="hidden" name="units[${index}][id]" value="${unit.id}">
-                                    <input type="text" name="units[${index}][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required value="${unit.asset_code}">
+                                    <input type="text" name="units[${index}][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required value="${unit.asset_code}">
                                 </td>
                                 <td class="py-2">
-                                    <input type="text" name="units[${index}][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN123456" value="${unit.serial_number || ''}" required>
+                                    <input type="text" name="units[${index}][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN123456" value="${unit.serial_number || ''}" required>
                                 </td>
                                 <td class="py-2" style="min-width: 120px;">
-                                    <select name="units[${index}][condition]" class="form-select form-select-sm" required>
+                                    <select name="units[${index}][condition]" class="odoo-table-select" required>
                                         <option value="good" ${unit.condition === 'good' ? 'selected' : ''}>Good</option>
                                         <option value="new" ${unit.condition === 'new' ? 'selected' : ''}>New</option>
                                         <option value="fair" ${unit.condition === 'fair' ? 'selected' : ''}>Fair</option>
@@ -392,13 +392,13 @@
                 if (tbody.children().length === 0) {
                     var rowHtml = `<tr>
                         <td class="py-2 px-3 text-start">
-                            <input type="text" name="units[0][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required>
+                            <input type="text" name="units[0][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required>
                         </td>
                         <td class="py-2">
-                            <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN123456" required>
+                            <input type="text" name="units[0][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN123456" required>
                         </td>
                         <td class="py-2" style="min-width: 120px;">
-                            <select name="units[0][condition]" class="form-select form-select-sm" required>
+                            <select name="units[0][condition]" class="odoo-table-select" required>
                                 <option value="good">Good</option>
                                 <option value="new">New</option>
                                 <option value="fair">Fair</option>
@@ -435,13 +435,13 @@
                 var index = tbody.children().length;
                 var rowHtml = `<tr>
                     <td class="py-2 px-3 text-start">
-                        <input type="text" name="units[${index}][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required>
+                        <input type="text" name="units[${index}][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required>
                     </td>
                     <td class="py-2">
-                        <input type="text" name="units[${index}][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN123456" required>
+                        <input type="text" name="units[${index}][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN123456" required>
                     </td>
                     <td class="py-2" style="min-width: 120px;">
-                        <select name="units[${index}][condition]" class="form-select form-select-sm" required>
+                        <select name="units[${index}][condition]" class="odoo-table-select" required>
                             <option value="good">Good</option>
                             <option value="new">New</option>
                             <option value="fair">Fair</option>
@@ -499,13 +499,13 @@
                     var code = prefix + String(currentNumber).padStart(3, '0');
                     var rowHtml = `<tr>
                         <td class="py-2 px-3 text-start">
-                            <input type="text" name="units[${finalIndex}][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required value="${code}">
+                            <input type="text" name="units[${finalIndex}][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required value="${code}">
                         </td>
                         <td class="py-2">
-                            <input type="text" name="units[${finalIndex}][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN123456" required>
+                            <input type="text" name="units[${finalIndex}][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN123456" required>
                         </td>
                         <td class="py-2" style="min-width: 120px;">
-                            <select name="units[${finalIndex}][condition]" class="form-select form-select-sm" required>
+                            <select name="units[${finalIndex}][condition]" class="odoo-table-select" required>
                                 <option value="good">Good</option>
                                 <option value="new">New</option>
                                 <option value="fair">Fair</option>
@@ -566,13 +566,13 @@
                 let rowHtml = `
                     <tr>
                         <td class="py-2 px-3 text-start">
-                            <input type="text" name="units[${unitRowIndex}][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" value="${code}" required>
+                            <input type="text" name="units[${unitRowIndex}][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" value="${code}" required>
                         </td>
                         <td class="py-2">
-                            <input type="text" name="units[${unitRowIndex}][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN-XXXX" value="${serial}" required>
+                            <input type="text" name="units[${unitRowIndex}][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN-XXXX" value="${serial}" required>
                         </td>
                         <td class="py-2" style="min-width: 120px;">
-                            <select name="units[${unitRowIndex}][condition]" class="form-select form-select-sm" required>
+                            <select name="units[${unitRowIndex}][condition]" class="odoo-table-select" required>
                                 <option value="good" ${condition === 'good' ? 'selected' : ''}>Good</option>
                                 <option value="new" ${condition === 'new' ? 'selected' : ''}>New</option>
                                 <option value="fair" ${condition === 'fair' ? 'selected' : ''}>Fair</option>
@@ -1597,4 +1597,4 @@
     </script>
 @endpush
 
-@include('modules.hrms.partials.settings-sidebar')
+@include('modules.hrms.partials.hrms-settings-helpers')

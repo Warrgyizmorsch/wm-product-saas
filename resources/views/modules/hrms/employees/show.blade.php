@@ -971,6 +971,11 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link {{ $activeTabName === 'documents' ? 'active' : '' }}" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab" aria-controls="documents-pane" aria-selected="{{ $activeTabName === 'documents' ? 'true' : 'false' }}">
+                    <i class="feather-file-text"></i> {{ __('hrms.employees.tab_documents') }}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link {{ $activeTabName === 'leaves' ? 'active' : '' }}" id="leaves-tab" data-bs-toggle="tab" data-bs-target="#leaves-pane" type="button" role="tab" aria-controls="leaves-pane" aria-selected="{{ $activeTabName === 'leaves' ? 'true' : 'false' }}">
                     <i class="feather-calendar"></i> {{ __('hrms.employees.tab_leaves') }}
                 </button>
@@ -985,21 +990,7 @@
                     <i class="feather-clock"></i> {{ __('hrms.employees.tab_shift_overtime') }}
                 </button>
             </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ in_array($activeTabName, ['penalization', 'penalties']) ? 'active' : '' }}" id="penalization-tab" data-bs-toggle="tab" data-bs-target="#penalization-pane" type="button" role="tab" aria-controls="penalization-pane" aria-selected="{{ in_array($activeTabName, ['penalization', 'penalties']) ? 'true' : 'false' }}">
-                    <i class="feather-alert-triangle"></i> {{ __('hrms.employees.tab_penalties') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'documents' ? 'active' : '' }}" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab" aria-controls="documents-pane" aria-selected="{{ $activeTabName === 'documents' ? 'true' : 'false' }}">
-                    <i class="feather-file-text"></i> {{ __('hrms.employees.tab_documents') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'history' ? 'active' : '' }}" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab" aria-controls="history-pane" aria-selected="{{ $activeTabName === 'history' ? 'true' : 'false' }}">
-                    <i class="feather-clock"></i> {{ __('hrms.employees.tab_history') }}
-                </button>
-            </li>
+
             <li class="nav-item" role="presentation">
                 <button class="nav-link {{ $activeTabName === 'assets' ? 'active' : '' }}" id="assets-tab" data-bs-toggle="tab" data-bs-target="#assets-pane" type="button" role="tab" aria-controls="assets-pane" aria-selected="{{ $activeTabName === 'assets' ? 'true' : 'false' }}">
                     <i class="feather-package"></i> {{ __('hrms.employees.tab_assets') }}
@@ -1014,15 +1005,14 @@
 
         <!-- Tab Content -->
         <div class="tab-content" id="profileTabsContent">
-            <!-- 1. OVERVIEW TAB -->
             @include('modules.hrms.employees.tabs.overview')
             @include('modules.hrms.employees.tabs.compensation')
+            @include('modules.hrms.employees.tabs.documents')
             @include('modules.hrms.employees.tabs.leaves')
             @include('modules.hrms.employees.tabs.wfh')
             @include('modules.hrms.employees.tabs.shift-overtime')
             @include('modules.hrms.employees.tabs.penalization')
-            @include('modules.hrms.employees.tabs.documents')
-            @include('modules.hrms.employees.tabs.history')
+
             @include('modules.hrms.employees.tabs.assets')
             @include('modules.hrms.employees.tabs.attendance')
         </div>
@@ -2062,31 +2052,79 @@
                 }
             };
 
-            // Toggle view between Shift Applications and Overtime Applications in Employee Profile
-            $(document).on('click', '#btnToggleShiftOvertimeView', function () {
-                var isOvertimeHidden = $('#overtimeApplicationsViewContainer').hasClass('d-none');
-                if (isOvertimeHidden) {
+            // Toggle view between Shift Applications and Overtime Applications in Employee Profile via sub-tabs
+            $(document).on('click', '.change-shift-tab-btn', function () {
+                var tabBtn = $(this);
+                if (tabBtn.hasClass('active')) return;
+
+                $('.change-shift-tab-btn').removeClass('active');
+                tabBtn.addClass('active');
+
+                var target = tabBtn.data('target');
+
+                // Save active shift sub-tab state to localStorage and sync with URL query parameters
+                localStorage.setItem('emp_active_shift_subtab_{{ $employee->id }}', target);
+                if (history.replaceState) {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('tab', 'shift-overtime');
+                    url.searchParams.set('shift_subtab', target);
+                    history.replaceState(null, null, url.href);
+                }
+
+                if (target === 'overtime') {
+                    // Hide shift views
                     $('#shiftApplicationsViewContainer').addClass('d-none');
-                    $('#shiftAppsHeaderTitle').addClass('d-none');
+                    $('#empShiftRequestsCountBadge').addClass('d-none');
+                    $('#shiftAppsToolbar').addClass('d-none');
+
+                    // Show overtime views
+                    $('#overtimeApplicationsViewContainer').removeClass('d-none');
+                    $('#empOvertimeRequestsCountBadge').removeClass('d-none');
+                    $('#overtimeAppsToolbar').removeClass('d-none');
+                } else {
+                    // Hide overtime views
+                    $('#overtimeApplicationsViewContainer').addClass('d-none');
+                    $('#empOvertimeRequestsCountBadge').addClass('d-none');
+                    $('#overtimeAppsToolbar').addClass('d-none');
+
+                    // Show shift views
+                    $('#shiftApplicationsViewContainer').removeClass('d-none');
+                    $('#empShiftRequestsCountBadge').removeClass('d-none');
+                    $('#shiftAppsToolbar').removeClass('d-none');
+                }
+            });
+
+            // Auto-restore active shift sub-tab on page load
+            (function restoreActiveShiftSubtab() {
+                var urlParams = new URLSearchParams(window.location.search);
+                var initialSubtab = urlParams.get('shift_subtab') || localStorage.getItem('emp_active_shift_subtab_{{ $employee->id }}') || 'shift';
+                
+                if (initialSubtab === 'overtime') {
+                    // Toggle overtime view active state programmatically
+                    $('.change-shift-tab-btn').removeClass('active');
+                    $('#btn-show-overtime-apps').addClass('active');
+                    
+                    $('#shiftApplicationsViewContainer').addClass('d-none');
+                    $('#empShiftRequestsCountBadge').addClass('d-none');
                     $('#shiftAppsToolbar').addClass('d-none');
 
                     $('#overtimeApplicationsViewContainer').removeClass('d-none');
-                    $('#overtimeAppsHeaderTitle').removeClass('d-none');
+                    $('#empOvertimeRequestsCountBadge').removeClass('d-none');
                     $('#overtimeAppsToolbar').removeClass('d-none');
-
-                    $('#toggleShiftOvertimeBtnLabel').html('<i class="feather-git-pull-request me-1"></i> ' + "{{ __('hrms.shift_change.shift_details') }}");
                 } else {
+                    // Default to shift view
+                    $('.change-shift-tab-btn').removeClass('active');
+                    $('#btn-show-shift-apps').addClass('active');
+
                     $('#overtimeApplicationsViewContainer').addClass('d-none');
-                    $('#overtimeAppsHeaderTitle').addClass('d-none');
+                    $('#empOvertimeRequestsCountBadge').addClass('d-none');
                     $('#overtimeAppsToolbar').addClass('d-none');
 
                     $('#shiftApplicationsViewContainer').removeClass('d-none');
-                    $('#shiftAppsHeaderTitle').removeClass('d-none');
+                    $('#empShiftRequestsCountBadge').removeClass('d-none');
                     $('#shiftAppsToolbar').removeClass('d-none');
-
-                    $('#toggleShiftOvertimeBtnLabel').html('<i class="feather-clock me-1"></i> ' + "{{ __('hrms.shift_change.overtime_details') }}");
                 }
-            });
+            })();
 
             // ── Dynamic Leave Rules Modal Handler ─────────────────────────────
             const langLeaveRules = {
@@ -2372,6 +2410,22 @@
                         var tabName = targetPane.replace('#', '').replace('-pane', '');
                         if (!$(this).find('input[name="tab"]').length && !$(this).find('input[name="active_tab"]').length) {
                             $(this).append('<input type="hidden" name="tab" value="' + tabName + '">');
+                        }
+                        // Append active subtab parameter if profile tab is leaves
+                        if (tabName === 'leaves') {
+                            var urlParams = new URLSearchParams(window.location.search);
+                            var activeSubtab = urlParams.get('subtab') || localStorage.getItem('emp_active_subtab_{{ $employee->id }}') || 'apps';
+                            if (!$(this).find('input[name="subtab"]').length) {
+                                $(this).append('<input type="hidden" name="subtab" value="' + activeSubtab + '">');
+                            }
+                        }
+                        // Append active shift_subtab parameter if profile tab is shift-overtime
+                        if (tabName === 'shift-overtime' || tabName === 'shift_overtime') {
+                            var urlParams = new URLSearchParams(window.location.search);
+                            var activeShiftSubtab = urlParams.get('shift_subtab') || localStorage.getItem('emp_active_shift_subtab_{{ $employee->id }}') || 'shift';
+                            if (!$(this).find('input[name="shift_subtab"]').length) {
+                                $(this).append('<input type="hidden" name="shift_subtab" value="' + activeShiftSubtab + '">');
+                            }
                         }
                     }
                 }

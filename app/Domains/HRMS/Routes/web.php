@@ -96,6 +96,7 @@ Route::prefix('hrms')
             Route::get('/import/template', [EmployeeController::class, 'downloadTemplate'])->name('employees.import.template');
             Route::post('/store', [EmployeeController::class, 'store'])->name('employees.store');
             Route::post('/update/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+            Route::post('/{employee}/update-status', [EmployeeController::class, 'updateStatus'])->name('employees.update-status');
             Route::get('/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
             Route::delete('/delete/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
             

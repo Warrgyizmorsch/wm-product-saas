@@ -1,5 +1,4 @@
-
-
+@push('styles')
 <style>
     /* Fixed/Sticky settings sidebar panel styles */
     @media (min-width: 992px) {
@@ -11,57 +10,6 @@
         .settings-container {
             align-items: flex-start !important;
         }
-        .settings-sidebar-col {
-            position: sticky !important;
-            top: 92px !important;
-            height: calc(100vh - 120px) !important;
-            align-self: flex-start !important;
-            z-index: 100 !important;
-        }
-        .settings-sidebar-panel {
-            display: flex !important;
-            flex-direction: column !important;
-            height: 100% !important;
-        }
-        .settings-sidebar-body {
-            flex-grow: 1 !important;
-            overflow-y: auto !important;
-        }
-    }
-
-    /* Premium dynamic settings sidebar shadow styles */
-    #settingsSubSidebar .nav-link {
-        background-color: transparent;
-        transition: all 0.25s ease-in-out;
-        border-radius: 8px !important;
-        font-size: 14px;
-        font-weight: 500;
-        color: #475569 !important;
-        padding: 12px 16px !important;
-        border: 0 !important;
-        display: flex;
-        align-items: center;
-        width: 100%;
-        margin-left: 6px; /* Offset spacing to accommodate the left shadow */
-    }
-    #settingsSubSidebar .nav-link:hover {
-        background-color: #f1f5f9;
-        color: #1e293b !important;
-    }
-    #settingsSubSidebar .nav-link.active {
-        background-color: var(--bs-primary) !important; /* Dynamically matches the active primary theme color */
-        color: #ffffff !important;
-        font-weight: 600;
-        border: none !important;
-        /* Renders a solid dynamic contrast offset shadow/shape on the left side of the active item */
-        box-shadow: -6px 0 0 0 color-mix(in srgb, var(--bs-primary) 70%, #555555) !important;
-    }
-    #settingsSubSidebar .nav-link i {
-        transition: all 0.25s ease;
-    }
-    #settingsSubSidebar .nav-link.active i {
-        color: #ffffff !important;
-        transform: scale(1.1);
     }
 
     /* Select2 Odoo look & duplicate fix overrides specifically inside HRMS Settings */
@@ -185,31 +133,8 @@
     .table-responsive:has(.dropdown.show) {
         overflow: visible !important;
     }
-
-    /* ── Custom Sort Dropdown Chevrons ── */
-    .erp-sort-dropdown .dropdown-item.active:not(:has(i))::after {
-        content: '';
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        background-repeat: no-repeat;
-        background-position: center;
-        background-size: contain;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
-        margin-left: 12px;
-    }
-    .erp-sort-dropdown .dropdown-item.active[data-sort*="desc"]:not(:has(i))::after,
-    .erp-sort-dropdown .dropdown-item.active[data-sort*="high"]:not(:has(i))::after,
-    .erp-sort-dropdown .dropdown-item.active[data-sort*="oldest"]:not(:has(i))::after,
-    .erp-sort-dropdown .dropdown-item.active[onclick*="desc"]:not(:has(i))::after,
-    .erp-sort-dropdown .dropdown-item.active[onclick*="high"]:not(:has(i))::after,
-    .erp-sort-dropdown .dropdown-item.active[onclick*="oldest"]:not(:has(i))::after,
-    .erp-sort-dropdown .dropdown-item.active[href*="desc"]:not(:has(i))::after,
-    .erp-sort-dropdown .dropdown-item.active[href*="high"]:not(:has(i))::after,
-    .erp-sort-dropdown .dropdown-item.active[href*="oldest"]:not(:has(i))::after {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
-    }
 </style>
+@endpush
 
 @push('scripts')
 <script>
