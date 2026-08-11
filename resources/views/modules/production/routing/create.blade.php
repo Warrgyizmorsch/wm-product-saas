@@ -42,9 +42,11 @@
             
             <x-ui.odoo-form-ui type="sheet">
                 <!-- Header with Close Button -->
-                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
                     <h4 class="fw-bold text-dark mb-0">{{ __('production.new_routing') }}</h4>
-                    <a href="{{ route('production.routing.index') }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
+                    <a href="{{ route('production.routing.index') }}" class="text-muted hover-danger fs-18" title="{{ __('production.cancel') }}">
+                        <i class="feather-x"></i>
+                    </a>
                 </div>
 
                 <!-- Routing General Header -->
@@ -76,15 +78,16 @@
                             <option value="0" @selected(old('is_default') == '0')>{{ __('production.alternative') }}</option>
                         </x-ui.odoo-form-ui>
 
-                        <div class="odoo-form-group">
-                            <label class="odoo-form-label">{{ __('production.sequence_control') }}</label>
-                            <div class="flex-grow-1">
-                                <div class="form-check form-switch pt-1">
-                                    <input class="form-check-input" type="checkbox" id="auto_sequence" x-model="autoSequence" checked>
-                                    <label class="form-check-label fw-semibold text-dark fs-12 ms-2" for="auto_sequence">{{ __('production.auto_manage_sequence') }}</label>
-                                </div>
+                        <x-ui.odoo-form-ui type="radio" :label="__('production.sequence_control')">
+                            <div class="form-check me-3">
+                                <input class="form-check-input" type="radio" name="auto_sequence_radio" id="auto_seq_auto" :value="true" x-model="autoSequence">
+                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_auto">{{ __('production.auto_manage_sequence') }}</label>
                             </div>
-                        </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="auto_sequence_radio" id="auto_seq_manual" :value="false" x-model="autoSequence">
+                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_manual">Manual Sequence</label>
+                            </div>
+                        </x-ui.odoo-form-ui>
                     </div>
 
                     <div class="col-12 border-top pt-3">
@@ -100,111 +103,134 @@
                         <x-ui.odoo-form-ui type="table">
                             <thead>
                                 <tr>
-                                    <th style="width: 8%" class="text-center">{{ __('production.seq') }}</th>
-                                    <th style="width: 25%">{{ __('production.operation_name_yield') }}</th>
-                                    <th style="width: 14%">{{ __('production.type') }}</th>
-                                    <th style="width: 18%">{{ __('production.work_center') }}</th>
-                                    <th style="width: 18%">{{ __('production.machine') }}</th>
-                                    <th style="width: 8%" class="text-end">{{ __('production.setup') }} (m)</th>
-                                    <th style="width: 8%" class="text-end">{{ __('production.run') }} (m)</th>
-                                    <th style="width: 5%" class="text-center">{{ __('production.qc_gate') }}</th>
-                                    <th style="width: 8%" class="text-end">{{ __('production.actions') }}</th>
+                                    <th style="width: 45px;" class="text-center">{{ __('production.seq') }}</th>
+                                    <th style="min-width: 310px;">{{ __('production.operation_name_yield') }}</th>
+                                    <th style="width: 125px;">{{ __('production.type') }}</th>
+                                    <th style="width: 165px;">{{ __('production.work_center') }}</th>
+                                    <th style="width: 165px;">{{ __('production.machine') }}</th>
+                                    <th style="width: 65px;" class="text-end">{{ __('production.setup') }} (m)</th>
+                                    <th style="width: 65px;" class="text-end">{{ __('production.run') }} (m)</th>
+                                    <th style="width: 40px;" class="text-center">{{ __('production.qc_gate') }}</th>
+                                    <th style="width: 110px;" class="text-end">{{ __('production.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="(operation, index) in operations" :key="operation.uid">
-                                    <tr class="routing-operation-row" x-init="$nextTick(() => initOperationSelects($el, operation))">
-                                        <!-- Sequence -->
-                                        <td class="align-middle">
-                                            <input type="number" x-bind:name="'operations['+index+'][sequence]'" class="odoo-table-input text-center font-monospace" x-model="operation.sequence" x-bind:readonly="autoSequence" required min="1" />
-                                        </td>
-                                        
-                                        <!-- Operation Name & Details -->
-                                        <td class="align-middle">
-                                            <input type="text" x-bind:name="'operations['+index+'][name]'" class="odoo-table-input" placeholder="{{ __('production.operation_placeholder') }}" x-model="operation.name" required />
-                                            
-                                            <div class="d-flex flex-wrap gap-3 mt-1.5 align-items-center">
-                                                <div class="form-check">
-                                                    <input type="checkbox" class="form-check-input" x-model="operation.is_external" x-bind:name="'operations['+index+'][is_external]'" x-bind:id="'ext_' + operation.uid" value="1">
-                                                    <label class="form-check-label fs-11 text-muted ms-1" x-bind:for="'ext_' + operation.uid">{{ __('production.outsourced') }}</label>
-                                                </div>
-                                                <div class="d-flex align-items-center gap-1.5">
-                                                    <span class="fs-10 text-muted">{{ __('production.yield') }} %:</span>
-                                                    <input type="number" step="any" x-bind:name="'operations['+index+'][expected_yield_percentage]'" class="odoo-table-input text-center" style="width: 60px; padding: 2px !important;" x-model="operation.expected_yield_percentage" min="0.01" max="100.00" required />
-                                                </div>
-                                                <div class="form-check me-1">
-                                                    <input type="checkbox" class="form-check-input" x-model="operation.overlap_enabled" x-bind:name="'operations['+index+'][overlap_enabled]'" x-bind:id="'ovl_' + operation.uid" value="1">
-                                                    <label class="form-check-label fs-11 text-info fw-semibold ms-1" x-bind:for="'ovl_' + operation.uid">Overlap</label>
-                                                </div>
-                                                <div class="d-flex align-items-center gap-1.5" x-show="operation.overlap_enabled">
-                                                    <span class="fs-10 text-muted">Transfer Qty:</span>
-                                                    <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center" style="width: 70px; padding: 2px !important;" x-model="operation.transfer_batch_quantity" min="0.0001" />
-                                                </div>
-                                            </div>
-                                        </td>
-                                        
-                                        <!-- Operation Type -->
-                                        <td class="align-middle">
-                                            <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][operation_type]'" class="odoo-table-select" x-model="operation.operation_type" required select2Selector="default">
-                                                @foreach ($operationTypes as $val => $label)
-                                                    <option value="{{ $val }}">{{ __('production.op_type_' . $val) }}</option>
-                                                @endforeach
-                                            </x-ui.odoo-form-ui>
-                                        </td>
-                                        
-                                        <!-- Work Center -->
-                                        <td class="align-middle">
-                                            <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][work_center_id]'" class="odoo-table-select" x-model="operation.work_center_id" required select2Selector="default">
-                                                <option value="">{{ __('production.select_work_center') }}</option>
-                                                @foreach ($workCenters as $wc)
-                                                    <option value="{{ $wc->id }}">{{ $wc->name }} ({{ $wc->code }})</option>
-                                                @endforeach
-                                            </x-ui.odoo-form-ui>
-                                        </td>
-                                        
-                                        <!-- Machine -->
-                                        <td class="align-middle">
-                                            <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][machine_id]'" class="odoo-table-select" x-model="operation.machine_id" x-bind:disabled="!operation.work_center_id" select2Selector="default">
-                                                <option value="">{{ __('production.no_specific_machine') }}</option>
-                                                <template x-for="m in operation.availableMachines" :key="m.id">
-                                                    <option :value="m.id" x-text="m.label" :selected="m.id == operation.machine_id"></option>
-                                                </template>
-                                            </x-ui.odoo-form-ui>
-                                        </td>
-                                        
-                                        <!-- Setup Time -->
-                                        <td class="align-middle">
-                                            <input type="number" step="any" x-bind:name="'operations['+index+'][setup_time_minutes]'" class="odoo-table-input text-end" x-model="operation.setup_time_minutes" min="0" required />
-                                        </td>
-                                        
-                                        <!-- Process Time -->
-                                        <td class="align-middle">
-                                            <input type="number" step="any" x-bind:name="'operations['+index+'][processing_time_minutes]'" class="odoo-table-input text-end" x-model="operation.processing_time_minutes" min="0" required />
-                                        </td>
-                                        
-                                        <!-- Quality Required -->
-                                        <td class="text-center align-middle">
-                                            <input type="checkbox" class="form-check-input" x-model="operation.quality_required" x-bind:name="'operations['+index+'][quality_required]'" value="1" />
-                                        </td>
-                                        
-                                        <!-- Actions -->
-                                        <td class="text-end align-middle">
-                                            <div class="d-inline-flex gap-1">
-                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-arrow-up" x-on:click="moveUp(index)" x-bind:disabled="index === 0" title="{{ __('production.move_up') }}" />
-                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-arrow-down" x-on:click="moveDown(index)" x-bind:disabled="index === operations.length - 1" title="{{ __('production.move_down') }}" />
-                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-copy" class="text-primary" x-on:click="duplicateOperation(index)" title="{{ __('production.duplicate_operation') }}" />
-                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-trash-2" class="text-danger" x-on:click="removeOperation(index)" title="{{ __('production.remove_operation') }}" />
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </template>
+                                 <template x-for="(operation, index) in operations" :key="operation.uid">
+                                     <tr class="routing-operation-row" x-init="$nextTick(() => initOperationSelects($el, operation))">
+                                         <!-- Sequence -->
+                                         <td class="align-middle text-center">
+                                             <input type="number" x-bind:name="'operations['+index+'][sequence]'" class="odoo-table-input text-center font-monospace" x-model="operation.sequence" x-bind:readonly="autoSequence" required min="1" />
+                                         </td>
+                                         
+                                         <!-- Operation Name & Details -->
+                                         <td class="align-middle">
+                                             <input type="text" x-bind:name="'operations['+index+'][name]'" class="odoo-table-input fw-semibold" placeholder="{{ __('production.operation_placeholder') }}" x-model="operation.name" required />
+                                             
+                                             <div class="d-flex align-items-center gap-2 mt-1 fs-11 text-muted text-nowrap flex-nowrap overflow-hidden">
+                                                 <div class="form-check m-0 p-0 d-inline-flex align-items-center me-1">
+                                                     <input type="checkbox" class="form-check-input mt-0 me-1 ms-0" x-model="operation.is_external" x-bind:name="'operations['+index+'][is_external]'" x-bind:id="'ext_' + operation.uid" value="1">
+                                                     <label class="form-check-label fs-11 text-secondary c-pointer mb-0" x-bind:for="'ext_' + operation.uid">{{ __('production.outsourced') }}</label>
+                                                 </div>
+
+                                                 <span class="text-black-50 me-1">|</span>
+
+                                                 <div class="d-inline-flex align-items-center gap-1 me-1">
+                                                     <span class="fs-10 text-muted">{{ __('production.yield') }}%:</span>
+                                                     <input type="number" step="any" x-bind:name="'operations['+index+'][expected_yield_percentage]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.expected_yield_percentage" min="0.01" max="100.00" required />
+                                                 </div>
+
+                                                 <span class="text-black-50 me-1">|</span>
+
+                                                 <div class="form-check m-0 p-0 d-inline-flex align-items-center me-1">
+                                                     <input type="checkbox" class="form-check-input mt-0 me-1 ms-0" x-model="operation.overlap_enabled" x-bind:name="'operations['+index+'][overlap_enabled]'" x-bind:id="'ovl_' + operation.uid" value="1">
+                                                     <label class="form-check-label fs-11 text-info fw-semibold c-pointer mb-0" x-bind:for="'ovl_' + operation.uid">Overlap</label>
+                                                 </div>
+
+                                                 <div class="align-items-center gap-1"
+                                                      :class="(operation.overlap_enabled == 1 || operation.overlap_enabled === true) ? 'd-inline-flex' : 'd-none'"
+                                                      x-show="operation.overlap_enabled == 1 || operation.overlap_enabled === true"
+                                                      x-transition:enter="transition ease-out duration-300"
+                                                      x-transition:enter-start="opacity-0 transform -translate-x-2"
+                                                      x-transition:enter-end="opacity-100 transform translate-x-0"
+                                                      x-transition:leave="transition ease-in duration-200"
+                                                      x-transition:leave-start="opacity-100 transform translate-x-0"
+                                                      x-transition:leave-end="opacity-0 transform -translate-x-2">
+                                                     <span class="fs-10 text-muted">Qty:</span>
+                                                     <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_batch_quantity" min="0.0001" />
+                                                 </div>
+                                             </div>
+                                         </td>
+                                         
+                                         <!-- Operation Type -->
+                                         <td class="align-middle">
+                                             <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][operation_type]'" class="odoo-table-select" x-model="operation.operation_type" required select2Selector="default">
+                                                 @foreach ($operationTypes as $val => $label)
+                                                     <option value="{{ $val }}">{{ __('production.op_type_' . $val) }}</option>
+                                                 @endforeach
+                                             </x-ui.odoo-form-ui>
+                                         </td>
+                                         
+                                         <!-- Work Center -->
+                                         <td class="align-middle">
+                                             <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][work_center_id]'" class="odoo-table-select" x-model="operation.work_center_id" required select2Selector="default">
+                                                 <option value="">{{ __('production.select_work_center') }}</option>
+                                                 @foreach ($workCenters as $wc)
+                                                     <option value="{{ $wc->id }}">{{ $wc->name }} ({{ $wc->code }})</option>
+                                                 @endforeach
+                                             </x-ui.odoo-form-ui>
+                                         </td>
+                                         
+                                         <!-- Machine -->
+                                         <td class="align-middle">
+                                             <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][machine_id]'" class="odoo-table-select" x-model="operation.machine_id" x-bind:disabled="!operation.work_center_id" select2Selector="default">
+                                                 <option value="">{{ __('production.no_specific_machine') }}</option>
+                                                 <template x-for="m in operation.availableMachines" :key="m.id">
+                                                     <option :value="m.id" x-text="m.label" :selected="m.id == operation.machine_id"></option>
+                                                 </template>
+                                             </x-ui.odoo-form-ui>
+                                         </td>
+                                         
+                                         <!-- Setup Time -->
+                                         <td class="align-middle">
+                                             <input type="number" step="any" x-bind:name="'operations['+index+'][setup_time_minutes]'" class="odoo-table-input text-end" x-model="operation.setup_time_minutes" min="0" required />
+                                         </td>
+                                         
+                                         <!-- Process Time -->
+                                         <td class="align-middle">
+                                             <input type="number" step="any" x-bind:name="'operations['+index+'][processing_time_minutes]'" class="odoo-table-input text-end" x-model="operation.processing_time_minutes" min="0" required />
+                                         </td>
+                                         
+                                         <!-- Quality Required -->
+                                         <td class="text-center align-middle">
+                                             <input type="checkbox" class="form-check-input ms-0 mt-0" x-model="operation.quality_required" x-bind:name="'operations['+index+'][quality_required]'" value="1" />
+                                         </td>
+                                         
+                                         <!-- Actions -->
+                                         <td class="text-end align-middle">
+                                             <div class="d-inline-flex align-items-center gap-2">
+                                                 <button type="button" class="btn btn-link p-0 text-secondary border-0 bg-transparent text-decoration-none" x-on:click="moveUp(index)" x-bind:disabled="index === 0" title="{{ __('production.move_up') }}">
+                                                     <i class="feather-arrow-up fs-15 fw-bold"></i>
+                                                 </button>
+                                                 <button type="button" class="btn btn-link p-0 text-secondary border-0 bg-transparent text-decoration-none" x-on:click="moveDown(index)" x-bind:disabled="index === operations.length - 1" title="{{ __('production.move_down') }}">
+                                                     <i class="feather-arrow-down fs-15 fw-bold"></i>
+                                                 </button>
+                                                 <button type="button" class="btn btn-link p-0 text-primary border-0 bg-transparent text-decoration-none" x-on:click="duplicateOperation(index)" title="{{ __('production.duplicate_operation') }}">
+                                                     <i class="feather-copy fs-15"></i>
+                                                 </button>
+                                                 <button type="button" class="btn btn-link p-0 text-danger border-0 bg-transparent text-decoration-none" x-on:click="removeOperation(index)" title="{{ __('production.remove_operation') }}">
+                                                     <i class="feather-x fs-18 fw-bold"></i>
+                                                 </button>
+                                             </div>
+                                         </td>
+                                     </tr>
+                                 </template>
                             </tbody>
                         </x-ui.odoo-form-ui>
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center mt-3">
-                        <button type="button" class="btn btn-light-brand" x-on:click="addOperation()">
-                            <i class="feather-plus me-2"></i>{{ __('production.add_operation_stage') }}
+                        <button type="button" class="btn btn-link p-0 text-primary fw-semibold text-decoration-none shadow-none border-0 bg-transparent" x-on:click="addOperation()">
+                            <i class="feather-plus me-1 fs-14"></i>{{ __('production.add_operation_stage') }}
                         </button>
                         
                         <div class="text-muted fs-12 fw-medium">
@@ -216,10 +242,11 @@
                 <!-- Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
                     <button type="submit" class="btn btn-primary px-4">{{ __('production.save_routing_draft') }}</button>
-                    <a href="{{ route('production.routing.index') }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>
+
+        <x-ui.confirmation-modal />
     </div>
 
     <script>
@@ -272,7 +299,16 @@
                         this.recalculateSequences();
                         this.$nextTick(() => this.initAllOperationSelects());
                     } else {
-                        alert(@js(__('production.requires_at_least_one_operation')));
+                        if (typeof confirmAction === 'function') {
+                            confirmAction({
+                                title: @js(__('production.validation_failed') ?? 'Validation Warning'),
+                                message: @js(__('production.requires_at_least_one_operation')),
+                                variant: 'warning',
+                                confirmText: 'OK'
+                            });
+                        } else {
+                            alert(@js(__('production.requires_at_least_one_operation')));
+                        }
                     }
                 },
 
