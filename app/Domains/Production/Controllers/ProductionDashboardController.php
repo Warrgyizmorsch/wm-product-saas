@@ -71,18 +71,54 @@ class ProductionDashboardController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $readyToStartOrders = $allActiveOrders->filter(function ($order) {
+        // 4a. Fully Issued Production Orders (Excludes orders already active/in_progress on shopfloor)
+        $fullyIssuedOrders = $allActiveOrders->filter(function ($order) {
+            if (in_array($order->status, ['in_progress', 'completed', 'closed', 'cancelled'])) {
+                return false;
+            }
+
             if ($order->requisitionSlips->isEmpty()) {
                 return false;
             }
 
             return $order->requisitionSlips->contains(function ($slip) {
                 $statusLower = strtolower($slip->status ?? '');
-                return in_array($statusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
+                return in_array($statusLower, ['fully issued', 'completed', 'issued']);
             });
         });
 
+        $fullyIssuedCount = $fullyIssuedOrders->count();
+
+        // 4b. Partially Issued Production Orders (Warning Alert)
+        $partiallyIssuedOrders = $allActiveOrders->filter(function ($order) {
+            if ($order->requisitionSlips->isEmpty()) {
+                return false;
+            }
+
+            return $order->requisitionSlips->contains(function ($slip) {
+                $statusLower = strtolower($slip->status ?? '');
+                return in_array($statusLower, ['partially issued', 'partial']);
+            });
+        });
+
+        $partiallyIssuedCount = $partiallyIssuedOrders->count();
+
+        $readyToStartOrders = $fullyIssuedOrders->merge($partiallyIssuedOrders);
         $readyToStartCount = $readyToStartOrders->count();
+
+        // 4c. Production Orders with Store Requisition Requests Sent (Pending Store Release)
+        $pendingStoreOrders = $allActiveOrders->filter(function ($order) {
+            if ($order->requisitionSlips->isEmpty()) {
+                return false;
+            }
+
+            return $order->requisitionSlips->contains(function ($slip) {
+                $statusLower = strtolower($slip->status ?? '');
+                return in_array($statusLower, ['pending', 'pending store release']);
+            });
+        });
+
+        $pendingStoreCount = $pendingStoreOrders->count();
 
         // 5. Operator Assigned Operations Count
         $operatorAssignedCount = ProductionOrderOperation::where('tenant_id', $tenantId)
@@ -117,6 +153,12 @@ class ProductionDashboardController extends Controller
             'requisitionSummary',
             'readyToStartOrders',
             'readyToStartCount',
+            'fullyIssuedOrders',
+            'fullyIssuedCount',
+            'partiallyIssuedOrders',
+            'partiallyIssuedCount',
+            'pendingStoreOrders',
+            'pendingStoreCount',
             'operatorAssignedCount',
             'pendingReworkCount',
             'scrapLoggedCount',

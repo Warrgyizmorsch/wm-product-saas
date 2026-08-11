@@ -842,4 +842,4 @@
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
 @endpush
 
-@include('modules.hrms.partials.settings-sidebar')
+@include('modules.hrms.partials.hrms-settings-helpers')

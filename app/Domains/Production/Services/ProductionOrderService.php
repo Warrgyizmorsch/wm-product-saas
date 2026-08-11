@@ -341,6 +341,14 @@ class ProductionOrderService
             throw new InvalidArgumentException('Only draft orders can be released.');
         }
 
+        $latestSlip = $order->requisitionSlips()->latest('id')->first();
+        $slipStatusLower = strtolower($latestSlip?->status ?? '');
+        $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
+
+        if (!$hasIssuedMaterial) {
+            throw new InvalidArgumentException('Cannot release order: Raw materials must be fully or partially issued by the store department first.');
+        }
+
         $order->status = ProductionOrder::STATUS_RELEASED;
         $order->released_by = $userId;
         $order->released_at = now();

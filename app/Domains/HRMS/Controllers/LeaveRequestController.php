@@ -109,9 +109,14 @@ class LeaveRequestController extends Controller
 
         $this->leaveRequestRepository->updateStatus($leaveRequest, $validated, $request);
 
-        $msg = $validated['action'] === 'approved'
-            ? __('hrms.leave.app.approved_successfully')
-            : __('hrms.leave.app.rejected_successfully');
+        $statusLabels = [
+            'approved'     => __('hrms.leave.app.approved_successfully') ?? 'Leave application approved successfully.',
+            'rejected'     => __('hrms.leave.app.rejected_successfully') ?? 'Leave application rejected successfully.',
+            'pending'      => 'Leave application set to pending successfully.',
+            'unauthorized' => 'Leave application set to unauthorized successfully.',
+            'unpaid'       => 'Leave application set to unpaid successfully.',
+        ];
+        $msg = $statusLabels[$validated['action']] ?? 'Leave application status updated successfully.';
 
         return redirect()->back()->with('success', $msg);
     }

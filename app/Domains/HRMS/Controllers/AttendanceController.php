@@ -585,8 +585,9 @@ class AttendanceController extends Controller
 
                         $status = $hasWfh ? 'wfh' : 'present';
 
-                        if ($employee && $employee->shift) {
-                            $shiftStartStr = $employee->shift->start_time;
+                        $resolvedShift = $employee ? $employee->resolveShiftForDate($dateStr) : null;
+                        if ($resolvedShift) {
+                            $shiftStartStr = $resolvedShift->start_time;
                             $shiftStart = \Carbon\Carbon::parse($dateStr . ' ' . $shiftStartStr);
 
                             if ($checkInDatetime->greaterThan($shiftStart)) {
@@ -741,8 +742,9 @@ class AttendanceController extends Controller
 
                     $status = $hasWfh ? 'wfh' : 'present';
 
-                    if ($employee && $employee->shift) {
-                        $shiftStartStr = $employee->shift->start_time; // e.g. "09:00:00"
+                    $resolvedShift = $employee ? $employee->resolveShiftForDate($dateStr) : null;
+                    if ($resolvedShift) {
+                        $shiftStartStr = $resolvedShift->start_time; // e.g. "09:00:00"
                         $shiftStart = \Carbon\Carbon::parse($dateStr . ' ' . $shiftStartStr);
 
                         if ($checkInDatetime->greaterThan($shiftStart)) {
@@ -1066,8 +1068,9 @@ class AttendanceController extends Controller
 
                     $finalStatus = $hasWfh ? 'wfh' : 'present';
 
-                    if ($employee->shift) {
-                        $shiftStart = \Carbon\Carbon::parse($formattedDate . ' ' . $employee->shift->start_time);
+                    $resolvedShift = $employee->resolveShiftForDate($formattedDate);
+                    if ($resolvedShift) {
+                        $shiftStart = \Carbon\Carbon::parse($formattedDate . ' ' . $resolvedShift->start_time);
                         if ($checkInDatetime->greaterThan($shiftStart)) {
                             $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
                                     $q->where('company_id', $employee->company_id)

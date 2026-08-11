@@ -337,12 +337,6 @@
             <!-- Single Outer Card spanning full width -->
             <div class="col-12">
                 <x-ui.card title="{{ __('hrms.penalization.title') }}" subtitle="{{ __('hrms.penalization.subtitle') }}" bodyClass="p-0" stretch id="penalizationMasterCard">
-                    <x-slot:headerAction>
-                        <button type="button" id="btnSavePolicyGlobal" class="btn btn-primary btn-sm d-flex align-items-center gap-2" style="font-size: 12px; font-weight: 600; letter-spacing: 0.04em;">
-                            <i class="feather-save" style="font-size: 14px;"></i>
-                            {{ __('hrms.penalization.save_policy') }}
-                        </button>
-                    </x-slot:headerAction>
                     <div class="row g-0">
                         <!-- LEFT COLUMN: RULES CATEGORIES ONLY -->
                         <div class="col-md-3 col-12 border-end" id="penalizationLeftCol">
@@ -352,7 +346,8 @@
                                         'late_arrival' => [__('hrms.penalization.late_arrival'), 'feather-clock'],
                                         'under_hours' => [__('hrms.penalization.under_hours'), 'feather-trending-down'],
                                         'missing_logs' => [__('hrms.penalization.missing_logs'), 'feather-alert-triangle'],
-                                        'attendance_rules' => [__('hrms.penalization.attendance_rules'), 'feather-check-square']
+                                        'attendance_rules' => [__('hrms.penalization.attendance_rules'), 'feather-check-square'],
+                                        'overtime_rules' => [__('hrms.overtime.title') ?? 'Overtime Policy', 'feather-briefcase']
                                     ];
                                     $lateArrivalRule = $rules->get('late_arrival');
                                     $savedLateTiers = ($lateArrivalRule && $lateArrivalRule->penalty_tiers) ? $lateArrivalRule->penalty_tiers : null;
@@ -391,9 +386,11 @@
                                     $statusVal = $rule ? ($rule->status ? '1' : '0') : '1';
                                 @endphp
                                 <div class="policy-details-pane" id="policy-details-{{ $typeKey }}" style="{{ $isPaneActive ? '' : 'display:none;' }}">
-                                    <form action="{{ $typeKey === 'attendance_rules' ? route('hrms.attendance-rules.save') : route('hrms.penalization-policy.store') }}" method="POST" class="p-4">
+                                    <form action="{{ $typeKey === 'attendance_rules' ? route('hrms.attendance-rules.save') : ($typeKey === 'overtime_rules' ? route('hrms.overtime.update-settings') : route('hrms.penalization-policy.store')) }}" method="POST" class="p-4">
                                         @csrf
-                                        <input type="hidden" name="rule_type" value="{{ $typeKey }}">
+                                        @if($typeKey !== 'overtime_rules')
+                                            <input type="hidden" name="rule_type" value="{{ $typeKey }}">
+                                        @endif
 
                                         <!-- Panel Header Details -->
                                         <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
@@ -402,45 +399,88 @@
                                                     <i class="{{ $typeData[1] }} text-primary me-2 fs-18"></i>
                                                     @if($typeKey === 'attendance_rules')
                                                         Configure Attendance Rules
+                                                    @elseif($typeKey === 'overtime_rules')
+                                                        Configure Overtime Rules
                                                     @else
                                                         {{ __('hrms.penalization.configure_rules', ['type' => $typeData[0]]) }}
                                                     @endif
                                                 </h5>
-                                                <span class="text-muted fs-12">{{ __('hrms.penalization.set_thresholds_desc') }}</span>
+                                                <span class="text-muted fs-12">
+                                                    @if($typeKey === 'overtime_rules')
+                                                        Configure overtime threshold and minimum manual request hours rules.
+                                                     @else
+                                                        {{ __('hrms.penalization.set_thresholds_desc') }}
+                                                     @endif
+                                                </span>
                                             </div>
-                                            <div>
-                                                <x-ui.badge variant="{{ $statusVal === '1' ? 'success' : 'danger' }}" soft class="px-2 py-1">
-                                                    {{ $statusVal === '1' ? __('hrms.employees.frm_status_active') : __('hrms.employees.frm_status_inactive') }}
-                                                </x-ui.badge>
-                                            </div>
+                                            @if($typeKey !== 'overtime_rules')
+                                                <div>
+                                                    <x-ui.badge variant="{{ $statusVal === '1' ? 'success' : 'danger' }}" soft class="px-2 py-1">
+                                                        {{ $statusVal === '1' ? __('hrms.employees.frm_status_active') : __('hrms.employees.frm_status_inactive') }}
+                                                    </x-ui.badge>
+                                                </div>
+                                            @endif
                                         </div>
 
                                         <div class="row g-3 mb-4">
-                                            <!-- Entity Scope -->
-                                            <div class="col-md-6 col-12">
-                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_scope') }}" name="company_id" select2-selector="default" id="{{ $typeKey === 'attendance_rules' ? 'sel_company_id' : 'company_id_' . $typeKey }}">
-                                                    @if($typeKey === 'attendance_rules')
-                                                        <option value="" disabled selected>-- Select a Company (Required) --</option>
-                                                    @else
-                                                        <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
-                                                    @endif
-                                                    @foreach($companies as $company)
-                                                        <option value="{{ $company->id }}" {{ (($typeKey === 'attendance_rules' ? request('company_id') : ($rule ? $rule->company_id : null)) == $company->id) ? 'selected' : '' }}>
-                                                            {{ $company->company_name }}
-                                                        </option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-                                            </div>
+                                            @if($typeKey !== 'overtime_rules')
+                                                <!-- Entity Scope -->
+                                                <div class="col-md-6 col-12">
+                                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_scope') }}" name="company_id" select2-selector="default" id="{{ $typeKey === 'attendance_rules' ? 'sel_company_id' : 'company_id_' . $typeKey }}">
+                                                        @if($typeKey === 'attendance_rules')
+                                                            <option value="" disabled selected>-- Select a Company (Required) --</option>
+                                                        @else
+                                                            <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
+                                                        @endif
+                                                        @foreach($companies as $company)
+                                                            <option value="{{ $company->id }}" {{ (($typeKey === 'attendance_rules' ? request('company_id') : ($rule ? $rule->company_id : null)) == $company->id) ? 'selected' : '' }}>
+                                                                {{ $company->company_name }}
+                                                            </option>
+                                                        @endforeach
+                                                    </x-ui.odoo-form-ui>
+                                                </div>
 
-                                            <!-- Status -->
-                                            <div class="col-md-6 col-12">
-                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.policy_status') }}" name="status" select2-selector="default" :required="true" id="{{ $typeKey === 'attendance_rules' ? 'sel_status' : 'status_' . $typeKey }}">
-                                                    <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>{{ __('hrms.penalization.active_enforce') }}</option>
-                                                    <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>{{ __('hrms.penalization.inactive_ignore') }}</option>
-                                                </x-ui.odoo-form-ui>
-                                            </div>
+                                                <!-- Status -->
+                                                <div class="col-md-6 col-12">
+                                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.policy_status') }}" name="status" select2-selector="default" :required="true" id="{{ $typeKey === 'attendance_rules' ? 'sel_status' : 'status_' . $typeKey }}">
+                                                        <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>{{ __('hrms.penalization.active_enforce') }}</option>
+                                                        <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>{{ __('hrms.penalization.inactive_ignore') }}</option>
+                                                    </x-ui.odoo-form-ui>
+                                                </div>
+                                            @endif
 
-                                             <!-- Type-Specific Parameters -->
+                                             @if($typeKey === 'overtime_rules')
+                                                 <div class="col-12 d-flex flex-column gap-3">
+                                                     {{-- Overtime Threshold Rule --}}
+                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                         <div class="d-flex align-items-start gap-2">
+                                                             <i class="feather-info text-primary fs-16 mt-0.5"></i>
+                                                             <div>
+                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                     System automatically logs and approves overtime if actual worked extra hours equal or exceed 
+                                                                     <input type="number" name="auto_overtime_threshold_hours" step="0.5" min="0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['auto_overtime_threshold_hours'] }}" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                     hours.
+                                                                 </p>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {{-- Minimum Overtime Request Rule --}}
+                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                         <div class="d-flex align-items-start gap-2">
+                                                             <i class="feather-alert-circle text-primary fs-16 mt-0.5"></i>
+                                                             <div>
+                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                     Minimum hours required for a manual overtime request is 
+                                                                     <input type="number" name="min_overtime_request_hours" step="0.5" min="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['min_overtime_request_hours'] }}" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                     hours.
+                                                                 </p>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+                                                 </div>
+                                             @endif
+
                                              @if($typeKey === 'late_arrival')
                                                   <!-- Grace Period -->
                                                   <div class="col-12 d-flex flex-column gap-2">
@@ -702,7 +742,7 @@
                                                               </div>
                                                           </div>
                                                       </div>
-                                                 </div>
+                                                 
 
                                                   <!-- WFH Rules -->
                                                   <div class="col-12 border-bottom pb-4 mb-4">
@@ -778,9 +818,17 @@
                                                       </div>
                                                   </div>
                                               @endif
-                                          </div>
+                                           </div>
 
-                                     </form>
+                                           <div class="row mt-4 border-top pt-4">
+                                               <div class="col-12 d-flex justify-content-end">
+                                                   <x-ui.button type="submit" variant="primary" size="sm" class="d-flex align-items-center gap-2">
+                                                       <i class="feather-save" style="font-size: 14px;"></i>
+                                                       Save {{ $typeData[0] }} Settings
+                                                   </x-ui.button>
+                                               </div>
+                                           </div>
+                                      </form>
                                  </div>
                              @endforeach
                         </div>
@@ -794,17 +842,7 @@
     <script>
         document.addEventListener("DOMContentLoaded", function() {
 
-            // ── SINGLE GLOBAL SAVE BUTTON ──────────────────────────────────
-            // Finds whichever policy-details pane is currently visible and
-            // programmatically submits its <form>, which has the correct action URL.
-            document.getElementById('btnSavePolicyGlobal').addEventListener('click', function() {
-                var activePane = document.querySelector('.policy-details-pane:not([style*="display:none"])');
-                if (activePane) {
-                    var form = activePane.querySelector('form');
-                    if (form) form.submit();
-                }
-            });
-            // ──────────────────────────────────────────────────────────────
+
 
             // Close Select2 dropdowns when any parent scrollable container scrolls
             document.addEventListener('scroll', function(e) {
@@ -1800,4 +1838,4 @@
     @endpush
 @endsection
 
-@include('modules.hrms.partials.settings-sidebar')
+@include('modules.hrms.partials.hrms-settings-helpers')

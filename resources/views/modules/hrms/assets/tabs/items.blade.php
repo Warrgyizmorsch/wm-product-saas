@@ -426,13 +426,13 @@
                                     <tbody id="bulk-units-tbody">
                                         <tr>
                                             <td class="py-2 px-3 text-start">
-                                                <input type="text" name="units[0][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required>
+                                                <input type="text" name="units[0][asset_code]" class="odoo-table-input text-center" placeholder="e.g. AST-001" required>
                                             </td>
                                             <td class="py-2">
-                                                <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN-XXXX" required>
+                                                <input type="text" name="units[0][serial_number]" class="odoo-table-input text-center" placeholder="e.g. SN-XXXX" required>
                                             </td>
                                             <td class="py-2" style="min-width: 120px;">
-                                                <select name="units[0][condition]" class="form-select form-select-sm" required>
+                                                <select name="units[0][condition]" class="odoo-table-select" required>
                                                     <option value="good">Good</option>
                                                     <option value="new">New</option>
                                                     <option value="fair">Fair</option>

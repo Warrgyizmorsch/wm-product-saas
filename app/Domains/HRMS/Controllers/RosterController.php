@@ -146,7 +146,7 @@ class RosterController extends Controller
             ->with('success', 'Shifts assigned successfully.');
     }
 
-    public function updateCell(Request $request): RedirectResponse
+    public function updateCell(Request $request)
     {
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
@@ -162,6 +162,9 @@ class RosterController extends Controller
 
         if ($value === 'default' || $value === '') {
             ShiftRoster::where(['employee_id' => $validated['employee_id'], 'date' => $validated['date']])->delete();
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => true, 'message' => 'Shift roster cell reset to default.']);
+            }
             return redirect()->back()->with('success', 'Shift roster cell reset to default.');
         }
 
@@ -173,10 +176,14 @@ class RosterController extends Controller
             ['shift_id' => $shiftId, 'status' => 'scheduled']
         );
 
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Shift roster cell updated.']);
+        }
+
         return redirect()->back()->with('success', 'Shift roster cell updated.');
     }
 
-    public function updateWeeklyPattern(Request $request): RedirectResponse
+    public function updateWeeklyPattern(Request $request)
     {
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
@@ -197,6 +204,10 @@ class RosterController extends Controller
 
         ksort($pattern);
         $employee->update(['weekly_pattern' => $pattern]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Weekly pattern updated.']);
+        }
 
         return redirect()->back()->with('success', 'Weekly pattern updated.');
     }

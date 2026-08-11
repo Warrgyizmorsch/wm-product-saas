@@ -93,12 +93,37 @@
                             <span class="badge text-uppercase fs-10" style="background-color: {{ $req->type === 'permanent' ? 'rgba(25, 135, 84, 0.1)' : ($req->type === 'recurring' ? 'rgba(13, 110, 253, 0.1)' : 'rgba(108, 117, 125, 0.1)') }}; color: {{ $req->type === 'permanent' ? '#198754' : ($req->type === 'recurring' ? '#0d6efd' : '#6c757d') }};">
                                 {{ __('hrms.shift_change.type_' . $req->type) }}
                             </span>
-                            @if($req->type === 'recurring' && is_array($req->recurring_days))
+                            @if($req->type === 'recurring' && $req->recurring_days)
                                 @php
-                                    $dayNames = is_array(__('hrms.days')) ? __('hrms.days') : [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat'];
-                                    $mapped = array_map(fn($d) => $dayNames[$d] ?? '', $req->recurring_days);
+                                    $recurringDays = $req->recurring_days;
+                                    if (is_string($recurringDays)) {
+                                        $recurringDays = json_decode($recurringDays, true) ?: explode(',', $recurringDays);
+                                    }
+                                    $dayNames = [
+                                        0 => 'Sun',
+                                        1 => 'Mon',
+                                        2 => 'Tue',
+                                        3 => 'Wed',
+                                        4 => 'Thu',
+                                        5 => 'Fri',
+                                        6 => 'Sat'
+                                    ];
+                                    $mapped = [];
+                                    if (is_array($recurringDays)) {
+                                        foreach ($recurringDays as $d) {
+                                            $dVal = trim((string)$d);
+                                            if ($dVal !== '') {
+                                                $dInt = (int)$dVal;
+                                                if (isset($dayNames[$dInt])) {
+                                                    $mapped[] = $dayNames[$dInt];
+                                                }
+                                            }
+                                        }
+                                    }
                                 @endphp
-                                <div class="fs-10 text-muted mt-1 fw-medium" style="max-width: 120px; line-height: 1.2;">{{ implode(', ', $mapped) }}</div>
+                                @if(!empty($mapped))
+                                    <div class="fs-10 text-muted mt-1 fw-medium" style="max-width: 120px; line-height: 1.2;">{{ implode(', ', $mapped) }}</div>
+                                @endif
                             @endif
                         </td>
                         <td>

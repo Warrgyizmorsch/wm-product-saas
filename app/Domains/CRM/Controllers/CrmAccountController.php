@@ -226,6 +226,77 @@ class CrmAccountController extends Controller
         return redirect()->route('crm.accounts.show', $account)->with('success', 'Contact added successfully.');
     }
 
+    public function getContactsList(CrmAccount $account): \Illuminate\Http\JsonResponse
+    {
+        $contacts = CrmContact::where('crm_account_id', $account->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'designation', 'role', 'email', 'phone']);
+
+        return response()->json([
+            'success' => true,
+            'contacts' => $contacts
+        ]);
+    }
+
+    public function quickStoreContact(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $tenantId = tenant_id() ?? 1;
+
+        $validated = $request->validate([
+            'crm_account_id' => 'required|exists:crm_accounts,id',
+            'name'           => 'required|string|max:255',
+            'designation'    => 'nullable|string|max:255',
+            'role'           => 'nullable|string|max:100',
+            'email'          => 'nullable|email|max:255',
+            'phone'          => 'nullable|string|max:50',
+            'mobile'         => 'nullable|string|max:50',
+        ]);
+
+        $account = CrmAccount::findOrFail($validated['crm_account_id']);
+
+        $contact = CrmContact::create([
+            'tenant_id'      => $tenantId,
+            'crm_account_id' => $account->id,
+            'name'           => $validated['name'],
+            'designation'    => $validated['designation'] ?? null,
+            'role'           => $validated['role'] ?? 'Primary Contact',
+            'email'          => $validated['email'] ?? null,
+            'phone'          => $validated['phone'] ?? null,
+            'mobile'         => $validated['mobile'] ?? $validated['phone'] ?? null,
+            'is_primary'     => true,
+            'status'         => 'active',
+        ]);
+
+        $additional = $request->input('additional_contacts', []);
+        if (is_array($additional)) {
+            foreach ($additional as $add) {
+                if (empty($add['name'])) continue;
+                CrmContact::create([
+                    'tenant_id'      => $tenantId,
+                    'crm_account_id' => $account->id,
+                    'name'           => $add['name'],
+                    'designation'    => $add['designation'] ?? null,
+                    'role'           => 'Additional Contact',
+                    'email'          => $add['email'] ?? null,
+                    'phone'          => $add['phone'] ?? null,
+                    'mobile'         => $add['phone'] ?? null,
+                    'is_primary'     => false,
+                    'status'         => 'active',
+                ]);
+            }
+        }
+
+        $subInfo = $contact->designation ?: ($contact->role ?: '');
+        $displayText = $contact->name . ($subInfo ? " ({$subInfo})" : '');
+
+        return response()->json([
+            'success' => true,
+            'id'      => $contact->id,
+            'name'    => $displayText,
+            'message' => 'Contact Person created successfully for ' . $account->name . '!'
+        ]);
+    }
+
     public function destroy(CrmAccount $account): RedirectResponse
     {
         $account->delete();

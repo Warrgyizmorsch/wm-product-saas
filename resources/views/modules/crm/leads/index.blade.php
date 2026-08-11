@@ -401,13 +401,27 @@
                                             </a>
                                         </li>
 
-                                        {{-- Convert to Quotation (for Qualified Leads) --}}
-                                        @if (($lead->status ?: 'New') === 'Qualified' && $lead->getQuotations()->isEmpty())
+                                        {{-- Create Account & Deal (for Qualified Leads) --}}
+                                        @if ($lead->crm_account_id)
                                             <li>
-                                                <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST">
+                                                <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="dropdown-item text-primary fw-semibold">
+                                                    <i class="feather-briefcase me-2 text-primary fs-12"></i>View Account
+                                                </a>
+                                            </li>
+                                            @if ($lead->crm_deal_id)
+                                                <li>
+                                                    <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="dropdown-item text-success fw-semibold">
+                                                        <i class="feather-git-branch me-2 text-success fs-12"></i>View Deal
+                                                    </a>
+                                                </li>
+                                            @endif
+                                        @elseif (($lead->status ?: 'New') === 'Qualified')
+                                            <li>
+                                                <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST">
                                                     @csrf
-                                                    <button type="submit" class="dropdown-item text-primary fw-semibold">
-                                                        <i class="feather-file-plus me-2 text-primary fs-12"></i>Convert Quotation
+                                                    @method('PATCH')
+                                                    <button type="submit" class="dropdown-item text-warning fw-bold">
+                                                        <i class="feather-user-check me-2 text-warning fs-12"></i>Create Account & Deal
                                                     </button>
                                                 </form>
                                             </li>
@@ -629,44 +643,49 @@
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
         window.updateLeadPriority = function(leadId, priority, el) {
-            var csrfToken = $('meta[name="csrf-token"]').attr('content');
-            $.ajax({
-                url: "{{ url('crm/leads') }}/" + leadId + '/priority',
-                type: 'PATCH',
+            var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            fetch("{{ url('crm/leads') }}/" + leadId + '/priority', {
+                method: 'PATCH',
                 headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
                 },
-                data: { priority: priority },
-                success: function(res) {
-                    if (res.success) {
-                        var widget = $('#starRating_' + leadId);
-                        var starsCount = priority === 'Low' ? 1 : (priority === 'Medium' ? 2 : (priority === 'High' ? 3 : 4));
-                        widget.attr('data-current-stars', starsCount);
-                        widget.attr('data-current-priority', priority);
+                body: JSON.stringify({ priority: priority })
+            })
+            .then(r => r.json())
+            .then(function(res) {
+                if (res.success) {
+                    var widget = document.getElementById('starRating_' + leadId);
+                    var starsCount = priority === 'Low' ? 1 : (priority === 'Medium' ? 2 : (priority === 'High' ? 3 : 4));
+                    if (widget) {
+                        widget.setAttribute('data-current-stars', starsCount);
+                        widget.setAttribute('data-current-priority', priority);
 
-                        widget.find('.star-icon').each(function() {
-                            var s = parseInt($(this).attr('data-star'));
+                        widget.querySelectorAll('.star-icon').forEach(function(icon) {
+                            var s = parseInt(icon.getAttribute('data-star'));
                             if (s <= starsCount) {
-                                $(this).addClass('active-star').removeClass('inactive-star');
+                                icon.classList.add('active-star');
+                                icon.classList.remove('inactive-star');
                             } else {
-                                $(this).addClass('inactive-star').removeClass('active-star');
+                                icon.classList.add('inactive-star');
+                                icon.classList.remove('active-star');
                             }
                         });
-
-                        var badge = $('.priority-badge-' + leadId);
-                        badge.text(priority);
-                        badge.removeClass('bg-soft-success text-success bg-soft-warning text-warning bg-soft-danger text-danger bg-danger text-white bg-soft-secondary text-secondary');
-                        if (priority === 'Low') badge.addClass('bg-soft-success text-success');
-                        else if (priority === 'Medium') badge.addClass('bg-soft-warning text-warning');
-                        else if (priority === 'High') badge.addClass('bg-soft-danger text-danger');
-                        else if (priority === 'Urgent') badge.addClass('bg-danger text-white');
                     }
-                },
-                error: function(err) {
-                    console.error('Failed to update priority:', err);
+
+                    var badge = document.querySelector('.priority-badge-' + leadId);
+                    if (badge) {
+                        badge.textContent = priority;
+                        badge.className = 'badge fs-10 ms-1 priority-badge-' + leadId;
+                        if (priority === 'Low')         badge.classList.add('bg-soft-success', 'text-success');
+                        else if (priority === 'Medium') badge.classList.add('bg-soft-warning', 'text-warning');
+                        else if (priority === 'High')   badge.classList.add('bg-soft-danger',  'text-danger');
+                        else if (priority === 'Urgent') badge.classList.add('bg-danger',        'text-white');
+                    }
                 }
-            });
+            })
+            .catch(function(err) { console.error('Priority update failed:', err); });
         };
 
         $(function () {
@@ -725,6 +744,8 @@
                         '<tr class="no-search-results"><td colspan="9" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>' + noResultsText + '</td></tr>'
                     );
                 }
+            });
+
             // Auto submit form when status is changed from dropdown
             $(document).on('change change.select2', '.status-select', function() {
                 var form = $(this).closest('form');

@@ -129,61 +129,7 @@
                 </div>
             </div>
 
-            <div class="card-custom">
-                <div class="card-custom-header">
-                    <h5 class="card-custom-title"><i class="feather-plus-circle text-primary"></i> {{ __('hrms.employees.lbl_monthly_adhoc') }}</h5>
-                    <x-ui.button 
-                        type="button" 
-                        variant="soft-primary" 
-                        size="sm" 
-                        data-bs-toggle="modal" 
-                        data-bs-target="#addAdhocModal" 
-                        :disabled="!$employee->pay_group_id"
-                    >
-                        {{ __('hrms.common.add') }}
-                    </x-ui.button>
-                </div>
-                <div class="card-body p-0">
-                    @if(!isset($adhocComponents) || $adhocComponents->isEmpty())
-                        <div class="p-4 text-center text-muted fs-13">
-                            {{ __('hrms.employees.lbl_no_adhoc_components') }}
-                        </div>
-                    @else
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
-                                 <thead class="table-light">
-                                     <tr>
-                                         <th>{{ __('hrms.employees.tbl_component') }}</th>
-                                         <th class="text-end">{{ __('hrms.employees.tbl_amount') }}</th>
-                                         <th class="text-end">{{ __('hrms.employees.tbl_action') }}</th>
-                                     </tr>
-                                 </thead>
-                                 <tbody>
-                                     @foreach($adhocComponents as $adhoc)
-                                         <tr>
-                                             <td>
-                                                 <div class="fw-bold">{{ $adhoc->component->name }}</div>
-                                                 <div class="d-flex align-items-center gap-2 mt-1">
-                                                     <span class="badge bg-soft-info text-info fs-10">{{ $adhoc->status }}</span>
-                                                     <span class="text-muted fs-11"><i class="feather-calendar me-1"></i>{{ $adhoc->payroll_month }}</span>
-                                                 </div>
-                                             </td>
-                                             <td class="text-end fw-semibold">₹{{ number_format($adhoc->amount, 2) }}</td>
-                                             <td class="text-end">
-                                                 <form action="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_adhoc') }}', { title: '{{ __('hrms.employees.lbl_delete_adhoc') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
-                                                     @csrf
-                                                     @method('DELETE')
-                                                     <button type="submit" class="btn btn-link text-danger p-1 m-0" style="text-decoration: none !important; box-shadow: none !important;"><i class="feather-trash-2"></i></button>
-                                                 </form>
-                                             </td>
-                                         </tr>
-                                     @endforeach
-                                 </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
-            </div>
+
         </div>
     </div>
 </div>

@@ -737,6 +737,7 @@
                         {{ $multiple ? 'multiple' : '' }}
                         {{ $disabled ? 'disabled' : '' }}
                         @if($select2Selector) data-select2-selector="{{ $select2Selector }}" @endif
+                        {{ $attributes->except('class') }}
                         {{ $attributes->class([
                             $label ? 'odoo-form-control form-select-sm' : 'odoo-table-select', 
                             ($searchable && !$select2Selector) ? 'odoo-select2' : '',

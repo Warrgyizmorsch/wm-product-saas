@@ -1313,14 +1313,14 @@
                                     <thead class="table-light">
                                         <tr>
                                             @if($isAdmin)
-                                                <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="min-width:150px;">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</th>
+                                                <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 18%;">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</th>
                                             @endif
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold {{ !$isAdmin ? 'ps-3' : '' }}" style="min-width:280px;">{{ __('hrms.leave.leave_types') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:160px;">{{ __('hrms.leave.app.duration_timeline') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:75px;">{{ __('hrms.leave.days') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:95px;">{{ __('ui.status') ?? 'Status' }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:65px;">File</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width:110px;">{{ __('hrms.common.action') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold {{ !$isAdmin ? 'ps-3' : '' }}" style="width: 18%;">{{ __('hrms.leave.leave_types') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 16%;">{{ __('hrms.leave.app.duration_timeline') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">{{ __('hrms.leave.days') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 14%;">{{ __('ui.status') ?? 'Status' }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">File</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 18%;">{{ __('hrms.common.action') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody id="leavesTableBody">
@@ -1436,8 +1436,8 @@
                                                         <span class="text-muted">—</span>
                                                     @endif
                                                 </td>
-                                                <td class="text-end pe-3" style="min-width:110px;">
-                                                     <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
+                                                <td class="text-end pe-3" style="white-space: nowrap;">
+                                                     <div class="d-flex align-items-center justify-content-end gap-2 flex-nowrap">
                                                          {{-- Eye / detail button --}}
                                                          <button type="button"
                                                              class="btn btn-sm btn-soft-primary open-leave-detail-idx"
@@ -1447,6 +1447,37 @@
                                                              style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
                                                              <i class="feather-eye fs-14"></i>
                                                          </button>
+
+                                                         @if($isAdmin && $req->status !== 'cancelled')
+                                                             {{-- Status Dropdown --}}
+                                                             <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                                 <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 120px; border: none;" title="Change Status">
+                                                                     <span>{{ $statusBadge['lbl'] }}</span>
+                                                                 </button>
+                                                                 <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 130px; border-radius: 8px; left: auto; right: 0; background: #ffffff; z-index: 1050;">
+                                                                     @php
+                                                                         $actionsList = [
+                                                                             'pending' => __('hrms.leave.app.status_pending'),
+                                                                             'approved' => __('hrms.leave.app.status_approved'),
+                                                                             'rejected' => __('hrms.leave.app.status_rejected'),
+                                                                             'unauthorized' => __('hrms.leave.app.status_unauthorized'),
+                                                                             'unpaid' => __('hrms.leave.app.status_unpaid')
+                                                                         ];
+                                                                     @endphp
+                                                                     @foreach($actionsList as $actionKey => $actionLabel)
+                                                                         <li>
+                                                                             <form action="{{ route('hrms.leaves.update-status', $req->id) }}" method="POST">
+                                                                                 @csrf
+                                                                                 <input type="hidden" name="action" value="{{ $actionKey }}">
+                                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === $actionKey ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $req->status === $actionKey ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                                     <span>{{ $actionLabel }}</span>
+                                                                                 </button>
+                                                                             </form>
+                                                                         </li>
+                                                                     @endforeach
+                                                                 </ul>
+                                                             </div>
+                                                         @endif
 
                                                          {{-- Unified Withdraw / Cancellation Delete button --}}
                                                          @if($req->canWithdraw())

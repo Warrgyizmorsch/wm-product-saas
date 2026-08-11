@@ -728,7 +728,7 @@
 
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">Lead Source</div>
-                                            <div class="zoho-field-value text-dark">{{ $deal->lead_source ?: 'Direct' }}</div>
+                                            <div class="zoho-field-value text-dark">{{ ($deal->lead_source && !in_array($deal->lead_source, ['Select an Option', 'Select an option', 'Select Option'], true)) ? $deal->lead_source : '—' }}</div>
                                         </div>
                                     </div>
                                 </div>

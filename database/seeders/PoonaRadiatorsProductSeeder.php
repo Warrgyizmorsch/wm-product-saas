@@ -34,12 +34,39 @@ class PoonaRadiatorsProductSeeder extends Seeder
         $userId = $user?->id ?? 1;
 
         DB::transaction(function () use ($tenantId, $userId) {
+            $this->cleanupPreviousData($tenantId);
             $accounts = $this->ensureChartOfAccounts($tenantId);
             $uoms = $this->ensureUoms($tenantId);
             $warehouses = $this->ensureWarehouses($tenantId);
             $products = $this->seedProducts($tenantId, $uoms, $accounts);
             $this->seedInitialStock($tenantId, $products, $warehouses);
         });
+    }
+
+    /**
+     * Clean up previous stock transactions and warehouse stock balances for Poona Radiators products.
+     */
+    private function cleanupPreviousData(int $tenantId): void
+    {
+        $skus = [
+            'PR-RM-ALU-FIN-01',
+            'PR-RM-ALU-TUBE-F',
+            'PR-RM-TANK-PLATE',
+            'PR-RM-NOZZLE-45',
+            'PR-RM-BRAZE-FLUX',
+            'PR-SUB-CORE-750',
+            'PR-FG-RAD-750',
+        ];
+
+        $productIds = Product::where('tenant_id', $tenantId)
+            ->whereIn('sku', $skus)
+            ->pluck('id')
+            ->toArray();
+
+        if (!empty($productIds)) {
+            StockTransaction::where('tenant_id', $tenantId)->whereIn('product_id', $productIds)->delete();
+            ProductWarehouseStock::where('tenant_id', $tenantId)->whereIn('product_id', $productIds)->delete();
+        }
     }
 
     /**

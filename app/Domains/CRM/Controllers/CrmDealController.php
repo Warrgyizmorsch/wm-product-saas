@@ -131,13 +131,13 @@ class CrmDealController extends Controller
     {
         $tenantId = tenant_id() ?? 1;
         $accounts = CrmAccount::where('tenant_id', $tenantId)->orderBy('name')->get();
-        $selectedAccountId = $request->input('account_id');
-        $contacts = collect();
-        if ($selectedAccountId) {
-            $contacts = CrmContact::where('crm_account_id', $selectedAccountId)->orderBy('name')->get();
-        }
+        $selectedAccountId = $request->input('account_id') ?? $request->input('crm_account_id');
+        $contacts = $selectedAccountId 
+            ? CrmContact::where('crm_account_id', $selectedAccountId)->orderBy('name')->get()
+            : collect();
 
-        return view('modules.crm.deals.create', compact('accounts', 'contacts', 'selectedAccountId'));
+        $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
+        return view('modules.crm.deals.create', compact('accounts', 'contacts', 'selectedAccountId', 'products'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -176,6 +176,10 @@ class CrmDealController extends Controller
             'Lost'           => 0,
         ];
 
+        $rawItems = $request->input('items', []);
+        $rawProductIds = $request->input('product_ids', []);
+        $processed = app(\App\Domains\CRM\Services\LeadService::class)->processItems($rawItems, $rawProductIds);
+
         $deal = CrmDeal::create([
             'tenant_id'       => $tenantId,
             'crm_account_id'  => $validated['crm_account_id'],
@@ -188,7 +192,28 @@ class CrmDealController extends Controller
             'closing_date'    => $validated['closing_date'] ?? null,
             'lead_source'     => $validated['lead_source'] ?? null,
             'notes'           => $validated['notes'] ?? null,
+            'product_ids'     => $processed['product_ids'],
+            'product_items'   => $processed['product_items'],
         ]);
+
+        // Process any additional contacts submitted in form
+        $additional = $request->input('additional_contacts', []);
+        if (is_array($additional) && !empty($validated['crm_account_id'])) {
+            foreach ($additional as $add) {
+                if (empty($add['name'])) continue;
+                CrmContact::create([
+                    'tenant_id'      => $tenantId,
+                    'crm_account_id' => $validated['crm_account_id'],
+                    'name'           => $add['name'],
+                    'role'           => 'Additional Contact',
+                    'email'          => $add['email'] ?? null,
+                    'phone'          => $add['phone'] ?? null,
+                    'mobile'         => $add['phone'] ?? null,
+                    'is_primary'     => false,
+                    'status'         => 'active',
+                ]);
+            }
+        }
 
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal created successfully.');
     }
@@ -228,24 +253,30 @@ class CrmDealController extends Controller
         $leadDocuments = $linkedLead ? $linkedLead->leadDocuments : collect();
 
         $prefilledDealItems = [];
-        if ($linkedLead) {
+        $rawItems = $deal->product_items ?: [];
+        if (empty($rawItems) && !empty($deal->product_ids)) {
+            foreach ($deal->product_ids as $pid) {
+                $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
+            }
+        }
+        if (empty($rawItems) && $linkedLead) {
             $rawItems = $linkedLead->product_items ?: [];
             if (empty($rawItems) && !empty($linkedLead->product_ids)) {
                 foreach ($linkedLead->product_ids as $pid) {
                     $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
                 }
             }
-            foreach ($rawItems as $it) {
-                if (empty($it['product_id'])) continue;
-                $productObj = \App\Domains\Inventory\Models\Product::find($it['product_id']);
-                if ($productObj) {
-                    $prefilledDealItems[] = [
-                        'product_id' => $productObj->id,
-                        'quantity'   => floatval($it['quantity'] ?? 1),
-                        'unit_price' => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
-                        'tax_rate'   => floatval($productObj->gst_rate ?: 18),
-                    ];
-                }
+        }
+        foreach ($rawItems as $it) {
+            if (empty($it['product_id'])) continue;
+            $productObj = \App\Domains\Inventory\Models\Product::find($it['product_id']);
+            if ($productObj) {
+                $prefilledDealItems[] = [
+                    'product_id' => $productObj->id,
+                    'quantity'   => floatval($it['quantity'] ?? 1),
+                    'unit_price' => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
+                    'tax_rate'   => floatval($productObj->gst_rate ?: 18),
+                ];
             }
         }
 
@@ -256,9 +287,12 @@ class CrmDealController extends Controller
     {
         $tenantId = tenant_id() ?? 1;
         $accounts = CrmAccount::where('tenant_id', $tenantId)->orderBy('name')->get();
-        $contacts = CrmContact::where('crm_account_id', $deal->crm_account_id)->orderBy('name')->get();
+        $contacts = $deal->crm_account_id 
+            ? CrmContact::where('crm_account_id', $deal->crm_account_id)->orderBy('name')->get()
+            : collect();
+        $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
 
-        return view('modules.crm.deals.edit', compact('deal', 'accounts', 'contacts'));
+        return view('modules.crm.deals.edit', compact('deal', 'accounts', 'contacts', 'products'));
     }
 
     public function update(Request $request, CrmDeal $deal): RedirectResponse
@@ -298,7 +332,34 @@ class CrmDealController extends Controller
         ];
         $validated['probability'] = $probMap[$stage] ?? $deal->probability;
 
+        $rawItems = $request->input('items', []);
+        $rawProductIds = $request->input('product_ids', []);
+        $processed = app(\App\Domains\CRM\Services\LeadService::class)->processItems($rawItems, $rawProductIds);
+
+        $validated['product_ids'] = $processed['product_ids'];
+        $validated['product_items'] = $processed['product_items'];
+
         $deal->update($validated);
+
+        // Process any additional contacts submitted in form
+        $tenantId = tenant_id() ?? 1;
+        $additional = $request->input('additional_contacts', []);
+        if (is_array($additional) && !empty($validated['crm_account_id'])) {
+            foreach ($additional as $add) {
+                if (empty($add['name'])) continue;
+                CrmContact::create([
+                    'tenant_id'      => $tenantId,
+                    'crm_account_id' => $validated['crm_account_id'],
+                    'name'           => $add['name'],
+                    'role'           => 'Additional Contact',
+                    'email'          => $add['email'] ?? null,
+                    'phone'          => $add['phone'] ?? null,
+                    'mobile'         => $add['phone'] ?? null,
+                    'is_primary'     => false,
+                    'status'         => 'active',
+                ]);
+            }
+        }
 
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal updated successfully.');
     }

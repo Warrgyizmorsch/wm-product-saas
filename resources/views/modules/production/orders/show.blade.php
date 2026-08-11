@@ -84,13 +84,28 @@
         </x-ui.button>
 
         @if($order->isDraft())
-            {{-- Release Order Button --}}
-            <form method="POST" action="{{ route('production.orders.release', $order->id) }}" class="d-inline">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1.5">
-                    <i class="feather-play-circle"></i> {{ __('production.release_order') }}
-                </button>
-            </form>
+            @php
+                $latestSlip = $order->requisitionSlips->last();
+                $slipStatusLower = strtolower($latestSlip?->status ?? '');
+                $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
+            @endphp
+
+            @if($hasIssuedMaterial)
+                {{-- Release Order Button (Enabled) --}}
+                <form method="POST" action="{{ route('production.orders.release', $order->id) }}" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1.5">
+                        <i class="feather-play-circle"></i> {{ __('production.release_order') }}
+                    </button>
+                </form>
+            @else
+                {{-- Release Order Button (Disabled until store issues raw materials) --}}
+                <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Material issue required: Store must issue raw materials (fully or partially) before releasing order to shopfloor.">
+                    <button type="button" class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1.5 opacity-65" disabled>
+                        <i class="feather-lock"></i> {{ __('production.release_order') }}
+                    </button>
+                </span>
+            @endif
 
             {{-- Grouped Header Actions Dropdown --}}
             <x-ui.action-dropdown id="headerActionsDropdownDraft">
@@ -235,6 +250,27 @@
             Order Status: {{ ucfirst($order->status) }}
         @endif
     </x-ui.workflow-guide>
+
+    @php
+        $latestSlip = $order->requisitionSlips->last();
+        $slipStatusLower = strtolower($latestSlip?->status ?? '');
+        $isPartiallyIssued = in_array($slipStatusLower, ['partially issued', 'partial']);
+    @endphp
+
+    @if($isPartiallyIssued)
+        <div class="alert alert-warning border border-warning shadow-sm mb-3 d-flex align-items-center justify-content-between gap-3 rounded-3 p-3" role="alert">
+            <div class="d-flex align-items-center gap-2">
+                <i class="feather-alert-circle fs-18 text-warning-emphasis"></i>
+                <div>
+                    <strong class="text-warning-emphasis">Store Material Partially Issued:</strong>
+                    <span class="fs-13 text-dark">Raw materials for this Production Order have been partially issued by the store. Track issued and remaining items under <a href="?tab=vtab-procurement" class="fw-bold text-dark text-decoration-underline">Procurement & Requisitions</a>.</span>
+                </div>
+            </div>
+            <a href="?tab=vtab-procurement" class="btn btn-sm btn-warning text-dark fw-bold px-3 shadow-sm">
+                View Material Status
+            </a>
+        </div>
+    @endif
 
     <div class="erp-single-panel bg-white">
 
