@@ -120,14 +120,24 @@ $masterDefinitions = [
             ['component' => 'textarea', 'props' => ['label' => 'Address Details', 'name' => 'address', 'placeholder' => 'e.g. 123 Industrial Area, Block B', 'rows' => 2]],
         ],
     ],
+    'contact' => [
+        'label'  => 'Contact Person',
+        'route'  => 'crm.contacts.quick-create',
+        'fields' => [
+            ['component' => 'input', 'props' => ['label' => 'Contact Name', 'name' => 'name', 'placeholder' => 'e.g. Prakash Sharma', 'required' => true]],
+            ['component' => 'input', 'props' => ['label' => 'Designation', 'name' => 'designation', 'placeholder' => 'e.g. Purchase Manager']],
+            ['component' => 'input', 'props' => ['label' => 'Mobile / Phone', 'name' => 'phone', 'placeholder' => 'e.g. +91 9876543210']],
+            ['component' => 'input', 'props' => ['label' => 'Email Address', 'name' => 'email', 'placeholder' => 'e.g. prakash@company.com', 'type' => 'email']],
+        ],
+    ],
 ];
 @endphp
 
 @foreach($masters as $masterKey)
     @if(isset($masterDefinitions[$masterKey]))
         @php $def = $masterDefinitions[$masterKey]; @endphp
-        @if(\Illuminate\Support\Facades\Route::has($def['route']))
-        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" title="Quick Create {{ $def['label'] }}" size="{{ $masterKey === 'product' ? 'lg' : '' }}">
+        @if($masterKey === 'contact' || \Illuminate\Support\Facades\Route::has($def['route']))
+        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" title="Quick Create {{ $def['label'] }}" size="{{ in_array($masterKey, ['product', 'contact']) ? 'lg' : '' }}">
             @if($masterKey === 'product')
                 <!-- Handcrafted Premium Product Modal layout matching Inventory Create screen section headers -->
                 <div data-action="{{ route('products.quick-create') }}"
@@ -269,6 +279,43 @@ $masterDefinitions = [
                                 <option value="Raw Materials Stock">Raw Materials Stock</option>
                                 <option value="Finished Goods Stock">Finished Goods Stock</option>
                             </x-ui.odoo-form-ui>
+                        </div>
+                    </div>
+                </div>
+            @elseif($masterKey === 'contact')
+                <!-- Handcrafted Contact Person Modal layout -->
+                <div data-action="{{ route('crm.contacts.quick-create') }}"
+                     class="quick-create-form"
+                     id="quickCreateForm_contact">
+                    @csrf
+                    <div class="row g-3 text-dark fs-13">
+                        <div class="col-md-12">
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                label="Contact Name"
+                                name="name"
+                                placeholder="e.g. John Doe"
+                                :required="true"
+                            />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="tel"
+                                label="Mobile / Phone"
+                                name="phone"
+                                placeholder="e.g. +91 9876543210"
+                            />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="email"
+                                label="Email Address"
+                                name="email"
+                                placeholder="e.g. john.doe@gmail.com"
+                            />
                         </div>
                     </div>
                 </div>

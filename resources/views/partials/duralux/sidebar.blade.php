@@ -17,7 +17,7 @@
         'Revenue Cycle' => [
             ['label' => __('ui.crm'), 'icon' => 'feather-users', 'url' => '#', 'children' => [
                 ['label' => 'Accounts (Companies)', 'route' => 'crm.accounts.index'],
-                ['label' => 'Deals (Pipeline)', 'route' => 'crm.deals.kanban'],
+                ['label' => 'Deals (Pipeline)', 'route' => 'crm.deals.index'],
                 ['label' => 'Leads', 'route' => 'crm.leads.index'],
                 ['label' => 'Track Status', 'route' => 'crm.leads.trackStatus'],
                 ['label' => 'Customers', 'route' => 'crm.customers.index'],

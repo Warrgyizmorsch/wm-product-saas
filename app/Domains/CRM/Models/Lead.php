@@ -187,4 +187,24 @@ class Lead extends Model
     {
         return $this->belongsTo(CrmDeal::class, 'crm_deal_id');
     }
+
+    public function setSourceAttribute($value)
+    {
+        $this->attributes['source'] = (empty($value) || in_array($value, ['Select an Option', 'Select an option', 'Select Option'], true)) ? null : $value;
+    }
+
+    public function setPriorityAttribute($value)
+    {
+        $this->attributes['priority'] = (empty($value) || in_array($value, ['Select an Option', 'Select an option', 'Select Option'], true)) ? null : $value;
+    }
+
+    public function setSegmentAttribute($value)
+    {
+        $this->attributes['segment'] = (empty($value) || in_array($value, ['Select an Option', 'Select an option', 'Select Option'], true)) ? null : $value;
+    }
+
+    public function setIndustryTypeAttribute($value)
+    {
+        $this->attributes['industry_type'] = (empty($value) || in_array($value, ['Select an Option', 'Select an option', 'Select Option'], true)) ? null : $value;
+    }
 }

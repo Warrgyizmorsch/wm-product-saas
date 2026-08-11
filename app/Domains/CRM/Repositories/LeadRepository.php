@@ -261,7 +261,7 @@ class LeadRepository
                 'estimated_value' => $lead->expected_amount ?: 0.00,
                 'stage'           => 'Qualification',
                 'closing_date'    => $lead->expected_sale_date ?: now()->addDays(30),
-                'lead_source'     => $lead->source ?: 'Qualified Lead',
+                'lead_source'     => ($lead->source && !in_array($lead->source, ['Select an Option', 'Select an option', 'Select Option'], true)) ? $lead->source : null,
                 'probability'     => 40,
                 'owner_id'        => $lead->lead_owner_id ?: (auth()->id() ?: 1),
             ]);

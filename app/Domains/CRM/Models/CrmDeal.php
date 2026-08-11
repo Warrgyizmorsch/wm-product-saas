@@ -86,4 +86,9 @@ class CrmDeal extends BaseModel
         }
         return (float) $this->estimated_value;
     }
+
+    public function setLeadSourceAttribute($value)
+    {
+        $this->attributes['lead_source'] = (empty($value) || in_array($value, ['Select an Option', 'Select an option', 'Select Option'], true)) ? null : $value;
+    }
 }

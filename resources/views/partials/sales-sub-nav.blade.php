@@ -8,7 +8,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link pb-3 px-3 @if(Route::is('crm.deals.*')) active fw-bold text-primary border-bottom border-primary border-2 @else text-muted border-0 @endif" href="{{ route('crm.deals.kanban') }}">
+                    <a class="nav-link pb-3 px-3 @if(Route::is('crm.deals.*')) active fw-bold text-primary border-bottom border-primary border-2 @else text-muted border-0 @endif" href="{{ route('crm.deals.index') }}">
                         <i class="feather-git-branch me-1"></i> Deals
                     </a>
                 </li>
