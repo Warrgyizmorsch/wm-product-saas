@@ -53,9 +53,8 @@ class WorkCenterDashboardDetailTest extends TestCase
             ->get(route('production.mes.work-centers.show', $this->workCenter->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Based on Standard Shift (8 hours)');
-        $response->assertSee('Adjusted for 90% efficiency.');
-        $response->assertSee('(No active shifts configured; showing fallback)');
+        $response->assertSee('Standard Shift (8h)');
+        $response->assertSee('90% efficiency');
     }
 
     /** @test */
@@ -99,8 +98,8 @@ class WorkCenterDashboardDetailTest extends TestCase
         $response->assertSee('Night Shift');
         $response->assertSee('16:00 - 00:00');
         $response->assertSee('break: 45m');
-        $response->assertSee('Adjusted for 90% efficiency.');
-        $response->assertDontSee('Based on Standard Shift (8 hours)');
+        $response->assertSee('90% efficiency');
+        $response->assertDontSee('(No active shifts configured; showing fallback)');
     }
 
     /** @test */

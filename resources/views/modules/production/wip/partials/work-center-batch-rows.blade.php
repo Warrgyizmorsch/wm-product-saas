@@ -17,14 +17,16 @@
         <td class="text-end text-success fw-bold">{{ number_format($sw->completed_quantity, 2) }}</td>
         <td class="text-end text-primary fw-bold">{{ format_currency($sw->total_value) }}</td>
         <td>
-            @if($sw->status === 'active')
-                <span class="badge bg-soft-success text-success text-uppercase">Active</span>
+            @if($sw->status === 'transferred')
+                <span class="badge bg-soft-info text-info text-uppercase fs-10">Transferred</span>
+            @elseif($sw->status === 'active')
+                <span class="badge bg-soft-success text-success text-uppercase fs-10">Active</span>
             @elseif($sw->status === 'quality_hold')
-                <span class="badge bg-soft-warning text-warning text-uppercase">Quality Hold</span>
+                <span class="badge bg-soft-warning text-warning text-uppercase fs-10">Quality Hold</span>
             @elseif($sw->status === 'rework')
-                <span class="badge bg-soft-danger text-danger text-uppercase">Rework</span>
+                <span class="badge bg-soft-danger text-danger text-uppercase fs-10">Rework</span>
             @else
-                <span class="badge bg-soft-secondary text-secondary text-uppercase">Completed</span>
+                <span class="badge bg-soft-secondary text-secondary text-uppercase fs-10">Completed</span>
             @endif
         </td>
         <td class="text-end">

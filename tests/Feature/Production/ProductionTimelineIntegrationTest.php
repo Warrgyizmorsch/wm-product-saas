@@ -148,7 +148,7 @@ class ProductionTimelineIntegrationTest extends TestCase
         ]);
 
         // 2. Order Release
-        $orderService->release($order->id, $this->user->id);
+        $orderService->release($order->id, $this->user->id, true);
 
         $this->assertDatabaseHas('production_event_timelines', [
             'tenant_id'           => $this->tenantId,

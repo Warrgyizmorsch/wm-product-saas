@@ -156,7 +156,6 @@ class ProductionExecutionService
             $op->processing_time_actual += $runMinutes;
             $op->quantity_produced += $produced;
             $op->quantity_rejected += $rejected;
-            $op->quantity_scrapped += $scrapped;
             $op->save();
 
             // 4. Update Batch actual_quantity ONLY on final routing operation (or on initial op when overproduction occurs)
@@ -804,5 +803,24 @@ class ProductionExecutionService
             ->where('is_default', true)
             ->value('id')
             ?? Warehouse::query()->where('tenant_id', $tenantId)->value('id');
+    }
+
+    /**
+     * Reconcile operation-level scrap quantity to ensure consistency with logged scrap records.
+     */
+    public function reconcileOperationQuantities(int $operationId): ProductionOrderOperation
+    {
+        $op = ProductionOrderOperation::findOrFail($operationId);
+
+        $scrapSum = (float) ProductionOrderScrap::where('production_order_operation_id', $op->id)->sum('quantity');
+        $logScrapSum = (float) ProductionOrderProgressLog::where('operation_id', $op->id)->sum('quantity_scrapped');
+        $actualScrap = max($scrapSum, $logScrapSum);
+
+        if (abs((float) $op->quantity_scrapped - $actualScrap) > 0.0001) {
+            $op->quantity_scrapped = $actualScrap;
+            $op->save();
+        }
+
+        return $op;
     }
 }

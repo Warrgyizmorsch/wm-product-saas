@@ -280,6 +280,75 @@
                             <tr class="p-0 border-0">
                                 <td colspan="9" class="p-0 border-0">
                                     <div class="collapse wip-order-collapse bg-light p-3 border-bottom shadow-inner" id="wip-group-{{ $orderId }}">
+                                        @php
+                                            $pipelines = $orderBatchPipelinesMap[$orderId] ?? collect();
+                                        @endphp
+
+                                        {{-- Visual Batch Pipeline Tracker --}}
+                                        @if($pipelines->isNotEmpty())
+                                            <div class="card border mb-3 bg-white shadow-2xs">
+                                                <div class="card-header bg-soft-primary py-2 px-3 d-flex justify-content-between align-items-center">
+                                                    <span class="fs-12 fw-bold text-primary text-uppercase">
+                                                        <i class="feather-git-commit me-1"></i> Live Batch Progress Pipeline ({{ $pipelines->count() }} {{ Str::plural('Batch', $pipelines->count()) }})
+                                                    </span>
+                                                    <span class="fs-11 text-muted">Real-time unit movement across operation stages</span>
+                                                </div>
+                                                <div class="card-body p-3">
+                                                    @foreach($pipelines as $pipeline)
+                                                        <div class="mb-2.5 last:mb-0 p-2.5 bg-light rounded border">
+                                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                <span class="fw-bold text-dark fs-12">
+                                                                    <i class="feather-box text-primary me-1"></i> Batch #{{ $pipeline['batch_number'] }}
+                                                                </span>
+                                                                <span class="badge bg-soft-info text-info border fs-10">
+                                                                    Planned: {{ number_format($pipeline['planned_quantity'], 2) }} units
+                                                                </span>
+                                                            </div>
+                                                            <div class="d-flex align-items-center flex-wrap gap-2">
+                                                                @foreach($pipeline['stages'] as $index => $stage)
+                                                                    <div class="d-flex align-items-center">
+                                                                        <div class="p-2 rounded border {{ ($stage['stage_status'] ?? '') === 'active' || $stage['is_current'] ? 'bg-soft-primary border-primary' : (($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']) ? 'bg-soft-success border-success-subtle' : 'bg-white') }}" style="min-width: 170px;">
+                                                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                                <strong class="fs-11 {{ ($stage['stage_status'] ?? '') === 'active' || $stage['is_current'] ? 'text-primary' : 'text-dark' }}">{{ $stage['operation_number'] }}</strong>
+                                                                                @if(($stage['stage_status'] ?? '') === 'active' || $stage['is_current'])
+                                                                                    <span class="badge bg-primary text-white fs-9">ACTIVE STAGE</span>
+                                                                                @elseif(($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']))
+                                                                                    <span class="badge bg-success text-white fs-9"><i class="feather-check me-0.5"></i>PASSED</span>
+                                                                                @else
+                                                                                    <span class="badge bg-secondary text-white fs-9">UPCOMING</span>
+                                                                                @endif
+                                                                            </div>
+                                                                            <div class="fs-10 text-muted text-truncate" title="{{ $stage['name'] }} ({{ $stage['work_center_name'] }})">
+                                                                                {{ $stage['name'] }}
+                                                                            </div>
+                                                                            <div class="fs-10 mt-1 d-flex gap-2">
+                                                                                <span class="text-success fw-bold" title="Good Output">
+                                                                                    ✓ {{ number_format($stage['good_output'], 0) }}
+                                                                                </span>
+                                                                                @if($stage['rejected'] > 0)
+                                                                                    <span class="text-warning fw-bold" title="Pending Rework">
+                                                                                        ⚙ {{ number_format($stage['rejected'], 0) }}
+                                                                                    </span>
+                                                                                @endif
+                                                                                @if($stage['scrapped'] > 0)
+                                                                                    <span class="text-danger fw-bold" title="Scrapped">
+                                                                                        ✗ {{ number_format($stage['scrapped'], 0) }}
+                                                                                    </span>
+                                                                                @endif
+                                                                            </div>
+                                                                        </div>
+                                                                        @if(!$loop->last)
+                                                                            <i class="feather-arrow-right text-muted mx-2 fs-14"></i>
+                                                                        @endif
+                                                                    </div>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
+
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <h6 class="fs-12 text-uppercase fw-bold text-dark mb-0">
                                                 <i class="feather-grid me-1 text-primary"></i> Work Center Breakdown for {{ $order->order_number ?? 'Order #' . $orderId }}

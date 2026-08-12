@@ -236,7 +236,7 @@
                     class="fw-bold text-primary text-decoration-underline">Operations Routing Tab</a> to begin execution.
             @else
                 Order released. Click <a href="javascript:void(0)" class="fw-bold text-primary text-decoration-underline"
-                    data-bs-toggle="modal" data-bs-target="#scheduleModal">Plan & Schedule Order</a> to plan work centers.
+                    data-bs-toggle="modal" data-bs-target="#scheduleModal">{{ __('production.generate_schedule') }}</a> to plan work centers.
             @endif
         @elseif($order->isInProgress())
             Production is active on shop floor. Track live progress in <a href="?tab=vtab-wip"
@@ -495,8 +495,7 @@
                                     </x-ui.table>
                                 @else
                                     <div class="alert alert-warning py-2 px-3 fs-12 mb-0">
-                                        <i class="feather-alert-triangle me-1"></i> No schedule has been generated for this
-                                        production order yet.
+                                        <i class="feather-alert-triangle me-1"></i> No schedule has been generated for this production order yet.
                                     </div>
                                 @endif
                             </div>

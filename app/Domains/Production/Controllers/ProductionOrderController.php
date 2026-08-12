@@ -206,6 +206,14 @@ class ProductionOrderController extends Controller
             }
         }
 
+        foreach ($order->operations as $op) {
+            try {
+                $this->executionService->reconcileOperationQuantities($op->id);
+            } catch (\Exception $e) {
+                // Fail-safe to avoid blocking page load
+            }
+        }
+
         // Get variance analysis calculations
         $costs = $this->costService->getCostAnalysis($order);
 
