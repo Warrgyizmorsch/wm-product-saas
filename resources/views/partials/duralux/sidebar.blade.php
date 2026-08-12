@@ -42,6 +42,7 @@
         __('ui.supply_chain') => [
             ['label' => 'Store', 'icon' => 'feather-archive', 'url' => '#', 'children' => [
                 ['label' => 'Material Requirements', 'route' => 'inventory.material-requirements.index'],
+                ['label' => 'MRP & Shortage Analysis', 'route' => 'inventory.mrp-shortage.index'],
                 ['label' => 'Material Requests (Prod)', 'route' => 'inventory.material-requests.index'],
                 ['label' => 'Dispatch Orders', 'route' => 'inventory.dispatches.index'],
             ]],
