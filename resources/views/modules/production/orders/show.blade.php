@@ -919,7 +919,7 @@
                                             <td class="text-center fw-semibold text-muted">#{{ $op->sequence }}</td>
                                             <td>
                                                 <div class="fw-bold text-dark">{{ $op->operation_number }}</div>
-                                                <small class="text-muted">{{ $op->name }}</small>
+                                                <small class="text-muted">{{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</small>
                                             </td>
                                             <td>{{ $op->workCenter->name }}</td>
                                             <td>{{ $op->machine->name ?? 'Any' }}</td>
@@ -2079,7 +2079,7 @@
                     id="op_select_id" :required="true">
                     @foreach($order->operations as $op)
                         @if($op->status !== 'completed')
-                            <option value="{{ $op->id }}">{{ $op->operation_number }} — {{ $op->name }}</option>
+                            <option value="{{ $op->id }}">{{ $op->operation_number }} — {{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</option>
                         @endif
                     @endforeach
                 </x-ui.odoo-form-ui>
@@ -2197,15 +2197,23 @@
 
                     statsContainer.classList.remove('d-none');
 
+                    // Calculate cumulative scrap from preceding operations in sequence order
+                    const precedingScrap = operationsData
+                        .filter(o => o.sequence < op.sequence)
+                        .reduce((acc, o) => acc + parseFloat(o.quantity_scrapped || 0), 0);
+
+                    // Operation target equals order planned quantity minus preceding scrapped units
+                    const opTarget = Math.max(0, plannedQty - precedingScrap);
+
                     const produced = parseFloat(op.quantity_produced || 0);
                     const rejected = parseFloat(op.quantity_rejected || 0);
                     const scrapped = parseFloat(op.quantity_scrapped || 0);
 
-                    // Remaining Limit is target - (already produced + already rejected + already scrapped)
+                    // Remaining Limit for this operation is opTarget - (already produced + already rejected + already scrapped)
                     const processed = produced + rejected + scrapped;
-                    const remaining = Math.max(0, plannedQty - processed);
+                    const remaining = Math.max(0, opTarget - processed);
 
-                    statPlanned.textContent = plannedQty.toFixed(2);
+                    statPlanned.textContent = opTarget.toFixed(2);
                     statRemaining.textContent = remaining.toFixed(2);
                     statProduced.textContent = produced.toFixed(2);
                     statRejected.textContent = rejected.toFixed(2);

@@ -1285,7 +1285,7 @@ class ProductionWipService
 
             $currentOpSeq = $batch->currentOperation?->sequence ?? 0;
 
-            $stages = $operations->map(function ($op) use ($logs, $scraps, $reworks, $batch, $currentOpSeq) {
+            $stages = $operations->map(function ($op) use ($order, $logs, $scraps, $reworks, $batch, $currentOpSeq) {
                 $opLogs = $logs->where('operation_id', $op->id);
                 $produced = (float) $opLogs->sum('quantity_produced');
                 $rejected = (float) $opLogs->sum('quantity_rejected');
@@ -1302,6 +1302,26 @@ class ProductionWipService
                 $isPassed = ($op->sequence < $currentOpSeq) || ($batch->status === 'completed') || ($op->status === 'completed');
                 $stageStatus = $isCurrent ? 'active' : ($isPassed ? 'passed' : 'upcoming');
 
+                $qcRequired = (bool) ($op->routingOperation?->quality_required);
+                $qcInspection = \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $order->tenant_id)
+                    ->where('production_order_id', $order->id)
+                    ->where(function ($q) use ($op) {
+                        $q->where('production_order_operation_id', $op->id)
+                          ->orWhereNull('production_order_operation_id');
+                    })
+                    ->when($batch->id, function ($q) use ($batch) {
+                        $q->where(fn($sub) => $sub->whereNull('batch_id')->orWhere('batch_id', $batch->id));
+                    })
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                $qcStatus = 'none';
+                if ($qcInspection) {
+                    $qcStatus = $qcInspection->result; // passed, hold, failed
+                } elseif ($qcRequired) {
+                    $qcStatus = 'required';
+                }
+
                 return [
                     'operation_id' => $op->id,
                     'sequence' => $op->sequence,
@@ -1314,6 +1334,8 @@ class ProductionWipService
                     'is_current' => $isCurrent,
                     'is_passed' => $isPassed,
                     'stage_status' => $stageStatus,
+                    'qc_required' => $qcRequired,
+                    'qc_status' => $qcStatus,
                 ];
             });
 

@@ -64,6 +64,76 @@ class QualityInspectionService
     }
 
     /**
+     * Create and auto-approve a quick inline operator quality inspection for an operation or batch.
+     */
+    public function quickOperatorInspection(int $tenantId, array $data, ?int $userId = null): ProductionQualityInspection
+    {
+        return DB::transaction(function () use ($tenantId, $data, $userId) {
+            $orderOpId = $data['production_order_operation_id'] ?? null;
+            $orderOp = $orderOpId ? \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)->find($orderOpId) : null;
+            $orderId = $data['production_order_id'] ?? ($orderOp?->production_order_id);
+            $batchId = $data['batch_id'] ?? null;
+            $result = $data['result'] ?? 'passed'; // passed, hold, failed
+            $remarks = $data['remarks'] ?? 'Quick operator inspection completed.';
+
+            // Look up existing quality plan for product or fallback
+            $planId = $data['quality_plan_id'] ?? null;
+            if (!$planId && $orderId) {
+                $order = \App\Domains\Production\Models\ProductionOrder::find($orderId);
+                $planId = ProductionQualityPlan::where('tenant_id', $tenantId)
+                    ->where('product_id', $order?->product_id)
+                    ->value('id');
+            }
+
+            if (!$planId) {
+                $planId = ProductionQualityPlan::where('tenant_id', $tenantId)->value('id');
+            }
+
+            // Create quality plan if none exists for tenant
+            if (!$planId) {
+                $plan = ProductionQualityPlan::create([
+                    'tenant_id' => $tenantId,
+                    'name' => 'Standard In-Process Quality Plan',
+                    'code' => 'QP-STD-' . rand(100, 999),
+                    'type' => $data['stage'] ?? 'in_process',
+                    'status' => 'approved',
+                    'created_by' => $userId ?? auth()->id() ?? 1,
+                ]);
+                $planId = $plan->id;
+            }
+
+            $inspection = ProductionQualityInspection::create([
+                'tenant_id' => $tenantId,
+                'quality_plan_id' => $planId,
+                'inspection_number' => 'INSP-OP-' . date('Ymd') . '-' . rand(1000, 9999),
+                'stage' => $data['stage'] ?? 'in_process',
+                'status' => 'approved',
+                'result' => $result,
+                'production_order_id' => $orderId,
+                'production_order_operation_id' => $orderOpId,
+                'machine_id' => $orderOp?->machine_used_id ?? $orderOp?->machine_id,
+                'operator_id' => $userId ?? auth()->id(),
+                'batch_id' => $batchId,
+                'remarks' => $remarks,
+                'inspected_at' => now(),
+            ]);
+
+            $this->eventService->writeEvent($tenantId, [
+                'production_order_id' => $orderId,
+                'production_order_operation_id' => $orderOpId,
+                'operator_id' => $userId ?? auth()->id(),
+                'event_type' => 'Quick Quality Check',
+                'title' => 'Operator Quality Inspection Submitted',
+                'description' => "Quality check result: [{$result}] for operation #{$orderOpId}.",
+                'severity' => ($result === 'passed') ? 'info' : 'warning',
+                'event_source' => 'QualityInspectionService',
+            ]);
+
+            return $inspection;
+        });
+    }
+
+    /**
      * Record results for inspection parameters and evaluate pass/fail criteria.
      */
     public function recordResults(int $inspectionId, array $resultsData, ?int $tenantId = null): void

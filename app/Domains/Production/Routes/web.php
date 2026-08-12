@@ -252,6 +252,7 @@ Route::prefix('production')
         // ── Phase 4 Quality Management ──────────────────────────────────────
         Route::get('quality/dashboard', [QualityDashboardController::class, 'index'])->name('quality.dashboard');
 
+        Route::post('quality/quick-inspection', [QualityInspectionController::class, 'operatorQuickInspection'])->name('quality.inspections.quick');
         Route::post('quality/inspections/{id}/results', [QualityInspectionController::class, 'saveResults'])->name('quality.inspections.results');
         Route::post('quality/inspections/{id}/approve', [QualityInspectionController::class, 'approve'])->name('quality.inspections.approve');
         Route::resource('quality/inspections', QualityInspectionController::class)->only(['index', 'create', 'store', 'show']);

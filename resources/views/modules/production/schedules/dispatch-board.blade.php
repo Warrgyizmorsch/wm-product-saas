@@ -98,18 +98,18 @@
                     <button class="btn btn-sm btn-outline-dark dropdown-toggle d-inline-flex align-items-center gap-1.5 fs-12" type="button" id="btnShiftModeToggle" data-bs-toggle="dropdown" aria-expanded="false" title="Shift Mode determines how downstream operations react to schedule moves">
                         <i class="feather-git-commit text-primary"></i> <span id="currentShiftModeLabel">Ripple Shift</span>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end fs-12 shadow" aria-labelledby="btnShiftModeToggle">
+                    <ul class="dropdown-menu dropdown-menu-end fs-12 shadow p-2" aria-labelledby="btnShiftModeToggle" style="min-width: 300px; max-width: 360px;">
                         <li>
-                            <a class="dropdown-item active" href="javascript:void(0)" id="optShiftRipple" onclick="setShiftMode('ripple')">
-                                <strong><i class="feather-check me-1 text-success d-inline" id="iconRippleCheck"></i> Ripple Shift</strong>
-                                <div class="text-muted fs-11 ms-3">Recalculates downstream dependent operations automatically.</div>
+                            <a class="dropdown-item active rounded p-2 text-wrap" href="javascript:void(0)" id="optShiftRipple" onclick="setShiftMode('ripple')">
+                                <div class="fw-bold mb-1"><i class="feather-check me-1 text-success d-inline" id="iconRippleCheck"></i> Ripple Shift</div>
+                                <div class="text-muted fs-11 text-wrap lh-sm ms-3">Recalculates downstream dependent operations automatically.</div>
                             </a>
                         </li>
-                        <li><hr class="dropdown-divider"></li>
+                        <li><hr class="dropdown-divider my-1"></li>
                         <li>
-                            <a class="dropdown-item" href="javascript:void(0)" id="optShiftIsolated" onclick="setShiftMode('isolated')">
-                                <strong><i class="feather-check me-1 text-success d-none" id="iconIsolatedCheck"></i> Isolated Shift</strong>
-                                <div class="text-muted fs-11 ms-3">Moves only target operation; rejects moves that break dependencies.</div>
+                            <a class="dropdown-item rounded p-2 text-wrap" href="javascript:void(0)" id="optShiftIsolated" onclick="setShiftMode('isolated')">
+                                <div class="fw-bold mb-1"><i class="feather-check me-1 text-success d-none" id="iconIsolatedCheck"></i> Isolated Shift</div>
+                                <div class="text-muted fs-11 text-wrap lh-sm ms-3">Moves only target operation; rejects moves that break dependencies.</div>
                             </a>
                         </li>
                     </ul>

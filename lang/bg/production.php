@@ -270,6 +270,8 @@ return [
     'operations_count' => 'Операции',
     'effective_from' => 'В сила от',
     'effective_to' => 'В сила до',
+    'immediate' => 'Незабавно',
+    'indefinite' => 'За неопределено време',
     'routing_type' => 'Тип',
     'primary' => 'Основен',
     'alternative' => 'Алтернативен',
