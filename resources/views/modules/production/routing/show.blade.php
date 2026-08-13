@@ -74,9 +74,17 @@
 
                 @if ($routing->isPendingApproval())
                     @can('approve', $routing)
-                        <form action="{{ route('production.routing.approve', $routing->id) }}" method="POST" class="d-inline">
+                        <form action="{{ route('production.routing.approve', $routing->id) }}" method="POST" class="d-inline" id="approveRoutingForm">
                             @csrf
-                            <button type="submit" class="btn btn-success btn-sm px-3" onclick="return confirm(@js(__('production.confirm_approve_routing')));">
+                            <button type="button" class="btn btn-success btn-sm px-3" onclick="confirmAction({
+                                title: 'Approve & Activate Routing',
+                                message: @js(__('production.confirm_approve_routing')),
+                                confirmText: 'Approve & Activate',
+                                variant: 'success',
+                                onConfirm: function() {
+                                    document.getElementById('approveRoutingForm').submit();
+                                }
+                            })">
                                 <i class="feather-check-circle me-1"></i>{{ __('production.approve_activate') }}
                             </button>
                         </form>
@@ -415,6 +423,8 @@
             </div>
         </div>
     </div>
+
+    <x-ui.confirmation-modal />
 
     @push('scripts')
         <script>

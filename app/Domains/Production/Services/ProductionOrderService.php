@@ -333,7 +333,7 @@ class ProductionOrderService
     /**
      * Release order to shop floor execution.
      */
-    public function release(int $id, ?int $userId = null): void
+    public function release(int $id, ?int $userId = null, bool $force = false): void
     {
         $order = ProductionOrder::findOrFail($id);
 
@@ -341,12 +341,16 @@ class ProductionOrderService
             throw new InvalidArgumentException('Only draft orders can be released.');
         }
 
-        $latestSlip = $order->requisitionSlips()->latest('id')->first();
-        $slipStatusLower = strtolower($latestSlip?->status ?? '');
-        $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
+        if (!$force) {
+            $latestSlip = $order->requisitionSlips()->latest('id')->first();
+            if ($latestSlip) {
+                $slipStatusLower = strtolower($latestSlip->status ?? '');
+                $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
 
-        if (!$hasIssuedMaterial) {
-            throw new InvalidArgumentException('Cannot release order: Raw materials must be fully or partially issued by the store department first.');
+                if (!$hasIssuedMaterial) {
+                    throw new InvalidArgumentException('Cannot release order: Raw materials must be fully or partially issued by the store department first.');
+                }
+            }
         }
 
         $order->status = ProductionOrder::STATUS_RELEASED;

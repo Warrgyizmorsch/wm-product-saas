@@ -104,7 +104,7 @@ class ProductionSchedulingAndTraceabilityWiringTest extends TestCase
             'end_date'         => now()->addDays(3)->toDateString(),
         ], $this->tenantId, $this->user->id);
 
-        $orderService->release($order->id, $this->user->id);
+        $orderService->release($order->id, $this->user->id, true);
 
         $schedulingService = app(SchedulingService::class);
 

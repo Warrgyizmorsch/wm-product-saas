@@ -54,11 +54,13 @@ class WipController extends Controller
         $perPage = min(max((int) $request->input('per_page', 10), 1), 50);
         $ordersPaginator = $this->wipService->getConsolidatedOrderWipSummaries($tenantId, $search, $status, $perPage);
 
-        // Pre-aggregate Work-Center summaries for orders on the current page
+        // Pre-aggregate Work-Center summaries & Batch Pipeline data for orders on the current page
         $orderSummariesMap = [];
+        $orderBatchPipelinesMap = [];
         foreach ($ordersPaginator->items() as $order) {
             $summaries = $this->wipService->getWorkCenterWipSummaries($tenantId, $order->id, $workCenterIdFilter);
             $orderSummariesMap[$order->id] = $summaries;
+            $orderBatchPipelinesMap[$order->id] = $this->wipService->getBatchPipelineData($order->id);
         }
 
         // Flat card fallback view query
@@ -113,6 +115,7 @@ class WipController extends Controller
             'viewMode',
             'ordersPaginator',
             'orderSummariesMap',
+            'orderBatchPipelinesMap',
             'workCenters',
             'workCenterIdFilter',
             'warehouses'

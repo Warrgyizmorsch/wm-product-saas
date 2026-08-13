@@ -258,6 +258,8 @@ class SchedulingService
                     'priority' => $priority,
                     'planned_start' => $plannedStart,
                     'planned_finish' => $plannedFinish,
+                    'baseline_start' => $plannedStart,
+                    'baseline_finish' => $plannedFinish,
                     'planned_duration_minutes' => $duration,
                     'status' => $op->sequence === $operations->first()->sequence
                         ? ProductionScheduleOperation::STATUS_READY
@@ -434,6 +436,8 @@ class SchedulingService
                     'priority' => $priority,
                     'planned_start' => $plannedStart,
                     'planned_finish' => $plannedFinish,
+                    'baseline_start' => $plannedStart,
+                    'baseline_finish' => $plannedFinish,
                     'planned_duration_minutes' => $duration,
                     'status' => ProductionScheduleOperation::STATUS_WAITING,
                     'warnings' => $warnings,
@@ -522,7 +526,9 @@ class SchedulingService
                 $isParallel = $orderOp ? $orderOp->is_parallel : false;
                 $parallelGroup = $orderOp ? $orderOp->parallel_group : null;
 
-                if ($op->locked) {
+                $isFrozen = $op->locked || $op->isTerminal() || $op->isRunning() || $op->isPaused();
+
+                if ($isFrozen) {
                     $scheduledData[] = [
                         'sequence' => $op->sequence,
                         'parallel_group' => $parallelGroup,
@@ -1973,7 +1979,7 @@ class SchedulingService
                     ProductionScheduleOperation::STATUS_RUNNING,
                     ProductionScheduleOperation::STATUS_PAUSED,
                     ProductionScheduleOperation::STATUS_COMPLETED
-                ]) || !is_null($op->actual_start) || !is_null($op->actual_finish);
+                ]) || !is_null($op->actual_start) || !is_null($op->actual_finish) || (bool) $op->locked;
 
                 if ($isFrozen) {
                     $frozenOpIds[] = $op->id;

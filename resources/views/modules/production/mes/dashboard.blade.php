@@ -585,7 +585,7 @@
                             );
                             $activeRemainingToComplete = max(0.0, ($activeOp->schedule->order->quantity_ordered ?? 0.0) - (($activeOp->orderOperation->quantity_produced ?? 0.0) + $activeScrapQty + ($activeOp->orderOperation->quantity_rejected ?? 0.0)));
                         @endphp
-                        <x-ui.modal id="completeModal{{ $activeOp->id }}" title="{{ __('production.log_production_progress') }} — {{ $activeOp->orderOperation->name ?? 'Op #' . $activeOp->sequence }}" class="text-start">
+                        <x-ui.modal id="completeModal{{ $activeOp->id }}" title="{{ __('production.log_production_progress') }} — {{ html_entity_decode($activeOp->orderOperation->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}" class="text-start">
                             <form method="POST" action="{{ route('production.mes.complete', $activeOp->id) }}" id="completeForm{{ $activeOp->id }}">
                                 @csrf
                                 <div class="row g-3">
@@ -593,10 +593,10 @@
                                         <x-ui.odoo-form-ui type="input" label="{{ __('production.produced') }}" name="quantity_produced" inputType="number" step="any" value="{{ $activeRemainingToComplete }}" :required="true" />
                                     </div>
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="{{ __('production.rejects') ?? 'Qty Rejected' }}" name="quantity_rejected" inputType="number" step="any" value="0" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('production.rejects') }}" name="quantity_rejected" inputType="number" step="any" value="0" />
                                     </div>
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="{{ __('production.scrapped') ?? 'Qty Scrapped' }}" name="quantity_scrapped" inputType="number" step="any" value="0" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('production.scrapped') }}" name="quantity_scrapped" inputType="number" step="any" value="0" />
                                     </div>
                                     <div class="col-md-6">
                                         <x-ui.odoo-form-ui type="input" label="{{ __('production.setup_adjustment') }} (min)" name="setup_minutes" inputType="number" step="any" value="0" />
@@ -605,7 +605,7 @@
                                         <x-ui.odoo-form-ui type="input" label="{{ __('production.run_time_min') }}" name="run_minutes" inputType="number" step="any" value="{{ $elapsedMinutes }}" />
                                     </div>
                                     <div class="col-md-12">
-                                        <x-ui.odoo-form-ui type="textarea" label="{{ __('production.revision_notes') ?? 'Remarks' }}" name="remarks" placeholder="Optional completion notes..." />
+                                        <x-ui.odoo-form-ui type="textarea" label="{{ __('production.revision_notes') }}" name="remarks" placeholder="Optional completion notes..." />
                                     </div>
                                 </div>
                             </form>

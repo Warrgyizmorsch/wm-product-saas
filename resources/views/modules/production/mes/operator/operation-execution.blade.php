@@ -1,7 +1,7 @@
 @extends('layouts.duralux')
 
 @section('title', 'MES Execute Operation | SaaS ERP')
-@section('page-title', 'Execute Operation: ' . ($op->name ?? '—'))
+@section('page-title', 'Execute Operation: ' . html_entity_decode($op->name ?? '—', ENT_QUOTES, 'UTF-8'))
 @section('breadcrumb', 'Execute Operation')
 
 @push('styles')
@@ -19,12 +19,7 @@
             min-height: 44px;
             font-weight: 600;
         }
-        .btn-touch-large {
-            min-height: 50px;
-            font-size: 15px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
+        
     </style>
 @endpush
 
@@ -79,9 +74,9 @@
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <div>
                 <x-ui.badge variant="secondary" soft class="font-monospace mb-2">{{ $op->operation_number ?? 'OP-??' }}</x-ui.badge>
-                <h3 class="fw-bold text-dark mb-1">{{ $op->name }}</h3>
+                <h3 class="fw-bold text-dark mb-1">{{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</h3>
                 <p class="text-muted fs-13 mb-0">
-                    Order: <strong class="text-dark">{{ $order->order_number }}</strong> | Product: <strong class="text-dark">{{ $order->product->name }}</strong>
+                    Order: <strong class="text-dark">{{ $order->order_number }}</strong> | Product: <strong class="text-dark">{{ html_entity_decode($order->product->name ?? '', ENT_QUOTES, 'UTF-8') }}</strong>
                     | Mode: <x-ui.badge variant="info" soft class="font-monospace ms-1">{{ strtoupper($order->production_mode) }}</x-ui.badge>
                 </p>
             </div>
@@ -103,7 +98,7 @@
         <div class="row g-4 mb-4">
             <div class="col-lg-6">
                 <x-ui.card :title="__('production.touch_controls')" class="h-100 border">
-                    <div class="d-flex flex-column justify-content-center p-2">
+                    <div class="d-flex flex-column h-100 justify-content-between p-2">
                         @if($scheduleOp && ($scheduleOp->status === 'running' || $scheduleOp->status === 'paused'))
                             <div class="text-center mb-4 bg-light py-3 rounded border">
                                 <div class="text-muted fs-11 uppercase font-semibold mb-1">Active Execution Time</div>
@@ -117,7 +112,7 @@
                             </div>
                         @endif
 
-                        <div class="row g-3">
+                        <div class="row g-2">
                             @if($op->status !== 'running' && $op->status !== 'paused' && $op->status !== 'completed')
                                 <div class="col-12">
                                     <form method="POST" action="{{ route('production.mes.start', optional($scheduleOp)->id ?? $op->id) }}">
@@ -130,7 +125,7 @@
                             @endif
 
                             @if($op->status === 'running')
-                                <div class="col-4">
+                                <div class="col">
                                     <x-ui.button variant="warning" icon="feather-pause" class="btn-touch-large w-100" data-bs-toggle="modal" data-bs-target="#pauseModal">
                                         PAUSE
                                     </x-ui.button>
@@ -138,7 +133,7 @@
                             @endif
 
                             @if($op->status === 'paused')
-                                <div class="col-4">
+                                <div class="col">
                                     <form method="POST" action="{{ route('production.mes.resume', optional($scheduleOp)->id ?? $op->id) }}" class="w-100">
                                         @csrf
                                         <x-ui.button type="submit" variant="success" icon="feather-play" class="btn-touch-large w-100">
@@ -149,12 +144,25 @@
                             @endif
 
                             @if($op->status === 'running' || $op->status === 'paused')
-                                <div class="col-4">
+                                @php
+                                    $isQcRequired = (bool) ($op->routingOperation?->quality_required ?? $op->quality_required ?? false);
+                                @endphp
+
+                                <div class="col">
                                     <x-ui.button variant="info" icon="feather-edit-3" class="btn-touch-large w-100 text-white" data-bs-toggle="modal" data-bs-target="#logProgressModal">
                                         LOG PROGRESS
                                     </x-ui.button>
                                 </div>
-                                <div class="col-4">
+
+                                @if($isQcRequired)
+                                    <div class="col">
+                                        <x-ui.button variant="warning" icon="feather-shield-check" class="btn-touch-large w-100 text-dark" data-bs-toggle="modal" data-bs-target="#quickQcModal">
+                                            QC CHECK
+                                        </x-ui.button>
+                                    </div>
+                                @endif
+
+                                <div class="col">
                                     <x-ui.button variant="primary" icon="feather-check-circle" class="btn-touch-large w-100" data-bs-toggle="modal" data-bs-target="#completeModal">
                                         COMPLETE
                                     </x-ui.button>
@@ -488,6 +496,56 @@
         label="Remarks / Instructions" 
         name="remarks" 
         placeholder="Specify instructions or skill requirements..." 
+        rows="3"
+    />
+</x-ui.modal>
+
+{{-- Operator Quick Quality Check Modal --}}
+<x-ui.modal
+    id="quickQcModal"
+    title="Operator Quality Inspection Check"
+    centered="true"
+    formAction="{{ route('production.quality.inspections.quick') }}"
+    submitText="Submit & Approve Quality Inspection"
+    closeText="Cancel"
+>
+    <input type="hidden" name="production_order_operation_id" value="{{ $op->id }}">
+    <input type="hidden" name="production_order_id" value="{{ $order->id }}">
+    <input type="hidden" name="stage" value="in_process">
+
+    <div class="alert alert-info py-2 fs-12 mb-3">
+        <i class="feather-shield me-1"></i> Perform inline quality inspection for <strong>{{ $op->name }}</strong> before completing.
+    </div>
+
+    <x-ui.odoo-form-ui type="select" label="Inspection Result" name="result" :required="true">
+        <option value="passed">PASSED — Meets Quality Standard</option>
+        <option value="hold">QUALITY HOLD — Requires QA Review</option>
+        <option value="failed">FAILED — Defective / NCR Generated</option>
+    </x-ui.odoo-form-ui>
+
+    <div class="mb-3">
+        <label class="form-label fw-semibold fs-12 text-uppercase text-dark mb-1">Quality Checklist Parameters</label>
+        <div class="p-2 border rounded bg-light fs-12">
+            <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" checked id="chkVisual">
+                <label class="form-check-label" for="chkVisual">Visual Surface & Finish Inspection Passed</label>
+            </div>
+            <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" checked id="chkDim">
+                <label class="form-check-label" for="chkDim">Dimensional Tolerance Check Within Specification</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" checked id="chkFunc">
+                <label class="form-check-label" for="chkFunc">Functional / Assembly Test Passed</label>
+            </div>
+        </div>
+    </div>
+
+    <x-ui.odoo-form-ui
+        type="textarea"
+        label="Inspection Remarks"
+        name="remarks"
+        placeholder="Enter measured dimensions, batch details, or quality observations..."
         rows="3"
     />
 </x-ui.modal>

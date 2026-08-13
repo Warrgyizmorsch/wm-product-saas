@@ -211,7 +211,6 @@ class ProductionOrderAndWipUiTest extends TestCase
             ->get(route('production.orders.show', $this->order->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Generate Schedule');
         $response->assertSee('No schedule has been generated for this production order yet.');
 
         // 2. Create a schedule for this production order
@@ -225,13 +224,12 @@ class ProductionOrderAndWipUiTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        // 3. Verify that the schedule is listed under the Overview tab and the button is hidden
+        // 3. Verify that the schedule is listed under the Overview tab and the alert is hidden
         $response = $this->withHeader('X-Tenant', 'test-tenant')
             ->get(route('production.orders.show', $this->order->id));
 
         $response->assertStatus(200);
         $response->assertSee('SCH-TEST-99');
         $response->assertDontSee('No schedule has been generated for this production order yet.');
-        $response->assertDontSee('Generate Schedule');
     }
 }

@@ -526,6 +526,14 @@ class ProductionWipService
             $destWip->available_quantity = round((float) $destWip->available_quantity + $quantity, 4);
             $destWip->save();
 
+            if ($wip->id !== $destWip->id) {
+                $wip->available_quantity = max(0.0000, round((float) $wip->available_quantity - $quantity, 4));
+                if ($wip->available_quantity <= 0.0001 && $wip->status === 'active') {
+                    $wip->status = 'transferred';
+                }
+                $wip->save();
+            }
+
             if ($batch && $toOrderOp->sequence >= ($batch->currentOperation?->sequence ?? 0)) {
                 $batch->current_operation_id = $toOrderOp->id;
                 $batch->save();
@@ -1158,7 +1166,8 @@ class ProductionWipService
     }
 
     /**
-     * Reconcile unbatched Main Order WIP card available quantity against active batch planned allocations.
+     * Reconcile Main Order WIP card and Batch stage WIP cards for a Production Order.
+     * Ensures transferred-out upstream stage cards do not retain duplicate active quantities.
      */
     public function reconcileOrderWipCards(int $orderId): void
     {
@@ -1167,29 +1176,178 @@ class ProductionWipService
             return;
         }
 
+        // 1. Reconcile Main Order (unbatched) WIP card
         $mainWip = ProductionWip::where('tenant_id', $order->tenant_id)
             ->where('production_order_id', $orderId)
             ->whereNull('production_batch_id')
             ->first();
 
-        if (!$mainWip) {
-            return;
+        if ($mainWip) {
+            $sumBatchPlanned = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $orderId)
+                ->whereNotIn('status', ['cancelled'])
+                ->sum('planned_quantity');
+
+            $unallocatedQty = max(0.0000, (float) $order->quantity_ordered - (float) $sumBatchPlanned);
+            $newStatus = ($unallocatedQty <= 0) ? 'completed' : ($mainWip->status === 'completed' ? 'active' : $mainWip->status);
+
+            $mainWip->update([
+                'available_quantity' => $unallocatedQty,
+                'quantity'           => $unallocatedQty,
+                'status'             => $newStatus,
+            ]);
         }
 
-        $sumBatchPlanned = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $order->tenant_id)
+        // 2. Reconcile Batch Stage WIP Cards
+        $batches = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $order->tenant_id)
             ->where('production_order_id', $orderId)
-            ->whereNotIn('status', ['cancelled'])
-            ->sum('planned_quantity');
+            ->get();
 
-        $unallocatedQty = max(0.0000, (float) $order->quantity_ordered - (float) $sumBatchPlanned);
+        foreach ($batches as $batch) {
+            $batchWips = ProductionWip::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $orderId)
+                ->where('production_batch_id', $batch->id)
+                ->get();
 
-        $newStatus = ($unallocatedQty <= 0) ? 'completed' : ($mainWip->status === 'completed' ? 'active' : $mainWip->status);
+            if ($batchWips->isEmpty()) {
+                continue;
+            }
 
-        $mainWip->update([
-            'available_quantity' => $unallocatedQty,
-            'quantity'           => $unallocatedQty,
-            'status'             => $newStatus,
-        ]);
+            // Find all transferred transactions for this batch
+            $transferredTxs = ProductionWipTransaction::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $orderId)
+                ->where('production_batch_id', $batch->id)
+                ->where('transaction_type', 'transferred')
+                ->get();
+
+            $transferredFromOpIds = $transferredTxs->pluck('from_operation_id')->filter()->unique()->toArray();
+
+            // Find the highest sequence operation card for this batch
+            $highestOpSeq = -1;
+            $latestWip = null;
+
+            foreach ($batchWips as $wip) {
+                $opSeq = $wip->currentRoutingOperation?->sequence ?? 0;
+                if ($opSeq >= $highestOpSeq) {
+                    $highestOpSeq = $opSeq;
+                    $latestWip = $wip;
+                }
+            }
+
+            foreach ($batchWips as $wip) {
+                $opId = $wip->current_routing_operation_id;
+                $isTransferredOut = in_array($opId, $transferredFromOpIds) && ($latestWip && $wip->id !== $latestWip->id);
+
+                if ($isTransferredOut) {
+                    if ((float) $wip->available_quantity > 0.0001 || $wip->status === 'active') {
+                        $wip->update([
+                            'available_quantity' => 0.0000,
+                            'status' => 'transferred',
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Get visual Batch Pipeline data for a Production Order.
+     */
+    public function getBatchPipelineData(int $orderId): \Illuminate\Support\Collection
+    {
+        $order = ProductionOrder::with(['operations.workCenter', 'operations.routingOperation'])->find($orderId);
+        if (!$order) {
+            return collect();
+        }
+
+        $batches = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $orderId)
+            ->orderBy('id')
+            ->get();
+
+        $operations = $order->operations->sortBy('sequence')->values();
+
+        return $batches->map(function ($batch) use ($order, $operations) {
+            $logs = \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->where('production_batch_id', $batch->id)
+                ->get();
+
+            $scraps = \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->where('production_batch_id', $batch->id)
+                ->get();
+
+            $reworks = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->where('production_batch_id', $batch->id)
+                ->get();
+
+            $currentOpSeq = $batch->currentOperation?->sequence ?? 0;
+
+            $stages = $operations->map(function ($op) use ($order, $logs, $scraps, $reworks, $batch, $currentOpSeq) {
+                $opLogs = $logs->where('operation_id', $op->id);
+                $produced = (float) $opLogs->sum('quantity_produced');
+                $rejected = (float) $opLogs->sum('quantity_rejected');
+                $scrapped = (float) $scraps->where('production_order_operation_id', $op->id)->sum('quantity');
+
+                $reworkCompleted = (float) $reworks->where('operation_id', $op->id)
+                    ->where('status', 'completed')
+                    ->sum('quantity');
+
+                $goodOutput = $produced + $reworkCompleted;
+                $activeRejects = max(0.0, $rejected - $reworkCompleted);
+
+                $isCurrent = ($batch->current_operation_id === $op->id);
+                $isPassed = ($op->sequence < $currentOpSeq) || ($batch->status === 'completed') || ($op->status === 'completed');
+                $stageStatus = $isCurrent ? 'active' : ($isPassed ? 'passed' : 'upcoming');
+
+                $qcRequired = (bool) ($op->routingOperation?->quality_required);
+                $qcInspection = \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $order->tenant_id)
+                    ->where('production_order_id', $order->id)
+                    ->where(function ($q) use ($op) {
+                        $q->where('production_order_operation_id', $op->id)
+                          ->orWhereNull('production_order_operation_id');
+                    })
+                    ->when($batch->id, function ($q) use ($batch) {
+                        $q->where(fn($sub) => $sub->whereNull('batch_id')->orWhere('batch_id', $batch->id));
+                    })
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                $qcStatus = 'none';
+                if ($qcInspection) {
+                    $qcStatus = $qcInspection->result; // passed, hold, failed
+                } elseif ($qcRequired) {
+                    $qcStatus = 'required';
+                }
+
+                return [
+                    'operation_id' => $op->id,
+                    'sequence' => $op->sequence,
+                    'operation_number' => $op->operation_number ?? 'OP-' . $op->sequence,
+                    'name' => $op->name,
+                    'work_center_name' => $op->workCenter?->name ?? 'Work Center',
+                    'good_output' => $goodOutput,
+                    'rejected' => $activeRejects,
+                    'scrapped' => $scrapped,
+                    'is_current' => $isCurrent,
+                    'is_passed' => $isPassed,
+                    'stage_status' => $stageStatus,
+                    'qc_required' => $qcRequired,
+                    'qc_status' => $qcStatus,
+                ];
+            });
+
+            return [
+                'batch_id' => $batch->id,
+                'batch_number' => $batch->batch_number,
+                'planned_quantity' => (float) $batch->planned_quantity,
+                'actual_quantity' => (float) $batch->actual_quantity,
+                'status' => $batch->status,
+                'stages' => $stages,
+            ];
+        });
     }
 
     /**
