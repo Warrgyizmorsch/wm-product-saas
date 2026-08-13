@@ -27,13 +27,13 @@
                 if (qty !== undefined && qty !== '') {
                     $('input[name="quantity_ordered"]').val(qty);
                 }
-                $('#sales_order_id').val(salesOrderId || '');
-                $('#sales_order_item_id').val(salesOrderItemId || '');
+                if (salesOrderId !== undefined && salesOrderId !== '') {
+                    $('#sales_order_id').val(salesOrderId);
+                }
+                if (salesOrderItemId !== undefined && salesOrderItemId !== '') {
+                    $('#sales_order_item_id').val(salesOrderItemId);
+                }
             });
-
-            if ($('#production_order_request_select').val()) {
-                $('#production_order_request_select').trigger('change');
-            }
 
             // Handle Sales Order item autofill
             $('#product_select').on('change', function () {
@@ -41,10 +41,10 @@
                 var qty = selectedOption.data('qty');
                 var soItemId = selectedOption.data('so-item-id');
                 
-                if (qty !== undefined) {
+                if (qty !== undefined && qty !== '') {
                     $('input[name="quantity_ordered"]').val(qty);
                 }
-                if (soItemId !== undefined) {
+                if (soItemId !== undefined && soItemId !== '') {
                     $('#sales_order_item_id').val(soItemId);
                 }
             });
@@ -127,6 +127,13 @@
             // Bind preview loading events
             $('#product_select, #bom_select').on('change', loadBOMPreview);
             $('input[name="quantity_ordered"]').on('input change', loadBOMPreview);
+
+            // Trigger change on page load if pre-selected
+            if ($('#production_order_request_select').val()) {
+                $('#production_order_request_select').trigger('change');
+            } else if ($('#product_select').val()) {
+                $('#product_select').trigger('change');
+            }
         });
     </script>
 @endpush
@@ -154,65 +161,54 @@
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
-                        @if(!isset($salesOrder) || !$salesOrder)
-                            <x-ui.odoo-form-ui type="select" :label="__('production.sales_order_request')" name="production_order_request_id" id="production_order_request_select">
-                                <option value="">{{ __('production.select_sales_request') }}</option>
-                                @foreach($productionOrderRequests as $request)
-                                    @php
-                                        $deliveryItem = $request->materialRequirementItem;
-                                        $delivery = $deliveryItem?->materialRequirement;
-                                        $sales = $delivery?->salesOrder ?? $deliveryItem?->salesOrderItem?->salesOrder;
-                                        $product = $request->product;
-                                    @endphp
-                                    <option value="{{ $request->id }}"
-                                        data-product-id="{{ $request->product_id }}"
-                                        data-qty="{{ $request->quantity_requested }}"
-                                        data-sales-order-id="{{ $sales?->id }}"
-                                        data-sales-order-item-id="{{ $deliveryItem?->sales_order_item_id }}"
-                                        @selected(old('production_order_request_id') == $request->id)>
-                                        {{ $sales?->sales_order_number ?? 'Sales Order #' . ($sales?->id ?? 'N/A') }}
-                                        @if($delivery)
-                                            / {{ $delivery->requirement_number }}
-                                        @endif
-                                        @if($product)
-                                            — {{ $product->name }} ({{ $product->sku }})
-                                        @endif
-                                        — Qty: {{ rtrim(rtrim(number_format((float) $request->quantity_requested, 2, '.', ''), '0'), '.') }}
+                        <x-ui.odoo-form-ui type="select" :label="__('production.sales_order_request')" name="production_order_request_id" id="production_order_request_select">
+                            <option value="">{{ __('production.select_sales_request') }}</option>
+                            @foreach($productionOrderRequests as $request)
+                                @php
+                                    $deliveryItem = $request->materialRequirementItem;
+                                    $delivery = $deliveryItem?->materialRequirement;
+                                    $sales = $delivery?->salesOrder ?? $deliveryItem?->salesOrderItem?->salesOrder;
+                                    $product = $request->product;
+                                @endphp
+                                <option value="{{ $request->id }}"
+                                    data-product-id="{{ $request->product_id }}"
+                                    data-qty="{{ $request->quantity_requested }}"
+                                    data-sales-order-id="{{ $sales?->id }}"
+                                    data-sales-order-item-id="{{ $deliveryItem?->sales_order_item_id }}"
+                                    @selected(old('production_order_request_id', $productionOrderRequestId ?? null) == $request->id)>
+                                    {{ $sales?->sales_order_number ?? 'Sales Order #' . ($sales?->id ?? 'N/A') }}
+                                    @if($delivery)
+                                        / {{ $delivery->requirement_number }}
+                                    @endif
+                                    @if($product)
+                                        — {{ $product->name }} ({{ $product->sku }})
+                                    @endif
+                                    — Qty: {{ rtrim(rtrim(number_format((float) $request->quantity_requested, 2, '.', ''), '0'), '.') }}
 
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        @endif
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+
+                        <input type="hidden" name="sales_order_id" id="sales_order_id" value="{{ old('sales_order_id', $salesOrder?->id) }}">
+                        <input type="hidden" name="sales_order_item_id" id="sales_order_item_id" value="{{ old('sales_order_item_id', $selectedSoItemId ?? '') }}">
 
                         @if(isset($salesOrder) && $salesOrder)
-                            <input type="hidden" name="sales_order_id" value="{{ $salesOrder->id }}">
-                            <input type="hidden" name="sales_order_item_id" id="sales_order_item_id" value="{{ old('sales_order_item_id') }}">
-
-                            <x-ui.odoo-form-ui type="input" label="Sales Order" name="sales_order_number" :value="$salesOrder->sales_order_number" readonly="true" style="font-weight: bold; background-color: #f8f9fa;" />
-
-                            <x-ui.odoo-form-ui type="select" :label="__('production.target_product_so')" name="product_id" id="product_select" :required="true">
-                                <option value="">{{ __('production.select_target_product') }}</option>
-                                @foreach($salesOrderItems as $item)
-                                    @if($item->product)
-                                        <option value="{{ $item->product->id }}" data-qty="{{ $item->quantity }}" data-so-item-id="{{ $item->id }}" @selected(old('product_id') == $item->product->id)>
-                                            {{ $item->product->name }} ({{ $item->product->sku }}) — Qty: {{ (int)$item->quantity }}
-                                        </option>
-                                    @endif
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        @else
-                            <input type="hidden" name="sales_order_id" id="sales_order_id" value="{{ old('sales_order_id') }}">
-                            <input type="hidden" name="sales_order_item_id" id="sales_order_item_id" value="{{ old('sales_order_item_id') }}">
-
-                            <x-ui.odoo-form-ui type="select" :label="__('production.target_product')" name="product_id" id="product_select" :required="true">
-                                <option value="">{{ __('production.select_finished_good') }}</option>
-                                @foreach($products as $product)
-                                    <option value="{{ $product->id }}" @selected(old('product_id') == $product->id)>
-                                        {{ $product->name }} ({{ $product->sku }})
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
+                            <x-ui.odoo-form-ui type="input" label="Sales Order Reference" name="sales_order_number" :value="$salesOrder->sales_order_number" readonly="true" style="font-weight: bold; background-color: #f8f9fa;" />
                         @endif
+
+                        <x-ui.odoo-form-ui type="select" :label="isset($salesOrder) && $salesOrder ? __('production.target_product_so') : __('production.target_product')" name="product_id" id="product_select" :required="true">
+                            <option value="">{{ __('production.select_target_product') }}</option>
+                            @foreach($products as $product)
+                                @php
+                                    $soItem = $salesOrderItems->firstWhere('product_id', $product->id);
+                                @endphp
+                                <option value="{{ $product->id }}"
+                                    @if($soItem) data-qty="{{ $soItem->quantity }}" data-so-item-id="{{ $soItem->id }}" @endif
+                                    @selected(($selectedProductId ?? null) == $product->id)>
+                                    {{ $product->name }} ({{ $product->sku }}) @if($soItem) — Qty: {{ (int)$soItem->quantity }} @endif
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
 
                         <x-ui.odoo-form-ui type="select" :label="__('production.bill_of_materials')" name="bom_id" id="bom_select">
                             <option value="">{{ __('production.auto_select_bom') }}</option>
@@ -242,7 +238,7 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.qty_to_manufacture')" name="quantity_ordered" inputType="number" placeholder="e.g. 10.0000" :value="old('quantity_ordered', '1.0000')" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.qty_to_manufacture')" name="quantity_ordered" inputType="number" placeholder="e.g. 10.0000" :value="old('quantity_ordered', $selectedQty ?? '1.0000')" :required="true" />
 
                         <x-ui.odoo-form-ui type="input" :label="__('production.start_date')" name="start_date" inputType="date" :value="old('start_date', date('Y-m-d'))" :required="true" />
                         

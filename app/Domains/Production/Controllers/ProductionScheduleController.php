@@ -29,7 +29,8 @@ class ProductionScheduleController extends Controller
         private readonly SchedulePreReleaseValidationService $validationService,
         private readonly CapacityLevelingService $capacityLevelingService,
         private readonly ProductionScheduleScenarioService $scenarioService
-    ) {}
+    ) {
+    }
 
     public function index(Request $request)
     {
@@ -41,10 +42,10 @@ class ProductionScheduleController extends Controller
             $search = '%' . $request->input('search') . '%';
             $query->where(function ($q) use ($search) {
                 $q->where('schedule_number', 'like', $search)
-                  ->orWhereHas('order', function ($o) use ($search) {
-                      $o->where('order_number', 'like', $search)
-                        ->orWhereHas('product', fn ($p) => $p->where('name', 'like', $search));
-                  });
+                    ->orWhereHas('order', function ($o) use ($search) {
+                        $o->where('order_number', 'like', $search)
+                            ->orWhereHas('product', fn($p) => $p->where('name', 'like', $search));
+                    });
             });
         }
 
@@ -57,7 +58,9 @@ class ProductionScheduleController extends Controller
         }
 
         if ($request->filled('start_date')) {
-            $query->whereHas('operations', fn ($q) =>
+            $query->whereHas(
+                'operations',
+                fn($q) =>
                 $q->where('planned_start', '>=', $request->input('start_date'))
             );
         }
@@ -93,9 +96,9 @@ class ProductionScheduleController extends Controller
         $tenantId = require_tenant_id();
 
         try {
-            $order     = ProductionOrder::findOrFail($request->validated()['production_order_id']);
+            $order = ProductionOrder::findOrFail($request->validated()['production_order_id']);
             $startDate = Carbon::parse($request->validated()['start_date']);
-            $type      = $request->validated()['scheduling_type'];
+            $type = $request->validated()['scheduling_type'];
 
             $schedule = $this->schedulingService->generateSchedule($order, $startDate, $type);
 
@@ -193,8 +196,8 @@ class ProductionScheduleController extends Controller
             $errorMsgs = collect($validationResult['errors'])->pluck('message')->implode(' ');
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
-                    'success'           => false,
-                    'message'           => 'Release blocked due to schedule errors: ' . $errorMsgs,
+                    'success' => false,
+                    'message' => 'Release blocked due to schedule errors: ' . $errorMsgs,
                     'validation_result' => $validationResult,
                 ], 422);
             }
@@ -206,10 +209,10 @@ class ProductionScheduleController extends Controller
             $warningMsgs = collect($validationResult['warnings'])->pluck('message')->implode(' ');
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
-                    'success'               => false,
+                    'success' => false,
                     'requires_confirmation' => true,
-                    'message'               => 'Schedule has warnings. Explicit confirmation required to proceed with release.',
-                    'validation_result'     => $validationResult,
+                    'message' => 'Schedule has warnings. Explicit confirmation required to proceed with release.',
+                    'validation_result' => $validationResult,
                 ], 422);
             }
             return redirect()->back()->with('warning', 'Release requires confirmation: ' . $warningMsgs);
@@ -217,7 +220,7 @@ class ProductionScheduleController extends Controller
 
         try {
             $schedule->update([
-                'status'      => ProductionSchedule::STATUS_RELEASED,
+                'status' => ProductionSchedule::STATUS_RELEASED,
                 'released_at' => now(),
                 'released_by' => auth()->id(),
             ]);
@@ -226,6 +229,7 @@ class ProductionScheduleController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => "Schedule [{$schedule->schedule_number}] released to the shop floor successfully!",
+                    'redirect_url' => route('production.mes.dashboard')
                 ]);
             }
 
@@ -243,8 +247,32 @@ class ProductionScheduleController extends Controller
     public function dispatchBoardView(Request $request)
     {
         $this->authorize('viewAny', ProductionSchedule::class);
+        $tenantId = require_tenant_id();
         $workCenters = WorkCenter::active()->get();
-        return view('modules.production.schedules.dispatch-board', compact('workCenters'));
+
+        $activeScenario = null;
+        if ($request->filled('scenario_id')) {
+            $activeScenario = ProductionScheduleScenario::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find((int) $request->input('scenario_id'));
+        }
+
+        $activeSchedule = null;
+        if ($request->filled('schedule_id')) {
+            $activeSchedule = ProductionSchedule::with(['order.product'])
+                ->withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find((int) $request->input('schedule_id'));
+        }
+
+        $schedulesList = ProductionSchedule::with(['order.product'])
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', [ProductionSchedule::STATUS_DRAFT, ProductionSchedule::STATUS_SCHEDULED, ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS])
+            ->orderByDesc('id')
+            ->get();
+
+        return view('modules.production.schedules.dispatch-board', compact('workCenters', 'activeScenario', 'activeSchedule', 'schedulesList'));
     }
 
     public function dispatchBoardData(Request $request)
@@ -252,13 +280,14 @@ class ProductionScheduleController extends Controller
         $this->authorize('viewAny', ProductionSchedule::class);
 
         $request->validate([
-            'start_date'          => 'nullable|date',
-            'end_date'            => 'nullable|date',
-            'work_center_id'      => 'nullable|integer',
-            'machine_id'          => 'nullable|integer',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+            'work_center_id' => 'nullable|integer',
+            'machine_id' => 'nullable|integer',
             'production_order_id' => 'nullable|integer',
-            'schedule_id'         => 'nullable|integer',
-            'status'              => 'nullable|string',
+            'schedule_id' => 'nullable|integer',
+            'scenario_id' => 'nullable|integer',
+            'status' => 'nullable|string',
         ]);
 
         $startDate = $request->filled('start_date')
@@ -276,7 +305,7 @@ class ProductionScheduleController extends Controller
                 $tenantId,
                 $startDate,
                 $endDate,
-                $request->only(['work_center_id', 'machine_id', 'production_order_id', 'schedule_id', 'status'])
+                $request->only(['work_center_id', 'machine_id', 'production_order_id', 'schedule_id', 'status', 'scenario_id'])
             );
 
             return response()->json($data);
@@ -331,7 +360,7 @@ class ProductionScheduleController extends Controller
         }
 
         $schedule->update([
-            'status'       => ProductionSchedule::STATUS_CANCELLED,
+            'status' => ProductionSchedule::STATUS_CANCELLED,
             'cancelled_at' => now(),
             'cancelled_by' => auth()->id(),
         ]);
@@ -388,28 +417,33 @@ class ProductionScheduleController extends Controller
 
     public function workCenterView(Request $request)
     {
-        $tenantId    = require_tenant_id();
+        $tenantId = require_tenant_id();
         $workCenters = WorkCenter::active()->with(['machines'])->get();
 
         // Load released schedule operations grouped by work center
         $operations = ProductionScheduleOperation::with([
-            'schedule', 'order.product', 'machine', 'orderOperation',
+            'schedule',
+            'order.product',
+            'machine',
+            'orderOperation',
         ])
-        ->whereHas('schedule', fn ($q) =>
-            $q->whereIn('status', [
-                ProductionSchedule::STATUS_SCHEDULED,
-                ProductionSchedule::STATUS_RELEASED,
-                ProductionSchedule::STATUS_IN_PROGRESS
+            ->whereHas(
+                'schedule',
+                fn($q) =>
+                $q->whereIn('status', [
+                    ProductionSchedule::STATUS_SCHEDULED,
+                    ProductionSchedule::STATUS_RELEASED,
+                    ProductionSchedule::STATUS_IN_PROGRESS
+                ])
+            )
+            ->whereNotIn('status', [
+                ProductionScheduleOperation::STATUS_COMPLETED,
+                ProductionScheduleOperation::STATUS_CANCELLED,
+                ProductionScheduleOperation::STATUS_SKIPPED,
             ])
-        )
-        ->whereNotIn('status', [
-            ProductionScheduleOperation::STATUS_COMPLETED,
-            ProductionScheduleOperation::STATUS_CANCELLED,
-            ProductionScheduleOperation::STATUS_SKIPPED,
-        ])
-        ->orderBy('sequence')
-        ->get()
-        ->groupBy('work_center_id');
+            ->orderBy('sequence')
+            ->get()
+            ->groupBy('work_center_id');
 
         return view('modules.production.schedules.work-center-view', compact('workCenters', 'operations'));
     }
@@ -419,19 +453,61 @@ class ProductionScheduleController extends Controller
         $this->authorize('create', ProductionSchedule::class);
 
         $request->validate([
-            'planned_start'    => 'required|date',
-            'machine_id'       => 'nullable|integer|exists:production_machines,id',
-            'shift_mode'       => 'nullable|string|in:isolated,ripple',
-            'reason'           => 'nullable|string|max:500',
+            'planned_start' => 'required|date',
+            'machine_id' => 'nullable|integer|exists:production_machines,id',
+            'shift_mode' => 'nullable|string|in:isolated,ripple',
+            'reason' => 'nullable|string|max:500',
             'expected_version' => 'nullable|integer',
+            'scenario_id' => 'nullable|integer',
         ]);
 
         try {
-            $newStart        = Carbon::parse($request->input('planned_start'));
-            $newMachineId    = $request->filled('machine_id') ? (int) $request->input('machine_id') : null;
-            $shiftMode       = $request->input('shift_mode', \App\Domains\Production\Models\ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED);
-            $reason          = $request->input('reason');
+            $newStart = Carbon::parse($request->input('planned_start'));
+            $newMachineId = $request->filled('machine_id') ? (int) $request->input('machine_id') : null;
+            $shiftMode = $request->input('shift_mode', \App\Domains\Production\Models\ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED);
+            $reason = $request->input('reason');
             $expectedVersion = $request->filled('expected_version') ? (int) $request->input('expected_version') : null;
+
+            if ($request->filled('scenario_id')) {
+                $scenarioId = (int) $request->input('scenario_id');
+                $scenOp = \App\Domains\Production\Models\ProductionScheduleScenarioOperation::withoutGlobalScopes()
+                    ->where('scenario_id', $scenarioId)
+                    ->where(function ($q) use ($operationId) {
+                        $q->where('id', $operationId)
+                            ->orWhere('source_schedule_operation_id', $operationId);
+                    })->first();
+
+                if ($scenOp) {
+                    $duration = (float) $scenOp->planned_duration_minutes;
+                    $newFinish = $this->schedulingService->addWorkingMinutes(
+                        $scenOp->work_center_id,
+                        $newStart,
+                        $duration
+                    );
+
+                    $scenOp->update([
+                        'planned_start' => $newStart,
+                        'planned_finish' => $newFinish,
+                        'machine_id' => $newMachineId ?? $scenOp->machine_id,
+                        'manual_override' => true,
+                    ]);
+
+                    $result = [
+                        'success' => true,
+                        'message' => "Scenario operation sequence #{$scenOp->sequence} rescheduled in What-If Sandbox mode.",
+                        'operation' => [
+                            'id' => $scenOp->source_schedule_operation_id ?: $scenOp->id,
+                            'planned_start' => $scenOp->planned_start->toIso8601String(),
+                            'planned_finish' => $scenOp->planned_finish->toIso8601String(),
+                        ]
+                    ];
+
+                    if ($request->ajax() || $request->wantsJson()) {
+                        return response()->json($result);
+                    }
+                    return redirect()->back()->with('success', $result['message']);
+                }
+            }
 
             $result = $this->capacityService->rescheduleOperationWithMode(
                 $operationId,
@@ -478,7 +554,7 @@ class ProductionScheduleController extends Controller
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => true,
-                    'locked'  => $schedOp->locked,
+                    'locked' => $schedOp->locked,
                     'version' => $schedOp->version,
                     'message' => "Operation successfully {$statusStr}.",
                 ]);
@@ -498,16 +574,16 @@ class ProductionScheduleController extends Controller
         $this->authorize('create', ProductionSchedule::class);
 
         $validated = $request->validate([
-            'start_date'     => 'nullable|date',
-            'end_date'       => 'nullable|date|after_or_equal:start_date',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
             'work_center_id' => 'nullable|integer',
-            'machine_id'     => 'nullable|integer',
-            'schedule_id'    => 'nullable|integer',
+            'machine_id' => 'nullable|integer',
+            'schedule_id' => 'nullable|integer',
         ]);
 
         try {
             $tenantId = auth()->user()->tenant_id;
-            $userId   = auth()->id();
+            $userId = auth()->id();
 
             $result = $this->capacityLevelingService->generatePreview($tenantId, $validated, $userId);
 
@@ -529,7 +605,7 @@ class ProductionScheduleController extends Controller
 
         try {
             $tenantId = auth()->user()->tenant_id;
-            $userId   = auth()->id();
+            $userId = auth()->id();
 
             $result = $this->capacityLevelingService->applyPreview($tenantId, (int) $validated['run_id'], $userId);
 
@@ -566,21 +642,21 @@ class ProductionScheduleController extends Controller
         $this->authorize('create', ProductionSchedule::class);
 
         $validated = $request->validate([
-            'name'                 => 'required|string|max:255',
-            'description'          => 'nullable|string',
-            'scenario_type'        => 'nullable|string',
-            'source_schedule_id'   => 'nullable|integer',
-            'work_center_id'       => 'nullable|integer',
-            'machine_id'           => 'nullable|integer',
-            'start_date'           => 'nullable|date',
-            'end_date'             => 'nullable|date',
-            'assumptions'          => 'nullable|array',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'scenario_type' => 'nullable|string',
+            'source_schedule_id' => 'nullable|integer',
+            'work_center_id' => 'nullable|integer',
+            'machine_id' => 'nullable|integer',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+            'assumptions' => 'nullable|array',
             'production_order_ids' => 'nullable|array',
         ]);
 
         try {
             $tenantId = require_tenant_id();
-            $userId   = auth()->id();
+            $userId = auth()->id();
 
             $scenario = $this->scenarioService->createScenario($tenantId, $validated, $userId);
 
@@ -602,7 +678,7 @@ class ProductionScheduleController extends Controller
 
         try {
             $tenantId = require_tenant_id();
-            $result   = $this->scenarioService->recalculateScenario($tenantId, $scenario);
+            $result = $this->scenarioService->recalculateScenario($tenantId, $scenario);
 
             return response()->json(['success' => true, 'data' => $result]);
         } catch (\InvalidArgumentException $e) {
@@ -618,7 +694,7 @@ class ProductionScheduleController extends Controller
 
         try {
             $tenantId = require_tenant_id();
-            $result   = $this->scenarioService->levelScenarioCapacity($tenantId, $scenario);
+            $result = $this->scenarioService->levelScenarioCapacity($tenantId, $scenario);
 
             return response()->json($result);
         } catch (\InvalidArgumentException $e) {
@@ -633,7 +709,7 @@ class ProductionScheduleController extends Controller
         $this->authorize('viewAny', ProductionSchedule::class);
 
         try {
-            $tenantId   = require_tenant_id();
+            $tenantId = require_tenant_id();
             $comparison = $this->scenarioService->compareWithLive($tenantId, $scenario);
 
             return response()->json($comparison);
@@ -650,7 +726,7 @@ class ProductionScheduleController extends Controller
 
         try {
             $tenantId = require_tenant_id();
-            $userId   = auth()->id();
+            $userId = auth()->id();
 
             $result = $this->scenarioService->promoteScenario($tenantId, $scenario, $userId);
 
@@ -669,7 +745,7 @@ class ProductionScheduleController extends Controller
 
         try {
             $tenantId = require_tenant_id();
-            $result   = $this->scenarioService->discardScenario($tenantId, $scenario);
+            $result = $this->scenarioService->discardScenario($tenantId, $scenario);
 
             return response()->json($result);
         } catch (\InvalidArgumentException $e) {

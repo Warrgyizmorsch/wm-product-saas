@@ -65,65 +65,126 @@ class CapacityPlanningService
             ];
         })->values()->all();
 
-        // 2. Scheduled Operations
-        $opsQuery = ProductionScheduleOperation::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->with([
-                'schedule',
-                'order.product',
-                'orderOperation',
-                'workCenter',
-                'machine',
-            ])
-            ->whereBetween('planned_start', [$startWindow, $endWindow]);
+        // 2. Scheduled Operations (Scenario Sandbox vs Live Schedule)
+        if (!empty($filters['scenario_id'])) {
+            $scenarioId = (int) $filters['scenario_id'];
+            $opsQuery = \App\Domains\Production\Models\ProductionScheduleScenarioOperation::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('scenario_id', $scenarioId)
+                ->with([
+                    'order.product',
+                    'orderOperation',
+                    'workCenter',
+                    'machine',
+                ]);
 
-        if (!empty($filters['work_center_id'])) {
-            $opsQuery->where('work_center_id', $filters['work_center_id']);
-        }
-        if (!empty($filters['machine_id'])) {
-            $opsQuery->where('machine_id', $filters['machine_id']);
-        }
-        if (!empty($filters['production_order_id'])) {
-            $opsQuery->where('production_order_id', $filters['production_order_id']);
-        }
-        if (!empty($filters['schedule_id'])) {
-            $opsQuery->where('production_schedule_id', $filters['schedule_id']);
-        }
-        if (!empty($filters['status'])) {
-            $opsQuery->where('status', $filters['status']);
-        }
+            if (!empty($filters['work_center_id'])) {
+                $opsQuery->where('work_center_id', $filters['work_center_id']);
+            }
+            if (!empty($filters['machine_id'])) {
+                $opsQuery->where('machine_id', $filters['machine_id']);
+            }
+            if (!empty($filters['production_order_id'])) {
+                $opsQuery->where('production_order_id', $filters['production_order_id']);
+            }
+            if (!empty($filters['status'])) {
+                $opsQuery->where('status', $filters['status']);
+            }
 
-        $operations = $opsQuery->orderBy('sequence')->get()->map(function ($op) {
-            $orderOp = $op->orderOperation;
-            return [
-                'schedule_operation_id'   => $op->id,
-                'schedule_id'             => $op->production_schedule_id,
-                'production_order_id'     => $op->production_order_id,
-                'production_order_number' => $op->order ? $op->order->order_number : null,
-                'product_name'            => $op->order && $op->order->product ? $op->order->product->name : null,
-                'production_order_operation_id' => $op->production_order_operation_id,
-                'operation_name'          => $orderOp ? $orderOp->name : 'Operation #' . $op->sequence,
-                'operation_number'        => $orderOp ? $orderOp->operation_number : 'OP' . $op->sequence,
-                'sequence'                => $op->sequence,
-                'work_center_id'          => $op->work_center_id,
-                'machine_id'              => $op->machine_id,
-                'planned_start'           => $op->planned_start ? $op->planned_start->toIso8601String() : null,
-                'planned_finish'          => $op->planned_finish ? $op->planned_finish->toIso8601String() : null,
-                'baseline_start'          => $op->baseline_start ? $op->baseline_start->toIso8601String() : null,
-                'baseline_finish'         => $op->baseline_finish ? $op->baseline_finish->toIso8601String() : null,
-                'start_variance_minutes'  => $op->start_variance_minutes,
-                'finish_variance_minutes' => $op->finish_variance_minutes,
-                'planned_duration_minutes'=> (float) $op->planned_duration_minutes,
-                'status'                  => $op->status,
-                'locked'                  => (bool) $op->locked,
-                'manual_override'         => (bool) $op->manual_override,
-                'version'                 => (int) $op->version,
-                'priority'                => (int) $op->priority,
-                'overlap_enabled'         => $orderOp ? (bool) $orderOp->overlap_enabled : false,
-                'transfer_batch_quantity' => $orderOp ? (float) $orderOp->transfer_batch_quantity : 0.0,
-                'transfer_lag_minutes'    => $orderOp ? (float) $orderOp->transfer_lag_minutes : 0.0,
-            ];
-        })->values()->all();
+            $operations = $opsQuery->orderBy('sequence')->get()->map(function ($op) {
+                $orderOp = $op->orderOperation;
+                return [
+                    'schedule_operation_id'   => $op->source_schedule_operation_id ?: $op->id,
+                    'scenario_operation_id'   => $op->id,
+                    'schedule_id'             => $op->production_schedule_id,
+                    'production_order_id'     => $op->production_order_id,
+                    'production_order_number' => $op->order ? $op->order->order_number : null,
+                    'product_name'            => $op->order && $op->order->product ? $op->order->product->name : null,
+                    'production_order_operation_id' => $op->production_order_operation_id,
+                    'operation_name'          => $orderOp ? $orderOp->name : 'Operation #' . $op->sequence,
+                    'operation_number'        => $orderOp ? $orderOp->operation_number : 'OP' . $op->sequence,
+                    'sequence'                => $op->sequence,
+                    'work_center_id'          => $op->work_center_id,
+                    'machine_id'              => $op->machine_id,
+                    'planned_start'           => $op->planned_start ? $op->planned_start->toIso8601String() : null,
+                    'planned_finish'          => $op->planned_finish ? $op->planned_finish->toIso8601String() : null,
+                    'baseline_start'          => $op->planned_start ? $op->planned_start->toIso8601String() : null,
+                    'baseline_finish'         => $op->planned_finish ? $op->planned_finish->toIso8601String() : null,
+                    'start_variance_minutes'  => 0,
+                    'finish_variance_minutes' => 0,
+                    'planned_duration_minutes'=> (float) $op->planned_duration_minutes,
+                    'status'                  => $op->status,
+                    'locked'                  => (bool) $op->locked,
+                    'manual_override'         => (bool) $op->manual_override,
+                    'version'                 => (int) $op->source_version,
+                    'priority'                => (int) $op->priority,
+                    'overlap_enabled'         => $orderOp ? (bool) $orderOp->overlap_enabled : false,
+                    'transfer_batch_quantity' => $orderOp ? (float) $orderOp->transfer_batch_quantity : 0.0,
+                    'transfer_lag_minutes'    => $orderOp ? (float) $orderOp->transfer_lag_minutes : 0.0,
+                ];
+            })->values()->all();
+        } else {
+            $opsQuery = ProductionScheduleOperation::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->with([
+                    'schedule',
+                    'order.product',
+                    'orderOperation',
+                    'workCenter',
+                    'machine',
+                ])
+                ->whereBetween('planned_start', [$startWindow, $endWindow]);
+
+            if (!empty($filters['work_center_id'])) {
+                $opsQuery->where('work_center_id', $filters['work_center_id']);
+            }
+            if (!empty($filters['machine_id'])) {
+                $opsQuery->where('machine_id', $filters['machine_id']);
+            }
+            if (!empty($filters['production_order_id'])) {
+                $opsQuery->where('production_order_id', $filters['production_order_id']);
+            }
+            if (!empty($filters['schedule_id'])) {
+                $opsQuery->where('production_schedule_id', $filters['schedule_id']);
+            }
+            if (!empty($filters['status'])) {
+                $opsQuery->where('status', $filters['status']);
+            }
+
+            $operations = $opsQuery->orderBy('sequence')->get()->map(function ($op) {
+                $orderOp = $op->orderOperation;
+                return [
+                    'schedule_operation_id'   => $op->id,
+                    'schedule_id'             => $op->production_schedule_id,
+                    'schedule_number'        => $op->schedule ? $op->schedule->schedule_number : null,
+                    'schedule_status'        => $op->schedule ? $op->schedule->status : null,
+                    'production_order_id'     => $op->production_order_id,
+                    'production_order_number' => $op->order ? $op->order->order_number : null,
+                    'product_name'            => $op->order && $op->order->product ? $op->order->product->name : null,
+                    'production_order_operation_id' => $op->production_order_operation_id,
+                    'operation_name'          => $orderOp ? $orderOp->name : 'Operation #' . $op->sequence,
+                    'operation_number'        => $orderOp ? $orderOp->operation_number : 'OP' . $op->sequence,
+                    'sequence'                => $op->sequence,
+                    'work_center_id'          => $op->work_center_id,
+                    'machine_id'              => $op->machine_id,
+                    'planned_start'           => $op->planned_start ? $op->planned_start->toIso8601String() : null,
+                    'planned_finish'          => $op->planned_finish ? $op->planned_finish->toIso8601String() : null,
+                    'baseline_start'          => $op->baseline_start ? $op->baseline_start->toIso8601String() : null,
+                    'baseline_finish'         => $op->baseline_finish ? $op->baseline_finish->toIso8601String() : null,
+                    'start_variance_minutes'  => $op->start_variance_minutes,
+                    'finish_variance_minutes' => $op->finish_variance_minutes,
+                    'planned_duration_minutes'=> (float) $op->planned_duration_minutes,
+                    'status'                  => $op->status,
+                    'locked'                  => (bool) $op->locked,
+                    'manual_override'         => (bool) $op->manual_override,
+                    'version'                 => (int) $op->version,
+                    'priority'                => (int) $op->priority,
+                    'overlap_enabled'         => $orderOp ? (bool) $orderOp->overlap_enabled : false,
+                    'transfer_batch_quantity' => $orderOp ? (float) $orderOp->transfer_batch_quantity : 0.0,
+                    'transfer_lag_minutes'    => $orderOp ? (float) $orderOp->transfer_lag_minutes : 0.0,
+                ];
+            })->values()->all();
+        }
 
         // 3. Machine Downtimes
         $downtimes = ProductionMachineDowntime::withoutGlobalScopes()

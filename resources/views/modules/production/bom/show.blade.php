@@ -223,10 +223,11 @@
                         <thead>
                             <tr>
                                 <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
-                                <th style="width: 45%">{{ __('production.component_product') }}</th>
-                                <th style="width: 20%" class="text-end">{{ __('production.quantity') }}</th>
-                                <th style="width: 15%">{{ __('production.unit') }}</th>
+                                <th style="width: 35%">{{ __('production.component_product') }}</th>
+                                <th style="width: 15%" class="text-end">{{ __('production.quantity') }}</th>
+                                <th style="width: 10%">{{ __('production.unit') }}</th>
                                 <th style="width: 15%" class="text-end">{{ __('production.scrap_percent') }}</th>
+                                <th style="width: 20%" class="text-end">{{ __('production.unit_cost') ?? 'Cost' }} / {{ __('production.total_item_cost') ?? 'Total' }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -235,6 +236,10 @@
                                     function renderComponentTreeRows($items, $level = 1) {
                                         foreach ($items as $item) {
                                             $padding = ($level - 1) * 24;
+                                            $scrapFactor = 1 + (($item->material_scrap_percentage ?? 0) / 100);
+                                            $grossQty = $item->quantity * $scrapFactor;
+                                            $unitCost = $item->material->unit_cost ?? 0.0;
+                                            $itemTotalCost = $grossQty * $unitCost;
                                             
                                             echo '<tr class="' . ($level > 1 ? 'table-light bg-light-soft erp-child-bom-row' : '') . '">';
                                             
@@ -277,6 +282,12 @@
                                             // Scrap %
                                             echo '<td class="text-end text-danger fw-semibold align-middle">' . number_format($item->material_scrap_percentage, 2) . '%</td>';
                                             
+                                            // Cost (Line Total & Unit Cost)
+                                            echo '<td class="text-end align-middle">';
+                                            echo '<span class="fw-bold text-dark d-block">' . format_currency($itemTotalCost) . '</span>';
+                                            echo '<small class="text-muted font-monospace fs-10">@ ' . format_currency($unitCost) . ' / ' . e($item->uom ? $item->uom->code : 'PCS') . '</small>';
+                                            echo '</td>';
+
                                             echo '</tr>';
                                             
                                             // Recursively render child components if linked BOM exists
@@ -292,7 +303,7 @@
                                 @php renderComponentTreeRows($bom->items) @endphp
                             @else
                                 <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">{{ __('production.no_components_spec_yet') }}</td>
+                                    <td colspan="6" class="text-center py-4 text-muted">{{ __('production.no_components_spec_yet') }}</td>
                                 </tr>
                             @endif
                         </tbody>

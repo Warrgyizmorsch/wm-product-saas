@@ -1036,9 +1036,9 @@ class ProductionWipService
     /**
      * Convert completed WIP into Finished Goods completion request.
      */
-    public function convertWipToFinishedGoods(int $wipId, int $warehouseId, ?string $remarks = null, ?int $userId = null): void
+    public function convertWipToFinishedGoods(int $wipId, int $warehouseId, ?string $remarks = null, ?int $userId = null, string $qualityStatus = 'passed'): void
     {
-        DB::transaction(function () use ($wipId, $warehouseId, $remarks, $userId) {
+        DB::transaction(function () use ($wipId, $warehouseId, $remarks, $userId, $qualityStatus) {
             $wip = ProductionWip::lockForUpdate()->findOrFail($wipId);
 
             if ($wip->available_quantity <= 0) {
@@ -1054,7 +1054,7 @@ class ProductionWipService
             app(ProductionExecutionService::class)->receiveFinishedGoods(
                 $wip->production_order_id,
                 $qtyToComplete,
-                'passed',
+                $qualityStatus,
                 $remarks ?? 'Converted from completed WIP stage.',
                 $userId,
                 $warehouseId,
@@ -1090,9 +1090,9 @@ class ProductionWipService
     /**
      * Convert all completed WIP for an entire Production Order into Finished Goods inventory in one transaction.
      */
-    public function convertOrderWipToFinishedGoods(int $orderId, int $warehouseId, ?string $remarks = null, ?int $userId = null): float
+    public function convertOrderWipToFinishedGoods(int $orderId, int $warehouseId, ?string $remarks = null, ?int $userId = null, string $qualityStatus = 'passed'): float
     {
-        return DB::transaction(function () use ($orderId, $warehouseId, $remarks, $userId) {
+        return DB::transaction(function () use ($orderId, $warehouseId, $remarks, $userId, $qualityStatus) {
             $order = ProductionOrder::findOrFail($orderId);
 
             // Fetch all active WIP cards for this order that have completed quantity (excluding quality hold / rework)
@@ -1125,7 +1125,7 @@ class ProductionWipService
                 app(ProductionExecutionService::class)->receiveFinishedGoods(
                     $wip->production_order_id,
                     $qtyToComplete,
-                    'passed',
+                    $qualityStatus,
                     $remarks ?? 'Bulk converted from order completed WIP.',
                     $userId,
                     $warehouseId,
@@ -1298,9 +1298,13 @@ class ProductionWipService
                 $goodOutput = $produced + $reworkCompleted;
                 $activeRejects = max(0.0, $rejected - $reworkCompleted);
 
-                $isCurrent = ($batch->current_operation_id === $op->id);
-                $isPassed = ($op->sequence < $currentOpSeq) || ($batch->status === 'completed') || ($op->status === 'completed');
-                $stageStatus = $isCurrent ? 'active' : ($isPassed ? 'passed' : 'upcoming');
+                $isPassed = ($op->sequence < $currentOpSeq)
+                    || ($batch->status === 'completed')
+                    || ($op->status === 'completed')
+                    || ($batch->planned_quantity > 0 && ($goodOutput + $scrapped) >= $batch->planned_quantity);
+
+                $isCurrent = ($batch->current_operation_id === $op->id) && !$isPassed;
+                $stageStatus = $isPassed ? 'passed' : ($isCurrent ? 'active' : 'upcoming');
 
                 $qcRequired = (bool) ($op->routingOperation?->quality_required);
                 $qcInspection = \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $order->tenant_id)

@@ -312,9 +312,9 @@
                                                             <div class="d-flex align-items-center flex-wrap gap-2">
                                                                 @foreach($pipeline['stages'] as $index => $stage)
                                                                     <div class="d-flex align-items-center">
-                                                                        <div class="p-2 rounded border {{ ($stage['stage_status'] ?? '') === 'active' || $stage['is_current'] ? 'bg-soft-primary border-primary' : (($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']) ? 'bg-soft-success border-success-subtle' : 'bg-white') }}" style="min-width: 170px;">
+                                                                        <div class="p-2 rounded border {{ ($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']) ? 'bg-soft-success border-success-subtle' : (($stage['stage_status'] ?? '') === 'active' || !empty($stage['is_current']) ? 'bg-soft-primary border-primary' : 'bg-white') }}" style="min-width: 170px;">
                                                                             <div class="d-flex justify-content-between align-items-center mb-1">
-                                                                                <strong class="fs-11 {{ ($stage['stage_status'] ?? '') === 'active' || $stage['is_current'] ? 'text-primary' : 'text-dark' }}">{{ $stage['operation_number'] }}</strong>
+                                                                                <strong class="fs-11 {{ ($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']) ? 'text-success' : (($stage['stage_status'] ?? '') === 'active' || !empty($stage['is_current']) ? 'text-primary' : 'text-dark') }}">{{ $stage['operation_number'] }}</strong>
                                                                                 <div class="d-flex gap-1 align-items-center">
                                                                                     @if(($stage['qc_status'] ?? 'none') === 'passed')
                                                                                         <span class="badge bg-soft-success text-success border border-success-subtle fs-9" title="Quality Inspection Passed"><i class="feather-shield me-0.5"></i>QC PASSED</span>
@@ -324,10 +324,10 @@
                                                                                         <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-9" title="Quality Check Required"><i class="feather-shield me-0.5"></i>QC REQ</span>
                                                                                     @endif
                                                                                     
-                                                                                    @if(($stage['stage_status'] ?? '') === 'active' || $stage['is_current'])
-                                                                                        <span class="badge bg-primary text-white fs-9">ACTIVE STAGE</span>
-                                                                                    @elseif(($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']))
+                                                                                    @if(($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']))
                                                                                         <span class="badge bg-success text-white fs-9"><i class="feather-check me-0.5"></i>PASSED</span>
+                                                                                    @elseif(($stage['stage_status'] ?? '') === 'active' || !empty($stage['is_current']))
+                                                                                        <span class="badge bg-primary text-white fs-9">ACTIVE STAGE</span>
                                                                                     @else
                                                                                         <span class="badge bg-secondary text-white fs-9">UPCOMING</span>
                                                                                     @endif
