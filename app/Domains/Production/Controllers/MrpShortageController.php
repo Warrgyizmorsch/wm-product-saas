@@ -111,7 +111,7 @@ class MrpShortageController extends Controller
             'warehouse_id'
         ]);
 
-        return redirect()->route('production.mrp-shortage.index', array_filter($params));
+        return redirect()->route('inventory.mrp-shortage.index', array_filter($params));
     }
 
     /**

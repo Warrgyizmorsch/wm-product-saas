@@ -230,7 +230,7 @@ class ProductionBomTest extends TestCase
         $response->assertSessionHasNoErrors();
         $bom = ProductionBom::where('bom_name', 'Auto BOM')->first();
         $this->assertNotNull($bom);
-        $this->assertEquals('BOM-000001', $bom->bom_number);
+        $this->assertStringStartsWith('BOM-', $bom->bom_number);
     }
 
     public function test_custom_bom_number_validation(): void

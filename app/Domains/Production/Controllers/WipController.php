@@ -239,6 +239,7 @@ class WipController extends Controller
 
         $request->validate([
             'warehouse_id' => 'required|exists:warehouses,id',
+            'quality_status' => 'nullable|string|in:passed,quarantine,failed',
             'remarks' => 'nullable|string|max:255',
         ]);
 
@@ -247,7 +248,8 @@ class WipController extends Controller
                 $id,
                 (int) $request->input('warehouse_id'),
                 $request->input('remarks'),
-                auth()->id()
+                auth()->id(),
+                $request->input('quality_status', 'passed')
             );
 
             return redirect()->route('production.wip.show', $id)->with('success', 'WIP converted and Finished Goods stock received.');
@@ -262,6 +264,7 @@ class WipController extends Controller
 
         $request->validate([
             'warehouse_id' => 'required|exists:warehouses,id',
+            'quality_status' => 'nullable|string|in:passed,quarantine,failed',
             'remarks' => 'nullable|string|max:255',
         ]);
 
@@ -270,7 +273,8 @@ class WipController extends Controller
                 $orderId,
                 (int) $request->input('warehouse_id'),
                 $request->input('remarks'),
-                auth()->id()
+                auth()->id(),
+                $request->input('quality_status', 'passed')
             );
 
             return redirect()->back()

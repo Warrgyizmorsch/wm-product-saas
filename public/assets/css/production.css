@@ -123,6 +123,7 @@ select.odoo-form-control {
     .production-sidebar-sticky {
         display: none !important;
     }
+
     .production-main-content-scroll {
         max-height: none !important;
         min-height: auto !important;
@@ -154,14 +155,17 @@ select.odoo-form-control {
     overflow-y: hidden !important;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;
-    scrollbar-width: none !important; /* Firefox: Hide scrollbar */
-    -ms-overflow-style: none !important; /* IE/Edge: Hide scrollbar */
+    scrollbar-width: none !important;
+    /* Firefox: Hide scrollbar */
+    -ms-overflow-style: none !important;
+    /* IE/Edge: Hide scrollbar */
     padding-top: 4px !important;
     padding-bottom: 4px !important;
 }
 
 .production-flow-tabs-wrapper::-webkit-scrollbar {
-    display: none !important; /* Chrome/Safari/Blink: Hide scrollbar */
+    display: none !important;
+    /* Chrome/Safari/Blink: Hide scrollbar */
     width: 0 !important;
     height: 0 !important;
 }

@@ -5,6 +5,9 @@
 @section('breadcrumb', 'Schedule Scenarios')
 
 @section('page-actions')
+    <a href="{{ route('production.schedules.dispatch-board') }}" class="btn btn-outline-primary me-2">
+        <i class="feather-calendar me-1"></i> Live Dispatch Board
+    </a>
     <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#createScenarioModal">
         <i class="feather-plus"></i> New What-If Scenario
     </button>

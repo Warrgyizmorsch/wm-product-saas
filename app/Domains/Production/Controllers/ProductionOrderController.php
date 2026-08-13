@@ -81,12 +81,20 @@ class ProductionOrderController extends Controller
         Gate::authorize('create', ProductionOrder::class);
 
         $salesOrderId = $request->query('sales_order_id');
-        $salesOrder = null;
-        $salesOrderItems = collect();
+        $productionOrderRequestId = $request->query('production_order_request_id');
+        $productId = $request->query('product_id');
+
         $tenantId = require_tenant_id();
+
         $productionOrderRequests = ProductionOrderRequest::where('tenant_id', $tenantId)
-            ->where('status', 'draft')
-            ->whereNull('production_order_id')
+            ->where(function ($q) use ($productionOrderRequestId) {
+                $q->where(function ($sub) {
+                    $sub->where('status', 'draft')->whereNull('production_order_id');
+                });
+                if ($productionOrderRequestId) {
+                    $q->orWhere('id', $productionOrderRequestId);
+                }
+            })
             ->with([
                 'product',
                 'materialRequirementItem.materialRequirement.salesOrder.customer',
@@ -95,17 +103,50 @@ class ProductionOrderController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        $selectedRequest = null;
+        if ($productionOrderRequestId) {
+            $selectedRequest = $productionOrderRequests->firstWhere('id', (int) $productionOrderRequestId);
+        }
+
+        $salesOrder = null;
+        $salesOrderItems = collect();
+
         if ($salesOrderId) {
-            $salesOrder = SalesOrder::with(['items.product'])->findOrFail($salesOrderId);
-            $salesOrderItems = $salesOrder->items->filter(function ($item) {
-                return $item->product && $item->product->supplier_method === 'manufacture';
-            });
-            $products = $salesOrderItems->map(fn($item) => $item->product)->unique('id');
+            $salesOrder = SalesOrder::with(['items.product'])->find($salesOrderId);
+            if ($salesOrder) {
+                $salesOrderItems = $salesOrder->items->filter(function ($item) {
+                    return $item->product && $item->product->supplier_method === 'manufacture';
+                });
+                $products = $salesOrderItems->map(fn($item) => $item->product)->unique('id');
+            } else {
+                $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+            }
         } else {
             $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         }
 
-        return view('modules.production.orders.create', compact('products', 'salesOrder', 'salesOrderItems', 'productionOrderRequests'));
+        $selectedProductId = old('product_id', $productId ?? $selectedRequest?->product_id);
+        $selectedQty = old('quantity_ordered', $selectedRequest?->quantity_requested);
+        $selectedSoItemId = old('sales_order_item_id', $selectedRequest?->materialRequirementItem?->sales_order_item_id);
+
+        if (!$selectedProductId && $salesOrderItems->isNotEmpty()) {
+            $firstItem = $salesOrderItems->first();
+            $selectedProductId = $firstItem->product_id;
+            $selectedQty = $selectedQty ?? $firstItem->quantity;
+            $selectedSoItemId = $selectedSoItemId ?? $firstItem->id;
+        }
+
+        return view('modules.production.orders.create', compact(
+            'products',
+            'salesOrder',
+            'salesOrderItems',
+            'productionOrderRequests',
+            'productionOrderRequestId',
+            'selectedRequest',
+            'selectedProductId',
+            'selectedQty',
+            'selectedSoItemId'
+        ));
     }
 
     public function store(StoreProductionOrderRequest $request)

@@ -2,6 +2,7 @@
 
 use App\Domains\Sales\Controllers\SalesOrderController;
 use App\Domains\Sales\Controllers\MaterialRequestController;
+use App\Domains\Sales\Controllers\MaterialRequirementController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('sales')
@@ -19,11 +20,10 @@ Route::prefix('sales')
         Route::get('orders/{order}/download', [SalesOrderController::class, 'downloadPdf'])->name('orders.download');
 
         // Material Requirements Routes
-        // Material Requirements Routes (Alias Redirects to /inventory/material-requirements)
-        Route::get('material-requirements', fn() => redirect()->route('inventory.material-requirements.index'))->name('material-requirements.index');
-        Route::get('material-requirements/create', fn() => redirect()->route('inventory.material-requirements.create'))->name('material-requirements.create');
-        Route::post('material-requirements', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'store'])->name('material-requirements.store');
-        Route::get('material-requirements/{delivery}', fn($delivery) => redirect()->route('inventory.material-requirements.show', $delivery))->name('material-requirements.show');
+        Route::get('material-requirements', [MaterialRequirementController::class, 'index'])->name('material-requirements.index');
+        Route::get('material-requirements/create', [MaterialRequirementController::class, 'create'])->name('material-requirements.create');
+        Route::post('material-requirements', [MaterialRequirementController::class, 'store'])->name('material-requirements.store');
+        Route::get('material-requirements/{delivery}', [MaterialRequirementController::class, 'show'])->name('material-requirements.show');
         Route::post('material-requirements/{delivery}/ship', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'ship'])->name('material-requirements.ship');
         Route::post('material-requirements/{delivery}/cancel', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'cancel'])->name('material-requirements.cancel');
 

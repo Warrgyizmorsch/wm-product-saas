@@ -14,6 +14,7 @@ use App\Domains\Production\Models\ProductionOrderReceipt;
 use App\Domains\Production\Models\ProductionOrderRework;
 use App\Domains\Production\Models\ProductionOrderScrap;
 use App\Domains\Production\Models\ProductionQualityInspection;
+use App\Domains\Production\Models\ProductionQualityPlan;
 use App\Domains\Production\Models\ProductionSerialNumber;
 use App\Domains\Production\Models\ProductionNcr;
 use App\Domains\Production\Models\ProductionWip;
@@ -632,7 +633,29 @@ class ProductionExecutionService
                 );
             }
 
-            $warehouseId = $warehouseId ?: $this->defaultWarehouseId($order->tenant_id);
+            if ($qualityStatus === 'quarantine') {
+                $quarantineWarehouse = Warehouse::where('tenant_id', $order->tenant_id)
+                    ->where(function ($q) {
+                        $q->where('code', 'QUARANTINE')
+                            ->orWhere('name', 'LIKE', '%Quarantine%');
+                    })
+                    ->first();
+
+                if (!$quarantineWarehouse) {
+                    $quarantineWarehouse = Warehouse::create([
+                        'tenant_id'  => $order->tenant_id,
+                        'name'       => 'Quality Quarantine Warehouse',
+                        'code'       => 'QUARANTINE',
+                        'status'     => 'active',
+                        'address'    => 'Quality Assurance Quarantine Area',
+                        'is_default' => false,
+                    ]);
+                }
+                $warehouseId = $quarantineWarehouse->id;
+            } else {
+                $warehouseId = $warehouseId ?: $this->defaultWarehouseId($order->tenant_id);
+            }
+
             if (!$warehouseId) {
                 throw new InvalidArgumentException('A warehouse is required before receiving finished goods.');
             }
@@ -703,6 +726,37 @@ class ProductionExecutionService
                 'received_at' => now(),
                 'remarks' => $remarks,
             ]);
+
+            // If quality status is quarantine, automatically raise a pending Quality Inspection for QA
+            if ($qualityStatus === 'quarantine') {
+                $plan = ProductionQualityPlan::where('tenant_id', $order->tenant_id)
+                    ->where('product_id', $order->product_id)
+                    ->first()
+                    ?? ProductionQualityPlan::where('tenant_id', $order->tenant_id)->first();
+
+                if (!$plan) {
+                    $plan = ProductionQualityPlan::create([
+                        'tenant_id' => $order->tenant_id,
+                        'name' => 'Default FG Receiving Quality Plan',
+                        'code' => 'QP-FG-' . rand(1000, 9999),
+                        'type' => 'final',
+                        'product_id' => $order->product_id,
+                        'status' => 'active',
+                        'created_by' => $userId ?? 1,
+                    ]);
+                }
+
+                ProductionQualityInspection::create([
+                    'tenant_id'           => $order->tenant_id,
+                    'quality_plan_id'     => $plan->id,
+                    'stage'               => 'final',
+                    'status'              => 'submitted',
+                    'result'              => 'quarantine',
+                    'production_order_id' => $order->id,
+                    'operator_id'         => $userId,
+                    'remarks'             => "Quarantine Inspection raised automatically upon FG receipt of {$quantity} units into Quality Quarantine Warehouse (Order #{$order->order_number}). {$remarks}",
+                ]);
+            }
 
             // ── Step 7: Write FG genealogy trace ─────────────────────────────
             // Link ProductionBatch → Inventory::Batch for full forward traceability.
@@ -796,7 +850,7 @@ class ProductionExecutionService
         }
     }
 
-    private function defaultWarehouseId(int $tenantId): ?int
+    public function defaultWarehouseId(int $tenantId): ?int
     {
         return Warehouse::query()
             ->where('tenant_id', $tenantId)

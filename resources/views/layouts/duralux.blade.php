@@ -224,8 +224,8 @@
 
             if (isAddNew) {
                 // Get master from select attr first, then fallback to selected option attr, then fallback by element ID
-                var master = select.attr('data-master') 
-                    || select.data('master') 
+                var master = select.attr('data-master')
+                    || select.data('master')
                     || select.find('option[value="__ADD_NEW__"]').attr('data-master')
                     || (select.attr('id') === 'crm_contact_id' ? 'contact' : null);
 
@@ -242,9 +242,9 @@
                     }
                     modalEl.data('trigger-select', select);
                 }
-                
+
                 if (Array.isArray(val)) {
-                    var newVal = val.filter(function(v) { return v !== '__ADD_NEW__'; });
+                    var newVal = val.filter(function (v) { return v !== '__ADD_NEW__'; });
                     select.val(newVal).trigger('change.select2');
                 } else {
                     select.val('').trigger('change.select2');
@@ -395,7 +395,7 @@
                                     currentVals = [currentVals];
                                 }
                                 // Filter out dummy __ADD_NEW__ value
-                                currentVals = currentVals.filter(function(v) { return v !== '__ADD_NEW__' && v !== ''; });
+                                currentVals = currentVals.filter(function (v) { return v !== '__ADD_NEW__' && v !== ''; });
                                 var strId = String(response.id);
                                 if (!currentVals.includes(strId) && !currentVals.includes(Number(response.id))) {
                                     currentVals.push(strId);
@@ -447,20 +447,20 @@
         function showAppToast(type, message) {
             if (typeof Swal === 'undefined' || !message) return;
 
-                Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
+            Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
                 timer: 5000,
-                    timerProgressBar: true,
-                    didOpen: function (toast) {
-                        toast.addEventListener('mouseenter', Swal.stopTimer);
-                        toast.addEventListener('mouseleave', Swal.resumeTimer);
-                    }
-                }).fire({
+                timerProgressBar: true,
+                didOpen: function (toast) {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                }
+            }).fire({
                 icon: type,
-                    title: message
-                });
+                title: message
+            });
         }
     </script>
 

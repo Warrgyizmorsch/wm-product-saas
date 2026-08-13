@@ -271,4 +271,66 @@ class QualityManagementTest extends TestCase
         $this->assertEquals(1, ProductionQualityPlan::where('tenant_id', $this->tenantId)->count());
         $this->assertEquals(1, ProductionQualityPlan::where('tenant_id', $otherTenantId)->count());
     }
+
+    /** @test */
+    public function test_receiving_finished_goods_with_quarantine_creates_inspection_and_quarantine_warehouse()
+    {
+        $product = Product::create([
+            'tenant_id' => $this->tenantId,
+            'name' => 'Quarantine Test Product',
+            'sku' => 'PROD-QAR-01',
+            'type' => 'finished_goods',
+            'unit_cost' => 100.00,
+        ]);
+
+        $order = ProductionOrder::create([
+            'tenant_id' => $this->tenantId,
+            'order_number' => 'ORD-TEST-QAR-1',
+            'product_id' => $product->id,
+            'quantity_ordered' => 10.00,
+            'quantity_produced' => 0.00,
+            'status' => 'in_progress',
+            'start_date' => now(),
+            'end_date' => now()->addDays(7),
+        ]);
+
+        $executionService = app(\App\Domains\Production\Services\ProductionExecutionService::class);
+        $receipt = $executionService->receiveFinishedGoods(
+            $order->id,
+            5.00,
+            'quarantine',
+            'Testing quarantine auto-inspection raising',
+            $this->user->id
+        );
+
+        $this->assertEquals('quarantine', $receipt->quality_status);
+
+        // Verify stock was routed into Quality Quarantine Warehouse
+        $quarantineWh = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $this->tenantId)
+            ->where('code', 'QUARANTINE')
+            ->first();
+        $this->assertNotNull($quarantineWh);
+        $this->assertEquals($quarantineWh->id, $receipt->warehouse_id);
+
+        // Verify a pending Quality Inspection was automatically created
+        $inspection = ProductionQualityInspection::where('tenant_id', $this->tenantId)
+            ->where('production_order_id', $order->id)
+            ->where('result', 'quarantine')
+            ->first();
+
+        $this->assertNotNull($inspection);
+        $this->assertEquals('final', $inspection->stage);
+        $this->assertEquals('submitted', $inspection->status);
+
+        // Approve Quality Inspection and verify result becomes PASSED and receipt status is updated to PASSED
+        $qualityService = app(\App\Domains\Production\Services\QualityInspectionService::class);
+        $qualityService->approveInspection($inspection->id, $this->user->id, 'SIGNATURE-HASH');
+
+        $inspection->refresh();
+        $this->assertEquals('approved', $inspection->status);
+        $this->assertEquals('passed', $inspection->result);
+
+        $receipt->refresh();
+        $this->assertEquals('passed', $receipt->quality_status);
+    }
 }
