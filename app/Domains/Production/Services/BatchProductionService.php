@@ -535,16 +535,19 @@ class BatchProductionService
             $reworkCompletedAtOp = (float) $batchWip->where('from_operation_id', $operation->routing_operation_id)
                 ->where('transaction_type', 'rework_completed')
                 ->sum('quantity');
+            $reworkFailedScrappedAtOp = (float) $batchWip->where('from_operation_id', $operation->routing_operation_id)
+                ->where('transaction_type', 'rework_failed_scrapped')
+                ->sum('quantity');
             $processedAtOp = (float) $batchLogs->where('operation_id', $operation->id)->sum('quantity_produced') + $reworkCompletedAtOp;
 
             $logScrapAtOp = (float) $batchLogs->where('operation_id', $operation->id)->sum('quantity_scrapped');
             $disposalScrapAtOp = (float) $batchScraps->where('production_order_operation_id', $operation->id)->sum('quantity');
             $scrapAtOp = max($disposalScrapAtOp, $logScrapAtOp);
 
-            $reworkAtOp = (float) $batchReworks->where('operation_id', $operation->id)->sum('rework_quantity');
+            $reworkAtOp = (float) $batchReworks->where('production_order_operation_id', $operation->id)->where('status', 'pending')->sum('quantity');
             $logRejectedAtOp = (float) $batchLogs->where('operation_id', $operation->id)->sum('quantity_rejected');
             $rejectedAtOp = max($reworkAtOp, $logRejectedAtOp);
-            $pendingRejectedAtOp = max(0.0, $rejectedAtOp - $reworkCompletedAtOp);
+            $pendingRejectedAtOp = max(0.0, $rejectedAtOp - $reworkCompletedAtOp - $reworkFailedScrappedAtOp);
 
             // Transferred IN into current operation's routing_operation_id
             $transferredIn = (float) $batchWip->where('to_operation_id', $operation->routing_operation_id)
@@ -589,7 +592,7 @@ class BatchProductionService
 
             // Check holds / quality blocking
             $isBlocked = ($batch->status === ProductionBatch::STATUS_BLOCKED || $batch->status === 'quarantine');
-            $hasPendingRework = ($batchReworks->where('operation_id', $operation->id)->where('status', 'pending')->isNotEmpty()) || ($pendingRejectedAtOp > 0);
+            $hasPendingRework = ($batchReworks->whereIn('production_order_operation_id', [$operation->id, $operation->routing_operation_id])->where('status', 'pending')->isNotEmpty()) || ($pendingRejectedAtOp > 0);
 
             // Determine Display State
             if ($isBlocked) {
@@ -626,6 +629,7 @@ class BatchProductionService
                 'rework_at_operation' => $reworkAtOp,
                 'rejected_at_operation' => $rejectedAtOp,
                 'rework_completed_at_operation' => $reworkCompletedAtOp,
+                'rework_failed_scrapped_at_operation' => $reworkFailedScrappedAtOp,
                 'pending_rejected_at_operation' => $pendingRejectedAtOp,
                 'transferred_to_next' => $transferredOut,
                 'remaining_to_process' => $remainingToProcess,

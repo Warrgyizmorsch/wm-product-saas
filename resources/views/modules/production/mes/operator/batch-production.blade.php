@@ -73,9 +73,9 @@
                                     <span class="badge bg-soft-success text-success font-monospace fs-11 px-1 py-1" title="Processed Good Quantity">
                                         <i class="feather-check me-1"></i>{{ number_format($item['processed_at_operation'], 2) }} Good
                                     </span>
-                                    @if(($item['rejected_at_operation'] ?? 0) > 0)
-                                        <span class="badge bg-soft-danger text-danger font-monospace fs-11 px-1 py-1" title="Rejected Quantity">
-                                            <i class="feather-x me-1"></i>{{ number_format($item['rejected_at_operation'], 2) }} Rej
+                                    @if(($item['pending_rejected_at_operation'] ?? 0) > 0)
+                                        <span class="badge bg-soft-danger text-danger font-monospace fs-11 px-1 py-1" title="Pending Rejected Quantity">
+                                            <i class="feather-x me-1"></i>{{ number_format($item['pending_rejected_at_operation'], 2) }} Rej
                                         </span>
                                     @endif
                                     @if(($item['scrap_at_operation'] ?? 0) > 0)
@@ -88,7 +88,13 @@
                                     <div class="fs-10 text-success font-semibold mt-1">
                                         <i class="feather-check-circle me-1"></i>{{ number_format($item['rework_completed_at_operation'], 2) }} Recovered
                                     </div>
-                                @elseif(($item['pending_rejected_at_operation'] ?? 0) > 0)
+                                @endif
+                                @if(($item['rework_failed_scrapped_at_operation'] ?? 0) > 0)
+                                    <div class="fs-10 text-danger font-semibold mt-1">
+                                        <i class="feather-x-circle me-1"></i>{{ number_format($item['rework_failed_scrapped_at_operation'], 2) }} Rework Failed (Scrapped)
+                                    </div>
+                                @endif
+                                @if(($item['pending_rejected_at_operation'] ?? 0) > 0)
                                     <div class="fs-10 text-warning font-semibold mt-1">
                                         <i class="feather-alert-triangle me-1"></i>{{ number_format($item['pending_rejected_at_operation'], 2) }} Pending Rework
                                     </div>
@@ -281,23 +287,33 @@
                                             <td class="text-end fw-semibold text-success">{{ number_format($item['processed_at_operation'], 2) }}</td>
                                             <td class="text-center">
                                                 <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center">
-                                                    @if(($item['rejected_at_operation'] ?? 0) > 0)
-                                                        <span class="badge bg-soft-danger text-danger font-monospace fs-11 px-1 py-1">
-                                                            <i class="feather-x me-1"></i>{{ number_format($item['rejected_at_operation'], 2) }} Rej
+                                                    @if(($item['pending_rejected_at_operation'] ?? 0) > 0)
+                                                        <span class="badge bg-soft-danger text-danger font-monospace fs-11 px-1 py-1" title="Pending Rejected Quantity">
+                                                            <i class="feather-x me-1"></i>{{ number_format($item['pending_rejected_at_operation'], 2) }} Rej
                                                         </span>
                                                     @endif
                                                     @if(($item['scrap_at_operation'] ?? 0) > 0)
-                                                        <span class="badge bg-soft-warning text-warning font-monospace fs-11 px-1 py-1">
+                                                        <span class="badge bg-soft-warning text-warning font-monospace fs-11 px-1 py-1" title="Scrapped Quantity">
                                                             <i class="feather-trash-2 me-1"></i>{{ number_format($item['scrap_at_operation'], 2) }} Scrap
                                                         </span>
                                                     @endif
-                                                    @if(($item['rejected_at_operation'] ?? 0) == 0 && ($item['scrap_at_operation'] ?? 0) == 0)
+                                                    @if(($item['pending_rejected_at_operation'] ?? 0) == 0 && ($item['scrap_at_operation'] ?? 0) == 0)
                                                         <span class="text-muted fs-11">—</span>
                                                     @endif
                                                 </div>
                                                 @if(($item['rework_completed_at_operation'] ?? 0) > 0)
                                                     <div class="fs-10 text-success font-semibold mt-1">
                                                         <i class="feather-check-circle me-1"></i>{{ number_format($item['rework_completed_at_operation'], 2) }} Recovered
+                                                    </div>
+                                                @endif
+                                                @if(($item['rework_failed_scrapped_at_operation'] ?? 0) > 0)
+                                                    <div class="fs-10 text-danger font-semibold mt-1">
+                                                        <i class="feather-x-circle me-1"></i>{{ number_format($item['rework_failed_scrapped_at_operation'], 2) }} Rework Failed (Scrapped)
+                                                    </div>
+                                                @endif
+                                                @if(($item['pending_rejected_at_operation'] ?? 0) > 0)
+                                                    <div class="fs-10 text-warning font-semibold mt-1">
+                                                        <i class="feather-alert-triangle me-1"></i>{{ number_format($item['pending_rejected_at_operation'], 2) }} Pending Rework
                                                     </div>
                                                 @endif
                                             </td>

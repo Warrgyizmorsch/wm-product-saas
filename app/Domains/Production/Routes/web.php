@@ -267,6 +267,7 @@ Route::prefix('production')
 
         Route::post('quality/rework/ops/{id}/start', [ReworkController::class, 'startOp'])->name('quality.rework.ops.start');
         Route::post('quality/rework/ops/{id}/complete', [ReworkController::class, 'completeOp'])->name('quality.rework.ops.complete');
+        Route::post('quality/rework/{id}/fail', [ReworkController::class, 'fail'])->name('quality.rework.fail');
         Route::resource('quality/rework', ReworkController::class)->only(['index', 'show']);
 
         Route::post('quality/scrap/{id}/approve', [ScrapController::class, 'approve'])->name('quality.scrap.approve');
