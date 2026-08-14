@@ -14,11 +14,7 @@
 @endpush
 
 @section('content')
-<div class="container-fluid px-4 py-4">
-
     @php
-
-
         // Load geofencing configs for Leaflet Map
         $rule = \App\Domains\HRMS\Models\AttendanceRule::where(function ($q) use ($employee) {
                 $q->where('company_id', $employee->company_id)
@@ -36,10 +32,8 @@
         $wfhRad    = ($rule && $rule->wfh_tracking_meters) ? (int)$rule->wfh_tracking_meters : 200;
     @endphp
 
-    <!-- Attendance Card -->
-    <div class="card border-0 shadow-sm rounded-4">
-        <!-- Filters Toolbar -->
-        <div class="card-header bg-transparent border-0 pt-4 px-4 pb-3">
+    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        <div class="mb-4 pb-3 border-bottom">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 w-100">
                 <div>
                     <h5 class="fw-bold text-dark mb-0 fs-16">Attendance History</h5>
@@ -131,7 +125,7 @@
             </div>
         </div>
 
-        <div class="card-body p-0">
+        <div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light text-uppercase fs-10 tracking-wider">
@@ -277,11 +271,7 @@
                         @endforelse
                     </tbody>
                 </table>
-            </div>
-        </div>
     </div>
-
-</div>
 
 <!-- Attendance Record Details Drawer -->
 <x-ui.drawer id="attendanceRecordDetailDrawer" title="Attendance Session Details" position="end" style="width: 480px; max-width: 95vw;">

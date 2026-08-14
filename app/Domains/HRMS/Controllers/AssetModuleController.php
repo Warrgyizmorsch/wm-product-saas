@@ -21,8 +21,26 @@ class AssetModuleController extends Controller
      */
     public function index(Request $request): View
     {
+        // Self-healing: Ensure all currently allocated assets have an active AssetAllocation record
+        $allocatedAssetsWithoutActiveAlloc = Asset::where('status', 'allocated')
+            ->whereNotNull('assigned_employee_id')
+            ->whereDoesntHave('allocations', function ($query) {
+                $query->whereNull('returned_at');
+            })
+            ->get();
+
+        foreach ($allocatedAssetsWithoutActiveAlloc as $asset) {
+            AssetAllocation::create([
+                'asset_id'             => $asset->id,
+                'employee_id'          => $asset->assigned_employee_id,
+                'allocated_at'         => $asset->allocated_at ?? now(),
+                'allocation_condition' => $asset->condition ?? 'good',
+                'notes'                => 'Auto-generated active allocation record (self-healing)',
+            ]);
+        }
+
         $companies = Company::orderBy('company_name')->get();
-        $employees = Employee::whereIn('status', ['active', 'probation'])
+        $employees = Employee::where('status', true)
             ->orderBy('full_name')
             ->get();
 
@@ -71,7 +89,7 @@ class AssetModuleController extends Controller
         $employeesWithAllocationsQuery = Employee::whereHas('allocations', function($q) {
             $q->whereNull('returned_at');
         })->with(['company', 'allocations' => function($q) {
-            $q->whereNull('returned_at')->with('asset.category');
+            $q->whereNull('returned_at')->with(['asset.category', 'asset.item']);
         }]);
 
         if ($historySearch = $request->input('history_search')) {
@@ -127,36 +145,47 @@ class AssetModuleController extends Controller
     {
         $validated = $request->validate([
             'employee_id'          => 'required|exists:employees,id',
-            'asset_id'             => 'required|exists:assets,id',
             'allocated_at'         => 'required|date',
             'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
             'notes'                => 'nullable|string|max:1000',
+            'items'                => 'required|array|min:1',
+            'items.*.asset_id'     => 'required|exists:assets,id',
+            'items.*.quantity'     => 'required|integer|min:1',
         ]);
 
-        $asset = Asset::findOrFail($validated['asset_id']);
+        $assetIds = collect($validated['items'])->pluck('asset_id')->all();
 
-        if ($asset->status !== 'available') {
-            return redirect()->back()->with('error', 'The selected asset is not currently available.');
+        if (count($assetIds) !== count(array_unique($assetIds))) {
+            return redirect()->back()->withInput()->with('error', 'Duplicate assets selected for allocation.');
         }
 
-        DB::transaction(function () use ($asset, $validated) {
-            $asset->update([
-                'status'               => 'allocated',
-                'assigned_employee_id' => $validated['employee_id'],
-                'allocated_at'         => $validated['allocated_at'],
-                'expected_return_date' => $validated['expected_return_date'] ?? null,
-            ]);
+        $assets = Asset::whereIn('id', $assetIds)->get();
+        foreach ($assets as $asset) {
+            if ($asset->status !== 'available') {
+                return redirect()->back()->withInput()->with('error', "Asset '{$asset->name} ({$asset->asset_code})' is not currently available.");
+            }
+        }
 
-            AssetAllocation::create([
-                'asset_id'             => $asset->id,
-                'employee_id'          => $validated['employee_id'],
-                'allocated_at'         => $validated['allocated_at'],
-                'allocation_condition' => $asset->condition,
-                'notes'                => $validated['notes'] ?? 'Allocated directly by Admin',
-            ]);
+        DB::transaction(function () use ($assets, $validated) {
+            foreach ($assets as $asset) {
+                $asset->update([
+                    'status'               => 'allocated',
+                    'assigned_employee_id' => $validated['employee_id'],
+                    'allocated_at'         => $validated['allocated_at'],
+                    'expected_return_date' => $validated['expected_return_date'] ?? null,
+                ]);
+
+                AssetAllocation::create([
+                    'asset_id'             => $asset->id,
+                    'employee_id'          => $validated['employee_id'],
+                    'allocated_at'         => $validated['allocated_at'],
+                    'allocation_condition' => $asset->condition,
+                    'notes'                => $validated['notes'] ?? 'Allocated directly by Admin',
+                ]);
+            }
         });
 
-        return redirect()->route('hrms.assets-module.index')->with('success', 'Asset allocated directly successfully.');
+        return redirect()->route('hrms.assets-module.index')->with('success', 'Asset(s) allocated directly successfully.');
     }
 
     /**
@@ -202,7 +231,7 @@ class AssetModuleController extends Controller
             ]);
         });
 
-        return redirect()->route('hrms.assets-module.index')->with('success', 'Asset returned to inventory successfully.');
+        return redirect()->back()->with('success', 'Asset returned to inventory successfully.');
     }
 
     /**
@@ -251,7 +280,7 @@ class AssetModuleController extends Controller
             }
         });
 
-        return redirect()->route('hrms.assets-module.index')->with('success', 'Selected asset(s) returned to inventory successfully.');
+        return redirect()->back()->with('success', 'Selected asset(s) returned to inventory successfully.');
     }
 
     /**

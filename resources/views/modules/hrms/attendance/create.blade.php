@@ -13,11 +13,8 @@
 @endsection
 
 @section('content')
-<div class="container-fluid px-4 py-4">
-
-    <!-- Manual Log Entry Table -->
-    <div class="card border-0 shadow-sm rounded-4">
-        <div class="card-header bg-transparent border-0 pt-4 px-4 pb-3">
+<div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        <div class="mb-4 pb-3 border-bottom">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 w-100">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-1">
@@ -123,7 +120,7 @@
             </div>
         </div>
         
-        <div class="card-body p-0">
+        <div>
             @if(isset($employee))
                 {{-- EMPLOYEE MODE --}}
                 <form method="POST" action="{{ route('hrms.attendance.store-manual') }}">
@@ -324,16 +321,14 @@
                         </div>
                         
                         <!-- Submit Toolbar -->
-                        <div class="card-footer bg-transparent border-top p-4 d-flex justify-content-end gap-3">
+                        <div class="border-top pt-4 mt-3 d-flex justify-content-end gap-3">
                             <x-ui.button href="{{ route('hrms.attendance.index', request()->except(['employee_id', 'date', 'view'])) }}" variant="light" class="border fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Cancel</x-ui.button>
                             <x-ui.button type="submit" variant="primary" class="fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Save Attendance Logs</x-ui.button>
                         </div>
                     </form>
                 @endif
             @endif
-        </div>
     </div>
-</div>
 
 <script>
     let currentFilters = {

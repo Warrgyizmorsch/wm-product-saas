@@ -922,7 +922,7 @@
         }
     </style>
 
-    <div class="profile-page">
+    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
 
         <!-- Profile Header -->
         <div class="profile-header-card mb-4">
@@ -1821,81 +1821,13 @@
                     }
                 }
 
-                const $assetRequestRows = $('.asset-request-row');
-                const $assetRequestTbody = $('.asset-requests-table tbody');
-                const $assetRequestNoResultsRow = $('#assetRequestNoResultsRow');
-                let assetRequestSortMode = 'date_desc';
-                let appliedAssetRequestFilters = {
-                    category: '',
-                    status: '',
-                };
 
-                function getAssetRequestFilters() {
-                    return {
-                        search: normalizeText($('#assetRequestSearchInput').val()),
-                        category: appliedAssetRequestFilters.category,
-                        status: appliedAssetRequestFilters.status,
-                    };
-                }
-
-                function compareAssetRequestRows(firstRow, secondRow) {
-                    const $first = $(firstRow);
-                    const $second = $(secondRow);
-                    const firstCategory = $first.data('category') || '';
-                    const secondCategory = $second.data('category') || '';
-                    const firstStatus = $first.data('status') || '';
-                    const secondStatus = $second.data('status') || '';
-                    const firstDate = parseInt($first.data('date'), 10);
-                    const secondDate = parseInt($second.data('date'), 10);
-                    const firstDateValue = Number.isNaN(firstDate) ? 0 : firstDate;
-                    const secondDateValue = Number.isNaN(secondDate) ? 0 : secondDate;
-
-                    if (assetRequestSortMode === 'date_asc') {
-                        return firstDateValue - secondDateValue || firstCategory.localeCompare(secondCategory);
-                    }
-
-                    if (assetRequestSortMode === 'category_asc') {
-                        return firstCategory.localeCompare(secondCategory) || secondDateValue - firstDateValue;
-                    }
-
-                    if (assetRequestSortMode === 'status_asc') {
-                        return firstStatus.localeCompare(secondStatus) || secondDateValue - firstDateValue;
-                    }
-
-                    return secondDateValue - firstDateValue || firstCategory.localeCompare(secondCategory);
-                }
-
-                function refreshAssetRequestRows() {
-                    const filters = getAssetRequestFilters();
-                    let visibleCount = 0;
-                    const sortedRows = $assetRequestRows.toArray().sort(compareAssetRequestRows);
-
-                    $.each(sortedRows, function(_, row) {
-                        const $row = $(row);
-                        const matchesSearch = !filters.search || normalizeText($row.data('search')).includes(filters.search);
-                        const matchesCategory = !filters.category || $row.data('category') === filters.category;
-                        const matchesStatus = !filters.status || $row.data('status') === filters.status;
-                        const isVisible = matchesSearch && matchesCategory && matchesStatus;
-
-                        $row.toggleClass('d-none', !isVisible);
-                        if (isVisible) {
-                            visibleCount++;
-                        }
-
-                        $assetRequestTbody.append(row);
-                    });
-
-                    if ($assetRequestNoResultsRow.length) {
-                        $assetRequestTbody.append($assetRequestNoResultsRow);
-                        $assetRequestNoResultsRow.toggleClass('d-none', !(visibleCount === 0 && $assetRequestRows.length > 0));
-                    }
-                }
 
                 initDocumentFilterSelects();
 
                 $('#documentSearchInput').on('input', refreshDocumentRows);
                 $('#assignedAssetSearchInput').on('input', refreshAssignedAssetRows);
-                $('#assetRequestSearchInput').on('input', refreshAssetRequestRows);
+
 
                 $('#btnDocumentFilterApply').on('click', function() {
                     const $form = $('#documentFilterForm');
@@ -1941,27 +1873,7 @@
                     refreshAssignedAssetRows();
                 });
 
-                $('#btnAssetRequestFilterApply').on('click', function() {
-                    const $form = $('#assetRequestFilterForm');
-                    appliedAssetRequestFilters = {
-                        category: $form.find('[name="category"]').val(),
-                        status: $form.find('[name="status"]').val(),
-                    };
 
-                    refreshAssetRequestRows();
-                    $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
-                    $('.erp-filter-dropdown.show').removeClass('show');
-                });
-
-                $('#btnAssetRequestFilterReset').on('click', function() {
-                    $('#assetRequestFilterForm [name="category"]').val('').trigger('change');
-                    $('#assetRequestFilterForm [name="status"]').val('').trigger('change');
-                    appliedAssetRequestFilters = {
-                        category: '',
-                        status: '',
-                    };
-                    refreshAssetRequestRows();
-                });
 
                 $('.document-sort-link').on('click', function(e) {
                     e.preventDefault();
@@ -1983,19 +1895,11 @@
                     $('.erp-sort-dropdown.show').removeClass('show');
                 });
 
-                $('.asset-request-sort-link').on('click', function(e) {
-                    e.preventDefault();
-                    assetRequestSortMode = $(this).data('sort') || 'date_desc';
-                    $('.asset-request-sort-link').removeClass('active').find('.feather-check').remove();
-                    $(this).addClass('active').append('<i class="feather-check ms-3"></i>');
-                    refreshAssetRequestRows();
-                    $('.erp-sort-dropdown .dropdown-menu.show').removeClass('show');
-                    $('.erp-sort-dropdown.show').removeClass('show');
-                });
+
 
                 refreshDocumentRows();
                 refreshAssignedAssetRows();
-                refreshAssetRequestRows();
+
             });
         </script>
 

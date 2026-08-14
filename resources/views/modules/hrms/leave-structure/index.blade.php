@@ -282,11 +282,13 @@
 
     <div class="settings-container">
         <!-- Content Column -->
-        <div class="settings-content-col">
+        <div class="settings-content-col erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
 
             <div class="col-12">
-                <x-ui.card title="{{ __('hrms.leave.leave_plans') }}" bodyClass="p-0" stretch id="leavePlanMasterCard">
-                    <x-slot name="headerAction">
+            <div id="leavePlanMasterCard">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom bg-transparent border-0 px-0 pt-0">
+                    <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.leave.leave_plans') }}</h5>
+                    <div class="d-flex align-items-center gap-2">
                         <form method="GET" action="{{ route('hrms.leave-structure.index') }}" id="leavePlanFilterForm" class="d-flex align-items-center gap-2 m-0">
                             <!-- Hidden inputs for pagination/plan state -->
                             <input type="hidden" name="plan_id" value="{{ request()->get('plan_id', $selectedPlan ? $selectedPlan->id : '') }}">
@@ -335,9 +337,10 @@
                                 </div>
                             </x-ui.filter>
                         </form>
-                    </x-slot>
-
-                    <div class="row g-0">
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-0">
                         <!-- LEFT COLUMN: ALL PLANS NAMES ONLY -->
                         <div class="col-md-4 col-12 border-end" id="leavePlanStickyCol">
 
@@ -596,7 +599,8 @@
                         </div>
                         </div>
                     </div>
-                </x-ui.card>
+            </div>
+            </div>
             </div>
         </div>
     </div>

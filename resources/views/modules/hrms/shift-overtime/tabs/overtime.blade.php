@@ -2,8 +2,8 @@
 
 
     {{-- Overtime Table --}}
-    <div class="card border-0 shadow-sm rounded-3">
-        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
             <div>
                 <h5 class="fw-bold text-dark mb-0"><i class="feather-clock me-2 text-primary"></i> {{ __('hrms.overtime.title') }}</h5>
                 <p class="text-muted fs-12 mb-0">{{ __('hrms.overtime.title') }}</p>
@@ -63,7 +63,7 @@
                 </form>
             </div>
         </div>
-        <div class="card-body p-0">
+        <div>
             <div class="table-responsive" style="overflow: visible;">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">

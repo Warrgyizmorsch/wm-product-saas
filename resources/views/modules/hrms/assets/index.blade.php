@@ -166,7 +166,7 @@
 @section('content')
     <div class="settings-container">
         <!-- Right Content Column -->
-        <div class="settings-content-col flex-grow-1">
+        <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark">
 
             <!-- Tabs Navigation -->
             <ul class="nav nav-tabs border-bottom mb-4" id="assetModuleTabs" role="tablist">

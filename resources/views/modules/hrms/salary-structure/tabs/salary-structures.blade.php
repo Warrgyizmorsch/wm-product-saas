@@ -8,15 +8,18 @@
 <div class="row g-4">
     <!-- List Table Card -->
     <div class="col-12">
-        <x-ui.card title="{{ __('hrms.salary.structures_slabs') }}" stretch bodyClass="p-0">
-            <x-slot name="headerAction">
+    <div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+            <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.salary.structures_slabs') }}</h5>
+            <div class="d-flex align-items-center gap-2">
                 <x-ui.button variant="light" size="sm" icon="feather-activity" data-bs-toggle="offcanvas" data-bs-target="#ctcCalculatorDrawer" class="me-2">
                     {{ __('hrms.salary.ctc_calculator') }}
                 </x-ui.button>
                 <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-structure-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-bs-toggle="modal" data-bs-target="#addSalaryStructureModal">
                     {{ __('hrms.salary.add_structure') }}
                 </x-ui.button>
-            </x-slot>
+            </div>
+        </div>
 
             <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative; z-index: 10;">
                 <input type="hidden" id="struct_sort_value" value="{{ request('struct_sort', 'name_asc') }}">
@@ -206,7 +209,7 @@
                 $perPage = $salaryStructures->perPage();
             @endphp
             @if($salaryStructures->hasPages())
-                <div class="card-footer bg-white border-top px-4 py-3 struct-pagination-container">
+                <div class="pt-3 border-top mt-3 struct-pagination-container">
                     <x-ui.pagination
                         class="px-0 py-0"
                         :current-page="$currentPage"
@@ -217,7 +220,7 @@
                     />
                 </div>
             @endif
-        </x-ui.card>
+        </div>
     </div>
 </div>
 

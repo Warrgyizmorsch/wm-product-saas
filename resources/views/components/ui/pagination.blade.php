@@ -8,68 +8,66 @@
 ])
 
 @once
-    @push('styles')
-        <style>
-            .erp-pagination-container {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                gap: 12px;
-                margin-top: auto !important;
-                padding-top: 15px;
-                border-top: 1px solid #f1f5f9;
-            }
-            .erp-pagination {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                margin-bottom: 0;
-                padding-left: 0;
-                list-style: none;
-            }
-            .erp-pagination .page-item {
-                display: inline-block;
-            }
-            .erp-pagination .page-link {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 36px;
-                height: 36px;
-                border-radius: 50% !important; /* Circle instead of square */
-                border: 1px solid #cbd5e1;
-                background-color: #ffffff;
-                color: #475569;
-                font-size: 13px;
-                font-weight: 600;
-                transition: all 0.2s ease-in-out;
-                text-decoration: none;
-                cursor: pointer;
-            }
-            .erp-pagination .page-link:hover {
-                background-color: rgba(var(--bs-primary-rgb), 0.08);
-                border-color: var(--bs-primary);
-                color: var(--bs-primary);
-            }
-            .erp-pagination .page-item.active .page-link {
-                background-color: var(--bs-primary) !important;
-                border-color: var(--bs-primary) !important;
-                color: #ffffff !important;
-                box-shadow: 0 4px 10px rgba(var(--bs-primary-rgb), 0.2);
-            }
-            .erp-pagination .page-item.disabled .page-link {
-                background-color: #f8fafc;
-                border-color: #e2e8f0;
-                color: #94a3b8;
-                cursor: not-allowed;
-            }
-            .erp-pagination-info {
-                font-size: 12px;
-                color: #64748b;
-            }
-        </style>
-    @endpush
+    <style>
+        .erp-pagination-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: auto !important;
+            padding-top: 15px;
+            border-top: 1px solid #f1f5f9;
+        }
+        .erp-pagination {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+        .erp-pagination .page-item {
+            display: inline-block;
+        }
+        .erp-pagination .page-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50% !important; /* Circle instead of square */
+            border: 1px solid #cbd5e1;
+            background-color: #ffffff;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .erp-pagination .page-link:hover {
+            background-color: rgba(var(--bs-primary-rgb), 0.08);
+            border-color: var(--bs-primary);
+            color: var(--bs-primary);
+        }
+        .erp-pagination .page-item.active .page-link {
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 10px rgba(var(--bs-primary-rgb), 0.2);
+        }
+        .erp-pagination .page-item.disabled .page-link {
+            background-color: #f8fafc;
+            border-color: #e2e8f0;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+        .erp-pagination-info {
+            font-size: 12px;
+            color: #64748b;
+        }
+    </style>
 @endonce
 
 @php
