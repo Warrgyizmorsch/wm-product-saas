@@ -36,37 +36,67 @@
 
         {{-- Section 1: Active / Ready to Process Batches --}}
         <x-ui.card :title="__('production.active_batches') . ' at ' . $op->name" class="mb-4">
-            <x-ui.odoo-form-ui type="table">
+            <x-ui.odoo-form-ui type="table" class="align-middle mb-0 w-100">
                 <thead>
                     <tr>
                         <th style="width: 22%">Batch Number</th>
                         @if($batchQueue['meta']['is_first_op'])
-                            <th style="width: 12%" class="text-end">Planned Qty</th>
+                            <th style="width: 13%" class="text-end">Planned / Rem</th>
                         @else
-                            <th style="width: 12%" class="text-end">Transferred In</th>
+                            <th style="width: 13%" class="text-end">In / Rem</th>
                         @endif
-                        <th style="width: 12%" class="text-end">Processed</th>
-                        <th style="width: 12%" class="text-end">Remaining</th>
-                        <th style="width: 12%" class="text-end">Transferred Out</th>
-                        <th style="width: 12%" class="text-center">Status</th>
-                        <th style="width: 18%" class="text-center">Actions</th>
+                        <th style="width: 26%" class="text-center">Output Metrics</th>
+                        <th style="width: 9%" class="text-end">Out</th>
+                        <th style="width: 13%" class="text-center">Status</th>
+                        <th style="width: 17%" class="text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($batchQueue['active'] as $item)
                         <tr>
                             <td>
-                                <div class="fw-bold text-dark font-monospace">{{ $item['batch']->batch_number }}</div>
+                                <div class="fw-bold text-dark font-monospace text-break">{{ $item['batch']->batch_number }}</div>
                                 @if(!$batchQueue['meta']['is_first_op'] && $item['previous_operation'])
                                     <div class="fs-10 text-muted"><i class="feather-corner-down-right me-1"></i>From: {{ $item['previous_operation']->name }}</div>
                                 @endif
                             </td>
-                            <td class="text-end fw-semibold text-primary">
-                                {{ number_format($batchQueue['meta']['is_first_op'] ? $item['planned_quantity'] : $item['input_received'], 2) }}
+                            <td class="text-end fs-12">
+                                <div class="fw-semibold text-primary" title="Planned / Transferred In">
+                                    <span class="fs-10 text-muted me-1">In:</span>{{ number_format($batchQueue['meta']['is_first_op'] ? $item['planned_quantity'] : $item['input_received'], 2) }}
+                                </div>
+                                <div class="fw-semibold text-danger fs-11" title="Remaining to process">
+                                    <span class="fs-10 text-muted me-1">Rem:</span>{{ number_format($item['remaining_to_process'], 2) }}
+                                </div>
                             </td>
-                            <td class="text-end fw-semibold text-dark">{{ number_format($item['processed_at_operation'], 2) }}</td>
-                            <td class="text-end text-danger fw-semibold">{{ number_format($item['remaining_to_process'], 2) }}</td>
-                            <td class="text-end text-muted">{{ number_format($item['transferred_to_next'], 2) }}</td>
+                            <td class="text-center">
+                                <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center">
+                                    <span class="badge bg-soft-success text-success font-monospace fs-11 px-1 py-1" title="Processed Good Quantity">
+                                        <i class="feather-check me-1"></i>{{ number_format($item['processed_at_operation'], 2) }} Good
+                                    </span>
+                                    @if(($item['rejected_at_operation'] ?? 0) > 0)
+                                        <span class="badge bg-soft-danger text-danger font-monospace fs-11 px-1 py-1" title="Rejected Quantity">
+                                            <i class="feather-x me-1"></i>{{ number_format($item['rejected_at_operation'], 2) }} Rej
+                                        </span>
+                                    @endif
+                                    @if(($item['scrap_at_operation'] ?? 0) > 0)
+                                        <span class="badge bg-soft-warning text-warning font-monospace fs-11 px-1 py-1" title="Scrapped Quantity">
+                                            <i class="feather-trash-2 me-1"></i>{{ number_format($item['scrap_at_operation'], 2) }} Scrap
+                                        </span>
+                                    @endif
+                                </div>
+                                @if(($item['rework_completed_at_operation'] ?? 0) > 0)
+                                    <div class="fs-10 text-success font-semibold mt-1">
+                                        <i class="feather-check-circle me-1"></i>{{ number_format($item['rework_completed_at_operation'], 2) }} Recovered
+                                    </div>
+                                @elseif(($item['pending_rejected_at_operation'] ?? 0) > 0)
+                                    <div class="fs-10 text-warning font-semibold mt-1">
+                                        <i class="feather-alert-triangle me-1"></i>{{ number_format($item['pending_rejected_at_operation'], 2) }} Pending Rework
+                                    </div>
+                                @endif
+                            </td>
+                            <td class="text-end text-muted fs-12 font-monospace">
+                                {{ number_format($item['transferred_to_next'], 2) }}
+                            </td>
                             <td class="text-center">
                                 @php
                                     $badgeVariant = match ($item['display_status']) {
@@ -76,14 +106,14 @@
                                         default => 'secondary',
                                     };
                                 @endphp
-                                <x-ui.badge :variant="$badgeVariant" soft class="fs-11">
+                                <x-ui.badge :variant="$badgeVariant" soft class="fs-10 px-1 py-1">
                                     {{ str_replace('_', ' ', $item['display_status']) }}
                                 </x-ui.badge>
                             </td>
                             <td class="text-center">
                                 <div class="d-flex gap-1 justify-content-center flex-wrap">
                                     @if($item['can_log_progress'])
-                                        <x-ui.button size="sm" variant="info" class="text-white py-1 px-2"
+                                        <x-ui.button size="sm" variant="info" class="text-white py-1 px-2 fs-11"
                                             onclick="openLogProgressForBatch({{ $item['batch']->id }}, '{{ $item['batch']->batch_number }}', {{ $item['remaining_to_process'] }})"
                                             title="Log Progress">
                                             <i class="feather-edit-3 me-1"></i> Log
@@ -98,7 +128,7 @@
                                                 ->value('id');
                                         @endphp
                                         @if($wipId && $item['next_operation'])
-                                            <x-ui.button size="sm" variant="success" class="py-1 px-2"
+                                            <x-ui.button size="sm" variant="success" class="py-1 px-2 fs-11"
                                                 onclick="openTransferModal({{ $wipId }}, '{{ $item['batch']->batch_number }}', {{ $op->routing_operation_id }}, {{ $item['next_operation']->routing_operation_id }}, '{{ $item['next_operation']->name }}', {{ $item['ready_to_transfer'] }})"
                                                 title="Transfer WIP">
                                                 <i class="feather-send me-1"></i> Transfer
@@ -106,14 +136,14 @@
                                         @endif
                                     @endif
 
-                                    <x-ui.button size="sm" variant="light" class="border py-1 px-1"
+                                    <x-ui.button size="sm" variant="light" class="border py-1 px-1 fs-11"
                                         href="{{ route('production.labels.batches.print', $item['batch']->id) }}" target="_blank"
                                         title="Print Label">
                                         <i class="feather-printer"></i>
                                     </x-ui.button>
 
                                     @if($item['can_split'])
-                                        <x-ui.button size="sm" variant="light" class="border py-1 px-1"
+                                        <x-ui.button size="sm" variant="light" class="border py-1 px-1 fs-11"
                                             onclick="openSplitModal({{ $item['batch']->id }}, '{{ $item['batch']->batch_number }}', {{ $item['input_available'] }})"
                                             title="Split Batch">
                                             <i class="feather-git-commit"></i>
@@ -124,7 +154,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-4 text-muted">
+                            <td colspan="6" class="text-center py-4 text-muted">
                                 No active batches currently requiring production at this operation.
                             </td>
                         </tr>
@@ -136,13 +166,13 @@
         {{-- Section 2: Waiting for Transfer Section --}}
         @if(!empty($batchQueue['waiting_transfer']))
             <x-ui.card title="Waiting for Transfer to Next Operation" class="mb-4 border-warning">
-                <x-ui.odoo-form-ui type="table">
+                <x-ui.odoo-form-ui type="table" class="align-middle mb-0 w-100">
                     <thead>
                         <tr>
                             <th>Batch Number</th>
-                            <th class="text-end">Processed Good Qty</th>
-                            <th class="text-end">Already Transferred</th>
-                            <th class="text-end">Ready to Transfer</th>
+                            <th class="text-end">Good Qty</th>
+                            <th class="text-end">Transferred</th>
+                            <th class="text-end">Ready</th>
                             <th>Destination</th>
                             <th class="text-center">Action</th>
                         </tr>
@@ -150,12 +180,12 @@
                     <tbody>
                         @foreach($batchQueue['waiting_transfer'] as $item)
                             <tr>
-                                <td><strong class="font-monospace text-dark">{{ $item['batch']->batch_number }}</strong></td>
+                                <td><strong class="font-monospace text-dark text-break">{{ $item['batch']->batch_number }}</strong></td>
                                 <td class="text-end fw-semibold text-success">{{ number_format($item['good_at_operation'], 2) }}</td>
                                 <td class="text-end text-muted">{{ number_format($item['transferred_to_next'], 2) }}</td>
                                 <td class="text-end fw-bold text-primary">{{ number_format($item['ready_to_transfer'], 2) }}</td>
                                 <td>
-                                    <x-ui.badge variant="info" soft class="font-monospace">
+                                    <x-ui.badge variant="info" soft class="font-monospace fs-11">
                                         {{ $item['next_operation']?->name ?? 'Next Operation' }}
                                     </x-ui.badge>
                                 </td>
@@ -167,7 +197,7 @@
                                             ->value('id');
                                     @endphp
                                     @if($wipId && $item['next_operation'])
-                                        <x-ui.button size="sm" variant="warning" class="py-1 px-3"
+                                        <x-ui.button size="sm" variant="warning" class="py-1 px-3 fs-11"
                                             onclick="openTransferModal({{ $wipId }}, {{ $item['batch']->id }}, '{{ $item['batch']->batch_number }}', {{ $op->routing_operation_id }}, {{ $item['next_operation']->routing_operation_id }}, '{{ $item['next_operation']->name }}', {{ $item['ready_to_transfer'] }})">
                                             <i class="feather-send me-1"></i> Transfer WIP
                                         </x-ui.button>
@@ -183,7 +213,7 @@
         {{-- Section 3: Blocked / On Hold / Rework --}}
         @if(!empty($batchQueue['blocked']))
             <x-ui.card title="Blocked / Quality Hold / Rework" class="mb-4 border-danger">
-                <x-ui.odoo-form-ui type="table">
+                <x-ui.odoo-form-ui type="table" class="align-middle mb-0 w-100">
                     <thead>
                         <tr>
                             <th>Batch Number</th>
@@ -195,7 +225,7 @@
                     <tbody>
                         @foreach($batchQueue['blocked'] as $item)
                             <tr>
-                                <td><strong class="font-monospace text-dark">{{ $item['batch']->batch_number }}</strong></td>
+                                <td><strong class="font-monospace text-dark text-break">{{ $item['batch']->batch_number }}</strong></td>
                                 <td class="text-end text-danger fw-semibold">{{ number_format($item['scrap_at_operation'], 2) }}</td>
                                 <td class="text-end text-warning fw-semibold">{{ number_format($item['rework_at_operation'], 2) }}</td>
                                 <td>
@@ -233,29 +263,52 @@
                     </h2>
                     <div id="collapseCompleted" class="accordion-collapse collapse" aria-labelledby="headingCompleted" data-bs-parent="#completedBatchesAccordion">
                         <div class="accordion-body p-0">
-                            <x-ui.odoo-form-ui type="table" class="mb-0">
+                            <x-ui.odoo-form-ui type="table" class="mb-0 align-middle w-100">
                                 <thead>
                                     <tr>
-                                        <th>Batch Number</th>
-                                        <th class="text-end">Processed Qty</th>
-                                        <th class="text-end">Transferred Out</th>
-                                        <th>Destination</th>
-                                        <th class="text-center">Status</th>
+                                        <th style="width: 22%">Batch Number</th>
+                                        <th style="width: 15%" class="text-end">Good Qty</th>
+                                        <th style="width: 26%" class="text-center">Defects & Scrap</th>
+                                        <th style="width: 12%" class="text-end">Out</th>
+                                        <th style="width: 15%">Destination</th>
+                                        <th style="width: 10%" class="text-center">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach($batchQueue['completed'] as $item)
                                         <tr>
-                                            <td><strong class="font-monospace text-dark">{{ $item['batch']->batch_number }}</strong></td>
+                                            <td><strong class="font-monospace text-dark text-break">{{ $item['batch']->batch_number }}</strong></td>
                                             <td class="text-end fw-semibold text-success">{{ number_format($item['processed_at_operation'], 2) }}</td>
-                                            <td class="text-end text-dark">{{ number_format($item['transferred_to_next'], 2) }}</td>
+                                            <td class="text-center">
+                                                <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center">
+                                                    @if(($item['rejected_at_operation'] ?? 0) > 0)
+                                                        <span class="badge bg-soft-danger text-danger font-monospace fs-11 px-1 py-1">
+                                                            <i class="feather-x me-1"></i>{{ number_format($item['rejected_at_operation'], 2) }} Rej
+                                                        </span>
+                                                    @endif
+                                                    @if(($item['scrap_at_operation'] ?? 0) > 0)
+                                                        <span class="badge bg-soft-warning text-warning font-monospace fs-11 px-1 py-1">
+                                                            <i class="feather-trash-2 me-1"></i>{{ number_format($item['scrap_at_operation'], 2) }} Scrap
+                                                        </span>
+                                                    @endif
+                                                    @if(($item['rejected_at_operation'] ?? 0) == 0 && ($item['scrap_at_operation'] ?? 0) == 0)
+                                                        <span class="text-muted fs-11">—</span>
+                                                    @endif
+                                                </div>
+                                                @if(($item['rework_completed_at_operation'] ?? 0) > 0)
+                                                    <div class="fs-10 text-success font-semibold mt-1">
+                                                        <i class="feather-check-circle me-1"></i>{{ number_format($item['rework_completed_at_operation'], 2) }} Recovered
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td class="text-end text-dark font-monospace">{{ number_format($item['transferred_to_next'], 2) }}</td>
                                             <td>
-                                                <x-ui.badge variant="info" soft class="font-monospace">
+                                                <x-ui.badge variant="info" soft class="font-monospace fs-11">
                                                     {{ $item['next_operation']?->name ?? 'Finished Goods Receipt' }}
                                                 </x-ui.badge>
                                             </td>
                                             <td class="text-center">
-                                                <x-ui.badge variant="success" soft class="fs-10">COMPLETED HERE</x-ui.badge>
+                                                <x-ui.badge variant="success" soft class="fs-10">COMPLETED</x-ui.badge>
                                             </td>
                                         </tr>
                                     @endforeach

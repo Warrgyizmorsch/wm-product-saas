@@ -542,6 +542,9 @@ class BatchProductionService
             $scrapAtOp = max($disposalScrapAtOp, $logScrapAtOp);
 
             $reworkAtOp = (float) $batchReworks->where('operation_id', $operation->id)->sum('rework_quantity');
+            $logRejectedAtOp = (float) $batchLogs->where('operation_id', $operation->id)->sum('quantity_rejected');
+            $rejectedAtOp = max($reworkAtOp, $logRejectedAtOp);
+            $pendingRejectedAtOp = max(0.0, $rejectedAtOp - $reworkCompletedAtOp);
 
             // Transferred IN into current operation's routing_operation_id
             $transferredIn = (float) $batchWip->where('to_operation_id', $operation->routing_operation_id)
@@ -568,7 +571,7 @@ class BatchProductionService
             }
 
             // Input available & remaining processable quantity
-            $totalInputConsumed = $processedAtOp + $scrapAtOp;
+            $totalInputConsumed = $processedAtOp + $pendingRejectedAtOp + $scrapAtOp;
 
             if ($isFirstOp) {
                 $inputAvailable = max(0.0, (float) $batch->planned_quantity - $totalInputConsumed);
@@ -586,28 +589,28 @@ class BatchProductionService
 
             // Check holds / quality blocking
             $isBlocked = ($batch->status === ProductionBatch::STATUS_BLOCKED || $batch->status === 'quarantine');
-            $hasPendingRework = $batchReworks->where('operation_id', $operation->id)->where('status', 'pending')->isNotEmpty();
+            $hasPendingRework = ($batchReworks->where('operation_id', $operation->id)->where('status', 'pending')->isNotEmpty()) || ($pendingRejectedAtOp > 0);
 
             // Determine Display State
             if ($isBlocked) {
                 $displayStatus = 'BLOCKED';
             } elseif ($hasPendingRework) {
                 $displayStatus = 'REWORK';
-            } elseif ($isFirstOp && $totalInputConsumed >= $batch->planned_quantity && $readyToTransfer <= 0) {
+            } elseif ($isFirstOp && $totalInputConsumed >= $batch->planned_quantity && $readyToTransfer <= 0 && $pendingRejectedAtOp <= 0) {
                 $displayStatus = 'COMPLETED_AT_OPERATION';
-            } elseif (!$isFirstOp && $transferredIn > 0 && $remainingToProcess <= 0 && $readyToTransfer <= 0) {
+            } elseif (!$isFirstOp && $transferredIn > 0 && $remainingToProcess <= 0 && $readyToTransfer <= 0 && $pendingRejectedAtOp <= 0) {
                 $displayStatus = 'COMPLETED_AT_OPERATION';
-            } elseif (($processedAtOp > 0 || $scrapAtOp > 0) && $remainingToProcess <= 0 && $readyToTransfer > 0) {
+            } elseif (($processedAtOp > 0 || $scrapAtOp > 0 || $rejectedAtOp > 0) && $remainingToProcess <= 0 && $readyToTransfer > 0 && $pendingRejectedAtOp <= 0) {
                 $displayStatus = 'WAITING_FOR_TRANSFER';
-            } elseif (($processedAtOp > 0 || $scrapAtOp > 0) && $remainingToProcess > 0) {
+            } elseif (($processedAtOp > 0 || $scrapAtOp > 0 || $rejectedAtOp > 0) && ($remainingToProcess > 0 || $pendingRejectedAtOp > 0)) {
                 $displayStatus = 'PARTIALLY_PROCESSED';
-            } elseif ($processedAtOp == 0 && $scrapAtOp == 0 && $totalInputReceived > 0 && $remainingToProcess > 0) {
+            } elseif ($processedAtOp == 0 && $scrapAtOp == 0 && $rejectedAtOp == 0 && $totalInputReceived > 0 && $remainingToProcess > 0) {
                 $displayStatus = 'READY';
             } else {
                 $displayStatus = 'WAITING_FOR_INPUT';
             }
 
-            $canLogProgress = ($remainingToProcess > 0) && !$isBlocked && !$hasPendingRework;
+            $canLogProgress = ($remainingToProcess > 0 || $pendingRejectedAtOp > 0) && !$isBlocked;
             $canTransfer = ($nextOp !== null) && ($readyToTransfer > 0) && !$isBlocked;
             $canSplit = ($inputAvailable > 0) && !$isBlocked;
             $canPrintLabel = true;
@@ -621,6 +624,9 @@ class BatchProductionService
                 'good_at_operation' => $goodAtOp,
                 'scrap_at_operation' => $scrapAtOp,
                 'rework_at_operation' => $reworkAtOp,
+                'rejected_at_operation' => $rejectedAtOp,
+                'rework_completed_at_operation' => $reworkCompletedAtOp,
+                'pending_rejected_at_operation' => $pendingRejectedAtOp,
                 'transferred_to_next' => $transferredOut,
                 'remaining_to_process' => $remainingToProcess,
                 'ready_to_transfer' => $readyToTransfer,
@@ -634,13 +640,13 @@ class BatchProductionService
             ];
 
             // Assign to queue categories
-            if ($displayStatus === 'BLOCKED' || $displayStatus === 'REWORK') {
+            if ($displayStatus === 'BLOCKED') {
                 $queue['blocked'][] = $item;
             } elseif ($displayStatus === 'COMPLETED_AT_OPERATION') {
                 $queue['completed'][] = $item;
             } elseif ($displayStatus === 'WAITING_FOR_TRANSFER') {
                 $queue['waiting_transfer'][] = $item;
-            } elseif ($displayStatus === 'READY' || $displayStatus === 'PARTIALLY_PROCESSED') {
+            } elseif ($displayStatus === 'READY' || $displayStatus === 'PARTIALLY_PROCESSED' || $displayStatus === 'REWORK') {
                 $queue['active'][] = $item;
             } else {
                 $queue['waiting_input'][] = $item;

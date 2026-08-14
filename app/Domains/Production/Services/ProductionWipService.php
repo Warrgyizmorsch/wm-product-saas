@@ -1193,8 +1193,8 @@ class ProductionWipService
 
             $mainWip->update([
                 'available_quantity' => $unallocatedQty,
-                'quantity'           => $unallocatedQty,
-                'status'             => $newStatus,
+                'quantity' => $unallocatedQty,
+                'status' => $newStatus,
             ]);
         }
 
@@ -1311,7 +1311,7 @@ class ProductionWipService
                     ->where('production_order_id', $order->id)
                     ->where(function ($q) use ($op) {
                         $q->where('production_order_operation_id', $op->id)
-                          ->orWhereNull('production_order_operation_id');
+                            ->orWhereNull('production_order_operation_id');
                     })
                     ->when($batch->id, function ($q) use ($batch) {
                         $q->where(fn($sub) => $sub->whereNull('batch_id')->orWhere('batch_id', $batch->id));
@@ -1417,7 +1417,8 @@ class ProductionWipService
 
         $query = ProductionWip::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
-            ->when($workCenterId !== null,
+            ->when(
+                $workCenterId !== null,
                 fn($q) => $q->where('current_work_center_id', $workCenterId),
                 fn($q) => $q->whereNull('current_work_center_id')
             )
