@@ -28,6 +28,7 @@ class Document extends BaseModel
         'has_expiry',
         'expiry_date',
         'requested_by_id',
+        'document_master_id',
     ];
 
     protected $casts = [
@@ -43,5 +44,10 @@ class Document extends BaseModel
     public function requestedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by_id');
+    }
+
+    public function documentMaster(): BelongsTo
+    {
+        return $this->belongsTo(DocumentMaster::class, 'document_master_id');
     }
 }

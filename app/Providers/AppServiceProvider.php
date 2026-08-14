@@ -100,6 +100,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
+            \App\Domains\HRMS\Repositories\DocumentMasterRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\DocumentMasterRepository::class
+        );
+
+        $this->app->bind(
             \App\Domains\HRMS\Repositories\ShiftChangeRequestRepositoryInterface::class,
             \App\Domains\HRMS\Repositories\ShiftChangeRequestRepository::class
         );
