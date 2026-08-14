@@ -1,8 +1,10 @@
 <div class="row">
     <!-- List Table Card -->
     <div class="col-12">
-        <x-ui.card title="{{ __('hrms.org.departments') }}" stretch bodyClass="p-0">
-            <x-slot name="headerAction">
+    <div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+            <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.org.departments') }}</h5>
+            <div class="d-flex align-items-center gap-2">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <!-- Search Form -->
                     <form method="GET" action="{{ route('hrms.org.index') }}" class="d-flex align-items-center bg-light border rounded px-3 py-1 m-0" style="min-width: 240px; height: 36px !important; box-sizing: border-box !important;">
@@ -96,7 +98,8 @@
                         </form>
                     </x-ui.filter>
                 </div>
-            </x-slot>
+            </div>
+        </div>
 
             <div class="table-responsive">
                 <table class="table table-hover mb-0 align-middle" style="table-layout: fixed; width: 100%;">
@@ -178,7 +181,7 @@
                     tab="departments"
                 />
             </div>
-        </x-ui.card>
+        </div>
     </div>
 </div>
 

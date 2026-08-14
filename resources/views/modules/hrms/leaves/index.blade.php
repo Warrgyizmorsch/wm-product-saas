@@ -1208,7 +1208,8 @@
 @endpush
 
 @section('content')
-    <div class="row pt-4 px-4">
+    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        <div class="row">
 
 
         <!-- Main Module Navigation Tabs -->
@@ -1236,8 +1237,8 @@
             <div class="tab-content" id="leavesModuleTabContent">
                 <!-- Pane 1: Leave Applications -->
                 <div class="tab-pane fade show active" id="pane-leave-applications" role="tabpanel">
-                    <div class="card border-0 shadow-sm rounded-3">
-                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                             <div>
                                 <h5 class="fw-bold text-dark mb-0">{{ __('hrms.leave.app.title') }}</h5>
                                 <p class="text-muted fs-12 mb-0">{{ __('hrms.leave.app.review_applications_desc') }}</p>
@@ -1307,7 +1308,7 @@
                             </div>
                         </div>
                         
-                        <div class="card-body p-0">
+                        <div>
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0" id="leavesTable">
                                     <thead class="table-light">
@@ -1654,8 +1655,8 @@
 
                 <!-- Pane 2: Leave Encashments -->
                 <div class="tab-pane fade" id="pane-leave-encashments" role="tabpanel">
-                    <div class="card border-0 shadow-sm rounded-3">
-                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                             <div>
                                 <h5 class="fw-bold text-dark mb-0">{{ __('hrms.leave.encashment_app.title') }}</h5>
                                 <p class="text-muted fs-12 mb-0">{{ __('hrms.leave.app.review_applications_desc') }}</p>
@@ -1729,7 +1730,7 @@
                             </div>
                         </div>
 
-                        <div class="card-body p-0">
+                        <div>
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0">
                                     <thead class="table-light">
@@ -1843,6 +1844,7 @@
                     </div>
                 </div>
             </div>
+        </div>
         </div>
     </div>
 

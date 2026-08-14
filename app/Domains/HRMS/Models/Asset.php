@@ -73,7 +73,7 @@ class Asset extends BaseModel
      */
     public function allocations(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(AssetAllocation::class)->orderBy('allocated_at', 'desc');
+        return $this->hasMany(AssetAllocation::class)->orderBy('allocated_at', 'desc')->orderBy('id', 'desc');
     }
 
     /**

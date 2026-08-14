@@ -1,7 +1,7 @@
 <!-- 1. ASSET ITEMS TAB -->
 <div class="tab-pane fade show active" id="items-pane" role="tabpanel" aria-labelledby="items-tab">
-    <div class="card border rounded bg-white shadow-sm">
-        <div class="card-header border-bottom d-flex flex-wrap justify-content-between align-items-center py-3 px-4 bg-white gap-3">
+    <div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
             <div>
                 <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.assets.item_catalog_master') }}</h5>
             </div>
@@ -69,7 +69,7 @@
                 </form>
             </div>
         </div>
-        <div class="card-body p-0">
+        <div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0 text-center" style="table-layout: fixed; width: 100%;">
                      <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
@@ -341,7 +341,7 @@
             $itemPerPage = $filteredItems->perPage();
         @endphp
         @if($filteredItems->hasPages())
-            <div class="card-footer bg-white border-top px-4 py-3">
+            <div class="pt-3 border-top mt-3">
                 <x-ui.pagination
                     class="px-0 py-0"
                     :current-page="$itemCurrentPage"
@@ -353,7 +353,7 @@
             </div>
         @endif
     </div>
-</div>
+</div>{{-- /#items-pane --}}
 
 <!-- MODAL: ADD ASSET -->
 <div class="modal fade" id="addAssetModal" aria-labelledby="addAssetModalLabel" aria-hidden="true">

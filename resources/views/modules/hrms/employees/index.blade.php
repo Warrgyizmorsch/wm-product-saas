@@ -435,9 +435,8 @@
         }
     </style>
 
-    <div class="employee-page">
-
-            <div class="employee-list-card p-4" id="employeeListCard">
+    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+            <div id="employeeListCard">
                 <!-- Card Header -->
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
                     <div>

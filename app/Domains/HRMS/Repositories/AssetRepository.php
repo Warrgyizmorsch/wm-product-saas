@@ -326,6 +326,15 @@ class AssetRepository implements AssetRepositoryInterface
             // Ignore if table missing
         }
 
+        // Create AssetAllocation record
+        \App\Domains\HRMS\Models\AssetAllocation::create([
+            'asset_id' => $asset->id,
+            'employee_id' => $validated['assigned_employee_id'],
+            'allocated_at' => $validated['allocated_at'],
+            'allocation_condition' => $asset->condition,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
         return true;
     }
 
@@ -347,6 +356,18 @@ class AssetRepository implements AssetRepositoryInterface
         ];
         if (Schema::hasColumn('assets', 'asset_request_id')) {
             $updateData['asset_request_id'] = null;
+        }
+
+        // Update active AssetAllocation record
+        $allocation = \App\Domains\HRMS\Models\AssetAllocation::where('asset_id', $asset->id)
+            ->whereNull('returned_at')
+            ->first();
+        if ($allocation) {
+            $allocation->update([
+                'returned_at' => $validated['returned_at'] ?? now(),
+                'return_condition' => $validated['condition_on_return'],
+                'notes' => $validated['return_notes'] ?? null,
+            ]);
         }
 
         return $asset->update($updateData);
@@ -378,6 +399,15 @@ class AssetRepository implements AssetRepositoryInterface
                     $upd['asset_request_id'] = $validated['request_id'];
                 }
                 $asset->update($upd);
+
+                // Create AssetAllocation record
+                \App\Domains\HRMS\Models\AssetAllocation::create([
+                    'asset_id' => $asset->id,
+                    'employee_id' => $validated['assigned_employee_id'],
+                    'allocated_at' => $validated['allocated_at'],
+                    'allocation_condition' => $asset->condition,
+                    'notes' => $validated['notes'] ?? null,
+                ]);
             }
         });
 
@@ -387,11 +417,16 @@ class AssetRepository implements AssetRepositoryInterface
     public function returnItem(AssetItem $assetItem, array $validated): bool
     {
         $quantity = (int) $validated['quantity'];
-        $allocatedAssets = Asset::where('asset_item_id', $assetItem->id)
+        
+        $query = Asset::where('asset_item_id', $assetItem->id)
             ->where('status', 'allocated')
-            ->where('assigned_employee_id', $validated['employee_id'])
-            ->limit($quantity)
-            ->get();
+            ->where('assigned_employee_id', $validated['employee_id']);
+            
+        if (!empty($validated['allocated_asset_ids'])) {
+            $query->whereIn('id', $validated['allocated_asset_ids']);
+        }
+        
+        $allocatedAssets = $query->limit($quantity)->get();
 
         if ($allocatedAssets->count() < $quantity) {
             return false;
@@ -419,6 +454,18 @@ class AssetRepository implements AssetRepositoryInterface
                     $upd['asset_request_id'] = null;
                 }
                 $asset->update($upd);
+
+                // Update active AssetAllocation record
+                $allocation = \App\Domains\HRMS\Models\AssetAllocation::where('asset_id', $asset->id)
+                    ->whereNull('returned_at')
+                    ->first();
+                if ($allocation) {
+                    $allocation->update([
+                        'returned_at' => $validated['returned_at'] ?? now(),
+                        'return_condition' => $validated['condition_on_return'],
+                        'notes' => $validated['return_notes'] ?? null,
+                    ]);
+                }
             }
         });
 

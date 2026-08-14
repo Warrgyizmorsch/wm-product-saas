@@ -53,6 +53,33 @@
             color: var(--bs-primary) !important;
             border-bottom: 2px solid var(--bs-primary) !important;
         }
+        #alloc-items-table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            white-space: normal !important;
+            word-break: break-word !important;
+            line-height: 1.3 !important;
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
+        }
+        .info-label {
+            color: #475569;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            display: inline-block;
+        }
+        /* Scoped wrap rules for modal columns so they stack vertically if width is cramped */
+        .modal-body .odoo-form-group {
+            flex-wrap: wrap !important;
+        }
+        .modal-body .odoo-form-group > .flex-grow-1 {
+            min-width: 200px !important;
+        }
+        .modal-body .odoo-form-label {
+            width: 100% !important;
+            margin-bottom: 5px !important;
+        }
     </style>
 @endpush
 
@@ -62,10 +89,8 @@
 @endpush
 
 @section('content')
-<div class="container-fluid px-4 py-4">
-    <div class="card border-0 shadow-sm rounded-4">
-        <!-- Card Header -->
-        <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+<div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3 border-bottom">
             <div>
                 <h5 class="fw-bold text-dark mb-0 fs-16">Assets Custody & Requests Dashboard</h5>
                 <p class="text-muted fs-12 mb-0">Manage employee requests, direct allocations, custody records and histories</p>
@@ -77,7 +102,7 @@
             </div>
         </div>
 
-        <div class="card-body px-4 pb-4 pt-3">
+
             <!-- Tabs Navigation -->
             <ul class="nav nav-tabs tab-nav-custom border-bottom mb-4" id="assetsModuleTabs" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -428,19 +453,21 @@
                                     <th class="text-start" style="width: 25%; padding-left: 20px;">Custodian Employee</th>
                                     <th class="text-start" style="width: 50%;">Allocated Assets (Item Details)</th>
                                     <th style="width: 13%;">Total Qty</th>
-                                    <th class="text-end px-4" style="width: 12%; white-space: nowrap;">Actions</th>
+                                    <th class="text-center" style="width: 12%; white-space: nowrap;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($allocations as $empAlloc)
                                     @php
-                                        $grouped = $empAlloc->allocations->groupBy('asset.name');
+                                        $grouped = $empAlloc->allocations->groupBy(function($alloc) {
+                                            return $alloc->asset->item->name ?? $alloc->asset->name;
+                                        });
                                         $encodedUnits = base64_encode(json_encode($empAlloc->allocations->map(function($alloc) {
                                             return [
                                                 'id' => $alloc->asset->id,
                                                 'asset_code' => $alloc->asset->asset_code,
                                                 'serial_number' => $alloc->asset->serial_number ?: 'N/A',
-                                                'asset_name' => $alloc->asset->name
+                                                'asset_name' => $alloc->asset->item->name ?? $alloc->asset->name
                                             ];
                                         })->values()->all()));
                                     @endphp
@@ -469,12 +496,13 @@
                                                     @php $iterator++; @endphp
                                                 @endforeach
                                                 
-                                                @if($totalUnique > 2)
+                                                @if($totalUnique >= 1)
                                                     <button type="button" class="btn p-0 border-0 bg-transparent show-all-assets-offcanvas-btn align-middle" 
+                                                        data-employee-id="{{ $empAlloc->id }}"
                                                         data-employee-name="{{ $empAlloc->display_name }} ({{ $empAlloc->employee_id }})"
                                                         data-company-name="{{ $empAlloc->company->company_name ?? '' }}"
                                                         data-allocated-assets="{{ $encodedUnits }}">
-                                                        <span class="badge bg-light text-secondary border d-inline-flex align-items-center justify-content-center" style="font-size: 11px; cursor: pointer; border-radius: 4px; width: 28px; height: 28px; padding: 0;" title="View all {{ $totalUnique }} assets">
+                                                        <span class="badge bg-light text-secondary border d-inline-flex align-items-center justify-content-center" style="font-size: 11px; cursor: pointer; border-radius: 4px; width: 28px; height: 28px; padding: 0;" title="View all {{ $totalUnique }} asset(s)">
                                                             <i class="feather-plus fs-13"></i>
                                                         </span>
                                                     </button>
@@ -484,7 +512,7 @@
                                         <td>
                                             <span class="badge bg-soft-primary text-primary fw-bold fs-12 px-2.5 py-1">{{ $empAlloc->allocations->count() }}</span>
                                         </td>
-                                        <td class="text-end px-4">
+                                        <td class="text-center">
                                             <button type="button" class="btn btn-sm btn-soft-danger fw-bold return-direct-multi-trigger-btn px-3" 
                                                 style="font-size: 11px; height: 30px; border-radius: 6px;"
                                                 data-employee-id="{{ $empAlloc->id }}"
@@ -522,12 +550,10 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
 <!-- MODAL: DIRECT ALLOCATE ASSET -->
 <div class="modal fade" id="directAllocateModal" tabindex="-1" aria-labelledby="directAllocateModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 620px;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-dark" id="directAllocateModalLabel">
@@ -535,27 +561,52 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ route('hrms.assets-module.allocate-direct') }}" method="POST">
+            <form action="{{ route('hrms.assets-module.allocate-direct') }}" method="POST" id="directAllocateForm">
                 @csrf
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Select Employee <span class="text-danger">*</span></label>
-                            <select name="employee_id" class="form-select select2-modal" required style="width: 100%;">
-                                <option value="">Choose Employee...</option>
+                            <x-ui.odoo-form-ui type="select" label="Select Employee" name="employee_id" :required="true" class="select2-modal">
+                                <option value="">Select Employee...</option>
                                 @foreach($employees as $emp)
                                     <option value="{{ $emp->id }}">{{ $emp->display_name }} ({{ $emp->employee_id }})</option>
                                 @endforeach
-                            </select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Select Available Asset <span class="text-danger">*</span></label>
-                            <select name="asset_id" class="form-select select2-modal" required style="width: 100%;">
-                                <option value="">Choose Asset...</option>
-                                @foreach($availableAssets as $ast)
-                                    <option value="{{ $ast->id }}">{{ $ast->name }} - {{ $ast->asset_code }}</option>
-                                @endforeach
-                            </select>
+                            <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+                                <h6 class="fw-bold text-dark mb-0">Allocated Assets & Quantities</h6>
+                                <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="btn-add-alloc-item-row" style="font-size: 11px;">
+                                    <i class="feather-plus me-1"></i>Add Another Asset
+                                </button>
+                            </div>
+                            <x-ui.odoo-form-ui type="table" id="alloc-items-table" style="table-layout: fixed; width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 62%;">Asset</th>
+                                        <th style="width: 95px;" class="text-center">Quantity</th>
+                                        <th style="width: 50px;" class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alloc-items-tbody">
+                                    <tr>
+                                        <td class="py-2 px-3">
+                                            <x-ui.odoo-form-ui type="select" name="items[0][asset_id]" :required="true" class="alloc-item-select">
+                                                <option value="">Select Asset...</option>
+                                                @foreach($availableAssets as $ast)
+                                                    <option value="{{ $ast->id }}">{{ $ast->name }} - {{ $ast->asset_code }} (Category: {{ $ast->category->name ?? 'N/A' }})</option>
+                                                @endforeach
+                                            </x-ui.odoo-form-ui>
+                                        </td>
+                                        <td class="py-2 text-center">
+                                            <x-ui.odoo-form-ui type="input" inputType="number" name="items[0][quantity]" value="1" min="1" :required="true" class="text-center alloc-qty-input" style="width: 65px; height: 32px; margin: 0 auto; font-weight: 600;" />
+                                        </td>
+                                        <td class="py-2 text-center px-2">
+                                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-alloc-item-row" disabled style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-trash-2"></i></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-6">
                             <x-ui.odoo-form-ui type="input" inputType="date" label="Allocation Date" name="allocated_at" value="{{ date('Y-m-d') }}" :required="true" />
@@ -593,20 +644,24 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Custodian Employee</label>
-                            <input type="text" id="return_employee_name_display" class="form-control bg-light" readonly>
+                            <x-ui.odoo-form-ui type="input" label="Custodian Employee" id="return_employee_name_display" name="employee_name_display" readonly="true" class="bg-light" />
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-2">Select Serialized Unit(s) to Return <span class="text-danger">*</span></label>
-                            <div id="return_assets_checklist" class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
+                            <label class="info-label" style="color: #dc3545 !important;">Select Serialized Unit(s) to Return <span class="text-danger">*</span></label>
+                            <div id="return_assets_checklist" style="max-height: 280px; overflow-y: auto;">
                                 <!-- Checklist populated via JS -->
+                            </div>
+                            <div id="return_checklist_error" class="d-none mt-2">
+                                <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style="background: #fff3f3; border: 1px solid #f5c2c7;">
+                                    <i class="feather-alert-circle text-danger" style="font-size: 15px; flex-shrink: 0;"></i>
+                                    <span class="text-danger fs-12 fw-semibold">Please select at least one unit to return.</span>
+                                </div>
                             </div>
                             <small class="text-muted mt-1 d-block">Check the specific physical units being returned.</small>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Condition on Return <span class="text-danger">*</span></label>
-                            <x-ui.odoo-form-ui type="select" name="condition_on_return" :required="true">
+                            <x-ui.odoo-form-ui type="select" label="Condition on Return" name="condition_on_return" :required="true">
                                 <option value="good">Good</option>
                                 <option value="new">New</option>
                                 <option value="fair">Fair</option>
@@ -675,13 +730,17 @@
                     </div>
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Select Physical Asset <span class="text-danger">*</span></label>
-                            <select name="asset_id" id="alloc_modal_asset_select" class="form-select select2-modal" required style="width: 100%;">
-                                <option value="">Choose Asset...</option>
-                            </select>
-                            <div class="form-text text-danger d-none" id="alloc_modal_no_assets_alert">
-                                No available assets found for this category!
+                            <label class="info-label" style="color: #dc3545 !important;">Select Physical Unit(s) to Allocate <span class="text-danger">*</span></label>
+                            <div id="alloc_modal_checklist" class="border rounded p-2 bg-white" style="max-height: 220px; overflow-y: auto;">
+                                <!-- Checklist populated via JS -->
                             </div>
+                            <div id="alloc_modal_checklist_error" class="d-none mt-2">
+                                <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style="background: #fff3f3; border: 1px solid #f5c2c7;">
+                                    <i class="feather-alert-circle text-danger" style="font-size: 15px; flex-shrink: 0;"></i>
+                                    <span class="text-danger fs-12 fw-semibold">Please select at least one unit to allocate.</span>
+                                </div>
+                            </div>
+                            <small class="text-muted mt-1 d-block">Check all physical units to assign to this employee.</small>
                         </div>
                         <div class="col-6">
                             <x-ui.odoo-form-ui type="input" inputType="date" label="Allocation Date" name="allocated_at" value="{{ date('Y-m-d') }}" :required="true" />
@@ -692,7 +751,7 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Fulfill Allocation</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;" id="alloc_modal_submit_btn">Fulfill Allocation</button>
                     <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
                 </div>
             </form>
@@ -809,12 +868,12 @@
                 @csrf
                 <div class="modal-body">
                     <div class="table-responsive mb-3">
-                        <table class="table table-bordered align-middle text-center mb-0" id="bulk_allocate_table">
+                        <table class="table table-bordered align-middle mb-0" id="bulk_allocate_table">
                             <thead class="table-light fs-11 text-uppercase">
                                 <tr>
                                     <th class="text-start" style="width: 25%;">Employee</th>
                                     <th class="text-start" style="width: 30%;">Requested Item</th>
-                                    <th class="text-start" style="width: 45%;">Available Units</th>
+                                    <th class="text-start" style="width: 45%;">Select Unit(s) to Allocate</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -822,7 +881,12 @@
                             </tbody>
                         </table>
                     </div>
-
+                    <div id="bulk_alloc_checklist_error" class="d-none mb-2">
+                        <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style="background: #fff3f3; border: 1px solid #f5c2c7;">
+                            <i class="feather-alert-circle text-danger" style="font-size: 15px; flex-shrink: 0;"></i>
+                            <span class="text-danger fs-12 fw-semibold">Please select at least one unit for every request row.</span>
+                        </div>
+                    </div>
                     <input type="hidden" name="allocated_at" value="{{ date('Y-m-d') }}">
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
@@ -863,30 +927,22 @@
     </div>
 </div>
 <!-- OFFCANVAS: VIEW ALL EMPLOYEE ASSETS -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="employeeAssetsOffcanvas" aria-labelledby="employeeAssetsOffcanvasLabel" style="width: 420px; border-left: 1px solid #e2e8f0; box-shadow: -4px 0 24px rgba(0,0,0,0.08);">
-    <div class="offcanvas-header border-bottom py-3 px-4">
-        <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="employeeAssetsOffcanvasLabel">
-            <i class="feather-package me-2 text-primary"></i>Custodian Assets List
-        </h5>
-        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-    <div class="offcanvas-body p-4">
-        <div class="card border bg-light shadow-none mb-4">
-            <div class="card-body p-3">
-                <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1">Custodian Employee</span>
-                <h6 class="fw-bold text-dark mb-0.5 fs-13" id="offcanvas_emp_name">-</h6>
-                <span class="text-secondary fs-11" id="offcanvas_emp_company">-</span>
-            </div>
-        </div>
-        
-        <div>
-            <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-2.5">Currently Allocated Items</span>
-            <div id="offcanvas_assets_list" class="d-flex flex-column gap-2">
-                <!-- Populated via JS -->
-            </div>
+<x-ui.drawer id="employeeAssetsOffcanvas" title="Custodian Assets List" position="end" style="width: 420px; border-left: 1px solid #e2e8f0; box-shadow: -4px 0 24px rgba(0,0,0,0.08);">
+    <div class="card border bg-light shadow-none mb-4">
+        <div class="card-body p-3">
+            <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1">Custodian Employee</span>
+            <h6 class="fw-bold text-dark mb-0.5 fs-13" id="offcanvas_emp_name">-</h6>
+            <span class="text-secondary fs-11" id="offcanvas_emp_company">-</span>
         </div>
     </div>
-</div>
+    
+    <div>
+        <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-2.5">Currently Allocated Items</span>
+        <div id="offcanvas_assets_list" class="d-flex flex-column gap-2">
+            <!-- Populated via JS -->
+        </div>
+    </div>
+</x-ui.drawer>
 @endsection
 
 @push('scripts')
@@ -931,6 +987,15 @@
         $('#bulkAllocateModal').appendTo('body');
         $('#bulkRejectModal').appendTo('body');
 
+        // Universal backdrop cleanup — fixes blur/frozen screen after closing any modal
+        $(document).on('hidden.bs.modal', '.modal', function() {
+            // If no other modal is still open, clean up body and backdrops
+            if ($('.modal.show').length === 0) {
+                $('body').removeClass('modal-open').css({ overflow: '', paddingRight: '' });
+                $('.modal-backdrop').remove();
+            }
+        });
+
         // Initialize select2 elements in modals
         $('.select2-modal').each(function() {
             var dropdownParent = $(this).closest('.modal');
@@ -953,6 +1018,89 @@
             localStorage.setItem('activeAssetsTab', '#' + targetId);
         });
 
+        // Add dynamic direct allocation item row logic
+        var allocItemIndex = 1;
+        $('#btn-add-alloc-item-row').on('click', function() {
+            var tbody = $('#alloc-items-tbody');
+            
+            // Clone first row's select and clean its options from select2 internal states
+            var selectClone = $('#alloc-items-tbody tr:first-child select.alloc-item-select').clone();
+            selectClone.find('option').removeAttr('selected').removeAttr('data-select2-id').removeProp('selected');
+            selectClone.val('');
+            var selectOptions = selectClone.html();
+            
+            var newRow = `
+                <tr>
+                    <td class="py-2 px-3">
+                        <select name="items[${allocItemIndex}][asset_id]" class="odoo-table-select odoo-select2 alloc-item-select" required style="width: 100%;">
+                            ${selectOptions}
+                        </select>
+                    </td>
+                    <td class="py-2 text-center">
+                        <input type="number" name="items[${allocItemIndex}][quantity]" class="odoo-table-input text-center alloc-qty-input" min="1" value="1" required style="width: 65px; height: 32px; margin: 0 auto; font-weight: 600;">
+                    </td>
+                    <td class="py-2 text-center px-2">
+                        <button type="button" class="btn btn-sm btn-soft-danger btn-remove-alloc-item-row" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-trash-2"></i></button>
+                    </td>
+                </tr>
+            `;
+            tbody.append(newRow);
+            
+            // Initialize select2 on the newly cloned select element and reset its value
+            var newSelect = tbody.find('tr:last-child select.alloc-item-select');
+            newSelect.select2({
+                theme: "bootstrap-5",
+                width: "100%"
+            });
+            newSelect.val('').trigger('change');
+            
+            allocItemIndex++;
+            $('#alloc-items-tbody tr:first-child .btn-remove-alloc-item-row').prop('disabled', false);
+        });
+
+        $(document).on('click', '.btn-remove-alloc-item-row', function() {
+            $(this).closest('tr').remove();
+            if ($('#alloc-items-tbody tr').length === 1) {
+                $('#alloc-items-tbody tr:first-child .btn-remove-alloc-item-row').prop('disabled', true);
+            }
+        });
+
+        // Validate quantity in direct allocate form on submit
+        $('#directAllocateForm').on('submit', function(e) {
+            var form = $(this);
+            var hasErrors = false;
+            
+            // Clear any existing dynamic quantity errors first
+            form.find('.alloc-qty-input').removeClass('is-invalid');
+            form.find('.alloc-qty-input').parent().find('.dynamic-error-feedback').remove();
+            
+            form.find('.alloc-qty-input').each(function() {
+                var input = $(this);
+                var qty = parseInt(input.val(), 10);
+                
+                if (qty > 1) {
+                    hasErrors = true;
+                    input.addClass('is-invalid');
+                    
+                    // Create error element exactly matching common UI element style
+                    var errorEl = $('<div class="invalid-feedback dynamic-error-feedback d-block fs-11 mt-1">Quantity cannot exceed available stock (1).</div>');
+                    input.parent().append(errorEl);
+                }
+            });
+            
+            if (hasErrors) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Focus first invalid field
+                var firstErr = form.find('.is-invalid').first();
+                if (firstErr.length) {
+                    firstErr.focus();
+                }
+                return false;
+            }
+        });
+
         // 1. REJECT REQUEST ACTION
         $('.reject-request-btn').on('click', function() {
             var requestId = $(this).attr('data-request-id');
@@ -965,7 +1113,7 @@
             rejectModal.show();
         });
 
-        // 2. ALLOCATE ASSET FOR REQUEST ACTION
+        // 2. ALLOCATE ASSET FOR REQUEST ACTION — checklist of units
         $('.allocate-request-trigger-btn').on('click', function() {
             var button = $(this);
             var requestId = button.attr('data-request-id');
@@ -980,26 +1128,55 @@
             $('#alloc_modal_emp_name').text(employeeName);
             $('#alloc_modal_item_name').text(itemName);
 
-            // Populate available asset options based on requested category / item
-            var select = $('#alloc_modal_asset_select');
-            select.empty().append('<option value="">Choose Asset...</option>');
+            // Reset error
+            $('#alloc_modal_checklist_error').addClass('d-none');
+
+            // Build checklist of available units
+            var checklist = $('#alloc_modal_checklist');
+            checklist.empty();
 
             var filteredAssets = allAvailableAssets.filter(function(a) {
                 return a.asset_item_id == assetItemId;
             });
 
-            if (filteredAssets.length > 0) {
-                filteredAssets.forEach(function(a) {
-                    select.append('<option value="' + a.id + '">' + a.name + '</option>');
-                });
-                $('#alloc_modal_no_assets_alert').addClass('d-none');
-                $('#allocateAssetForm').find('button[type="submit"]').prop('disabled', false);
+            if (filteredAssets.length === 0) {
+                checklist.html('<div class="d-flex align-items-center gap-2 px-2 py-2 text-danger fs-12"><i class="feather-alert-triangle"></i> No available units found for this item.</div>');
+                $('#alloc_modal_submit_btn').prop('disabled', true);
             } else {
-                $('#alloc_modal_no_assets_alert').removeClass('d-none');
-                $('#allocateAssetForm').find('button[type="submit"]').prop('disabled', true);
+                $('#alloc_modal_submit_btn').prop('disabled', false);
+                filteredAssets.forEach(function(a, idx) {
+                    var cbId = 'alloc_unit_check_' + a.id;
+                    var label = '<strong>' + a.asset_code + '</strong>';
+                    if (a.serial_number) label += ' <span class="text-muted">(S/N: ' + a.serial_number + ')</span>';
+                    var row = $('<div class="form-check py-1.5 d-flex align-items-center" style="border-bottom: 1px dashed #e9ecef;"></div>');
+                    if (idx === filteredAssets.length - 1) row.css('border-bottom', 'none');
+                    row.html(
+                        '<input class="form-check-input alloc-unit-checkbox me-2" type="checkbox" name="asset_ids[]" value="' + a.id + '" id="' + cbId + '" style="cursor:pointer;">'
+                        + '<label class="form-check-label fs-12 text-dark mb-0" for="' + cbId + '" style="cursor:pointer;">' + label + '</label>'
+                    );
+                    checklist.append(row);
+                });
+
+                // Auto-dismiss error on any check
+                checklist.off('change.allocCheck').on('change.allocCheck', '.alloc-unit-checkbox', function() {
+                    if (checklist.find('.alloc-unit-checkbox:checked').length > 0) {
+                        $('#alloc_modal_checklist_error').addClass('d-none');
+                    }
+                });
             }
 
-            select.val('').trigger('change');
+            // Bind submit validation
+            $('#allocateAssetForm').off('submit.allocValidate').on('submit.allocValidate', function(e) {
+                var checked = $('#alloc_modal_checklist .alloc-unit-checkbox:checked').length;
+                if (checked === 0) {
+                    e.preventDefault();
+                    $('#alloc_modal_checklist_error').removeClass('d-none');
+                    $('#alloc_modal_checklist')[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            });
+
+            var allocModal = new bootstrap.Modal(document.getElementById('allocateAssetModal'));
+            allocModal.show();
         });
 
         // 3. VIEW DETAILS MODAL
@@ -1089,36 +1266,20 @@
             $('#return_employee_id').val(employeeId);
             $('#return_employee_name_display').val(employeeName);
 
-            var checklistDiv = $('#return_assets_checklist');
-            checklistDiv.empty();
-
             var assets = [];
             if (rawAssets) {
                 assets = JSON.parse(atob(rawAssets));
             }
 
-            if (assets.length === 0) {
-                checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No active allocations found.</span>');
-            } else {
-                assets.forEach(function(asset) {
-                    var checkboxId = 'return_asset_check_' + asset.id;
-                    var itemHtml = `
-                        <div class="form-check py-1 border-bottom-dashed d-flex align-items-center">
-                            <input class="form-check-input return-allocated-asset-checkbox" type="checkbox" name="allocated_asset_ids[]" value="${asset.id}" id="${checkboxId}" style="cursor: pointer;">
-                            <label class="form-check-label fs-12 ms-2 text-dark mb-0" for="${checkboxId}" style="cursor: pointer;">
-                                <strong>${asset.asset_name}</strong> (Code: ${asset.asset_code} | Serial: ${asset.serial_number || 'N/A'})
-                            </label>
-                        </div>
-                    `;
-                    checklistDiv.append(itemHtml);
-                });
-            }
+            // Show all item groups, none pre-checked, no filter
+            populateReturnChecklist(assets, null, null);
 
             $('#returnAssetForm').off('submit').on('submit', function(e) {
                 var checkedCount = $('.return-allocated-asset-checkbox:checked').length;
                 if (checkedCount === 0) {
                     e.preventDefault();
-                    alert('Please select at least one physical asset/serial number to return.');
+                    $('#return_checklist_error').removeClass('d-none');
+                    $('#return_assets_checklist').get(0).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
             });
 
@@ -1161,43 +1322,82 @@
                 var allocatedCount = cb.attr('data-allocated-count');
                 var remainingQty = cb.attr('data-remaining-qty');
 
-                // Filter available options for this item
-                var optionsHtml = '<option value="">Choose Asset...</option>';
+                // Filter available units for this item and build a checkbox checklist
+                // Only show up to remainingQty units (what the requester still needs)
                 var itemAssets = allAvailableAssets.filter(function(a) {
                     return a.asset_item_id == assetItemId;
-                });
+                }).slice(0, parseInt(remainingQty, 10));
 
-                itemAssets.forEach(function(a) {
-                    optionsHtml += '<option value="' + a.id + '">' + a.name + '</option>';
-                });
+                var checklistHtml = '';
+                if (itemAssets.length === 0) {
+                    checklistHtml = '<div class="text-danger fs-12 py-1"><i class="feather-alert-triangle me-1"></i>No units available.</div>';
+                } else {
+                    itemAssets.forEach(function(a, idx) {
+                        var cbId = 'bulk_alloc_unit_' + reqId + '_' + a.id;
+                        var label = '<strong>' + a.asset_code + '</strong>';
+                        if (a.serial_number) label += ' <span class="text-muted fs-11">(S/N: ' + a.serial_number + ')</span>';
+                        var borderStyle = idx < itemAssets.length - 1 ? 'border-bottom: 1px dashed #e9ecef;' : '';
+                        checklistHtml += '<div class="form-check py-1 d-flex align-items-center" style="' + borderStyle + '">' +
+                            '<input class="form-check-input bulk-alloc-unit-checkbox me-2" type="checkbox" name="allocations[' + reqId + '][]" value="' + a.id + '" id="' + cbId + '" data-req-id="' + reqId + '" style="cursor:pointer;">' +
+                            '<label class="form-check-label fs-12 text-dark mb-0" for="' + cbId + '" style="cursor:pointer;">' + label + '</label>' +
+                            '</div>';
+                    });
+                }
 
-                var rowHtml = '<tr>' +
-                    '<td class="text-start fs-12 fw-bold text-dark">' + empName + '</td>' +
-                    '<td class="text-start">' +
+                var rowHtml = '<tr data-req-id="' + reqId + '">' +
+                    '<td class="text-start fs-12 fw-bold text-dark align-top py-2 ps-3">' + empName + '</td>' +
+                    '<td class="text-start align-top py-2">' +
                         '<div class="fs-12 fw-semibold text-dark">' + itemName + '</div>' +
-                        '<div class="text-muted fs-10">' + catName + ' (Qty: ' + remainingQty + ')</div>' +
+                        '<div class="text-muted fs-10">' + catName + '</div>' +
+                        '<div class="mt-1"><span class="badge bg-soft-warning text-warning fs-10">Qty Remaining: ' + remainingQty + '</span></div>' +
                     '</td>' +
-                    '<td class="text-start">' +
-                        '<select name="allocations[' + reqId + ']" class="form-select fs-12 py-1 select2-modal" required style="width: 100%;">' +
-                            optionsHtml +
-                        '</select>' +
+                    '<td class="text-start align-top py-2">' +
+                        '<div class="border rounded p-2 bg-white" style="max-height: 160px; overflow-y: auto;">' +
+                            checklistHtml +
+                        '</div>' +
                     '</td>' +
                 '</tr>';
 
                 tbody.append(rowHtml);
             });
 
-            // Initialize select2 inside the modal
+            // Bind bulk allocate submit validation — each row must have at least one checkbox checked
+            $('#bulkAllocateForm').off('submit.bulkValidate').on('submit.bulkValidate', function(e) {
+                var allValid = true;
+                $('#bulk_allocate_table tbody tr').each(function() {
+                    var rowChecked = $(this).find('.bulk-alloc-unit-checkbox:checked').length;
+                    if (rowChecked === 0) {
+                        allValid = false;
+                        $(this).find('.border.rounded.p-2').addClass('border-danger');
+                    } else {
+                        $(this).find('.border.rounded.p-2').removeClass('border-danger');
+                    }
+                });
+                if (!allValid) {
+                    e.preventDefault();
+                    $('#bulk_alloc_checklist_error').removeClass('d-none');
+                    $('#bulk_allocate_table')[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    $('#bulk_alloc_checklist_error').addClass('d-none');
+                }
+            });
+
+            // Auto-dismiss bulk error when a checkbox is checked
+            $(document).off('change.bulkAllocCheck').on('change.bulkAllocCheck', '.bulk-alloc-unit-checkbox', function() {
+                var reqId = $(this).attr('data-req-id');
+                var rowChecked = $('[data-req-id="' + reqId + '"] .bulk-alloc-unit-checkbox:checked').length;
+                if (rowChecked > 0) {
+                    $('tr[data-req-id="' + reqId + '"] .border.rounded.p-2').removeClass('border-danger');
+                }
+                var anyInvalid = false;
+                $('#bulk_allocate_table tbody tr').each(function() {
+                    if ($(this).find('.bulk-alloc-unit-checkbox:checked').length === 0) anyInvalid = true;
+                });
+                if (!anyInvalid) $('#bulk_alloc_checklist_error').addClass('d-none');
+            });
+
             var bulkModal = new bootstrap.Modal(document.getElementById('bulkAllocateModal'));
             bulkModal.show();
-
-            $('#bulkAllocateModal .select2-modal').each(function() {
-                $(this).select2({
-                    dropdownParent: $('#bulkAllocateModal'),
-                    theme: 'bootstrap-5',
-                    width: '100%'
-                });
-            });
         });
 
         // 7. BULK REJECT MODAL GENERATOR
@@ -1232,24 +1432,41 @@
                 assets = JSON.parse(atob(rawAssets));
             }
 
-            // Group assets by name on the client side
+            // Group assets by name/item type and store their asset IDs
             var groupedAssets = {};
             assets.forEach(function(asset) {
                 if (!groupedAssets[asset.asset_name]) {
-                    groupedAssets[asset.asset_name] = 0;
+                    groupedAssets[asset.asset_name] = {
+                        ids: [],
+                        qty: 0,
+                        codes: []
+                    };
                 }
-                groupedAssets[asset.asset_name]++;
+                groupedAssets[asset.asset_name].ids.push(asset.id);
+                groupedAssets[asset.asset_name].qty++;
+                groupedAssets[asset.asset_name].codes.push(asset.asset_code);
             });
 
             Object.keys(groupedAssets).forEach(function(name) {
-                var qty = groupedAssets[name];
+                var group = groupedAssets[name];
+                var idsString = JSON.stringify(group.ids);
                 var itemHtml = `
                     <div class="p-3 bg-light rounded border d-flex justify-content-between align-items-center mb-2">
                         <div class="d-flex align-items-center">
-                            <i class="feather-package text-secondary me-2.5 fs-15"></i>
-                            <span class="fw-bold text-dark fs-12">${name}</span>
+                            <div class="d-flex flex-column">
+                                <span class="fw-bold text-dark fs-12">${name}</span>
+                                <span class="text-muted fs-10 mt-0.5">Qty: ${group.qty} (${group.codes.join(', ')})</span>
+                            </div>
                         </div>
-                        <span class="badge bg-soft-secondary text-secondary border px-2.5 py-1 fs-11 fw-bold">Qty: ${qty}</span>
+                        <button type="button" class="btn btn-xs btn-soft-danger return-from-drawer-btn px-2.5 py-1 text-uppercase fw-bold" 
+                                data-employee-id="${button.attr('data-employee-id') || ''}"
+                                data-employee-name="${empName}"
+                                data-asset-ids='${idsString}'
+                                data-raw-assets='${rawAssets}'
+                                data-item-name="${name}"
+                                style="font-size: 10px; border-radius: 4px;">
+                            Return
+                        </button>
                     </div>
                 `;
                 listDiv.append(itemHtml);
@@ -1258,6 +1475,190 @@
             var offcanvas = new bootstrap.Offcanvas(document.getElementById('employeeAssetsOffcanvas'));
             offcanvas.show();
         });
+
+        // Handle Return action trigger from within the Custodian drawer
+        $(document).on('click', '.return-from-drawer-btn', function() {
+            var btn = $(this);
+            var employeeId = btn.attr('data-employee-id');
+            var employeeName = btn.attr('data-employee-name');
+            var assetIds = JSON.parse(btn.attr('data-asset-ids'));
+            var itemName = btn.attr('data-item-name');
+
+            // Use the raw assets stored directly on this button (from the drawer)
+            var rawAssets = btn.attr('data-raw-assets');
+            var allEmployeeAssets = [];
+            if (rawAssets) {
+                allEmployeeAssets = JSON.parse(atob(rawAssets));
+            }
+
+            // Hide the offcanvas drawer
+            var offcanvasEl = document.getElementById('employeeAssetsOffcanvas');
+            var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
+            if (offcanvas) {
+                offcanvas.hide();
+            }
+
+            // Populate returnAssetModal — filter to this item only, pre-check all its units
+            $('#return_employee_id').val(employeeId);
+            $('#return_employee_name_display').val(employeeName);
+
+            populateReturnChecklist(allEmployeeAssets, assetIds, itemName);
+
+            $('#returnAssetForm').off('submit').on('submit', function(e) {
+                var checkedCount = $('.return-allocated-asset-checkbox:checked').length;
+                if (checkedCount === 0) {
+                    e.preventDefault();
+                    $('#return_checklist_error').removeClass('d-none');
+                    $('#return_assets_checklist').get(0).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            });
+
+            var returnModal = new bootstrap.Modal(document.getElementById('returnAssetModal'));
+            returnModal.show();
+        });
+
+        // Helper to populate grouped and collapsible asset checklists in the return modal
+        function populateReturnChecklist(assets, precheckedIds, filterItemName) {
+            var checklistDiv = $('#return_assets_checklist');
+            checklistDiv.empty();
+            // Always hide error when checklist is freshly populated
+            $('#return_checklist_error').addClass('d-none');
+
+            if (assets.length === 0) {
+                checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No active allocations found.</span>');
+                return;
+            }
+
+            // Filter assets by item name if specified
+            var filteredAssets = assets;
+            if (filterItemName) {
+                filteredAssets = assets.filter(function(asset) {
+                    return asset.asset_name === filterItemName;
+                });
+            }
+
+            // Group by asset_name
+            var grouped = {};
+            filteredAssets.forEach(function(asset) {
+                if (!grouped[asset.asset_name]) {
+                    grouped[asset.asset_name] = [];
+                }
+                grouped[asset.asset_name].push(asset);
+            });
+
+            Object.keys(grouped).forEach(function(itemName, idx) {
+                var groupItems = grouped[itemName];
+                var groupCheckboxId = 'return_group_check_' + idx;
+                var collapseId = 'collapse_return_group_' + idx;
+                
+                // Determine if all/any items are prechecked
+                var checkedCount = 0;
+                var childrenHtml = groupItems.map(function(asset) {
+                    var checkboxId = 'return_asset_check_' + asset.id;
+                    var isChecked = '';
+                    if (precheckedIds && precheckedIds.includes(asset.id)) {
+                        isChecked = 'checked';
+                        checkedCount++;
+                    }
+                    return `
+                        <div class="form-check py-1.5 d-flex align-items-center ms-1">
+                            <input class="form-check-input return-allocated-asset-checkbox me-2" type="checkbox" name="allocated_asset_ids[]" value="${asset.id}" id="${checkboxId}" data-parent-group="${groupCheckboxId}" ${isChecked} style="cursor: pointer;">
+                            <label class="form-check-label fs-12 text-dark mb-0" for="${checkboxId}" style="cursor: pointer;">
+                                <strong>${asset.asset_code}</strong> <span class="text-muted">(Serial: ${asset.serial_number || 'N/A'})</span>
+                            </label>
+                        </div>
+                    `;
+                }).join('');
+
+                var isGroupChecked = (checkedCount === groupItems.length) ? 'checked' : '';
+                var groupBadgeClass = (checkedCount > 0) ? 'bg-soft-success text-success' : 'd-none';
+                var collapseClass = (checkedCount > 0) ? 'show' : '';
+
+                var groupHtml = `
+                    <div class="card border mb-2 shadow-none rounded-3" style="overflow: hidden;">
+                        <div class="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between border-bottom">
+                            <div class="d-flex align-items-center">
+                                <input class="form-check-input return-group-checkbox me-2" type="checkbox" id="${groupCheckboxId}" ${isGroupChecked} style="cursor: pointer;">
+                                <label class="form-check-label fs-12 fw-bold text-dark mb-0" for="${groupCheckboxId}" style="cursor: pointer;">
+                                    ${itemName}
+                                </label>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge fs-10 fw-bold rounded-pill selected-qty-badge ${groupBadgeClass}">Qty: ${checkedCount} / ${groupItems.length}</span>
+                            </div>
+                        </div>
+                        <div class="collapse ${collapseClass}" id="${collapseId}">
+                            <div class="card-body py-1 px-3 bg-white">
+                                ${childrenHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                checklistDiv.append(groupHtml);
+            });
+        }
+
+        // Sync badge and collapse state for a group card
+        function syncGroupState(groupCard) {
+            var totalChildren = groupCard.find('.return-allocated-asset-checkbox').length;
+            var checkedChildren = groupCard.find('.return-allocated-asset-checkbox:checked').length;
+            var badge = groupCard.find('.selected-qty-badge');
+            var collapseEl = groupCard.find('.collapse')[0];
+            var groupCheckbox = groupCard.find('.return-group-checkbox');
+
+            badge.text('Qty: ' + checkedChildren + ' / ' + totalChildren);
+
+            if (checkedChildren > 0) {
+                badge.removeClass('d-none').addClass('bg-soft-success text-success');
+                if (collapseEl) {
+                    bootstrap.Collapse.getOrCreateInstance(collapseEl).show();
+                }
+                if (checkedChildren === totalChildren) {
+                    groupCheckbox.prop('checked', true);
+                } else {
+                    groupCheckbox.prop('checked', false);
+                }
+            } else {
+                badge.addClass('d-none').removeClass('bg-soft-success text-success');
+                if (collapseEl) {
+                    bootstrap.Collapse.getOrCreateInstance(collapseEl).hide();
+                }
+                groupCheckbox.prop('checked', false);
+            }
+        }
+
+        // Parent master checkbox toggle logic
+        $(document).on('change', '.return-group-checkbox', function() {
+            var groupCheckbox = $(this);
+            var groupCard = groupCheckbox.closest('.card');
+            var isChecked = groupCheckbox.prop('checked');
+            
+            // Set all children to match the group checkbox state
+            groupCard.find('.return-allocated-asset-checkbox').prop('checked', isChecked);
+            
+            // Sync badge and collapse state
+            syncGroupState(groupCard);
+            if ($('.return-allocated-asset-checkbox:checked').length > 0) {
+                $('#return_checklist_error').addClass('d-none');
+            }
+        });
+
+        // Child checkbox state syncs parent checkbox and clears error banner
+        $(document).on('change', '.return-allocated-asset-checkbox', function() {
+            var childCheckbox = $(this);
+            var groupCard = childCheckbox.closest('.card');
+
+            // Sync badge and collapse state
+            syncGroupState(groupCard);
+
+            // Hide error as soon as anything is checked
+            if ($('.return-allocated-asset-checkbox:checked').length > 0) {
+                $('#return_checklist_error').addClass('d-none');
+            }
+        });
+
+        // Chevron icon rotation listeners removed as chevrons are deleted.
+        // End of JavaScript blocks
     });
 </script>
 @endpush

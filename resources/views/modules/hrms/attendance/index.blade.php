@@ -34,7 +34,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-<div class="container-fluid px-4 py-4">
+<div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
 
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert" style="border-radius: 8px;">
@@ -63,9 +63,8 @@
     @endif
 
     <!-- Attendance List Card -->
-    <div class="card border-0 shadow-sm rounded-4">
-        <!-- Card Header with Filters (Common UI Toolbar Style) -->
-        <div class="card-header bg-transparent border-0 pt-4 px-4 pb-3">
+    <div>
+        <div class="mb-4 pb-3 border-bottom">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 w-100">
                 <div>
                     <h5 class="fw-bold text-dark mb-0 fs-16">Daily Attendance Overview</h5>
@@ -156,7 +155,7 @@
             </div>
         </div>
 
-        <div class="card-body p-0">
+        <div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     @if(($view ?? 'date') === 'date')
@@ -378,7 +377,6 @@
                 </div>
             @endif
         </div>
-    </div>
 </div>
 
 <!-- Dynamic Detailed logs Drawer -->

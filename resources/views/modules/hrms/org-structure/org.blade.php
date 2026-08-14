@@ -154,7 +154,7 @@
 
     <div class="settings-container">
         <!-- Right Content Column -->
-        <div class="settings-content-col flex-grow-1">
+        <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark">
             <div class="tab-content" id="settingsSubSidebarContent">
                 <!-- Org Structure Pane -->
                 <div class="tab-pane fade show active" id="org-structure-pane" role="tabpanel" aria-labelledby="org-structure-menu">

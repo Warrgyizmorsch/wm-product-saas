@@ -3,6 +3,20 @@
 @section('title', 'My Assets | SaaS ERP')
 @section('page-title', 'My Assets')
 @section('breadcrumb', 'HRMS / Assets / My Assets')
+@section('page-actions')
+    <div class="d-flex align-items-center gap-2">
+        <!-- Toggle View Button: Switch between history and log -->
+        <button type="button" class="btn btn-outline-light border text-dark fw-bold text-uppercase d-flex align-items-center gap-1.5" id="btn-toggle-asset-view" style="height: 38px; border-radius: 6px; font-size: 11px; padding-inline: 14px; background-color: #fff; border-color: #cbd5e1 !important; color: #334155 !important;">
+            <i class="feather-git-pull-request text-muted" id="toggle-view-icon"></i>
+            <span id="toggle-view-text">Request Log</span>
+        </button>
+
+        <!-- Action: Request Asset -->
+        <x-ui.button type="button" variant="primary" class="fw-bold text-uppercase d-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#requestAssetModal" style="height: 38px; border-radius: 6px; font-size: 11px;">
+            <i class="feather-plus-circle"></i> Request Asset
+        </x-ui.button>
+    </div>
+@endsection
 
 @section('content')
 <style>
@@ -98,11 +112,20 @@
         text-transform: uppercase;
         margin-bottom: 4px;
     }
+    /* Scoped wrap rules for modal columns so they stack vertically if width is cramped */
+    .modal-body .odoo-form-group {
+        flex-wrap: wrap !important;
+    }
+    .modal-body .odoo-form-group > .flex-grow-1 {
+        min-width: 200px !important;
+    }
+    .modal-body .odoo-form-label {
+        width: 100% !important;
+        margin-bottom: 5px !important;
+    }
 </style>
-<div class="container-fluid px-4 py-4">
-    <!-- Assigned Assets / Request Log Unified Card -->
-    <div class="card border-0 shadow-sm rounded-4">
-        <div class="card-header bg-transparent border-0 pt-4 px-4 pb-0 d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+<div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4 pb-3 border-bottom">
                 <div>
                     <h5 class="card-custom-title" id="my_assets_card_title">
                         <i class="feather-package text-primary"></i> {{ __('hrms.employees.lbl_co_assets') }}
@@ -212,19 +235,9 @@
                         </x-ui.filter>
                     </div>
 
-                    <!-- Action: Request Asset -->
-                    <x-ui.button type="button" variant="primary" class="fw-bold text-uppercase d-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#requestAssetModal">
-                        <i class="feather-plus-circle"></i> Request Asset
-                    </x-ui.button>
-
-                    <!-- Toggle View Button: Switch between history and log -->
-                    <button type="button" class="btn btn-outline-secondary fw-bold text-uppercase d-flex align-items-center gap-1.5" id="btn-toggle-asset-view" style="height: 38px; border-radius: 10px; font-size: 12px; padding-inline: 14px;">
-                        <i class="feather-git-pull-request" id="toggle-view-icon"></i>
-                        <span id="toggle-view-text">Request Log</span>
-                    </button>
+                    </div>
                 </div>
-            </div>
-            <div class="card-body px-4 pb-4 pt-3">
+
                 <!-- VIEW 1: ASSIGNED ASSETS -->
                 <div id="view_assigned_assets" class="table-responsive">
                     <table class="table table-hover align-middle mb-0 assigned-assets-table" id="assignedAssetsTable" style="table-layout: fixed; width: 100%;">
@@ -251,7 +264,7 @@
                                     data-assigned="{{ $latestAssignedDate ? $latestAssignedDate->timestamp : 0 }}">
                                     <td class="ps-3" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
                                         <div class="d-flex align-items-center">
-                                            <div class="avatar-sm bg-soft-primary text-primary rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                                            <div class="avatar-sm rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px; background-color: rgba(59, 130, 246, 0.08) !important; color: #3b82f6 !important;">
                                                 <i class="feather-package fs-16"></i>
                                             </div>
                                             <div style="flex-grow: 1; min-width: 0;">
@@ -273,12 +286,12 @@
                                     </td>
                                     <td class="text-end pe-3">
                                         <div class="d-flex align-items-center justify-content-end gap-2">
-                                            <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase d-flex align-items-center gap-1.5 py-1 px-3" data-bs-toggle="modal" data-bs-target="#viewAssetDetailsModal" data-item-name="{{ $asset->name }}" data-allocated-assets="{{ base64_encode(json_encode($units)) }}" style="border-radius: 8px; font-size: 11px;">
-                                                <i class="feather-info"></i> {{ __('hrms.common.detail') }}
+                                            <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase px-3" data-bs-toggle="modal" data-bs-target="#viewAssetDetailsModal" data-item-name="{{ $asset->name }}" data-allocated-assets="{{ base64_encode(json_encode($units)) }}" style="font-size: 11px; height: 30px; border-radius: 6px;">
+                                                <i class="feather-info me-1.5 fs-12 text-primary"></i>{{ __('hrms.common.detail') }}
                                             </button>
                                             
-                                            <button type="button" class="btn btn-sm btn-soft-warning fw-bold text-uppercase d-flex align-items-center gap-1.5 py-1 px-3" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-item-id="{{ $asset->asset_item_id }}" data-item-name="{{ $asset->name }}" data-allocated-assets="{{ base64_encode(json_encode($units)) }}" style="border-radius: 8px; font-size: 11px;">
-                                                <i class="feather-corner-up-left"></i> {{ __('hrms.employees.lbl_return') }}
+                                            <button type="button" class="btn btn-sm btn-soft-warning fw-bold text-uppercase px-3" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-item-id="{{ $asset->asset_item_id }}" data-item-name="{{ $asset->name }}" data-allocated-assets="{{ base64_encode(json_encode($units)) }}" style="font-size: 11px; height: 30px; border-radius: 6px;">
+                                                <i class="feather-corner-up-left me-1.5 fs-12 text-warning"></i>{{ __('hrms.employees.lbl_return') }}
                                             </button>
                                         </div>
                                     </td>
@@ -384,8 +397,6 @@
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
 
 <!-- RETURN ASSET MODAL -->
 <div class="modal fade" id="returnAssetModal" tabindex="-1" aria-labelledby="returnAssetModalLabel" aria-hidden="true">
@@ -411,13 +422,19 @@
                             <div id="return_assets_checklist" class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
                                 <!-- Checklist populated via JS -->
                             </div>
+                            <div id="my_return_checklist_error" class="d-none mt-2">
+                                <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style="background: #fff3f3; border: 1px solid #f5c2c7;">
+                                    <i class="feather-alert-circle text-danger" style="font-size: 15px; flex-shrink: 0;"></i>
+                                    <span class="text-danger fs-12 fw-semibold">Please select at least one unit to return.</span>
+                                </div>
+                            </div>
                             <small class="text-muted mt-1 d-block">{{ __('hrms.employees.mdl_select_units_desc') }}</small>
                         </div>
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_return_date') }}" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_return_condition') }}" name="return_condition" :required="true" select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_return_condition') }}" name="condition_on_return" :required="true" select2-selector="default">
                                 <option value="good">{{ __('hrms.employees.mdl_condition_good') }}</option>
                                 <option value="new">{{ __('hrms.employees.mdl_condition_new') }}</option>
                                 <option value="fair">{{ __('hrms.employees.mdl_condition_fair') }}</option>
@@ -426,7 +443,7 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_return_notes') }}" name="return_notes" placeholder="{{ __('hrms.employees.mdl_return_notes_placeholder') }}" />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_return_notes') }}" name="notes" placeholder="{{ __('hrms.employees.mdl_return_notes_placeholder') }}" />
                         </div>
                     </div>
                 </div>
@@ -462,7 +479,7 @@
                                 <th class="py-2.5">{{ __('hrms.employees.tbl_serial_number') }}</th>
                                 <th class="py-2.5">{{ __('hrms.employees.tbl_assigned_date') }}</th>
                                 <th class="py-2.5">{{ __('hrms.employees.tbl_condition') }}</th>
-                                <th class="py-2.5 px-3">{{ __('hrms.employees.tbl_notes') }}</th>
+                                <th class="text-start py-2.5 px-3">{{ __('hrms.employees.tbl_notes') }}</th>
                             </tr>
                         </thead>
                         <tbody id="detail_assets_table_body" style="font-size: 13px;">
@@ -514,7 +531,7 @@
                                     </thead>
                                     <tbody id="req-items-tbody">
                                         <tr>
-                                            <td class="py-2 px-3" style="overflow: hidden; max-width: 0;">
+                                            <td class="py-2 px-3">
                                                 <select name="items[0][asset_item_id]" class="form-select form-select-sm req-item-select" required style="width: 100%;">
                                                     <option value="">{{ __('hrms.employees.mdl_select_item') }}</option>
                                                     @foreach($availableAssetItems as $item)
@@ -555,6 +572,14 @@
         $('#returnAssetModal').appendTo('body');
         $('#viewAssetDetailsModal').appendTo('body');
         $('#requestAssetModal').appendTo('body');
+
+        // Universal backdrop cleanup — fixes blur/frozen screen after closing any modal
+        $(document).on('hidden.bs.modal', '.modal', function() {
+            if ($('.modal.show').length === 0) {
+                $('body').removeClass('modal-open').css({ overflow: '', paddingRight: '' });
+                $('.modal-backdrop').remove();
+            }
+        });
 
         // Normalize text utility
         function normalizeText(text) {
@@ -769,15 +794,33 @@
 
         // Add dynamic request item row logic
         var requestItemIndex = 1;
+
+        // Initialize Select2 on the static first row when modal opens
+        $('#requestAssetModal').on('shown.bs.modal', function() {
+            $('#req-items-tbody .req-item-select').each(function() {
+                if (!$(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2({
+                        dropdownParent: $('#requestAssetModal'),
+                        theme: 'bootstrap-5',
+                        width: '100%',
+                        placeholder: '{{ __('hrms.employees.mdl_select_item') }}'
+                    });
+                }
+            });
+        });
+
         $('#btn-add-req-item-row').on('click', function() {
             var tbody = $('#req-items-tbody');
-            var selectOptions = $('#req-items-tbody tr:first-child select').html();
-            
+            // Clone options from static first row (strip selected state)
+            var rawOptions = $('#req-items-tbody tr:first-child select option').map(function() {
+                return '<option value="' + $(this).val() + '">' + $(this).text() + '</option>';
+            }).get().join('');
+
             var newRow = `
                 <tr>
                     <td class="py-2 px-3">
                         <select name="items[${requestItemIndex}][asset_item_id]" class="form-select form-select-sm req-item-select" required style="width: 100%;">
-                            ${selectOptions}
+                            ${rawOptions}
                         </select>
                     </td>
                     <td class="py-2 text-center">
@@ -788,12 +831,27 @@
                     </td>
                 </tr>
             `;
-            tbody.append(newRow);
+            var $newRow = $(newRow);
+            tbody.append($newRow);
+
+            // Initialize Select2 on the newly added row
+            $newRow.find('.req-item-select').select2({
+                dropdownParent: $('#requestAssetModal'),
+                theme: 'bootstrap-5',
+                width: '100%',
+                placeholder: '{{ __('hrms.employees.mdl_select_item') }}'
+            });
+
             requestItemIndex++;
             $('#req-items-tbody tr:first-child .btn-remove-req-item-row').prop('disabled', false);
         });
 
         $(document).on('click', '.btn-remove-req-item-row', function() {
+            // Destroy Select2 before removing
+            var $sel = $(this).closest('tr').find('.req-item-select');
+            if ($sel.hasClass('select2-hidden-accessible')) {
+                $sel.select2('destroy');
+            }
             $(this).closest('tr').remove();
             if ($('#req-items-tbody tr').length === 1) {
                 $('#req-items-tbody tr:first-child .btn-remove-req-item-row').prop('disabled', true);
@@ -807,8 +865,10 @@
             var itemName = button.data('item-name');
             var rawAssets = button.data('allocated-assets');
 
+            // Reset error banner when modal opens fresh
             var modal = $(this);
-            modal.find('form').attr('action', '/hrms/assets/item/' + itemId + '/return');
+            modal.find('#my_return_checklist_error').addClass('d-none');
+            modal.find('form').attr('action', "{{ route('hrms.assets-module.return-direct-multi') }}");
             modal.find('#return_asset_name_display').val(itemName);
 
             var checklistDiv = modal.find('#return_assets_checklist');
@@ -840,7 +900,15 @@
                 var checkedCount = modal.find('.return-allocated-asset-checkbox:checked').length;
                 if (checkedCount === 0) {
                     e.preventDefault();
-                    alert('Please select at least one physical asset/serial number to return.');
+                    modal.find('#my_return_checklist_error').removeClass('d-none');
+                    modal.find('#return_assets_checklist')[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            });
+
+            // Auto-dismiss error when any checkbox is checked
+            modal.find('#return_assets_checklist').off('change.myReturn').on('change.myReturn', '.return-allocated-asset-checkbox', function() {
+                if (modal.find('.return-allocated-asset-checkbox:checked').length > 0) {
+                    modal.find('#my_return_checklist_error').addClass('d-none');
                 }
             });
         });
@@ -883,7 +951,7 @@
                             <td class="py-2">
                                 <span class="badge ${badgeClass} rounded-pill px-2 py-0.5" style="font-size: 11px;">${asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1)}</span>
                             </td>
-                            <td class="py-2 px-3 text-muted text-truncate" style="max-width: 150px;" title="${asset.notes || ''}">${asset.notes || '-'}</td>
+                            <td class="text-start py-2 px-3 text-muted" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 320px;" title="${asset.notes || ''}">${asset.notes || '-'}</td>
                         </tr>
                     `;
                     tbody.append(rowHtml);

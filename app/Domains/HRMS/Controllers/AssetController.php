@@ -24,6 +24,24 @@ class AssetController extends Controller
      */
     public function index(Request $request): View
     {
+        // Self-healing: Ensure all currently allocated assets have an active AssetAllocation record
+        $allocatedAssetsWithoutActiveAlloc = Asset::where('status', 'allocated')
+            ->whereNotNull('assigned_employee_id')
+            ->whereDoesntHave('allocations', function ($query) {
+                $query->whereNull('returned_at');
+            })
+            ->get();
+
+        foreach ($allocatedAssetsWithoutActiveAlloc as $asset) {
+            \App\Domains\HRMS\Models\AssetAllocation::create([
+                'asset_id'             => $asset->id,
+                'employee_id'          => $asset->assigned_employee_id,
+                'allocated_at'         => $asset->allocated_at ?? now(),
+                'allocation_condition' => $asset->condition ?? 'good',
+                'notes'                => 'Auto-generated active allocation record (self-healing)',
+            ]);
+        }
+
         $data = $this->assetRepository->getIndexData($request->all());
 
         return view('modules.hrms.assets.index', $data);
@@ -202,10 +220,18 @@ class AssetController extends Controller
 
     public function returnItem(Request $request, AssetItem $assetItem): RedirectResponse
     {
+        if (!$request->has('quantity') && $request->has('allocated_asset_ids')) {
+            $request->merge([
+                'quantity' => count($request->input('allocated_asset_ids', []))
+            ]);
+        }
+
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'quantity' => 'required|integer|min:1',
             'condition_on_return' => 'required|string|in:new,good,fair,damaged,scrapped',
+            'allocated_asset_ids' => 'nullable|array',
+            'allocated_asset_ids.*' => 'exists:assets,id',
         ]);
 
         $success = $this->assetRepository->returnItem($assetItem, $validated);
@@ -401,37 +427,54 @@ class AssetController extends Controller
 
     public function allocateRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
     {
+        if ($request->has('allocated_asset_ids') && !$request->has('asset_ids')) {
+            $request->merge([
+                'asset_ids' => $request->input('allocated_asset_ids')
+            ]);
+        }
+
         $validated = $request->validate([
-            'asset_id'             => 'required|exists:assets,id',
+            'asset_ids'            => 'required|array|min:1',
+            'asset_ids.*'          => 'required|exists:assets,id',
             'allocated_at'         => 'required|date',
             'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
         ]);
 
-        $asset = Asset::findOrFail($validated['asset_id']);
+        $assetIds = $validated['asset_ids'];
+        $assets = Asset::whereIn('id', $assetIds)->get();
 
-        if ($asset->status !== 'available') {
-            return redirect()->back()->with('error', 'The selected asset is not currently available.');
+        foreach ($assets as $asset) {
+            if ($asset->status !== 'available') {
+                return redirect()->back()->with('error', "Asset {$asset->asset_code} ({$asset->name}) is not currently available.");
+            }
         }
 
-        $asset->update([
-            'status'               => 'allocated',
-            'assigned_employee_id' => $assetRequest->employee_id,
-            'allocated_at'         => $validated['allocated_at'],
-            'expected_return_date' => $validated['expected_return_date'] ?? null,
-        ]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($assets, $assetRequest, $validated, $assetIds) {
+            $assetCodes = [];
+            foreach ($assets as $asset) {
+                $asset->update([
+                    'status'               => 'allocated',
+                    'assigned_employee_id' => $assetRequest->employee_id,
+                    'allocated_at'         => $validated['allocated_at'],
+                    'expected_return_date' => $validated['expected_return_date'] ?? null,
+                ]);
 
-        $asset->allocations()->create([
-            'employee_id'          => $assetRequest->employee_id,
-            'allocated_at'         => $validated['allocated_at'],
-            'allocation_condition' => $asset->condition,
-            'notes'                => $asset->notes,
-        ]);
+                $asset->allocations()->create([
+                    'employee_id'          => $assetRequest->employee_id,
+                    'allocated_at'         => $validated['allocated_at'],
+                    'allocation_condition' => $asset->condition,
+                    'notes'                => $asset->notes,
+                ]);
 
-        $assetRequest->update([
-            'status'             => 'allocated',
-            'allocated_asset_id' => $asset->id,
-            'admin_notes'        => "Allocated asset {$asset->asset_code} ({$asset->name}) on " . date('d M, Y'),
-        ]);
+                $assetCodes[] = $asset->asset_code;
+            }
+
+            $assetRequest->update([
+                'status'             => 'allocated',
+                'allocated_asset_id' => $assetIds[0],
+                'admin_notes'        => "Allocated asset(s): " . implode(', ', $assetCodes) . " on " . date('d M, Y'),
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Asset request allocated successfully.');
     }
