@@ -1193,8 +1193,8 @@ class ProductionWipService
 
             $mainWip->update([
                 'available_quantity' => $unallocatedQty,
-                'quantity'           => $unallocatedQty,
-                'status'             => $newStatus,
+                'quantity' => $unallocatedQty,
+                'status' => $newStatus,
             ]);
         }
 
@@ -1291,12 +1291,23 @@ class ProductionWipService
                 $rejected = (float) $opLogs->sum('quantity_rejected');
                 $scrapped = (float) $scraps->where('production_order_operation_id', $op->id)->sum('quantity');
 
-                $reworkCompleted = (float) $reworks->where('operation_id', $op->id)
+                $reworkCompleted = (float) $reworks->whereIn('production_order_operation_id', [$op->id, $op->routing_operation_id])
                     ->where('status', 'completed')
                     ->sum('quantity');
 
+                $reworkFailedScrapped = (float) \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $order->tenant_id)
+                    ->where('production_order_id', $order->id)
+                    ->where('production_batch_id', $batch->id)
+                    ->where('from_operation_id', $op->routing_operation_id)
+                    ->where('transaction_type', 'rework_failed_scrapped')
+                    ->sum('quantity');
+
+                $pendingRework = (float) $reworks->whereIn('production_order_operation_id', [$op->id, $op->routing_operation_id])
+                    ->where('status', 'pending')
+                    ->sum('quantity');
+
                 $goodOutput = $produced + $reworkCompleted;
-                $activeRejects = max(0.0, $rejected - $reworkCompleted);
+                $activeRejects = max(0.0, $pendingRework);
 
                 $isPassed = ($op->sequence < $currentOpSeq)
                     || ($batch->status === 'completed')
@@ -1311,7 +1322,7 @@ class ProductionWipService
                     ->where('production_order_id', $order->id)
                     ->where(function ($q) use ($op) {
                         $q->where('production_order_operation_id', $op->id)
-                          ->orWhereNull('production_order_operation_id');
+                            ->orWhereNull('production_order_operation_id');
                     })
                     ->when($batch->id, function ($q) use ($batch) {
                         $q->where(fn($sub) => $sub->whereNull('batch_id')->orWhere('batch_id', $batch->id));
@@ -1333,6 +1344,10 @@ class ProductionWipService
                     'name' => $op->name,
                     'work_center_name' => $op->workCenter?->name ?? 'Work Center',
                     'good_output' => $goodOutput,
+                    'produced' => $produced,
+                    'rework_completed' => $reworkCompleted,
+                    'rework_failed_scrapped' => $reworkFailedScrapped,
+                    'pending_rework' => $pendingRework,
                     'rejected' => $activeRejects,
                     'scrapped' => $scrapped,
                     'is_current' => $isCurrent,
@@ -1417,7 +1432,8 @@ class ProductionWipService
 
         $query = ProductionWip::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
-            ->when($workCenterId !== null,
+            ->when(
+                $workCenterId !== null,
                 fn($q) => $q->where('current_work_center_id', $workCenterId),
                 fn($q) => $q->whereNull('current_work_center_id')
             )

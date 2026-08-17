@@ -335,21 +335,27 @@
                                                                             </div>
                                                                             <div class="fs-10 text-muted text-truncate" title="{{ $stage['name'] }} ({{ $stage['work_center_name'] }})">
                                                                                 {{ $stage['name'] }}
-                                                                            </div>
-                                                                            <div class="fs-10 mt-1 d-flex gap-2">
-                                                                                <span class="text-success fw-bold" title="Good Output">
-                                                                                    ✓ {{ number_format($stage['good_output'], 0) }}
-                                                                                </span>
-                                                                                @if($stage['rejected'] > 0)
-                                                                                    <span class="text-warning fw-bold" title="Pending Rework">
-                                                                                        ⚙ {{ number_format($stage['rejected'], 0) }}
+                                                                                <div class="fs-10 mt-1 d-flex flex-wrap align-items-center gap-1.5">
+                                                                                    <span class="text-success fw-bold" title="Good Output (Passed Operation)">
+                                                                                        ✓ {{ number_format($stage['good_output'], 0) }}
+                                                                                        @if(($stage['rework_completed'] ?? 0) > 0)
+                                                                                            <span class="text-success font-normal" style="font-size: 0.72rem;" title="Includes {{ number_format($stage['rework_completed'], 0) }} Recovered via Rework">(+{{ number_format($stage['rework_completed'], 0) }} Rec)</span>
+                                                                                        @endif
                                                                                     </span>
-                                                                                @endif
-                                                                                @if($stage['scrapped'] > 0)
-                                                                                    <span class="text-danger fw-bold" title="Scrapped">
-                                                                                        ✗ {{ number_format($stage['scrapped'], 0) }}
-                                                                                    </span>
-                                                                                @endif
+                                                                                    @if(($stage['pending_rework'] ?? $stage['rejected'] ?? 0) > 0)
+                                                                                        <span class="text-warning fw-bold ms-1" title="Pending Rework (Awaiting Repair)">
+                                                                                            ⚙ {{ number_format($stage['pending_rework'] ?? $stage['rejected'], 0) }} Rwk
+                                                                                        </span>
+                                                                                    @endif
+                                                                                    @if(($stage['scrapped'] ?? 0) > 0)
+                                                                                        <span class="text-danger fw-bold ms-1" title="Scrapped Quantity">
+                                                                                            ✗ {{ number_format($stage['scrapped'], 0) }} Scrap
+                                                                                            @if(($stage['rework_failed_scrapped'] ?? 0) > 0)
+                                                                                                <span class="text-danger font-normal" style="font-size: 0.72rem;" title="Includes {{ number_format($stage['rework_failed_scrapped'], 0) }} from Failed Rework">({{ number_format($stage['rework_failed_scrapped'], 0) }} Failed)</span>
+                                                                                            @endif
+                                                                                        </span>
+                                                                                    @endif
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                         @if(!$loop->last)

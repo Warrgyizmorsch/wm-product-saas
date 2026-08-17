@@ -1476,7 +1476,11 @@
                                                         {{ number_format($rew->quantity, 2) }}</td>
                                                     <td>
                                                         @if($rew->status === 'completed')
-                                                            <span class="badge bg-success text-white">Resolved</span>
+                                                            <span class="badge bg-success text-white">Resolved (Recovered)</span>
+                                                        @elseif($rew->status === 'failed')
+                                                            <span class="badge bg-danger text-white">Failed (Scrapped)</span>
+                                                        @elseif($rew->status === 'cancelled')
+                                                            <span class="badge bg-secondary text-white">Cancelled</span>
                                                         @else
                                                             <span class="badge bg-warning text-dark">Rework Pending</span>
                                                         @endif

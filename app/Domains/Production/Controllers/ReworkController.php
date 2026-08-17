@@ -78,4 +78,19 @@ class ReworkController extends Controller
 
         return redirect()->back()->with('success', 'Rework operation completed.');
     }
+
+    public function fail(Request $request, int $id)
+    {
+        $this->authorize('manage', ProductionReworkOrder::class);
+        $tenantId = require_tenant_id();
+
+        $data = $request->validate([
+            'reason' => 'nullable|string|max:500',
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        $this->reworkService->failRework($id, $data, $tenantId);
+
+        return redirect()->back()->with('success', 'Rework order failed and rejected quantity successfully converted to scrap.');
+    }
 }
