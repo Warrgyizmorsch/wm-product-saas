@@ -2558,6 +2558,37 @@
                     }
                 });
 
+                // Helper to toggle expiry date required styling dynamically
+                window.setExpiryDateRequired = function(modal, isRequired) {
+                    var group = modal.find('#upload_expiry_date_group');
+                    var input = modal.find('#upload_expiry_date');
+                    var label = group.find('label');
+                    
+                    if (isRequired) {
+                        group.show();
+                        input.prop('required', true);
+                        if (label.length) {
+                            var html = label.html();
+                            // Clean up any existing asterisk or "(Optional)" tags first
+                            label.find('.text-danger').remove();
+                            html = label.html().replace(/\s*\(Optional\)/g, '');
+                            label.html(html);
+                            // Append asterisk and color label red
+                            label.append(' <span class="text-danger">*</span>');
+                            label.css('color', '#dc3545');
+                        }
+                    } else {
+                        group.hide();
+                        input.prop('required', false).val('');
+                        if (label.length) {
+                            label.find('.text-danger').remove();
+                            var html = label.html().replace(/\s*\(Optional\)/g, '');
+                            label.html(html + ' (Optional)');
+                            label.css('color', '');
+                        }
+                    }
+                };
+
                 // Prefill document ID and details when opening upload modal from table rows
                 $(document).on('show.bs.modal', '#uploadDocumentModal', function (e) {
                     var button = $(e.relatedTarget);
@@ -2567,13 +2598,29 @@
                     
                     if (docId) {
                         modal.find('#upload_doc_modal_document_id').val(docId);
-                        modal.find('input[name="name"]').val(docName).prop('readonly', true);
+                        modal.find('#upload_template_select_group').hide();
+                        modal.find('#upload_document_name_label_group').show();
+                        modal.find('#upload_document_name_label').text(docName);
                         modal.find('.modal-title').html('<i class="feather-upload-cloud me-2 text-primary"></i>Upload ' + docName);
+                        
+                        var docHasExpiry = button.data('has-expiry') == 1;
+                        window.setExpiryDateRequired(modal, docHasExpiry);
                     } else {
                         modal.find('#upload_doc_modal_document_id').val('');
-                        modal.find('input[name="name"]').val('').prop('readonly', false);
+                        modal.find('#upload_template_select_group').show();
+                        modal.find('#upload_document_name_label_group').hide();
+                        modal.find('#upload_document_master_id').val('').trigger('change.select2');
+                        window.setExpiryDateRequired(modal, false);
                         modal.find('.modal-title').html('<i class="feather-upload-cloud me-2 text-primary"></i>' + "{{ __('hrms.employees.mdl_upload_doc_title') }}");
                     }
+                });
+
+                // Toggle upload modal expiry date based on selected document template
+                $(document).on('change', '#upload_document_master_id', function() {
+                    var option = $(this).find('option:selected');
+                    var expiryApplicable = option.data('expiry-applicable') == 1;
+                    var modal = $(this).closest('.modal');
+                    window.setExpiryDateRequired(modal, expiryApplicable);
                 });
 
                 window.openWfhRejectModal = function(btn) {

@@ -236,37 +236,13 @@ class EmployeeController extends Controller
         return redirect()->back()->with('success', __('hrms.employees.history_delete_success'));
     }
 
-    public function requestDocument(Request $request, Employee $employee): RedirectResponse
-    {
-        $request->validate([
-            'name'        => 'required|string|max:255',
-            'description' => 'nullable|string|max:500',
-            'has_expiry'  => 'nullable|boolean',
-        ]);
-
-        $tenantId = auth()->user()->tenant_id;
-
-        \App\Domains\HRMS\Models\Document::create([
-            'tenant_id'         => $tenantId,
-            'documentable_id'   => $employee->id,
-            'documentable_type' => Employee::class,
-            'name'              => $request->string('name')->value(),
-            'description'       => $request->input('description'),
-            'status'            => 'requested',
-            'has_expiry'        => $request->boolean('has_expiry'),
-            'requested_by_id'   => auth()->id(),
-        ]);
-
-        return redirect()->back()->with('success', __('hrms.employees.doc_request_success'));
-    }
-
     public function uploadDocument(Request $request, Employee $employee): RedirectResponse
     {
         $request->validate([
-            'document_id' => 'nullable|exists:documents,id',
-            'name'        => 'nullable|required_without:document_id|string|max:255',
-            'file'        => 'required|file|max:10240', // Max 10MB
-            'expiry_date' => 'nullable|date',
+            'document_id'        => 'nullable|exists:documents,id',
+            'document_master_id' => 'required_without:document_id|exists:document_masters,id',
+            'file'               => 'required|file|max:10240', // Max 10MB
+            'expiry_date'        => 'nullable|date',
         ]);
 
         $tenantId = auth()->user()->tenant_id;
@@ -275,35 +251,64 @@ class EmployeeController extends Controller
         if ($request->filled('document_id')) {
             $document = \App\Domains\HRMS\Models\Document::findOrFail($request->integer('document_id'));
             
-            if ($document->has_expiry && !$request->filled('expiry_date')) {
-                return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this requested document.'])->withInput();
+            $expiryApplicable = $document->has_expiry;
+            if ($document->document_master_id) {
+                $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::find($document->document_master_id);
+                if ($documentMaster) {
+                    $expiryApplicable = $documentMaster->expiry_applicable;
+                }
+            }
+
+            if ($expiryApplicable && !$request->filled('expiry_date')) {
+                return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this document.'])->withInput();
             }
 
             $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+
+            $approvalRequired = true;
+            if ($document->document_master_id) {
+                $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::find($document->document_master_id);
+                if ($documentMaster) {
+                    $approvalRequired = (bool) $documentMaster->approval_required;
+                }
+            }
+            $status = $approvalRequired ? 'uploaded' : 'approved';
 
             $document->update([
                 'file_name'   => $file->getClientOriginalName(),
                 'file_path'   => $path,
                 'file_type'   => $file->getClientMimeType(),
                 'file_size'   => $file->getSize(),
-                'expiry_date' => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                'status'      => 'uploaded',
+                'expiry_date' => $expiryApplicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status'      => $status,
             ]);
         } else {
+            $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::findOrFail($request->integer('document_master_id'));
+            
+            if ($documentMaster->expiry_applicable && !$request->filled('expiry_date')) {
+                return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this document template.'])->withInput();
+            }
+
             $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
+            $approvalRequired = (bool) $documentMaster->approval_required;
+            $status = $approvalRequired ? 'uploaded' : 'approved';
+
             \App\Domains\HRMS\Models\Document::create([
-                'tenant_id'         => $tenantId,
-                'documentable_id'   => $employee->id,
-                'documentable_type' => Employee::class,
-                'name'              => $request->string('name')->value(),
-                'file_name'         => $file->getClientOriginalName(),
-                'file_path'         => $path,
-                'file_type'         => $file->getClientMimeType(),
-                'file_size'         => $file->getSize(),
-                'expiry_date'       => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                'status'            => 'uploaded',
-                'has_expiry'        => $request->filled('expiry_date'),
+                'tenant_id'          => $tenantId,
+                'documentable_id'    => $employee->id,
+                'documentable_type'  => Employee::class,
+                'document_master_id' => $documentMaster->id,
+                'name'               => $documentMaster->name,
+                'description'        => $documentMaster->description,
+                'file_name'          => $file->getClientOriginalName(),
+                'file_path'          => $path,
+                'file_type'          => $file->getClientMimeType(),
+                'file_size'          => $file->getSize(),
+                'status'             => $status,
+                'has_expiry'         => $documentMaster->expiry_applicable,
+                'expiry_date'        => $documentMaster->expiry_applicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'requested_by_id'    => auth()->id(),
             ]);
         }
 

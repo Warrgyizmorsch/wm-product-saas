@@ -61,6 +61,9 @@ class LoginController extends Controller
         }
 
         $user = Auth::user();
+        if ($user->role_id && !$user->role) {
+            $user->role = $user->primaryRole?->name;
+        }
         $token = $user->createToken('api-token')->plainTextToken;
 
         return response()->json([

@@ -128,8 +128,10 @@
                 ['label' => 'Shift Roster', 'route' => 'hrms.roster.index'],
                 ['label' => 'Penalization Policy', 'route' => 'hrms.penalization-policy.index'],
                 ['label' => 'Asset Management', 'route' => 'hrms.assets.index'],
+                ['label' => 'Document Master', 'route' => 'hrms.documents-master.index'],
             ]],
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
+            ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'],
             ['label' => 'Assets', 'icon' => 'feather-package', 'url' => '#', 'children' => [
                 ['label' => 'Employees Assets', 'route' => 'hrms.assets-module.index'],
                 ['label' => 'My Assets', 'route' => 'hrms.assets-module.my-assets'],

@@ -278,13 +278,14 @@ class EmployeeRepository implements EmployeeRepositoryInterface
 
         $options = $this->getDropdownOptions();
 
-        // Determine active tab name from inputs
+        $documentMasters = \App\Domains\HRMS\Models\DocumentMaster::where('status', 'active')->orderBy('name')->get();
         $activeTabName = $inputs['active_tab'] ?? $inputs['tab'] ?? 'overview';
 
         return array_merge([
             'employee'                  => $employee,
             'availableAssets'           => $availableAssets,
             'leaveTypes'                => $leaveTypes,
+            'documentMasters'           => $documentMasters,
             'allEmployees'              => $allEmployees,
             'salaryStructure'           => $salaryStructure,
             'computedComponents'        => $computedComponents,
