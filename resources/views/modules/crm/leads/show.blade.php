@@ -1077,11 +1077,19 @@
                                                             elseif($item->type === 'Demo')    { $actIcon = 'feather-monitor'; $actIconBg = 'bg-soft-danger';  $actIconColor = 'text-danger'; }
 
                                                             $statusBadgeClass = 'bg-primary text-white';
-                                                            $statusLabel = 'Pending';
-                                                            if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = 'Connected'; }
+                                                            $statusLabel = $item->status ?: 'Pending';
+                                                            if($item->status === 'Completed' || $item->status === 'Connected') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = 'Connected'; }
                                                             elseif($item->status === 'Not Connected') { $statusBadgeClass = 'bg-warning text-white'; $statusLabel = 'Not Connected'; }
+                                                            elseif($item->status === 'Not Answering') { $statusBadgeClass = 'bg-secondary text-white'; $statusLabel = 'Not Answering'; }
                                                             elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-danger text-white'; $statusLabel = 'Cancelled'; }
                                                             elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-purple text-white'; $statusLabel = 'Rescheduled'; }
+
+                                                            $displayTitle = $item->type;
+                                                            if ($item->status === 'Pending') {
+                                                                $displayTitle = \Illuminate\Support\Facades\Lang::has('crm.activity_types.' . $item->type) ? __('crm.activity_types.' . $item->type) : 'Scheduled ' . $item->type;
+                                                            } else {
+                                                                $displayTitle = $item->type . ' Log';
+                                                            }
                                                         @endphp
 
                                                         <div class="activity-card mb-2">
@@ -1092,7 +1100,7 @@
                                                                     <div class="activity-type-icon {{ $actIconBg }} {{ $actIconColor }} flex-shrink-0">
                                                                         <i class="{{ $actIcon }}"></i>
                                                                     </div>
-                                                                    <span class="fw-bold text-dark fs-13">{{ __('crm.activity_types.' . $item->type) ?? $item->type }}</span>
+                                                                    <span class="fw-bold text-dark fs-13">{{ $displayTitle }}</span>
                                                                     <span class="activity-time-chip"><i class="feather-clock fs-9 me-1"></i>{{ $item->followup_date->format('h:i A') }}</span>
                                                                     <span class="badge rounded-pill {{ $statusBadgeClass }} px-2.5 py-1 fs-10 fw-semibold" @if($item->status !== 'Pending') title="Status updated on {{ $item->updated_at->format('d/m/Y h:i A') }}" @endif>{{ $statusLabel }}</span>
 

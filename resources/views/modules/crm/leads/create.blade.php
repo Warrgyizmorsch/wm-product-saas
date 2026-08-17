@@ -581,6 +581,17 @@
             const dismissedMatchKeys = new Set();
             let currentActiveMatchKey = null;
 
+            function showDuplicateModal() {
+                const modalEl = document.getElementById('duplicateAccountModal');
+                if (!modalEl) return;
+                if (typeof $(modalEl).modal === 'function') {
+                    $(modalEl).modal('show');
+                } else if (window.bootstrap && bootstrap.Modal) {
+                    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modalInstance.show();
+                }
+            }
+
             function performDuplicateCheck(blurredFieldName) {
                 const leadType = $('input[name="lead_type"]:checked').val() || 'b2b';
 
@@ -591,23 +602,32 @@
 
                 if (leadType === 'b2b') {
                     // In B2B mode, check ONLY using Company fields (Ignore Contact Person fields)
-                    const b2bFields = ['company_name', 'gstin', 'company_email', 'company_phone', 'company_name_input', 'gstin_input'];
+                    const b2bFields = [
+                        'company_name', 'company_name_input',
+                        'gstin', 'gstin_input',
+                        'company_email', 'company_email_input',
+                        'company_phone', 'company_phone_input'
+                    ];
                     if (blurredFieldName && !b2bFields.includes(blurredFieldName)) {
                         return; // Do NOT check duplicates for Contact Person fields in B2B mode
                     }
 
                     companyName = ($('input[name="company_name"]').val() || $('#company_name_input').val() || '').trim();
                     gstin = ($('input[name="gstin"]').val() || $('#gstin_input').val() || '').trim();
-                    email = ($('input[name="company_email"]').val() || '').trim();
-                    phone = ($('input[name="company_phone"]').val() || '').trim();
+                    email = ($('input[name="company_email"]').val() || $('#company_email_input').val() || '').trim();
+                    phone = ($('input[name="company_phone"]').val() || $('#company_phone_input').val() || '').trim();
                 } else {
                     // In B2C mode, check ONLY using Individual Person Contact fields
-                    const b2cFields = ['contact_person', 'email', 'contact_email', 'phone', 'contact_phone', 'email_input', 'phone_input'];
+                    const b2cFields = [
+                        'contact_person', 'contact_person_input',
+                        'email', 'email_input', 'contact_email',
+                        'phone', 'phone_input', 'contact_phone'
+                    ];
                     if (blurredFieldName && !b2cFields.includes(blurredFieldName)) {
                         return; // Ignore company fields in B2C mode
                     }
 
-                    companyName = ($('input[name="contact_person"]').val() || '').trim();
+                    companyName = ($('input[name="contact_person"]').val() || $('#contact_person_input').val() || '').trim();
                     email = ($('input[name="email"], input[name="contact_email"]').val() || $('#email_input').val() || '').trim();
                     phone = ($('input[name="phone"], input[name="contact_phone"]').val() || $('#phone_input').val() || '').trim();
                 }
@@ -639,31 +659,37 @@
                             currentActiveMatchKey = matchKey;
 
                             if (res.matched) {
-                                $('#dupMatchedByText').text(res.matched_by);
+                                $('#dupModalHeaderTitle').html('<i class="feather-alert-triangle me-2 text-warning fs-4"></i>Existing Customer Account Found!');
+                                $('#dupModalNotice').html('System detected an existing customer account matching <strong class="text-dark">' + (res.matched_by || '') + '</strong>. To prevent duplicate data, you can create a <strong>New Deal</strong> directly under this Account.');
                                 $('#dupAccountNameText').text(res.account_name + ' (' + res.account_number + ')');
-                                $('#dupAccountGstinText').text(res.gstin);
-                                $('#dupAccountPhoneText').text(res.phone);
-                                $('#dupAccountRevenueText').text('₹' + res.lifetime_revenue);
-                                $('#dupAccountDealsText').text(res.open_deals_count + ' Open Deals');
-                                $('#dupAccountLastPurchaseText').text(res.last_purchase_date);
+                                $('#dupAccountGstinText').text(res.gstin || 'N/A');
                                 
-                                $('#dupViewAccountBtn').attr('href', '/crm/accounts/' + res.account_id);
-                                $('#dupCreateDealBtn').attr('href', '/crm/deals/create?account_id=' + res.account_id);
+                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>Lifetime Revenue: <strong id="dupAccountRevenueText" class="text-success">₹' + res.lifetime_revenue + '</strong></span>');
+                                $('#dupDealsContainer').html('<span><i class="feather-layers me-1 text-info"></i>Active Deals: <strong id="dupAccountDealsText" class="text-dark">' + res.open_deals_count + ' Open Deals</strong></span>');
+                                $('#dupDateContainer').html('<span><i class="feather-calendar me-1 text-primary"></i>Last Purchase: <strong id="dupAccountLastPurchaseText" class="text-dark">' + res.last_purchase_date + '</strong></span>');
                                 
-                                $('#duplicateAccountModal').modal('show');
+                                $('#dupViewAccountBtn').html('<i class="feather-external-link me-1"></i>View Account').attr('href', '/crm/accounts/' + res.account_id);
+                                $('#dupCreateDealBtn').show().html('<i class="feather-plus me-1"></i>Create New Deal').attr('href', '/crm/deals/create?account_id=' + res.account_id);
+                                
+                                showDuplicateModal();
                             } else if (res.is_duplicate) {
-                                $('#dupMatchedByText').text(res.matched_by || 'Email / Phone');
-                                $('#dupAccountNameText').text(res.lead ? res.lead.company_name : 'Existing Lead');
-                                $('#dupAccountGstinText').text('Lead #' + (res.lead ? res.lead.id : ''));
-                                $('#dupAccountPhoneText').text(res.lead ? res.lead.phone : 'N/A');
-                                $('#dupAccountRevenueText').text(res.message || 'Duplicate Lead Found');
-                                $('#dupAccountDealsText').text('Open Lead');
-                                $('#dupAccountLastPurchaseText').text(res.lead ? res.lead.created_at : 'N/A');
+                                const leadName = res.lead ? (res.lead.company_name || res.lead.contact_person || ('Lead #' + res.lead.id)) : 'Existing Lead';
+                                const expAmt = res.lead && res.lead.expected_amount ? parseFloat(res.lead.expected_amount).toFixed(2) : '0.00';
+                                const createdAt = res.lead && res.lead.created_at ? (typeof res.lead.created_at === 'string' ? res.lead.created_at.substring(0, 10) : res.lead.created_at) : 'N/A';
 
-                                $('#dupViewAccountBtn').attr('href', '/crm/leads/' + (res.lead ? res.lead.id : ''));
-                                $('#dupCreateDealBtn').attr('href', '/crm/leads/' + (res.lead ? res.lead.id : ''));
+                                $('#dupModalHeaderTitle').html('<i class="feather-copy me-2 text-warning fs-4"></i>Duplicate Lead Found!');
+                                $('#dupModalNotice').html('<div class="alert alert-warning border-0 shadow-2xs mb-0 py-2 px-3 fs-13"><i class="feather-alert-circle me-1 text-warning"></i>' + (res.message || 'Duplicate Lead Found!') + '</div>');
+                                $('#dupAccountNameText').text(leadName);
+                                $('#dupAccountGstinText').text('Lead #' + (res.lead ? res.lead.id : ''));
                                 
-                                $('#duplicateAccountModal').modal('show');
+                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>Expected Amount: <strong id="dupAccountRevenueText" class="text-success">₹' + expAmt + '</strong></span>');
+                                $('#dupDealsContainer').html('<span><i class="feather-tag me-1 text-info"></i>Status: <strong id="dupAccountDealsText" class="text-dark">' + (res.lead ? (res.lead.status || 'New') : 'N/A') + '</strong></span>');
+                                $('#dupDateContainer').html('<span><i class="feather-calendar me-1 text-primary"></i>Created On: <strong id="dupAccountLastPurchaseText" class="text-dark">' + createdAt + '</strong></span>');
+
+                                $('#dupViewAccountBtn').html('<i class="feather-eye me-1"></i>View Lead').attr('href', '/crm/leads/' + (res.lead ? res.lead.id : ''));
+                                $('#dupCreateDealBtn').hide();
+                                
+                                showDuplicateModal();
                             }
                         }
                     }
@@ -754,28 +780,30 @@
             var initialLeadType = $('input[name="lead_type"]:checked').val() || 'b2b';
             window.toggleLeadType(initialLeadType);
 
-            // Trigger duplicate check ONLY on simple field blur (when focus leaves the input box)
-            $(document).on('blur', '#gstin_input, #phone_input, #email_input, #company_name_input, input[name="gstin"], input[name="phone"], input[name="email"], input[name="company_name"], input[name="company_email"], input[name="company_phone"], input[name="contact_person"], input[name="contact_email"], input[name="contact_phone"]', function() {
+            // Trigger duplicate check strictly on blur event (when user moves out of an input box)
+            $(document).on('blur', '#gstin_input, #phone_input, #email_input, #company_name_input, #company_email_input, #company_phone_input, #contact_person_input, input[name="gstin"], input[name="phone"], input[name="email"], input[name="company_name"], input[name="company_email"], input[name="company_phone"], input[name="contact_person"], input[name="contact_email"], input[name="contact_phone"]', function() {
                 const fieldName = $(this).attr('name') || $(this).attr('id');
                 performDuplicateCheck(fieldName);
             });
         });
     </script>
 
-    <!-- Modal: Duplicate Account Found Alert -->
+    <!-- Modal: Duplicate Account / Lead Found Alert -->
     <div class="modal fade" id="duplicateAccountModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered border-0">
             <div class="modal-content shadow-lg rounded-3 border-0">
                 <div class="modal-header bg-warning-subtle text-warning-emphasis border-bottom">
-                    <h5 class="modal-title fw-bold text-dark d-flex align-items-center">
+                    <h5 class="modal-title fw-bold text-dark d-flex align-items-center" id="dupModalHeaderTitle">
                         <i class="feather-alert-triangle me-2 text-warning fs-4"></i>Existing Customer Found!
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <p class="text-muted fs-13 mb-3">
-                        System detected an existing customer account matching <strong id="dupMatchedByText" class="text-dark"></strong>. To prevent duplicate data, you can create a <strong>New Deal #2</strong> directly under this Account.
-                    </p>
+                    <div id="dupModalNotice" class="mb-3">
+                        <p class="text-muted fs-13 mb-0">
+                            System detected an existing record matching <strong id="dupMatchedByText" class="text-dark"></strong>.
+                        </p>
+                    </div>
 
                     <div class="card border border-light-subtle rounded-3 p-3 bg-light mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -783,21 +811,21 @@
                             <span class="badge bg-white text-dark border font-monospace" id="dupAccountGstinText">GSTIN</span>
                         </div>
                         <div class="row g-2 fs-12 text-muted mt-1">
-                            <div class="col-6">
+                            <div class="col-6" id="dupRevenueContainer">
                                 <span><i class="feather-dollar-sign me-1 text-success"></i>Revenue: <strong id="dupAccountRevenueText" class="text-success">₹0.00</strong></span>
                             </div>
-                            <div class="col-6">
+                            <div class="col-6" id="dupDealsContainer">
                                 <span><i class="feather-layers me-1 text-info"></i>Active: <strong id="dupAccountDealsText" class="text-dark">0 Deals</strong></span>
                             </div>
-                            <div class="col-12 mt-1">
-                                <span><i class="feather-calendar me-1 text-primary"></i>Last Purchase: <strong id="dupAccountLastPurchaseText" class="text-dark">N/A</strong></span>
+                            <div class="col-12 mt-1" id="dupDateContainer">
+                                <span><i class="feather-calendar me-1 text-primary"></i>Date: <strong id="dupAccountLastPurchaseText" class="text-dark">N/A</strong></span>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-top">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Ignore & Continue</button>
-                    <a href="#" id="dupViewAccountBtn" class="btn btn-soft-primary" target="_blank">View Account</a>
+                    <a href="#" id="dupViewAccountBtn" class="btn btn-soft-primary" target="_blank"><i class="feather-external-link me-1"></i>View Record</a>
                     <a href="#" id="dupCreateDealBtn" class="btn btn-warning fw-bold px-3"><i class="feather-plus me-1"></i>Create New Deal</a>
                 </div>
             </div>

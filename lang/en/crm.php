@@ -273,6 +273,7 @@ return [
         'Email' => 'Scheduled Email',
         'Meeting' => 'Scheduled Meeting',
         'Demo' => 'Scheduled Demo',
+        'WhatsApp' => 'WhatsApp Message',
     ],
     'due_date_time' => 'Due Date & Time',
     'description_plan' => 'Description / Plan',
