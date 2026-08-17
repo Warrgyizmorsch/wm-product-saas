@@ -45,12 +45,15 @@
     <div class="tab-pane fade {{ request()->get('subtab', 'recurring') === 'recurring' ? 'show active' : '' }}" id="recurring-pane" role="tabpanel" aria-labelledby="recurring-subtab">
         <div class="row">
             <div class="col-12">
-                <x-ui.card title="{{ __('hrms.salary.recurring_components_fixed') }}" stretch bodyClass="p-0">
-                    <x-slot name="headerAction">
-                        <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-component-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-is-adhoc="0" data-bs-toggle="modal" data-bs-target="#addSalaryComponentModal">
-                            {{ __('hrms.salary.add_component') }}
-                        </x-ui.button>
-                    </x-slot>
+                <div>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.salary.recurring_components_fixed') }}</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-component-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-is-adhoc="0" data-bs-toggle="modal" data-bs-target="#addSalaryComponentModal">
+                                {{ __('hrms.salary.add_component') }}
+                            </x-ui.button>
+                        </div>
+                    </div>
 
                     <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative; z-index: 10;">
                         <input type="hidden" id="rec_sort_value" value="{{ request('rec_sort') }}">
@@ -183,7 +186,7 @@
                             $totalResults = $recurringComponents->total();
                             $perPage = $recurringComponents->perPage();
                         @endphp
-                        <div class="card-footer bg-white border-top px-4 py-3 rec-pagination-container">
+                        <div class="pt-3 border-top mt-3 rec-pagination-container">
                             <x-ui.pagination
                                 class="px-0 py-0"
                                 :current-page="$currentPage"
@@ -195,7 +198,7 @@
                             />
                         </div>
                     @endif
-                </x-ui.card>
+                </div>
             </div>
         </div>
     </div>
@@ -204,12 +207,15 @@
     <div class="tab-pane fade {{ request()->get('subtab') === 'adhoc' ? 'show active' : '' }}" id="adhoc-pane" role="tabpanel" aria-labelledby="adhoc-subtab">
         <div class="row">
             <div class="col-12">
-                <x-ui.card title="{{ __('hrms.salary.adhoc_components_title') }}" stretch bodyClass="p-0">
-                    <x-slot name="headerAction">
-                        <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-component-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-is-adhoc="1" data-bs-toggle="modal" data-bs-target="#addSalaryComponentModal">
-                            {{ __('hrms.salary.add_component') }}
-                        </x-ui.button>
-                    </x-slot>
+                <div>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.salary.adhoc_components_title') }}</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-component-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-is-adhoc="1" data-bs-toggle="modal" data-bs-target="#addSalaryComponentModal">
+                                {{ __('hrms.salary.add_component') }}
+                            </x-ui.button>
+                        </div>
+                    </div>
 
                     <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative; z-index: 10;">
                         <input type="hidden" id="adhoc_sort_value" value="{{ request('adhoc_sort') }}">
@@ -342,7 +348,7 @@
                             $totalResults = $adhocComponents->total();
                             $perPage = $adhocComponents->perPage();
                         @endphp
-                        <div class="card-footer bg-white border-top px-4 py-3 adhoc-pagination-container">
+                        <div class="pt-3 border-top mt-3 adhoc-pagination-container">
                             <x-ui.pagination
                                 class="px-0 py-0"
                                 :current-page="$currentPage"
@@ -354,7 +360,7 @@
                             />
                         </div>
                     @endif
-                </x-ui.card>
+                </div>
             </div>
         </div>
     </div>

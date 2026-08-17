@@ -7,6 +7,7 @@ use App\Domains\HRMS\Controllers\LeaveStructureController;
 use App\Domains\HRMS\Controllers\PenalizationPolicyController;
 use App\Domains\HRMS\Controllers\RosterController;
 use App\Domains\HRMS\Controllers\AssetController;
+use App\Domains\HRMS\Controllers\AssetModuleController;
 use App\Domains\HRMS\Controllers\LeaveRequestController;
 use Illuminate\Support\Facades\Route;
 
@@ -81,6 +82,9 @@ Route::prefix('hrms')
             Route::get('/date/{date}', [AttendanceController::class, 'getDateLogs'])->name('attendance.date-logs');
             Route::delete('/date/{date}', [AttendanceController::class, 'destroyDate'])->name('attendance.destroy-date');
             Route::post('/track-location', [AttendanceController::class, 'trackLocation'])->name('attendance.track-location');
+
+            // Employee Attendance
+            Route::get('/my-attendance', [AttendanceController::class, 'myAttendance'])->name('attendance.myAttendance');
             
             // Import / Export
             Route::post('/import', [AttendanceController::class, 'import'])->name('attendance.import');
@@ -255,6 +259,37 @@ Route::prefix('hrms')
             Route::post('/requests/{assetRequest}/allocate', [AssetController::class, 'allocateRequest'])->name('assets.requests.allocate');
             Route::post('/requests/bulk-allocate', [AssetController::class, 'bulkAllocate'])->name('assets.requests.bulk-allocate');
             Route::post('/requests/bulk-reject', [AssetController::class, 'bulkReject'])->name('assets.requests.bulk-reject');
+        });
+
+        // Assets Module (Outside Settings)
+        Route::prefix('assets-module')->group(function (): void {
+            Route::get('/', [AssetModuleController::class, 'index'])->name('assets-module.index');
+            Route::get('/my-assets', [AssetModuleController::class, 'myAssets'])->name('assets-module.my-assets');
+            Route::post('/allocate-direct', [AssetModuleController::class, 'allocateDirect'])->name('assets-module.allocate-direct');
+            Route::post('/return-direct/{asset}', [AssetModuleController::class, 'returnDirect'])->name('assets-module.return-direct');
+            Route::post('/return-direct-multi', [AssetModuleController::class, 'returnDirectMulti'])->name('assets-module.return-direct-multi');
+        });
+
+        // Document Master Management
+        Route::prefix('documents-master')->group(function (): void {
+            Route::get('/', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'index'])->name('documents-master.index');
+            
+            // Category Routes
+            Route::post('/categories', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'storeCategory'])->name('documents-master.categories.store');
+            Route::match(['post', 'put'], '/categories/{category}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'updateCategory'])->name('documents-master.categories.update');
+            Route::delete('/categories/{category}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'destroyCategory'])->name('documents-master.categories.destroy');
+            
+            // Document Master Routes
+            Route::post('/documents', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'storeDocument'])->name('documents-master.documents.store');
+            Route::match(['post', 'put'], '/documents/{document}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'updateDocument'])->name('documents-master.documents.update');
+            Route::post('/documents/{document}/toggle-status', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'toggleStatus'])->name('documents-master.documents.toggle-status');
+            Route::delete('/documents/{document}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'destroyDocument'])->name('documents-master.documents.destroy');
+        });
+
+        // Documents Registry (All uploaded documents)
+        Route::prefix('documents')->group(function (): void {
+            Route::get('/', [\App\Domains\HRMS\Controllers\DocumentController::class, 'index'])->name('documents.index');
+            Route::post('/bulk-upload', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkUpload'])->name('documents.bulk-upload');
         });
 
         Route::view('/track-status', 'modules.hrms.track-status')->name('track-status');

@@ -111,7 +111,7 @@
                             @endif
                         </td>
                         <td>
-                            @if($insp->result === 'passed')
+                            @if($insp->result === 'passed' || $insp->status === 'approved')
                                 <span class="text-success fw-bold"><i class="feather-check-circle me-1"></i>PASSED</span>
                             @elseif($insp->result === 'failed')
                                 <span class="text-danger fw-bold"><i class="feather-alert-triangle me-1"></i>FAILED</span>

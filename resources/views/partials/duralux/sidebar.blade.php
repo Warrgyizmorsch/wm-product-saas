@@ -42,6 +42,7 @@
         __('ui.supply_chain') => [
             ['label' => 'Store', 'icon' => 'feather-archive', 'url' => '#', 'children' => [
                 ['label' => 'Material Requirements', 'route' => 'inventory.material-requirements.index'],
+                ['label' => 'MRP & Shortage Analysis', 'route' => 'inventory.mrp-shortage.index'],
                 ['label' => 'Material Requests (Prod)', 'route' => 'inventory.material-requests.index'],
                 ['label' => 'Dispatch Orders', 'route' => 'inventory.dispatches.index'],
             ]],
@@ -127,9 +128,18 @@
                 ['label' => 'Shift Roster', 'route' => 'hrms.roster.index'],
                 ['label' => 'Penalization Policy', 'route' => 'hrms.penalization-policy.index'],
                 ['label' => 'Asset Management', 'route' => 'hrms.assets.index'],
+                ['label' => 'Document Master', 'route' => 'hrms.documents-master.index'],
             ]],
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
-            ['label' => 'Attendance', 'icon' => 'feather-clock', 'route' => 'hrms.attendance.index'],
+            ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'],
+            ['label' => 'Assets', 'icon' => 'feather-package', 'url' => '#', 'children' => [
+                ['label' => 'Employees Assets', 'route' => 'hrms.assets-module.index'],
+                ['label' => 'My Assets', 'route' => 'hrms.assets-module.my-assets'],
+            ]],
+            ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#', 'children' => [
+                ['label' => 'Admin Attendance', 'route' => 'hrms.attendance.index'],
+                ['label' => 'My Attendance', 'route' => 'hrms.attendance.myAttendance'],
+            ]],
             ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],

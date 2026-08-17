@@ -166,7 +166,7 @@
 @section('content')
     <div class="settings-container">
         <!-- Right Content Column -->
-        <div class="settings-content-col flex-grow-1">
+        <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark">
 
             <!-- Tabs Navigation -->
             <ul class="nav nav-tabs border-bottom mb-4" id="assetModuleTabs" role="tablist">
@@ -180,22 +180,11 @@
                         <i class="feather-sliders me-2"></i>{{ __('hrms.assets.tab_categories') }}
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="requests-tab" data-bs-toggle="tab" data-bs-target="#requests-pane" type="button" role="tab" aria-controls="requests-pane" aria-selected="false">
-                        <i class="feather-user-check me-2"></i>{{ __('hrms.assets.tab_requests') }}
-                        @if($pendingRequestsCount > 0)
-                            <span class="badge bg-danger rounded-circle p-1 ms-1" style="font-size: 9px; min-width: 16px; min-height: 16px; line-height: 8px;">
-                                {{ $pendingRequestsCount }}
-                            </span>
-                        @endif
-                    </button>
-                </li>
             </ul>
 
             <div class="tab-content" id="assetModuleTabsContent">
                 @include('modules.hrms.assets.tabs.categories')
                 @include('modules.hrms.assets.tabs.items')
-                @include('modules.hrms.assets.tabs.requests')
             </div>
         </div>
     </div>

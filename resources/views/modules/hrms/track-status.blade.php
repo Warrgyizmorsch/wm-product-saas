@@ -260,24 +260,26 @@
 @endphp
 
 @section('content')
-    <!-- Task List Card with Tabs -->
-    <x-ui.card title="Task Status Tracker" bodyClass="p-0">
-        @php
-            $statusTabs = [];
-            $isFirst = true;
-            foreach (array_keys($tabData) as $tabName) {
-                $statusTabs[] = [
-                    'id' => Str::slug($tabName),
-                    'label' => $tabName,
-                    'active' => $isFirst,
-                    'icon' => $tabName === 'Lead' ? 'feather-users' : 'feather-file-text'
-                ];
-                $isFirst = false;
-            }
-        @endphp
-        <div class="px-4 pt-3 border-bottom">
-            <x-ui.horizontal-tabs id="trackStatusTabs" :tabs="$statusTabs" />
+    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        <div class="mb-4 pb-3 border-bottom">
+            <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">Task Status Tracker</h5>
         </div>
+            @php
+                $statusTabs = [];
+                $isFirst = true;
+                foreach (array_keys($tabData) as $tabName) {
+                    $statusTabs[] = [
+                        'id' => Str::slug($tabName),
+                        'label' => $tabName,
+                        'active' => $isFirst,
+                        'icon' => $tabName === 'Lead' ? 'feather-users' : 'feather-file-text'
+                    ];
+                    $isFirst = false;
+                }
+            @endphp
+            <div class="px-4 pt-3 border-bottom">
+                <x-ui.horizontal-tabs id="trackStatusTabs" :tabs="$statusTabs" />
+            </div>
 
             <!-- Tab Content (Tables) -->
             <div class="tab-content" id="trackStatusTabContent">
@@ -343,7 +345,7 @@
                     @php $isFirst = false; @endphp
                 @endforeach
             </div>
-    </x-ui.card>
+    </div>
 @endsection
 
 @push('styles')

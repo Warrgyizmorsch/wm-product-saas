@@ -50,7 +50,8 @@
                                 'draft' => 'Draft',
                                 'scheduled' => 'Scheduled',
                                 'running' => 'Running / In Progress',
-                                'completed' => 'Completed'
+                                'completed' => 'Completed',
+                                'failed' => 'Failed / Scrapped'
                             ]" selected="{{ request('status') }}" data-select2-selector="default" />
                         </div>
 
@@ -113,6 +114,8 @@
                         <td>
                             @if($rwk->status === 'completed')
                                 <span class="erp-badge-active">Completed</span>
+                            @elseif($rwk->status === 'failed')
+                                <span class="badge bg-soft-danger text-danger text-uppercase px-2 py-1 fs-10">Failed</span>
                             @elseif($rwk->status === 'running')
                                 <span class="erp-badge-pending">Running</span>
                             @else

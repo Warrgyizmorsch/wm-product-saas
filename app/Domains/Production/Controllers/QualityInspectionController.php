@@ -107,4 +107,30 @@ class QualityInspectionController extends Controller
 
         return redirect()->back()->with('success', 'Inspection approved and audited.');
     }
+
+    public function operatorQuickInspection(Request $request)
+    {
+        $tenantId = require_tenant_id();
+        $validated = $request->validate([
+            'production_order_operation_id' => 'nullable|integer',
+            'production_order_id' => 'nullable|integer',
+            'batch_id' => 'nullable|integer',
+            'result' => 'required|in:passed,hold,failed',
+            'remarks' => 'nullable|string|max:500',
+            'stage' => 'nullable|string|max:50',
+        ]);
+
+        $inspection = $this->inspectionService->quickOperatorInspection($tenantId, $validated, auth()->id());
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Operator Quick Quality Check logged successfully.',
+                'inspection_id' => $inspection->id,
+                'result' => $inspection->result,
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Operator Quick Quality Check logged and approved.');
+    }
 }

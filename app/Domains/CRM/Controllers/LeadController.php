@@ -279,29 +279,54 @@ class LeadController extends Controller
         }
 
         if (!$matchedLead && !empty($rawEmail)) {
-            $matchedLead = (clone $leadQuery)->whereRaw('LOWER(email) = ?', [$rawEmail])->first();
+            $matchedLead = (clone $leadQuery)
+                ->where(function ($q) use ($rawEmail) {
+                    $q->whereRaw('LOWER(email) = ?', [$rawEmail])
+                      ->orWhereRaw('LOWER(company_email) = ?', [$rawEmail]);
+                })->first();
             if ($matchedLead) $leadMatchedBy = 'Lead Email (' . $rawEmail . ')';
         }
 
         if (!$matchedLead && (!empty($cleanPhone) || !empty($rawPhone))) {
             $matchedLead = (clone $leadQuery)
                 ->where(function ($q) use ($cleanPhone, $rawPhone) {
-                    if (!empty($rawPhone)) $q->where('phone', 'like', "%{$rawPhone}%");
+                    if (!empty($rawPhone)) {
+                        $q->where('phone', 'like', "%{$rawPhone}%")
+                          ->orWhere('company_phone', 'like', "%{$rawPhone}%");
+                    }
                     if (!empty($cleanPhone) && strlen($cleanPhone) >= 5) {
-                        $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"]);
+                        $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"])
+                          ->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(company_phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"]);
                     }
                 })->first();
             if ($matchedLead) $leadMatchedBy = 'Lead Phone (' . ($rawPhone ?: $cleanPhone) . ')';
         }
 
+        if (!$matchedLead && !empty($company) && strlen($company) >= 3) {
+            $cleanCompany = trim(preg_replace('/(pvt|ltd|private|limited|inc|corp|co)/i', '', $company));
+            $matchedLead = (clone $leadQuery)
+                ->where(function ($q) use ($company, $cleanCompany) {
+                    $q->where('company_name', 'like', "%{$company}%");
+                    if (!empty($cleanCompany)) {
+                        $q->orWhere('company_name', 'like', "%{$cleanCompany}%");
+                    }
+                    $q->orWhere('contact_person', 'like', "%{$company}%");
+                })->first();
+            if ($matchedLead) {
+                $matchedName = $matchedLead->company_name ?: $matchedLead->contact_person;
+                $leadMatchedBy = 'Company / Lead Name (' . $matchedName . ')';
+            }
+        }
+
         if ($matchedLead) {
+            $displayName = $matchedLead->company_name ?: $matchedLead->contact_person ?: "Lead #{$matchedLead->id}";
             return response()->json([
                 'matched'      => false,
                 'is_duplicate' => true,
                 'matched_by'   => $leadMatchedBy,
                 'match_key'    => 'lead_' . $matchedLead->id . '_' . md5($leadMatchedBy),
                 'lead'         => $matchedLead,
-                'message'      => "Duplicate Lead Found! Lead #{$matchedLead->id} ({$matchedLead->company_name}) has matching " . $leadMatchedBy,
+                'message'      => "Duplicate Lead Found! Lead #{$matchedLead->id} ({$displayName}) has matching " . $leadMatchedBy,
             ]);
         }
 

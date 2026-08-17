@@ -172,21 +172,37 @@ class ReworkService
 
                 // Update original ProductionOrderRework status
                 $ncrBatchId = $ncr?->batch_id ?? $ncr?->production_batch_id;
+                $ncrOpId = $ncr?->production_order_operation_id;
+
                 $orderRework = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $rework->tenant_id)
                     ->where('production_order_id', $rework->original_production_order_id)
                     ->when($ncrBatchId, fn($q) => $q->where('production_batch_id', $ncrBatchId))
+                    ->when($ncrOpId, fn($q) => $q->where('production_order_operation_id', $ncrOpId))
                     ->where('status', '!=', 'completed')
-                    ->first() ?? \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $rework->tenant_id)
+                    ->first();
+
+                if (!$orderRework && $ncrOpId) {
+                    $orderRework = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $rework->tenant_id)
+                        ->where('production_order_id', $rework->original_production_order_id)
+                        ->where('production_order_operation_id', $ncrOpId)
+                        ->where('status', '!=', 'completed')
+                        ->first();
+                }
+
+                if (!$orderRework) {
+                    $orderRework = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $rework->tenant_id)
                         ->where('production_order_id', $rework->original_production_order_id)
                         ->where('status', '!=', 'completed')
                         ->first();
+                }
 
                 if ($orderRework) {
                     $orderRework->update(['status' => 'completed']);
                     $reworkQty = $orderRework->quantity;
 
                     // Update operation-level counts
-                    $originalOp = \App\Domains\Production\Models\ProductionOrderOperation::find($ncr->production_order_operation_id);
+                    $originalOpId = $orderRework->production_order_operation_id ?? $ncrOpId;
+                    $originalOp = $originalOpId ? \App\Domains\Production\Models\ProductionOrderOperation::find($originalOpId) : null;
                     if ($originalOp) {
                         $originalOp->quantity_rejected = max(0.0000, $originalOp->quantity_rejected - $reworkQty);
                         $originalOp->quantity_produced += $reworkQty;
@@ -262,6 +278,207 @@ class ReworkService
                     'event_source' => 'ReworkService',
                 ]);
             }
+        });
+    }
+
+    /**
+     * Mark a Rework Order as failed, converting rejected units permanently to Scrap.
+     */
+    public function failRework(int $reworkId, array $data = [], ?int $tenantId = null): ProductionReworkOrder
+    {
+        return DB::transaction(function () use ($reworkId, $data, $tenantId) {
+            /** @var ProductionReworkOrder $rework */
+            $rework = ProductionReworkOrder::query()
+                ->when($tenantId !== null, fn($q) => $q->where('tenant_id', $tenantId))
+                ->lockForUpdate()
+                ->findOrFail($reworkId);
+
+            // Idempotency check: if already failed, return gracefully
+            if ($rework->status === 'failed') {
+                return $rework;
+            }
+
+            if (in_array($rework->status, ['completed', 'cancelled'], true)) {
+                throw new \InvalidArgumentException("Rework order {$rework->rework_number} is already {$rework->status} and cannot be marked as failed.");
+            }
+
+            $userId = auth()->id() ?? $data['user_id'] ?? null;
+            $failureReason = $data['reason'] ?? $data['remarks'] ?? 'Rework attempt failed; converted to scrap.';
+
+            // 1. Mark Rework Order status as failed
+            $rework->update([
+                'status' => 'failed',
+            ]);
+
+            // Mark any pending operations as cancelled
+            ProductionReworkOperation::where('rework_order_id', $rework->id)
+                ->where('status', '!=', 'completed')
+                ->update(['status' => 'cancelled']);
+
+            // 2. Identify linked shop-floor ProductionOrderRework record(s)
+            $ncr = $rework->ncr;
+            $ncrBatchId = $ncr?->batch_id ?? $ncr?->production_batch_id;
+            $ncrOpId = $ncr?->production_order_operation_id;
+
+            $orderReworks = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $rework->tenant_id)
+                ->where('production_order_id', $rework->original_production_order_id)
+                ->when($ncrBatchId, fn($q) => $q->where('production_batch_id', $ncrBatchId))
+                ->when($ncrOpId, fn($q) => $q->where('production_order_operation_id', $ncrOpId))
+                ->whereIn('status', ['pending', 'in_progress', 'draft'])
+                ->lockForUpdate()
+                ->get();
+
+            if ($orderReworks->isEmpty() && $ncrOpId) {
+                $orderReworks = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $rework->tenant_id)
+                    ->where('production_order_id', $rework->original_production_order_id)
+                    ->where('production_order_operation_id', $ncrOpId)
+                    ->whereIn('status', ['pending', 'in_progress', 'draft'])
+                    ->lockForUpdate()
+                    ->get();
+            }
+
+            if ($orderReworks->isEmpty()) {
+                $orderReworks = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $rework->tenant_id)
+                    ->where('production_order_id', $rework->original_production_order_id)
+                    ->whereNotIn('status', ['completed', 'failed', 'cancelled'])
+                    ->lockForUpdate()
+                    ->get();
+            }
+
+            $failedQty = 0.0;
+            foreach ($orderReworks as $orw) {
+                $orw->update(['status' => 'failed']);
+                $failedQty += (float) $orw->quantity;
+            }
+
+            if ($failedQty <= 0) {
+                $failedQty = (float) ($ncr?->quantity ?? 1.0);
+            }
+
+            // 3. Update Operation metrics (quantity_rejected -= failedQty, quantity_scrapped += failedQty)
+            $originalOpId = $ncr?->production_order_operation_id ?? $orderReworks->first()?->production_order_operation_id;
+            $originalOp = $originalOpId ? \App\Domains\Production\Models\ProductionOrderOperation::lockForUpdate()->find($originalOpId) : null;
+
+            if ($originalOp) {
+                $originalOp->quantity_rejected = max(0.0000, round((float) $originalOp->quantity_rejected - $failedQty, 4));
+                $originalOp->quantity_scrapped = round((float) $originalOp->quantity_scrapped + $failedQty, 4);
+                $originalOp->save();
+            }
+
+            // 4. Update Production Order metrics (quantity_rejected -= failedQty, quantity_scrapped += failedQty)
+            $originalOrder = $rework->originalOrder;
+            if ($originalOrder) {
+                $originalOrder->quantity_rejected = max(0.0000, round((float) $originalOrder->quantity_rejected - $failedQty, 4));
+                $originalOrder->quantity_scrapped = round((float) $originalOrder->quantity_scrapped + $failedQty, 4);
+                $originalOrder->save();
+            }
+
+            // 5. Create ProductionOrderScrap record to ensure traceability
+            $batchIdCandidate = $orderReworks->first()?->production_batch_id ?? $ncrBatchId;
+            $validBatchId = ($batchIdCandidate && \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $rework->tenant_id)->where('id', $batchIdCandidate)->exists())
+                ? (int) $batchIdCandidate
+                : null;
+
+            \App\Domains\Production\Models\ProductionOrderScrap::create([
+                'tenant_id' => $rework->tenant_id,
+                'production_order_id' => $rework->original_production_order_id,
+                'production_order_operation_id' => $originalOp?->id,
+                'production_batch_id' => $validBatchId,
+                'product_id' => $originalOrder?->product_id,
+                'quantity' => $failedQty,
+                'reason' => "Failed Rework scrap: " . $failureReason,
+                'recorded_by' => $userId,
+                'recorded_at' => now(),
+                'stock_transaction_id' => null,
+            ]);
+
+            // 6. Update WIP card metrics (rejected_quantity -= failedQty, scrap_quantity += failedQty, available_quantity unchanged)
+            $wip = ($validBatchId)
+                ? \App\Domains\Production\Models\ProductionWip::where('production_order_id', $rework->original_production_order_id)->where('production_batch_id', $validBatchId)->lockForUpdate()->first()
+                : null;
+
+            if (!$wip) {
+                $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $rework->original_production_order_id)->lockForUpdate()->first();
+            }
+
+            if ($wip) {
+                $wip->rejected_quantity = max(0.0000, round((float) $wip->rejected_quantity - $failedQty, 4));
+                $wip->scrap_quantity = round((float) $wip->scrap_quantity + $failedQty, 4);
+                $wip->save();
+
+                // Log WIP Transaction Ledger entry
+                \App\Domains\Production\Models\ProductionWipTransaction::create([
+                    'tenant_id' => $wip->tenant_id,
+                    'wip_id' => $wip->id,
+                    'production_order_id' => $wip->production_order_id,
+                    'production_batch_id' => $validBatchId,
+                    'from_operation_id' => $originalOp ? $originalOp->routing_operation_id : null,
+                    'to_operation_id' => $originalOp ? $originalOp->routing_operation_id : null,
+                    'from_work_center_id' => $originalOp ? $originalOp->work_center_id : null,
+                    'to_work_center_id' => $originalOp ? $originalOp->work_center_id : null,
+                    'transaction_type' => 'rework_failed_scrapped',
+                    'quantity' => $failedQty,
+                    'good_quantity' => 0.00,
+                    'rework_quantity' => -$failedQty,
+                    'scrap_quantity' => $failedQty,
+                    'remarks' => "Rework failed for {$failedQty} units; converted to scrap.",
+                    'transaction_at' => now(),
+                    'created_by' => $userId,
+                ]);
+            }
+
+            // 7. Register NCR Scrap Disposal via ScrapService
+            app(\App\Domains\Production\Services\ScrapService::class)->createScrapDisposal($rework->tenant_id, [
+                'ncr_id' => $ncr?->id,
+                'category' => 'finished_good',
+                'reason_code' => 'rework_failed',
+                'quantity' => $failedQty,
+                'cost' => $failedQty * ($originalOrder?->product?->unit_cost ?? 1.00),
+                'status' => 'approved',
+            ]);
+
+            // 8. Close linked NCR with disposition_type = 'scrap'
+            if ($ncr && $ncr->status !== 'closed') {
+                $ncr->update([
+                    'disposition_type' => 'scrap',
+                    'status' => 'closed',
+                    'closed_by' => $userId,
+                    'closed_at' => Carbon::now(),
+                    'esignature_closed' => hash('sha256', ($userId ?? 'system') . $ncr->id . 'closed' . now()->timestamp),
+                ]);
+
+                $this->eventService->writeEvent($ncr->tenant_id, [
+                    'production_order_id' => $ncr->production_order_id,
+                    'event_type' => 'NCR Closed',
+                    'title' => 'Non-Conformance Resolved (Scrapped)',
+                    'description' => "NCR {$ncr->ncr_number} closed with Scrap disposition following Rework Failure.",
+                    'severity' => 'warning',
+                    'event_source' => 'ReworkService',
+                    'triggered_by' => $userId,
+                ]);
+            }
+
+            // 9. Write timeline event
+            $this->eventService->writeEvent($rework->tenant_id, [
+                'production_order_id' => $rework->original_production_order_id,
+                'event_type' => 'Rework Failed',
+                'title' => 'Rework Failed - Converted to Scrap',
+                'description' => "Rework Order {$rework->rework_number} failed. {$failedQty} units converted to scrap.",
+                'severity' => 'danger',
+                'event_source' => 'ReworkService',
+                'triggered_by' => $userId,
+            ]);
+
+            // 10. Re-evaluate holds, batch reconciliation, and WIP transfers
+            if ($validBatchId) {
+                app(\App\Domains\Production\Services\BatchProductionService::class)->reconcileBatchActualQuantity($validBatchId);
+            }
+
+            if ($originalOp) {
+                app(\App\Domains\Production\Services\ProductionWipService::class)->evaluateAndExecuteWipTransfers($originalOp->id, $userId);
+            }
+
+            return $rework;
         });
     }
 }

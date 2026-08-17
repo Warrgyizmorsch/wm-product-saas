@@ -270,6 +270,8 @@ return [
     'operations_count' => 'संचालन',
     'effective_from' => 'प्रभावी तिथि से',
     'effective_to' => 'प्रभावी तिथि तक',
+    'immediate' => 'तत्काल',
+    'indefinite' => 'अनिश्चित काल',
     'routing_type' => 'प्रकार',
     'primary' => 'प्राथमिक',
     'alternative' => 'वैकल्पिक',

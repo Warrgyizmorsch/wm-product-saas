@@ -11,15 +11,26 @@ use App\Domains\Production\Requests\StoreProductionScheduleRequest;
 use App\Domains\Production\Requests\ProductionScheduleCalendarRequest;
 use App\Domains\Production\Services\SchedulingService;
 use App\Domains\Production\Services\SchedulingCalendarService;
+use App\Domains\Production\Services\CapacityPlanningService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+
+use App\Domains\Production\Models\ProductionScheduleScenario;
+use App\Domains\Production\Services\SchedulePreReleaseValidationService;
+use App\Domains\Production\Services\CapacityLevelingService;
+use App\Domains\Production\Services\ProductionScheduleScenarioService;
 
 class ProductionScheduleController extends Controller
 {
     public function __construct(
         private readonly SchedulingService $schedulingService,
-        private readonly SchedulingCalendarService $calendarService
-    ) {}
+        private readonly SchedulingCalendarService $calendarService,
+        private readonly CapacityPlanningService $capacityService,
+        private readonly SchedulePreReleaseValidationService $validationService,
+        private readonly CapacityLevelingService $capacityLevelingService,
+        private readonly ProductionScheduleScenarioService $scenarioService
+    ) {
+    }
 
     public function index(Request $request)
     {
@@ -31,10 +42,10 @@ class ProductionScheduleController extends Controller
             $search = '%' . $request->input('search') . '%';
             $query->where(function ($q) use ($search) {
                 $q->where('schedule_number', 'like', $search)
-                  ->orWhereHas('order', function ($o) use ($search) {
-                      $o->where('order_number', 'like', $search)
-                        ->orWhereHas('product', fn ($p) => $p->where('name', 'like', $search));
-                  });
+                    ->orWhereHas('order', function ($o) use ($search) {
+                        $o->where('order_number', 'like', $search)
+                            ->orWhereHas('product', fn($p) => $p->where('name', 'like', $search));
+                    });
             });
         }
 
@@ -47,7 +58,9 @@ class ProductionScheduleController extends Controller
         }
 
         if ($request->filled('start_date')) {
-            $query->whereHas('operations', fn ($q) =>
+            $query->whereHas(
+                'operations',
+                fn($q) =>
                 $q->where('planned_start', '>=', $request->input('start_date'))
             );
         }
@@ -83,9 +96,9 @@ class ProductionScheduleController extends Controller
         $tenantId = require_tenant_id();
 
         try {
-            $order     = ProductionOrder::findOrFail($request->validated()['production_order_id']);
+            $order = ProductionOrder::findOrFail($request->validated()['production_order_id']);
             $startDate = Carbon::parse($request->validated()['start_date']);
-            $type      = $request->validated()['scheduling_type'];
+            $type = $request->validated()['scheduling_type'];
 
             $schedule = $this->schedulingService->generateSchedule($order, $startDate, $type);
 
@@ -163,31 +176,177 @@ class ProductionScheduleController extends Controller
             ->with('success', "Schedule [{$schedule->schedule_number}] deleted successfully.");
     }
 
-    public function release(int $id)
+    public function release(Request $request, int $id)
     {
         $schedule = ProductionSchedule::findOrFail($id);
 
         $this->authorize('release', $schedule);
 
         if (!$schedule->isScheduled()) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Only scheduled (confirmed) schedules can be released.'], 422);
+            }
             return redirect()->back()->with('error', 'Only scheduled (confirmed) schedules can be released.');
         }
 
-        try {
-            $this->schedulingService->validateSchedule($schedule);
+        // Run Server-side Pre-Release Validation
+        $validationResult = $this->validationService->validate($schedule);
 
+        if (!$validationResult['can_release']) {
+            $errorMsgs = collect($validationResult['errors'])->pluck('message')->implode(' ');
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Release blocked due to schedule errors: ' . $errorMsgs,
+                    'validation_result' => $validationResult,
+                ], 422);
+            }
+            return redirect()->back()->with('error', 'Release blocked: ' . $errorMsgs);
+        }
+
+        // Check Warnings requiring explicit confirmation
+        if ($validationResult['has_warnings'] && !$request->boolean('confirm_warnings')) {
+            $warningMsgs = collect($validationResult['warnings'])->pluck('message')->implode(' ');
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'requires_confirmation' => true,
+                    'message' => 'Schedule has warnings. Explicit confirmation required to proceed with release.',
+                    'validation_result' => $validationResult,
+                ], 422);
+            }
+            return redirect()->back()->with('warning', 'Release requires confirmation: ' . $warningMsgs);
+        }
+
+        try {
             $schedule->update([
-                'status'      => ProductionSchedule::STATUS_RELEASED,
+                'status' => ProductionSchedule::STATUS_RELEASED,
                 'released_at' => now(),
                 'released_by' => auth()->id(),
             ]);
 
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Schedule [{$schedule->schedule_number}] released to the shop floor successfully!",
+                    'redirect_url' => route('production.mes.dashboard')
+                ]);
+            }
+
             return redirect()
                 ->route('production.mes.dashboard')
                 ->with('success', "Schedule [{$schedule->schedule_number}] released to the shop floor successfully!");
-        } catch (\LogicException $e) {
+        } catch (\Exception $e) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            }
             return redirect()->back()->with('error', $e->getMessage());
         }
+    }
+
+    public function dispatchBoardView(Request $request)
+    {
+        $this->authorize('viewAny', ProductionSchedule::class);
+        $tenantId = require_tenant_id();
+        $workCenters = WorkCenter::active()->get();
+
+        $activeScenario = null;
+        if ($request->filled('scenario_id')) {
+            $activeScenario = ProductionScheduleScenario::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find((int) $request->input('scenario_id'));
+        }
+
+        $activeSchedule = null;
+        if ($request->filled('schedule_id')) {
+            $activeSchedule = ProductionSchedule::with(['order.product'])
+                ->withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find((int) $request->input('schedule_id'));
+        }
+
+        $schedulesList = ProductionSchedule::with(['order.product'])
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', [ProductionSchedule::STATUS_DRAFT, ProductionSchedule::STATUS_SCHEDULED, ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS])
+            ->orderByDesc('id')
+            ->get();
+
+        return view('modules.production.schedules.dispatch-board', compact('workCenters', 'activeScenario', 'activeSchedule', 'schedulesList'));
+    }
+
+    public function dispatchBoardData(Request $request)
+    {
+        $this->authorize('viewAny', ProductionSchedule::class);
+
+        $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+            'work_center_id' => 'nullable|integer',
+            'machine_id' => 'nullable|integer',
+            'production_order_id' => 'nullable|integer',
+            'schedule_id' => 'nullable|integer',
+            'scenario_id' => 'nullable|integer',
+            'status' => 'nullable|string',
+        ]);
+
+        $startDate = $request->filled('start_date')
+            ? Carbon::parse($request->input('start_date'))
+            : Carbon::now()->startOfDay();
+
+        $endDate = $request->filled('end_date')
+            ? Carbon::parse($request->input('end_date'))
+            : $startDate->copy()->addDays(14)->endOfDay();
+
+        $tenantId = require_tenant_id();
+
+        try {
+            $data = $this->capacityService->getDispatchBoardData(
+                $tenantId,
+                $startDate,
+                $endDate,
+                $request->only(['work_center_id', 'machine_id', 'production_order_id', 'schedule_id', 'status', 'scenario_id'])
+            );
+
+            return response()->json($data);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to load dispatch board data: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function changeHistory(Request $request, int $scheduleId)
+    {
+        $tenantId = require_tenant_id();
+        $schedule = ProductionSchedule::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->findOrFail($scheduleId);
+
+        $this->authorize('view', $schedule);
+
+        $logs = \App\Domains\Production\Models\ProductionScheduleChangeLog::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('production_schedule_id', $schedule->id)
+            ->with(['changedBy', 'operation.orderOperation', 'oldMachine', 'newMachine'])
+            ->orderByDesc('created_at')
+            ->paginate(15);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json($logs);
+        }
+
+        return view('modules.production.schedules.change-history', compact('schedule', 'logs'));
+    }
+
+    public function preReleaseCheck(Request $request, int $scheduleId)
+    {
+        $schedule = ProductionSchedule::findOrFail($scheduleId);
+        $this->authorize('view', $schedule);
+
+        $result = $this->validationService->validate($schedule);
+
+        return response()->json($result);
     }
 
     public function cancel(int $id)
@@ -201,7 +360,7 @@ class ProductionScheduleController extends Controller
         }
 
         $schedule->update([
-            'status'       => ProductionSchedule::STATUS_CANCELLED,
+            'status' => ProductionSchedule::STATUS_CANCELLED,
             'cancelled_at' => now(),
             'cancelled_by' => auth()->id(),
         ]);
@@ -225,10 +384,10 @@ class ProductionScheduleController extends Controller
 
         try {
             $startDate = Carbon::parse($request->input('start_date'));
-            $newSchedule = $this->schedulingService->generateSchedule(
-                $schedule->order,
+            $newSchedule = $this->schedulingService->reschedule(
+                $schedule->id,
                 $startDate,
-                $schedule->scheduling_type
+                $schedule->scheduling_type ?? 'forward'
             );
 
             if ($schedule->notes) {
@@ -258,29 +417,341 @@ class ProductionScheduleController extends Controller
 
     public function workCenterView(Request $request)
     {
-        $tenantId    = require_tenant_id();
+        $tenantId = require_tenant_id();
         $workCenters = WorkCenter::active()->with(['machines'])->get();
 
         // Load released schedule operations grouped by work center
         $operations = ProductionScheduleOperation::with([
-            'schedule', 'order.product', 'machine', 'orderOperation',
+            'schedule',
+            'order.product',
+            'machine',
+            'orderOperation',
         ])
-        ->whereHas('schedule', fn ($q) =>
-            $q->whereIn('status', [
-                ProductionSchedule::STATUS_SCHEDULED,
-                ProductionSchedule::STATUS_RELEASED,
-                ProductionSchedule::STATUS_IN_PROGRESS
+            ->whereHas(
+                'schedule',
+                fn($q) =>
+                $q->whereIn('status', [
+                    ProductionSchedule::STATUS_SCHEDULED,
+                    ProductionSchedule::STATUS_RELEASED,
+                    ProductionSchedule::STATUS_IN_PROGRESS
+                ])
+            )
+            ->whereNotIn('status', [
+                ProductionScheduleOperation::STATUS_COMPLETED,
+                ProductionScheduleOperation::STATUS_CANCELLED,
+                ProductionScheduleOperation::STATUS_SKIPPED,
             ])
-        )
-        ->whereNotIn('status', [
-            ProductionScheduleOperation::STATUS_COMPLETED,
-            ProductionScheduleOperation::STATUS_CANCELLED,
-            ProductionScheduleOperation::STATUS_SKIPPED,
-        ])
-        ->orderBy('sequence')
-        ->get()
-        ->groupBy('work_center_id');
+            ->orderBy('sequence')
+            ->get()
+            ->groupBy('work_center_id');
 
         return view('modules.production.schedules.work-center-view', compact('workCenters', 'operations'));
+    }
+
+    public function adjustOperation(Request $request, int $operationId)
+    {
+        $this->authorize('create', ProductionSchedule::class);
+
+        $request->validate([
+            'planned_start' => 'required|date',
+            'machine_id' => 'nullable|integer|exists:production_machines,id',
+            'shift_mode' => 'nullable|string|in:isolated,ripple',
+            'reason' => 'nullable|string|max:500',
+            'expected_version' => 'nullable|integer',
+            'scenario_id' => 'nullable|integer',
+        ]);
+
+        try {
+            $newStart = Carbon::parse($request->input('planned_start'));
+            $newMachineId = $request->filled('machine_id') ? (int) $request->input('machine_id') : null;
+            $shiftMode = $request->input('shift_mode', \App\Domains\Production\Models\ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED);
+            $reason = $request->input('reason');
+            $expectedVersion = $request->filled('expected_version') ? (int) $request->input('expected_version') : null;
+
+            if ($request->filled('scenario_id')) {
+                $scenarioId = (int) $request->input('scenario_id');
+                $scenOp = \App\Domains\Production\Models\ProductionScheduleScenarioOperation::withoutGlobalScopes()
+                    ->where('scenario_id', $scenarioId)
+                    ->where(function ($q) use ($operationId) {
+                        $q->where('id', $operationId)
+                            ->orWhere('source_schedule_operation_id', $operationId);
+                    })->first();
+
+                if ($scenOp) {
+                    $duration = (float) $scenOp->planned_duration_minutes;
+                    $newFinish = $this->schedulingService->addWorkingMinutes(
+                        $scenOp->work_center_id,
+                        $newStart,
+                        $duration
+                    );
+
+                    $scenOp->update([
+                        'planned_start' => $newStart,
+                        'planned_finish' => $newFinish,
+                        'machine_id' => $newMachineId ?? $scenOp->machine_id,
+                        'manual_override' => true,
+                    ]);
+
+                    $result = [
+                        'success' => true,
+                        'message' => "Scenario operation sequence #{$scenOp->sequence} rescheduled in What-If Sandbox mode.",
+                        'operation' => [
+                            'id' => $scenOp->source_schedule_operation_id ?: $scenOp->id,
+                            'planned_start' => $scenOp->planned_start->toIso8601String(),
+                            'planned_finish' => $scenOp->planned_finish->toIso8601String(),
+                        ]
+                    ];
+
+                    if ($request->ajax() || $request->wantsJson()) {
+                        return response()->json($result);
+                    }
+                    return redirect()->back()->with('success', $result['message']);
+                }
+            }
+
+            $result = $this->capacityService->rescheduleOperationWithMode(
+                $operationId,
+                $newStart,
+                $newMachineId,
+                $shiftMode,
+                $reason,
+                auth()->id(),
+                $expectedVersion
+            );
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json($result);
+            }
+
+            return redirect()->back()->with('success', $result['message']);
+        } catch (\InvalidArgumentException $e) {
+            $status = str_contains($e->getMessage(), 'CONCURRENCY_CONFLICT') ? 409 : 422;
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], $status);
+            }
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        } catch (\LogicException $e) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        } catch (\Exception $e) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Failed to adjust operation: ' . $e->getMessage()], 500);
+            }
+            return redirect()->back()->withInput()->with('error', 'Failed to adjust operation.');
+        }
+    }
+
+    public function toggleLock(Request $request, int $operationId)
+    {
+        $this->authorize('create', ProductionSchedule::class);
+
+        try {
+            $schedOp = $this->capacityService->toggleOperationLock($operationId, auth()->id());
+            $statusStr = $schedOp->locked ? 'locked' : 'unlocked';
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'locked' => $schedOp->locked,
+                    'version' => $schedOp->version,
+                    'message' => "Operation successfully {$statusStr}.",
+                ]);
+            }
+
+            return redirect()->back()->with('success', "Operation successfully {$statusStr}.");
+        } catch (\Exception $e) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function previewCapacityLeveling(Request $request)
+    {
+        $this->authorize('create', ProductionSchedule::class);
+
+        $validated = $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'work_center_id' => 'nullable|integer',
+            'machine_id' => 'nullable|integer',
+            'schedule_id' => 'nullable|integer',
+        ]);
+
+        try {
+            $tenantId = auth()->user()->tenant_id;
+            $userId = auth()->id();
+
+            $result = $this->capacityLevelingService->generatePreview($tenantId, $validated, $userId);
+
+            return response()->json($result);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to generate capacity leveling preview: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function applyCapacityLeveling(Request $request)
+    {
+        $this->authorize('create', ProductionSchedule::class);
+
+        $validated = $request->validate([
+            'run_id' => 'required|integer',
+        ]);
+
+        try {
+            $tenantId = auth()->user()->tenant_id;
+            $userId = auth()->id();
+
+            $result = $this->capacityLevelingService->applyPreview($tenantId, (int) $validated['run_id'], $userId);
+
+            return response()->json($result);
+        } catch (\InvalidArgumentException $e) {
+            $status = str_contains($e->getMessage(), 'OPTIMIZATION_PREVIEW_STALE') ? 409 : 422;
+            return response()->json(['success' => false, 'message' => $e->getMessage()], $status);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to apply capacity leveling preview: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ── Phase 6 — What-If Planning & Schedule Scenarios ─────────────────────
+    public function scenariosIndex(Request $request)
+    {
+        $this->authorize('viewAny', ProductionSchedule::class);
+        $tenantId = require_tenant_id();
+
+        $scenarios = ProductionScheduleScenario::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->with(['creator', 'sourceSchedule'])
+            ->orderBy('id', 'desc')
+            ->get();
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json($scenarios);
+        }
+
+        return view('modules.production.schedules.scenarios.index', compact('scenarios'));
+    }
+
+    public function storeScenario(Request $request)
+    {
+        $this->authorize('create', ProductionSchedule::class);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'scenario_type' => 'nullable|string',
+            'source_schedule_id' => 'nullable|integer',
+            'work_center_id' => 'nullable|integer',
+            'machine_id' => 'nullable|integer',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+            'assumptions' => 'nullable|array',
+            'production_order_ids' => 'nullable|array',
+        ]);
+
+        try {
+            $tenantId = require_tenant_id();
+            $userId = auth()->id();
+
+            $scenario = $this->scenarioService->createScenario($tenantId, $validated, $userId);
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => true, 'scenario' => $scenario]);
+            }
+
+            return redirect()->back()->with('success', "What-If Scenario [{$scenario->name}] created successfully.");
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to create scenario: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function recalculateScenario(Request $request, int $scenario)
+    {
+        $this->authorize('create', ProductionSchedule::class);
+
+        try {
+            $tenantId = require_tenant_id();
+            $result = $this->scenarioService->recalculateScenario($tenantId, $scenario);
+
+            return response()->json(['success' => true, 'data' => $result]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to recalculate scenario: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function levelScenarioCapacity(Request $request, int $scenario)
+    {
+        $this->authorize('create', ProductionSchedule::class);
+
+        try {
+            $tenantId = require_tenant_id();
+            $result = $this->scenarioService->levelScenarioCapacity($tenantId, $scenario);
+
+            return response()->json($result);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to level scenario capacity: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function compareScenario(Request $request, int $scenario)
+    {
+        $this->authorize('viewAny', ProductionSchedule::class);
+
+        try {
+            $tenantId = require_tenant_id();
+            $comparison = $this->scenarioService->compareWithLive($tenantId, $scenario);
+
+            return response()->json($comparison);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to compare scenario: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function promoteScenario(Request $request, int $scenario)
+    {
+        $this->authorize('create', ProductionSchedule::class);
+
+        try {
+            $tenantId = require_tenant_id();
+            $userId = auth()->id();
+
+            $result = $this->scenarioService->promoteScenario($tenantId, $scenario, $userId);
+
+            return response()->json($result);
+        } catch (\InvalidArgumentException $e) {
+            $status = str_contains($e->getMessage(), 'SCENARIO_STALE') ? 409 : 422;
+            return response()->json(['success' => false, 'message' => $e->getMessage()], $status);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to promote scenario: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function discardScenario(Request $request, int $scenario)
+    {
+        $this->authorize('create', ProductionSchedule::class);
+
+        try {
+            $tenantId = require_tenant_id();
+            $result = $this->scenarioService->discardScenario($tenantId, $scenario);
+
+            return response()->json($result);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to discard scenario: ' . $e->getMessage()], 500);
+        }
     }
 }

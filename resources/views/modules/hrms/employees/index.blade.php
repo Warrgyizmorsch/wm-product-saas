@@ -435,9 +435,8 @@
         }
     </style>
 
-    <div class="employee-page">
-
-            <div class="employee-list-card p-4" id="employeeListCard">
+    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+            <div id="employeeListCard">
                 <!-- Card Header -->
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
                     <div>
@@ -593,11 +592,12 @@
                                                          color: {{ $employee->status ? '#10b981' : '#ef4444' }};">
                                                 {{ $employee->status ? 'Active' : 'Inactive' }}
                                             </span>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm status-dropdown-menu" aria-labelledby="statusDropdown_{{ $employee->id }}" style="z-index: 1050;">
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm status-dropdown-menu" aria-labelledby="statusDropdown_{{ $employee->id }}" style="min-width: auto !important; width: 110px !important; z-index: 1050;">
                                                 <li>
-                                                    <button type="button" class="dropdown-item change-status-btn fw-bold text-success d-flex align-items-center justify-content-between" 
+                                                    <button type="button" class="dropdown-item change-status-btn fw-bold text-success d-flex align-items-center justify-content-between gap-2" 
                                                             data-employee-id="{{ $employee->id }}" 
-                                                            data-status="1">
+                                                            data-status="1"
+                                                            style="background: transparent !important; color: var(--bs-success) !important; box-shadow: none !important; border: 0; width: 100%;">
                                                         Active
                                                         @if($employee->status)
                                                             <i class="feather feather-check ms-2"></i>
@@ -605,9 +605,10 @@
                                                     </button>
                                                 </li>
                                                 <li>
-                                                    <button type="button" class="dropdown-item change-status-btn fw-bold text-danger d-flex align-items-center justify-content-between" 
+                                                    <button type="button" class="dropdown-item change-status-btn fw-bold text-danger d-flex align-items-center justify-content-between gap-2" 
                                                             data-employee-id="{{ $employee->id }}" 
-                                                            data-status="0">
+                                                            data-status="0"
+                                                            style="background: transparent !important; color: var(--bs-danger) !important; box-shadow: none !important; border: 0; width: 100%;">
                                                         Inactive
                                                         @if(!$employee->status)
                                                             <i class="feather feather-check ms-2"></i>

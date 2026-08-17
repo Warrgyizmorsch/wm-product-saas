@@ -12,6 +12,9 @@
         <x-ui.button href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" variant="light" size="sm" class="border" icon="feather-external-link">
             SO Details
         </x-ui.button>
+        <x-ui.button href="{{ route('inventory.mrp-shortage.index', ['mr_ids' => [$delivery->id]]) }}" variant="warning" size="sm" class="fw-bold px-3 text-dark border me-1" icon="feather-cpu">
+            MRP Shortage Analysis
+        </x-ui.button>
 
         @if (in_array($delivery->status, ['Ready', 'Partially Ready', 'Processing', 'Picked', 'Packed']))
             <x-ui.button href="{{ route('sales.dispatches.create', ['material_requirement_id' => $delivery->id, 'sales_order_id' => $delivery->sales_order_id]) }}" variant="primary" size="sm" class="fw-bold px-3" icon="feather-truck">

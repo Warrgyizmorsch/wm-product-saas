@@ -94,15 +94,16 @@
 @section('content')
     <div class="settings-container">
         <!-- Content Column -->
-        <div class="settings-content-col">
+        <div class="settings-content-col erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
 
             <form action="{{ route('hrms.leave-structure.transition.process') }}" method="POST" id="bulkTransitionForm">
                 @csrf
                 <div class="row g-4">
                     <!-- Left: Employee Selection -->
                     <div class="col-lg-7 col-12">
-                        <x-ui.card :title="__('hrms.leave.select_employees_for_transition')" bodyClass="p-0">
-                            <x-slot name="headerAction">
+                        <div>
+                            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.leave.select_employees_for_transition') }}</h5>
                                 <div class="d-flex align-items-center gap-2">
                                     <!-- Search Input -->
                                     <div class="theme-search-container" style="width: 180px !important; position: relative;">
@@ -110,7 +111,7 @@
                                         <input type="text" id="employeeSearchInput" class="theme-search-input" placeholder="{{ __('hrms.leave.search_employees') }}">
                                     </div>
                                 </div>
-                            </x-slot>
+                            </div>
 
                             <!-- Select All Checkbox on the Left Side of List Header -->
                             <div class="p-3 border-bottom d-flex align-items-center bg-light justify-content-between">
@@ -209,16 +210,16 @@
                                     </div>
                                 @endforelse
                             </div>
-                        </x-ui.card>
+                        </div>
                     </div>
 
                     <!-- Right: Plan & Transition Settings -->
                     <div class="col-lg-5 col-12">
-                        <div class="card border-0 shadow-sm mb-4">
-                            <div class="card-header bg-white border-bottom p-4">
+                        <div>
+                            <div class="mb-4 pb-3 border-bottom">
                                 <h6 class="card-title fw-bold text-dark mb-0">{{ __('hrms.leave.transition_parameters') }}</h6>
                             </div>
-                            <div class="card-body p-4">
+                            <div>
                                 <!-- Target Plan -->
                                 <div class="mb-4">
                                     <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.target_leave_plan')" name="new_leave_plan_id" id="new_leave_plan_id" select2-selector="default" :required="true">
@@ -258,7 +259,6 @@
                                         <span id="transitionBtnText"><i class="feather-shuffle me-1"></i> {{ __('hrms.leave.confirm_and_transition_plans') }}</span>
                                     </x-ui.button>
                                 </div>
-                            </div>
                         </div>
                     </div>
                 </div>

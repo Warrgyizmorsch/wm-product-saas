@@ -54,11 +54,13 @@ class WipController extends Controller
         $perPage = min(max((int) $request->input('per_page', 10), 1), 50);
         $ordersPaginator = $this->wipService->getConsolidatedOrderWipSummaries($tenantId, $search, $status, $perPage);
 
-        // Pre-aggregate Work-Center summaries for orders on the current page
+        // Pre-aggregate Work-Center summaries & Batch Pipeline data for orders on the current page
         $orderSummariesMap = [];
+        $orderBatchPipelinesMap = [];
         foreach ($ordersPaginator->items() as $order) {
             $summaries = $this->wipService->getWorkCenterWipSummaries($tenantId, $order->id, $workCenterIdFilter);
             $orderSummariesMap[$order->id] = $summaries;
+            $orderBatchPipelinesMap[$order->id] = $this->wipService->getBatchPipelineData($order->id);
         }
 
         // Flat card fallback view query
@@ -113,6 +115,7 @@ class WipController extends Controller
             'viewMode',
             'ordersPaginator',
             'orderSummariesMap',
+            'orderBatchPipelinesMap',
             'workCenters',
             'workCenterIdFilter',
             'warehouses'
@@ -236,6 +239,7 @@ class WipController extends Controller
 
         $request->validate([
             'warehouse_id' => 'required|exists:warehouses,id',
+            'quality_status' => 'nullable|string|in:passed,quarantine,failed',
             'remarks' => 'nullable|string|max:255',
         ]);
 
@@ -244,7 +248,8 @@ class WipController extends Controller
                 $id,
                 (int) $request->input('warehouse_id'),
                 $request->input('remarks'),
-                auth()->id()
+                auth()->id(),
+                $request->input('quality_status', 'passed')
             );
 
             return redirect()->route('production.wip.show', $id)->with('success', 'WIP converted and Finished Goods stock received.');
@@ -259,6 +264,7 @@ class WipController extends Controller
 
         $request->validate([
             'warehouse_id' => 'required|exists:warehouses,id',
+            'quality_status' => 'nullable|string|in:passed,quarantine,failed',
             'remarks' => 'nullable|string|max:255',
         ]);
 
@@ -267,7 +273,8 @@ class WipController extends Controller
                 $orderId,
                 (int) $request->input('warehouse_id'),
                 $request->input('remarks'),
-                auth()->id()
+                auth()->id(),
+                $request->input('quality_status', 'passed')
             );
 
             return redirect()->back()

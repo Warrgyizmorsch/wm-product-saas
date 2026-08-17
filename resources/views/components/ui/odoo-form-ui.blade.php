@@ -688,7 +688,7 @@
     @if($label)
         <div class="odoo-form-group">
             <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
-                {{ $label }} @if($required)<span class="text-danger">*</span>@endif
+                {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
     @endif
@@ -727,7 +727,7 @@
     @if($label)
         <div class="odoo-form-group">
             <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
-                {{ $label }} @if($required)<span class="text-danger">*</span>@endif
+                {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
     @endif
@@ -770,7 +770,7 @@
     @if($label)
         <div class="odoo-form-group">
             <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
-                {{ $label }} @if($required)<span class="text-danger">*</span>@endif
+                {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
     @endif
@@ -805,7 +805,7 @@
     @if($label)
         <div class="odoo-form-group">
             <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
-                {{ $label }} @if($required)<span class="text-danger">*</span>@endif
+                {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
     @endif
@@ -843,7 +843,7 @@
     @if($label)
         <div class="odoo-form-group align-items-start">
             <label class="odoo-form-label pt-1" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
-                {{ $label }} @if($required)<span class="text-danger">*</span>@endif
+                {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
                 <div class="d-flex gap-3 align-items-center">
@@ -872,7 +872,7 @@
     @if($label)
         <div class="odoo-form-group">
             <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
-                {{ $label }} @if($required)<span class="text-danger">*</span>@endif
+                {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
     @endif
@@ -913,7 +913,7 @@
     @if($label)
         <div class="mb-3">
             <label class="fw-bold text-dark mb-1 fs-12 d-block" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
-                {{ $label }} @if($required)<span class="text-danger">*</span>@endif
+                {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
     @endif
                 <div class="odoo-editor-wrapper {{ $errorText ? 'is-invalid' : '' }}"

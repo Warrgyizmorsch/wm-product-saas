@@ -58,20 +58,31 @@ class ProductionScheduleOperation extends BaseModel
         'warnings',
         'locked',
         'actual_machine_id',
+        'baseline_start',
+        'baseline_finish',
+        'manual_override',
+        'last_adjusted_at',
+        'last_adjusted_by',
+        'version',
     ];
 
     protected $casts = [
-        'planned_start'            => 'datetime',
-        'planned_finish'           => 'datetime',
-        'actual_start'             => 'datetime',
-        'actual_finish'            => 'datetime',
-        'last_paused_at'           => 'datetime',
+        'planned_start'              => 'datetime',
+        'planned_finish'             => 'datetime',
+        'actual_start'               => 'datetime',
+        'actual_finish'              => 'datetime',
+        'last_paused_at'             => 'datetime',
         'accumulated_paused_seconds' => 'integer',
-        'planned_duration_minutes' => 'float',
-        'sequence'                 => 'integer',
-        'priority'                 => 'integer',
-        'warnings'                 => 'array',
-        'locked'                   => 'boolean',
+        'planned_duration_minutes'   => 'float',
+        'sequence'                   => 'integer',
+        'priority'                   => 'integer',
+        'warnings'                   => 'array',
+        'locked'                     => 'boolean',
+        'baseline_start'             => 'datetime',
+        'baseline_finish'            => 'datetime',
+        'manual_override'            => 'boolean',
+        'last_adjusted_at'           => 'datetime',
+        'version'                    => 'integer',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
@@ -104,6 +115,37 @@ class ProductionScheduleOperation extends BaseModel
     public function actualMachine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'actual_machine_id');
+    }
+
+    public function lastAdjustedBy(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'last_adjusted_by');
+    }
+
+    public function changeLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductionScheduleChangeLog::class, 'production_schedule_operation_id')
+            ->orderBy('id', 'desc');
+    }
+
+    // ─── Dynamic Variance Attributes ──────────────────────────────────────────
+
+    public function getStartVarianceMinutesAttribute(): float
+    {
+        if (!$this->baseline_start || !$this->planned_start) {
+            return 0.0;
+        }
+
+        return (float) $this->baseline_start->diffInMinutes($this->planned_start, false);
+    }
+
+    public function getFinishVarianceMinutesAttribute(): float
+    {
+        if (!$this->baseline_finish || !$this->planned_finish) {
+            return 0.0;
+        }
+
+        return (float) $this->baseline_finish->diffInMinutes($this->planned_finish, false);
     }
 
     // ─── Status Helpers ───────────────────────────────────────────────────────

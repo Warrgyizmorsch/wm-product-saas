@@ -332,11 +332,16 @@
 
     <div class="settings-container">
         <!-- Content Column -->
-        <div class="settings-content-col">
+        <div class="settings-content-col erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
 
             <!-- Single Outer Card spanning full width -->
             <div class="col-12">
-                <x-ui.card title="{{ __('hrms.penalization.title') }}" subtitle="{{ __('hrms.penalization.subtitle') }}" bodyClass="p-0" stretch id="penalizationMasterCard">
+            <div id="penalizationMasterCard">
+                <div class="card-header mb-4 pb-3 border-bottom bg-transparent border-0 px-0 pt-0">
+                    <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.penalization.title') }}</h5>
+                    <p class="text-muted fs-12 mb-0">{{ __('hrms.penalization.subtitle') }}</p>
+                </div>
+                <div class="card-body">
                     <div class="row g-0">
                         <!-- LEFT COLUMN: RULES CATEGORIES ONLY -->
                         <div class="col-md-3 col-12 border-end" id="penalizationLeftCol">
@@ -833,7 +838,8 @@
                              @endforeach
                         </div>
                     </div>
-                </x-ui.card>
+                </div>
+            </div>
             </div>
         </div>
     </div>

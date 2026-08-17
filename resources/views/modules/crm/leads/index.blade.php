@@ -215,15 +215,14 @@
                             <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
                                 <input type="checkbox" class="form-check-input">
                             </th>
-                            <th style="width: 10%; background-color: #e8ecf1 !important;">{{ __('crm.call_date_time') }}</th>
-                            <th style="width: 17%; background-color: #e8ecf1 !important;">{{ __('crm.lead_company') }}</th>
-                            <th style="width: 13%; background-color: #e8ecf1 !important;">Lead Owner</th>
-                            <th style="width: 15%; background-color: #e8ecf1 !important;">{{ __('crm.phone_email') }}</th>
-                            <th style="width: 11%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.value_est_sale') }}</th>
-                            <th style="width: 16%; background-color: #e8ecf1 !important;">Details</th>
-                            <th style="width: 8%; background-color: #e8ecf1 !important;">Quotation</th>
-                            <th style="width: 8%; background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
-                            <th style="width: 3%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
+                            <th style="width: 11%; background-color: #e8ecf1 !important;">{{ __('crm.call_date_time') }}</th>
+                            <th style="width: 19%; background-color: #e8ecf1 !important;">{{ __('crm.lead_company') }}</th>
+                            <th style="width: 14%; background-color: #e8ecf1 !important;">Lead Owner</th>
+                            <th style="width: 17%; background-color: #e8ecf1 !important;">{{ __('crm.phone_email') }}</th>
+                            <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.value_est_sale') }}</th>
+                            <th style="width: 18%; background-color: #e8ecf1 !important;">Details</th>
+                            <th style="width: 9%; background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
+                            <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -264,10 +263,11 @@
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <img src="https://ui-avatars.com/api/?name={{ urlencode($lead->owner?->name ?: 'Unassigned') }}&background=1e40af&color=ffffff&size=64&bold=true" 
-                                             alt="{{ $lead->owner?->name ?: 'Lead Owner' }}" 
-                                             class="rounded-circle me-2 border shadow-xs" 
-                                             style="width: 28px; height: 28px; object-fit: cover;">
+                                        <div class="rounded-circle me-2 d-flex align-items-center justify-content-center text-white fw-bold shadow-xs" 
+                                             style="width: 28px; height: 28px; background-color: #1e40af; font-size: 11px; flex-shrink: 0;"
+                                             title="{{ $lead->owner?->name ?: 'Unassigned' }}">
+                                            {{ strtoupper(substr($lead->owner?->name ?: 'U', 0, 1)) }}
+                                        </div>
                                         <div>
                                             <span class="d-block fw-semibold text-dark fs-12" style="line-height: 1.2;">{{ $lead->owner?->name ?: 'Unassigned' }}</span>
                                             <span class="text-muted fs-10 d-block">{{ $lead->owner?->email ?: '—' }}</span>
@@ -357,16 +357,7 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td>
-                                    @php
-                                        $latestQuotation = $lead->quotations->sortByDesc('id')->first();
-                                    @endphp
-                                    @if ($latestQuotation)
-                                        <span class="fw-semibold text-dark">{{ $latestQuotation->quotation_number }}</span>
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
+
                                 <td>
                                     @if ($lead->is_customer || $lead->status === 'Won')
                                         <span class="badge bg-soft-success text-success px-2 py-1 fs-11 fw-bold"><i class="feather-check-circle me-1"></i>Won</span>
@@ -394,6 +385,21 @@
                                 </td>
                                 <td class="text-end pe-4">
                                     <x-ui.action-dropdown :viewUrl="route('crm.leads.show', $lead->id)">
+                                        <x-slot:extraActions>
+                                            <button type="button" 
+                                                    class="action-dropdown-btn btn-open-followup-offcanvas" 
+                                                    title="Schedule Activity / Log Followup" 
+                                                    data-bs-toggle="offcanvas" 
+                                                    data-bs-target="#leadFollowupOffcanvas"
+                                                    data-lead-id="{{ $lead->id }}"
+                                                    data-lead-name="{{ e($lead->company_name ?: $lead->contact_person ?: ('Lead #'.$lead->id)) }}"
+                                                    data-lead-status="{{ $lead->status ?: 'New' }}"
+                                                    data-lead-priority="{{ $lead->priority ?: 'Medium' }}"
+                                                    data-next-followup="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}">
+                                                <i class="feather-calendar text-primary"></i>
+                                            </button>
+                                        </x-slot:extraActions>
+
                                         {{-- Edit --}}
                                         <li>
                                             <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="dropdown-item">
@@ -753,6 +759,177 @@
                     form[0].submit();
                 }
             });
+
+            // Toggle Offcanvas Mode (Log Activity & Next Followup vs Schedule Direct Activity)
+            function switchOffcanvasMode(mode) {
+                $('.offcanvas-mode-btn').removeClass('active btn-primary text-white shadow-sm').css({'background-color': 'transparent', 'color': '#64748b', 'box-shadow': 'none'});
+                var activeBtn = $('.offcanvas-mode-btn[data-mode="' + mode + '"]');
+                activeBtn.addClass('active btn-primary text-white shadow-sm').css({'background-color': 'var(--bs-primary)', 'color': '#ffffff', 'box-shadow': '0 2px 4px rgba(0,0,0,0.15)'});
+                
+                $('#offcanvasActionMode').val(mode);
+
+                if (mode === 'log_note') {
+                    $('#sectionPastInteraction').show();
+                    $('#sectionDirectSchedule').hide();
+                    $('#offcanvasFollowupDate').removeAttr('required');
+                } else if (mode === 'schedule') {
+                    $('#sectionPastInteraction').hide();
+                    $('#sectionDirectSchedule').show();
+                    $('#offcanvasFollowupDate').attr('required', 'required');
+                }
+            }
+
+            $(document).on('click', '.offcanvas-mode-btn', function() {
+                switchOffcanvasMode($(this).attr('data-mode'));
+            });
+
+            // Open and populate Offcanvas drawer for Lead Followup / Schedule Activity
+            $(document).on('click', '.btn-open-followup-offcanvas', function() {
+                var leadId = $(this).attr('data-lead-id');
+                var leadName = $(this).attr('data-lead-name');
+                var leadStatus = $(this).attr('data-lead-status');
+                var leadPriority = $(this).attr('data-lead-priority');
+                var nextFollowup = $(this).attr('data-next-followup');
+
+                $('#leadFollowupOffcanvasTitle').text('Edit Followup for ' + leadName);
+                $('#leadFollowupForm').attr('action', '/crm/leads/' + leadId + '/followups');
+                $('#offcanvasLeadStatus').val(leadStatus || 'New');
+                $('#offcanvasLeadPriority').val(leadPriority || 'Medium');
+                $('#offcanvasFollowupDate, #offcanvasNextFollowupDate').val(nextFollowup || '');
+                $('#offcanvasNotes, #offcanvasScheduleNotes').val('');
+                $('#offcanvasRecording').val('');
+                if ($('#offcanvasTagUser').length && $.fn.select2) {
+                    if ($('#offcanvasTagUser').hasClass('select2-hidden-accessible')) {
+                        $('#offcanvasTagUser').select2('destroy');
+                    }
+                    $('#offcanvasTagUser').select2({
+                        theme: 'bootstrap-5',
+                        placeholder: 'Select persons to tag...',
+                        allowClear: true,
+                        dropdownParent: $('#leadFollowupOffcanvas'),
+                        width: '100%'
+                    });
+                    $('#offcanvasTagUser').val(null).trigger('change');
+                }
+
+                switchOffcanvasMode('log_note');
+            });
         });
     </script>
+
+    <!-- Offcanvas Drawer: Edit Followup / Schedule Activity -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="leadFollowupOffcanvas" aria-labelledby="leadFollowupOffcanvasLabel" style="width: 490px; max-width: 92vw;">
+        <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle">
+                    <i class="feather-calendar"></i>
+                </div>
+                <div>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="leadFollowupOffcanvasTitle">Edit Followup</h5>
+                    <span class="text-muted fs-11">Log interaction & next followup or schedule activity</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        
+        <div class="offcanvas-body p-4 bg-white">
+            <form action="" method="POST" id="leadFollowupForm" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="action_mode" id="offcanvasActionMode" value="log_note">
+
+                <!-- 2-Mode Switcher Tabs -->
+                <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
+                        Log Discussion & Next
+                    </button>
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 offcanvas-mode-btn" data-mode="schedule" style="font-size: 12px; padding: 8px 6px; color: #64748b; background-color: transparent; border-radius: 6px; transition: all 0.2s ease;">
+                        Direct Schedule Activity
+                    </button>
+                </div>
+
+                <!-- Past Interaction Section (Tab 1: Log Activity) -->
+                <div id="sectionPastInteraction">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up / Interaction Type</label>
+                        <select name="type" id="offcanvasFollowupType" class="form-select form-select-sm shadow-2xs">
+                            <option value="Call">Call</option>
+                            <option value="Email">Email</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up Status / Outcome</label>
+                        <select name="status" id="offcanvasFollowupStatus" class="form-select form-select-sm shadow-2xs">
+                            <option value="Connected">Connected</option>
+                            <option value="Not Connected">Not Connected</option>
+                            <option value="Not Answering">Not Answering</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Discussion Notes / Summary</label>
+                        <textarea name="notes" id="offcanvasNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Write discussion notes..."></textarea>
+                    </div>
+
+                    <!-- Next Follow-up Section inside Log Mode -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type (Optional)</label>
+                        <select name="next_activity_type" id="offcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
+                            <option value="Call">Call</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="Email">Email</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
+                        <input type="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs">
+                    </div>
+                </div>
+
+                <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
+                <div id="sectionDirectSchedule" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
+                        <select name="schedule_type" id="offcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#offcanvasFollowupType').val(this.value)">
+                            <option value="Call">Call</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="Email">Email</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
+                        <input type="datetime-local" name="followup_date" id="offcanvasFollowupDate" class="form-control form-control-sm shadow-2xs">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Description / Plan</label>
+                        <textarea name="schedule_notes" id="offcanvasScheduleNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Agenda / plan for upcoming activity..." oninput="$('#offcanvasNotes').val(this.value)"></textarea>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">Tag / Assign Persons</label>
+                    <select name="tagged_user_ids[]" id="offcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="Select persons to tag...">
+                        @foreach($users as $u)
+                            <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">UPDATE DETAILS</button>
+                </div>
+            </form>
+        </div>
+    </div>
 @endpush

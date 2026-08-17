@@ -1,7 +1,7 @@
 @extends('layouts.duralux')
 
 @section('title', 'MES Execute Operation | SaaS ERP')
-@section('page-title', 'Execute Operation: ' . ($op->name ?? '—'))
+@section('page-title', 'Execute Operation: ' . html_entity_decode($op->name ?? '—', ENT_QUOTES, 'UTF-8'))
 @section('breadcrumb', 'Execute Operation')
 
 @push('styles')
@@ -15,24 +15,21 @@
             align-items: center;
             justify-content: center;
         }
+
         .touch-tab {
             min-height: 44px;
             font-weight: 600;
-        }
-        .btn-touch-large {
-            min-height: 50px;
-            font-size: 15px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
         }
     </style>
 @endpush
 
 @section('page-actions')
-    <x-ui.button href="{{ route('production.labels.orders.print', $order->id) }}" target="_blank" icon="feather-printer" variant="outline-dark" size="sm" class="me-2">
+    <x-ui.button href="{{ route('production.labels.orders.print', $order->id) }}" target="_blank" icon="feather-printer"
+        variant="outline-dark" size="sm" class="me-2">
         {{ __('production.print_order_label') }}
     </x-ui.button>
-    <x-ui.icon-btn href="{{ route('production.mes.operator.dashboard') }}" icon="feather-arrow-left" variant="transparent-dark" title="Dashboard">
+    <x-ui.icon-btn href="{{ route('production.mes.operator.dashboard') }}" icon="feather-arrow-left"
+        variant="transparent-dark" title="Dashboard">
         Dashboard
     </x-ui.icon-btn>
 @endsection
@@ -47,563 +44,586 @@
 
     <x-ui.workflow-guide title="What's Next?">
         @if($op->status !== 'running' && $op->status !== 'paused' && $op->status !== 'completed')
-            Click <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold">START OPERATION</span> below to begin shop floor execution.
+            Click <span class="badge bg-soft-success text-success border border-success-subtle fw-semibold">START
+                OPERATION</span> below to begin shop floor execution.
         @elseif($op->status === 'completed')
             @if($isFinalOp)
-                Operation complete. This was the final routing operation for Order <strong class="text-dark">{{ $order->order_number }}</strong>. Finished goods production can now be transferred into the warehouse from the <a href="{{ url('production/wip') }}?search={{ $order->order_number }}" class="fw-bold text-primary text-decoration-underline">WIP Tracking Page</a>.
+                Operation complete. This was the final routing operation for Order <strong
+                    class="text-dark">{{ $order->order_number }}</strong>. Finished goods production can now be transferred into the
+                warehouse from the <a href="{{ url('production/wip') }}?search={{ $order->order_number }}"
+                    class="fw-bold text-primary text-decoration-underline">WIP Tracking Page</a>.
             @else
                 Operation complete. The WIP batch and completed output have transitioned to the next routing operation.
             @endif
         @else
             @if(strtolower($order->production_mode ?? '') === 'batch')
-                Create or select the required production batch below and log progress for that batch. Any rejected or scrapped quantities will automatically move under Quality Control (<a href="{{ url('production/quality/rework') }}" class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap Management</a>). Once completed with rework/scrap decomposition, the WIP batch will transition to the next operation.
+                Create or select the required production batch below and log progress for that batch. Any rejected or scrapped
+                quantities will automatically move under Quality Control (<a href="{{ url('production/quality/rework') }}"
+                    class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a
+                    href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap
+                    Management</a>). Once completed with rework/scrap decomposition, the WIP batch will transition to the next
+                operation.
             @elseif(strtolower($order->production_mode ?? '') === 'serial')
-                Scan or select serial numbers below to log progress. Any rejected or scrapped units will automatically move under Quality Control (<a href="{{ url('production/quality/rework') }}" class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap Management</a>).
+                Scan or select serial numbers below to log progress. Any rejected or scrapped units will automatically move under
+                Quality Control (<a href="{{ url('production/quality/rework') }}"
+                    class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a
+                    href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap
+                    Management</a>).
             @else
-                Log completed output or progress below. Any rejected or scrapped quantities will automatically move under Quality Control (<a href="{{ url('production/quality/rework') }}" class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap Management</a>).
+                Log completed output or progress below. Any rejected or scrapped quantities will automatically move under Quality
+                Control (<a href="{{ url('production/quality/rework') }}"
+                    class="fw-bold text-primary text-decoration-underline">Rework Management</a> & <a
+                    href="{{ url('production/quality/scrap') }}" class="fw-bold text-primary text-decoration-underline">Scrap
+                    Management</a>).
             @endif
 
             @if($isFinalOp)
                 <div class="mt-1.5 fs-12 text-dark">
-                    <i class="feather-check-circle me-1 text-primary"></i><strong>Final Operation Note:</strong> Upon completing this final routing operation, finished goods production can be moved from WIP into the warehouse directly from the <a href="{{ url('production/wip') }}?search={{ $order->order_number }}" class="fw-bold text-primary text-decoration-underline">Work-in-Progress (WIP) Tracking Page</a> for Order <strong>{{ $order->order_number }}</strong>.
+                    <i class="feather-check-circle me-1 text-primary"></i><strong>Final Operation Note:</strong> Upon completing
+                    this final routing operation, finished goods production can be moved from WIP into the warehouse directly from
+                    the <a href="{{ url('production/wip') }}?search={{ $order->order_number }}"
+                        class="fw-bold text-primary text-decoration-underline">Work-in-Progress (WIP) Tracking Page</a> for Order
+                    <strong>{{ $order->order_number }}</strong>.
                 </div>
             @endif
         @endif
     </x-ui.workflow-guide>
 
-<div class="erp-single-panel bg-white p-4">
+    <div class="erp-single-panel bg-white p-4">
 
-    <x-ui.odoo-form-ui type="sheet">
+        <x-ui.odoo-form-ui type="sheet">
 
-        {{-- Header Identity Row --}}
-        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-            <div>
-                <x-ui.badge variant="secondary" soft class="font-monospace mb-2">{{ $op->operation_number ?? 'OP-??' }}</x-ui.badge>
-                <h3 class="fw-bold text-dark mb-1">{{ $op->name }}</h3>
-                <p class="text-muted fs-13 mb-0">
-                    Order: <strong class="text-dark">{{ $order->order_number }}</strong> | Product: <strong class="text-dark">{{ $order->product->name }}</strong>
-                    | Mode: <x-ui.badge variant="info" soft class="font-monospace ms-1">{{ strtoupper($order->production_mode) }}</x-ui.badge>
-                </p>
+            {{-- Header Identity Row --}}
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+                <div>
+                    <x-ui.badge variant="secondary" soft
+                        class="font-monospace mb-2">{{ $op->operation_number ?? 'OP-??' }}</x-ui.badge>
+                    <h3 class="fw-bold text-dark mb-1">{{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</h3>
+                    <p class="text-muted fs-13 mb-0">
+                        Order: <strong class="text-dark">{{ $order->order_number }}</strong> | Product: <strong
+                            class="text-dark">{{ html_entity_decode($order->product->name ?? '', ENT_QUOTES, 'UTF-8') }}</strong>
+                        | Mode: <x-ui.badge variant="info" soft
+                            class="font-monospace ms-1">{{ strtoupper($order->production_mode) }}</x-ui.badge>
+                    </p>
+                </div>
+                <div class="text-end">
+                    <div class="fs-11 text-muted uppercase font-semibold mb-1">{{ __('production.status') }}</div>
+                    @php
+                        $statusVariant = match ($op->status) {
+                            'running' => 'success',
+                            'paused' => 'warning',
+                            'completed' => 'secondary',
+                            default => 'primary',
+                        };
+                    @endphp
+                    <x-ui.badge :variant="$statusVariant"
+                        class="fs-13 px-3 py-2 fw-bold">{{ strtoupper($op->status) }}</x-ui.badge>
+                </div>
             </div>
-            <div class="text-end">
-                <div class="fs-11 text-muted uppercase font-semibold mb-1">{{ __('production.status') }}</div>
-                @php
-                    $statusVariant = match($op->status) {
-                        'running' => 'success',
-                        'paused' => 'warning',
-                        'completed' => 'secondary',
-                        default => 'primary',
-                    };
-                @endphp
-                <x-ui.badge :variant="$statusVariant" class="fs-13 px-3 py-2 fw-bold">{{ strtoupper($op->status) }}</x-ui.badge>
-            </div>
-        </div>
 
-        {{-- Execution Controls --}}
-        <div class="row g-4 mb-4">
-            <div class="col-lg-6">
-                <x-ui.card :title="__('production.touch_controls')" class="h-100 border">
-                    <div class="d-flex flex-column justify-content-center p-2">
-                        @if($scheduleOp && ($scheduleOp->status === 'running' || $scheduleOp->status === 'paused'))
-                            <div class="text-center mb-4 bg-light py-3 rounded border">
-                                <div class="text-muted fs-11 uppercase font-semibold mb-1">Active Execution Time</div>
-                                <h1 class="display-6 fw-bold text-dark font-monospace mb-0" id="opLiveTimer"
-                                     data-status="{{ $scheduleOp->status }}"
-                                     data-start="{{ $scheduleOp->actual_start ? $scheduleOp->actual_start->toIso8601String() : '' }}"
-                                     data-paused-at="{{ $scheduleOp->last_paused_at ? $scheduleOp->last_paused_at->toIso8601String() : '' }}"
-                                     data-accumulated-paused="{{ $scheduleOp->accumulated_paused_seconds ?? 0 }}">
-                                     00:00:00
-                                </h1>
+            {{-- Execution Controls --}}
+            <div class="row g-4 mb-4">
+                <div class="col-lg-6">
+                    <x-ui.card :title="__('production.touch_controls')" class="h-100 border">
+                        <div class="d-flex flex-column h-100 justify-content-between p-2">
+                            @if($scheduleOp && ($scheduleOp->status === 'running' || $scheduleOp->status === 'paused'))
+                                <div class="text-center mb-4 bg-light py-3 rounded border">
+                                    <div class="text-muted fs-11 uppercase font-semibold mb-1">Active Execution Time</div>
+                                    <h1 class="display-6 fw-bold text-dark font-monospace mb-0" id="opLiveTimer"
+                                        data-status="{{ $scheduleOp->status }}"
+                                        data-start="{{ $scheduleOp->actual_start ? $scheduleOp->actual_start->toIso8601String() : '' }}"
+                                        data-paused-at="{{ $scheduleOp->last_paused_at ? $scheduleOp->last_paused_at->toIso8601String() : '' }}"
+                                        data-accumulated-paused="{{ $scheduleOp->accumulated_paused_seconds ?? 0 }}">
+                                        00:00:00
+                                    </h1>
+                                </div>
+                            @endif
+
+                            <div class="row g-2">
+                                @if($op->status !== 'running' && $op->status !== 'paused' && $op->status !== 'completed')
+                                    <div class="col-12">
+                                        <form method="POST"
+                                            action="{{ route('production.mes.start', optional($scheduleOp)->id ?? $op->id) }}">
+                                            @csrf
+                                            <x-ui.button type="submit" variant="success" icon="feather-play"
+                                                class="btn-touch-large w-100">
+                                                START OPERATION
+                                            </x-ui.button>
+                                        </form>
+                                    </div>
+                                @endif
+
+                                @if($op->status === 'running')
+                                    <div class="col">
+                                        <x-ui.button variant="warning" icon="feather-pause" class="btn-touch-large w-100"
+                                            data-bs-toggle="modal" data-bs-target="#pauseModal">
+                                            PAUSE
+                                        </x-ui.button>
+                                    </div>
+                                @endif
+
+                                @if($op->status === 'paused')
+                                    <div class="col">
+                                        <form method="POST"
+                                            action="{{ route('production.mes.resume', optional($scheduleOp)->id ?? $op->id) }}"
+                                            class="w-100">
+                                            @csrf
+                                            <x-ui.button type="submit" variant="success" icon="feather-play"
+                                                class="btn-touch-large w-100">
+                                                RESUME
+                                            </x-ui.button>
+                                        </form>
+                                    </div>
+                                @endif
+
+                                @if($op->status === 'running' || $op->status === 'paused')
+                                    @php
+                                        $isQcRequired = (bool) ($op->routingOperation?->quality_required ?? $op->quality_required ?? false);
+                                    @endphp
+
+                                    <div class="col">
+                                        <x-ui.button variant="info" icon="feather-edit-3"
+                                            class="btn-touch-large w-100 text-white" data-bs-toggle="modal"
+                                            data-bs-target="#logProgressModal">
+                                            LOG PROGRESS
+                                        </x-ui.button>
+                                    </div>
+
+                                    @if($isQcRequired)
+                                        <div class="col">
+                                            <x-ui.button variant="warning" icon="feather-shield-check"
+                                                class="btn-touch-large w-100 text-dark" data-bs-toggle="modal"
+                                                data-bs-target="#quickQcModal">
+                                                QC CHECK
+                                            </x-ui.button>
+                                        </div>
+                                    @endif
+
+                                    <div class="col">
+                                        <x-ui.button variant="primary" icon="feather-check-circle" class="btn-touch-large w-100"
+                                            data-bs-toggle="modal" data-bs-target="#completeModal">
+                                            COMPLETE
+                                        </x-ui.button>
+                                    </div>
+                                @endif
+
+                                @if($op->status === 'completed')
+                                    <div class="col-12 text-center py-4">
+                                        <i class="feather-check-circle text-success fs-48 mb-2 d-block"></i>
+                                        <h5 class="fw-bold text-dark">Operation is Completed</h5>
+                                        <p class="text-muted mb-0 fs-13">This operation's steps on the shop floor have finished
+                                            successfully.</p>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </x-ui.card>
+                </div>
+
+                {{-- Quick Stats / Assignment info --}}
+                <div class="col-lg-6">
+                    <x-ui.card :title="__('production.operator_info_instructions')" class="h-100 border">
+                        <div class="mb-3">
+                            <span class="text-muted d-block fs-11 uppercase font-semibold">Assigned Operator</span>
+                            <div class="d-flex align-items-center mt-1">
+                                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle me-2">
+                                    <i class="feather-user"></i>
+                                </div>
+                                <span class="fw-bold text-dark me-3 fs-13">
+                                    {{ $assignment ? $assignment->user->name : 'No active assignments' }}
+                                    @if($assignment)
+                                        @if($assignment->status === 'assigned')
+                                            <x-ui.badge variant="warning" soft class="fs-10 ms-1">Pending Acceptance</x-ui.badge>
+                                        @elseif($assignment->status === 'accepted')
+                                            <x-ui.badge variant="success" soft class="fs-10 ms-1">Accepted</x-ui.badge>
+                                        @endif
+                                    @endif
+                                </span>
+                                @can('manage', \App\Domains\Production\Models\ProductionOperatorAssignment::class)
+                                    <x-ui.button variant="outline-primary" size="sm" icon="feather-user-plus me-1"
+                                        class="ms-auto" data-bs-toggle="modal" data-bs-target="#assignOperatorModal">
+                                        {{ $assignment ? 'Reassign' : 'Assign' }}
+                                    </x-ui.button>
+                                @endcan
+                            </div>
+                        </div>
+                        <div class="mb-2 pt-3 border-top">
+                            <span class="text-muted d-block fs-11 uppercase font-semibold mb-1">Process Instructions</span>
+                            <div class="bg-light p-3 rounded text-dark font-monospace fs-13 border"
+                                style="max-height: 120px; overflow-y: auto;">
+                                {!! nl2br(e($op->instructions ?? 'No special process instructions provided for this step.')) !!}
+                            </div>
+                        </div>
+                    </x-ui.card>
+                </div>
+            </div>
+
+            {{-- Dynamic Tabs based on Production Mode --}}
+            @php
+                $defaultTab = ($order->production_mode === 'serial') ? 'serial-content' : 'batch-content';
+                $activeMesTab = request('tab', request('active_tab', session('active_tab', $defaultTab)));
+                if ($activeMesTab !== 'batch-content' && $activeMesTab !== 'serial-content') {
+                    $activeMesTab = $defaultTab;
+                }
+
+                $mesTabs = [];
+                if ($order->production_mode === 'batch' || $order->production_mode === 'batch_and_serial') {
+                    $mesTabs[] = [
+                        'id' => 'batch-content',
+                        'label' => __('production.batch_control_panel'),
+                        'active' => ($activeMesTab === 'batch-content'),
+                        'icon' => 'feather-box',
+                    ];
+                }
+                if ($order->production_mode === 'serial' || $order->production_mode === 'batch_and_serial') {
+                    $mesTabs[] = [
+                        'id' => 'serial-content',
+                        'label' => __('production.serial_numbers_manager'),
+                        'active' => ($activeMesTab === 'serial-content'),
+                        'icon' => 'feather-hash',
+                    ];
+                }
+            @endphp
+
+            @if($order->production_mode !== 'standard' && !empty($mesTabs))
+                <div class="mt-4">
+                    <x-ui.horizontal-tabs id="mesOperatorTabs" :tabs="$mesTabs" class="mb-3" />
+
+                    <div class="tab-content pt-2" id="mesOperatorTabsContent">
+                        {{-- Batch Tab --}}
+                        @if($order->production_mode === 'batch' || $order->production_mode === 'batch_and_serial')
+                            <div class="tab-pane fade @if($activeMesTab === 'batch-content') show active @endif" id="batch-content"
+                                role="tabpanel" aria-labelledby="batch-content-tab">
+                                @include('modules.production.mes.operator.batch-production')
                             </div>
                         @endif
-
-                        <div class="row g-3">
-                            @if($op->status !== 'running' && $op->status !== 'paused' && $op->status !== 'completed')
-                                <div class="col-12">
-                                    <form method="POST" action="{{ route('production.mes.start', optional($scheduleOp)->id ?? $op->id) }}">
-                                        @csrf
-                                        <x-ui.button type="submit" variant="success" icon="feather-play" class="btn-touch-large w-100">
-                                            START OPERATION
-                                        </x-ui.button>
-                                    </form>
-                                </div>
-                            @endif
-
-                            @if($op->status === 'running')
-                                <div class="col-4">
-                                    <x-ui.button variant="warning" icon="feather-pause" class="btn-touch-large w-100" data-bs-toggle="modal" data-bs-target="#pauseModal">
-                                        PAUSE
-                                    </x-ui.button>
-                                </div>
-                            @endif
-
-                            @if($op->status === 'paused')
-                                <div class="col-4">
-                                    <form method="POST" action="{{ route('production.mes.resume', optional($scheduleOp)->id ?? $op->id) }}" class="w-100">
-                                        @csrf
-                                        <x-ui.button type="submit" variant="success" icon="feather-play" class="btn-touch-large w-100">
-                                            RESUME
-                                        </x-ui.button>
-                                    </form>
-                                </div>
-                            @endif
-
-                            @if($op->status === 'running' || $op->status === 'paused')
-                                <div class="col-4">
-                                    <x-ui.button variant="info" icon="feather-edit-3" class="btn-touch-large w-100 text-white" data-bs-toggle="modal" data-bs-target="#logProgressModal">
-                                        LOG PROGRESS
-                                    </x-ui.button>
-                                </div>
-                                <div class="col-4">
-                                    <x-ui.button variant="primary" icon="feather-check-circle" class="btn-touch-large w-100" data-bs-toggle="modal" data-bs-target="#completeModal">
-                                        COMPLETE
-                                    </x-ui.button>
-                                </div>
-                            @endif
-
-                            @if($op->status === 'completed')
-                                <div class="col-12 text-center py-4">
-                                    <i class="feather-check-circle text-success fs-48 mb-2 d-block"></i>
-                                    <h5 class="fw-bold text-dark">Operation is Completed</h5>
-                                    <p class="text-muted mb-0 fs-13">This operation's steps on the shop floor have finished successfully.</p>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                </x-ui.card>
-            </div>
-
-            {{-- Quick Stats / Assignment info --}}
-            <div class="col-lg-6">
-                <x-ui.card :title="__('production.operator_info_instructions')" class="h-100 border">
-                    <div class="mb-3">
-                        <span class="text-muted d-block fs-11 uppercase font-semibold">Assigned Operator</span>
-                        <div class="d-flex align-items-center mt-1">
-                            <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle me-2">
-                                <i class="feather-user"></i>
+                        {{-- Serial Tab --}}
+                        @if($order->production_mode === 'serial' || $order->production_mode === 'batch_and_serial')
+                            <div class="tab-pane fade @if($activeMesTab === 'serial-content') show active @endif"
+                                id="serial-content" role="tabpanel" aria-labelledby="serial-content-tab">
+                                @include('modules.production.mes.operator.serial-production')
                             </div>
-                            <span class="fw-bold text-dark me-3 fs-13">
-                                {{ $assignment ? $assignment->user->name : 'No active assignments' }}
-                                @if($assignment)
-                                    @if($assignment->status === 'assigned')
-                                        <x-ui.badge variant="warning" soft class="fs-10 ms-1">Pending Acceptance</x-ui.badge>
-                                    @elseif($assignment->status === 'accepted')
-                                        <x-ui.badge variant="success" soft class="fs-10 ms-1">Accepted</x-ui.badge>
-                                    @endif
-                                @endif
-                            </span>
-                            @can('manage', \App\Domains\Production\Models\ProductionOperatorAssignment::class)
-                                <x-ui.button variant="outline-primary" size="sm" icon="feather-user-plus me-1" class="ms-auto" data-bs-toggle="modal" data-bs-target="#assignOperatorModal">
-                                    {{ $assignment ? 'Reassign' : 'Assign' }}
-                                </x-ui.button>
-                            @endcan
-                        </div>
+                        @endif
                     </div>
-                    <div class="mb-2 pt-3 border-top">
-                        <span class="text-muted d-block fs-11 uppercase font-semibold mb-1">Process Instructions</span>
-                        <div class="bg-light p-3 rounded text-dark font-monospace fs-13 border" style="max-height: 120px; overflow-y: auto;">
-                            {!! nl2br(e($op->instructions ?? 'No special process instructions provided for this step.')) !!}
-                        </div>
+                </div>
+            @endif
+
+        </x-ui.odoo-form-ui>
+
+    </div>{{-- end .erp-single-panel --}}
+
+    {{-- Pause Modal --}}
+    <x-ui.modal id="pauseModal" title="Pause Operation" centered="true"
+        formAction="{{ route('production.mes.pause', optional($scheduleOp)->id ?? $op->id) }}" submitText="Pause Operation"
+        closeText="Cancel">
+        <x-ui.odoo-form-ui type="textarea" label="Reason for Pause / Remarks" name="remarks"
+            placeholder="Enter reason (e.g. material shortage, machine breakdown)..." :required="true" rows="3" />
+    </x-ui.modal>
+
+    {{-- Complete Modal (Touch Numeric Pad) --}}
+    <x-ui.modal id="completeModal" title="Log Progress & Complete" centered="true" size="lg"
+        formAction="{{ route('production.mes.complete', optional($scheduleOp)->id ?? $op->id) }}"
+        submitText="Submit & Complete" closeText="Cancel">
+        <div class="row g-4 text-start">
+            {{-- Numeric Pad & Inputs --}}
+            <div class="col-md-7 border-end pe-md-4">
+                <div class="mb-3">
+                    <label class="form-label uppercase font-semibold fs-11 text-muted">Active Input field</label>
+                    <div class="d-flex gap-2">
+                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn active"
+                            onclick="selectInput('produced', this)">Produced</x-ui.button>
+                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn"
+                            onclick="selectInput('rejected', this)">Rejected</x-ui.button>
+                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn"
+                            onclick="selectInput('scrapped', this)">Scrapped</x-ui.button>
                     </div>
-                </x-ui.card>
-            </div>
-        </div>
+                </div>
 
-        {{-- Dynamic Tabs based on Production Mode --}}
-        @php
-            $defaultTab = ($order->production_mode === 'serial') ? 'serial-content' : 'batch-content';
-            $activeMesTab = request('tab', request('active_tab', session('active_tab', $defaultTab)));
-            if ($activeMesTab !== 'batch-content' && $activeMesTab !== 'serial-content') {
-                $activeMesTab = $defaultTab;
-            }
-
-            $mesTabs = [];
-            if ($order->production_mode === 'batch' || $order->production_mode === 'batch_and_serial') {
-                $mesTabs[] = [
-                    'id' => 'batch-content',
-                    'label' => __('production.batch_control_panel'),
-                    'active' => ($activeMesTab === 'batch-content'),
-                    'icon' => 'feather-box',
-                ];
-            }
-            if ($order->production_mode === 'serial' || $order->production_mode === 'batch_and_serial') {
-                $mesTabs[] = [
-                    'id' => 'serial-content',
-                    'label' => __('production.serial_numbers_manager'),
-                    'active' => ($activeMesTab === 'serial-content'),
-                    'icon' => 'feather-hash',
-                ];
-            }
-        @endphp
-
-        @if($order->production_mode !== 'standard' && !empty($mesTabs))
-            <div class="mt-4">
-                <x-ui.horizontal-tabs id="mesOperatorTabs" :tabs="$mesTabs" class="mb-3" />
-
-                <div class="tab-content pt-2" id="mesOperatorTabsContent">
-                    {{-- Batch Tab --}}
-                    @if($order->production_mode === 'batch' || $order->production_mode === 'batch_and_serial')
-                        <div class="tab-pane fade @if($activeMesTab === 'batch-content') show active @endif" id="batch-content" role="tabpanel" aria-labelledby="batch-content-tab">
-                            @include('modules.production.mes.operator.batch-production')
+                <div class="row g-2 mb-3">
+                    @for($i = 1; $i <= 9; $i++)
+                        <div class="col-4">
+                            <x-ui.button type="button" variant="light" class="num-btn w-100"
+                                onclick="numPress('{{ $i }}')">{{ $i }}</x-ui.button>
                         </div>
-                    @endif
-                    {{-- Serial Tab --}}
-                    @if($order->production_mode === 'serial' || $order->production_mode === 'batch_and_serial')
-                        <div class="tab-pane fade @if($activeMesTab === 'serial-content') show active @endif" id="serial-content" role="tabpanel" aria-labelledby="serial-content-tab">
-                            @include('modules.production.mes.operator.serial-production')
-                        </div>
-                    @endif
+                    @endfor
+                    <div class="col-4">
+                        <x-ui.button type="button" variant="light" class="num-btn w-100"
+                            onclick="numPress('.')">.</x-ui.button>
+                    </div>
+                    <div class="col-4">
+                        <x-ui.button type="button" variant="light" class="num-btn w-100"
+                            onclick="numPress('0')">0</x-ui.button>
+                    </div>
+                    <div class="col-4">
+                        <x-ui.button type="button" variant="soft-danger" class="num-btn w-100" onclick="numPress('C')"><i
+                                class="feather-delete"></i></x-ui.button>
+                    </div>
                 </div>
             </div>
+
+            {{-- Target Quantities --}}
+            <div class="col-md-5 ps-md-4">
+                @php
+                    $totalScrappedAtOp = max(
+                        (float) ($op->quantity_scrapped ?? 0),
+                        (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $op->tenant_id)
+                            ->where('production_order_id', $op->production_order_id)
+                            ->where('production_order_operation_id', $op->id)
+                            ->sum('quantity')
+                    );
+                    $remainingToComplete = max(0.0, (float) $order->quantity_ordered - (($op->quantity_produced ?? 0) + $totalScrappedAtOp + ($op->quantity_rejected ?? 0)));
+                @endphp
+                <x-ui.odoo-form-ui type="input" label="Quantity Produced" name="quantity_produced" id="producedInput"
+                    inputType="number" step="0.0001" :value="$remainingToComplete" :required="true" />
+                <x-ui.odoo-form-ui type="input" label="Quantity Rejected" name="quantity_rejected" id="rejectedInput"
+                    inputType="number" step="0.0001" value="0" />
+                <x-ui.odoo-form-ui type="input" label="Quantity Scrapped" name="quantity_scrapped" id="scrappedInput"
+                    inputType="number" step="0.0001" value="0" />
+                <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" placeholder="Optional comments..."
+                    rows="2" />
+            </div>
+        </div>
+    </x-ui.modal>
+
+    {{-- Log Daily/Partial Progress Modal (Touch Numeric Pad) --}}
+    <x-ui.modal id="logProgressModal" title="Log Daily / Shift Progress" centered="true" size="lg"
+        formAction="{{ route('production.mes.log-progress', optional($scheduleOp)->id ?? $op->id) }}"
+        submitText="Submit Progress Log" closeText="Cancel">
+        <div class="row g-4 text-start">
+            {{-- Numeric Pad & Inputs --}}
+            <div class="col-md-7 border-end pe-md-4">
+                <div class="mb-3">
+                    <label class="form-label uppercase font-semibold fs-11 text-muted">Active Input field</label>
+                    <div class="d-flex gap-2">
+                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn active"
+                            onclick="selectInput('log_produced', this)">Produced</x-ui.button>
+                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn"
+                            onclick="selectInput('log_rejected', this)">Rejected</x-ui.button>
+                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn"
+                            onclick="selectInput('log_scrapped', this)">Scrapped</x-ui.button>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    @for($i = 1; $i <= 9; $i++)
+                        <div class="col-4">
+                            <x-ui.button type="button" variant="light" class="num-btn w-100"
+                                onclick="numPress('{{ $i }}')">{{ $i }}</x-ui.button>
+                        </div>
+                    @endfor
+                    <div class="col-4">
+                        <x-ui.button type="button" variant="light" class="num-btn w-100"
+                            onclick="numPress('.')">.</x-ui.button>
+                    </div>
+                    <div class="col-4">
+                        <x-ui.button type="button" variant="light" class="num-btn w-100"
+                            onclick="numPress('0')">0</x-ui.button>
+                    </div>
+                    <div class="col-4">
+                        <x-ui.button type="button" variant="soft-danger" class="num-btn w-100" onclick="numPress('C')"><i
+                                class="feather-delete"></i></x-ui.button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Target Quantities --}}
+            <div class="col-md-5 ps-md-4">
+                @if(!empty($batchQueue['active']))
+                    <x-ui.odoo-form-ui type="select" label="Production Batch" name="production_batch_id">
+                        @foreach($batchQueue['active'] as $item)
+                            <option value="{{ $item['batch']->id }}">
+                                Batch #{{ $item['batch']->batch_number }} (Remaining:
+                                {{ number_format($item['remaining_to_process'], 2) }})
+                            </option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                @endif
+                <x-ui.odoo-form-ui type="input" label="Quantity Produced (Today)" name="quantity_produced"
+                    id="log_producedInput" inputType="number" step="0.0001" value="0" :required="true" />
+                <x-ui.odoo-form-ui type="input" label="Quantity Rejected (Today)" name="quantity_rejected"
+                    id="log_rejectedInput" inputType="number" step="0.0001" value="0" />
+                <x-ui.odoo-form-ui type="input" label="Quantity Scrapped (Today)" name="quantity_scrapped"
+                    id="log_scrappedInput" inputType="number" step="0.0001" value="0" />
+                <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks"
+                    placeholder="Optional shift handover comments..." rows="2" />
+            </div>
+        </div>
+    </x-ui.modal>
+
+    {{-- Assign/Reassign Operator Modal --}}
+    <x-ui.modal id="assignOperatorModal" title="{{ $assignment ? 'Reassign Operator' : 'Assign Operator' }}" centered="true"
+        formAction="{{ $assignment ? route('production.mes.assignments.reassign', $assignment->id) : route('production.mes.assignments.assign') }}"
+        submitText="{{ $assignment ? 'Reassign' : 'Assign' }}" closeText="Cancel">
+        @if(!$assignment)
+            <input type="hidden" name="production_order_operation_id" value="{{ $op->id }}">
         @endif
 
-    </x-ui.odoo-form-ui>
+        <x-ui.odoo-form-ui type="select" label="Select Operator" name="user_id" :required="true">
+            <option value="">-- Choose Operator --</option>
+            @foreach($operators as $operator)
+                <option value="{{ $operator->id }}" {{ $assignment && $assignment->user_id == $operator->id ? 'selected' : '' }}>
+                    {{ $operator->name }} ({{ ucfirst($operator->role) }})
+                </option>
+            @endforeach
+        </x-ui.odoo-form-ui>
 
-</div>{{-- end .erp-single-panel --}}
+        <x-ui.odoo-form-ui type="textarea" label="Remarks / Instructions" name="remarks"
+            placeholder="Specify instructions or skill requirements..." rows="3" />
+    </x-ui.modal>
 
-{{-- Pause Modal --}}
-<x-ui.modal 
-    id="pauseModal" 
-    title="Pause Operation" 
-    centered="true"
-    formAction="{{ route('production.mes.pause', optional($scheduleOp)->id ?? $op->id) }}"
-    submitText="Pause Operation"
-    closeText="Cancel"
->
-    <x-ui.odoo-form-ui 
-        type="textarea" 
-        label="Reason for Pause / Remarks" 
-        name="remarks" 
-        placeholder="Enter reason (e.g. material shortage, machine breakdown)..." 
-        :required="true" 
-        rows="3"
-    />
-</x-ui.modal>
-
-{{-- Complete Modal (Touch Numeric Pad) --}}
-<x-ui.modal 
-    id="completeModal" 
-    title="Log Progress & Complete" 
-    centered="true"
-    size="lg"
-    formAction="{{ route('production.mes.complete', optional($scheduleOp)->id ?? $op->id) }}"
-    submitText="Submit & Complete"
-    closeText="Cancel"
->
-    <div class="row g-4 text-start">
-        {{-- Numeric Pad & Inputs --}}
-        <div class="col-md-7 border-end pe-md-4">
-            <div class="mb-3">
-                <label class="form-label uppercase font-semibold fs-11 text-muted">Active Input field</label>
-                <div class="d-flex gap-2">
-                    <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn active" onclick="selectInput('produced', this)">Produced</x-ui.button>
-                    <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn" onclick="selectInput('rejected', this)">Rejected</x-ui.button>
-                    <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn" onclick="selectInput('scrapped', this)">Scrapped</x-ui.button>
-                </div>
-            </div>
-
-            <div class="row g-2 mb-3">
-                @for($i = 1; $i <= 9; $i++)
-                    <div class="col-4">
-                        <x-ui.button type="button" variant="light" class="num-btn w-100" onclick="numPress('{{ $i }}')">{{ $i }}</x-ui.button>
-                    </div>
-                @endfor
-                <div class="col-4">
-                    <x-ui.button type="button" variant="light" class="num-btn w-100" onclick="numPress('.')">.</x-ui.button>
-                </div>
-                <div class="col-4">
-                    <x-ui.button type="button" variant="light" class="num-btn w-100" onclick="numPress('0')">0</x-ui.button>
-                </div>
-                <div class="col-4">
-                    <x-ui.button type="button" variant="soft-danger" class="num-btn w-100" onclick="numPress('C')"><i class="feather-delete"></i></x-ui.button>
-                </div>
-            </div>
-        </div>
-
-        {{-- Target Quantities --}}
-        <div class="col-md-5 ps-md-4">
-            @php
-                $totalScrappedAtOp = max(
-                    (float) ($op->quantity_scrapped ?? 0),
-                    (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $op->tenant_id)
-                        ->where('production_order_id', $op->production_order_id)
-                        ->where('production_order_operation_id', $op->id)
-                        ->sum('quantity')
-                );
-                $remainingToComplete = max(0.0, (float)$order->quantity_ordered - (($op->quantity_produced ?? 0) + $totalScrappedAtOp + ($op->quantity_rejected ?? 0)));
-            @endphp
-            <x-ui.odoo-form-ui 
-                type="input" 
-                label="Quantity Produced" 
-                name="quantity_produced" 
-                id="producedInput" 
-                inputType="number" 
-                step="0.0001"
-                :value="$remainingToComplete" 
-                :required="true" 
-            />
-            <x-ui.odoo-form-ui 
-                type="input" 
-                label="Quantity Rejected" 
-                name="quantity_rejected" 
-                id="rejectedInput" 
-                inputType="number" 
-                step="0.0001"
-                value="0" 
-            />
-            <x-ui.odoo-form-ui 
-                type="input" 
-                label="Quantity Scrapped" 
-                name="quantity_scrapped" 
-                id="scrappedInput" 
-                inputType="number" 
-                step="0.0001"
-                value="0" 
-            />
-            <x-ui.odoo-form-ui 
-                type="textarea" 
-                label="Remarks" 
-                name="remarks" 
-                placeholder="Optional comments..." 
-                rows="2"
-            />
-        </div>
-    </div>
-</x-ui.modal>
-
-{{-- Log Daily/Partial Progress Modal (Touch Numeric Pad) --}}
-<x-ui.modal 
-    id="logProgressModal" 
-    title="Log Daily / Shift Progress" 
-    centered="true"
-    size="lg"
-    formAction="{{ route('production.mes.log-progress', optional($scheduleOp)->id ?? $op->id) }}"
-    submitText="Submit Progress Log"
-    closeText="Cancel"
->
-    <div class="row g-4 text-start">
-        {{-- Numeric Pad & Inputs --}}
-        <div class="col-md-7 border-end pe-md-4">
-            <div class="mb-3">
-                <label class="form-label uppercase font-semibold fs-11 text-muted">Active Input field</label>
-                <div class="d-flex gap-2">
-                    <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn active" onclick="selectInput('log_produced', this)">Produced</x-ui.button>
-                    <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn" onclick="selectInput('log_rejected', this)">Rejected</x-ui.button>
-                    <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn" onclick="selectInput('log_scrapped', this)">Scrapped</x-ui.button>
-                </div>
-            </div>
-
-            <div class="row g-2 mb-3">
-                @for($i = 1; $i <= 9; $i++)
-                    <div class="col-4">
-                        <x-ui.button type="button" variant="light" class="num-btn w-100" onclick="numPress('{{ $i }}')">{{ $i }}</x-ui.button>
-                    </div>
-                @endfor
-                <div class="col-4">
-                    <x-ui.button type="button" variant="light" class="num-btn w-100" onclick="numPress('.')">.</x-ui.button>
-                </div>
-                <div class="col-4">
-                    <x-ui.button type="button" variant="light" class="num-btn w-100" onclick="numPress('0')">0</x-ui.button>
-                </div>
-                <div class="col-4">
-                    <x-ui.button type="button" variant="soft-danger" class="num-btn w-100" onclick="numPress('C')"><i class="feather-delete"></i></x-ui.button>
-                </div>
-            </div>
-        </div>
-
-        {{-- Target Quantities --}}
-        <div class="col-md-5 ps-md-4">
-            @if(!empty($batchQueue['active']))
-                <x-ui.odoo-form-ui type="select" label="Production Batch" name="production_batch_id">
-                    @foreach($batchQueue['active'] as $item)
-                        <option value="{{ $item['batch']->id }}">
-                            Batch #{{ $item['batch']->batch_number }} (Remaining: {{ number_format($item['remaining_to_process'], 2) }})
-                        </option>
-                    @endforeach
-                </x-ui.odoo-form-ui>
-            @endif
-            <x-ui.odoo-form-ui 
-                type="input" 
-                label="Quantity Produced (Today)" 
-                name="quantity_produced" 
-                id="log_producedInput" 
-                inputType="number" 
-                step="0.0001"
-                value="0" 
-                :required="true" 
-            />
-            <x-ui.odoo-form-ui 
-                type="input" 
-                label="Quantity Rejected (Today)" 
-                name="quantity_rejected" 
-                id="log_rejectedInput" 
-                inputType="number" 
-                step="0.0001"
-                value="0" 
-            />
-            <x-ui.odoo-form-ui 
-                type="input" 
-                label="Quantity Scrapped (Today)" 
-                name="quantity_scrapped" 
-                id="log_scrappedInput" 
-                inputType="number" 
-                step="0.0001"
-                value="0" 
-            />
-            <x-ui.odoo-form-ui 
-                type="textarea" 
-                label="Remarks" 
-                name="remarks" 
-                placeholder="Optional shift handover comments..." 
-                rows="2"
-            />
-        </div>
-    </div>
-</x-ui.modal>
-
-{{-- Assign/Reassign Operator Modal --}}
-<x-ui.modal 
-    id="assignOperatorModal" 
-    title="{{ $assignment ? 'Reassign Operator' : 'Assign Operator' }}"
-    centered="true"
-    formAction="{{ $assignment ? route('production.mes.assignments.reassign', $assignment->id) : route('production.mes.assignments.assign') }}"
-    submitText="{{ $assignment ? 'Reassign' : 'Assign' }}"
-    closeText="Cancel"
->
-    @if(!$assignment)
+    {{-- Operator Quick Quality Check Modal --}}
+    <x-ui.modal id="quickQcModal" title="Operator Quality Inspection Check" centered="true"
+        formAction="{{ route('production.quality.inspections.quick') }}" submitText="Submit & Approve Quality Inspection"
+        closeText="Cancel">
         <input type="hidden" name="production_order_operation_id" value="{{ $op->id }}">
-    @endif
+        <input type="hidden" name="production_order_id" value="{{ $order->id }}">
+        <input type="hidden" name="stage" value="in_process">
 
-    <x-ui.odoo-form-ui type="select" label="Select Operator" name="user_id" :required="true">
-        <option value="">-- Choose Operator --</option>
-        @foreach($operators as $operator)
-            <option value="{{ $operator->id }}" {{ $assignment && $assignment->user_id == $operator->id ? 'selected' : '' }}>
-                {{ $operator->name }} ({{ ucfirst($operator->role) }})
-            </option>
-        @endforeach
-    </x-ui.odoo-form-ui>
+        <div class="alert alert-info py-2 fs-12 mb-3">
+            <i class="feather-shield me-1"></i> Perform inline quality inspection for <strong>{{ $op->name }}</strong>
+            before completing.
+        </div>
 
-    <x-ui.odoo-form-ui 
-        type="textarea" 
-        label="Remarks / Instructions" 
-        name="remarks" 
-        placeholder="Specify instructions or skill requirements..." 
-        rows="3"
-    />
-</x-ui.modal>
+        <x-ui.odoo-form-ui type="select" label="Inspection Result" name="result" :required="true">
+            <option value="passed">PASSED — Meets Quality Standard</option>
+            <option value="hold">QUALITY HOLD — Requires QA Review</option>
+            <option value="failed">FAILED — Defective / NCR Generated</option>
+        </x-ui.odoo-form-ui>
 
-@push('scripts')
-    <script>
-        let currentField = 'produced';
+        <div class="mb-3">
+            <label class="form-label fw-semibold fs-12 text-uppercase text-dark mb-1">Quality Checklist Parameters</label>
+            <div class="p-2 border rounded bg-light fs-12">
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" checked id="chkVisual">
+                    <label class="form-check-label" for="chkVisual">Visual Surface & Finish Inspection Passed</label>
+                </div>
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" checked id="chkDim">
+                    <label class="form-check-label" for="chkDim">Dimensional Tolerance Check Within Specification</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" checked id="chkFunc">
+                    <label class="form-check-label" for="chkFunc">Functional / Assembly Test Passed</label>
+                </div>
+            </div>
+        </div>
 
-        function selectInput(field, btnEl) {
-            currentField = field;
-            const modal = btnEl.closest('.modal');
-            modal.querySelectorAll('.active-input-btn').forEach(btn => btn.classList.remove('active'));
-            btnEl.classList.add('active');
-        }
+        <x-ui.odoo-form-ui type="textarea" label="Inspection Remarks" name="remarks"
+            placeholder="Enter measured dimensions, batch details, or quality observations..." rows="3" />
+    </x-ui.modal>
 
-        function numPress(val) {
-            let input = document.getElementById(currentField + 'Input');
-            if (!input) return;
+    @push('scripts')
+        <script>
+            let currentField = 'produced';
 
-            if (val === 'C') {
-                input.value = '0';
-                return;
+            function selectInput(field, btnEl) {
+                currentField = field;
+                const modal = btnEl.closest('.modal');
+                modal.querySelectorAll('.active-input-btn').forEach(btn => btn.classList.remove('active'));
+                btnEl.classList.add('active');
             }
 
-            if (input.value === '0') {
-                input.value = val;
-            } else {
-                input.value += val;
-            }
-        }
+            function numPress(val) {
+                let input = document.getElementById(currentField + 'Input');
+                if (!input) return;
 
-        document.addEventListener('DOMContentLoaded', function () {
-            const logModal = document.getElementById('logProgressModal');
-            if (logModal) {
-                logModal.addEventListener('shown.bs.modal', function () {
-                    currentField = 'log_produced';
-                });
-            }
-            const compModal = document.getElementById('completeModal');
-            if (compModal) {
-                compModal.addEventListener('shown.bs.modal', function () {
-                    currentField = 'produced';
-                });
-            }
-
-            // Live Operation Timer (HH:MM:SS format)
-            const liveTimerEl = document.getElementById('opLiveTimer');
-            if (liveTimerEl) {
-                function updateOpLiveTimer() {
-                    const now = new Date();
-                    const status = liveTimerEl.getAttribute('data-status');
-                    const startVal = liveTimerEl.getAttribute('data-start');
-                    if (!startVal) {
-                        liveTimerEl.textContent = '00:00:00';
-                        return;
-                    }
-                    
-                    const start = new Date(startVal);
-                    let end;
-                    
-                    if (status === 'running') {
-                        end = now;
-                    } else if (status === 'paused') {
-                        const pausedAtVal = liveTimerEl.getAttribute('data-paused-at');
-                        end = pausedAtVal ? new Date(pausedAtVal) : now;
-                    } else {
-                        liveTimerEl.textContent = '00:00:00';
-                        return;
-                    }
-                    
-                    const diffSeconds = (end.getTime() - start.getTime()) / 1000;
-                    const pausedSec = parseInt(liveTimerEl.getAttribute('data-accumulated-paused') || 0);
-                    const activeSeconds = Math.max(0, diffSeconds - pausedSec);
-                    
-                    const hrs = Math.floor(activeSeconds / 3600);
-                    const mins = Math.floor((activeSeconds % 3600) / 60);
-                    const secs = Math.floor(activeSeconds % 60);
-                    
-                    const hrsStr = hrs.toString().padStart(2, '0');
-                    const minsStr = mins.toString().padStart(2, '0');
-                    const secsStr = secs.toString().padStart(2, '0');
-                    
-                    liveTimerEl.textContent = `${hrsStr}:${minsStr}:${secsStr}`;
+                if (val === 'C') {
+                    input.value = '0';
+                    return;
                 }
-                
-                updateOpLiveTimer();
-                setInterval(updateOpLiveTimer, 1000);
+
+                if (input.value === '0') {
+                    input.value = val;
+                } else {
+                    input.value += val;
+                }
             }
 
-            // MES Tab URL Persistence & Form State Sync
-            const mesTabsContainer = document.getElementById('mesOperatorTabs');
-            if (mesTabsContainer) {
-                mesTabsContainer.querySelectorAll('button[data-bs-toggle="tab"]').forEach(function (tabBtn) {
-                    tabBtn.addEventListener('shown.bs.tab', function (e) {
-                        const targetId = e.target.getAttribute('data-bs-target')?.replace('#', '') || e.target.getAttribute('aria-controls');
-                        if (targetId) {
-                            const url = new URL(window.location.href);
-                            url.searchParams.set('tab', targetId);
-                            window.history.replaceState(null, '', url.toString());
-
-                            // Attach tab parameter to form actions inside the activated tab content
-                            const tabPane = document.getElementById(targetId);
-                            if (tabPane) {
-                                tabPane.querySelectorAll('form').forEach(function (form) {
-                                    try {
-                                        const formUrl = new URL(form.action, window.location.origin);
-                                        formUrl.searchParams.set('tab', targetId);
-                                        form.action = formUrl.toString();
-                                    } catch (err) {}
-                                });
-                            }
-                        }
+            document.addEventListener('DOMContentLoaded', function () {
+                const logModal = document.getElementById('logProgressModal');
+                if (logModal) {
+                    logModal.addEventListener('shown.bs.modal', function () {
+                        currentField = 'log_produced';
                     });
-                });
-            }
-        });
-    </script>
-@endpush
+                }
+                const compModal = document.getElementById('completeModal');
+                if (compModal) {
+                    compModal.addEventListener('shown.bs.modal', function () {
+                        currentField = 'produced';
+                    });
+                }
+
+                // Live Operation Timer (HH:MM:SS format)
+                const liveTimerEl = document.getElementById('opLiveTimer');
+                if (liveTimerEl) {
+                    function updateOpLiveTimer() {
+                        const now = new Date();
+                        const status = liveTimerEl.getAttribute('data-status');
+                        const startVal = liveTimerEl.getAttribute('data-start');
+                        if (!startVal) {
+                            liveTimerEl.textContent = '00:00:00';
+                            return;
+                        }
+
+                        const start = new Date(startVal);
+                        let end;
+
+                        if (status === 'running') {
+                            end = now;
+                        } else if (status === 'paused') {
+                            const pausedAtVal = liveTimerEl.getAttribute('data-paused-at');
+                            end = pausedAtVal ? new Date(pausedAtVal) : now;
+                        } else {
+                            liveTimerEl.textContent = '00:00:00';
+                            return;
+                        }
+
+                        const diffSeconds = (end.getTime() - start.getTime()) / 1000;
+                        const pausedSec = parseInt(liveTimerEl.getAttribute('data-accumulated-paused') || 0);
+                        const activeSeconds = Math.max(0, diffSeconds - pausedSec);
+
+                        const hrs = Math.floor(activeSeconds / 3600);
+                        const mins = Math.floor((activeSeconds % 3600) / 60);
+                        const secs = Math.floor(activeSeconds % 60);
+
+                        const hrsStr = hrs.toString().padStart(2, '0');
+                        const minsStr = mins.toString().padStart(2, '0');
+                        const secsStr = secs.toString().padStart(2, '0');
+
+                        liveTimerEl.textContent = `${hrsStr}:${minsStr}:${secsStr}`;
+                    }
+
+                    updateOpLiveTimer();
+                    setInterval(updateOpLiveTimer, 1000);
+                }
+
+                // MES Tab URL Persistence & Form State Sync
+                const mesTabsContainer = document.getElementById('mesOperatorTabs');
+                if (mesTabsContainer) {
+                    mesTabsContainer.querySelectorAll('button[data-bs-toggle="tab"]').forEach(function (tabBtn) {
+                        tabBtn.addEventListener('shown.bs.tab', function (e) {
+                            const targetId = e.target.getAttribute('data-bs-target')?.replace('#', '') || e.target.getAttribute('aria-controls');
+                            if (targetId) {
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('tab', targetId);
+                                window.history.replaceState(null, '', url.toString());
+
+                                // Attach tab parameter to form actions inside the activated tab content
+                                const tabPane = document.getElementById(targetId);
+                                if (tabPane) {
+                                    tabPane.querySelectorAll('form').forEach(function (form) {
+                                        try {
+                                            const formUrl = new URL(form.action, window.location.origin);
+                                            formUrl.searchParams.set('tab', targetId);
+                                            form.action = formUrl.toString();
+                                        } catch (err) { }
+                                    });
+                                }
+                            }
+                        });
+                    });
+                }
+            });
+        </script>
+    @endpush
 @endsection

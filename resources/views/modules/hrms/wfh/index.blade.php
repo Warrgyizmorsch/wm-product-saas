@@ -122,8 +122,8 @@
 @endsection
 
 @section('content')
-
-    @if($errors->any())
+    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        @if($errors->any())
         <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
             <i class="feather-alert-triangle me-2"></i>
             <ul class="mb-0 ps-3">
@@ -195,8 +195,8 @@
     </div>
 
     {{-- Requests Table --}}
-    <div class="card border-0 shadow-sm rounded-3">
-        <div class="card-header bg-white border-0 pt-4 px-4 d-flex align-items-center justify-content-between">
+    <div>
+        <div class="d-flex align-items-center justify-content-between mb-4">
             <div>
                 <h5 class="fw-bold text-dark mb-0"><i class="feather-home me-2 text-primary"></i> {{ __('hrms.wfh.title') }}</h5>
                 <p class="text-muted fs-12 mb-0">{{ __('hrms.wfh.title') }}</p>
@@ -266,7 +266,7 @@
                 </form>
             </div>
         </div>
-        <div class="card-body p-0">
+        <div>
             <div class="table-responsive" style="overflow: visible;">
                 <table class="table table-hover align-middle mb-0" id="wfhTable">
                     <thead class="table-light">
@@ -542,7 +542,7 @@
                     />
                 @endif
             </div>
-        </div>
+            </div>
     </div>
 
 {{-- WFH Cancellation Request Modal --}}

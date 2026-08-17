@@ -328,8 +328,8 @@
                                     {{ $routing->operations_count }}
                                 </span>
                             </td>
-                            <td class="text-muted">{{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : __('production.immediate') ?? 'Immediate' }}</td>
-                            <td class="text-muted">{{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : __('production.indefinite') ?? 'Indefinite' }}</td>
+                            <td class="text-muted">{{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : __('production.immediate') }}</td>
+                            <td class="text-muted">{{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : __('production.indefinite') }}</td>
                             <td>
                                 @if ($routing->is_default)
                                     <span class="badge bg-soft-success text-success px-2 py-1 rounded-pill fs-10">{{ __('production.primary') }}</span>

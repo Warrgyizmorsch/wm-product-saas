@@ -266,7 +266,12 @@
                                             <i class="feather-info me-1"></i> Transfer all <strong>{{ number_format($readyQtyToReceive, 2) }} completed finished units</strong> across all sub-cards for this order directly into Finished Goods warehouse inventory in one click.
                                         </div>
 
-                                        <x-ui.odoo-form-ui type="select" label="Destination Warehouse" name="warehouse_id" :searchable="false" required>
+                                        <x-ui.odoo-form-ui type="select" label="Quality Disposition" name="quality_status" :required="true">
+                                            <option value="passed">PASSED — Transfer directly to Finished Goods Warehouse</option>
+                                            <option value="quarantine">QUARANTINE — Send to Quality Quarantine Warehouse for inspection</option>
+                                        </x-ui.odoo-form-ui>
+
+                                        <x-ui.odoo-form-ui type="select" label="Destination Warehouse" name="warehouse_id" :required="true">
                                             @foreach($warehouses as $wh)
                                                 <option value="{{ $wh->id }}">{{ $wh->name }} {{ $wh->is_default ? '(Default)' : '' }}</option>
                                             @endforeach
@@ -280,6 +285,91 @@
                             <tr class="p-0 border-0">
                                 <td colspan="9" class="p-0 border-0">
                                     <div class="collapse wip-order-collapse bg-light p-3 border-bottom shadow-inner" id="wip-group-{{ $orderId }}">
+                                        @php
+                                            $pipelines = $orderBatchPipelinesMap[$orderId] ?? collect();
+                                        @endphp
+
+                                        {{-- Visual Batch Pipeline Tracker --}}
+                                        @if($pipelines->isNotEmpty())
+                                            <div class="card border mb-3 bg-white shadow-2xs">
+                                                <div class="card-header bg-soft-primary py-2 px-3 d-flex justify-content-between align-items-center">
+                                                    <span class="fs-12 fw-bold text-primary text-uppercase">
+                                                        <i class="feather-git-commit me-1"></i> Live Batch Progress Pipeline ({{ $pipelines->count() }} {{ Str::plural('Batch', $pipelines->count()) }})
+                                                    </span>
+                                                    <span class="fs-11 text-muted">Real-time unit movement across operation stages</span>
+                                                </div>
+                                                <div class="card-body p-3">
+                                                    @foreach($pipelines as $pipeline)
+                                                        <div class="mb-2.5 last:mb-0 p-2.5 bg-light rounded border">
+                                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                <span class="fw-bold text-dark fs-12">
+                                                                    <i class="feather-box text-primary me-1"></i> Batch #{{ $pipeline['batch_number'] }}
+                                                                </span>
+                                                                <span class="badge bg-soft-info text-info border fs-10">
+                                                                    Planned: {{ number_format($pipeline['planned_quantity'], 2) }} units
+                                                                </span>
+                                                            </div>
+                                                            <div class="d-flex align-items-center flex-wrap gap-2">
+                                                                @foreach($pipeline['stages'] as $index => $stage)
+                                                                    <div class="d-flex align-items-center">
+                                                                        <div class="p-2 rounded border {{ ($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']) ? 'bg-soft-success border-success-subtle' : (($stage['stage_status'] ?? '') === 'active' || !empty($stage['is_current']) ? 'bg-soft-primary border-primary' : 'bg-white') }}" style="min-width: 170px;">
+                                                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                                <strong class="fs-11 {{ ($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']) ? 'text-success' : (($stage['stage_status'] ?? '') === 'active' || !empty($stage['is_current']) ? 'text-primary' : 'text-dark') }}">{{ $stage['operation_number'] }}</strong>
+                                                                                <div class="d-flex gap-1 align-items-center">
+                                                                                    @if(($stage['qc_status'] ?? 'none') === 'passed')
+                                                                                        <span class="badge bg-soft-success text-success border border-success-subtle fs-9" title="Quality Inspection Passed"><i class="feather-shield me-0.5"></i>QC PASSED</span>
+                                                                                    @elseif(($stage['qc_status'] ?? 'none') === 'hold')
+                                                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-9" title="Quality Hold"><i class="feather-alert-octagon me-0.5"></i>QC HOLD</span>
+                                                                                    @elseif(($stage['qc_status'] ?? 'none') === 'required')
+                                                                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-9" title="Quality Check Required"><i class="feather-shield me-0.5"></i>QC REQ</span>
+                                                                                    @endif
+                                                                                    
+                                                                                    @if(($stage['stage_status'] ?? '') === 'passed' || !empty($stage['is_passed']))
+                                                                                        <span class="badge bg-success text-white fs-9"><i class="feather-check me-0.5"></i>PASSED</span>
+                                                                                    @elseif(($stage['stage_status'] ?? '') === 'active' || !empty($stage['is_current']))
+                                                                                        <span class="badge bg-primary text-white fs-9">ACTIVE STAGE</span>
+                                                                                    @else
+                                                                                        <span class="badge bg-secondary text-white fs-9">UPCOMING</span>
+                                                                                    @endif
+                                                                                </div>
+                                                                            </div>
+                                                                            <div class="fs-10 text-muted text-truncate" title="{{ $stage['name'] }} ({{ $stage['work_center_name'] }})">
+                                                                                {{ $stage['name'] }}
+                                                                                <div class="fs-10 mt-1 d-flex flex-wrap align-items-center gap-1.5">
+                                                                                    <span class="text-success fw-bold" title="Good Output (Passed Operation)">
+                                                                                        ✓ {{ number_format($stage['good_output'], 0) }}
+                                                                                        @if(($stage['rework_completed'] ?? 0) > 0)
+                                                                                            <span class="text-success font-normal" style="font-size: 0.72rem;" title="Includes {{ number_format($stage['rework_completed'], 0) }} Recovered via Rework">(+{{ number_format($stage['rework_completed'], 0) }} Rec)</span>
+                                                                                        @endif
+                                                                                    </span>
+                                                                                    @if(($stage['pending_rework'] ?? $stage['rejected'] ?? 0) > 0)
+                                                                                        <span class="text-warning fw-bold ms-1" title="Pending Rework (Awaiting Repair)">
+                                                                                            ⚙ {{ number_format($stage['pending_rework'] ?? $stage['rejected'], 0) }} Rwk
+                                                                                        </span>
+                                                                                    @endif
+                                                                                    @if(($stage['scrapped'] ?? 0) > 0)
+                                                                                        <span class="text-danger fw-bold ms-1" title="Scrapped Quantity">
+                                                                                            ✗ {{ number_format($stage['scrapped'], 0) }} Scrap
+                                                                                            @if(($stage['rework_failed_scrapped'] ?? 0) > 0)
+                                                                                                <span class="text-danger font-normal" style="font-size: 0.72rem;" title="Includes {{ number_format($stage['rework_failed_scrapped'], 0) }} from Failed Rework">({{ number_format($stage['rework_failed_scrapped'], 0) }} Failed)</span>
+                                                                                            @endif
+                                                                                        </span>
+                                                                                    @endif
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        @if(!$loop->last)
+                                                                            <i class="feather-arrow-right text-muted mx-2 fs-14"></i>
+                                                                        @endif
+                                                                    </div>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
+
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <h6 class="fs-12 text-uppercase fw-bold text-dark mb-0">
                                                 <i class="feather-grid me-1 text-primary"></i> Work Center Breakdown for {{ $order->order_number ?? 'Order #' . $orderId }}

@@ -357,6 +357,83 @@
         .roster-grid-select-dropdown .select2-results__option--highlighted[aria-selected] span {
             color: #ffffff !important;
         }
+
+        /* ERP Pagination styles matching WFH/Leaves theme */
+        .erp-pagination-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: auto !important;
+            padding-top: 15px;
+            border-top: 1px solid #f1f5f9;
+        }
+        .erp-pagination {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+        .erp-pagination .page-item {
+            display: inline-block;
+        }
+        .erp-pagination .page-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50% !important;
+            border: 1px solid #cbd5e1;
+            background-color: #ffffff;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .erp-pagination .page-link:hover {
+            background-color: rgba(var(--bs-primary-rgb), 0.08);
+            border-color: var(--bs-primary);
+            color: var(--bs-primary);
+        }
+        .erp-pagination .page-item.active .page-link {
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 10px rgba(var(--bs-primary-rgb), 0.2);
+        }
+        .erp-pagination .page-item.disabled .page-link {
+            background-color: #f8fafc;
+            border-color: #e2e8f0;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+        .erp-pagination-info {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        /* Force pagination centering in Roster and Shifts */
+        .shift-pagination-container,
+        .weekly-pagination-container,
+        .erp-pagination-container,
+        .erp-pagination {
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            text-align: center !important;
+        }
+        .erp-pagination-container {
+            flex-direction: column !important;
+            width: 100% !important;
+            border-top: none !important;
+            padding-top: 0 !important;
+        }
     </style>
 @endpush
 
@@ -368,7 +445,7 @@
 @section('content')
     <div class="settings-container">
         <!-- Right Content Column -->
-        <div class="settings-content-col flex-grow-1">
+        <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark">
 
             <div class="tab-content" id="rosterSettingsContent">
                 <div class="tab-pane fade show active" id="roster-pane" role="tabpanel">
@@ -400,19 +477,21 @@
                                 <!-- SHIFT MASTER TAB (Default View) -->
                                 <div class="row">
                                     <div class="col-12">
-                                        <x-ui.card title="{{ __('hrms.roster.shifts') }}" stretch bodyClass="p-0">
-                                            <input type="hidden" id="shift_sort_value" value="{{ $shiftSort }}">
-                                            <x-slot name="headerAction">
-                                                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                     <!-- Search Input -->
-                                                     <form method="GET" action="{{ route('hrms.roster.index') }}" class="d-flex align-items-center bg-light border rounded px-3 py-1 m-0" style="min-width: 240px; height: 36px !important; box-sizing: border-box !important;">
-                                                         <input type="hidden" name="tab" value="shifts">
-                                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                                         <input type="text" name="shift_search" class="w-100 border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.roster.search_shifts') }}" value="{{ $shiftSearch }}" style="box-shadow: none; height: 100%; outline: none;">
-                                                     </form>
+                                    <div>
+                                        <div class="d-flex flex-wrap justify-content-between align-items-center" style="margin-bottom: 25px !important;">
+                                            <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.roster.shifts') }}</h5>
+                                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                                 <!-- Search Input -->
+                                                 <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftSearchForm" class="m-0">
+                                                     <input type="hidden" name="tab" value="shifts">
+                                                     <div class="position-relative" style="width: 240px;">
+                                                         <i class="feather-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" style="font-size: 14px;"></i>
+                                                         <input type="text" name="shift_search" class="form-control form-control-sm ps-5 border-0" placeholder="{{ __('hrms.roster.search_shifts') }}" value="{{ $shiftSearch }}" style="height: 38px; border-radius: 8px; font-size: 13px; color: #475569; background-color: #f1f5f9; box-shadow: none; outline: none;">
+                                                     </div>
+                                                 </form>
 
                                                      <!-- Sort Dropdown -->
-                                                     <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                                                     <x-ui.sort-dropdown label="{{ strtoupper(__('hrms.common.sort')) }}">
                                                          <div id="shift_sort_dropdown_menu">
                                                              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_asc' ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeShiftSort('name_asc', this); event.preventDefault();">
                                                                  <span>{{ __('hrms.common.sort_name_asc') }}</span>
@@ -442,7 +521,7 @@
                                                      </x-ui.sort-dropdown>
 
                                                      <!-- Filter Dropdown -->
-                                                     <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                                                     <x-ui.filter label="{{ strtoupper(__('hrms.common.filter')) }}">
                                                          <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
                                                          <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftFilterForm">
                                                               <div class="mb-3">
@@ -478,22 +557,23 @@
                                                                   <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em;">{{ __('hrms.common.apply') }}</button>
                                                               </div>
                                                          </form>
-                                                     </x-ui.filter>
-</div>
-                                             </x-slot>
+                                                      </x-ui.filter>
+                                                  </div>
+                                             </div>
+                                            <input type="hidden" id="shift_sort_value" value="{{ $shiftSort }}">
 
-                                             <div class="table-responsive">
+                                             <div class="table-responsive" style="margin-top: 20px !important;">
                                                   <table class="table table-hover mb-0 align-middle" id="shiftsTable" style="table-layout: fixed; width: 100%;">
                                                       <thead class="table-light">
                                                           <tr>
-                                                              <th style="width: 5%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">#</th>
-                                                              <th style="width: 17%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.shift_name') }}</th>
-                                                              <th style="width: 16%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.org.company') }}</th>
-                                                              <th style="width: 15%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.shift_timing') }}</th>
-                                                              <th style="width: 15%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.break_duration') }}</th>
-                                                              <th style="width: 15%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.overtime_allowed') }}</th>
-                                                              <th style="width: 9%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.org.status') }}</th>
-                                                              <th style="width: 8%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
+                                                              <th style="width: 5%; white-space: nowrap;">#</th>
+                                                              <th style="width: 17%; white-space: nowrap;">{{ __('hrms.roster.shift_name') }}</th>
+                                                              <th style="width: 16%; white-space: nowrap;">{{ __('hrms.org.company') }}</th>
+                                                              <th style="width: 15%; white-space: nowrap;">{{ __('hrms.roster.shift_timing') }}</th>
+                                                              <th style="width: 15%; white-space: nowrap;">{{ __('hrms.roster.break_duration') }}</th>
+                                                              <th style="width: 15%; white-space: nowrap;">{{ __('hrms.roster.overtime_allowed') }}</th>
+                                                              <th style="width: 9%; white-space: nowrap;">{{ __('hrms.org.status') }}</th>
+                                                              <th style="width: 8%; white-space: nowrap;" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
                                                           </tr>
                                                       </thead>
                                                       <tbody>
@@ -571,22 +651,25 @@
                                                  $totalResults = $shifts->total();
                                                  $perPage = $shifts->perPage();
                                              @endphp
-                                              <div class="px-4 py-3 border-top bg-light-soft shift-pagination-container">
+                                              <div class="px-4 py-3 border-top bg-soft-light shift-pagination-container d-flex justify-content-center align-items-center" style="display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important;">
                                                   <x-ui.pagination 
                                                       :current-page="$currentPage"
                                                       :total-pages="$totalPages"
                                                       :total-results="$totalResults"
                                                       :per-page="$perPage"
                                                       page-param="shift_page"
+                                                      style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; width: 100% !important;"
                                                   />
                                               </div>
-                                        </x-ui.card>
+                                        </div>
                                     </div>
                                 </div>
                             @elseif($tab === 'weekly_patterns')
                                 <!-- WEEKLY PATTERNS TAB -->
-                                 <x-ui.card title="{{ __('hrms.roster.weekly_shift_patterns') }}" bodyClass="p-0" stretch>
-                                     <x-slot name="headerAction">
+                                 <div>
+                                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                         <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.roster.weekly_shift_patterns') }}</h5>
+                                         <div class="d-flex align-items-center gap-2">
                                          <form method="GET" action="{{ route('hrms.roster.index') }}" id="weeklyPatternFilterForm" class="d-flex align-items-center gap-2">
                                              <input type="hidden" name="tab" value="weekly_patterns">
                                              <input type="hidden" name="sort" id="weeklyPatternSortInput" value="{{ $sortBy }}">
@@ -661,7 +744,8 @@
                                                  </div>
                                              </x-ui.filter>
                                          </form>
-                                     </x-slot>
+                                         </div>
+                                     </div>
  
                                      <!-- Weekly Defaults Grid Matrix -->
                                      <div class="bg-white border-top" id="weeklyPatternsGrid">
@@ -742,20 +826,23 @@
                                          $totalResults = $employees->total();
                                          $perPage = $employees->perPage();
                                      @endphp
-                                      <div class="px-4 py-3 border-top bg-light-soft weekly-pagination-container">
+                                      <div class="px-4 py-3 border-top bg-soft-light weekly-pagination-container d-flex justify-content-center align-items-center" style="display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important;">
                                          <x-ui.pagination 
                                              :current-page="$currentPage"
                                              :total-pages="$totalPages"
                                              :total-results="$totalResults"
                                              :per-page="$perPage"
                                              page-param="roster_page"
+                                             style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; width: 100% !important;"
                                          />
                                       </div>
-                                 </x-ui.card>
+                                 </div>
                             @else
                                 <!-- ROSTER BOARD TAB -->
-                                 <x-ui.card title="{{ __('hrms.roster.roster_scheduler_grid') }}" bodyClass="p-0" stretch>
-                                     <x-slot name="headerAction">
+                                 <div>
+                                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                         <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.roster.roster_scheduler_grid') }}</h5>
+                                         <div class="d-flex align-items-center gap-2">
                                          <form method="GET" action="{{ route('hrms.roster.index') }}" id="rosterFilterForm" class="d-flex align-items-center gap-2">
                                              <input type="hidden" name="tab" value="roster">
                                              <input type="hidden" name="sort" id="filterSortInput" value="{{ $sortBy }}">
@@ -838,7 +925,8 @@
                                                  </div>
                                              </x-ui.filter>
                                          </form>
-                                     </x-slot>
+                                         </div>
+                                     </div>
 
                                      <!-- Grid Board Matrix (Fixed Column Width Layout to prevent viewport overflow) -->
                                      <div class="bg-white border-top" id="rosterBoardGrid">
@@ -948,16 +1036,17 @@
                                          $totalResults = $employees->total();
                                          $perPage = $employees->perPage();
                                      @endphp
-                                      <div class="px-4 py-3 border-top bg-light-soft roster-pagination-container">
+                                      <div class="px-4 py-3 border-top bg-soft-light roster-pagination-container d-flex justify-content-center align-items-center" style="display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important;">
                                          <x-ui.pagination 
                                              :current-page="$currentPage"
                                              :total-pages="$totalPages"
                                              :total-results="$totalResults"
                                              :per-page="$perPage"
                                              page-param="roster_page"
+                                             style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; width: 100% !important;"
                                          />
                                      </div>
-                                </x-ui.card>
+                                 </div>
                             @endif
                         </div>
                     </div>

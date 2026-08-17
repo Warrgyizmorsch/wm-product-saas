@@ -243,11 +243,13 @@
 
     <div class="settings-container">
         <!-- Right Content Column -->
-        <div class="settings-content-col flex-grow-1">
+        <div class="settings-content-col erp-single-panel bg-white flex-grow-1 p-4 shadow-sm rounded border-0 text-dark">
 
             <div class="col-12">
-                <x-ui.card title="{{ __('hrms.salary.pay_groups') }}" bodyClass="p-0" stretch id="payGroupMasterCard">
-                    <x-slot name="headerAction">
+            <div id="payGroupMasterCard">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom bg-transparent border-0 px-0 pt-0">
+                    <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.salary.pay_groups') }}</h5>
+                    <div class="d-flex align-items-center gap-2">
                         <form method="GET" action="{{ route('hrms.salary-structure.index') }}" id="payGroupFilterForm" class="d-flex align-items-center gap-2 m-0">
                             <!-- Hidden inputs for pagination/tabs state -->
                             <input type="hidden" name="tab" value="{{ request()->get('tab', 'structures') }}">
@@ -298,8 +300,10 @@
                                 </div>
                             </x-ui.filter>
                         </form>
-                    </x-slot>
-                    <div class="row g-0">
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-0">
                         <!-- LEFT COLUMN: ALL PAY GROUPS LIST -->
                         <div class="col-md-4 col-12 border-end" id="payGroupStickyCol">
 
@@ -407,7 +411,8 @@
                             @endif
                         </div>
                     </div>
-                </x-ui.card>
+                </div>
+            </div>
             </div>
         </div>
     </div>

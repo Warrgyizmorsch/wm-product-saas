@@ -205,6 +205,11 @@ class Employee extends BaseModel
         return $this->hasMany(Asset::class, 'assigned_employee_id');
     }
 
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(AssetAllocation::class, 'employee_id');
+    }
+
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class, 'employee_id');

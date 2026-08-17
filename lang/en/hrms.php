@@ -912,7 +912,7 @@ return [
         'lbl_leave_applications' => 'Leave Applications',
         'lbl_leave_app_detail' => 'Leave Application Detail',
         'lbl_update_status' => 'Update Status',
-        'tbl_source_expiry' => 'Source Expiry',
+        'tbl_source_expiry' => 'Source & Expiry',
         'status_partial' => 'Partial',
         'mdl_select_serialized_assets' => 'Select Units to Return',
         'mdl_select_units_desc' => 'Select units to return.',

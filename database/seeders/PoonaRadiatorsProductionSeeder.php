@@ -650,7 +650,8 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'description' => 'High speed roll corrugation of aluminum fin foil & precision tube seam welding.',
             'setup_time_minutes' => 30.0,
             'processing_time_minutes' => 12.0,
-            'machine_cost_rate' => 110.0,
+            'labor_cost_rate' => round($wcFinTube->cost_per_hour / 60, 4),
+            'machine_cost_rate' => 1.8333,
             'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 5.0,
@@ -668,7 +669,8 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'description' => 'Interleaving tubes and fins into core matrix frame and electrostatic flux slurry spraying.',
             'setup_time_minutes' => 20.0,
             'processing_time_minutes' => 15.0,
-            'machine_cost_rate' => 160.0,
+            'labor_cost_rate' => round($wcCoreCab->cost_per_hour / 60, 4),
+            'machine_cost_rate' => 2.6667,
             'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 5.0,
@@ -686,7 +688,8 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'description' => 'Controlled atmosphere nitrogen furnace brazing at 600°C for leak-proof metallic bond.',
             'setup_time_minutes' => 45.0,
             'processing_time_minutes' => 25.0,
-            'machine_cost_rate' => 180.0,
+            'labor_cost_rate' => round($wcCoreCab->cost_per_hour / 60, 4),
+            'machine_cost_rate' => 3.0000,
             'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 5.0,
@@ -700,6 +703,9 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'action' => 'Approved',
             'comments' => 'Core routing verified for shop floor execution.',
         ]);
+
+        // Link core routing to core BOM
+        $coreBom->update(['routing_id' => $routCore->id]);
 
         // Routing 2: Finished Radiator Assembly Routing
         $routFg = Routing::create([
@@ -724,7 +730,8 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'description' => 'Fitting aluminum header plates onto brazed core ends with high precision rubber gaskets.',
             'setup_time_minutes' => 15.0,
             'processing_time_minutes' => 10.0,
-            'machine_cost_rate' => 115.0,
+            'labor_cost_rate' => round($wcTankCrimp->cost_per_hour / 60, 4),
+            'machine_cost_rate' => 1.9167,
             'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 2.0,
@@ -742,7 +749,8 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'description' => 'Pneumatic mechanical crimping of header tank tabs & TIG welding brass coolant hose nipples.',
             'setup_time_minutes' => 20.0,
             'processing_time_minutes' => 18.0,
-            'machine_cost_rate' => 125.0,
+            'labor_cost_rate' => round($wcTankCrimp->cost_per_hour / 60, 4),
+            'machine_cost_rate' => 2.0833,
             'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 2.0,
@@ -760,7 +768,8 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'description' => '60-Bar underwater pneumatic leak testing followed by electrostatic powder coating cure.',
             'setup_time_minutes' => 25.0,
             'processing_time_minutes' => 15.0,
-            'machine_cost_rate' => 105.0,
+            'labor_cost_rate' => round($wcTestCoat->cost_per_hour / 60, 4),
+            'machine_cost_rate' => 1.7500,
             'expected_yield_percentage' => 100.0,
             'overlap_enabled' => true,
             'transfer_batch_quantity' => 2.0,
@@ -774,5 +783,8 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'action' => 'Approved',
             'comments' => 'Finished good assembly routing approved for OEM orders.',
         ]);
+
+        // Link finished good routing to FG BOM
+        $fgBom->update(['routing_id' => $routFg->id]);
     }
 }

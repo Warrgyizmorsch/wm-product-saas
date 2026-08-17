@@ -11,6 +11,8 @@ use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Models\ProductionCalendar;
 use App\Domains\Production\Models\ProductionCalendarHoliday;
+use App\Domains\Production\Models\ProductionScheduleChangeLog;
+use App\Domains\Production\Models\RoutingOperationAlternateMachine;
 use App\Domains\Production\Services\ProductionEventService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +23,223 @@ class CapacityPlanningService
     public function __construct(
         private readonly SchedulingService $schedulingService
     ) {}
+
+    /**
+     * Get bounded, tenant-scoped data payload for the Interactive Dispatch Board.
+     */
+    public function getDispatchBoardData(int $tenantId, Carbon $startDate, Carbon $endDate, array $filters = []): array
+    {
+        if ($startDate->diffInDays($endDate) > 62) {
+            throw new \InvalidArgumentException('Date range cannot exceed 62 days.');
+        }
+
+        $startWindow = $startDate->copy()->startOfDay();
+        $endWindow   = $endDate->copy()->endOfDay();
+
+        // 1. Resources (Work Centers and Child Machines)
+        $wcQuery = WorkCenter::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->with(['machines' => fn ($q) => $q->where('tenant_id', $tenantId)]);
+
+        if (!empty($filters['work_center_id'])) {
+            $wcQuery->where('id', $filters['work_center_id']);
+        }
+
+        $workCenters = $wcQuery->get();
+        $resources = $workCenters->map(function ($wc) {
+            return [
+                'id'                    => $wc->id,
+                'code'                  => $wc->code,
+                'name'                  => $wc->name,
+                'type'                  => 'work_center',
+                'efficiency_percentage' => (float) $wc->efficiency_percentage,
+                'machines'              => $wc->machines->map(fn ($m) => [
+                    'id'             => $m->id,
+                    'code'           => $m->code,
+                    'name'           => $m->name,
+                    'type'           => 'machine',
+                    'work_center_id' => $m->work_center_id,
+                    'status'         => $m->status,
+                ])->values()->all(),
+            ];
+        })->values()->all();
+
+        // 2. Scheduled Operations (Scenario Sandbox vs Live Schedule)
+        if (!empty($filters['scenario_id'])) {
+            $scenarioId = (int) $filters['scenario_id'];
+            $opsQuery = \App\Domains\Production\Models\ProductionScheduleScenarioOperation::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('scenario_id', $scenarioId)
+                ->with([
+                    'order.product',
+                    'orderOperation',
+                    'workCenter',
+                    'machine',
+                ]);
+
+            if (!empty($filters['work_center_id'])) {
+                $opsQuery->where('work_center_id', $filters['work_center_id']);
+            }
+            if (!empty($filters['machine_id'])) {
+                $opsQuery->where('machine_id', $filters['machine_id']);
+            }
+            if (!empty($filters['production_order_id'])) {
+                $opsQuery->where('production_order_id', $filters['production_order_id']);
+            }
+            if (!empty($filters['status'])) {
+                $opsQuery->where('status', $filters['status']);
+            }
+
+            $operations = $opsQuery->orderBy('sequence')->get()->map(function ($op) {
+                $orderOp = $op->orderOperation;
+                return [
+                    'schedule_operation_id'   => $op->source_schedule_operation_id ?: $op->id,
+                    'scenario_operation_id'   => $op->id,
+                    'schedule_id'             => $op->production_schedule_id,
+                    'production_order_id'     => $op->production_order_id,
+                    'production_order_number' => $op->order ? $op->order->order_number : null,
+                    'product_name'            => $op->order && $op->order->product ? $op->order->product->name : null,
+                    'production_order_operation_id' => $op->production_order_operation_id,
+                    'operation_name'          => $orderOp ? $orderOp->name : 'Operation #' . $op->sequence,
+                    'operation_number'        => $orderOp ? $orderOp->operation_number : 'OP' . $op->sequence,
+                    'sequence'                => $op->sequence,
+                    'work_center_id'          => $op->work_center_id,
+                    'machine_id'              => $op->machine_id,
+                    'planned_start'           => $op->planned_start ? $op->planned_start->toIso8601String() : null,
+                    'planned_finish'          => $op->planned_finish ? $op->planned_finish->toIso8601String() : null,
+                    'baseline_start'          => $op->planned_start ? $op->planned_start->toIso8601String() : null,
+                    'baseline_finish'         => $op->planned_finish ? $op->planned_finish->toIso8601String() : null,
+                    'start_variance_minutes'  => 0,
+                    'finish_variance_minutes' => 0,
+                    'planned_duration_minutes'=> (float) $op->planned_duration_minutes,
+                    'status'                  => $op->status,
+                    'locked'                  => (bool) $op->locked,
+                    'manual_override'         => (bool) $op->manual_override,
+                    'version'                 => (int) $op->source_version,
+                    'priority'                => (int) $op->priority,
+                    'overlap_enabled'         => $orderOp ? (bool) $orderOp->overlap_enabled : false,
+                    'transfer_batch_quantity' => $orderOp ? (float) $orderOp->transfer_batch_quantity : 0.0,
+                    'transfer_lag_minutes'    => $orderOp ? (float) $orderOp->transfer_lag_minutes : 0.0,
+                ];
+            })->values()->all();
+        } else {
+            $opsQuery = ProductionScheduleOperation::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->with([
+                    'schedule',
+                    'order.product',
+                    'orderOperation',
+                    'workCenter',
+                    'machine',
+                ])
+                ->whereBetween('planned_start', [$startWindow, $endWindow]);
+
+            if (!empty($filters['work_center_id'])) {
+                $opsQuery->where('work_center_id', $filters['work_center_id']);
+            }
+            if (!empty($filters['machine_id'])) {
+                $opsQuery->where('machine_id', $filters['machine_id']);
+            }
+            if (!empty($filters['production_order_id'])) {
+                $opsQuery->where('production_order_id', $filters['production_order_id']);
+            }
+            if (!empty($filters['schedule_id'])) {
+                $opsQuery->where('production_schedule_id', $filters['schedule_id']);
+            }
+            if (!empty($filters['status'])) {
+                $opsQuery->where('status', $filters['status']);
+            }
+
+            $operations = $opsQuery->orderBy('sequence')->get()->map(function ($op) {
+                $orderOp = $op->orderOperation;
+                return [
+                    'schedule_operation_id'   => $op->id,
+                    'schedule_id'             => $op->production_schedule_id,
+                    'schedule_number'        => $op->schedule ? $op->schedule->schedule_number : null,
+                    'schedule_status'        => $op->schedule ? $op->schedule->status : null,
+                    'production_order_id'     => $op->production_order_id,
+                    'production_order_number' => $op->order ? $op->order->order_number : null,
+                    'product_name'            => $op->order && $op->order->product ? $op->order->product->name : null,
+                    'production_order_operation_id' => $op->production_order_operation_id,
+                    'operation_name'          => $orderOp ? $orderOp->name : 'Operation #' . $op->sequence,
+                    'operation_number'        => $orderOp ? $orderOp->operation_number : 'OP' . $op->sequence,
+                    'sequence'                => $op->sequence,
+                    'work_center_id'          => $op->work_center_id,
+                    'machine_id'              => $op->machine_id,
+                    'planned_start'           => $op->planned_start ? $op->planned_start->toIso8601String() : null,
+                    'planned_finish'          => $op->planned_finish ? $op->planned_finish->toIso8601String() : null,
+                    'baseline_start'          => $op->baseline_start ? $op->baseline_start->toIso8601String() : null,
+                    'baseline_finish'         => $op->baseline_finish ? $op->baseline_finish->toIso8601String() : null,
+                    'start_variance_minutes'  => $op->start_variance_minutes,
+                    'finish_variance_minutes' => $op->finish_variance_minutes,
+                    'planned_duration_minutes'=> (float) $op->planned_duration_minutes,
+                    'status'                  => $op->status,
+                    'locked'                  => (bool) $op->locked,
+                    'manual_override'         => (bool) $op->manual_override,
+                    'version'                 => (int) $op->version,
+                    'priority'                => (int) $op->priority,
+                    'overlap_enabled'         => $orderOp ? (bool) $orderOp->overlap_enabled : false,
+                    'transfer_batch_quantity' => $orderOp ? (float) $orderOp->transfer_batch_quantity : 0.0,
+                    'transfer_lag_minutes'    => $orderOp ? (float) $orderOp->transfer_lag_minutes : 0.0,
+                ];
+            })->values()->all();
+        }
+
+        // 3. Machine Downtimes
+        $downtimes = ProductionMachineDowntime::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('start_time', [$startWindow, $endWindow])
+            ->get()
+            ->map(fn ($d) => [
+                'id'         => $d->id,
+                'machine_id' => $d->machine_id,
+                'start_time' => $d->start_time ? $d->start_time->toIso8601String() : null,
+                'end_time'   => $d->end_time ? $d->end_time->toIso8601String() : null,
+                'reason'     => $d->reason,
+                'status'     => $d->status,
+            ])->values()->all();
+
+        // 4. Capacity Load Metrics
+        $capacity = $this->getDailyLoad($tenantId, $startDate, $endDate);
+
+        // 5. Active Schedule Warnings & Conflicts
+        $warnings = [];
+        $detectedConflicts = $this->schedulingService->detectConflicts($tenantId);
+        foreach ($detectedConflicts as $msg) {
+            $warnings[] = [
+                'type'     => 'MACHINE_CONFLICT',
+                'severity' => 'error',
+                'message'  => $msg,
+            ];
+        }
+
+        $detectedOverloads = $this->schedulingService->detectOverloads($tenantId);
+        foreach ($detectedOverloads as $msg) {
+            $warnings[] = [
+                'type'     => 'CAPACITY_OVERLOAD',
+                'severity' => 'warning',
+                'message'  => $msg,
+            ];
+        }
+
+        return [
+            'range' => [
+                'start' => $startDate->toDateString(),
+                'end'   => $endDate->toDateString(),
+            ],
+            'resources'  => $resources,
+            'operations' => $operations,
+            'downtimes'  => $downtimes,
+            'capacity'   => $capacity,
+            'warnings'   => $warnings,
+            'meta'       => [
+                'total_operations' => count($operations),
+                'total_resources'  => count($resources),
+                'filters_applied'  => array_filter($filters),
+            ],
+        ];
+    }
 
     /**
      * Get capacity planning details for work centers.
@@ -217,7 +436,7 @@ class CapacityPlanningService
     }
 
     /**
-     * Reschedule a single schedule operation step safely.
+     * Reschedule a single schedule operation step safely (delegates to rescheduleOperationWithMode).
      */
     public function rescheduleOperation(
         int     $schedOpId,
@@ -226,28 +445,155 @@ class CapacityPlanningService
         ?string $reason       = null,
         ?int    $userId       = null
     ): void {
-        DB::transaction(function () use ($schedOpId, $newStart, $newMachineId, $reason, $userId) {
-            $schedOp = ProductionScheduleOperation::lockForUpdate()->findOrFail($schedOpId);
+        $this->rescheduleOperationWithMode(
+            $schedOpId,
+            $newStart,
+            $newMachineId,
+            ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED,
+            $reason,
+            $userId
+        );
+    }
+
+    /**
+     * Validate if a machine is qualified for a schedule operation.
+     * Must be active, belong to tenant & work center, and be primary or approved alternate machine.
+     */
+    public function validateMachineQualification(ProductionScheduleOperation $schedOp, int $machineId, int $tenantId): Machine
+    {
+        $machine = Machine::where('tenant_id', $tenantId)->findOrFail($machineId);
+
+        if (!$machine->isActive()) {
+            throw new InvalidArgumentException("Selected machine [{$machine->name}] is inactive.");
+        }
+
+        if ($machine->work_center_id !== $schedOp->work_center_id) {
+            throw new InvalidArgumentException("Selected machine [{$machine->name}] does not belong to Work Center [#{$schedOp->work_center_id}].");
+        }
+
+        $orderOp = $schedOp->orderOperation;
+        if ($orderOp && $orderOp->routing_operation_id) {
+            $routingOpId      = $orderOp->routing_operation_id;
+            $primaryMachineId = $orderOp->machine_id;
+
+            if ($primaryMachineId && (int) $primaryMachineId === (int) $machineId) {
+                return $machine;
+            }
+
+            $isAlternate = RoutingOperationAlternateMachine::where('tenant_id', $tenantId)
+                ->where('routing_operation_id', $routingOpId)
+                ->where('machine_id', $machineId)
+                ->exists();
+
+            if (!$isAlternate && $primaryMachineId) {
+                throw new InvalidArgumentException("Machine [{$machine->name}] is not an approved primary or alternate machine for operation [{$orderOp->name}].");
+            }
+        }
+
+        return $machine;
+    }
+
+    /**
+     * Toggle lock state on a schedule operation.
+     */
+    public function toggleOperationLock(int $schedOpId, ?int $userId = null): ProductionScheduleOperation
+    {
+        return DB::transaction(function () use ($schedOpId, $userId) {
             $tenantId = require_tenant_id();
+            $schedOp  = ProductionScheduleOperation::lockForUpdate()->findOrFail($schedOpId);
 
             if ($schedOp->tenant_id !== $tenantId) {
                 throw new InvalidArgumentException("Operation does not belong to your tenant context.");
             }
 
+            $oldLocked       = (bool) $schedOp->locked;
+            $schedOp->locked = !$oldLocked;
+            $schedOp->version = (int) $schedOp->version + 1;
+            $schedOp->save();
+
+            ProductionScheduleChangeLog::create([
+                'tenant_id'                        => $tenantId,
+                'production_schedule_id'           => $schedOp->production_schedule_id,
+                'production_schedule_operation_id' => $schedOp->id,
+                'change_type'                      => ProductionScheduleChangeLog::CHANGE_TYPE_LOCK_TOGGLE,
+                'old_planned_start'                => $schedOp->planned_start,
+                'new_planned_start'                => $schedOp->planned_start,
+                'old_planned_finish'               => $schedOp->planned_finish,
+                'new_planned_finish'               => $schedOp->planned_finish,
+                'reason'                           => $schedOp->locked ? 'Operation locked by planner' : 'Operation unlocked by planner',
+                'changed_by'                       => $userId ?: (auth()->id() ?: 1),
+            ]);
+
+            app(ProductionEventService::class)->writeEvent($tenantId, [
+                'production_order_id' => $schedOp->production_order_id,
+                'event_type'          => 'Operation Lock Toggled',
+                'title'               => $schedOp->locked ? 'Operation Locked' : 'Operation Unlocked',
+                'description'         => "Operation [{$schedOp->orderOperation?->name}] lock status set to " . ($schedOp->locked ? 'LOCKED' : 'UNLOCKED'),
+                'severity'            => 'info',
+                'event_source'        => 'CapacityPlanningService',
+                'triggered_by'        => $userId ?: (auth()->id() ?: 1),
+            ]);
+
+            return $schedOp;
+        });
+    }
+
+    /**
+     * Reschedule an operation supporting Isolated or Ripple shift modes.
+     */
+    public function rescheduleOperationWithMode(
+        int     $schedOpId,
+        Carbon  $newStart,
+        ?int    $newMachineId    = null,
+        string  $shiftMode       = ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED,
+        ?string $reason          = null,
+        ?int    $userId          = null,
+        ?int    $expectedVersion = null
+    ): array {
+        return DB::transaction(function () use ($schedOpId, $newStart, $newMachineId, $shiftMode, $reason, $userId, $expectedVersion) {
+            $tenantId = require_tenant_id();
+            $schedOp  = ProductionScheduleOperation::lockForUpdate()->findOrFail($schedOpId);
+
+            if ($schedOp->tenant_id !== $tenantId) {
+                throw new InvalidArgumentException("Operation does not belong to your tenant context.");
+            }
+
+            if ($expectedVersion !== null && (int) $schedOp->version !== (int) $expectedVersion) {
+                throw new InvalidArgumentException("CONCURRENCY_CONFLICT: Operation schedule was modified by another user (Expected version {$expectedVersion}, actual {$schedOp->version}).");
+            }
+
             if ($schedOp->locked) {
-                throw new InvalidArgumentException("Operation schedule is locked and cannot be moved.");
+                throw new InvalidArgumentException("Operation [{$schedOp->orderOperation?->name}] is locked and cannot be moved.");
+            }
+
+            if ($schedOp->isTerminal() || $schedOp->isRunning() || $schedOp->isPaused()) {
+                throw new InvalidArgumentException("Operation is in execution state ({$schedOp->status}) and cannot be rescheduled.");
             }
 
             $order = $schedOp->order;
-            if ($order->isClosed() || $order->isCancelled()) {
+            if ($order && ($order->isClosed() || $order->isCancelled())) {
                 throw new InvalidArgumentException("Operation cannot be rescheduled: Parent production order is closed or cancelled.");
             }
 
-            $oldStart = $schedOp->planned_start->toDateTimeString();
-            $oldFinish = $schedOp->planned_finish->toDateTimeString();
-            $oldMachineName = $schedOp->machine ? $schedOp->machine->name : 'N/A';
+            $targetMachineId = $newMachineId ?: $schedOp->machine_id;
+            if ($targetMachineId) {
+                $this->validateMachineQualification($schedOp, $targetMachineId, $tenantId);
+            }
 
-            // Validate sequence timeline rules
+            $wc       = $schedOp->workCenter;
+            $calendar = $this->resolveCalendarForWorkCenter($wc, $tenantId);
+            if (!$this->isWorkingDay($calendar, $newStart, $tenantId)) {
+                throw new InvalidArgumentException("Reschedule failed: Target date is not a valid working day on calendar.");
+            }
+
+            $durationMinutes = (float) $schedOp->planned_duration_minutes;
+            $newFinish       = $this->schedulingService->addWorkingMinutes($schedOp->work_center_id, $newStart, $durationMinutes);
+
+            if ($targetMachineId) {
+                $this->validateMachineAvailability($tenantId, $targetMachineId, $newStart, $newFinish, $schedOp->id);
+            }
+
+            // Predecessor Check
             $predecessor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                 ->where('sequence', '<', $schedOp->sequence)
                 ->whereNotIn('status', ['cancelled', 'skipped'])
@@ -257,13 +603,13 @@ class CapacityPlanningService
             if ($predecessor) {
                 $predOrderOp = $predecessor->orderOperation;
                 if ($predOrderOp && (bool) $predOrderOp->overlap_enabled) {
-                    $setupMinutes = (float) ($predOrderOp->setup_time_planned ?? 0);
-                    $batchQty = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
-                    $lagMinutes = (float) ($predOrderOp->transfer_lag_minutes ?? 0);
-                    $orderQty = (float) ($order->quantity_ordered ?? 1);
-                    $effectiveBatchQty = min($batchQty, $orderQty);
+                    $setupMinutes          = (float) ($predOrderOp->setup_time_planned ?? 0);
+                    $batchQty              = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
+                    $lagMinutes            = (float) ($predOrderOp->transfer_lag_minutes ?? 0);
+                    $orderQty              = (float) ($order->quantity_ordered ?? 1);
+                    $effectiveBatchQty     = min($batchQty, $orderQty);
                     $firstBatchRunDuration = (float) $predOrderOp->processing_time_planned * $effectiveBatchQty;
-                    $totalOffsetMinutes = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+                    $totalOffsetMinutes    = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
 
                     $earliestAllowedStart = $this->schedulingService->addWorkingMinutes(
                         $predecessor->work_center_id,
@@ -272,99 +618,204 @@ class CapacityPlanningService
                     );
 
                     if ($newStart->lt($earliestAllowedStart)) {
-                        throw new InvalidArgumentException("Reschedule conflict: Starts before predecessor transfer-ready time (Predecessor transfer-ready at: {$earliestAllowedStart->toDateTimeString()}).");
+                        throw new InvalidArgumentException("Reschedule conflict: Starts before predecessor transfer-ready time ({$earliestAllowedStart->toDateTimeString()}).");
                     }
                 } else {
                     if ($newStart->lt($predecessor->planned_finish)) {
-                        throw new InvalidArgumentException("Reschedule conflict: Starts before predecessor finishes (Predecessor finishes at: {$predecessor->planned_finish->toDateTimeString()}).");
+                        throw new InvalidArgumentException("Reschedule conflict: Starts before predecessor finishes ({$predecessor->planned_finish->toDateTimeString()}).");
                     }
                 }
             }
 
-            // Successor must start after newFinish (or after new transfer-ready time if overlap enabled)
-            $newFinish = $newStart->copy()->addMinutes((int) ceil($schedOp->planned_duration_minutes));
+            if ($shiftMode === ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED) {
+                // Successor Check for Isolated shift
+                $successor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->where('sequence', '>', $schedOp->sequence)
+                    ->whereNotIn('status', ['cancelled', 'skipped'])
+                    ->orderBy('sequence', 'asc')
+                    ->first();
 
-            $successor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                ->where('sequence', '>', $schedOp->sequence)
-                ->whereNotIn('status', ['cancelled', 'skipped'])
-                ->orderBy('sequence', 'asc')
-                ->first();
+                if ($successor) {
+                    $orderOp = $schedOp->orderOperation;
+                    if ($orderOp && (bool) $orderOp->overlap_enabled) {
+                        $setupMinutes          = (float) ($orderOp->setup_time_planned ?? 0);
+                        $batchQty              = (float) ($orderOp->transfer_batch_quantity ?? 0);
+                        $lagMinutes            = (float) ($orderOp->transfer_lag_minutes ?? 0);
+                        $orderQty              = (float) ($order->quantity_ordered ?? 1);
+                        $effectiveBatchQty     = min($batchQty, $orderQty);
+                        $firstBatchRunDuration = (float) $orderOp->processing_time_planned * $effectiveBatchQty;
+                        $totalOffsetMinutes    = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
 
-            if ($successor) {
-                $orderOp = $schedOp->orderOperation;
-                if ($orderOp && (bool) $orderOp->overlap_enabled) {
-                    $setupMinutes = (float) ($orderOp->setup_time_planned ?? 0);
-                    $batchQty = (float) ($orderOp->transfer_batch_quantity ?? 0);
-                    $lagMinutes = (float) ($orderOp->transfer_lag_minutes ?? 0);
-                    $orderQty = (float) ($order->quantity_ordered ?? 1);
-                    $effectiveBatchQty = min($batchQty, $orderQty);
-                    $firstBatchRunDuration = (float) $orderOp->processing_time_planned * $effectiveBatchQty;
-                    $totalOffsetMinutes = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+                        $earliestSuccessorStart = $this->schedulingService->addWorkingMinutes(
+                            $schedOp->work_center_id,
+                            $newStart,
+                            $totalOffsetMinutes
+                        );
 
-                    $earliestSuccessorStart = $this->schedulingService->addWorkingMinutes(
-                        $schedOp->work_center_id,
-                        $newStart,
-                        $totalOffsetMinutes
-                    );
-
-                    if ($successor->planned_start->lt($earliestSuccessorStart)) {
-                        throw new InvalidArgumentException("Reschedule conflict: Moving this operation delays predecessor transfer-ready time beyond successor start.");
-                    }
-                } else {
-                    if ($newFinish->gt($successor->planned_start)) {
-                        throw new InvalidArgumentException("Reschedule conflict: Finishes after successor starts (Successor starts at: {$successor->planned_start->toDateTimeString()}).");
+                        if ($successor->planned_start->lt($earliestSuccessorStart)) {
+                            throw new InvalidArgumentException("Isolated move conflict: Moving this operation delays transfer-ready time beyond successor start ({$successor->planned_start->toDateTimeString()}).");
+                        }
+                    } else {
+                        if ($newFinish->gt($successor->planned_start)) {
+                            throw new InvalidArgumentException("Isolated move conflict: Operation finishes after successor starts ({$successor->planned_start->toDateTimeString()}).");
+                        }
                     }
                 }
             }
 
-            // Validate Working Day & Holiday rules
-            $wc = $schedOp->workCenter;
-            $calendar = $this->resolveCalendarForWorkCenter($wc, $tenantId);
-            if (!$this->isWorkingDay($calendar, $newStart, $tenantId)) {
-                throw new InvalidArgumentException("Reschedule failed: Target date is not a valid working day on calendar.");
-            }
+            // Save Target Operation
+            $oldStart     = $schedOp->planned_start;
+            $oldFinish    = $schedOp->planned_finish;
+            $oldMachineId = $schedOp->machine_id;
 
-            // Validate Machine Eligibility & Downtime Overlaps
-            $targetMachineId = $newMachineId ?: $schedOp->machine_id;
-            if ($targetMachineId) {
-                $machine = Machine::where('tenant_id', $tenantId)->findOrFail($targetMachineId);
-                if ($machine->work_center_id !== $schedOp->work_center_id) {
-                    throw new InvalidArgumentException("Reschedule failed: Selected machine does not belong to Work Center.");
-                }
-                $this->validateMachineAvailability($tenantId, $targetMachineId, $newStart, $newFinish, $schedOp->id);
-            }
-
-            // Update
-            $schedOp->planned_start = $newStart;
-            $schedOp->planned_finish = $newFinish;
-            if ($newMachineId) {
-                $schedOp->machine_id = $newMachineId;
-            }
+            $schedOp->planned_start    = $newStart;
+            $schedOp->planned_finish   = $newFinish;
+            $schedOp->machine_id       = $targetMachineId;
+            $schedOp->manual_override  = true;
+            $schedOp->last_adjusted_at = now();
+            $schedOp->last_adjusted_by = $userId ?: (auth()->id() ?: 1);
+            $schedOp->version           = (int) $schedOp->version + 1;
             $schedOp->save();
 
-            // Sync to the Order Operation timings
-            $orderOp = $schedOp->orderOperation;
-            if ($orderOp) {
-                $orderOp->update([
-                    'setup_time_planned' => $orderOp->setup_time_planned, // remains standard
-                ]);
-            }
+            ProductionScheduleChangeLog::create([
+                'tenant_id'                        => $tenantId,
+                'production_schedule_id'           => $schedOp->production_schedule_id,
+                'production_schedule_operation_id' => $schedOp->id,
+                'change_type'                      => $newMachineId && $newMachineId !== $oldMachineId
+                    ? ProductionScheduleChangeLog::CHANGE_TYPE_MACHINE_REASSIGN
+                    : ProductionScheduleChangeLog::CHANGE_TYPE_MANUAL_SHIFT,
+                'shift_mode'                       => $shiftMode,
+                'old_machine_id'                   => $oldMachineId,
+                'new_machine_id'                   => $targetMachineId,
+                'old_planned_start'                => $oldStart,
+                'new_planned_start'                => $newStart,
+                'old_planned_finish'               => $oldFinish,
+                'new_planned_finish'               => $newFinish,
+                'reason'                           => $reason ?: 'Manual planner shift',
+                'changed_by'                       => $userId ?: (auth()->id() ?: 1),
+            ]);
 
-            // Write Timeline Audit Event log
-            $newMachineName = $schedOp->machine ? $schedOp->machine->name : 'N/A';
-            $userName = auth()->user() ? auth()->user()->name : 'System';
+            $adjustedCount = 1;
+
+            if ($shiftMode === ProductionScheduleChangeLog::SHIFT_MODE_RIPPLE) {
+                // Downstream Ripple recalculation
+                $successors = ProductionScheduleOperation::lockForUpdate()
+                    ->where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->where('sequence', '>', $schedOp->sequence)
+                    ->whereNotIn('status', ['cancelled', 'skipped'])
+                    ->orderBy('sequence', 'asc')
+                    ->get();
+
+                $scheduledMap = [
+                    $schedOp->sequence => [
+                        'sequence'       => $schedOp->sequence,
+                        'parallel_group' => $schedOp->orderOperation?->parallel_group,
+                        'is_parallel'    => $schedOp->orderOperation?->is_parallel,
+                        'planned_start'  => $schedOp->planned_start->copy(),
+                        'planned_finish' => $schedOp->planned_finish->copy(),
+                        'work_center_id' => $schedOp->work_center_id,
+                        'order_op'       => $schedOp->orderOperation,
+                    ],
+                ];
+
+                foreach ($successors as $succOp) {
+                    $isSuccFrozen = $succOp->locked || $succOp->isTerminal() || $succOp->isRunning() || $succOp->isPaused();
+
+                    $earliestStart = $this->schedulingService->calculateEarliestStartFromPredecessors(
+                        $scheduledMap,
+                        $succOp->sequence,
+                        $succOp->orderOperation?->parallel_group,
+                        (bool) $succOp->orderOperation?->is_parallel,
+                        $newStart,
+                        (float) ($order->quantity_ordered ?? 1)
+                    );
+
+                    if ($isSuccFrozen) {
+                        if ($succOp->planned_start->lt($earliestStart)) {
+                            throw new \LogicException(json_encode([
+                                'success'               => false,
+                                'code'                  => 'LOCKED_OPERATION_CONFLICT',
+                                'blocking_operation_id' => $succOp->id,
+                                'message'               => "LOCKED_OPERATION_CONFLICT: Operation sequence [{$succOp->sequence}] ({$succOp->orderOperation?->name}) is locked/running and prevents downstream ripple propagation (Requires start at {$earliestStart->toDateTimeString()}, locked at {$succOp->planned_start->toDateTimeString()}).",
+                            ]));
+                        }
+                        $scheduledMap[$succOp->sequence] = [
+                            'sequence'       => $succOp->sequence,
+                            'parallel_group' => $succOp->orderOperation?->parallel_group,
+                            'is_parallel'    => $succOp->orderOperation?->is_parallel,
+                            'planned_start'  => $succOp->planned_start->copy(),
+                            'planned_finish' => $succOp->planned_finish->copy(),
+                            'work_center_id' => $succOp->work_center_id,
+                            'order_op'       => $succOp->orderOperation,
+                        ];
+                        continue;
+                    }
+
+                    if ($succOp->planned_start->lt($earliestStart)) {
+                        $succDuration = (float) $succOp->planned_duration_minutes;
+                        $succFinish   = $this->schedulingService->addWorkingMinutes($succOp->work_center_id, $earliestStart, $succDuration);
+
+                        if ($succOp->machine_id) {
+                            $this->validateMachineAvailability($tenantId, $succOp->machine_id, $earliestStart, $succFinish, $succOp->id);
+                        }
+
+                        $succOldStart  = $succOp->planned_start;
+                        $succOldFinish = $succOp->planned_finish;
+
+                        $succOp->planned_start    = $earliestStart;
+                        $succOp->planned_finish   = $succFinish;
+                        $succOp->last_adjusted_at = now();
+                        $succOp->last_adjusted_by = $userId ?: (auth()->id() ?: 1);
+                        $succOp->version           = (int) $succOp->version + 1;
+                        $succOp->save();
+
+                        ProductionScheduleChangeLog::create([
+                            'tenant_id'                        => $tenantId,
+                            'production_schedule_id'           => $succOp->production_schedule_id,
+                            'production_schedule_operation_id' => $succOp->id,
+                            'change_type'                      => ProductionScheduleChangeLog::CHANGE_TYPE_RIPPLE_SHIFT,
+                            'shift_mode'                       => ProductionScheduleChangeLog::SHIFT_MODE_RIPPLE,
+                            'old_machine_id'                   => $succOp->machine_id,
+                            'new_machine_id'                   => $succOp->machine_id,
+                            'old_planned_start'                => $succOldStart,
+                            'new_planned_start'                => $earliestStart,
+                            'old_planned_finish'               => $succOldFinish,
+                            'new_planned_finish'               => $succFinish,
+                            'reason'                           => "Ripple shift from operation sequence [{$schedOp->sequence}]",
+                            'changed_by'                       => $userId ?: (auth()->id() ?: 1),
+                        ]);
+
+                        $adjustedCount++;
+                    }
+
+                    $scheduledMap[$succOp->sequence] = [
+                        'sequence'       => $succOp->sequence,
+                        'parallel_group' => $succOp->orderOperation?->parallel_group,
+                        'is_parallel'    => $succOp->orderOperation?->is_parallel,
+                        'planned_start'  => $succOp->planned_start->copy(),
+                        'planned_finish' => $succOp->planned_finish->copy(),
+                        'work_center_id' => $succOp->work_center_id,
+                        'order_op'       => $succOp->orderOperation,
+                    ];
+                }
+            }
 
             app(ProductionEventService::class)->writeEvent($tenantId, [
                 'production_order_id' => $schedOp->production_order_id,
-                'event_type'          => 'Schedule Rescheduled',
-                'title'               => 'Operation Rescheduled',
-                'description'         => "Rescheduled sequence {$schedOp->sequence} by {$userName}. Reason: {$reason}. " .
-                                         "Old Slot: {$oldStart} to {$oldFinish} (Machine: {$oldMachineName}). " .
-                                         "New Slot: {$newStart->toDateTimeString()} to {$newFinish->toDateTimeString()} (Machine: {$newMachineName}).",
+                'event_type'          => 'Schedule Operation Adjusted',
+                'title'               => 'Schedule Adjusted (' . strtoupper($shiftMode) . ')',
+                'description'         => "Schedule operation sequence [{$schedOp->sequence}] rescheduled. Total operations updated: {$adjustedCount}.",
                 'severity'            => 'info',
                 'event_source'        => 'CapacityPlanningService',
-                'triggered_by'        => $userId,
+                'triggered_by'        => $userId ?: (auth()->id() ?: 1),
             ]);
+
+            return [
+                'success'                   => true,
+                'message'                   => "Operation sequence [{$schedOp->sequence}] rescheduled successfully ({$shiftMode} mode).",
+                'adjusted_operations_count' => $adjustedCount,
+                'schedule_id'               => $schedOp->production_schedule_id,
+            ];
         });
     }
 

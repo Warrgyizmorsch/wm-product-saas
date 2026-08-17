@@ -382,8 +382,4 @@
                 }
             }
         </script>
-    @endsection
-    }
-    }
-    </script>
 @endsection

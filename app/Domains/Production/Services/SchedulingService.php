@@ -51,10 +51,10 @@ class SchedulingService
             if ($shifts->isEmpty()) {
                 $shifts = collect([
                     new ProductionShift([
-                        'name'          => 'Standard Shift',
-                        'code'          => 'STD',
-                        'start_time'    => '08:00:00',
-                        'end_time'      => '16:00:00',
+                        'name' => 'Standard Shift',
+                        'code' => 'STD',
+                        'start_time' => '08:00:00',
+                        'end_time' => '16:00:00',
                         'break_minutes' => 0,
                     ])
                 ]);
@@ -258,6 +258,8 @@ class SchedulingService
                     'priority' => $priority,
                     'planned_start' => $plannedStart,
                     'planned_finish' => $plannedFinish,
+                    'baseline_start' => $plannedStart,
+                    'baseline_finish' => $plannedFinish,
                     'planned_duration_minutes' => $duration,
                     'status' => $op->sequence === $operations->first()->sequence
                         ? ProductionScheduleOperation::STATUS_READY
@@ -434,6 +436,8 @@ class SchedulingService
                     'priority' => $priority,
                     'planned_start' => $plannedStart,
                     'planned_finish' => $plannedFinish,
+                    'baseline_start' => $plannedStart,
+                    'baseline_finish' => $plannedFinish,
                     'planned_duration_minutes' => $duration,
                     'status' => ProductionScheduleOperation::STATUS_WAITING,
                     'warnings' => $warnings,
@@ -522,7 +526,9 @@ class SchedulingService
                 $isParallel = $orderOp ? $orderOp->is_parallel : false;
                 $parallelGroup = $orderOp ? $orderOp->parallel_group : null;
 
-                if ($op->locked) {
+                $isFrozen = $op->locked || $op->isTerminal() || $op->isRunning() || $op->isPaused();
+
+                if ($isFrozen) {
                     $scheduledData[] = [
                         'sequence' => $op->sequence,
                         'parallel_group' => $parallelGroup,
@@ -671,7 +677,7 @@ class SchedulingService
                 ->get();
 
             foreach ($downtimes as $dt) {
-                $bookings->push((object)[
+                $bookings->push((object) [
                     'planned_start' => Carbon::parse($dt->start_time),
                     'planned_finish' => Carbon::parse($dt->end_time),
                 ]);
@@ -1069,6 +1075,7 @@ class SchedulingService
             ->whereHas('schedule', fn($q) => $q->where('tenant_id', $tenantId)->whereIn('status', ['scheduled', 'released', 'in_progress']))
             ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
             ->whereNotNull('machine_id')
+            ->with(['machine', 'order', 'orderOperation'])
             ->orderBy('machine_id')
             ->orderBy('planned_start')
             ->get();
@@ -1081,7 +1088,13 @@ class SchedulingService
                 $next = $machineOps[$i + 1];
 
                 if ($curr->planned_finish->gt($next->planned_start)) {
-                    $conflicts[] = "Overlap on machine #{$machineId}: Schedule Op #{$curr->id} overlaps with Op #{$next->id}.";
+                    $mName = $curr->machine ? "{$curr->machine->name} ({$curr->machine->code})" : "Machine #{$machineId}";
+                    $currOpName = $curr->orderOperation ? $curr->orderOperation->name : "Op #{$curr->sequence}";
+                    $currOrder = $curr->order ? "Order #{$curr->order->order_number}" : "Schedule Op #{$curr->id}";
+                    $nextOpName = $next->orderOperation ? $next->orderOperation->name : "Op #{$next->sequence}";
+                    $nextOrder = $next->order ? "Order #{$next->order->order_number}" : "Schedule Op #{$next->id}";
+
+                    $conflicts[] = "Overlap on machine {$mName}: {$currOrder} (Op #{$curr->sequence} - {$currOpName}) overlaps with {$nextOrder} (Op #{$next->sequence} - {$nextOpName}).";
                 }
             }
         }
@@ -1934,8 +1947,8 @@ class SchedulingService
             }
             $hasQuantity = ProductionOrderOperation::whereIn('id', $opIds)
                 ->where(fn($q) => $q->where('quantity_produced', '>', 0)
-                                   ->orWhere('quantity_rejected', '>', 0)
-                                   ->orWhere('quantity_scrapped', '>', 0))
+                    ->orWhere('quantity_rejected', '>', 0)
+                    ->orWhere('quantity_scrapped', '>', 0))
                 ->exists();
             if ($hasQuantity) {
                 return true;
@@ -1973,7 +1986,7 @@ class SchedulingService
                     ProductionScheduleOperation::STATUS_RUNNING,
                     ProductionScheduleOperation::STATUS_PAUSED,
                     ProductionScheduleOperation::STATUS_COMPLETED
-                ]) || !is_null($op->actual_start) || !is_null($op->actual_finish);
+                ]) || !is_null($op->actual_start) || !is_null($op->actual_finish) || (bool) $op->locked;
 
                 if ($isFrozen) {
                     $frozenOpIds[] = $op->id;

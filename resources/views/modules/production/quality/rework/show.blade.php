@@ -47,8 +47,21 @@
                     </strong>
                 </div>
             </div>
-            <div>
-                <span class="badge bg-soft-primary text-primary px-3 py-1.5 rounded-pill text-uppercase">{{ $rework->status }}</span>
+            <div class="d-flex align-items-center gap-2">
+                @if(in_array($rework->status, ['draft', 'scheduled', 'running']))
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#failReworkModal">
+                        <i class="feather-x-circle me-1"></i>Fail Rework &amp; Move to Scrap
+                    </button>
+                @endif
+                @php
+                    $badgeClass = match($rework->status) {
+                        'completed' => 'bg-soft-success text-success',
+                        'failed' => 'bg-soft-danger text-danger',
+                        'running' => 'bg-soft-primary text-primary',
+                        default => 'bg-soft-secondary text-secondary',
+                    };
+                @endphp
+                <span class="badge {{ $badgeClass }} px-3 py-1.5 rounded-pill text-uppercase">{{ $rework->status === 'failed' ? 'FAILED / SCRAPPED' : $rework->status }}</span>
             </div>
         </div>
 
@@ -141,4 +154,27 @@
             </div>
         </div>
     </div>
+
+    {{-- Fail Rework Confirmation Modal --}}
+    @if(in_array($rework->status, ['draft', 'scheduled', 'running']))
+        <x-ui.modal 
+            id="failReworkModal" 
+            title="<span class='text-danger fw-bold'><i class='feather-alert-triangle me-2'></i>Fail Rework &amp; Move to Scrap</span>" 
+            :centered="true" 
+            formAction="{{ route('production.quality.rework.fail', $rework->id) }}" 
+            submitText="Confirm Failure &amp; Scrap">
+            
+            <div class="alert alert-soft-warning border-warning-subtle mb-3 fs-12">
+                <i class="feather-alert-octagon me-1"></i>
+                <strong>Warning:</strong> This action will permanently convert the unresolved rework quantity to <strong>Scrap</strong>. The quantity will <strong>not</strong> return to available production output.
+            </div>
+
+            <x-ui.textarea 
+                name="reason" 
+                label="Failure Reason / Remarks" 
+                placeholder="Provide detailed explanation why rework attempt failed..." 
+                :required="true" 
+                rows="3" />
+        </x-ui.modal>
+    @endif
 @endsection

@@ -385,11 +385,32 @@
 
                 const targetCol = this.closest('.kanban-column');
                 const newStatus = targetCol.getAttribute('data-status');
+                const oldStatus = originalParent ? originalParent.closest('.kanban-column').getAttribute('data-status') : null;
                 const leadId = draggedCard.getAttribute('data-lead-id');
                 const companyName = draggedCard.getAttribute('data-company-name') || ('Lead #' + leadId);
                 const hasAccountDeal = draggedCard.getAttribute('data-has-account-deal') === '1';
 
-                // Guard: Direct Won conversion blocked if Account & Deal not created yet
+                // Guard 1: Won status lead is permanently locked! Status cannot be changed from Won to any other status
+                if (oldStatus === 'Won' && newStatus !== 'Won') {
+                    // Revert card immediately back to Won column box!
+                    if (originalNextSibling) {
+                        originalParent.insertBefore(draggedCard, originalNextSibling);
+                    } else {
+                        originalParent.appendChild(draggedCard);
+                    }
+                    recalculateTotals();
+
+                    // Open Warning Modal Alert
+                    confirmAction({
+                        title: 'Action Blocked: Won Status Locked',
+                        message: 'Lead "' + companyName + '" status is Won and permanently locked. It cannot be changed to ' + newStatus + '.',
+                        variant: 'warning',
+                        confirmText: 'Got It'
+                    });
+                    return false;
+                }
+
+                // Guard 2: Direct Won conversion blocked if Account & Deal not created yet
                 if (newStatus === 'Won' && !hasAccountDeal) {
                     // Revert card immediately to original column box!
                     if (originalNextSibling) {

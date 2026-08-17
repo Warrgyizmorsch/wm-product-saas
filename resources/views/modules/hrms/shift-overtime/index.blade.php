@@ -244,29 +244,31 @@
         </div>
     @endif
 
-    <div class="row pt-4 px-4">
-        {{-- Tabs Header (matching Leave Module styling) --}}
-        <div class="col-12 mb-2">
-            <ul class="nav gap-2 border-bottom pb-2" id="shiftOvertimeTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link @if($activeTab === 'shift') active @endif" id="tab-shift" data-bs-toggle="tab" data-bs-target="#shift-pane" type="button" role="tab" aria-controls="shift-pane" aria-selected="@if($activeTab === 'shift') true @else false @endif">
-                        <i class="feather-git-pull-request me-1"></i> {{ __('hrms.shift_change.title') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link @if($activeTab === 'overtime') active @endif" id="tab-overtime" data-bs-toggle="tab" data-bs-target="#overtime-pane" type="button" role="tab" aria-controls="overtime-pane" aria-selected="@if($activeTab === 'overtime') true @else false @endif">
-                        <i class="feather-clock me-1"></i> {{ __('hrms.overtime.title') }}
-                    </button>
-                </li>
-            </ul>
-        </div>
+    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        <div class="row">
+            {{-- Tabs Header (matching Leave Module styling) --}}
+            <div class="col-12 mb-2">
+                <ul class="nav gap-2 border-bottom pb-2" id="shiftOvertimeTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @if($activeTab === 'shift') active @endif" id="tab-shift" data-bs-toggle="tab" data-bs-target="#shift-pane" type="button" role="tab" aria-controls="shift-pane" aria-selected="@if($activeTab === 'shift') true @else false @endif">
+                            <i class="feather-git-pull-request me-1"></i> {{ __('hrms.shift_change.title') }}
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @if($activeTab === 'overtime') active @endif" id="tab-overtime" data-bs-toggle="tab" data-bs-target="#overtime-pane" type="button" role="tab" aria-controls="overtime-pane" aria-selected="@if($activeTab === 'overtime') true @else false @endif">
+                            <i class="feather-clock me-1"></i> {{ __('hrms.overtime.title') }}
+                        </button>
+                    </li>
+                </ul>
+            </div>
 
-        {{-- Tab Content --}}
-        <div class="col-12">
-            <div class="tab-content" id="shiftOvertimeTabContent">
-                
-                @include('modules.hrms.shift-overtime.tabs.shift')
-                @include('modules.hrms.shift-overtime.tabs.overtime')
+            {{-- Tab Content --}}
+            <div class="col-12">
+                <div class="tab-content" id="shiftOvertimeTabContent">
+                    
+                    @include('modules.hrms.shift-overtime.tabs.shift')
+                    @include('modules.hrms.shift-overtime.tabs.overtime')
+                </div>
             </div>
         </div>
     </div>

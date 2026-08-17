@@ -409,4 +409,67 @@ class MesOperationBatchVisibilityTest extends TestCase
         $this->assertCount(1, $op10Queue['active']);
         $this->assertEquals($batch1->id, $op10Queue['active'][0]['batch']->id);
     }
+
+    /**
+     * 8. Test Batch Queue Tracks Scrapped, Rejected, Pending Rework, and Rework Recovery (e.g. 4 planned, 2 produced, 1 rejected, 1 scrapped).
+     */
+    public function test_batch_queue_tracks_scrap_and_processed_quantities(): void
+    {
+        [$order, $op10] = $this->createOrderWith3Operations(4.0);
+        $batch = $this->batchService->createBatch($this->tenant->id, $order->id, $this->product->id, 4.0, ProductionBatch::STATUS_IN_PROGRESS);
+
+        // Log progress: 2 produced, 1 rejected, 1 scrapped (out of 4 planned)
+        ProductionOrderProgressLog::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'operation_id' => $op10->id,
+            'production_batch_id' => $batch->id,
+            'operator_id' => $this->user->id,
+            'quantity_produced' => 2.0,
+            'quantity_rejected' => 1.0,
+            'quantity_scrapped' => 1.0,
+            'logged_at' => now(),
+            'recorded_at' => now(),
+        ]);
+
+        $op10Queue = $this->batchService->getOperationBatchQueue($op10);
+
+        // Active queue: Batch has 1 pending rejected unit requiring rework (status = REWORK)
+        $this->assertCount(1, $op10Queue['active']);
+        $item = $op10Queue['active'][0];
+        $this->assertEquals(4.0, $item['planned_quantity']);
+        $this->assertEquals(2.0, $item['processed_at_operation']);
+        $this->assertEquals(1.0, $item['rejected_at_operation']);
+        $this->assertEquals(1.0, $item['pending_rejected_at_operation']);
+        $this->assertEquals(0.0, $item['rework_completed_at_operation']);
+        $this->assertEquals(1.0, $item['scrap_at_operation']);
+        $this->assertEquals('REWORK', $item['display_status']);
+
+        // Now complete rework on the 1 rejected unit
+        $wip = $this->wipService->initializeWip($order->id, $batch->id);
+        \App\Domains\Production\Models\ProductionWipTransaction::create([
+            'tenant_id' => $this->tenant->id,
+            'wip_id' => $wip->id,
+            'production_order_id' => $order->id,
+            'production_batch_id' => $batch->id,
+            'from_operation_id' => $op10->routing_operation_id,
+            'to_operation_id' => $op10->routing_operation_id,
+            'transaction_type' => 'rework_completed',
+            'quantity' => 1.0,
+            'good_quantity' => 1.0,
+            'rework_quantity' => -1.0,
+            'transaction_at' => now(),
+            'created_at' => now(),
+        ]);
+
+        $op10QueueFull = $this->batchService->getOperationBatchQueue($op10);
+        $this->assertCount(0, $op10QueueFull['active']);
+        $this->assertCount(1, $op10QueueFull['waiting_transfer']);
+        $itemCompleted = $op10QueueFull['waiting_transfer'][0];
+        $this->assertEquals(3.0, $itemCompleted['processed_at_operation']); // 2 initial + 1 recovered
+        $this->assertEquals(1.0, $itemCompleted['rejected_at_operation']);
+        $this->assertEquals(1.0, $itemCompleted['rework_completed_at_operation']);
+        $this->assertEquals(0.0, $itemCompleted['pending_rejected_at_operation']);
+        $this->assertEquals(1.0, $itemCompleted['scrap_at_operation']);
+    }
 }

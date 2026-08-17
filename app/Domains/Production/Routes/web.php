@@ -143,6 +143,21 @@ Route::prefix('production')
         // Static named routes must be registered before the resource to avoid conflicts
         Route::get('schedules/calendar', [ProductionScheduleController::class, 'calendarView'])->name('schedules.calendar');
         Route::get('schedules/work-center-view', [ProductionScheduleController::class, 'workCenterView'])->name('schedules.work-center-view');
+        Route::get('schedules/dispatch-board', [ProductionScheduleController::class, 'dispatchBoardView'])->name('schedules.dispatch-board');
+        Route::get('schedules/dispatch-board/data', [ProductionScheduleController::class, 'dispatchBoardData'])->name('schedules.dispatch-board.data');
+        Route::get('schedules/{schedule}/change-history', [ProductionScheduleController::class, 'changeHistory'])->name('schedules.change-history');
+        Route::get('schedules/{schedule}/pre-release-check', [ProductionScheduleController::class, 'preReleaseCheck'])->name('schedules.pre-release-check');
+        Route::post('schedules/operations/{operation}/adjust', [ProductionScheduleController::class, 'adjustOperation'])->name('schedules.operations.adjust');
+        Route::post('schedules/operations/{operation}/toggle-lock', [ProductionScheduleController::class, 'toggleLock'])->name('schedules.operations.toggle-lock');
+        Route::post('schedules/capacity-leveling/preview', [ProductionScheduleController::class, 'previewCapacityLeveling'])->name('schedules.capacity-leveling.preview');
+        Route::post('schedules/capacity-leveling/apply', [ProductionScheduleController::class, 'applyCapacityLeveling'])->name('schedules.capacity-leveling.apply');
+        Route::get('schedules/scenarios', [ProductionScheduleController::class, 'scenariosIndex'])->name('schedules.scenarios.index');
+        Route::post('schedules/scenarios', [ProductionScheduleController::class, 'storeScenario'])->name('schedules.scenarios.store');
+        Route::post('schedules/scenarios/{scenario}/recalculate', [ProductionScheduleController::class, 'recalculateScenario'])->name('schedules.scenarios.recalculate');
+        Route::post('schedules/scenarios/{scenario}/level-capacity', [ProductionScheduleController::class, 'levelScenarioCapacity'])->name('schedules.scenarios.level-capacity');
+        Route::get('schedules/scenarios/{scenario}/compare', [ProductionScheduleController::class, 'compareScenario'])->name('schedules.scenarios.compare');
+        Route::post('schedules/scenarios/{scenario}/promote', [ProductionScheduleController::class, 'promoteScenario'])->name('schedules.scenarios.promote');
+        Route::post('schedules/scenarios/{scenario}/discard', [ProductionScheduleController::class, 'discardScenario'])->name('schedules.scenarios.discard');
         Route::post('schedules/{schedule}/release', [ProductionScheduleController::class, 'release'])->name('schedules.release');
         Route::post('schedules/{schedule}/cancel', [ProductionScheduleController::class, 'cancel'])->name('schedules.cancel');
         Route::post('schedules/{schedule}/reschedule-start', [ProductionScheduleController::class, 'rescheduleStart'])->name('schedules.reschedule-start');
@@ -237,6 +252,7 @@ Route::prefix('production')
         // ── Phase 4 Quality Management ──────────────────────────────────────
         Route::get('quality/dashboard', [QualityDashboardController::class, 'index'])->name('quality.dashboard');
 
+        Route::post('quality/quick-inspection', [QualityInspectionController::class, 'operatorQuickInspection'])->name('quality.inspections.quick');
         Route::post('quality/inspections/{id}/results', [QualityInspectionController::class, 'saveResults'])->name('quality.inspections.results');
         Route::post('quality/inspections/{id}/approve', [QualityInspectionController::class, 'approve'])->name('quality.inspections.approve');
         Route::resource('quality/inspections', QualityInspectionController::class)->only(['index', 'create', 'store', 'show']);
@@ -251,6 +267,7 @@ Route::prefix('production')
 
         Route::post('quality/rework/ops/{id}/start', [ReworkController::class, 'startOp'])->name('quality.rework.ops.start');
         Route::post('quality/rework/ops/{id}/complete', [ReworkController::class, 'completeOp'])->name('quality.rework.ops.complete');
+        Route::post('quality/rework/{id}/fail', [ReworkController::class, 'fail'])->name('quality.rework.fail');
         Route::resource('quality/rework', ReworkController::class)->only(['index', 'show']);
 
         Route::post('quality/scrap/{id}/approve', [ScrapController::class, 'approve'])->name('quality.scrap.approve');

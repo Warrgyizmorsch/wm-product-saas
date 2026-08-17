@@ -8,6 +8,14 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
+        <a href="{{ route('production.schedules.dispatch-board', ['schedule_id' => $schedule->id]) }}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5">
+            <i class="feather-grid"></i> Open Dispatch Board
+        </a>
+
+        <a href="{{ route('production.schedules.change-history', $schedule->id) }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1.5">
+            <i class="feather-clock"></i> History
+        </a>
+
         @if($schedule->isScheduled())
             <form method="POST" action="{{ route('production.schedules.release', $schedule->id) }}" class="d-inline">
                 @csrf

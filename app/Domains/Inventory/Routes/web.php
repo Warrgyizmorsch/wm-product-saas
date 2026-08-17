@@ -15,6 +15,7 @@ use App\Domains\Inventory\Controllers\StockReservationController;
 use App\Domains\Sales\Controllers\MaterialRequirementController;
 use App\Domains\Sales\Controllers\MaterialRequestController;
 use App\Domains\Sales\Controllers\DispatchOrderController;
+use App\Domains\Production\Controllers\MrpShortageController;
 
 Route::prefix('inventory')
     ->as('inventory.')
@@ -96,6 +97,11 @@ Route::prefix('inventory')
         Route::post('material-requirements/{delivery}/dispatch', [MaterialRequirementController::class, 'dispatch'])->name('material-requirements.dispatch');
         Route::post('material-requirements/{delivery}/dispatch-order', [MaterialRequirementController::class, 'storeDispatchOrder'])->name('material-requirements.dispatch-order.store');
         Route::post('material-requirements/{delivery}/deliver', [MaterialRequirementController::class, 'deliver'])->name('material-requirements.deliver');
+
+        // MRP & Shortage Analysis Routes (/inventory/mrp-shortage)
+        Route::get('mrp-shortage', [MrpShortageController::class, 'index'])->name('mrp-shortage.index');
+        Route::get('mrp-shortage/calculate', [MrpShortageController::class, 'calculate'])->name('mrp-shortage.calculate');
+        Route::post('mrp-shortage/generate-pr', [MrpShortageController::class, 'generatePr'])->name('mrp-shortage.generate-pr');
 
         // Material Requests (Prod) Routes (/inventory/material-requests)
         Route::get('material-requests', [MaterialRequestController::class, 'index'])->name('material-requests.index');
