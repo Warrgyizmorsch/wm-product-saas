@@ -52,6 +52,10 @@
         </a>
     @endif
 
+    @if(isset($extraActions))
+        {{ $extraActions }}
+    @endif
+
     @if(isset($slot) && trim($slot) !== '')
         <div class="dropdown" id="{{ $dropdownId }}">
             <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" data-offset="{{ $offset }}" title="More Actions" data-bs-toggle="tooltip">
