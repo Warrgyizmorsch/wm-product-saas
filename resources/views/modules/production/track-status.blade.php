@@ -323,7 +323,7 @@
     <div class="row g-4 mb-4">
         <!-- Overall Progress Card -->
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);">
+            <div class="card border-0 shadow-sm bg-primary text-white">
                 <div class="card-body p-4 text-white">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 class="text-uppercase text-white-50 fw-bold fs-12 mb-0">Overall Completion</h6>
@@ -443,7 +443,7 @@
                             <span class="badge bg-soft-primary text-primary px-3 py-1 fs-12">Production Module</span>
                         </div>
                         <div class="table-responsive">
-                            <table class="table mb-0 align-middle table-hover">
+                            <x-ui.odoo-form-ui type="table">
                                 <thead class="table-light fs-11 text-uppercase text-muted">
                                     <tr>
                                         <th class="ps-4">Description</th>
@@ -489,7 +489,7 @@
                                         </tr>
                                     @endforelse
                                 </tbody>
-                            </table>
+                            </x-ui.odoo-form-ui>
                         </div>
                     </div>
                     @php $isFirst = false; @endphp

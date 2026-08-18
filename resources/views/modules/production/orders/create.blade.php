@@ -257,7 +257,7 @@
                         <span class="fs-12 text-muted">{{ __('production.stock_warehouse') }}: <strong id="bom-preview-warehouse">—</strong></span>
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-bordered table-striped table-hover align-middle mb-0 fs-13">
+                        <x-ui.odoo-form-ui type="table">
                             <thead class="bg-soft-light text-uppercase fs-11 fw-semibold text-muted">
                                 <tr>
                                     <th style="width: 5%">{{ __('production.sr_no') }}</th>
@@ -275,7 +275,7 @@
                             <tbody id="bom-preview-table-body" class="text-dark">
                                 {{-- Dynamically populated via AJAX --}}
                             </tbody>
-                        </table>
+                        </x-ui.odoo-form-ui>
                     </div>
                 </div>
 

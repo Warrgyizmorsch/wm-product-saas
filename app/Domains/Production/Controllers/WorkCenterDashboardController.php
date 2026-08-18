@@ -3,56 +3,24 @@
 namespace App\Domains\Production\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Domains\Production\Models\ProductionSchedule;
-use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\ProductionScheduleOperation;
+use App\Domains\Production\Models\ProductionSchedule;
+use App\Domains\Production\Repositories\WorkCenterRepositoryInterface;
 
 class WorkCenterDashboardController extends Controller
 {
+    public function __construct(
+        private readonly WorkCenterRepositoryInterface $workCenterRepository
+    ) {
+    }
+
     public function index()
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
 
-        $workCenters = WorkCenter::where('tenant_id', $tenantId)
-            ->active()
-            ->with(['machines'])
-            ->orderBy('name')
-            ->get();
-
-        $wcIds = $workCenters->pluck('id')->toArray();
-
-        // 1. Grouped running counts
-        $runningCounts = ProductionScheduleOperation::where('tenant_id', $tenantId)
-            ->whereIn('work_center_id', $wcIds)
-            ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
-            ->selectRaw('work_center_id, count(*) as count')
-            ->groupBy('work_center_id')
-            ->pluck('count', 'work_center_id');
-
-        // 2. Grouped waiting counts
-        $waitingCounts = ProductionScheduleOperation::where('tenant_id', $tenantId)
-            ->whereIn('work_center_id', $wcIds)
-            ->where('status', ProductionScheduleOperation::STATUS_READY)
-            ->selectRaw('work_center_id, count(*) as count')
-            ->groupBy('work_center_id')
-            ->pluck('count', 'work_center_id');
-
-        // 3. Grouped completed today counts
-        $completedTodayCounts = ProductionScheduleOperation::where('tenant_id', $tenantId)
-            ->whereIn('work_center_id', $wcIds)
-            ->where('status', ProductionScheduleOperation::STATUS_COMPLETED)
-            ->whereDate('actual_finish', today())
-            ->selectRaw('work_center_id, count(*) as count')
-            ->groupBy('work_center_id')
-            ->pluck('count', 'work_center_id');
-
-        // Attach summary stats to each work center
-        $workCenters->each(function ($wc) use ($runningCounts, $waitingCounts, $completedTodayCounts) {
-            $wc->runningCount   = $runningCounts->get($wc->id, 0);
-            $wc->waitingCount   = $waitingCounts->get($wc->id, 0);
-            $wc->completedToday = $completedTodayCounts->get($wc->id, 0);
-        });
+        $workCenters = $this->workCenterRepository->getDashboardWorkCenters($tenantId);
 
         return view('modules.production.mes.work-center-dashboard', compact('workCenters'));
     }

@@ -352,85 +352,56 @@
         </div>
     </div>
 
+    @php
+        $rejectTitle = '<i class="feather-x-circle me-2 text-danger"></i>' . __('production.reject_routing_version');
+        $cancelTitle = '<i class="feather-slash me-2 text-dark"></i>' . __('production.cancel_routing_version');
+        $duplicateTitle = '<i class="feather-git-branch me-2 text-primary"></i>' . __('production.duplicate_routing_version');
+    @endphp
+
     <!-- Reject Comment Modal -->
-    <div class="modal fade" id="rejectModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content border-0 shadow-lg">
-                <form action="{{ route('production.routing.reject', $routing->id) }}" method="POST">
-                    @csrf
-                    <div class="modal-header bg-danger text-white border-0 py-3">
-                        <h5 class="modal-title fw-bold" id="rejectModalLabel"><i class="feather-x-circle me-2"></i>{{ __('production.reject_routing_version') }}</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-4">
-                        <x-ui.odoo-form-ui type="textarea" :label="__('production.comments_notes')" name="comments" placeholder="{{ __('production.reject_comments_placeholder') }}" :required="true" rows="4"></x-ui.odoo-form-ui>
-                    </div>
-                    <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                        <button type="submit" class="btn btn-danger">{{ __('production.confirm_rejection') }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    <x-ui.modal
+        id="rejectModal"
+        :title="$rejectTitle"
+        formAction="{{ route('production.routing.reject', $routing->id) }}"
+        formMethod="POST"
+        :submitText="__('production.confirm_rejection')"
+        :closeText="__('production.cancel')"
+        :static="true"
+    >
+        <x-ui.odoo-form-ui type="textarea" :label="__('production.comments_notes')" name="comments" placeholder="{{ __('production.reject_comments_placeholder') }}" :required="true" rows="4"></x-ui.odoo-form-ui>
+    </x-ui.modal>
 
     <!-- Cancel Comment Modal -->
-    <div class="modal fade" id="cancelModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content border-0 shadow-lg">
-                <form action="{{ route('production.routing.cancel', $routing->id) }}" method="POST">
-                    @csrf
-                    <div class="modal-header bg-dark text-white border-0 py-3">
-                        <h5 class="modal-title fw-bold" id="cancelModalLabel"><i class="feather-slash me-2"></i>{{ __('production.cancel_routing_version') }}</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-4">
-                        <x-ui.odoo-form-ui type="textarea" :label="__('production.notes_reasons')" name="comments" placeholder="{{ __('production.cancel_reason_placeholder') }}" :required="true" rows="4"></x-ui.odoo-form-ui>
-                    </div>
-                    <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                        <button type="submit" class="btn btn-dark">{{ __('production.decommission_routing') }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    <x-ui.modal
+        id="cancelModal"
+        :title="$cancelTitle"
+        formAction="{{ route('production.routing.cancel', $routing->id) }}"
+        formMethod="POST"
+        :submitText="__('production.decommission_routing')"
+        :closeText="__('production.cancel')"
+        :static="true"
+    >
+        <x-ui.odoo-form-ui type="textarea" :label="__('production.notes_reasons')" name="comments" placeholder="{{ __('production.cancel_reason_placeholder') }}" :required="true" rows="4"></x-ui.odoo-form-ui>
+    </x-ui.modal>
 
     <!-- Duplicate / Create New Version Modal -->
-    <div class="modal fade" id="duplicateVersionModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="duplicateVersionModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content border-0 shadow-lg">
-                <form action="{{ route('production.routing.duplicate', $routing->id) }}" method="POST">
-                    @csrf
-                    <div class="modal-header bg-brand text-white border-0 py-3">
-                        <h5 class="modal-title fw-bold" id="duplicateVersionModalLabel"><i class="feather-git-branch me-2"></i>{{ __('production.duplicate_routing_version') }}</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-4 text-dark fs-13">
-                        <div class="mb-3 d-flex align-items-center">
-                            <span class="odoo-form-label" style="width: 150px;">{{ __('production.original_version_profile') }}</span>
-                            <span class="fw-bold text-dark fs-14">{{ $routing->version }} ({{ __('production.revision') ?? 'Revision' }} {{ $routing->revision }})</span>
-                        </div>
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.new_version_name')" name="new_version" placeholder="e.g. 1.0.1 or 2.0.0" :value="old('new_version')" :required="true" />
-                        <small class="text-muted d-block mt-2">{{ __('production.duplicate_routing_modal_body') }}</small>
-                    </div>
-                    <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                        <button type="submit" class="btn btn-brand text-white">{{ __('production.create_revision_version') }}</button>
-                    </div>
-                </form>
-            </div>
+    <x-ui.modal
+        id="duplicateVersionModal"
+        :title="$duplicateTitle"
+        formAction="{{ route('production.routing.duplicate', $routing->id) }}"
+        formMethod="POST"
+        :submitText="__('production.create_revision_version')"
+        :closeText="__('production.cancel')"
+        :static="true"
+    >
+        <div class="mb-3 d-flex align-items-center">
+            <span class="odoo-form-label" style="width: 150px;">{{ __('production.original_version_profile') }}</span>
+            <span class="fw-bold text-dark fs-14">{{ $routing->version }} ({{ __('production.revision') ?? 'Revision' }} {{ $routing->revision }})</span>
         </div>
-    </div>
+        
+        <x-ui.odoo-form-ui type="input" :label="__('production.new_version_name')" name="new_version" placeholder="e.g. 1.0.1 or 2.0.0" :value="old('new_version')" :required="true" />
+        <small class="text-muted d-block mt-2">{{ __('production.duplicate_routing_modal_body') }}</small>
+    </x-ui.modal>
 
     <x-ui.confirmation-modal />
-
-    @push('scripts')
-        <script>
-            $(document).ready(function() {
-                $('.modal').appendTo('body');
-            });
-        </script>
-    @endpush
 @endsection

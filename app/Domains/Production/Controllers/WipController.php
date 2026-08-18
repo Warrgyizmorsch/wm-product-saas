@@ -5,6 +5,7 @@ namespace App\Domains\Production\Controllers;
 use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionWip;
 use App\Domains\Production\Models\ProductionWipTransaction;
+use App\Domains\Production\Repositories\ProductionWipRepositoryInterface;
 use App\Domains\Production\Services\ProductionWipService;
 use App\Domains\Inventory\Models\Warehouse;
 use Illuminate\Http\Request;
@@ -13,7 +14,8 @@ use InvalidArgumentException;
 class WipController extends Controller
 {
     public function __construct(
-        private readonly ProductionWipService $wipService
+        private readonly ProductionWipService $wipService,
+        private readonly ProductionWipRepositoryInterface $wipRepository
     ) {
     }
 
@@ -23,14 +25,7 @@ class WipController extends Controller
         $tenantId = require_tenant_id();
 
         // Self-heal: initialize WIP for any existing released or in-progress orders that do not have a WIP card yet
-        $uninitializedOrders = \App\Domains\Production\Models\ProductionOrder::where('tenant_id', $tenantId)
-            ->whereIn('status', ['released', 'in_progress'])
-            ->whereNotExists(function ($query) {
-                $query->select(\Illuminate\Support\Facades\DB::raw(1))
-                    ->from('production_wips')
-                    ->whereColumn('production_wips.production_order_id', 'production_orders.id');
-            })
-            ->get();
+        $uninitializedOrders = $this->wipRepository->getUninitializedOrders($tenantId);
 
         foreach ($uninitializedOrders as $order) {
             try {
@@ -64,47 +59,15 @@ class WipController extends Controller
         }
 
         // Flat card fallback view query
-        $wipQuery = ProductionWip::where('tenant_id', $tenantId)
-            ->with(['order', 'product', 'currentRoutingOperation', 'currentWorkCenter', 'currentMachine', 'batch']);
-
-        if ($search) {
-            $searchTerm = '%' . $search . '%';
-            $wipQuery->where(function ($q) use ($searchTerm) {
-                $q->whereHas('product', fn($p) => $p->where('name', 'like', $searchTerm)->orWhere('sku', 'like', $searchTerm))
-                    ->orWhereHas('order', fn($o) => $o->where('order_number', 'like', $searchTerm));
-            });
-        }
-
-        if ($status) {
-            $wipQuery->where('status', $status);
-        }
-
-        if ($workCenterIdFilter) {
-            $wipQuery->where('current_work_center_id', $workCenterIdFilter);
-        }
-
-        $wips = $wipQuery->orderBy('id', 'desc')->paginate($perPage)->withQueryString();
+        $filters = array_filter([
+            'search' => $search,
+            'status' => $status,
+            'work_center_id' => $workCenterIdFilter,
+        ]);
+        $wips = $this->wipRepository->paginateWip($filters, $perPage)->withQueryString();
 
         // Calculate tenant-scoped summary KPI metrics using aggregate DB selectRaw
-        $summary = ProductionWip::where('tenant_id', $tenantId)
-            ->selectRaw('
-                count(*) as total_count,
-                sum(available_quantity) as total_available,
-                sum(case when status = "active" then 1 else 0 end) as active_count,
-                sum(case when status = "quality_hold" then 1 else 0 end) as hold_count,
-                sum(case when status = "rework" then 1 else 0 end) as rework_count,
-                sum(case when status = "completed" then 1 else 0 end) as completed_count
-            ')
-            ->first();
-
-        $wipSummary = [
-            'total_count' => (int) ($summary->total_count ?? 0),
-            'total_available' => (float) ($summary->total_available ?? 0),
-            'active_count' => (int) ($summary->active_count ?? 0),
-            'hold_count' => (int) ($summary->hold_count ?? 0),
-            'rework_count' => (int) ($summary->rework_count ?? 0),
-            'completed_count' => (int) ($summary->completed_count ?? 0),
-        ];
+        $wipSummary = $this->wipRepository->getWipKpiSummary($tenantId);
 
         $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->orderBy('name')->get();
         $warehouses = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)->orderByDesc('is_default')->get();

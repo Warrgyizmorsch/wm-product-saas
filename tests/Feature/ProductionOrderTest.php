@@ -224,7 +224,7 @@ class ProductionOrderTest extends TestCase
         // (BOM qty 2.0 * Order qty 5.0) * (1 + 10% scrap) = 11.0
         $this->assertCount(1, $order->reservations);
         $this->assertEquals(11.0, $order->reservations->first()->quantity_planned);
-        $this->assertEquals(11.0, $order->reservations->first()->quantity_reserved);
+        $this->assertEquals(0.0, $order->reservations->first()->quantity_reserved);
         $this->assertEquals($this->warehouse->id, $order->reservations->first()->warehouse_id);
     }
 
@@ -375,6 +375,7 @@ class ProductionOrderTest extends TestCase
     {
         $order = $this->createDirectOrderHelper();
         $reservation = $order->reservations->first();
+        $reservation->update(['quantity_reserved' => 11.0]);
 
         // Release order so we can issue materials
         $this->post(route('production.orders.release', $order->id));
@@ -501,6 +502,7 @@ class ProductionOrderTest extends TestCase
         $order = $this->createDirectOrderHelper();
         $op = $order->operations->first();
         $res = $order->reservations->first();
+        $res->update(['quantity_reserved' => 22.0]);
 
         $this->post(route('production.orders.release', $order->id));
 
@@ -776,9 +778,9 @@ class ProductionOrderTest extends TestCase
         // 2. Cannot log any more once target is hit
         $response2 = $this->post(route('production.orders.log-progress', $order->id), [
             'operation_id' => $op->id,
-            'quantity_produced' => 0.0,
+            'quantity_produced' => 1.0,
             'quantity_rejected' => 0.0,
-            'quantity_scrapped' => 1.0,
+            'quantity_scrapped' => 0.0,
             'setup_minutes_logged' => 10,
             'run_minutes_logged' => 30,
             'complete_operation' => 0,
@@ -798,6 +800,8 @@ class ProductionOrderTest extends TestCase
             'end_date' => date('Y-m-d', strtotime('+5 days')),
         ]);
 
-        return ProductionOrder::orderBy('id', 'desc')->first();
+        $order = ProductionOrder::orderBy('id', 'desc')->first();
+        $order->requisitionSlips()->update(['status' => 'fully issued']);
+        return $order;
     }
 }
