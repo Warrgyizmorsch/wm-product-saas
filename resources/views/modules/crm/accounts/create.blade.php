@@ -36,8 +36,18 @@
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" label="Industry Type" name="industry_type" :value="old('industry_type')" placeholder="e.g. Construction / Infrastructure" />
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-3">
                     <x-ui.odoo-form-ui type="input" inputType="number" label="Credit Limit (₹)" name="credit_limit" :value="old('credit_limit', '0.00')" step="0.01" placeholder="0.00" />
+                </div>
+                <div class="col-md-3">
+                    <x-ui.odoo-form-ui type="select" label="Account Manager / Owner" name="owner_id">
+                        <option value="">Select Account Manager...</option>
+                        @foreach($users as $user)
+                            <option value="{{ $user->id }}" @selected(old('owner_id', auth()->id()) == $user->id)>
+                                {{ $user->name }}
+                            </option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
                 </div>
             </div>
 

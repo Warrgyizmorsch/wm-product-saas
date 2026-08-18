@@ -33,8 +33,10 @@ Route::prefix('crm')
         Route::get('deals/{deal}/edit', [CrmDealController::class, 'edit'])->name('deals.edit');
         Route::put('deals/{deal}', [CrmDealController::class, 'update'])->name('deals.update');
         Route::patch('deals/{deal}/stage', [CrmDealController::class, 'updateStage'])->name('deals.updateStage');
+        Route::patch('deals/{deal}/requirement', [CrmDealController::class, 'updateRequirement'])->name('deals.updateRequirement');
         Route::delete('deals/{deal}', [CrmDealController::class, 'destroy'])->name('deals.destroy');
         Route::post('deals/{deal}/documents', [CrmDealController::class, 'uploadDocuments'])->name('deals.documents.upload');
+        Route::post('deals/{deal}/followups', [LeadFollowupController::class, 'storeDealFollowup'])->name('deals.followups.store');
         Route::get('leads/create', [LeadController::class, 'create'])
             ->name('leads.create');
         Route::get('leads', [LeadController::class, 'index'])
@@ -69,6 +71,8 @@ Route::prefix('crm')
             ->name('leads.updatePriority');
         Route::patch('leads/{lead}/owner', [LeadController::class, 'updateOwner'])
             ->name('leads.updateOwner');
+        Route::patch('leads/{lead}/requirement', [LeadController::class, 'updateRequirement'])
+            ->name('leads.updateRequirement');
         Route::post('leads/{lead}/convert-to-quotation', [LeadController::class, 'convertToQuotation'])
             ->name('leads.convertToQuotation');
         Route::delete('leads/{lead}', [LeadController::class, 'destroy'])

@@ -289,7 +289,7 @@ $masterDefinitions = [
                      id="quickCreateForm_contact">
                     @csrf
                     <div class="row g-3 text-dark fs-13">
-                        <div class="col-md-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="text"
@@ -297,6 +297,15 @@ $masterDefinitions = [
                                 name="name"
                                 placeholder="e.g. John Doe"
                                 :required="true"
+                            />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                label="Designation / Role"
+                                name="designation"
+                                placeholder="e.g. Purchase Manager / Doctor"
                             />
                         </div>
                         <div class="col-md-6">

@@ -402,7 +402,7 @@
                     <!-- Subhead Details -->
                     <div class="mt-1 d-flex align-items-center gap-3 fs-11 text-muted">
                         <span><strong class="text-dark">Deal #:</strong> <span class="font-monospace text-primary fw-bold">{{ $deal->deal_number }}</span></span>
-                        <span><strong class="text-dark">Owner:</strong> {{ $deal->user ? $deal->user->name : 'Demo Admin' }}</span>
+                        <span><strong class="text-dark">Deal Owner:</strong> {{ $deal->owner?->name ?: ($deal->user?->name ?: 'Unassigned') }}</span>
                         @if($deal->contact)
                             <span><strong class="text-dark">Contact:</strong> {{ $deal->contact->name }}</span>
                         @endif
@@ -412,6 +412,14 @@
             
             <!-- Right Action Buttons Toolbar -->
             <div class="d-flex align-items-center gap-2 flex-wrap">
+                <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-outline-secondary fw-bold py-1 px-2 rounded bg-white text-dark border-secondary d-inline-flex align-items-center" title="Back to Deals" style="font-size: 13px;">
+                    <i class="feather-arrow-left"></i>
+                </a>
+
+                <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas">
+                    <i class="feather-calendar me-1"></i> + Followup
+                </button>
+
                 @if($activeQuotation && ($activeQuotation->status === 'Accepted' || $deal->stage === 'Won'))
                     <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-xs btn-success fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
                         <i class="feather-shopping-cart me-1"></i> Convert to Sales Order
@@ -424,16 +432,20 @@
                     </a>
                 @endif
 
-                <a href="{{ route('crm.deals.edit', $deal) }}" class="btn btn-xs btn-primary fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center text-white" style="font-family: 'Inter', sans-serif; font-size: 11px;">
-                    <i class="feather-edit me-1"></i> Edit Deal
-                </a>
-
-                <a href="{{ route('crm.deals.index') }}" class="btn btn-xs btn-outline-secondary fw-bold py-1 px-2.5 rounded bg-white text-dark border-secondary d-inline-flex align-items-center" style="font-size: 11px;">
-                    <i class="feather-arrow-left me-1"></i> Back
-                </a>
 
                 <!-- Action Dropdown -->
                 <x-ui.action-dropdown id="dealProfileActionsDropdown">
+                    <li>
+                        <a class="dropdown-item py-2 btn-open-deal-followup-offcanvas" href="javascript:void(0)" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="log_note">
+                            <i class="feather-calendar me-1.5 text-muted"></i> Log Activity / Discussion
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item py-2 btn-open-deal-followup-offcanvas" href="javascript:void(0)" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="schedule">
+                            <i class="feather-clock me-1.5 text-muted"></i> Schedule Next Activity
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
                     <li>
                         <a class="dropdown-item py-2" href="{{ route('crm.deals.edit', $deal) }}">
                             <i class="feather-edit me-1.5 text-muted"></i> Edit Deal Details
@@ -705,6 +717,11 @@
                                         </div>
 
                                         <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Designation / Role</div>
+                                            <div class="zoho-field-value text-dark">{{ ($deal->contact && $deal->contact->designation) ? $deal->contact->designation : '—' }}</div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
                                             <div class="zoho-field-label">Target Closing Date</div>
                                             <div class="zoho-field-value text-dark">{{ $deal->closing_date ? $deal->closing_date->format('d/m/Y') : '—' }}</div>
                                         </div>
@@ -730,20 +747,40 @@
                                             <div class="zoho-field-label">Lead Source</div>
                                             <div class="zoho-field-value text-dark">{{ ($deal->lead_source && !in_array($deal->lead_source, ['Select an Option', 'Select an option', 'Select Option'], true)) ? $deal->lead_source : '—' }}</div>
                                         </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Deal Owner / Manager</div>
+                                            <div class="zoho-field-value text-dark fw-bold">{{ $deal->owner?->name ?: ($deal->user?->name ?: 'Unassigned') }}</div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Account Manager</div>
+                                            <div class="zoho-field-value text-primary fw-bold">{{ $deal->account?->owner?->name ?: 'Unassigned' }}</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Deal Interested Products & Quantities Section -->
-                        @if($linkedLead && (!empty($linkedLead->product_items) || !empty($linkedLead->product_ids)))
-                            @php
+                        @php
+                            $rawItems = $deal->product_items ?: [];
+                            if (empty($rawItems) && !empty($deal->product_ids)) {
+                                foreach ($deal->product_ids as $pid) {
+                                    $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
+                                }
+                            }
+                            if (empty($rawItems) && $linkedLead) {
                                 $rawItems = $linkedLead->product_items ?: [];
                                 if (empty($rawItems) && !empty($linkedLead->product_ids)) {
                                     foreach ($linkedLead->product_ids as $pid) {
                                         $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
                                     }
                                 }
+                            }
+                        @endphp
+                        @if(!empty($rawItems))
+                            @php
                                 $pIds = array_column($rawItems, 'product_id');
                                 $dealProductsMap = \App\Domains\Inventory\Models\Product::whereIn('id', $pIds)->get()->keyBy('id');
                             @endphp
@@ -837,26 +874,63 @@
                             </div>
                         </div>
 
-                        <!-- Notes & Summary Box -->
+                        <!-- Requirements / Notes Details Card (Click to Edit like Lead) -->
                         <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionNotes">
                             <div class="card-body p-3">
-                                <h6 class="fs-12 text-muted fw-bold text-uppercase mb-2"><i class="feather-file-text me-1 text-primary"></i>Deal Notes & Requirements Description</h6>
-                                <div class="p-3 bg-light rounded text-dark fs-13" style="min-height: 50px;">
-                                    @php
-                                        $leadRequirement = !empty($linkedLead?->requirement) ? $linkedLead->requirement : ($deal->notes ?: $deal->title);
-                                    @endphp
-                                    @if(!empty($leadRequirement))
-                                        <div class="fw-semibold text-dark fs-13">
-                                            {{ $leadRequirement }}
-                                        </div>
-                                        @if(!empty($deal->notes) && $deal->notes !== $leadRequirement)
-                                            <div class="text-muted fs-12 mt-2 pt-2 border-top">
-                                                <strong>Internal Notes:</strong> {{ $deal->notes }}
+                                <div class="d-flex align-items-center justify-content-between pb-2 border-bottom mb-3">
+                                    <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="font-family: 'Inter', sans-serif; border-bottom: none;">
+                                        <i class="feather-file-text text-primary me-1.5"></i>Requirements Details
+                                    </h5>
+                                    <span class="text-muted fs-11 d-none d-sm-inline-block"><i class="feather-info me-1 text-primary"></i>Click box below to edit</span>
+                                </div>
+
+                                @php
+                                    $currentReq = !empty($deal->notes) ? $deal->notes : (!empty($linkedLead?->requirement) ? $linkedLead->requirement : '');
+                                @endphp
+
+                                <!-- View Mode (Clickable to Edit) -->
+                                <div id="viewDealRequirementBlock">
+                                    @if (!empty($currentReq))
+                                        <div class="position-relative requirement-clickable-box p-3 rounded shadow-2xs" onclick="enableDealRequirementEdit()" title="Click anywhere to edit requirement" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1; transition: all 0.2s ease;">
+                                            <div class="d-flex align-items-start justify-content-between gap-3">
+                                                <div class="text-dark fs-13 flex-grow-1" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;" id="viewDealRequirementText">{{ $currentReq }}</div>
+                                                <span class="badge bg-white text-primary border shadow-2xs px-2.5 py-1.5 fs-11 flex-shrink-0 edit-hint-badge" style="border-color: #cbd5e1 !important; transition: all 0.2s ease;">
+                                                    <i class="feather-edit-2 me-1"></i>Click to Edit
+                                                </span>
                                             </div>
-                                        @endif
+                                        </div>
                                     @else
-                                        <span class="text-muted">No specific internal notes or requirements description added.</span>
+                                        <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableDealRequirementEdit()" title="Click to add requirement" style="cursor: pointer; background: #f8fafc; border: 1px dashed #cbd5e1; transition: all 0.2s ease;">
+                                            <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2">
+                                                <i class="feather-edit-3 fs-5"></i>
+                                            </div>
+                                            <h6 class="fw-bold text-dark fs-13 mb-1">No Requirements Details Specified</h6>
+                                            <p class="text-muted fs-12 mb-0">Click here to add deal notes, requirements, or scope of work.</p>
+                                        </div>
                                     @endif
+                                </div>
+
+                                <!-- Edit Mode -->
+                                <div id="editDealRequirementBlock" style="display: none;">
+                                    <form id="ajaxDealRequirementForm" action="{{ route('crm.deals.updateRequirement', $deal->id) }}" method="POST">
+                                        @csrf
+                                        @method('PATCH')
+                                        <div class="mb-2">
+                                            <textarea name="notes" id="dealRequirementInput" rows="4" class="form-control form-control-sm shadow-2xs fs-13" placeholder="Enter detailed requirements or specifications for this deal..." style="border-color: var(--bs-primary); border-radius: 6px; font-family: 'Inter', sans-serif;" oninput="updateDealReqCharCount(this)">{{ old('notes', $currentReq) }}</textarea>
+                                        </div>
+                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                            <span class="text-muted fs-11">
+                                                <i class="feather-corner-down-left me-1"></i>Press <kbd class="bg-light text-dark border px-1 py-0.5 rounded fs-10">Ctrl + Enter</kbd> or click save
+                                            </span>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="text-muted fs-11 me-2" id="dealReqCharCounter">0 chars</span>
+                                                <button type="button" class="btn btn-xs btn-light border px-3 py-1.5 fw-bold rounded" onclick="cancelDealRequirementEdit()">CANCEL</button>
+                                                <button type="submit" id="btnSaveDealRequirement" class="btn btn-xs btn-primary px-3 py-1.5 fw-bold shadow-2xs text-white rounded d-inline-flex align-items-center" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
+                                                    <i class="feather-check me-1"></i> SAVE REQUIREMENT
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
                                 </div>
                             </div>
                         </div>
@@ -1559,7 +1633,7 @@
                                     <div class="tab-pane fade" id="subtab-interactions" role="tabpanel">
                                         <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
                                             <h5 class="fw-bold text-dark fs-14 mb-0">Interactions / Scheduled Activities</h5>
-                                            <button type="button" class="btn btn-xs text-white fw-bold px-3 py-1.5" style="background-color: #2b304a;" data-bs-toggle="modal" data-bs-target="#modalScheduleActivity">
+                                            <button type="button" class="btn btn-xs text-white fw-bold px-3 py-1.5 btn-open-deal-followup-offcanvas" style="background-color: #2b304a;" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="schedule">
                                                 <i class="feather-calendar me-1"></i>SCHEDULE ACTIVITY
                                             </button>
                                         </div>
@@ -1806,29 +1880,130 @@
         </div>
     </div>
 
-    <!-- Schedule Activity Modal -->
-    @if(isset($linkedLead))
-        <x-ui.modal id="modalScheduleActivity" :title="__('crm.schedule_next_activity')" :centered="true" :formAction="route('crm.leads.followups.store', $linkedLead->id)" formMethod="POST" :submitText="__('crm.schedule')" :closeText="__('crm.cancel')">
-            <input type="hidden" name="status" value="Pending">
-            
-            <x-ui.odoo-form-ui type="select" :label="__('crm.activity_type')" name="type" :required="true">
-                <option value="Call">{{ __('crm.activity_types.Call') }}</option>
-                <option value="Email">{{ __('crm.activity_types.Email') }}</option>
-                <option value="Meeting">{{ __('crm.activity_types.Meeting') }}</option>
-                <option value="Demo">{{ __('crm.activity_types.Demo') }}</option>
-            </x-ui.odoo-form-ui>
+    <!-- Offcanvas Drawer: Deal Followup / Schedule Activity -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg d-print-none" tabindex="-1" id="dealFollowupOffcanvas" aria-labelledby="dealFollowupOffcanvasLabel" style="width: 490px; max-width: 92vw;">
+        <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle">
+                    <i class="feather-calendar"></i>
+                </div>
+                <div>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="dealFollowupOffcanvasTitle">Log / Schedule Activity for {{ $deal->title }}</h5>
+                    <span class="text-muted fs-11">Log interaction & next followup or schedule activity</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        
+        <div class="offcanvas-body p-4 bg-white">
+            <form action="{{ route('crm.deals.followups.store', $deal->id) }}" method="POST" id="dealFollowupForm" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="action_mode" id="dealOffcanvasActionMode" value="log_note">
 
-            <x-ui.odoo-form-ui type="input" inputType="datetime-local" :label="__('crm.due_date_time')" name="followup_date" id="deal_activity_datepicker" :required="true" />
+                <!-- 2-Mode Switcher Tabs -->
+                <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
+                        LOG DISCUSSION & NEXT
+                    </button>
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn" data-mode="schedule" style="font-size: 12px; padding: 8px 6px; color: #64748b; background-color: transparent; border-radius: 6px; transition: all 0.2s ease;">
+                        DIRECT SCHEDULE ACTIVITY
+                    </button>
+                </div>
 
-            <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-                @foreach($users as $u)
-                    <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
-                @endforeach
-            </x-ui.odoo-form-ui>
+                <!-- Past Interaction Section (Tab 1: Log Activity) -->
+                <div id="dealSectionPastInteraction">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up / Interaction Type</label>
+                        <select name="type" id="dealOffcanvasFollowupType" class="form-select form-select-sm shadow-2xs">
+                            <option value="Call">Call</option>
+                            <option value="Email">Email</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
 
-            <x-ui.odoo-form-ui type="textarea" :label="__('crm.description_plan')" name="notes" rows="4" :placeholder="__('crm.activity_plan_placeholder')" />
-        </x-ui.modal>
-    @endif
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up Status / Outcome</label>
+                        <select name="status" id="dealOffcanvasFollowupStatus" class="form-select form-select-sm shadow-2xs">
+                            <option value="Connected">Connected</option>
+                            <option value="Not Connected">Not Connected</option>
+                            <option value="Not Answering">Not Answering</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Discussion Notes / Summary</label>
+                        <textarea name="notes" id="dealOffcanvasNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Write discussion notes..."></textarea>
+                    </div>
+
+                    <!-- Next Follow-up Section inside Log Mode -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type (Optional)</label>
+                        <select name="next_activity_type" id="dealOffcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
+                            <option value="Call">Call</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="Email">Email</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
+                        <input type="datetime-local" name="next_followup_date" id="dealOffcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs">
+                    </div>
+                </div>
+
+                <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
+                <div id="dealSectionDirectSchedule" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
+                        <select name="schedule_type" id="dealOffcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#dealOffcanvasFollowupType').val(this.value)">
+                            <option value="Call">Call</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="Email">Email</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
+                        <input type="datetime-local" name="followup_date" id="dealOffcanvasFollowupDate" class="form-control form-control-sm shadow-2xs">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Description / Plan</label>
+                        <textarea name="schedule_notes" id="dealOffcanvasScheduleNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Agenda / plan for upcoming activity..." oninput="$('#dealOffcanvasNotes').val(this.value)"></textarea>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">Deal Stage</label>
+                    <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
+                        @foreach(['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost'] as $stg)
+                            <option value="{{ $stg }}" @selected(old('stage', $deal->stage) === $stg)>{{ $stg }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">Tag / Assign Persons</label>
+                    <select name="tagged_user_ids[]" id="dealOffcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="Select persons to tag...">
+                        @foreach($users as $u)
+                            <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">SAVE ACTIVITY</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     @push('scripts')
     <script>
@@ -2179,6 +2354,104 @@
             });
         });
 
+        window.enableDealRequirementEdit = function() {
+            $('#viewDealRequirementBlock').hide();
+            $('#editDealRequirementBlock').show();
+            var input = $('#dealRequirementInput');
+            input.focus();
+            if (input.val()) {
+                var len = input.val().length;
+                input[0].setSelectionRange(len, len);
+            }
+            updateDealReqCharCount(input[0]);
+        };
+
+        window.cancelDealRequirementEdit = function() {
+            $('#editDealRequirementBlock').hide();
+            $('#viewDealRequirementBlock').show();
+        };
+
+        window.updateDealReqCharCount = function(el) {
+            var len = el ? el.value.length : 0;
+            $('#dealReqCharCounter').text(len + ' chars');
+        };
+
+        function escapeDealHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        $(document).on('keydown', '#dealRequirementInput', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
+                e.preventDefault();
+                $('#ajaxDealRequirementForm').submit();
+            }
+        });
+
+        $(document).on('submit', '#ajaxDealRequirementForm', function(e) {
+            e.preventDefault();
+            var form = $(this);
+            var btn = $('#btnSaveDealRequirement');
+            var originalHtml = btn.html();
+
+            btn.attr('disabled', true).html('<i class="feather-loader me-1"></i> SAVING...');
+
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST',
+                data: form.serialize(),
+                dataType: 'json',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                success: function(res) {
+                    btn.attr('disabled', false).html(originalHtml);
+                    if (res.success) {
+                        var reqText = res.requirement || res.notes || '';
+                        var viewBlock = $('#viewDealRequirementBlock');
+
+                        if (reqText.trim().length > 0) {
+                            viewBlock.html(`
+                                <div class="position-relative requirement-clickable-box p-3 rounded shadow-2xs" onclick="enableDealRequirementEdit()" title="Click anywhere to edit requirement" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1; transition: all 0.2s ease;">
+                                    <div class="d-flex align-items-start justify-content-between gap-3">
+                                        <div class="text-dark fs-13 flex-grow-1" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;" id="viewDealRequirementText">${escapeDealHtml(reqText)}</div>
+                                        <span class="badge bg-white text-primary border shadow-2xs px-2.5 py-1.5 fs-11 flex-shrink-0 edit-hint-badge" style="border-color: #cbd5e1 !important; transition: all 0.2s ease;">
+                                            <i class="feather-edit-2 me-1"></i>Click to Edit
+                                        </span>
+                                    </div>
+                                </div>
+                            `);
+                        } else {
+                            viewBlock.html(`
+                                <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableDealRequirementEdit()" title="Click to add requirement" style="cursor: pointer; background: #f8fafc; border: 1px dashed #cbd5e1; transition: all 0.2s ease;">
+                                    <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2">
+                                        <i class="feather-edit-3 fs-5"></i>
+                                    </div>
+                                    <h6 class="fw-bold text-dark fs-13 mb-1">No Requirements Details Specified</h6>
+                                    <p class="text-muted fs-12 mb-0">Click here to add deal notes, requirements, or scope of work.</p>
+                                </div>
+                            `);
+                        }
+
+                        cancelDealRequirementEdit();
+                        if (typeof Toast !== 'undefined' && Toast.fire) {
+                            Toast.fire({ icon: 'success', title: res.message || 'Requirements updated successfully!' });
+                        } else if (typeof toastr !== 'undefined') {
+                            toastr.success(res.message || 'Requirements updated successfully!');
+                        }
+                    }
+                },
+                error: function(xhr) {
+                    btn.attr('disabled', false).html(originalHtml);
+                    alert('Failed to save requirements. Please try again.');
+                }
+            });
+        });
+
         window.submitDealStage = function(stage) {
             var form = $('#dealStageForm');
             if (form.length) {
@@ -2186,6 +2459,66 @@
                 form.submit();
             }
         };
+
+        // Toggle Offcanvas Mode (Exact replica of Lead switchOffcanvasMode)
+        function switchDealOffcanvasMode(mode) {
+            $('.deal-offcanvas-mode-btn').removeClass('active btn-primary text-white shadow-sm').css({'background-color': 'transparent', 'color': '#64748b', 'box-shadow': 'none'});
+            var activeBtn = $('.deal-offcanvas-mode-btn[data-mode="' + mode + '"]');
+            activeBtn.addClass('active btn-primary text-white shadow-sm').css({'background-color': 'var(--bs-primary)', 'color': '#ffffff', 'box-shadow': '0 2px 4px rgba(0,0,0,0.15)'});
+            
+            $('#dealOffcanvasActionMode').val(mode);
+
+            if (mode === 'log_note') {
+                $('#dealSectionPastInteraction').show();
+                $('#dealSectionDirectSchedule').hide();
+                $('#dealOffcanvasFollowupDate').removeAttr('required');
+            } else if (mode === 'schedule') {
+                $('#dealSectionPastInteraction').hide();
+                $('#dealSectionDirectSchedule').show();
+                $('#dealOffcanvasFollowupDate').attr('required', 'required');
+            }
+        }
+
+        $(document).on('click', '.deal-offcanvas-mode-btn', function() {
+            switchDealOffcanvasMode($(this).attr('data-mode'));
+        });
+
+        function initDealTagUserSelect2() {
+            if ($('#dealOffcanvasTagUser').length && $.fn.select2) {
+                if ($('#dealOffcanvasTagUser').hasClass('select2-hidden-accessible')) {
+                    $('#dealOffcanvasTagUser').select2('destroy');
+                }
+                $('#dealOffcanvasTagUser').select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Select persons to tag...',
+                    allowClear: true,
+                    dropdownParent: $('#dealFollowupOffcanvas'),
+                    width: '100%'
+                });
+            }
+        }
+
+        // Open and populate Offcanvas drawer for Deal Followup / Schedule Activity
+        $(document).on('click', '.btn-open-deal-followup-offcanvas', function() {
+            var dealId = $(this).attr('data-deal-id') || '{{ $deal->id }}';
+            var dealTitle = $(this).attr('data-deal-title') || '{{ addslashes($deal->title) }}';
+            var mode = $(this).attr('data-mode') || 'log_note';
+
+            $('#dealFollowupOffcanvasTitle').text('Log / Schedule Activity for ' + dealTitle);
+            $('#dealFollowupForm').attr('action', '/crm/deals/' + dealId + '/followups');
+            $('#dealOffcanvasNotes, #dealOffcanvasScheduleNotes').val('');
+
+            initDealTagUserSelect2();
+            if ($('#dealOffcanvasTagUser').hasClass('select2-hidden-accessible')) {
+                $('#dealOffcanvasTagUser').val(null).trigger('change');
+            }
+
+            switchDealOffcanvasMode(mode);
+        });
+
+        $('#dealFollowupOffcanvas').on('shown.bs.offcanvas', function () {
+            initDealTagUserSelect2();
+        });
     </script>
     @endpush
 

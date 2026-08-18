@@ -480,6 +480,27 @@ class LeadController extends Controller
         return redirect()->back()->with('success', 'Lead owner successfully updated!');
     }
 
+    public function updateRequirement(Request $request, Lead $lead)
+    {
+        $this->authorize('update', $lead);
+        $validated = $request->validate([
+            'requirement' => 'nullable|string',
+        ]);
+
+        $lead->requirement = $validated['requirement'] ?? null;
+        $lead->save();
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Requirements updated successfully!',
+                'requirement' => $lead->requirement
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Lead requirements updated successfully!');
+    }
+
     public function destroy(Lead $lead)
     {
         $this->authorize('delete', $lead);
@@ -539,6 +560,7 @@ class LeadController extends Controller
             'gstin' => 'nullable|string|max:100',
             'lead_type' => 'nullable|string|in:b2b,b2c',
             'contact_person' => $isB2B ? 'nullable|string|max:255' : 'required|string|max:255',
+            'designation' => 'nullable|string|max:255',
             'email' => $isB2B ? 'nullable|email|max:255' : 'required|email|max:255',
             'phone' => 'nullable|string|regex:/^[0-9]+$/',
             'additional_contacts' => 'nullable|array',
