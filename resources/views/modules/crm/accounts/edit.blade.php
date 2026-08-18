@@ -34,13 +34,23 @@
                 <div class="col-md-4">
                     <x-ui.odoo-form-ui type="input" label="Website URL" name="website" :value="old('website', $account->website)" />
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <x-ui.odoo-form-ui type="input" label="Industry Type" name="industry_type" :value="old('industry_type', $account->industry_type)" />
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <x-ui.odoo-form-ui type="input" inputType="number" label="Credit Limit (₹)" name="credit_limit" :value="old('credit_limit', $account->credit_limit)" step="0.01" />
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <x-ui.odoo-form-ui type="select" label="Account Manager / Owner" name="owner_id">
+                        <option value="">Select Account Manager...</option>
+                        @foreach($users as $user)
+                            <option value="{{ $user->id }}" @selected(old('owner_id', $account->owner_id) == $user->id)>
+                                {{ $user->name }}
+                            </option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
+                <div class="col-md-3">
                     <x-ui.odoo-form-ui type="select" label="Account Status" name="status">
                         <option value="active" {{ $account->status === 'active' ? 'selected' : '' }}>Active</option>
                         <option value="inactive" {{ $account->status === 'inactive' ? 'selected' : '' }}>Inactive</option>

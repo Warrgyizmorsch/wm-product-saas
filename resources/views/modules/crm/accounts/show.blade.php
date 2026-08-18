@@ -227,8 +227,12 @@
                                             <div><strong>Email:</strong> {{ $primaryContact->email ?: 'N/A' }}</div>
                                             <div><strong>Phone:</strong> {{ $primaryContact->mobile ?: ($primaryContact->phone ?: 'N/A') }}</div>
                                         @else
-                                            <div class="text-muted">No primary contact added yet. Click on <strong>Personnel Contacts</strong> tab to add.</div>
+                                            <div class="text-muted mb-2">No primary contact added yet. Click on <strong>Personnel Contacts</strong> tab to add.</div>
                                         @endif
+                                        <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between">
+                                            <span class="text-muted fw-semibold">Account Manager / Owner:</span>
+                                            <span class="badge bg-soft-primary text-primary fs-12 fw-bold"><i class="feather-user me-1"></i>{{ $account->owner?->name ?: 'Unassigned' }}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

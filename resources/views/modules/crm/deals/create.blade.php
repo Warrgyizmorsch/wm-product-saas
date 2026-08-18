@@ -46,6 +46,15 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
 
+                    <x-ui.odoo-form-ui type="select" label="Deal Owner / Manager" name="owner_id">
+                        <option value="">Select Deal Owner...</option>
+                        @foreach($users as $user)
+                            <option value="{{ $user->id }}" @selected(old('owner_id', auth()->id()) == $user->id)>
+                                {{ $user->name }}
+                            </option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+
                     <!-- Additional Contacts Section (Cloned Contacts matching Leads) -->
                     <div class="my-3 border-top pt-3">
                         <div class="d-flex align-items-center justify-content-between mb-2">
@@ -98,6 +107,56 @@
 
                     <x-ui.odoo-form-ui type="textarea" label="Notes & Requirement Summary" name="notes" placeholder="Describe the project scope, specifications, or key customer notes..." />
 
+                    <style>
+                        #productItemsTable {
+                            table-layout: fixed !important;
+                            width: 100% !important;
+                        }
+                        #productItemsTable td, #productItemsTable th {
+                            overflow: hidden !important;
+                        }
+                        #productItemsTable .select2-container {
+                            width: 100% !important;
+                            max-width: 100% !important;
+                        }
+                        #productItemsTable .select2-container .select2-selection--single {
+                            height: 32px !important;
+                            padding: 2px 8px !important;
+                            font-size: 13px !important;
+                            border-color: #dee2e6 !important;
+                            display: flex !important;
+                            align-items: center !important;
+                        }
+                        #productItemsTable .select2-container .select2-selection--single .select2-selection__rendered {
+                            line-height: 26px !important;
+                            white-space: nowrap !important;
+                            overflow: hidden !important;
+                            text-overflow: ellipsis !important;
+                            padding-left: 0 !important;
+                            padding-right: 18px !important;
+                            display: block !important;
+                            width: 100% !important;
+                        }
+                        #productItemsTable .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+                            height: 30px !important;
+                        }
+                        #productItemsTable .qty-row-input {
+                            height: 32px !important;
+                            font-size: 13px !important;
+                            font-weight: 600 !important;
+                            border-color: #dee2e6 !important;
+                            background-color: #ffffff !important;
+                            width: 100% !important;
+                        }
+                        .remove-product-row-btn {
+                            transition: transform 0.15s ease-in-out, opacity 0.15s ease-in-out;
+                        }
+                        .remove-product-row-btn:hover {
+                            opacity: 1 !important;
+                            transform: scale(1.15);
+                        }
+                    </style>
+
                     <div class="mb-3 mt-3" id="productItemsContainer">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <label class="form-label fw-bold text-dark fs-12 mb-0">
@@ -109,7 +168,7 @@
                         </div>
                         
                         <div class="border rounded-3 bg-white p-2 shadow-sm" style="max-height: 270px; overflow-y: auto;">
-                            <table class="table table-sm table-borderless align-middle mb-0" id="productItemsTable">
+                            <table class="table table-sm table-borderless align-middle mb-0" id="productItemsTable" style="table-layout: fixed; width: 100%;">
                                 <thead>
                                     <tr class="border-bottom text-muted fs-11" style="background-color: #f8fafc;">
                                         <th style="width: 70%; font-weight: 600;" class="py-1 ps-2">Product</th>
@@ -140,7 +199,8 @@
                                                     @if($finished->count())
                                                         <optgroup label="📦 Finished Goods">
                                                             @foreach($finished as $p)
-                                                                <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                                                <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
                                                                     {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
                                                                 </option>
                                                             @endforeach
@@ -150,7 +210,8 @@
                                                     @if($semiFinished->count())
                                                         <optgroup label="⚙️ Semi-Finished Goods">
                                                             @foreach($semiFinished as $p)
-                                                                <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                                                <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
                                                                     {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
                                                                 </option>
                                                             @endforeach
@@ -160,7 +221,8 @@
                                                     @if($services->count())
                                                         <optgroup label="🛠️ Services">
                                                             @foreach($services as $p)
-                                                                <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                                                <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
                                                                     {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
                                                                 </option>
                                                             @endforeach
@@ -170,7 +232,8 @@
                                                     @if($others->count())
                                                         <optgroup label="🧱 Raw Materials & Components">
                                                             @foreach($others as $p)
-                                                                <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                                                <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
                                                                     {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
                                                                 </option>
                                                             @endforeach
@@ -179,7 +242,7 @@
                                                 </select>
                                             </td>
                                             <td class="py-1 px-1 align-top">
-                                                <input type="number" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="{{ $item['quantity'] ?? 1 }}" min="1" step="1">
+                                                 <input type="text" inputmode="decimal" autocomplete="off" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="{{ $item['quantity'] ?? 1 }}">
                                             </td>
                                             <td class="py-1 text-center align-top pt-2">
                                                 <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="Remove Product">
@@ -201,7 +264,8 @@
                             @if($finished->count())
                                 <optgroup label="📦 Finished Goods">
                                     @foreach($finished as $p)
-                                        <option value="{{ $p->id }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
+                                        @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                        <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
                                     @endforeach
                                 </optgroup>
                             @endif
@@ -209,7 +273,8 @@
                             @if($semiFinished->count())
                                 <optgroup label="⚙️ Semi-Finished Goods">
                                     @foreach($semiFinished as $p)
-                                        <option value="{{ $p->id }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
+                                        @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                        <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
                                     @endforeach
                                 </optgroup>
                             @endif
@@ -217,7 +282,8 @@
                             @if($services->count())
                                 <optgroup label="🛠️ Services">
                                     @foreach($services as $p)
-                                        <option value="{{ $p->id }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
+                                        @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                        <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
                                     @endforeach
                                 </optgroup>
                             @endif
@@ -225,7 +291,8 @@
                             @if($others->count())
                                 <optgroup label="🧱 Raw Materials & Components">
                                     @foreach($others as $p)
-                                        <option value="{{ $p->id }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
+                                        @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                        <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
                                     @endforeach
                                 </optgroup>
                             @endif
@@ -382,13 +449,21 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="odoo-form-group d-flex align-items-center gap-2">
+                                    <label class="odoo-form-label fs-13 text-muted mb-0" style="width: 85px !important; min-width: 85px !important;">Designation</label>
+                                    <div class="flex-grow-1">
+                                        <input type="text" name="additional_contacts[${addlContactIdx}][designation]" class="form-control odoo-form-control contact-designation-input" placeholder="Designation / Role" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="odoo-form-group d-flex align-items-center gap-2">
                                     <label class="odoo-form-label fs-13 text-muted mb-0" style="width: 85px !important; min-width: 85px !important;">Phone No.</label>
                                     <div class="flex-grow-1">
                                         <input type="tel" name="additional_contacts[${addlContactIdx}][phone]" class="form-control odoo-form-control contact-phone-input" placeholder="Phone Number" oninput="this.value = this.value.replace(/[^0-9+]/g, '')" />
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-12">
+                            <div class="col-md-6">
                                 <div class="odoo-form-group d-flex align-items-center gap-2">
                                     <label class="odoo-form-label fs-13 text-muted mb-0" style="width: 85px !important; min-width: 85px !important;">Email</label>
                                     <div class="flex-grow-1">
@@ -436,7 +511,7 @@
                     <tr class="lead-item-row border-bottom">
                         <td class="py-1 ps-1 pe-1 align-top"></td>
                         <td class="py-1 px-1 align-top">
-                            <input type="number" name="items[${itemRowIndex}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="1" min="1" step="1">
+                            <input type="text" inputmode="decimal" autocomplete="off" name="items[${itemRowIndex}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="1">
                         </td>
                         <td class="py-1 text-center align-top pt-2">
                             <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="Remove Product">
@@ -465,6 +540,69 @@
                     updateRemoveButtonsState();
                 }
             });
+
+            // Prevent invalid characters (minus, plus, e) in quantity inputs
+            $(document).on('keydown', '.qty-row-input', function (e) {
+                if (['-', '+', 'e', 'E'].includes(e.key)) {
+                    e.preventDefault();
+                }
+            });
+
+            // Sanitize quantity input to allow positive numbers and single decimal dot only, preserving cursor
+            $(document).on('input', '.qty-row-input', function () {
+                let rawVal = $(this).val();
+                if (rawVal) {
+                    let cleanVal = rawVal.replace(/[^0-9.]/g, '');
+                    let parts = cleanVal.split('.');
+                    if (parts.length > 2) {
+                        cleanVal = parts[0] + '.' + parts.slice(1).join('');
+                    }
+                    if (cleanVal !== rawVal) {
+                        $(this).val(cleanVal);
+                    }
+                }
+            });
+
+            function calculateAutoExpectedRevenue() {
+                let grandTotal = 0;
+                let hasProductSelected = false;
+
+                $('#productItemsBody tr.lead-item-row').each(function() {
+                    let select = $(this).find('select.product-row-select');
+                    let qtyInput = $(this).find('input.qty-row-input');
+                    let selectedOpt = select.find('option:selected');
+                    let price = parseFloat(selectedOpt.attr('data-price')) || 0;
+                    let qty = parseFloat(qtyInput.val()) || 0;
+
+                    if (selectedOpt.val() && selectedOpt.val() !== '__ADD_NEW__') {
+                        hasProductSelected = true;
+                        grandTotal += (price * qty);
+                    }
+                });
+
+                let revenueInput = $('#expected_amount, input[name="expected_amount"], #estimated_value, input[name="estimated_value"], #expected_revenue, input[name="expected_revenue"]');
+                if (revenueInput.length && hasProductSelected) {
+                    revenueInput.val(grandTotal > 0 ? grandTotal.toFixed(2) : '0.00');
+                }
+            }
+
+            $(document).on('change change.select2 select2:select', 'select.product-row-select', function() {
+                calculateAutoExpectedRevenue();
+            });
+
+            $(document).on('input change keyup', 'input.qty-row-input', function() {
+                calculateAutoExpectedRevenue();
+            });
+
+            $('#addProductRowBtn').on('click', function () {
+                setTimeout(calculateAutoExpectedRevenue, 60);
+            });
+
+            $(document).on('click', '.remove-product-row-btn', function () {
+                setTimeout(calculateAutoExpectedRevenue, 60);
+            });
+
+            setTimeout(calculateAutoExpectedRevenue, 100);
         });
     </script>
 @endpush
