@@ -34,7 +34,8 @@ class InvoiceController extends Controller
     {
         $this->authorize('create', Invoice::class);
 
-        $mode = $request->input('mode', 'sales_order');
+        $customerId = $request->input('customer_id');
+        $mode = $request->input('mode', $customerId ? 'direct' : 'sales_order');
         $salesOrderId = $request->input('sales_order_id');
         $dispatchOrderId = $request->input('dispatch_order_id') ?? $request->input('material_requirement_id');
 
@@ -199,7 +200,7 @@ class InvoiceController extends Controller
 
         return view('modules.sales.invoices.create', compact(
             'mode', 'salesOrders', 'dispatchOrders', 'customers', 'products', 'warehouses',
-            'salesOrder', 'dispatchOrder', 'nextInvoiceNumber', 'advanceAllocations', 'invoiceItems'
+            'salesOrder', 'dispatchOrder', 'nextInvoiceNumber', 'advanceAllocations', 'invoiceItems', 'customerId'
         ));
     }
 

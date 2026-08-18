@@ -8,6 +8,7 @@
 @php
     $statusMap = [
         'active' => ['bg' => 'bg-soft-success', 'text' => 'text-success', 'dot' => 'bg-success', 'default_label' => 'Active'],
+        'inactive' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Inactive'],
         'available' => ['bg' => 'bg-soft-success', 'text' => 'text-success', 'dot' => 'bg-success', 'default_label' => 'Available'],
         'sold' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Sold'],
         'reserved' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Reserved'],

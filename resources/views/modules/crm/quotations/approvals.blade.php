@@ -184,24 +184,7 @@
 
                                     <div class="flex-shrink-0">
                                         <x-ui.action-dropdown id="quotationActions-{{ $quotation->id }}">
-                                            @if ($quotation->lead_id)
-                                                <li>
-                                                    <a href="{{ route('crm.leads.show', ['lead' => $quotation->lead_id, 'edit_quotation' => 1, 'active_quotation_id' => $quotation->id]) }}" class="dropdown-item">
-                                                        <i class="feather-edit me-2 text-muted fs-12"></i>Edit Quotation
-                                                    </a>
-                                                </li>
-                                            @endif
-
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <form action="{{ route('crm.quotations.destroy', $quotation->id) }}" method="POST" id="deleteQuoForm_{{ $quotation->id }}">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="button" class="dropdown-item text-danger" onclick="confirmAction({ title: 'Delete Quotation', message: 'Are you sure you want to delete this quotation?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteQuoForm_{{ $quotation->id }}').submit(); })">
-                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Quotation
-                                                    </button>
-                                                </form>
-                                            </li>
+                                           
                                         </x-ui.action-dropdown>
                                     </div>
                                 </div>
