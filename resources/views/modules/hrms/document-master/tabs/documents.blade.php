@@ -31,6 +31,12 @@
                     @if(request()->filled('category_search'))
                         <input type="hidden" name="category_search" value="{{ request('category_search') }}">
                     @endif
+                    @if(request()->filled('category_company_id'))
+                        <input type="hidden" name="category_company_id" value="{{ request('category_company_id') }}">
+                    @endif
+                    @if(request()->filled('category_sort'))
+                        <input type="hidden" name="category_sort" value="{{ request('category_sort') }}">
+                    @endif
                     
                     <input type="hidden" name="doc_sort" id="doc_sort" value="{{ request('doc_sort', 'name_asc') }}">
                     
@@ -47,7 +53,7 @@
                             <a class="dropdown-item py-2 {{ request('doc_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('doc', 'newest', this); event.preventDefault();">Newest</a>
                         </x-ui.sort-dropdown>
 
-                        <x-ui.filter label="Filter" offset="0, 5">
+                        <x-ui.filter label="Filter" offset="0, 5" :reset-url="route('hrms.documents-master.index', ['active_tab' => 'documents'])">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                             
                             <div class="mb-3" style="min-width: 250px;">
@@ -70,18 +76,7 @@
                                     <option value="inactive" {{ request('doc_status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
                                 </x-ui.odoo-form-ui>
                             </div>
-
-                            <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('hrms.documents-master.index', ['active_tab' => 'documents']) }}" class="btn btn-sm btn-light border">Reset</a>
-                                <button type="submit" class="btn btn-sm btn-primary">Apply</button>
-                            </div>
                         </x-ui.filter>
-
-                        @if(request()->anyFilled(['doc_search', 'doc_category_id', 'doc_status']))
-                            <a href="{{ route('hrms.documents-master.index', ['active_tab' => 'documents']) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="Clear Filters">
-                                <i class="feather-x"></i>
-                            </a>
-                        @endif
                     </div>
                 </form>
             </div>
@@ -99,7 +94,7 @@
                         <th class="text-end px-4" style="width: 10%;">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="documentsTableBody">
                     @forelse($documents as $doc)
                         <tr>
                             <td class="text-start px-4" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
@@ -146,9 +141,9 @@
                                     @endif
 
                                     @if($doc->employee_can_download)
-                                        <span class="badge-access-yes fs-9" title="Employee Can Download"><i class="feather-download"></i> Down</span>
+                                        <span class="badge-access-yes fs-9" title="Employee Can Download"><i class="feather-download"></i> Download</span>
                                     @else
-                                        <span class="badge-access-no fs-9" title="Employee Cannot Download"><i class="feather-download-cloud"></i> Down</span>
+                                        <span class="badge-access-no fs-9" title="Employee Cannot Download"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="me-1" style="vertical-align: middle; display: inline-block;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line><line x1="1" y1="1" x2="23" y2="23"></line></svg>Download</span>
                                     @endif
                                 </div>
                             </td>
@@ -231,7 +226,7 @@
             </table>
         </div>
 
-        <div class="mt-3">
+        <div class="mt-3" id="documentsPaginationWrapper">
             <x-ui.pagination 
                 :currentPage="$documents->currentPage()" 
                 :totalPages="$documents->lastPage()" 
@@ -351,8 +346,8 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Create Document</button>
                     <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Create Document</button>
                 </div>
             </form>
         </div>
@@ -467,8 +462,8 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Save Changes</button>
                     <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Save Changes</button>
                 </div>
             </form>
         </div>

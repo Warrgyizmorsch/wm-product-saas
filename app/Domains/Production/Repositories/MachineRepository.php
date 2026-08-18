@@ -101,4 +101,56 @@ class MachineRepository implements MachineRepositoryInterface
 
         return $query->first();
     }
+
+    public function getDashboardMachines(int $tenantId): Collection
+    {
+        $machines = Machine::where('tenant_id', $tenantId)
+            ->with('workCenter')
+            ->active()
+            ->orderBy('name')
+            ->get();
+
+        $machineIds = $machines->pluck('id')->toArray();
+
+        $runningOps = \App\Domains\Production\Models\ProductionScheduleOperation::where('tenant_id', $tenantId)
+            ->whereIn('machine_id', $machineIds)
+            ->where('status', \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_RUNNING)
+            ->with(['schedule.order.product', 'orderOperation'])
+            ->get()
+            ->keyBy('machine_id');
+
+        $machines->each(function ($machine) use ($runningOps) {
+            $machine->currentOp = $runningOps->get($machine->id);
+        });
+
+        return $machines;
+    }
+
+    public function getMachineDashboardDetails(int $machineId): array
+    {
+        $machine = Machine::with('workCenter')->findOrFail($machineId);
+
+        $currentOp = \App\Domains\Production\Models\ProductionScheduleOperation::with(['schedule.order.product', 'orderOperation', 'workCenter'])
+            ->where('machine_id', $machine->id)
+            ->where('status', \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_RUNNING)
+            ->first();
+
+        $nextOp = \App\Domains\Production\Models\ProductionScheduleOperation::with(['schedule.order.product', 'orderOperation'])
+            ->where('machine_id', $machine->id)
+            ->where('status', \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_READY)
+            ->orderBy('planned_start')
+            ->first();
+
+        $history = \App\Domains\Production\Models\ProductionScheduleOperation::with(['schedule.order.product', 'orderOperation'])
+            ->where('machine_id', $machine->id)
+            ->whereIn('status', [
+                \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_COMPLETED,
+                \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_CANCELLED,
+            ])
+            ->orderByDesc('actual_finish')
+            ->take(10)
+            ->get();
+
+        return compact('machine', 'currentOp', 'nextOp', 'history');
+    }
 }

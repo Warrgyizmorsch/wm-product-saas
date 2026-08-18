@@ -21,6 +21,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 
+use App\Domains\Production\Repositories\ProductionOrderRepositoryInterface;
+
 class ProductionOrderController extends Controller
 {
     public function __construct(
@@ -28,7 +30,8 @@ class ProductionOrderController extends Controller
         private readonly ProductionMaterialService $materialService,
         private readonly ProductionExecutionService $executionService,
         private readonly ProductionCostVarianceService $costService,
-        private readonly ProductionCostAdjustmentService $adjustmentService
+        private readonly ProductionCostAdjustmentService $adjustmentService,
+        private readonly ProductionOrderRepositoryInterface $orderRepository
     ) {
     }
 
@@ -36,42 +39,9 @@ class ProductionOrderController extends Controller
     {
         Gate::authorize('viewAny', ProductionOrder::class);
 
-        $tenantId = require_tenant_id();
-        $query = ProductionOrder::with(['product', 'bom', 'routing']);
-
-        if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
-            $query->where(function ($q) use ($search) {
-                $q->where('order_number', 'like', $search)
-                    ->orWhereHas('product', function ($p) use ($search) {
-                        $p->where('name', 'like', $search)->orWhere('sku', 'like', $search);
-                    });
-            });
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        if ($request->filled('production_mode')) {
-            $query->where('production_mode', $request->input('production_mode'));
-        }
-
-        if ($request->filled('start_date')) {
-            $query->where('start_date', '>=', $request->input('start_date'));
-        }
-
-        if ($request->filled('end_date')) {
-            $query->where('end_date', '<=', $request->input('end_date'));
-        }
-
-        $orders = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
-
-        // Calculate count widgets
-        $statusCounts = ProductionOrder::selectRaw('status, count(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status')
-            ->toArray();
+        $filters = $request->only(['search', 'status', 'production_mode', 'start_date', 'end_date']);
+        $orders = $this->orderRepository->paginateWithFilters($filters, 15)->withQueryString();
+        $statusCounts = $this->orderRepository->getStatusCounts();
 
         return view('modules.production.orders.index', compact('orders', 'statusCounts'));
     }
@@ -86,22 +56,10 @@ class ProductionOrderController extends Controller
 
         $tenantId = require_tenant_id();
 
-        $productionOrderRequests = ProductionOrderRequest::where('tenant_id', $tenantId)
-            ->where(function ($q) use ($productionOrderRequestId) {
-                $q->where(function ($sub) {
-                    $sub->where('status', 'draft')->whereNull('production_order_id');
-                });
-                if ($productionOrderRequestId) {
-                    $q->orWhere('id', $productionOrderRequestId);
-                }
-            })
-            ->with([
-                'product',
-                'materialRequirementItem.materialRequirement.salesOrder.customer',
-                'materialRequirementItem.salesOrderItem.salesOrder',
-            ])
-            ->orderByDesc('id')
-            ->get();
+        $productionOrderRequests = $this->orderRepository->getPendingRequests(
+            $tenantId,
+            $productionOrderRequestId ? (int) $productionOrderRequestId : null
+        );
 
         $selectedRequest = null;
         if ($productionOrderRequestId) {
@@ -183,45 +141,8 @@ class ProductionOrderController extends Controller
 
     public function show(int $id)
     {
-        $order = ProductionOrder::with([
-            'product',
-            'bom',
-            'routing',
-            'creator',
-            'releaser',
-            'completer',
-            'closer',
-            'operations.workCenter',
-            'operations.machine',
-            'operations.scheduleOperation',
-            'operations.operatorAssignments.user',
-            'reservations.product',
-            'reservations.uom',
-            'reservations.warehouse',
-            'issues.product',
-            'issues.user',
-            'issues.warehouse',
-            'progressLogs.operation',
-            'progressLogs.user',
-            'progressLogs.machine',
-            'receipts.user',
-            'receipts.warehouse',
-            'scraps.operation',
-            'scraps.product',
-            'scraps.user',
-            'reworks.operation',
-            'reworks.user',
-            'wips.currentRoutingOperation',
-            'wips.currentWorkCenter',
-            'wips.transactions.fromOperation',
-            'wips.transactions.toOperation',
-            'requisitionSlips.items.product',
-            'requisitionSlips.items.uom',
-            'requisitionSlips.purchaseRequisitions.items',
-            'schedules',
-            'batches',
-            'serialNumbers',
-        ])->findOrFail($id);
+        $order = $this->orderRepository->findWithDetails($id);
+        abort_if(!$order, 404, 'Production Order not found.');
 
         Gate::authorize('view', $order);
 

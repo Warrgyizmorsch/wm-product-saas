@@ -45,10 +45,7 @@ class ProductionBomController extends Controller
     {
         $tenantId = require_tenant_id();
 
-        $boms = ProductionBom::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('product_id', $productId)
-            ->get();
+        $boms = $this->bomRepository->getBomsByProductUnscoped($productId, $tenantId);
 
         $versions = $boms->map(function ($bom) {
             return [
@@ -91,11 +88,7 @@ class ProductionBomController extends Controller
         };
 
         $tenantId = require_tenant_id();
-        while (ProductionBom::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('product_id', $bom->product_id)
-            ->where('version', $newVersion)
-            ->exists()) {
+        while ($this->bomRepository->versionExistsUnscoped($bom->product_id, $newVersion, $tenantId)) {
             $newVersion = match ($bumpType) {
                 'major' => $this->versionService->incrementMajor($newVersion),
                 'minor' => $this->versionService->incrementMinor($newVersion),

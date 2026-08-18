@@ -115,7 +115,7 @@
 
                     {{-- Main Flat Modern Table --}}
                     <div class="table-responsive mb-3" style="max-width: 100%;">
-                        <table class="table table-hover table-sm align-middle text-dark mb-0 fs-12 w-100" style="min-width: 960px;">
+                        <x-ui.odoo-form-ui type="table">
                             <thead class="bg-light text-uppercase fs-10 fw-bold text-muted border-bottom">
                                 <tr>
                                     <th class="text-center py-2" style="width: 3%">
@@ -214,7 +214,7 @@
                                     </tr>
                                 @endforeach
                             </tbody>
-                        </table>
+                        </x-ui.odoo-form-ui>
                     </div>
 
                     {{-- Common Component Pagination Below Table --}}

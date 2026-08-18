@@ -7,6 +7,7 @@ use App\Domains\Production\Models\ProductionQualityInspection;
 use App\Domains\Production\Models\ProductionQualityPlan;
 use App\Domains\Production\Requests\QualityInspectionResultsRequest;
 use App\Domains\Production\Requests\StoreQualityInspectionRequest;
+use App\Domains\Production\Repositories\ProductionQualityRepositoryInterface;
 use App\Domains\Production\Services\QualityInspectionService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -14,37 +15,16 @@ use Illuminate\Http\Request;
 class QualityInspectionController extends Controller
 {
     public function __construct(
-        private readonly QualityInspectionService $inspectionService
+        private readonly QualityInspectionService $inspectionService,
+        private readonly ProductionQualityRepositoryInterface $qualityRepository
     ) {}
 
     public function index(Request $request)
     {
         $this->authorize('view', ProductionQualityInspection::class);
-        $tenantId = require_tenant_id();
 
-        $sortBy = $request->input('sort_by', 'id');
-        $sortOrder = $request->input('sort_order', 'desc');
-
-        $query = ProductionQualityInspection::with(['plan', 'order.product'])
-            ->where('tenant_id', $tenantId);
-
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function($q) use ($search) {
-                $q->where('inspection_number', 'like', "%{$search}%")
-                  ->orWhere('remarks', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        if ($request->filled('result')) {
-            $query->where('result', $request->input('result'));
-        }
-
-        $inspections = $query->orderBy($sortBy, $sortOrder)->paginate(15)->withQueryString();
+        $filters = $request->only(['search', 'status', 'result']);
+        $inspections = $this->qualityRepository->paginateInspections($filters, 15)->withQueryString();
 
         return view('modules.production.quality.inspections.index', compact('inspections'));
     }
@@ -78,10 +58,9 @@ class QualityInspectionController extends Controller
     public function show(int $id)
     {
         $this->authorize('view', ProductionQualityInspection::class);
-        $tenantId = require_tenant_id();
-        $inspection = ProductionQualityInspection::where('tenant_id', $tenantId)
-            ->with(['plan.parameters', 'results.parameter'])
-            ->findOrFail($id);
+
+        $inspection = $this->qualityRepository->findInspection($id);
+        abort_if(!$inspection, 404, 'Quality inspection record not found.');
 
         return view('modules.production.quality.inspections.show', compact('inspection'));
     }

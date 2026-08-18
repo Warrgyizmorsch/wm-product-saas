@@ -19,7 +19,7 @@
         }
         /* KPI Cards */
         .capacity-kpi-card {
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid var(--bs-primary);
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         }
         .capacity-kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.08) !important; }

@@ -29,6 +29,48 @@ class AppServiceProvider extends ServiceProvider
             return new \App\Support\Auth\TenantAwareUserProvider($app['hash'], $config['model']);
         });
 
+        // ── Production: Production Order ───────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\ProductionOrderRepositoryInterface::class,
+            \App\Domains\Production\Repositories\ProductionOrderRepository::class
+        );
+
+        // ── Production: Production Batch & MES ─────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\ProductionBatchRepositoryInterface::class,
+            \App\Domains\Production\Repositories\ProductionBatchRepository::class
+        );
+
+        // ── Production: Production WIP ─────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\ProductionWipRepositoryInterface::class,
+            \App\Domains\Production\Repositories\ProductionWipRepository::class
+        );
+
+        // ── Production: Production Schedule ────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\ProductionScheduleRepositoryInterface::class,
+            \App\Domains\Production\Repositories\ProductionScheduleRepository::class
+        );
+
+        // ── Production: Production Plan & MRP ─────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\ProductionPlanRepositoryInterface::class,
+            \App\Domains\Production\Repositories\ProductionPlanRepository::class
+        );
+
+        // ── Production: Quality Management ────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\ProductionQualityRepositoryInterface::class,
+            \App\Domains\Production\Repositories\ProductionQualityRepository::class
+        );
+
+        // ── Production: Cost & Traceability ───────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\ProductionCostTraceabilityRepositoryInterface::class,
+            \App\Domains\Production\Repositories\ProductionCostTraceabilityRepository::class
+        );
+
         // ── Production: BOM (Frozen) ──────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Production\Repositories\ProductionBomRepositoryInterface::class,

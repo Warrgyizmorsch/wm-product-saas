@@ -169,6 +169,7 @@ class ProductionPriority2VerificationTest extends TestCase
             'end_date' => now()->addDays(2)->toDateString(),
         ], $this->tenantA->id, $this->userA->id);
 
+        $order->requisitionSlips()->update(['status' => 'fully issued']);
         $this->orderService->release($order->id, $this->userA->id);
         $schedule = $this->schedulingService->generateForwardSchedule($order, now());
         $schedOp = $schedule->operations->first();
@@ -205,6 +206,7 @@ class ProductionPriority2VerificationTest extends TestCase
             'end_date' => now()->addDays(2)->toDateString(),
         ], $this->tenantA->id, $this->userA->id);
 
+        $order->requisitionSlips()->update(['status' => 'fully issued']);
         $this->orderService->release($order->id, $this->userA->id);
         $schedule = $this->schedulingService->generateForwardSchedule($order, now());
         $schedOp = $schedule->operations->first();
@@ -249,6 +251,7 @@ class ProductionPriority2VerificationTest extends TestCase
             'end_date' => now()->addDays(2)->toDateString(),
         ], $this->tenantA->id, $this->userA->id);
 
+        $order->requisitionSlips()->update(['status' => 'fully issued']);
         $this->orderService->release($order->id, $this->userA->id);
         $schedule = $this->schedulingService->generateForwardSchedule($order, now());
         $schedOp = $schedule->operations->first();
@@ -387,6 +390,7 @@ class ProductionPriority2VerificationTest extends TestCase
             'end_date' => now()->addDays(2)->toDateString(),
         ], $this->tenantA->id, $this->userA->id);
 
+        $order->requisitionSlips()->update(['status' => 'fully issued']);
         $this->orderService->release($order->id, $this->userA->id);
         $schedule = $this->schedulingService->generateForwardSchedule($order, now());
         $schedOp = $schedule->operations->first();

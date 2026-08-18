@@ -707,7 +707,7 @@ class ProductionEnterpriseTest extends TestCase
         $response->assertSessionHasNoErrors();
         $this->assertDatabaseHas('production_boms', [
             'tenant_id' => $this->tenant->id,
-            'bom_number' => 'BOM-000002',
+            'bom_number' => 'BOM-WDG-A',
             'bom_name' => 'Auto Unique BOM',
         ]);
     }

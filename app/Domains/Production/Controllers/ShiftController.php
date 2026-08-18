@@ -3,28 +3,23 @@
 namespace App\Domains\Production\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Domains\Production\Models\ProductionShift;
 use App\Domains\Production\Requests\StoreShiftRequest;
+use App\Domains\Production\Repositories\WorkCenterRepositoryInterface;
 use Illuminate\Http\Request;
 
 class ShiftController extends Controller
 {
+    public function __construct(
+        private readonly WorkCenterRepositoryInterface $workCenterRepository
+    ) {
+    }
+
     public function index(Request $request)
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
-        $tenantId = require_tenant_id();
 
-        $query = ProductionShift::where('tenant_id', $tenantId);
-
-        if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', $search)
-                  ->orWhere('code', 'like', $search);
-            });
-        }
-
-        $shifts = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
+        $filters = $request->only(['search']);
+        $shifts = $this->workCenterRepository->paginateShifts($filters, 15)->withQueryString();
 
         return view('modules.production.shifts.index', compact('shifts'));
     }
@@ -45,7 +40,7 @@ class ShiftController extends Controller
         $data['overtime_allowed'] = $request->boolean('overtime_allowed');
         $data['active'] = $request->boolean('active', true);
 
-        ProductionShift::create($data);
+        $this->workCenterRepository->createShift($data);
 
         return redirect()->route('production.shifts.index')
             ->with('success', 'Shift logged successfully.');
@@ -54,8 +49,8 @@ class ShiftController extends Controller
     public function edit(int $id)
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
-        $tenantId = require_tenant_id();
-        $shift = ProductionShift::where('tenant_id', $tenantId)->findOrFail($id);
+        $shift = $this->workCenterRepository->findShift($id);
+        abort_if(!$shift, 404, 'Shift not found.');
 
         return view('modules.production.shifts.edit', compact('shift'));
     }
@@ -63,14 +58,15 @@ class ShiftController extends Controller
     public function update(StoreShiftRequest $request, int $id)
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
-        $tenantId = require_tenant_id();
-        $shift = ProductionShift::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $shift = $this->workCenterRepository->findShift($id);
+        abort_if(!$shift, 404, 'Shift not found.');
 
         $data = $request->validated();
         $data['overtime_allowed'] = $request->boolean('overtime_allowed');
         $data['active'] = $request->boolean('active');
 
-        $shift->update($data);
+        $this->workCenterRepository->updateShift($id, $data);
 
         return redirect()->route('production.shifts.index')
             ->with('success', 'Shift updated successfully.');
@@ -79,10 +75,11 @@ class ShiftController extends Controller
     public function destroy(int $id)
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
-        $tenantId = require_tenant_id();
-        $shift = ProductionShift::where('tenant_id', $tenantId)->findOrFail($id);
 
-        $shift->delete();
+        $shift = $this->workCenterRepository->findShift($id);
+        abort_if(!$shift, 404, 'Shift not found.');
+
+        $this->workCenterRepository->deleteShift($id);
 
         return redirect()->route('production.shifts.index')
             ->with('success', 'Shift deleted.');

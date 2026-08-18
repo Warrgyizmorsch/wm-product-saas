@@ -22,4 +22,8 @@ interface MachineRepositoryInterface
     public function getByWorkCenter(int $workCenterId, bool $activeOnly = false): Collection;
 
     public function findByCode(string $code, int $tenantId, ?int $ignoreId = null): ?Machine;
+
+    public function getDashboardMachines(int $tenantId): Collection;
+
+    public function getMachineDashboardDetails(int $machineId): array;
 }

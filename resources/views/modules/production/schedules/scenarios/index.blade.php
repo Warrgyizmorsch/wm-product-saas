@@ -30,7 +30,7 @@
     @endif
 
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <x-ui.odoo-form-ui type="table">
             <thead class="bg-light text-muted small text-uppercase">
                 <tr>
                     <th class="ps-4">Scenario Name</th>
@@ -58,13 +58,13 @@
                         </td>
                         <td>
                             @if($scenario->status === 'promoted')
-                                <span class="badge bg-success">Promoted</span>
+                                <x-ui.status-badge status="active" text="Promoted" />
                             @elseif($scenario->status === 'calculated')
-                                <span class="badge bg-primary">Calculated</span>
+                                <x-ui.status-badge status="released" text="Calculated" />
                             @elseif($scenario->status === 'discarded')
-                                <span class="badge bg-secondary">Discarded</span>
+                                <x-ui.status-badge status="closed" text="Discarded" />
                             @else
-                                <span class="badge bg-warning text-dark">Draft</span>
+                                <x-ui.status-badge status="pending" text="Draft" />
                             @endif
                         </td>
                         <td class="small">{{ $scenario->creator?->name ?? 'System' }}</td>
@@ -101,7 +101,7 @@
                     </tr>
                 @endforelse
             </tbody>
-        </table>
+        </x-ui.odoo-form-ui>
     </div>
 </div>
 
