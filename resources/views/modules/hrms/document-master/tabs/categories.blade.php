@@ -19,6 +19,9 @@
                     @if(request()->filled('doc_status'))
                         <input type="hidden" name="doc_status" value="{{ request('doc_status') }}">
                     @endif
+                    @if(request()->filled('doc_sort'))
+                        <input type="hidden" name="doc_sort" value="{{ request('doc_sort') }}">
+                    @endif
                     
                     <input type="hidden" name="category_sort" id="category_sort" value="{{ request('category_sort', 'name_asc') }}">
                     
@@ -34,11 +37,21 @@
                             <a class="dropdown-item py-2 {{ request('category_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'newest', this); event.preventDefault();">Newest</a>
                         </x-ui.sort-dropdown>
 
-                        @if(request()->filled('category_search'))
-                            <a href="{{ route('hrms.documents-master.index', ['active_tab' => 'categories']) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="Clear Search">
-                                <i class="feather-x"></i>
-                            </a>
-                        @endif
+                        <x-ui.filter label="Filter" offset="0, 5" :reset-url="route('hrms.documents-master.index', ['active_tab' => 'categories'])">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            
+                            <div class="mb-3" style="min-width: 250px;">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Company</label>
+                                <x-ui.odoo-form-ui type="select" name="category_company_id">
+                                    <option value="">All Companies</option>
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}" {{ request('category_company_id') == $company->id ? 'selected' : '' }}>
+                                            {{ $company->company_name }}
+                                        </option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                        </x-ui.filter>
                     </div>
                 </form>
             </div>
@@ -55,7 +68,7 @@
                         <th class="text-end px-4" style="width: 10%;">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="categoriesTableBody">
                     @forelse($categories as $category)
                         <tr>
                             <td class="text-start px-4" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
@@ -117,7 +130,7 @@
             </table>
         </div>
 
-        <div class="mt-3">
+        <div class="mt-3" id="categoriesPaginationWrapper">
             <x-ui.pagination 
                 :currentPage="$categories->currentPage()" 
                 :totalPages="$categories->lastPage()" 
@@ -161,8 +174,8 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Create Category</button>
                     <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Create Category</button>
                 </div>
             </form>
         </div>
@@ -201,8 +214,8 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Save Changes</button>
                     <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Save Changes</button>
                 </div>
             </form>
         </div>

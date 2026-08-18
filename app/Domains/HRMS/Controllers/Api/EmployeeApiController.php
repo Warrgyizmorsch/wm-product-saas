@@ -520,12 +520,13 @@ class EmployeeApiController extends Controller
             $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $document->update([
-                'file_name'   => $file->getClientOriginalName(),
-                'file_path'   => $path,
-                'file_type'   => $file->getClientMimeType(),
-                'file_size'   => $file->getSize(),
-                'expiry_date' => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                'status'      => 'uploaded',
+                'file_name'       => $file->getClientOriginalName(),
+                'file_path'       => $path,
+                'file_type'       => $file->getClientMimeType(),
+                'file_size'       => $file->getSize(),
+                'expiry_date'     => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status'          => 'uploaded',
+                'requested_by_id' => auth()->id(),
             ]);
         } else {
             $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
@@ -542,6 +543,7 @@ class EmployeeApiController extends Controller
                 'expiry_date'       => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
                 'status'            => 'uploaded',
                 'has_expiry'        => $request->filled('expiry_date'),
+                'requested_by_id'   => auth()->id(),
             ]);
         }
 

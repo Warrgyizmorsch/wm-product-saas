@@ -146,13 +146,13 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($documents as $doc)
+                                @forelse($documents as $doc)
                                     @php
                                          $isExpired = $doc->expiry_date && $doc->expiry_date->isPast();
                                          $reminderDays = $doc->documentMaster?->reminder_days_before ?? 30;
                                          $isExpiringSoon = $doc->expiry_date && !$isExpired && now()->greaterThanOrEqualTo($doc->expiry_date->copy()->subDays($reminderDays));
                                         
-                                        $rowStatus = ($isExpired || $isExpiringSoon) ? 'requested' : $doc->status;
+                                        $rowStatus = $isExpired ? 'requested' : $doc->status;
                                         $rowHasExpiry = $doc->expiry_date ? '1' : '0';
 
                                         $requiresApproval = true;
@@ -161,7 +161,10 @@
                                         }
                                         
                                         $displayStatus = $doc->status;
-                                        if (!$requiresApproval && $displayStatus === 'uploaded') {
+                                        if ($doc->file_path && $displayStatus === 'requested') {
+                                            $displayStatus = 'uploaded';
+                                        }
+                                        if (!$requiresApproval && ($displayStatus === 'uploaded' || $displayStatus === 'requested')) {
                                             $displayStatus = 'approved';
                                         }
                                     @endphp
@@ -187,7 +190,7 @@
                                             <div>
                                                 <span class="badge bg-light text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
                                                     <i class="feather-user fs-11"></i>
-                                                    {{ $doc->file_path ? $employee->full_name : ($doc->requestedBy?->name ?? 'System') }}
+                                                    {{ $doc->requestedBy?->name ?? 'System' }}
                                                 </span>
                                             </div>
                                             <div class="mt-1.5">
@@ -334,12 +337,12 @@
                                             @endif
                                         </td>
                                         <td>
-                                            @if($isExpired || $isExpiringSoon)
+                                            @if(!$doc->file_path || $isExpired)
                                                 <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
                                                     <i class="feather-clock fs-11"></i>
                                                     {{ __('hrms.employees.lbl_pending_upload') }}
                                                 </span>
-                                            @elseif($doc->status !== 'requested')
+                                            @else
                                                 @if($requiresApproval)
                                                     <div class="dropdown d-inline-block">
                                                         <span class="dropdown-toggle doc-status-toggle fw-bold" 
@@ -383,20 +386,11 @@
                                                         Approved
                                                     </span>
                                                 @endif
-                                            @else
-                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
-                                                    <i class="feather-clock fs-11"></i>
-                                                    {{ __('hrms.employees.lbl_pending_upload') }}
-                                                </span>
                                             @endif
                                         </td>
                                         <td class="text-end pe-3">
                                             <div class="d-flex align-items-center justify-content-end gap-2">
-                                                @if($doc->status === 'requested' || $isExpired)
-                                                    <button class="btn btn-sm btn-light border py-1 px-3 d-inline-flex align-items-center justify-content-center fw-semibold text-muted disabled" style="font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 120px;" disabled>
-                                                        {{ __('hrms.employees.lbl_pending_upload') }}
-                                                    </button>
-                                                @endif
+
                                                 
                                                 <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
                                                     @csrf
@@ -408,7 +402,14 @@
                                             </div>
                                         </td>
                                     </tr>
-                                @endforeach
+                                @empty
+                                    <tr id="documentEmptyStateRow">
+                                        <td colspan="5" class="text-center py-5 text-muted fs-13">
+                                            <i class="feather-file-text d-block fs-32 text-light-muted mb-2" style="font-size: 28px;"></i>
+                                            No documents found.
+                                        </td>
+                                    </tr>
+                                @endforelse
                                 <tr id="documentNoResultsRow" class="d-none">
                                     <td colspan="5" class="text-center py-5 text-muted fs-13">
                                         <i class="feather-folder-minus d-block fs-32 text-light-muted mb-2"></i>

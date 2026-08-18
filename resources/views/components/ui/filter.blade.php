@@ -1,6 +1,9 @@
 @props([
     'label' => 'Filter',
-    'offset' => '0, 10'
+    'offset' => '0, 10',
+    'resetUrl' => null,
+    'submitLabel' => 'Apply Filters',
+    'resetLabel' => 'Reset'
 ])
 
 @once
@@ -55,6 +58,13 @@
     </x-ui.icon-btn>
     <div class="dropdown-menu dropdown-menu-end theme-filter-dropdown-menu shadow-lg">
         {{ $slot }}
+        @if($resetUrl)
+            <div class="dropdown-divider my-3"></div>
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ $submitLabel }}</x-ui.button>
+                <x-ui.button href="{{ $resetUrl }}" variant="light" size="sm" class="border flex-grow-1">{{ $resetLabel }}</x-ui.button>
+            </div>
+        @endif
     </div>
 </div>
 

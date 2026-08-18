@@ -15,8 +15,23 @@ class DocumentController extends Controller
 {
     public function index(Request $request): View
     {
+        $activeTab = $request->query('tab', 'employee');
+
         $query = Document::with(['documentable', 'documentMaster', 'requestedBy'])
             ->where('documentable_type', Employee::class);
+
+        // Separate by tab (Employee vs HR Uploads)
+        if ($activeTab === 'employee') {
+            $query->whereHasMorph('documentable', [Employee::class], function ($q) {
+                $q->whereColumn('user_id', 'documents.requested_by_id');
+            });
+        } else {
+            $query->where(function ($q) {
+                $q->whereDoesntHaveMorph('documentable', [Employee::class], function ($q2) {
+                    $q2->whereColumn('user_id', 'documents.requested_by_id');
+                })->orWhereNull('requested_by_id');
+            });
+        }
 
         // Search by employee name, ID or document name
         if ($request->filled('search')) {
@@ -37,17 +52,56 @@ class DocumentController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $documents = $query->orderBy('created_at', 'desc')->paginate(15);
+        // Filter by document category
+        if ($request->filled('category_id')) {
+            $query->whereHas('documentMaster', function ($q) use ($request) {
+                $q->where('document_category_id', $request->input('category_id'));
+            });
+        }
+
+        // Sort options
+        $sort = $request->input('sort', 'newest');
+        if ($sort === 'oldest') {
+            $query->orderBy('created_at', 'asc');
+        } elseif ($sort === 'employee_asc') {
+            $query->select('documents.*')
+                ->leftJoin('employees', function ($join) {
+                    $join->on('employees.id', '=', 'documents.documentable_id')
+                         ->where('documents.documentable_type', '=', Employee::class);
+                })
+                ->orderBy('employees.full_name', 'asc');
+        } elseif ($sort === 'employee_desc') {
+            $query->select('documents.*')
+                ->leftJoin('employees', function ($join) {
+                    $join->on('employees.id', '=', 'documents.documentable_id')
+                         ->where('documents.documentable_type', '=', Employee::class);
+                })
+                ->orderBy('employees.full_name', 'desc');
+        } elseif ($sort === 'doc_name_asc') {
+            $query->orderBy('name', 'asc');
+        } elseif ($sort === 'doc_name_desc') {
+            $query->orderBy('name', 'desc');
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
+        $documents = $query->paginate(10)->withQueryString();
 
         // Fetch all active employees, templates and categories for the upload modal selection
         $employees = Employee::orderBy('full_name')->get();
         $categories = DocumentCategory::orderBy('name')->get();
         $templates = DocumentMaster::where('status', 'active')
-            ->whereIn('upload_responsibility', ['hr', 'both'])
             ->orderBy('name')
             ->get();
 
-        return view('modules.hrms.documents.index', compact('documents', 'employees', 'templates', 'categories'));
+        $templatesJson = $templates->map(fn($tmpl) => [
+            'id' => $tmpl->id,
+            'text' => $tmpl->name,
+            'categoryId' => $tmpl->document_category_id,
+            'expiry' => $tmpl->expiry_applicable ? '1' : '0'
+        ]);
+
+        return view('modules.hrms.documents.index', compact('documents', 'employees', 'templates', 'categories', 'activeTab', 'templatesJson'));
     }
 
     public function bulkUpload(Request $request): RedirectResponse
