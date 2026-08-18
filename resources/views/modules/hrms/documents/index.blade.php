@@ -16,6 +16,11 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
+        .erp-single-panel.is-loading {
+            opacity: 0.6;
+            pointer-events: none;
+            transition: opacity 0.15s ease-in-out;
+        }
         .table-responsive {
             position: relative;
         }
@@ -94,6 +99,24 @@
             border-color: var(--bs-primary) !important;
             background-color: rgba(var(--bs-primary-rgb), 0.05) !important;
         }
+
+        /* Tabs styling */
+        #documentTabs .nav-link {
+            border: none !important;
+            background-color: transparent !important;
+            color: #64748b;
+            font-weight: 600;
+            padding: 12px 20px;
+            border-bottom: 2px solid transparent !important;
+            transition: all 0.2s ease-in-out;
+        }
+        #documentTabs .nav-link:hover {
+            color: var(--bs-primary);
+        }
+        #documentTabs .nav-link.active {
+            color: var(--bs-primary) !important;
+            border-bottom: 2px solid var(--bs-primary) !important;
+        }
     </style>
 @endpush
 
@@ -126,52 +149,84 @@
                 </div>
             @endif
 
-            <!-- Main Registry Card -->
-            <div class="card border-0 shadow-sm rounded-3">
-                <div class="card-header border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-3 bg-white">
+            <!-- Main Registry Panel -->
+            <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+                <!-- Tabs Navigation -->
+                <ul class="nav nav-tabs border-bottom mb-4" id="documentTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link {{ $activeTab === 'employee' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'employee']) }}">
+                            <i class="feather-user me-2"></i>Employee Uploaded
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link {{ $activeTab === 'hr' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'hr']) }}">
+                            <i class="feather-shield me-2"></i>HR Uploaded
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 pb-3 border-bottom mb-4">
                     <div>
-                        <h5 class="fw-bold mb-0 text-dark" style="font-size: 15px;">All Employee Documents</h5>
+                        <h5 class="fw-bold mb-0 text-dark" style="font-size: 15px;">
+                            {{ $activeTab === 'employee' ? 'Employee Uploaded Documents' : 'HR Uploaded Documents' }}
+                        </h5>
                     </div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <form method="GET" action="{{ route('hrms.documents.index') }}" class="d-flex align-items-center gap-2 m-0">
+                        <form method="GET" action="{{ route('hrms.documents.index') }}" class="d-flex align-items-center gap-2 m-0" id="documentsFilterForm">
+                            <input type="hidden" name="tab" value="{{ $activeTab }}">
+                            <input type="hidden" name="sort" id="sort_input" value="{{ request('sort', 'newest') }}">
+                            
                             <!-- Search Bar -->
-                            <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
+                            <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 280px; max-width: 340px; height: 38px;">
                                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                                 <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search employee or document..." value="{{ request('search') }}" style="box-shadow: none; height: 32px;">
                             </div>
 
-                            <!-- Filter Options -->
-                            <x-ui.filter label="Filter" offset="0, 5">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
-                                
-                                <div class="mb-3" style="min-width: 200px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
-                                    <select name="status" class="form-select fs-12">
-                                        <option value="">All Statuses</option>
-                                        <option value="uploaded" {{ request('status') === 'uploaded' ? 'selected' : '' }}>Pending Verification</option>
-                                        <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
-                                        <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
-                                        <option value="requested" {{ request('status') === 'requested' ? 'selected' : '' }}>Pending Upload</option>
-                                    </select>
-                                </div>
+                            <!-- Sort and Filter Group -->
+                            <div class="d-flex gap-2">
+                                <!-- Sort Options -->
+                                <x-ui.sort-dropdown label="Sort">
+                                    <a class="dropdown-item py-2 {{ request('sort', 'newest') === 'newest' ? 'active' : '' }}" href="#" onclick="applySort('newest'); return false;">Newest</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'oldest' ? 'active' : '' }}" href="#" onclick="applySort('oldest'); return false;">Oldest</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'employee_asc' ? 'active' : '' }}" href="#" onclick="applySort('employee_asc'); return false;">Employee Name (A-Z)</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'employee_desc' ? 'active' : '' }}" href="#" onclick="applySort('employee_desc'); return false;">Employee Name (Z-A)</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'doc_name_asc' ? 'active' : '' }}" href="#" onclick="applySort('doc_name_asc'); return false;">Document Name (A-Z)</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'doc_name_desc' ? 'active' : '' }}" href="#" onclick="applySort('doc_name_desc'); return false;">Document Name (Z-A)</a>
+                                </x-ui.sort-dropdown>
 
-                                <div class="d-flex gap-2 justify-content-end mt-4">
-                                    <a href="{{ route('hrms.documents.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                                    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
-                                </div>
-                            </x-ui.filter>
+                                <!-- Filter Options -->
+                                <x-ui.filter label="Filter" offset="0, 5" :reset-url="route('hrms.documents.index', ['tab' => $activeTab])">
+                                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                    
+                                    <div class="mb-3" style="min-width: 220px;">
+                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                        <x-ui.odoo-form-ui type="select" name="status">
+                                            <option value="">All Statuses</option>
+                                            <option value="uploaded" {{ request('status') === 'uploaded' ? 'selected' : '' }}>Pending Verification</option>
+                                            <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
+                                            <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                            <option value="requested" {{ request('status') === 'requested' ? 'selected' : '' }}>Pending Upload</option>
+                                        </x-ui.odoo-form-ui>
+                                    </div>
 
-                            @if(request()->anyFilled(['search', 'status']))
-                                <a href="{{ route('hrms.documents.index') }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="Clear Filters">
-                                    <i class="feather-x"></i>
-                                </a>
-                            @endif
+                                    <div class="mb-3" style="min-width: 220px;">
+                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Category</label>
+                                        <x-ui.odoo-form-ui type="select" name="category_id">
+                                            <option value="">All Categories</option>
+                                            @foreach($categories as $cat)
+                                                <option value="{{ $cat->id }}" {{ request('category_id') == $cat->id ? 'selected' : '' }}>
+                                                    {{ $cat->name }}
+                                                </option>
+                                            @endforeach
+                                        </x-ui.odoo-form-ui>
+                                    </div>
+                                </x-ui.filter>
+                            </div>
                         </form>
                     </div>
                 </div>
 
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="overflow: visible;">
+                <div class="table-responsive" style="overflow: visible;">
                         <table class="table table-hover align-middle mb-0" style="table-layout: fixed; width: 100%;">
                             <thead class="table-light">
                                 <tr>
@@ -182,7 +237,7 @@
                                     <th class="text-end pe-3" style="width: 10%;">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="documentsTableBody">
                                 @forelse($documents as $doc)
                                     @php
                                         $employee = $doc->documentable;
@@ -259,9 +314,8 @@
                                                     </div>
                                                 </div>
                                             @else
-                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
-                                                    <i class="feather-clock fs-11"></i>
-                                                    Pending Upload
+                                                <span class="text-muted fs-12" style="font-style: italic; font-weight: 500; padding-left: 8px;">
+                                                    <i class="feather-slash me-1 fs-11 text-muted"></i>No file uploaded
                                                 </span>
                                             @endif
                                         </td>
@@ -270,12 +324,12 @@
                                         <td>
                                             <!-- Status Dropdown or Badge -->
                                             <div>
-                                                @if($isExpired || $isExpiringSoon)
+                                                @if(!$doc->file_path || $isExpired)
                                                     <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
                                                         <i class="feather-clock fs-11"></i>
                                                         Pending Upload
                                                     </span>
-                                                @elseif($doc->status !== 'requested')
+                                                @else
                                                     @if($requiresApproval)
                                                         <div class="dropdown d-inline-block">
                                                             <span class="dropdown-toggle doc-status-toggle fw-bold" 
@@ -319,11 +373,6 @@
                                                             Approved
                                                         </span>
                                                     @endif
-                                                @else
-                                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
-                                                        <i class="feather-clock fs-11"></i>
-                                                        Pending Upload
-                                                    </span>
                                                 @endif
                                             </div>
 
@@ -372,25 +421,17 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
 
-                @if($documents->hasPages())
-                    @php
-                        $currentPage = $documents->currentPage();
-                        $totalPages = $documents->lastPage();
-                        $totalResults = $documents->total();
-                        $perPage = $documents->perPage();
-                    @endphp
-                    <div class="card-footer p-0">
-                        <x-ui.pagination 
-                            class="px-4 py-3 border-top"
-                            :current-page="$currentPage"
-                            :total-pages="$totalPages"
-                            :total-results="$totalResults"
-                            :per-page="$perPage"
-                        />
-                    </div>
-                @endif
+                <div class="mt-3" id="documentsPaginationWrapper">
+                    <x-ui.pagination 
+                        :currentPage="$documents->currentPage()" 
+                        :totalPages="$documents->lastPage()" 
+                        :totalResults="$documents->total()" 
+                        :perPage="$documents->perPage()" 
+                        pageParam="page"
+                        :tab="$activeTab"
+                    />
+                </div>
             </div>
         </div>
     </div>
@@ -621,19 +662,7 @@
             $('#uploadDocumentModal').appendTo('body');
 
             // Cache all templates options dynamically on page load
-            var allTemplates = [];
-            $('#document_master_id option').each(function() {
-                var val = $(this).val();
-                if (val !== '') {
-                    allTemplates.push({
-                        id: val,
-                        text: $(this).text(),
-                        categoryId: $(this).data('category-id'),
-                        expiry: $(this).data('expiry')
-                    });
-                }
-            });
-            window.allDocumentTemplates = allTemplates;
+            window.allDocumentTemplates = @json($templatesJson);
 
             // Handle clean clearing when inputs receive value
             $('#employee_id').on('change', function() {
@@ -668,6 +697,141 @@
                     $container.find('.error-msg').addClass('d-none');
                 }
             });
+
+            // Debounced quick search to avoid needing to press Enter
+            var searchTimeout = null;
+            $(document).on('input keyup search', '#documentsFilterForm input[name="search"]', function () {
+                const form = this.closest('form');
+                if (!form) return;
+                
+                const url = new URL(form.action || window.location.href);
+                const formData = new FormData(form);
+                for (const [key, val] of formData.entries()) {
+                    url.searchParams.set(key, val);
+                }
+
+                url.searchParams.delete('page'); // Reset page parameter on new search
+
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function () {
+                    refreshDocumentsList(url);
+                }, 250);
+            });
+
+            // Intercept dropdown changes
+            $(document).on('change', '#documentsFilterForm select', function() {
+                const form = this.closest('form');
+                if (!form) return;
+                
+                const url = new URL(form.action || window.location.href);
+                const formData = new FormData(form);
+                for (const [key, val] of formData.entries()) {
+                    url.searchParams.set(key, val);
+                }
+
+                url.searchParams.delete('page'); // Reset page parameter on new filter
+
+                refreshDocumentsList(url);
+            });
+
+            // Intercept form submission (when pressing enter in search)
+            $(document).on('submit', '#documentsFilterForm', function(event) {
+                event.preventDefault();
+                const url = new URL(this.action || window.location.href);
+                const formData = new FormData(this);
+                for (const [key, val] of formData.entries()) {
+                    url.searchParams.set(key, val);
+                }
+
+                url.searchParams.delete('page');
+
+                refreshDocumentsList(url);
+                
+                // Close the filter dropdown menu safely
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
+            });
+            
+            // Intercept pagination clicks to use AJAX loading
+            $(document).on('click', '#documentsPaginationWrapper a', function(event) {
+                event.preventDefault();
+                const url = new URL(this.href);
+                refreshDocumentsList(url);
+            });
         });
+
+        // Global sorting function
+        function applySort(val) {
+            $('#sort_input').val(val);
+            const form = document.getElementById('documentsFilterForm');
+            if (form) {
+                const url = new URL(form.action || window.location.href);
+                const formData = new FormData(form);
+                for (const [key, val] of formData.entries()) {
+                    url.searchParams.set(key, val);
+                }
+                url.searchParams.delete('page');
+                refreshDocumentsList(url);
+            }
+        }
+
+        var activeRequest = null;
+        function refreshDocumentsList(url) {
+            if (activeRequest) {
+                activeRequest.abort();
+            }
+
+            const controller = new AbortController();
+            activeRequest = controller;
+
+            const pane = document.querySelector('.erp-single-panel');
+            if (pane) {
+                pane.classList.add('is-loading');
+            }
+
+            fetch(url.toString(), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                signal: controller.signal,
+            })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Unable to refresh list.');
+                }
+                return response.text();
+            })
+            .then(function (html) {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                
+                const newTbody = doc.getElementById('documentsTableBody');
+                const oldTbody = document.getElementById('documentsTableBody');
+                const newPagination = doc.getElementById('documentsPaginationWrapper');
+                const oldPagination = document.getElementById('documentsPaginationWrapper');
+
+                if (newTbody && oldTbody) {
+                    oldTbody.innerHTML = newTbody.innerHTML;
+                }
+                if (newPagination && oldPagination) {
+                    oldPagination.innerHTML = newPagination.innerHTML;
+                }
+
+                // Push state to update browser URL
+                history.pushState(null, '', url.toString());
+            })
+            .catch(function (error) {
+                if (error.name !== 'AbortError') {
+                    window.location.href = url.toString();
+                }
+            })
+            .finally(function () {
+                if (activeRequest === controller) {
+                    if (pane) {
+                        pane.classList.remove('is-loading');
+                    }
+                    activeRequest = null;
+                }
+            });
+        }
     </script>
 @endpush

@@ -21,6 +21,12 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
+        .tab-pane.is-loading {
+            opacity: 0.6;
+            pointer-events: none;
+            transition: opacity 0.15s ease-in-out;
+        }
+
         .btn-outline-primary {
             border-color: var(--bs-primary) !important;
             color: var(--bs-primary) !important;
@@ -356,6 +362,78 @@
             });
         });
 
+        var activeRequest = null;
+        function refreshDocumentMasterList(url, tabId) {
+            if (activeRequest) {
+                activeRequest.abort();
+            }
+
+            const controller = new AbortController();
+            activeRequest = controller;
+
+            const targetIds = {
+                'categories': {
+                    tbody: 'categoriesTableBody',
+                    pagination: 'categoriesPaginationWrapper'
+                },
+                'documents': {
+                    tbody: 'documentsTableBody',
+                    pagination: 'documentsPaginationWrapper'
+                }
+            }[tabId];
+
+            const pane = document.getElementById(tabId + '-pane');
+            if (pane) {
+                pane.classList.add('is-loading');
+            }
+
+            fetch(url.toString(), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                signal: controller.signal,
+            })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Unable to refresh list.');
+                }
+                return response.text();
+            })
+            .then(function (html) {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                
+                if (targetIds) {
+                    const newTbody = doc.getElementById(targetIds.tbody);
+                    const oldTbody = document.getElementById(targetIds.tbody);
+                    const newPagination = doc.getElementById(targetIds.pagination);
+                    const oldPagination = document.getElementById(targetIds.pagination);
+
+                    if (newTbody && oldTbody) {
+                        oldTbody.innerHTML = newTbody.innerHTML;
+                    }
+                    if (newPagination && oldPagination) {
+                        oldPagination.innerHTML = newPagination.innerHTML;
+                    }
+                }
+
+                // Push state to update browser URL
+                history.pushState(null, '', url.toString());
+            })
+            .catch(function (error) {
+                if (error.name !== 'AbortError') {
+                    window.location.href = url.toString();
+                }
+            })
+            .finally(function () {
+                if (activeRequest === controller) {
+                    if (pane) {
+                        pane.classList.remove('is-loading');
+                    }
+                    activeRequest = null;
+                }
+            });
+        }
+
         // Global sort function
         function changeSort(tab, criteria, element) {
             var input = document.getElementById(tab + '_sort');
@@ -376,10 +454,75 @@
             if (input) {
                 var form = input.closest('form');
                 if (form) {
-                    form.submit();
+                    $(form).submit();
                 }
             }
         }
+
+        $(document).ready(function() {
+            // Debounced quick search to avoid needing to press Enter
+            var searchTimeout = null;
+            $(document).on('input', 'input[name="category_search"], input[name="doc_search"]', function () {
+                const input = this;
+                const form = input.closest('form');
+                if (!form) return;
+                
+                const tabId = form.querySelector('input[name="active_tab"]').value;
+                const url = new URL(form.action || window.location.href);
+                
+                const formData = new FormData(form);
+                for (const [key, val] of formData.entries()) {
+                    url.searchParams.set(key, val);
+                }
+
+                const pageParam = tabId === 'categories' ? 'category_page' : 'doc_page';
+                url.searchParams.delete(pageParam);
+
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function () {
+                    refreshDocumentMasterList(url, tabId);
+                }, 250);
+            });
+
+            // Intercept GET form submissions (search/filters)
+            $(document).on('submit', '#docMasterTabsContent form', function (event) {
+                const form = this;
+                if (form.method && form.method.toLowerCase() !== 'get') {
+                    return;
+                }
+                event.preventDefault();
+                const tabId = form.querySelector('input[name="active_tab"]').value;
+                const url = new URL(form.action || window.location.href);
+                
+                const formData = new FormData(form);
+                for (const [key, val] of formData.entries()) {
+                    url.searchParams.set(key, val);
+                }
+
+                const pageParam = tabId === 'categories' ? 'category_page' : 'doc_page';
+                url.searchParams.delete(pageParam);
+
+                refreshDocumentMasterList(url, tabId);
+                
+                // Close the filter dropdown menu safely
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
+            });
+
+            // Intercept Sort, Reset, and Pagination links
+            $(document).on('click', '#docMasterTabsContent a[href]', function (event) {
+                const href = this.getAttribute('href');
+                if (!href || href.startsWith('javascript:') || href === '#') return;
+
+                const urlObj = new URL(href, window.location.origin);
+                const tabId = urlObj.searchParams.get('active_tab');
+
+                if (tabId !== 'categories' && tabId !== 'documents') return;
+
+                event.preventDefault();
+                refreshDocumentMasterList(urlObj, tabId);
+            });
+        });
     </script>
 @endpush
 

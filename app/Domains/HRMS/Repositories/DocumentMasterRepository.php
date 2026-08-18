@@ -23,6 +23,10 @@ class DocumentMasterRepository implements DocumentMasterRepositoryInterface
             });
         }
 
+        if (!empty($inputs['category_company_id'])) {
+            $categoriesQuery->where('company_id', $inputs['category_company_id']);
+        }
+
         $categorySort = $inputs['category_sort'] ?? 'name_asc';
         if ($categorySort === 'name_desc') {
             $categoriesQuery->orderBy('name', 'desc');

@@ -275,12 +275,13 @@ class EmployeeController extends Controller
             $status = $approvalRequired ? 'uploaded' : 'approved';
 
             $document->update([
-                'file_name'   => $file->getClientOriginalName(),
-                'file_path'   => $path,
-                'file_type'   => $file->getClientMimeType(),
-                'file_size'   => $file->getSize(),
-                'expiry_date' => $expiryApplicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                'status'      => $status,
+                'file_name'       => $file->getClientOriginalName(),
+                'file_path'       => $path,
+                'file_type'       => $file->getClientMimeType(),
+                'file_size'       => $file->getSize(),
+                'expiry_date'     => $expiryApplicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status'          => $status,
+                'requested_by_id' => auth()->id(),
             ]);
         } else {
             $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::findOrFail($request->integer('document_master_id'));
