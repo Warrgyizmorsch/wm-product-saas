@@ -40,9 +40,9 @@ class WorkCenterController extends Controller
         Gate::authorize('create', WorkCenter::class);
 
         $tenantId = require_tenant_id();
-        $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->orderBy('name')->get();
+        $shifts = $this->repository->getActiveShifts($tenantId);
         $workCenterTypes = config('production.work_center_types', []);
-        $parentOptions = WorkCenter::orderBy('name')->get();
+        $parentOptions = $this->repository->getAllOrderedByName();
         return view('modules.production.work-centers.create', compact('workCenterTypes', 'parentOptions', 'shifts'));
     }
 

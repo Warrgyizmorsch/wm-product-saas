@@ -20,10 +20,13 @@ use App\Domains\Production\Models\Routing;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
+use App\Domains\Production\Repositories\ProductionOrderRepositoryInterface;
+
 class ProductionOrderService
 {
     public function __construct(
-        private readonly ProductionOrderNumberService $numberService
+        private readonly ProductionOrderNumberService $numberService,
+        private readonly ProductionOrderRepositoryInterface $orderRepository
     ) {}
 
     /**
@@ -335,7 +338,8 @@ class ProductionOrderService
      */
     public function release(int $id, ?int $userId = null, bool $force = false): void
     {
-        $order = ProductionOrder::findOrFail($id);
+        $order = $this->orderRepository->find($id);
+        abort_if(!$order, 404, 'Production Order not found.');
 
         if (! $order->isDraft()) {
             throw new InvalidArgumentException('Only draft orders can be released.');
@@ -377,7 +381,8 @@ class ProductionOrderService
      */
     public function complete(int $id, ?int $userId = null): void
     {
-        $order = ProductionOrder::findOrFail($id);
+        $order = $this->orderRepository->find($id);
+        abort_if(!$order, 404, 'Production Order not found.');
 
         if ($order->status !== ProductionOrder::STATUS_IN_PROGRESS && $order->status !== ProductionOrder::STATUS_RELEASED) {
             throw new InvalidArgumentException('Only orders in progress or released can be completed.');
@@ -416,7 +421,8 @@ class ProductionOrderService
      */
     public function close(int $id, ?int $userId = null): void
     {
-        $order = ProductionOrder::findOrFail($id);
+        $order = $this->orderRepository->find($id);
+        abort_if(!$order, 404, 'Production Order not found.');
 
         if (! $order->isCompleted()) {
             throw new InvalidArgumentException('Only completed orders can be closed.');
@@ -443,7 +449,8 @@ class ProductionOrderService
      */
     public function cancel(int $id, ?int $userId = null): void
     {
-        $order = ProductionOrder::findOrFail($id);
+        $order = $this->orderRepository->find($id);
+        abort_if(!$order, 404, 'Production Order not found.');
 
         if ($order->isClosed() || $order->isCompleted()) {
             throw new InvalidArgumentException('Closed or completed orders cannot be cancelled.');

@@ -4,6 +4,7 @@ namespace App\Domains\Production\Controllers;
 
 use App\Domains\Production\Models\ProductionReworkOrder;
 use App\Domains\Production\Requests\CompleteReworkOperationRequest;
+use App\Domains\Production\Repositories\ProductionQualityRepositoryInterface;
 use App\Domains\Production\Services\ReworkService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -11,39 +12,16 @@ use Illuminate\Http\Request;
 class ReworkController extends Controller
 {
     public function __construct(
-        private readonly ReworkService $reworkService
+        private readonly ReworkService $reworkService,
+        private readonly ProductionQualityRepositoryInterface $qualityRepository
     ) {}
 
     public function index(Request $request)
     {
         $this->authorize('view', ProductionReworkOrder::class);
-        $tenantId = require_tenant_id();
 
-        $query = ProductionReworkOrder::where('tenant_id', $tenantId)
-            ->with(['ncr', 'originalOrder.product']);
-
-        if ($request->filled('search')) {
-            $search = '%'.$request->input('search').'%';
-            $query->where(function ($q) use ($search) {
-                $q->where('rework_number', 'like', $search);
-            });
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        $sortBy = $request->input('sort_by', 'id');
-        $sortOrder = $request->input('sort_order', 'desc');
-
-        if (! in_array($sortBy, ['id', 'rework_number', 'status', 'cost_estimate', 'actual_cost'])) {
-            $sortBy = 'id';
-        }
-        if (! in_array($sortOrder, ['asc', 'desc'])) {
-            $sortOrder = 'desc';
-        }
-
-        $reworks = $query->orderBy($sortBy, $sortOrder)->paginate(15)->withQueryString();
+        $filters = $request->only(['search', 'status']);
+        $reworks = $this->qualityRepository->paginateReworkOrders($filters, 15)->withQueryString();
 
         return view('modules.production.quality.rework.index', compact('reworks'));
     }
@@ -51,10 +29,9 @@ class ReworkController extends Controller
     public function show(int $id)
     {
         $this->authorize('view', ProductionReworkOrder::class);
-        $tenantId = require_tenant_id();
-        $rework = ProductionReworkOrder::where('tenant_id', $tenantId)
-            ->with(['ncr', 'originalOrder.product', 'operations.workCenter', 'operations.machine'])
-            ->findOrFail($id);
+
+        $rework = $this->qualityRepository->findReworkOrder($id);
+        abort_if(!$rework, 404, 'Rework order not found.');
 
         return view('modules.production.quality.rework.show', compact('rework'));
     }

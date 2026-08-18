@@ -4,6 +4,7 @@ namespace App\Domains\Production\Controllers;
 
 use App\Domains\Production\Models\ProductionScrapDisposal;
 use App\Domains\Production\Requests\StoreScrapRequest;
+use App\Domains\Production\Repositories\ProductionQualityRepositoryInterface;
 use App\Domains\Production\Services\ScrapService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -11,18 +12,14 @@ use Illuminate\Http\Request;
 class ScrapController extends Controller
 {
     public function __construct(
-        private readonly ScrapService $scrapService
+        private readonly ScrapService $scrapService,
+        private readonly ProductionQualityRepositoryInterface $qualityRepository
     ) {}
 
     public function index()
     {
         $this->authorize('view', ProductionScrapDisposal::class);
-        $tenantId = require_tenant_id();
-        $scraps = ProductionScrapDisposal::where('tenant_id', $tenantId)
-            ->with(['ncr.order.product', 'disposer'])
-            ->orderBy('id', 'desc')
-            ->paginate(15)
-            ->withQueryString();
+        $scraps = $this->qualityRepository->paginateScrapDisposals([], 15)->withQueryString();
 
         return view('modules.production.quality.scrap.index', compact('scraps'));
     }

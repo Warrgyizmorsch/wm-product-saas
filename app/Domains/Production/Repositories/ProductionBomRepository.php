@@ -106,4 +106,21 @@ class ProductionBomRepository implements ProductionBomRepositoryInterface
             ->with(['product', 'items.material', 'items.uom', 'creator', 'approver'])
             ->find($id);
     }
+
+    public function getBomsByProductUnscoped(int $productId, int $tenantId): Collection
+    {
+        return ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->get();
+    }
+
+    public function versionExistsUnscoped(int $productId, string $version, int $tenantId): bool
+    {
+        return ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('version', $version)
+            ->exists();
+    }
 }

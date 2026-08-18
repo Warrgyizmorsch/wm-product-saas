@@ -408,6 +408,7 @@ class ProductionPriority1VerificationTest extends TestCase
         ]);
 
         // Release order & generate forward schedule
+        $order->requisitionSlips()->update(['status' => 'fully issued']);
         $this->orderService->release($order->id, $this->user->id);
         $schedule = app(\App\Domains\Production\Services\SchedulingService::class)
             ->generateForwardSchedule($order, now());

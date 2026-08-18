@@ -96,8 +96,8 @@
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0 fs-13">
-                                <thead class="table-light">
+                            <x-ui.odoo-form-ui type="table">
+                                <thead>
                                     <tr>
                                         <th>ID</th>
                                         <th>Stage</th>
@@ -114,11 +114,11 @@
                                             <td>{{ $insp->order?->order_number ?? 'N/A' }}</td>
                                             <td>
                                                 @if($insp->result === 'passed')
-                                                    <span class="badge bg-soft-success text-success">PASSED</span>
+                                                    <x-ui.status-badge status="active" text="PASSED" />
                                                 @elseif($insp->result === 'failed')
-                                                    <span class="badge bg-soft-danger text-danger">FAILED</span>
+                                                    <x-ui.status-badge status="danger" text="FAILED" />
                                                 @else
-                                                    <span class="badge bg-soft-secondary text-secondary">PENDING</span>
+                                                    <x-ui.status-badge status="draft" text="PENDING" />
                                                 @endif
                                             </td>
                                             <td>
@@ -131,7 +131,7 @@
                                         </tr>
                                     @endforelse
                                 </tbody>
-                            </table>
+                            </x-ui.odoo-form-ui>
                         </div>
                     </div>
                 </div>
@@ -145,8 +145,8 @@
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0 fs-13">
-                                <thead class="table-light">
+                            <x-ui.odoo-form-ui type="table">
+                                <thead>
                                     <tr>
                                         <th>NCR #</th>
                                         <th>Category</th>
@@ -162,9 +162,9 @@
                                             <td>{{ $ncr->order?->order_number ?? 'N/A' }}</td>
                                             <td>
                                                 @if($ncr->status === 'open')
-                                                    <span class="badge bg-soft-danger text-danger">OPEN</span>
+                                                    <x-ui.status-badge status="danger" text="OPEN" />
                                                 @else
-                                                    <span class="badge bg-soft-success text-success">CLOSED</span>
+                                                    <x-ui.status-badge status="active" text="CLOSED" />
                                                 @endif
                                             </td>
                                         </tr>
@@ -174,7 +174,7 @@
                                         </tr>
                                     @endforelse
                                 </tbody>
-                            </table>
+                            </x-ui.odoo-form-ui>
                         </div>
                     </div>
                 </div>

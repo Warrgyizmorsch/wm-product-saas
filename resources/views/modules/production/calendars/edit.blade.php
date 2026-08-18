@@ -175,143 +175,120 @@
     </div>
 
     <!-- Create Holiday Modal -->
-    <div class="modal fade text-dark" id="createHolidayModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="createHolidayModalLabel" aria-hidden="true" x-data="{ isFullDay: true }">
-        <div class="modal-dialog">
-            <div class="modal-content border-0 shadow-lg">
-                <form action="{{ route('production.calendars.holidays.store', $calendar->id) }}" method="POST">
-                    @csrf
-                    <div class="modal-header bg-primary text-white border-0 py-3">
-                        <h5 class="modal-title fw-bold" id="createHolidayModalLabel"><i class="feather-calendar me-2"></i>Add Calendar Holiday</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-4">
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="input" label="Holiday Name" name="name" placeholder="e.g. Christmas Day" :required="true" />
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="Holiday Date" name="holiday_date" inputType="date" :required="true" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="odoo-form-label mb-1">Holiday Type</label>
-                                <select class="form-select fs-13" name="holiday_type" required>
-                                    <option value="public_holiday">Public Holiday</option>
-                                    <option value="weekend">Weekend Override</option>
-                                    <option value="maintenance_shutdown">Maintenance Shutdown</option>
-                                    <option value="other">Other Holiday</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="e.g. Yearly corporate maintenance shutdown..." rows="2" />
-                        </div>
-                        <div class="row align-items-center mb-3">
-                            <div class="col-md-6">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="is_full_day" id="create_is_full_day" value="1" x-model="isFullDay" checked>
-                                    <label class="form-check-label fw-semibold" for="create_is_full_day">Is Full-Day Holiday</label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="active" id="create_active" value="1" checked>
-                                    <label class="form-check-label fw-semibold" for="create_active">Active Status</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row mb-3" x-show="!isFullDay" x-transition>
-                            <div class="col-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Start Time</label>
-                                <input type="time" name="start_time" class="form-control fs-13">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">End Time</label>
-                                <input type="time" name="end_time" class="form-control fs-13">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Add Holiday</button>
-                    </div>
-                </form>
+    <x-ui.modal
+        id="createHolidayModal"
+        title='<i class="feather-calendar me-2 text-primary"></i>Add Calendar Holiday'
+        formAction="{{ route('production.calendars.holidays.store', $calendar->id) }}"
+        formMethod="POST"
+        submitText="Add Holiday"
+        closeText="Cancel"
+        :static="true"
+        x-data="{ isFullDay: true }"
+        class="text-dark"
+    >
+        <div class="mb-3">
+            <x-ui.odoo-form-ui type="input" label="Holiday Name" name="name" placeholder="e.g. Christmas Day" :required="true" />
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" label="Holiday Date" name="holiday_date" inputType="date" :required="true" />
+            </div>
+            <div class="col-md-6">
+                <label class="odoo-form-label mb-1">Holiday Type</label>
+                <select class="form-select fs-13" name="holiday_type" required>
+                    <option value="public_holiday">Public Holiday</option>
+                    <option value="weekend">Weekend Override</option>
+                    <option value="maintenance_shutdown">Maintenance Shutdown</option>
+                    <option value="other">Other Holiday</option>
+                </select>
             </div>
         </div>
-    </div>
-
-    @foreach($calendar->holidays as $holiday)
-        <!-- Edit Holiday Modal {{ $holiday->id }} -->
-        <div class="modal fade text-dark" id="editHolidayModal{{ $holiday->id }}" data-bs-backdrop="static" tabindex="-1" aria-labelledby="editHolidayModal{{ $holiday->id }}Label" aria-hidden="true" x-data="{ isFullDay: {{ $holiday->is_full_day ? 'true' : 'false' }} }">
-            <div class="modal-dialog">
-                <div class="modal-content border-0 shadow-lg">
-                    <form action="{{ route('production.calendars.holidays.update', [$calendar->id, $holiday->id]) }}" method="POST">
-                        @csrf
-                        @method('PUT')
-                        <div class="modal-header bg-primary text-white border-0 py-3">
-                            <h5 class="modal-title fw-bold" id="editHolidayModal{{ $holiday->id }}Label"><i class="feather-calendar me-2"></i>Edit Calendar Holiday</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body p-4">
-                            <div class="mb-3">
-                                <x-ui.odoo-form-ui type="input" label="Holiday Name" name="name" placeholder="e.g. Christmas Day" :value="$holiday->name" :required="true" />
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Holiday Date" name="holiday_date" inputType="date" :value="$holiday->holiday_date->format('Y-m-d')" :required="true" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="odoo-form-label mb-1">Holiday Type</label>
-                                    <select class="form-select fs-13" name="holiday_type" required>
-                                        <option value="public_holiday" @selected($holiday->holiday_type === 'public_holiday')>Public Holiday</option>
-                                        <option value="weekend" @selected($holiday->holiday_type === 'weekend')>Weekend Override</option>
-                                        <option value="maintenance_shutdown" @selected($holiday->holiday_type === 'maintenance_shutdown')>Maintenance Shutdown</option>
-                                        <option value="other" @selected($holiday->holiday_type === 'other')>Other Holiday</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="e.g. Yearly corporate maintenance shutdown..." rows="2" :value="$holiday->description" />
-                            </div>
-                            <div class="row align-items-center mb-3">
-                                <div class="col-md-6">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="is_full_day" id="edit_is_full_day_{{ $holiday->id }}" value="1" x-model="isFullDay" @checked($holiday->is_full_day)>
-                                        <label class="form-check-label fw-semibold" for="edit_is_full_day_{{ $holiday->id }}">Is Full-Day Holiday</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" name="active" id="edit_active_{{ $holiday->id }}" value="1" @checked($holiday->active)>
-                                        <label class="form-check-label fw-semibold" for="edit_active_{{ $holiday->id }}">Active Status</label>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row mb-3" x-show="!isFullDay" x-transition>
-                                <div class="col-6">
-                                    <label class="form-label fw-bold text-dark fs-12 mb-1">Start Time</label>
-                                    <input type="time" name="start_time" class="form-control fs-13" value="{{ $holiday->start_time ? substr($holiday->start_time, 0, 5) : '' }}">
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label fw-bold text-dark fs-12 mb-1">End Time</label>
-                                    <input type="time" name="end_time" class="form-control fs-13" value="{{ $holiday->end_time ? substr($holiday->end_time, 0, 5) : '' }}">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="modal-footer border-0 pt-0">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Update Holiday</button>
-                        </div>
-                    </form>
+        <div class="mb-3">
+            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="e.g. Yearly corporate maintenance shutdown..." rows="2" />
+        </div>
+        <div class="row align-items-center mb-3">
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="is_full_day" id="create_is_full_day" value="1" x-model="isFullDay" checked>
+                    <label class="form-check-label fw-semibold" for="create_is_full_day">Is Full-Day Holiday</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="active" id="create_active" value="1" checked>
+                    <label class="form-check-label fw-semibold" for="create_active">Active Status</label>
                 </div>
             </div>
         </div>
-    @endforeach
+        <div class="row mb-3" x-show="!isFullDay" x-transition>
+            <div class="col-6">
+                <label class="form-label fw-bold text-dark fs-12 mb-1">Start Time</label>
+                <input type="time" name="start_time" class="form-control fs-13">
+            </div>
+            <div class="col-6">
+                <label class="form-label fw-bold text-dark fs-12 mb-1">End Time</label>
+                <input type="time" name="end_time" class="form-control fs-13">
+            </div>
+        </div>
+    </x-ui.modal>
 
-    @push('scripts')
-        <script>
-            $(document).ready(function() {
-                $('.modal').appendTo('body');
-            });
-        </script>
-    @endpush
+    @foreach($calendar->holidays as $holiday)
+        <!-- Edit Holiday Modal {{ $holiday->id }} -->
+        <x-ui.modal
+            id="editHolidayModal{{ $holiday->id }}"
+            title='<i class="feather-calendar me-2 text-primary"></i>Edit Calendar Holiday'
+            formAction="{{ route('production.calendars.holidays.update', [$calendar->id, $holiday->id]) }}"
+            formMethod="PUT"
+            submitText="Update Holiday"
+            closeText="Cancel"
+            :static="true"
+            x-data="{ isFullDay: {{ $holiday->is_full_day ? 'true' : 'false' }} }"
+            class="text-dark"
+        >
+            <div class="mb-3">
+                <x-ui.odoo-form-ui type="input" label="Holiday Name" name="name" placeholder="e.g. Christmas Day" :value="$holiday->name" :required="true" />
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="input" label="Holiday Date" name="holiday_date" inputType="date" :value="$holiday->holiday_date->format('Y-m-d')" :required="true" />
+                </div>
+                <div class="col-md-6">
+                    <label class="odoo-form-label mb-1">Holiday Type</label>
+                    <select class="form-select fs-13" name="holiday_type" required>
+                        <option value="public_holiday" @selected($holiday->holiday_type === 'public_holiday')>Public Holiday</option>
+                        <option value="weekend" @selected($holiday->holiday_type === 'weekend')>Weekend Override</option>
+                        <option value="maintenance_shutdown" @selected($holiday->holiday_type === 'maintenance_shutdown')>Maintenance Shutdown</option>
+                        <option value="other" @selected($holiday->holiday_type === 'other')>Other Holiday</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-3">
+                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="e.g. Yearly corporate maintenance shutdown..." rows="2" :value="$holiday->description" />
+            </div>
+            <div class="row align-items-center mb-3">
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="is_full_day" id="edit_is_full_day_{{ $holiday->id }}" value="1" x-model="isFullDay" @checked($holiday->is_full_day)>
+                        <label class="form-check-label fw-semibold" for="edit_is_full_day_{{ $holiday->id }}">Is Full-Day Holiday</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="active" id="edit_active_{{ $holiday->id }}" value="1" @checked($holiday->active)>
+                        <label class="form-check-label fw-semibold" for="edit_active_{{ $holiday->id }}">Active Status</label>
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-3" x-show="!isFullDay" x-transition>
+                <div class="col-6">
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">Start Time</label>
+                    <input type="time" name="start_time" class="form-control fs-13" value="{{ $holiday->start_time ? substr($holiday->start_time, 0, 5) : '' }}">
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">End Time</label>
+                    <input type="time" name="end_time" class="form-control fs-13" value="{{ $holiday->end_time ? substr($holiday->end_time, 0, 5) : '' }}">
+                </div>
+            </div>
+        </x-ui.modal>
+    @endforeach
 @endsection

@@ -6,6 +6,7 @@ use App\Domains\Production\Models\ProductionCapa;
 use App\Domains\Production\Models\ProductionNcr;
 use App\Domains\Production\Requests\CapaRcaRequest;
 use App\Domains\Production\Requests\StoreCapaRequest;
+use App\Domains\Production\Repositories\ProductionQualityRepositoryInterface;
 use App\Domains\Production\Services\CapaService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -14,40 +15,16 @@ use Illuminate\Http\Request;
 class CapaController extends Controller
 {
     public function __construct(
-        private readonly CapaService $capaService
+        private readonly CapaService $capaService,
+        private readonly ProductionQualityRepositoryInterface $qualityRepository
     ) {}
 
     public function index(Request $request)
     {
         $this->authorize('view', ProductionCapa::class);
-        $tenantId = require_tenant_id();
 
-        $query = ProductionCapa::where('tenant_id', $tenantId)
-            ->with(['ncr.order', 'owner']);
-
-        if ($request->filled('search')) {
-            $search = '%'.$request->input('search').'%';
-            $query->where(function ($q) use ($search) {
-                $q->where('capa_number', 'like', $search)
-                    ->orWhere('corrective_action', 'like', $search);
-            });
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        $sortBy = $request->input('sort_by', 'id');
-        $sortOrder = $request->input('sort_order', 'desc');
-
-        if (! in_array($sortBy, ['id', 'capa_number', 'status', 'target_date'])) {
-            $sortBy = 'id';
-        }
-        if (! in_array($sortOrder, ['asc', 'desc'])) {
-            $sortOrder = 'desc';
-        }
-
-        $capas = $query->orderBy($sortBy, $sortOrder)->paginate(15)->withQueryString();
+        $filters = $request->only(['search', 'status']);
+        $capas = $this->qualityRepository->paginateCapas($filters, 15)->withQueryString();
 
         return view('modules.production.quality.capas.index', compact('capas'));
     }
@@ -77,8 +54,9 @@ class CapaController extends Controller
     public function show(int $id)
     {
         $this->authorize('view', ProductionCapa::class);
-        $tenantId = require_tenant_id();
-        $capa = ProductionCapa::where('tenant_id', $tenantId)->with(['ncr', 'owner'])->findOrFail($id);
+
+        $capa = $this->qualityRepository->findCapa($id);
+        abort_if(!$capa, 404, 'CAPA record not found.');
 
         return view('modules.production.quality.capas.show', compact('capa'));
     }

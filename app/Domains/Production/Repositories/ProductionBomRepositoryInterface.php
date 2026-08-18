@@ -22,4 +22,8 @@ interface ProductionBomRepositoryInterface
     public function getActiveBom(int $productId): ?ProductionBom;
 
     public function getBomWithComponents(int $id): ?ProductionBom;
+
+    public function getBomsByProductUnscoped(int $productId, int $tenantId): Collection;
+
+    public function versionExistsUnscoped(int $productId, string $version, int $tenantId): bool;
 }

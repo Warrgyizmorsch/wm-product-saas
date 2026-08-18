@@ -288,7 +288,7 @@
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-custom-hover align-middle mb-0">
+                            <x-ui.odoo-form-ui type="table">
                                 <thead class="table-light fs-12 text-uppercase">
                                     <tr>
                                         <th>Sales Order / Request #</th>
@@ -332,9 +332,7 @@
                                                 {{ number_format((float) $req->quantity_requested, 2) }}
                                             </td>
                                             <td>
-                                                <span class="badge bg-soft-warning text-warning border border-warning fs-11">
-                                                    Pending Production Order
-                                                </span>
+                                                <x-ui.status-badge status="pending" text="Pending Production Order" />
                                             </td>
                                             <td class="text-center">
                                                 <a href="{{ route('production.orders.create', ['production_order_request_id' => $req->id, 'sales_order_id' => $sales?->id]) }}"
@@ -352,7 +350,7 @@
                                         </tr>
                                     @endforelse
                                 </tbody>
-                            </table>
+                            </x-ui.odoo-form-ui>
                         </div>
                     </div>
                 </div>
@@ -377,7 +375,7 @@
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-custom-hover align-middle mb-0">
+                            <x-ui.odoo-form-ui type="table">
                                 <thead class="table-light fs-12 text-uppercase">
                                     <tr>
                                         <th>Order #</th>
@@ -425,19 +423,7 @@
                                                 {{ number_format($order->quantity_ordered, 2) }}
                                             </td>
                                             <td class="text-center">
-                                                @php
-                                                    $orderBadgeVariant = match($order->status) {
-                                                        'draft' => 'warning',
-                                                        'released' => 'primary',
-                                                        'in_progress' => 'info',
-                                                        'completed' => 'success',
-                                                        'closed' => 'secondary',
-                                                        default => 'dark'
-                                                    };
-                                                @endphp
-                                                <span class="badge bg-soft-{{ $orderBadgeVariant }} text-{{ $orderBadgeVariant }} fs-11 px-2.5 py-1 text-uppercase">
-                                                    {{ str_replace('_', ' ', $order->status) }}
-                                                </span>
+                                                <x-ui.status-badge :status="$order->status" />
                                             </td>
                                             <td class="text-center">
                                                 <span class="badge bg-soft-{{ $materialBadge['variant'] }} text-{{ $materialBadge['variant'] }} border border-{{ $materialBadge['variant'] }} fs-11 px-2.5 py-1">
@@ -482,7 +468,7 @@
                                         </tr>
                                     @endforelse
                                 </tbody>
-                            </table>
+                            </x-ui.odoo-form-ui>
                         </div>
                     </div>
                 </div>
