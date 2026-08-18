@@ -2,6 +2,7 @@
 
 namespace App\Domains\Platform\Controllers;
 
+use App\Domains\Platform\Models\Plan;
 use App\Domains\Platform\Services\TenantService;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
@@ -24,6 +25,7 @@ class TenantController extends Controller
         return view('modules.platform.tenants.index', [
             'tenants' => $this->tenants->all(),
             'summary' => $this->tenants->summary(),
+            'planOptions' => $this->planOptions(),
         ]);
     }
 
@@ -33,6 +35,7 @@ class TenantController extends Controller
 
         return view('modules.platform.tenants.create', [
             'tenant' => new Tenant(),
+            'planOptions' => $this->planOptions(),
         ]);
     }
 
@@ -53,6 +56,7 @@ class TenantController extends Controller
 
         return view('modules.platform.tenants.edit', [
             'tenant' => $tenant,
+            'planOptions' => $this->planOptions(),
         ]);
     }
 
@@ -82,6 +86,11 @@ class TenantController extends Controller
             ->with('success', 'Tenant '.$tenant->name.' marked '.$validated['status'].'.');
     }
 
+    private function planOptions(): \Illuminate\Support\Collection
+    {
+        return Plan::query()->where('is_active', true)->orderBy('sort_order')->get();
+    }
+
     private function validated(Request $request, ?Tenant $tenant = null): array
     {
         $tenantId = $tenant?->id;
@@ -104,6 +113,7 @@ class TenantController extends Controller
             'billing_email' => ['nullable', 'email', 'max:255'],
             'status' => ['required', 'string', Rule::in(array_keys(Tenant::statuses()))],
             'plan' => ['required', 'string', Rule::in(array_keys(Tenant::plans()))],
+            'plan_id' => ['nullable', 'integer', Rule::exists('plans', 'id')],
             'subscription_status' => ['required', 'string', Rule::in(array_keys(Tenant::subscriptionStatuses()))],
             'max_users' => ['nullable', 'integer', 'min:1'],
             'max_storage_mb' => ['nullable', 'integer', 'min:1'],

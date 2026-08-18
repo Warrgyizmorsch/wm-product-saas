@@ -1,6 +1,8 @@
 <?php
 
+use App\Domains\Platform\Controllers\PlanController;
 use App\Domains\Platform\Controllers\TenantController;
+use App\Domains\Platform\Controllers\UsageOverviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('platform')
@@ -18,4 +20,18 @@ Route::prefix('platform')
             ->name('tenants.update');
         Route::patch('tenants/{tenant}/status', [TenantController::class, 'status'])
             ->name('tenants.status');
+
+        Route::get('plans', [PlanController::class, 'index'])
+            ->name('plans.index');
+        Route::get('plans/create', [PlanController::class, 'create'])
+            ->name('plans.create');
+        Route::post('plans', [PlanController::class, 'store'])
+            ->name('plans.store');
+        Route::get('plans/{plan}/edit', [PlanController::class, 'edit'])
+            ->name('plans.edit');
+        Route::put('plans/{plan}', [PlanController::class, 'update'])
+            ->name('plans.update');
+
+        Route::get('usage', [UsageOverviewController::class, 'index'])
+            ->name('usage.index');
     });

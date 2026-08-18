@@ -18,5 +18,6 @@
         'submitLabel' => 'Update Tenant',
         'formContext' => 'edit',
         'tenantId' => $tenant->id,
+        'planOptions' => $planOptions,
     ])
 @endsection

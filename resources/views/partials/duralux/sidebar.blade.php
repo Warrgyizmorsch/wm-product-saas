@@ -9,8 +9,9 @@
             ['label' => __('ui.executive_dashboard'), 'icon' => 'feather-home', 'route' => 'dashboard'],
             ['label' => 'Tenant Console', 'icon' => 'feather-grid', 'url' => '#', 'children' => [
                 ['label' => 'Tenants', 'route' => 'platform.tenants.index'],
+                ['label' => 'Plans', 'route' => 'platform.plans.index'],
                 ['label' => 'Subscriptions'],
-                ['label' => 'Usage Limits'],
+                ['label' => 'Usage Limits', 'route' => 'platform.usage.index'],
             ]],
             ['label' => __('ui.approvals_center'), 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
         ],
