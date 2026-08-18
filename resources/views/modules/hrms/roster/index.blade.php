@@ -779,6 +779,9 @@
                                                          @foreach([1 => 'monday', 2 => 'tuesday', 3 => 'wednesday', 4 => 'thursday', 5 => 'friday', 6 => 'saturday', 0 => 'sunday'] as $dayVal => $dayName)
                                                              @php
                                                                  $assignedVal = (isset($employee->weekly_pattern) && isset($employee->weekly_pattern[$dayVal])) ? $employee->weekly_pattern[$dayVal] : '';
+                                                                 if ($assignedVal === '' && $dayVal === 0) {
+                                                                     $assignedVal = 'off';
+                                                                 }
                                                                  $cellBg = 'bg-transparent';
                                                                  if ($assignedVal === 'off') {
                                                                      $cellBg = 'bg-soft-secondary';
@@ -964,6 +967,9 @@
                                                                 $assignedShiftId = $roster ? $roster->shift_id : null;
                                                                 $dayOfWeek = $date->dayOfWeek;
                                                                 $weeklyPatternShiftId = (isset($employee->weekly_pattern) && isset($employee->weekly_pattern[$dayOfWeek])) ? $employee->weekly_pattern[$dayOfWeek] : null;
+                                                                if (is_null($weeklyPatternShiftId) && $dayOfWeek === 0) {
+                                                                    $weeklyPatternShiftId = 'off';
+                                                                }
 
                                                                 $defaultLabel = __('hrms.roster.off_default');
                                                                 if ($employee->shift) {
