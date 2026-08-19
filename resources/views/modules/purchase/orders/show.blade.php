@@ -134,6 +134,7 @@
                             <x-ui.badge :soft="true" variant="warning" class="px-2.5 py-1 fs-11 fw-bold">
                                 <i class="feather-truck me-1"></i>Subcontract PO
                             </x-ui.badge>
+                        @endif
                         @if($order->reminder_count > 0)
                             @php
                                 $remData = $order->reminders->map(fn($r) => [
