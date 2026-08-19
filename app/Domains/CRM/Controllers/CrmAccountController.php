@@ -133,27 +133,17 @@ class CrmAccountController extends Controller
     {
         $account->load(['contacts', 'deals.quotations', 'quotations', 'customer', 'owner']);
 
-        $salesOrders = collect();
-        if ($account->customer_id) {
-            $salesOrders = SalesOrder::where('customer_id', $account->customer_id)->latest()->get();
-        }
-
-        $lifetimeRevenue = $account->lifetime_revenue;
         $openDealsCount = $account->deals->whereNotIn('stage', ['Closed Won', 'Closed Lost'])->count();
         $wonDealsCount = $account->deals->where('stage', 'Closed Won')->count();
         $lostDealsCount = $account->deals->where('stage', 'Closed Lost')->count();
-        $aov = $wonDealsCount > 0 ? ($lifetimeRevenue / $wonDealsCount) : 0;
-        $lastPurchaseDate = $account->last_purchase_date;
+        $pipelineValue = $account->deals->whereNotIn('stage', ['Closed Lost'])->sum('estimated_value');
 
         return view('modules.crm.accounts.show', compact(
             'account',
-            'salesOrders',
-            'lifetimeRevenue',
             'openDealsCount',
             'wonDealsCount',
             'lostDealsCount',
-            'aov',
-            'lastPurchaseDate'
+            'pipelineValue'
         ));
     }
 

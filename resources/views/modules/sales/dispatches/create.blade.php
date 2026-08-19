@@ -34,7 +34,7 @@
 
         <form action="{{ route('sales.dispatches.store') }}" method="POST" id="dispatchForm">
             @csrf
-            <input type="hidden" name="material_requirement_id" id="deliveryOrderId" value="{{ old('material_requirement_id') }}">
+            <input type="hidden" name="material_requirement_id" id="deliveryOrderId" value="{{ old('material_requirement_id', $mrId ?? request('material_requirement_id') ?? request('mr_id')) }}">
 
             <x-ui.odoo-form-ui type="sheet">
                 <!-- Actions Top Bar -->
@@ -438,7 +438,7 @@
 
         // Auto-select if material_requirement_id is passed in URL
         const urlParams = new URLSearchParams(window.location.search);
-        const preselectedId = parseInt(urlParams.get('material_requirement_id')) || null;
+        const preselectedId = parseInt('{{ $mrId ?? request('material_requirement_id') ?? request('mr_id') }}') || parseInt(urlParams.get('material_requirement_id')) || parseInt(urlParams.get('mr_id')) || null;
 
         pickerElement.addEventListener('show.bs.modal', () => {
             if (deliveryOrders.length) {
@@ -688,7 +688,7 @@
                 .then(response => response.ok ? response.json() : Promise.reject())
                 .then(res => {
                     deliveryOrders = res.data || res || [];
-                    const order = deliveryOrders.find(o => o.id === preselectedId);
+                    const order = deliveryOrders.find(o => Number(o.id) === Number(preselectedId));
                     if (order) {
                         selectDeliveryOrder(order);
                     }

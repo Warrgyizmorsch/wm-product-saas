@@ -47,7 +47,7 @@
                             <option value="{{ $c->id }}"
                                 data-billing="{{ $c->billing_address ?? '' }}"
                                 data-shipping="{{ $c->shipping_address ?? '' }}"
-                                @selected(old('customer_id', $prefillQuotation?->customer_id) == $c->id)>
+                                @selected(old('customer_id', $prefillQuotation?->customer_id ?? request('customer_id')) == $c->id)>
                                 {{ $c->name }} ({{ $c->email ?: $c->phone ?: 'No Contact' }})
                             </option>
                         @endforeach
@@ -408,6 +408,19 @@
                 $('#calcTax').text('₹' + taxTotal.toFixed(2));
                 $('#calcTotal').text('₹' + Math.max(0, grandTotal).toFixed(2));
             }
+
+            // Customer select address prefill
+            $('#customerSelect').on('change', function() {
+                const selected = $(this).find('option:selected');
+                const billing = selected.attr('data-billing') || '';
+                const shipping = selected.attr('data-shipping') || '';
+                if (billing && !$('textarea[name="billing_address"]').val()) {
+                    $('textarea[name="billing_address"]').val(billing);
+                }
+                if (shipping && !$('textarea[name="shipping_address"]').val()) {
+                    $('textarea[name="shipping_address"]').val(shipping);
+                }
+            }).trigger('change');
 
             // Prefill order items
             const prefillItems = @json($prefillQuotation ? $prefillQuotation->items : []);
