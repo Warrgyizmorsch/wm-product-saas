@@ -52,19 +52,26 @@ class PurchaseOrder extends BaseModel
         'status', // Draft, Approved, Cancelled
         'is_subcontract',
         'production_order_id',
+        'status', // Draft, Approved, Cancelled, Completed
+        'completed_at',
         'rejection_reason',
         'notes',
         'created_by',
+        'reminder_count',
+        'last_reminded_at',
     ];
 
     protected $casts = [
         'date' => 'date',
         'delivery_date' => 'date',
         'is_subcontract' => 'boolean',
+        'completed_at' => 'datetime',
+        'last_reminded_at' => 'datetime',
         'purchase_requisition_id' => 'integer',
         'vendor_id' => 'integer',
         'production_order_id' => 'integer',
         'created_by' => 'integer',
+        'reminder_count' => 'integer',
         'subtotal' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'cgst_amount' => 'decimal:2',
@@ -190,5 +197,10 @@ class PurchaseOrder extends BaseModel
         }
 
         return null;
+    }
+
+    public function reminders(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(ApprovalReminder::class, 'remindable')->orderBy('created_at', 'desc');
     }
 }

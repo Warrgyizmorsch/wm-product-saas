@@ -87,7 +87,7 @@ return [
     'single_item' => 'Единичен артикул',
     'contains_variants' => 'Съдържа варианти (напр. Размер, Цвят)',
     'supplier_method' => 'Метод на доставка',
-    'buy' => 'Купуване',
+    'buy' => 'Търговия (Trade)',
     'manufacture' => 'Производство',
 
     // Form detail sections

@@ -17,6 +17,13 @@
 
         @if($requisition->status === 'Draft')
             <x-ui.action-dropdown id="reqDetailsActions-{{ $requisition->id }}">
+                @if($requisition->status === 'Draft')
+                    <li>
+                        <button type="button" class="dropdown-item py-2 text-warning fw-semibold" onclick="openRemindModal('{{ route('purchase.requisitions.remind', $requisition->id) }}', '{{ $requisition->requisition_number }}')">
+                            <i class="feather-bell me-1.5 text-warning"></i> Send Quick Reminder
+                        </button>
+                    </li>
+                @endif
                 <li>
                     <a class="dropdown-item py-2" href="{{ route('purchase.requisitions.edit', $requisition->id) }}">
                         <i class="feather-edit me-1.5 text-muted"></i> {{ __('purchase.edit') }}
@@ -55,10 +62,26 @@
                         <x-ui.badge :soft="true" :variant="$statusClass" class="px-2.5 py-1 fs-11 fw-bold">
                             {{ __('purchase.status_' . strtolower($requisition->status)) }}
                         </x-ui.badge>
+                        @if($requisition->reminder_count > 0)
+                            @php
+                                $remData = $requisition->reminders->map(fn($r) => [
+                                    'user' => $r->user->name ?? 'User',
+                                    'time' => $r->created_at->format('d M Y h:i A'),
+                                    'note' => $r->note
+                                ]);
+                            @endphp
+                            <button type="button" class="btn btn-xs btn-soft-danger border border-danger-subtle px-2.5 py-1 fs-11 fw-bold"
+                                    onclick="showReminderHistoryModal('{{ $requisition->requisition_number }}', {{ json_encode($remData) }})">
+                                <i class="feather-bell me-1"></i>Reminded ({{ $requisition->reminder_count }})
+                            </button>
+                        @endif
                     </div>
                     <span class="fs-13 text-muted">
                         {{ __('purchase.requested_by') }}:&nbsp;<strong class="text-dark">{{ $requisition->requester->name ?? __('purchase.system') }}</strong>
-                        &nbsp;·&nbsp;{{ __('purchase.date') }}:&nbsp;<strong class="text-dark">{{ $requisition->requisition_date ? $requisition->requisition_date->format('d-m-Y') : '—' }}</strong>
+                        &nbsp;·&nbsp;Requisition Date:&nbsp;<strong class="text-dark">{{ $requisition->requisition_date ? $requisition->requisition_date->format('d-m-Y') : '—' }}</strong>
+                        @if($requisition->expected_date)
+                            &nbsp;·&nbsp;Expected Date:&nbsp;<strong class="text-primary">{{ $requisition->expected_date->format('d-m-Y') }}</strong>
+                        @endif
                     </span>
                 </div>
             </div>
@@ -196,5 +219,94 @@
             </div>
         </x-ui.odoo-form-ui>
     </div>
+
+    <!-- Send Quick Reminder Modal -->
+    <div class="modal fade" id="remindModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <div class="modal-header bg-soft-warning border-bottom py-3">
+                    <h6 class="modal-title fw-bold text-dark fs-14">
+                        <i class="feather-bell text-warning me-1.5 fs-15"></i> Send Quick Approval Reminder
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="remindForm" method="POST" action="">
+                    @csrf
+                    <div class="modal-body p-4">
+                        <div class="alert alert-warning border border-warning-subtle py-2 px-3 fs-12 mb-3">
+                            <i class="feather-info me-1"></i>
+                            Sending an in-app reminder for document <strong id="remindDocNumberText" class="text-dark"></strong>.
+                        </div>
+                        <div class="mb-3 text-start">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Optional Note / Message for Approver</label>
+                            <textarea name="note" class="form-control form-control-sm shadow-2xs" rows="3" placeholder="e.g. Urgent stock required for client delivery..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 px-3 border-top">
+                        <button type="button" class="btn btn-sm btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 shadow-2xs text-white" style="background-color: #f59e0b; border-color: #d97706;">
+                            <i class="feather-send me-1"></i> Send Reminder
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Approval Reminders Offcanvas Drawer -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="reminderHistoryOffcanvas" style="width: 420px; z-index: 1060;">
+        <div class="offcanvas-header bg-soft-warning border-bottom py-3">
+            <h6 class="offcanvas-title fw-bold text-dark fs-14">
+                <i class="feather-bell text-warning me-1.5 fs-15"></i> Approval Reminders Log — <span id="reminderOffcanvasDocNumber" class="text-primary font-monospace"></span>
+            </h6>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body p-3" style="overflow-y: auto;">
+            <div id="reminderOffcanvasList" class="d-flex flex-column gap-2.5">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </div>
+        <div class="offcanvas-footer bg-light p-3 border-top text-end">
+            <button type="button" class="btn btn-sm btn-secondary fw-semibold px-4" data-bs-dismiss="offcanvas">Close</button>
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+        function openRemindModal(actionUrl, docNumber) {
+            document.getElementById('remindForm').action = actionUrl;
+            document.getElementById('remindDocNumberText').innerText = docNumber || '';
+            var modal = new bootstrap.Modal(document.getElementById('remindModal'));
+            modal.show();
+        }
+
+        function showReminderHistoryModal(docNumber, reminders) {
+            document.getElementById('reminderOffcanvasDocNumber').innerText = docNumber || '';
+            const container = document.getElementById('reminderOffcanvasList');
+            container.innerHTML = '';
+
+            if (!reminders || reminders.length === 0) {
+                container.innerHTML = '<div class="text-muted fs-12 text-center py-4"><i class="feather-info me-1"></i>No reminder messages recorded.</div>';
+            } else {
+                reminders.forEach((r, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'border rounded-3 p-3 bg-white shadow-2xs position-relative';
+                    item.innerHTML = `
+                        <div class="d-flex align-items-center justify-content-between mb-1.5">
+                            <span class="fw-bold text-dark fs-12"><i class="feather-user text-primary me-1"></i>${r.user}</span>
+                            <span class="badge bg-soft-secondary text-muted font-monospace fs-10">${r.time}</span>
+                        </div>
+                        ${r.note ? `<div class="text-dark fst-italic fs-12 bg-light p-2 rounded border border-warning-subtle mt-1.5"><i class="feather-message-square me-1 text-warning"></i>"${r.note}"</div>` : '<div class="text-muted fs-11 fst-italic mt-1">(No note provided)</div>'}
+                    `;
+                    container.appendChild(item);
+                });
+            }
+
+            var offcanvasEl = document.getElementById('reminderHistoryOffcanvas');
+            var offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl) || new bootstrap.Offcanvas(offcanvasEl);
+            offcanvas.show();
+        }
+    </script>
+    @endpush
 @endsection
 

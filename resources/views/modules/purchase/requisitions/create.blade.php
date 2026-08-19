@@ -41,7 +41,14 @@
                         <div class="col-md-6 border-end">
                             <h6 class="fw-bold text-primary mb-3">{{ __('purchase.req_details') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.requisition_date') }}" name="requisition_date" inputType="date" :value="old('requisition_date', date('Y-m-d'))" required="true" />
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('purchase.requisition_date') }}" name="requisition_date" inputType="date" :value="old('requisition_date', date('Y-m-d'))" required="true" />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('purchase.expected_date') }}" name="expected_date" inputType="date" :value="old('expected_date')" placeholder="Select Expected Date" />
+                                </div>
+                            </div>
                             
                             <x-ui.odoo-form-ui type="select" label="{{ __('purchase.source_type') }}" name="source_type" id="sourceTypeSelect" required="true">
                                 <option value="direct" @selected(old('source_type') === 'direct')>{{ __('purchase.source_direct') }}</option>

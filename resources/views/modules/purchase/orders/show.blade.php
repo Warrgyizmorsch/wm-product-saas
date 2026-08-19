@@ -21,6 +21,13 @@
         @if($order->status === 'Draft')
             <!-- Action Dropdown -->
             <x-ui.action-dropdown id="poDetailsActions-{{ $order->id }}">
+                @if($order->status === 'Draft')
+                    <li>
+                        <button type="button" class="dropdown-item py-2 text-warning fw-semibold" onclick="openRemindModal('{{ route('purchase.orders.remind', $order->id) }}', '{{ $order->purchase_order_number }}')">
+                            <i class="feather-bell me-1.5 text-warning"></i> Send Quick Reminder
+                        </button>
+                    </li>
+                @endif
                 <li>
                     <a class="dropdown-item py-2" href="{{ route('purchase.orders.edit', $order->id) }}">
                         <i class="feather-edit me-1.5 text-muted"></i> {{ __('purchase.edit') }}
@@ -115,8 +122,10 @@
                         <h3 class="fw-bold text-dark mb-0 font-monospace">{{ $order->purchase_order_number }}</h3>
                         @php
                             $statusVariant = 'warning';
-                            if ($order->status === 'Approved') $statusVariant = 'success';
-                            elseif ($order->status === 'Cancelled') $statusVariant = 'danger';
+                            if ($order->status === 'Completed') $statusVariant = 'success';
+                            elseif ($order->status === 'Approved') $statusVariant = 'primary';
+                            elseif ($order->status === 'Partially Received') $statusVariant = 'info';
+                            elseif (in_array($order->status, ['Cancelled', 'Rejected'])) $statusVariant = 'danger';
                         @endphp
                         <x-ui.badge :soft="true" :variant="$statusVariant" class="px-2.5 py-1 fs-11 fw-bold">
                             {{ $order->status }}
@@ -125,13 +134,28 @@
                             <x-ui.badge :soft="true" variant="warning" class="px-2.5 py-1 fs-11 fw-bold">
                                 <i class="feather-truck me-1"></i>Subcontract PO
                             </x-ui.badge>
+                        @if($order->reminder_count > 0)
+                            @php
+                                $remData = $order->reminders->map(fn($r) => [
+                                    'user' => $r->user->name ?? 'User',
+                                    'time' => $r->created_at->format('d M Y h:i A'),
+                                    'note' => $r->note
+                                ]);
+                            @endphp
+                            <button type="button" class="btn btn-xs btn-soft-danger border border-danger-subtle px-2.5 py-1 fs-11 fw-bold"
+                                    onclick="showReminderHistoryModal('{{ $order->purchase_order_number }}', {{ json_encode($remData) }})">
+                                <i class="feather-bell me-1"></i>Reminded ({{ $order->reminder_count }})
+                            </button>
                         @endif
                     </div>
                     <span class="fs-13 text-muted">
                         Supplier:&nbsp;<strong class="text-dark">{{ $order->vendor->name ?? '—' }}</strong>
                         &nbsp;·&nbsp;Order Date:&nbsp;<strong class="text-dark">{{ $order->date ? $order->date->format('d-m-Y') : '—' }}</strong>
                         @if($order->delivery_date)
-                            &nbsp;·&nbsp;Delivery Date:&nbsp;<strong class="text-danger">{{ $order->delivery_date->format('d-m-Y') }}</strong>
+                            &nbsp;·&nbsp;Expected Delivery Date:&nbsp;<strong class="text-info">{{ $order->delivery_date->format('d-m-Y') }}</strong>
+                        @endif
+                        @if($order->completed_at)
+                            &nbsp;·&nbsp;Completion Date:&nbsp;<strong class="text-success">{{ $order->completed_at->format('d-m-Y') }}</strong>
                         @endif
                     </span>
                 </div>
@@ -222,9 +246,15 @@
                                     <td class="fw-semibold text-dark">{{ $order->date ? $order->date->format('d-m-Y') : '—' }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="text-muted ps-0">Delivery Date:</td>
-                                    <td class="fw-semibold text-danger">{{ $order->delivery_date ? $order->delivery_date->format('d-m-Y') : '—' }}</td>
+                                    <td class="text-muted ps-0">Expected Delivery Date:</td>
+                                    <td class="fw-semibold text-info">{{ $order->delivery_date ? $order->delivery_date->format('d-m-Y') : '—' }}</td>
                                 </tr>
+                                @if($order->completed_at)
+                                    <tr>
+                                        <td class="text-muted ps-0">Completion Date:</td>
+                                        <td class="fw-bold text-success">{{ $order->completed_at->format('d-m-Y H:i') }}</td>
+                                    </tr>
+                                @endif
                                 <tr>
                                     <td class="text-muted ps-0">Warehouse:</td>
                                     <td class="fw-semibold text-dark">{{ $order->location ?: 'Main Warehouse' }}</td>
@@ -645,4 +675,96 @@
             </form>
         </x-ui.modal>
     @endif
+
+    <!-- Send Quick Reminder Modal -->
+    <div class="modal fade" id="remindModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <div class="modal-header bg-soft-warning border-bottom py-3">
+                    <h6 class="modal-title fw-bold text-dark fs-14">
+                        <i class="feather-bell text-warning me-1.5 fs-15"></i> Send Quick Approval Reminder
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="remindForm" method="POST" action="">
+                    @csrf
+                    <div class="modal-body p-4">
+                        <div class="alert alert-warning border border-warning-subtle py-2 px-3 fs-12 mb-3">
+                            <i class="feather-info me-1"></i>
+                            Sending an in-app reminder for document <strong id="remindDocNumberText" class="text-dark"></strong>.
+                        </div>
+                        <div class="mb-3 text-start">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Optional Note / Message for Approver</label>
+                            <textarea name="note" class="form-control form-control-sm shadow-2xs" rows="3" placeholder="e.g. Urgent stock required for client delivery..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 px-3 border-top">
+                        <button type="button" class="btn btn-sm btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 shadow-2xs text-white" style="background-color: #f59e0b; border-color: #d97706;">
+                            <i class="feather-send me-1"></i> Send Reminder
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Approval Reminders Modal -->
+    <div class="modal fade" id="viewRemindersModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <div class="modal-header bg-soft-warning border-bottom py-3">
+                    <h6 class="modal-title fw-bold text-dark fs-14">
+                        <i class="feather-bell text-warning me-1.5 fs-15"></i> Approval Reminders Log — <span id="reminderModalDocNumber" class="text-primary font-monospace"></span>
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div id="reminderModalList" class="d-flex flex-column gap-2">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 px-3 border-top">
+                    <button type="button" class="btn btn-sm btn-secondary fw-semibold px-3" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+        function openRemindModal(actionUrl, docNumber) {
+            document.getElementById('remindForm').action = actionUrl;
+            document.getElementById('remindDocNumberText').innerText = docNumber || '';
+            var modal = new bootstrap.Modal(document.getElementById('remindModal'));
+            modal.show();
+        }
+
+        function showReminderHistoryModal(docNumber, reminders) {
+            document.getElementById('reminderModalDocNumber').innerText = docNumber || '';
+            const container = document.getElementById('reminderModalList');
+            container.innerHTML = '';
+
+            if (!reminders || reminders.length === 0) {
+                container.innerHTML = '<div class="text-muted fs-12 text-center py-3">No reminder messages found.</div>';
+            } else {
+                reminders.forEach(r => {
+                    const item = document.createElement('div');
+                    item.className = 'border rounded-3 p-3 bg-light-50 shadow-2xs';
+                    item.innerHTML = `
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="fw-bold text-dark fs-12"><i class="feather-user text-primary me-1"></i>${r.user}</span>
+                            <span class="text-muted fs-10 font-monospace">${r.time}</span>
+                        </div>
+                        ${r.note ? `<div class="text-dark fst-italic fs-12 bg-white p-2 rounded border border-warning-subtle mt-1"><i class="feather-message-square me-1 text-warning"></i>"${r.note}"</div>` : '<div class="text-muted fs-11 fst-italic mt-1">(No note provided)</div>'}
+                    `;
+                    container.appendChild(item);
+                });
+            }
+
+            var modal = new bootstrap.Modal(document.getElementById('viewRemindersModal'));
+            modal.show();
+        }
+    </script>
+    @endpush
 @endsection

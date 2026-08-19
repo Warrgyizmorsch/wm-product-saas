@@ -159,7 +159,10 @@ class GoodsReceiptNoteService
                 }
 
                 if ($allReceived) {
-                    $po->update(['status' => 'Completed']);
+                    $po->update([
+                        'status' => 'Completed',
+                        'completed_at' => now(),
+                    ]);
                 } elseif ($partiallyReceived) {
                     $po->update(['status' => 'Partially Received']);
                 }

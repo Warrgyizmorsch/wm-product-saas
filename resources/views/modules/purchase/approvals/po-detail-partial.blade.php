@@ -1,8 +1,10 @@
 {{-- PO Detail Partial — loaded into offcanvas drawer via AJAX --}}
 @php
     $statusClass = 'warning';
-    if ($order->status === 'Approved') $statusClass = 'success';
-    elseif ($order->status === 'Cancelled') $statusClass = 'danger';
+    if ($order->status === 'Completed') $statusClass = 'success';
+    elseif ($order->status === 'Approved') $statusClass = 'primary';
+    elseif ($order->status === 'Partially Received') $statusClass = 'info';
+    elseif (in_array($order->status, ['Cancelled', 'Rejected'])) $statusClass = 'danger';
 @endphp
 
 {{-- ── Header ── --}}
@@ -16,12 +18,27 @@
                 <span><i class="feather-calendar me-1"></i>{{ $order->date ? $order->date->format('d M Y') : '—' }}</span>
             </div>
         </div>
-        <x-ui.badge :soft="true" :variant="$statusClass" class="fs-11 fw-bold px-2 py-1">
-            {{ $order->status }}
-        </x-ui.badge>
+        <div class="d-flex align-items-center gap-1.5">
+            <x-ui.badge :soft="true" :variant="$statusClass" class="fs-11 fw-bold px-2 py-1">
+                {{ $order->status }}
+            </x-ui.badge>
+            @if($order->reminder_count > 0)
+                @php
+                    $remData = $order->reminders->map(fn($r) => [
+                        'user' => $r->user->name ?? 'User',
+                        'time' => $r->created_at->format('d M Y h:i A'),
+                        'note' => $r->note
+                    ]);
+                @endphp
+                <button type="button" class="btn btn-xs btn-soft-danger border border-danger-subtle px-2 py-1 fs-11 fw-bold"
+                        onclick="showReminderHistoryModal('{{ $order->purchase_order_number }}', {{ json_encode($remData) }})">
+                    <i class="feather-bell me-1"></i>Reminded ({{ $order->reminder_count }})
+                </button>
+            @endif
+        </div>
     </div>
 
-    {{-- Approve / Reject inside drawer --}}
+    {{-- Approve / Reject / Remind inside drawer --}}
     <div class="d-flex gap-2 mt-3">
         <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST" class="d-inline" id="approvePoDrawerForm_{{ $order->id }}">
             @csrf
@@ -47,6 +64,16 @@
 
             <div class="col-5 text-muted">PO Date</div>
             <div class="col-7 fw-semibold">{{ $order->date ? $order->date->format('d M Y') : '—' }}</div>
+
+            @if($order->delivery_date)
+                <div class="col-5 text-muted">Expected Delivery Date</div>
+                <div class="col-7 fw-semibold text-info">{{ $order->delivery_date->format('d M Y') }}</div>
+            @endif
+
+            @if($order->completed_at)
+                <div class="col-5 text-muted">Completion Date</div>
+                <div class="col-7 fw-bold text-success">{{ $order->completed_at->format('d M Y H:i') }}</div>
+            @endif
 
             @if($order->reference)
                 <div class="col-5 text-muted">Reference</div>

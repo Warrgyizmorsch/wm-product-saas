@@ -12,7 +12,7 @@ class PurchaseOrderRepository
         $tenantId = require_tenant_id();
 
         $query = PurchaseOrder::where('tenant_id', $tenantId)
-            ->with(['vendor', 'items.product']);
+            ->with(['vendor', 'items.product', 'reminders.user']);
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -31,9 +31,25 @@ class PurchaseOrderRepository
             $query->where('purchase_order_number', 'like', $search);
         }
 
+        if (!empty($filters['reminder_date_from'])) {
+            $query->whereDate('last_reminded_at', '>=', $filters['reminder_date_from']);
+        }
+
+        if (!empty($filters['reminder_date_to'])) {
+            $query->whereDate('last_reminded_at', '<=', $filters['reminder_date_to']);
+        }
+
+        if (isset($filters['has_reminders']) && $filters['has_reminders'] !== '') {
+            if ($filters['has_reminders'] == '1') {
+                $query->where('reminder_count', '>', 0);
+            } elseif ($filters['has_reminders'] == '0') {
+                $query->where('reminder_count', 0);
+            }
+        }
+
         $sortBy = $filters['sort_by'] ?? 'id';
         $sortOrder = $filters['sort_order'] ?? 'desc';
-        $allowedSorts = ['id', 'purchase_order_number', 'date', 'grand_total', 'status'];
+        $allowedSorts = ['id', 'purchase_order_number', 'date', 'grand_total', 'status', 'last_reminded_at'];
 
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortOrder);

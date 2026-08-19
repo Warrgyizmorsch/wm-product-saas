@@ -340,7 +340,7 @@
                                                             </div>
                                                         @endif
                                                     @else
-                                                        <span class="badge bg-soft-success text-success px-1.5 py-0.2 fs-9 fw-semibold rounded-pill">Buy</span>
+                                                        <span class="badge bg-soft-success text-success px-1.5 py-0.2 fs-9 fw-semibold rounded-pill">Trade</span>
                                                     @endif
                                                 </div>
                                             </div>

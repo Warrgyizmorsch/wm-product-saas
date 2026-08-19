@@ -51,6 +51,7 @@ class PurchaseRequisitionService
                 'tenant_id' => $tenantId,
                 'requisition_number' => $requisitionNumber,
                 'requisition_date' => $validated['requisition_date'],
+                'expected_date' => $validated['expected_date'] ?? null,
                 'status' => 'Draft',
                 'source_type' => $validated['source_type'],
                 'source_id' => $sourceId,
@@ -89,6 +90,7 @@ class PurchaseRequisitionService
         return DB::transaction(function () use ($validated, $sourceId, $requisition) {
             $requisition->update([
                 'requisition_date' => $validated['requisition_date'],
+                'expected_date' => $validated['expected_date'] ?? null,
                 'source_type' => $validated['source_type'],
                 'source_id' => $sourceId,
                 'requisition_slip_number' => $validated['requisition_slip_number'] ?? null,
@@ -215,6 +217,7 @@ class PurchaseRequisitionService
                         'vendor_id' => $vendorId,
                         'location' => $locationName,
                         'date' => now()->toDateString(),
+                        'delivery_date' => $firstPrItem->requisition?->expected_date?->format('Y-m-d'),
                         'discount_type' => 'without_discount',
                         'tax_type' => 'order_wise_tax',
                         'gst_type' => 'cgst_sgst',
