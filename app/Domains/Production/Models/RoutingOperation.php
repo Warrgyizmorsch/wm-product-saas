@@ -48,7 +48,13 @@ class RoutingOperation extends BaseModel
         'instructions',              // A1: inline documentation
         'quality_required',
         'is_external',               // Subcontracting ready
-        'vendor_id',                 // Future FK → vendors
+        'vendor_id',                 // Subcontractor Vendor FK
+        'subcontract_lead_time_days',
+        'subcontract_cost_per_unit',
+        'subcontract_service_product_id',
+        'material_supply_type',
+        'dispatch_buffer_days',
+        'return_buffer_days',
         'parallel_group',
         'is_parallel',
         'parallel_type',
@@ -65,6 +71,10 @@ class RoutingOperation extends BaseModel
         'expected_yield_percentage' => 'float',
         'labor_cost_rate'           => 'float',
         'machine_cost_rate'         => 'float',
+        'subcontract_lead_time_days'=> 'integer',
+        'subcontract_cost_per_unit' => 'float',
+        'dispatch_buffer_days'      => 'integer',
+        'return_buffer_days'        => 'integer',
         'quality_required'          => 'boolean',
         'is_external'               => 'boolean',
         'overlap_enabled'           => 'boolean',
@@ -87,6 +97,16 @@ class RoutingOperation extends BaseModel
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
+    }
+
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\Vendor::class, 'vendor_id');
+    }
+
+    public function subcontractServiceProduct(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'subcontract_service_product_id');
     }
 
     public function materials(): \Illuminate\Database\Eloquent\Relations\HasMany

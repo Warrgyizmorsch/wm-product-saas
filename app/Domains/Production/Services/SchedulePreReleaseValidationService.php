@@ -37,7 +37,7 @@ class SchedulePreReleaseValidationService
         $operations = ProductionScheduleOperation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('production_schedule_id', $schedule->id)
-            ->with(['workCenter', 'machine', 'orderOperation'])
+            ->with(['workCenter', 'machine', 'orderOperation.routingOperation'])
             ->orderBy('sequence')
             ->get();
 
@@ -51,6 +51,8 @@ class SchedulePreReleaseValidationService
         }
 
         foreach ($operations as $op) {
+            $isExternal = (bool) ($op->orderOperation?->is_external ?? $op->orderOperation?->routingOperation?->is_external ?? false);
+
             if (!$op->planned_start || !$op->planned_finish) {
                 $errors[] = [
                     'code'         => 'MISSING_PLANNED_TIMING',
@@ -69,8 +71,8 @@ class SchedulePreReleaseValidationService
                 ];
             }
 
-            // Check if Machine assignment is required for this WorkCenter
-            if (!$op->machine_id) {
+            // Check if Machine assignment is required for this WorkCenter (only for internal operations)
+            if (!$isExternal && !$op->machine_id) {
                 $machinesCount = Machine::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
                     ->where('work_center_id', $op->work_center_id)

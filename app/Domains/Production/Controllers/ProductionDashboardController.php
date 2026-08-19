@@ -146,6 +146,9 @@ class ProductionDashboardController extends Controller
             ->take(10)
             ->get();
 
+        // 8. Subcontracting Execution Metrics
+        $subcontractMetrics = app(\App\Domains\Production\Repositories\ProductionOrderRepositoryInterface::class)->getSubcontractDashboardMetrics($tenantId);
+
         return view('modules.production.dashboard', compact(
             'pendingRequests',
             'pendingSalesOrderCount',
@@ -162,7 +165,8 @@ class ProductionDashboardController extends Controller
             'operatorAssignedCount',
             'pendingReworkCount',
             'scrapLoggedCount',
-            'recentOrders'
+            'recentOrders',
+            'subcontractMetrics'
         ));
     }
 }

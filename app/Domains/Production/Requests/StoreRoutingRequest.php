@@ -13,6 +13,14 @@ class StoreRoutingRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'version'        => $this->input('version') ?: '1.0.0',
+            'effective_from' => $this->input('effective_from') ?: now()->toDateString(),
+        ]);
+    }
+
     public function rules(): array
     {
         $operationTypes = implode(',', RoutingOperation::TYPES);
@@ -22,9 +30,9 @@ class StoreRoutingRequest extends FormRequest
             'routing_number'     => 'nullable|string|max:50',
             'name'               => 'required|string|max:255',
             'product_id'         => 'required|exists:products,id',
-            'version'            => 'required|string|max:50',
+            'version'            => 'nullable|string|max:50',
             'is_default'         => 'boolean',
-            'effective_from'     => 'required|date',
+            'effective_from'     => 'nullable|date',
             'effective_to'       => 'nullable|date|after_or_equal:effective_from',
             'description'        => 'nullable|string',
 
@@ -33,7 +41,7 @@ class StoreRoutingRequest extends FormRequest
             'operations.*.sequence'                           => 'required|integer|min:1',
             'operations.*.name'                               => 'required|string|max:255',
             'operations.*.operation_type'                     => "required|in:{$operationTypes}",
-            'operations.*.work_center_id'                     => 'required|exists:production_work_centers,id',
+            'operations.*.work_center_id'                     => 'nullable|exists:production_work_centers,id',
             'operations.*.machine_id'                         => 'nullable|exists:production_machines,id',
             'operations.*.setup_time_minutes'                 => 'nullable|numeric|min:0',
             'operations.*.processing_time_minutes'            => 'nullable|numeric|min:0',
@@ -46,6 +54,12 @@ class StoreRoutingRequest extends FormRequest
             'operations.*.quality_required'                   => 'nullable|boolean',
             'operations.*.is_external'                        => 'nullable|boolean',
             'operations.*.vendor_id'                          => 'nullable|integer',
+            'operations.*.subcontract_lead_time_days'         => 'nullable|numeric|min:0',
+            'operations.*.subcontract_cost_per_unit'          => 'nullable|numeric|min:0',
+            'operations.*.subcontract_service_product_id'     => 'nullable|exists:products,id',
+            'operations.*.material_supply_type'               => 'nullable|in:company_supplied,vendor_supplied,none',
+            'operations.*.dispatch_buffer_days'               => 'nullable|numeric|min:0',
+            'operations.*.return_buffer_days'                 => 'nullable|numeric|min:0',
             'operations.*.overlap_enabled'                    => 'nullable|boolean',
             'operations.*.transfer_batch_quantity'            => 'nullable|numeric|min:0',
             'operations.*.transfer_lag_minutes'               => 'nullable|integer|min:0',
@@ -94,28 +108,56 @@ class StoreRoutingRequest extends FormRequest
                 }
             }
 
-            // Rule 2: Machine must belong to selected work center
+            // Rule 3: Conditional validation based on is_external
             foreach ($operations as $index => $op) {
+                $isExternal   = filter_var($op['is_external'] ?? false, FILTER_VALIDATE_BOOLEAN);
                 $machineId    = !empty($op['machine_id']) ? (int) $op['machine_id'] : null;
                 $workCenterId = !empty($op['work_center_id']) ? (int) $op['work_center_id'] : null;
+                $vendorId     = !empty($op['vendor_id']) ? (int) $op['vendor_id'] : null;
 
-                if ($machineId && $workCenterId) {
-                    $machine = Machine::find($machineId);
-                    if ($machine && $machine->work_center_id !== $workCenterId) {
+                if ($isExternal) {
+                    if (empty($vendorId)) {
                         $validator->errors()->add(
-                            "operations.{$index}.machine_id",
-                            "The selected machine does not belong to the chosen work center."
+                            "operations.{$index}.vendor_id",
+                            "Vendor is required for outsourced operations."
                         );
                     }
-                }
-            }
+                    if (isset($op['subcontract_lead_time_days']) && (float) $op['subcontract_lead_time_days'] < 0) {
+                        $validator->errors()->add(
+                            "operations.{$index}.subcontract_lead_time_days",
+                            "Subcontract lead time days cannot be negative."
+                        );
+                    }
+                    if (isset($op['dispatch_buffer_days']) && (float) $op['dispatch_buffer_days'] < 0) {
+                        $validator->errors()->add(
+                            "operations.{$index}.dispatch_buffer_days",
+                            "Dispatch buffer days cannot be negative."
+                        );
+                    }
+                    if (isset($op['return_buffer_days']) && (float) $op['return_buffer_days'] < 0) {
+                        $validator->errors()->add(
+                            "operations.{$index}.return_buffer_days",
+                            "Return buffer days cannot be negative."
+                        );
+                    }
+                } else {
+                    if (empty($workCenterId)) {
+                        $validator->errors()->add(
+                            "operations.{$index}.work_center_id",
+                            "Work center is required for internal operations."
+                        );
+                    }
 
-            // Rule 3: External operation note (vendor_id warning — no vendor table yet)
-            foreach ($operations as $index => $op) {
-                $isExternal = !empty($op['is_external']);
-                $vendorId   = !empty($op['vendor_id']) ? (int) $op['vendor_id'] : null;
-                // Future: when vendor module exists, enforce: if is_external => vendor_id required
-                // For now: just flag if is_external without vendor_id as a soft warning (no hard error)
+                    if ($machineId && $workCenterId) {
+                        $machine = Machine::find($machineId);
+                        if ($machine && $machine->work_center_id !== $workCenterId) {
+                            $validator->errors()->add(
+                                "operations.{$index}.machine_id",
+                                "The selected machine does not belong to the chosen work center."
+                            );
+                        }
+                    }
+                }
             }
         });
     }

@@ -68,6 +68,10 @@ class ProductionExecutionService
             }
 
             // Enforce Operation state validity
+            if ($op->is_external) {
+                throw new InvalidArgumentException("Operation {$op->operation_number} is an external subcontract operation. Internal shop floor progress logging is disabled.");
+            }
+
             if ($op->status === ProductionOrderOperation::STATUS_COMPLETED) {
                 throw new InvalidArgumentException('Cannot log progress on an already completed operation.');
             }
@@ -330,7 +334,7 @@ class ProductionExecutionService
             $wip = app(ProductionWipService::class)->getOrCreateWipForBatchOperation(
                 $op->production_order_id,
                 $batch->id,
-                $op->routing_operation_id,
+                $op->routing_operation_id ?? $op->id,
                 $userId
             );
             if ($wip) {
@@ -616,22 +620,8 @@ class ProductionExecutionService
                 throw new InvalidArgumentException('Cannot receive finished goods on a closed or cancelled order.');
             }
 
-            // Check for WIP quality hold or active rework loops
-            $hasWipHold = ProductionWip::where('tenant_id', $order->tenant_id)
-                ->where('production_order_id', $order->id)
-                ->whereIn('status', ['quality_hold', 'rework'])
-                ->exists();
-
-            $hasPendingRework = ProductionOrderRework::where('tenant_id', $order->tenant_id)
-                ->where('production_order_id', $order->id)
-                ->where('status', 'pending')
-                ->exists();
-
-            if ($hasWipHold || $hasPendingRework) {
-                throw new InvalidArgumentException(
-                    'Cannot receive finished goods: This production order has Work-in-Progress (WIP) on Quality Hold or pending Rework. Quality clearance is required before receiving finished goods into inventory.'
-                );
-            }
+            // Validate completion guardrails via domain validator
+            app(ProductionOrderCompletionValidator::class)->validateCompletion($order);
 
             if ($qualityStatus === 'quarantine') {
                 $quarantineWarehouse = Warehouse::where('tenant_id', $order->tenant_id)

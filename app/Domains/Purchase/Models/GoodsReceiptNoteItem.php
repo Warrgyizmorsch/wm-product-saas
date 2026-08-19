@@ -18,6 +18,9 @@ class GoodsReceiptNoteItem extends BaseModel
         'goods_receipt_note_id',
         'purchase_order_item_id',
         'product_id',
+        'production_order_id',
+        'production_order_operation_id',
+        'production_batch_id',
         'ordered_qty',
         'previous_received_qty',
         'received_qty',
@@ -38,6 +41,9 @@ class GoodsReceiptNoteItem extends BaseModel
         'remaining_qty' => 'float',
         'unit_rate' => 'float',
         'total_amount' => 'float',
+        'production_order_id' => 'integer',
+        'production_order_operation_id' => 'integer',
+        'production_batch_id' => 'integer',
     ];
 
     public function goodsReceiptNote(): BelongsTo
@@ -53,5 +59,20 @@ class GoodsReceiptNoteItem extends BaseModel
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    public function productionOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionOrder::class, 'production_order_id');
+    }
+
+    public function productionOrderOperation(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionOrderOperation::class, 'production_order_operation_id');
+    }
+
+    public function productionBatch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionBatch::class, 'production_batch_id');
     }
 }

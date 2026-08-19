@@ -80,6 +80,7 @@
                                 <option value="direct"               @selected(request('source_type') === 'direct')>{{ __('purchase.source_direct') }}</option>
                                 <option value="so"                   @selected(request('source_type') === 'so')>{{ __('purchase.source_so') }}</option>
                                 <option value="mo"                   @selected(request('source_type') === 'mo')>{{ __('purchase.source_mo') }}</option>
+                                <option value="subcontract"          @selected(request('source_type') === 'subcontract')>Subcontract Service</option>
                                 <option value="material_request"     @selected(request('source_type') === 'material_request')>{{ __('purchase.source_material_request') }}</option>
                                 <option value="material_requirement" @selected(request('source_type') === 'material_requirement')>{{ __('purchase.source_material_requirement') }}</option>
                                 <option value="requisition_slip"     @selected(request('source_type') === 'requisition_slip')>{{ __('purchase.source_requisition_slip') }}</option>
@@ -135,6 +136,12 @@
                 </thead>
                 <tbody>
                     @forelse($requisitions as $req)
+                        @php
+                            $isSubcontractPr = in_array($req->source_type, ['mo', 'ProductionOrder']) 
+                                && (str_contains($req->notes ?? '', 'Subcontract') 
+                                    || $req->items->contains(fn($i) => $i->product?->product_type === 'service')
+                                    || ($req->sourceable && method_exists($req->sourceable, 'operations') && $req->sourceable->operations->contains('is_external', true)));
+                        @endphp
                         <tr>
                             <td class="text-center">
                                 <input type="checkbox" class="form-check-input row-checkbox" value="{{ $req->id }}">
@@ -147,6 +154,22 @@
                             <td>{{ $req->requester->name ?? __('purchase.system') }}</td>
                             <td>{{ $req->requisition_date ? $req->requisition_date->format('d-m-Y') : '—' }}</td>
                             <td>
+                                @if($isSubcontractPr)
+                                    <x-ui.badge :soft="true" variant="warning" class="fs-10 text-uppercase">
+                                        <i class="feather-truck me-1"></i>Subcontract Service
+                                    </x-ui.badge>
+                                @else
+                                    @php
+                                        $sourceBadge = 'secondary';
+                                        if($req->source_type === 'mo') $sourceBadge = 'warning';
+                                        elseif($req->source_type === 'material_request') $sourceBadge = 'info';
+                                        elseif($req->source_type === 'material_requirement') $sourceBadge = 'success';
+                                        elseif($req->source_type === 'so') $sourceBadge = 'danger';
+                                    @endphp
+                                    <x-ui.badge :soft="true" :variant="$sourceBadge" class="fs-10 text-uppercase">
+                                        {{ __('purchase.source_' . $req->source_type) }}
+                                    </x-ui.badge>
+                                @endif
                                 @if($req->expected_date)
                                     <span class="badge bg-soft-info text-info border border-info-subtle font-monospace px-2 py-0.5 fs-11">
                                         {{ $req->expected_date->format('d-m-Y') }}
@@ -170,6 +193,10 @@
                             <td>
                                 @if($req->source_type === 'mo' && $req->sourceable)
                                     <a href="{{ route('production.orders.show', $req->source_id) }}" class="text-primary fw-medium">{{ $req->sourceable->order_number }}</a>
+                                    @if($isSubcontractPr)
+                                        <small class="d-block text-muted fs-11"><i class="feather-tool me-1"></i>Subcontract Processing</small>
+                                    @endif
+                                @elseif($req->source_type === 'material_request' && $req->sourceable)
                                 @elseif($req->source_type === 'material_request' && $req->sourceable)
                                     <a href="{{ route('sales.material-requests.show', $req->source_id) }}" class="text-primary fw-medium">{{ $req->sourceable->requisition_number }}</a>
                                 @elseif($req->source_type === 'material_requirement' && $req->sourceable)

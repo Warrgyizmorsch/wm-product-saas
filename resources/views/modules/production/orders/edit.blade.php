@@ -48,6 +48,13 @@
                             <option value="serial" @selected(old('production_mode', $order->production_mode) === 'serial')>{{ __('production.mode_serial') }}</option>
                             <option value="batch_and_serial" @selected(old('production_mode', $order->production_mode) === 'batch_and_serial')>{{ __('production.mode_batch_and_serial') }}</option>
                         </x-ui.odoo-form-ui>
+
+                        <x-ui.odoo-form-ui type="select" label="Production Model" name="production_model" id="production_model_select">
+                            <option value="pure_manufacturing" @selected(old('production_model', $order->production_model) === 'pure_manufacturing')>Pure Manufacturing</option>
+                            <option value="subcontract_complete" @selected(old('production_model', $order->production_model) === 'subcontract_complete')>Complete Subcontracting</option>
+                            <option value="subcontract_company_material" @selected(old('production_model', $order->production_model) === 'subcontract_company_material')>Subcontracting with Company Material</option>
+                            <option value="hybrid" @selected(old('production_model', $order->production_model) === 'hybrid')>Hybrid Manufacturing + Subcontracting</option>
+                        </x-ui.odoo-form-ui>
                     </div>
 
                     <!-- Right Column -->

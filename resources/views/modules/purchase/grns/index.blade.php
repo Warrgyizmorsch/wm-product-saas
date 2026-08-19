@@ -132,14 +132,26 @@
                         @endphp
                         <tr>
                             <td class="ps-4 fw-bold font-monospace">
+                                @php
+                                    $isSubcontractGrn = (bool) ($grn->purchaseOrder?->is_subcontract || $grn->production_order_id || str_contains($grn->notes ?? '', 'Subcontract'));
+                                @endphp
                                 <a href="{{ route('grns.show', $grn->id) }}" class="text-primary">
                                     {{ $grn->grn_number }}
                                 </a>
+                                @if($isSubcontractGrn)
+                                    <span class="badge bg-soft-warning text-dark border border-warning px-1.5 py-0.5 fs-10 fw-bold d-block mt-1">
+                                        <i class="feather-truck me-1"></i>Subcontract Receipt
+                                    </span>
+                                @endif
                             </td>
                             <td class="font-monospace fw-semibold">
                                 @if($grn->purchaseOrder)
                                     <a href="{{ route('purchase.orders.show', $grn->purchase_order_id) }}" class="text-dark">
                                         {{ $grn->purchaseOrder->purchase_order_number }}
+                                    </a>
+                                @elseif($grn->production_order_id)
+                                    <a href="{{ route('production.orders.show', $grn->production_order_id) }}" class="text-primary fw-bold">
+                                        <i class="feather-cpu me-1"></i>MO #{{ $grn->production_order_id }}
                                     </a>
                                 @else
                                     <span class="text-muted">{{ __('purchase.direct_receipt') }}</span>

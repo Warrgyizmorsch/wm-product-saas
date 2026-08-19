@@ -87,6 +87,18 @@ class ProductionOrder extends BaseModel
         self::STATUS_CANCELLED,
     ];
 
+    public const MODEL_PURE_MANUFACTURING = 'pure_manufacturing';
+    public const MODEL_SUBCONTRACT_COMPLETE = 'subcontract_complete';
+    public const MODEL_SUBCONTRACT_COMPANY_MATERIAL = 'subcontract_company_material';
+    public const MODEL_HYBRID = 'hybrid';
+
+    public const PRODUCTION_MODELS = [
+        self::MODEL_PURE_MANUFACTURING,
+        self::MODEL_SUBCONTRACT_COMPLETE,
+        self::MODEL_SUBCONTRACT_COMPANY_MATERIAL,
+        self::MODEL_HYBRID,
+    ];
+
     protected $fillable = [
         'tenant_id',
         'order_number',
@@ -103,6 +115,7 @@ class ProductionOrder extends BaseModel
         'actual_start_date',
         'actual_end_date',
         'status',
+        'production_model',
         'description',
         'created_by',
         'released_by',
@@ -283,5 +296,27 @@ class ProductionOrder extends BaseModel
             self::STATUS_CLOSED,
             self::STATUS_CANCELLED,
         ]);
+    }
+
+    // ── Production Model Helpers ──
+
+    public function isPureManufacturing(): bool
+    {
+        return ($this->production_model ?? self::MODEL_PURE_MANUFACTURING) === self::MODEL_PURE_MANUFACTURING;
+    }
+
+    public function isSubcontractComplete(): bool
+    {
+        return $this->production_model === self::MODEL_SUBCONTRACT_COMPLETE;
+    }
+
+    public function isSubcontractCompanyMaterial(): bool
+    {
+        return $this->production_model === self::MODEL_SUBCONTRACT_COMPANY_MATERIAL;
+    }
+
+    public function isHybrid(): bool
+    {
+        return $this->production_model === self::MODEL_HYBRID;
     }
 }

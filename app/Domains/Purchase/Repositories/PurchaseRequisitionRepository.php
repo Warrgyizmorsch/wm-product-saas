@@ -15,14 +15,26 @@ class PurchaseRequisitionRepository
         $tenantId = require_tenant_id();
 
         $query = PurchaseRequisition::where('tenant_id', $tenantId)
-            ->with(['requester', 'sourceable', 'reminders.user']);
+            ->with(['requester', 'sourceable', 'items.product','reminders.user']);
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
         if (!empty($filters['source_type'])) {
-            $query->where('source_type', $filters['source_type']);
+            if ($filters['source_type'] === 'subcontract') {
+                $query->whereIn('source_type', ['mo', 'ProductionOrder'])
+                    ->where(function ($q) {
+                        $q->where('notes', 'like', '%Subcontract%')
+                          ->orWhereHas('items', function ($iq) {
+                              $iq->whereHas('product', function ($pq) {
+                                  $pq->where('product_type', 'service');
+                              });
+                          });
+                    });
+            } else {
+                $query->where('source_type', $filters['source_type']);
+            }
         }
 
         if (!empty($filters['search'])) {

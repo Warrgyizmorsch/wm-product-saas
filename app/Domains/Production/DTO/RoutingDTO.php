@@ -13,7 +13,7 @@ class RoutingDTO
         public readonly string  $version,
         public readonly string  $effective_from,
         public readonly ?string $routing_number = null,
-        public readonly int     $revision = 0,
+        public readonly ?int    $revision = null,
         public readonly bool    $is_default = true,
         public readonly ?string $effective_to = null,
         public readonly ?string $description = null,
@@ -33,9 +33,9 @@ class RoutingDTO
             name:           $data['name'],
             product_id:     (int) $data['product_id'],
             version:        $data['version'] ?? '1.0.0',
-            effective_from: $data['effective_from'],
+            effective_from: $data['effective_from'] ?? now()->toDateString(),
             routing_number: $data['routing_number'] ?? null,
-            revision:       isset($data['revision']) ? (int) $data['revision'] : 0,
+            revision:       isset($data['revision']) ? (int) $data['revision'] : null,
             is_default:     isset($data['is_default']) ? (bool) $data['is_default'] : true,
             effective_to:   $data['effective_to'] ?? null,
             description:    $data['description'] ?? null,
@@ -45,16 +45,21 @@ class RoutingDTO
 
     public function toArray(): array
     {
-        return [
+        $data = [
             'name'           => $this->name,
             'product_id'     => $this->product_id,
             'version'        => $this->version,
             'effective_from' => $this->effective_from,
             'routing_number' => $this->routing_number,
-            'revision'       => $this->revision,
             'is_default'     => $this->is_default,
             'effective_to'   => $this->effective_to,
             'description'    => $this->description,
         ];
+
+        if ($this->revision !== null) {
+            $data['revision'] = $this->revision;
+        }
+
+        return $data;
     }
 }

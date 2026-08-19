@@ -70,6 +70,8 @@ class BomExplosionService
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $product->id)
                 ->where('status', 'approved')
+                ->whereIn('bom_type', ['manufacturing', 'subcontracting', 'phantom'])
+                ->orderByRaw("CASE WHEN bom_type = 'manufacturing' THEN 1 WHEN bom_type = 'subcontracting' THEN 2 WHEN bom_type = 'phantom' THEN 3 ELSE 4 END")
                 ->with(['items.material', 'items.uom'])
                 ->first();
         }
@@ -79,6 +81,8 @@ class BomExplosionService
             $node['bom_number'] = $bom->bom_number;
             $node['bom_name'] = $bom->bom_name;
             $node['bom_version'] = $bom->version;
+            $node['bom_type'] = $bom->bom_type;
+            $node['is_phantom'] = ($bom->bom_type === 'phantom');
             $node['uom_code'] = $bom->baseUom ? $bom->baseUom->code : 'PCS';
 
             $node['children'] = $this->resolveChildren($bom, $quantity, $tenantId, $level, $visited);
@@ -140,28 +144,35 @@ class BomExplosionService
 
     /**
      * Consolidate nested requirements into a flat list.
+     * Blows through Phantom BOMs (is_phantom = true at level > 1).
      */
     private function consolidateRequirements(array $node, array &$flat): void
     {
-        if (empty($node['children'])) {
-            if ($node['level'] === 1) {
+        $isPhantom = !empty($node['is_phantom']) && $node['level'] > 1;
+
+        if (empty($node['children']) || $isPhantom) {
+            if ($node['level'] === 1 && empty($node['children'])) {
                 return;
             }
 
-            $id = $node['product_id'];
-            if (!isset($flat[$id])) {
-                $flat[$id] = [
-                    'product_id' => $node['product_id'],
-                    'product_name' => $node['product_name'],
-                    'product_sku' => $node['product_sku'],
-                    'net_quantity' => 0.0,
-                    'gross_quantity' => 0.0,
-                    'uom_code' => $node['uom_code'],
-                ];
+            if (!$isPhantom) {
+                $id = $node['product_id'];
+                if (!isset($flat[$id])) {
+                    $flat[$id] = [
+                        'product_id' => $node['product_id'],
+                        'product_name' => $node['product_name'],
+                        'product_sku' => $node['product_sku'],
+                        'net_quantity' => 0.0,
+                        'gross_quantity' => 0.0,
+                        'uom_code' => $node['uom_code'],
+                    ];
+                }
+                $flat[$id]['net_quantity'] += $node['net_quantity'] ?? $node['quantity'];
+                $flat[$id]['gross_quantity'] += $node['gross_quantity'] ?? $node['quantity'];
             }
-            $flat[$id]['net_quantity'] += $node['net_quantity'] ?? $node['quantity'];
-            $flat[$id]['gross_quantity'] += $node['gross_quantity'] ?? $node['quantity'];
-        } else {
+        }
+
+        if (!empty($node['children'])) {
             foreach ($node['children'] as $child) {
                 $this->consolidateRequirements($child, $flat);
             }

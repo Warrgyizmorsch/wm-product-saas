@@ -52,6 +52,17 @@ class ProductionOrderOperation extends BaseModel
         'quantity_scrapped',
         'machine_used_id',
         'operator_id',
+        'is_external',
+        'vendor_id',
+        'subcontract_lead_time_days',
+        'subcontract_cost_per_unit',
+        'subcontract_service_product_id',
+        'material_supply_type',
+        'dispatch_buffer_days',
+        'return_buffer_days',
+        'purchase_order_id',
+        'purchase_order_item_id',
+        'quality_required',
         'parallel_group',
         'is_parallel',
         'parallel_type',
@@ -69,6 +80,12 @@ class ProductionOrderOperation extends BaseModel
         'total_time_planned'      => 'float',
         'setup_time_actual'       => 'float',
         'processing_time_actual'  => 'float',
+        'is_external'             => 'boolean',
+        'quality_required'        => 'boolean',
+        'subcontract_lead_time_days'=> 'integer',
+        'subcontract_cost_per_unit' => 'float',
+        'dispatch_buffer_days'      => 'integer',
+        'return_buffer_days'        => 'integer',
         'quantity_produced'       => 'float',
         'quantity_rejected'       => 'float',
         'quantity_scrapped'       => 'float',
@@ -116,6 +133,26 @@ class ProductionOrderOperation extends BaseModel
         return $this->belongsTo(User::class, 'operator_id');
     }
 
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\Vendor::class, 'vendor_id');
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Purchase\Models\PurchaseOrder::class, 'purchase_order_id');
+    }
+
+    public function purchaseOrderItem(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Purchase\Models\PurchaseOrderItem::class, 'purchase_order_item_id');
+    }
+
+    public function subcontractServiceProduct(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'subcontract_service_product_id');
+    }
+
     public function progressLogs(): HasMany
     {
         return $this->hasMany(ProductionOrderProgressLog::class, 'operation_id');
@@ -139,5 +176,10 @@ class ProductionOrderOperation extends BaseModel
     public function isCompleted(): bool
     {
         return $this->status === self::STATUS_COMPLETED;
+    }
+
+    public function isOutsourced(): bool
+    {
+        return (bool) ($this->is_external || $this->routingOperation?->isOutsourced() || $this->purchase_order_id !== null);
     }
 }

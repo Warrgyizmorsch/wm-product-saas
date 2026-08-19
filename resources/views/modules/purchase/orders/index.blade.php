@@ -61,6 +61,15 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Purchase Type</label>
+                            <x-ui.odoo-form-ui type="select" name="is_subcontract">
+                                <option value="">All Types</option>
+                                <option value="0" @selected(request('is_subcontract') === '0')>Standard PO</option>
+                                <option value="1" @selected(request('is_subcontract') === '1')>Subcontract PO</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
                                 <option value="">{{ __('purchase.all_statuses') }}</option>
@@ -128,10 +137,19 @@
                                 <a href="{{ route('purchase.orders.show', $order->id) }}" class="text-primary text-decoration-none">
                                     {{ $order->purchase_order_number }}
                                 </a>
+                                @if($order->is_subcontract)
+                                    <span class="badge bg-soft-warning text-dark border border-warning px-1.5 py-0.5 fs-10 fw-bold d-block mt-1">
+                                        <i class="feather-truck me-1"></i>Subcontract PO
+                                    </span>
+                                @endif
                             </td>
                             <td>{{ $order->vendor->name ?? '—' }}</td>
                             <td>
-                                @if($order->requisition)
+                                @if($order->is_subcontract && $order->production_order_id)
+                                    <a href="{{ route('production.orders.show', $order->production_order_id) }}" class="text-primary fw-bold">
+                                        <i class="feather-cpu me-1"></i>MO #{{ $order->production_order_id }}
+                                    </a>
+                                @elseif($order->requisition)
                                     <a href="{{ route('purchase.requisitions.show', $order->purchase_requisition_id) }}" class="text-primary fw-medium">
                                         {{ $order->requisition->requisition_number }}
                                     </a>

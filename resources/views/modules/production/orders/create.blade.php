@@ -73,6 +73,10 @@
                             rtHtml += '<option value="' + rt.id + '">' + rt.routing_number + ' — ' + rt.name + ' (v' + rt.version + ')</option>';
                         });
                         $('#routing_select').html(rtHtml).trigger('change');
+
+                        if (response.default_production_model) {
+                            $('#production_model_select').val(response.default_production_model).trigger('change');
+                        }
                     }
                 });
             });
@@ -233,6 +237,13 @@
                             <option value="batch" @selected(old('production_mode', 'batch') === 'batch')>{{ __('production.mode_batch') }}</option>
                             <option value="serial" @selected(old('production_mode') === 'serial')>{{ __('production.mode_serial') }}</option>
                             <option value="batch_and_serial" @selected(old('production_mode') === 'batch_and_serial')>{{ __('production.mode_batch_and_serial') }}</option>
+                        </x-ui.odoo-form-ui>
+
+                        <x-ui.odoo-form-ui type="select" label="Production Model" name="production_model" id="production_model_select">
+                            <option value="pure_manufacturing" @selected(old('production_model') === 'pure_manufacturing')>Pure Manufacturing</option>
+                            <option value="subcontract_complete" @selected(old('production_model') === 'subcontract_complete')>Complete Subcontracting</option>
+                            <option value="subcontract_company_material" @selected(old('production_model') === 'subcontract_company_material')>Subcontracting with Company Material</option>
+                            <option value="hybrid" @selected(old('production_model') === 'hybrid')>Hybrid Manufacturing + Subcontracting</option>
                         </x-ui.odoo-form-ui>
                     </div>
 

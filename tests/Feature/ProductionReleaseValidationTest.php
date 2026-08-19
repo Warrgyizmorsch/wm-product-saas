@@ -520,8 +520,9 @@ class ProductionReleaseValidationTest extends TestCase
             $this->assertStringContainsString('pending Rework', $e->getMessage());
         }
 
-        // Resolve Rework & Quality Hold
+        // Resolve Rework & Quality Hold & NCR
         $rework->update(['status' => 'completed']);
+        $ncr->update(['status' => 'resolved', 'disposition' => 'rework_completed']);
 
         // ══════════════════════════════════════════════════════════════
         // PHASE 11 — BATCH, SERIAL & SCANNER LOG TRACEABILITY
