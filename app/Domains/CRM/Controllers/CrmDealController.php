@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Domains\CRM\Models\CrmAccount;
 use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
+use App\Domains\CRM\Models\DealStatus;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,8 @@ class CrmDealController extends Controller
         $stage = $request->input('stage');
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
+
+        $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
 
         $baseQuery = CrmDeal::where('tenant_id', $tenantId);
 
@@ -39,16 +42,20 @@ class CrmDealController extends Controller
             $baseQuery->whereDate('created_at', '<=', $dateTo);
         }
 
-        // Calculate Stage Counts for Top Tabs
+        // Calculate Stage Counts for Top Tabs dynamically from DealStatus master
         $stageCounts = [
-            'all'            => (clone $baseQuery)->count(),
-            'Qualification'  => (clone $baseQuery)->whereIn('stage', ['Qualification', 'New'])->count(),
-            'Needs Analysis' => (clone $baseQuery)->whereIn('stage', ['Needs Analysis', 'Qualified'])->count(),
-            'Proposal'       => (clone $baseQuery)->where('stage', 'Proposal')->count(),
-            'Negotiation'    => (clone $baseQuery)->where('stage', 'Negotiation')->count(),
-            'Won'            => (clone $baseQuery)->whereIn('stage', ['Won', 'Closed Won'])->count(),
-            'Lost'           => (clone $baseQuery)->whereIn('stage', ['Lost', 'Closed Lost'])->count(),
+            'all' => (clone $baseQuery)->count(),
         ];
+
+        foreach ($dealStatuses as $st) {
+            if ($st->name === 'Won') {
+                $stageCounts[$st->name] = (clone $baseQuery)->whereIn('stage', ['Won', 'Closed Won'])->count();
+            } elseif ($st->name === 'Lost') {
+                $stageCounts[$st->name] = (clone $baseQuery)->whereIn('stage', ['Lost', 'Closed Lost'])->count();
+            } else {
+                $stageCounts[$st->name] = (clone $baseQuery)->where('stage', $st->name)->count();
+            }
+        }
 
         $query = CrmDeal::with(['account', 'contact', 'owner', 'quotations'])
             ->where('tenant_id', $tenantId);
@@ -85,21 +92,41 @@ class CrmDealController extends Controller
 
         $deals = $query->orderBy('id', 'desc')->paginate(100);
 
-        return view('modules.crm.deals.index', compact('deals', 'search', 'stage', 'stageCounts', 'dateFrom', 'dateTo'));
+        return view('modules.crm.deals.index', compact('deals', 'search', 'stage', 'stageCounts', 'dateFrom', 'dateTo', 'dealStatuses'));
     }
 
     public function kanban(Request $request): View
     {
         $tenantId = tenant_id() ?? 1;
 
-        $stages = [
-            'Qualification'  => ['label' => 'Qualification',  'color' => 'primary', 'prob' => 10],
-            'Needs Analysis' => ['label' => 'Needs Analysis', 'color' => 'info',    'prob' => 30],
-            'Proposal'       => ['label' => 'Proposal',       'color' => 'warning', 'prob' => 60],
-            'Negotiation'    => ['label' => 'Negotiation',    'color' => 'dark',    'prob' => 80],
-            'Won'            => ['label' => 'Won',            'color' => 'success', 'prob' => 100],
-            'Lost'           => ['label' => 'Lost',           'color' => 'danger',  'prob' => 0],
-        ];
+        $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+
+        $stages = [];
+        foreach ($dealStatuses as $st) {
+            $color = match(strtolower($st->name)) {
+                'qualification' => 'primary',
+                'needs analysis' => 'info',
+                'proposal' => 'warning',
+                'negotiation' => 'dark',
+                'won', 'closed won' => 'success',
+                'lost', 'closed lost' => 'danger',
+                default => str_replace('bg-', '', $st->color ?: 'primary'),
+            };
+            $prob = $st->probability ?? match(strtolower($st->name)) {
+                'qualification' => 10,
+                'needs analysis' => 30,
+                'proposal' => 60,
+                'negotiation' => 80,
+                'won', 'closed won' => 100,
+                'lost', 'closed lost' => 0,
+                default => 50,
+            };
+            $stages[$st->name] = [
+                'label' => $st->name,
+                'color' => $color,
+                'prob'  => $prob,
+            ];
+        }
 
         $allDeals = CrmDeal::with(['account', 'contact', 'quotations'])
             ->where('tenant_id', $tenantId)
@@ -124,7 +151,7 @@ class CrmDealController extends Controller
             ];
         }
 
-        return view('modules.crm.deals.kanban', compact('stages', 'kanbanData'));
+        return view('modules.crm.deals.kanban', compact('stages', 'kanbanData', 'dealStatuses'));
     }
 
     public function create(Request $request): View
@@ -138,26 +165,34 @@ class CrmDealController extends Controller
 
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
         $users = \App\Models\User::orderBy('name')->get();
-        return view('modules.crm.deals.create', compact('accounts', 'contacts', 'selectedAccountId', 'products', 'users'));
+        $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+
+        return view('modules.crm.deals.create', compact('accounts', 'contacts', 'selectedAccountId', 'products', 'users', 'dealStatuses'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $tenantId = tenant_id() ?? 1;
 
+        $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $validStages = array_unique(array_merge(
+            $dealStatuses->pluck('name')->toArray(),
+            ['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost', 'Closed Won', 'Closed Lost', 'New', 'Qualified']
+        ));
+
         $validated = $request->validate([
             'crm_account_id'  => 'required|exists:crm_accounts,id',
             'crm_contact_id'  => 'nullable|exists:crm_contacts,id',
             'title'           => 'required|string|max:255',
             'estimated_value' => 'required|numeric|min:0',
-            'stage'           => 'nullable|string|in:Qualification,Needs Analysis,Proposal,Negotiation,Won,Lost,Closed Won,Closed Lost,New,Qualified',
+            'stage'           => 'nullable|string|in:' . implode(',', $validStages),
             'closing_date'    => 'nullable|date',
             'lead_source'     => 'nullable|string|max:100',
             'owner_id'        => 'nullable|exists:users,id',
             'notes'           => 'nullable|string',
         ]);
 
-        $stage = $validated['stage'] ?? 'Qualification';
+        $stage = $validated['stage'] ?? ($dealStatuses->first()?->name ?: 'Qualification');
         if ($stage === 'Closed Won') $stage = 'Won';
         if ($stage === 'Closed Lost') $stage = 'Lost';
         if ($stage === 'New') $stage = 'Qualification';
@@ -169,14 +204,8 @@ class CrmDealController extends Controller
 
         $nextNumber = 'DL-' . date('Y') . '-' . str_pad(CrmDeal::where('tenant_id', $tenantId)->count() + 1, 5, '0', STR_PAD_LEFT);
 
-        $probMap = [
-            'Qualification'  => 10,
-            'Needs Analysis' => 30,
-            'Proposal'       => 60,
-            'Negotiation'    => 80,
-            'Won'            => 100,
-            'Lost'           => 0,
-        ];
+        $targetStatus = $dealStatuses->firstWhere('name', $stage);
+        $prob = $targetStatus ? $targetStatus->probability : ($probMap[$stage] ?? 50);
 
         $rawItems = $request->input('items', []);
         $rawProductIds = $request->input('product_ids', []);
@@ -190,7 +219,7 @@ class CrmDealController extends Controller
             'title'           => $validated['title'],
             'estimated_value' => $validated['estimated_value'],
             'stage'           => $stage,
-            'probability'     => $probMap[$stage] ?? 20,
+            'probability'     => $prob,
             'closing_date'    => $validated['closing_date'] ?? null,
             'lead_source'     => $validated['lead_source'] ?? null,
             'owner_id'        => $validated['owner_id'] ?? (auth()->id() ?: 1),
@@ -229,6 +258,7 @@ class CrmDealController extends Controller
         $nextQuotationNumber = app(\App\Domains\CRM\Services\QuotationService::class)->getNextQuotationNumber();
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
         $users = \App\Models\User::orderBy('name')->get();
+        $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
 
         $prevDeal = CrmDeal::where('tenant_id', $tenantId)->where('id', '<', $deal->id)->orderBy('id', 'desc')->first();
         $nextDeal = CrmDeal::where('tenant_id', $tenantId)->where('id', '>', $deal->id)->orderBy('id', 'asc')->first();
@@ -288,7 +318,7 @@ class CrmDealController extends Controller
             }
         }
 
-        return view('modules.crm.deals.show', compact('deal', 'nextQuotationNumber', 'products', 'users', 'prevDeal', 'nextDeal', 'activeQuotation', 'linkedLead', 'followups', 'histories', 'leadDocuments', 'prefilledDealItems'));
+        return view('modules.crm.deals.show', compact('deal', 'nextQuotationNumber', 'products', 'users', 'prevDeal', 'nextDeal', 'activeQuotation', 'linkedLead', 'followups', 'histories', 'leadDocuments', 'prefilledDealItems', 'dealStatuses'));
     }
 
     public function edit(CrmDeal $deal): View
@@ -300,18 +330,27 @@ class CrmDealController extends Controller
             : collect();
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
         $users = \App\Models\User::orderBy('name')->get();
+        $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
 
-        return view('modules.crm.deals.edit', compact('deal', 'accounts', 'contacts', 'products', 'users'));
+        return view('modules.crm.deals.edit', compact('deal', 'accounts', 'contacts', 'products', 'users', 'dealStatuses'));
     }
 
     public function update(Request $request, CrmDeal $deal): RedirectResponse
     {
+        $tenantId = tenant_id() ?? 1;
+
+        $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $validStages = array_unique(array_merge(
+            $dealStatuses->pluck('name')->toArray(),
+            ['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost', 'Closed Won', 'Closed Lost', 'New', 'Qualified']
+        ));
+
         $validated = $request->validate([
             'crm_account_id'  => 'required|exists:crm_accounts,id',
             'crm_contact_id'  => 'nullable|exists:crm_contacts,id',
             'title'           => 'required|string|max:255',
             'estimated_value' => 'required|numeric|min:0',
-            'stage'           => 'required|string|in:New,Qualified,Proposal,Won,Lost,Closed Won,Closed Lost,Qualification,Needs Analysis,Negotiation',
+            'stage'           => 'required|string|in:' . implode(',', $validStages),
             'close_reason'    => 'nullable|string|max:255',
             'closing_date'    => 'nullable|date',
             'lead_source'     => 'nullable|string|max:100',
@@ -330,17 +369,9 @@ class CrmDealController extends Controller
             }
         }
 
-        $validated['stage'] = $stage;
-
-        $probMap = [
-            'Qualification'  => 10,
-            'Needs Analysis' => 30,
-            'Proposal'       => 60,
-            'Negotiation'    => 80,
-            'Won'            => 100,
-            'Lost'           => 0,
-        ];
-        $validated['probability'] = $probMap[$stage] ?? $deal->probability;
+        $targetStatus = $dealStatuses->firstWhere('name', $stage);
+        $prob = $targetStatus ? $targetStatus->probability : ($probMap[$stage] ?? $deal->probability);
+        $validated['probability'] = $prob;
 
         $rawItems = $request->input('items', []);
         $rawProductIds = $request->input('product_ids', []);
@@ -352,7 +383,6 @@ class CrmDealController extends Controller
         $deal->update($validated);
 
         // Process any additional contacts submitted in form
-        $tenantId = tenant_id() ?? 1;
         $additional = $request->input('additional_contacts', []);
         if (is_array($additional) && !empty($validated['crm_account_id'])) {
             foreach ($additional as $add) {
@@ -376,8 +406,16 @@ class CrmDealController extends Controller
 
     public function updateStage(Request $request, CrmDeal $deal)
     {
+        $tenantId = tenant_id() ?? 1;
+
+        $dealStatuses = DealStatus::getOrderedStatuses($tenantId);
+        $validStages = array_unique(array_merge(
+            $dealStatuses->pluck('name')->toArray(),
+            ['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost', 'Closed Won', 'Closed Lost', 'New', 'Qualified']
+        ));
+
         $validated = $request->validate([
-            'stage'        => 'required|string|in:Qualification,Needs Analysis,Proposal,Negotiation,Won,Lost,Closed Won,Closed Lost,New,Qualified',
+            'stage'        => 'required|string|in:' . implode(',', $validStages),
             'close_reason' => 'nullable|string|max:255',
         ]);
 
@@ -401,18 +439,12 @@ class CrmDealController extends Controller
             }
         }
 
-        $probMap = [
-            'Qualification'  => 10,
-            'Needs Analysis' => 30,
-            'Proposal'       => 60,
-            'Negotiation'    => 80,
-            'Won'            => 100,
-            'Lost'           => 0,
-        ];
+        $targetStatus = $dealStatuses->firstWhere('name', $stage);
+        $prob = $targetStatus ? $targetStatus->probability : ($probMap[$stage] ?? $deal->probability);
 
         $deal->update([
             'stage'        => $stage,
-            'probability'  => $probMap[$stage] ?? $deal->probability,
+            'probability'  => $prob,
             'close_reason' => $validated['close_reason'] ?? $deal->close_reason,
         ]);
 

@@ -106,7 +106,7 @@ class MaterialRequirementRepository
         $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->findOrFail($salesOrderId);
 
         $salesOrder->setRelation('items', $salesOrder->items->filter(function ($item) {
-            return !$item->product || $item->product->supplier_method === 'buy' || is_null($item->product->supplier_method);
+            return !$item->product || in_array($item->product->supplier_method, ['buy', 'trade'], true) || is_null($item->product->supplier_method);
         }));
 
         if (!in_array($salesOrder->status, ['Confirmed', 'Partially Shipped'])) {

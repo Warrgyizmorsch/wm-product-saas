@@ -129,7 +129,13 @@ class MaterialRequirementController extends Controller
         $qtyToRequest = (float) $request->input('quantity_request');
         if ($qtyToRequest <= 0) return back()->with('error', 'Quantity to request must be greater than 0.');
 
-        $this->deliveryService->createPurchaseRequisition($item, $qtyToRequest, $request->input('warehouse_id'), $request->input('notes'));
+        $this->deliveryService->createPurchaseRequisition(
+            $item,
+            $qtyToRequest,
+            $request->input('warehouse_id'),
+            $request->input('notes'),
+            $request->input('expected_date')
+        );
         return back()->with('success', "Purchase Requisition successfully generated for {$qtyToRequest} unit(s).");
     }
 

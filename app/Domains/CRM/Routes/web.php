@@ -6,12 +6,31 @@ use App\Domains\CRM\Controllers\CrmDealController;
 use App\Domains\CRM\Controllers\LeadController;
 use App\Domains\CRM\Controllers\LeadFollowupController;
 use App\Domains\CRM\Controllers\LeadActivityController;
+use App\Domains\CRM\Controllers\LeadStatusController;
+use App\Domains\CRM\Controllers\DealStatusController;
 use App\Domains\CRM\Controllers\QuotationController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('crm')
     ->as('crm.')
     ->group(function (): void {
+        // CRM Masters Routes
+        Route::prefix('masters')->as('masters.')->group(function (): void {
+            Route::get('lead-statuses', [LeadStatusController::class, 'index'])->name('lead-statuses.index');
+            Route::post('lead-statuses', [LeadStatusController::class, 'store'])->name('lead-statuses.store');
+            Route::put('lead-statuses/{leadStatus}', [LeadStatusController::class, 'update'])->name('lead-statuses.update');
+            Route::delete('lead-statuses/{leadStatus}', [LeadStatusController::class, 'destroy'])->name('lead-statuses.destroy');
+            Route::post('lead-statuses/reorder', [LeadStatusController::class, 'reorder'])->name('lead-statuses.reorder');
+            Route::post('lead-statuses/{leadStatus}/move/{direction}', [LeadStatusController::class, 'move'])->name('lead-statuses.move');
+
+            Route::get('deal-statuses', [DealStatusController::class, 'index'])->name('deal-statuses.index');
+            Route::post('deal-statuses', [DealStatusController::class, 'store'])->name('deal-statuses.store');
+            Route::put('deal-statuses/{dealStatus}', [DealStatusController::class, 'update'])->name('deal-statuses.update');
+            Route::delete('deal-statuses/{dealStatus}', [DealStatusController::class, 'destroy'])->name('deal-statuses.destroy');
+            Route::post('deal-statuses/reorder', [DealStatusController::class, 'reorder'])->name('deal-statuses.reorder');
+            Route::post('deal-statuses/{dealStatus}/move/{direction}', [DealStatusController::class, 'move'])->name('deal-statuses.move');
+        });
+
         // CRM Accounts Routes
         Route::get('accounts', [CrmAccountController::class, 'index'])->name('accounts.index');
         Route::get('accounts/create', [CrmAccountController::class, 'create'])->name('accounts.create');

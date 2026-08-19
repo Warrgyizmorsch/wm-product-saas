@@ -87,7 +87,7 @@ return [
     'single_item' => 'Single Item',
     'contains_variants' => 'Contains Variants (e.g. Size, Color)',
     'supplier_method' => 'Supplier Method',
-    'buy' => 'Buy',
+    'buy' => 'Trade',
     'manufacture' => 'Manufacture',
 
     // Form detail sections

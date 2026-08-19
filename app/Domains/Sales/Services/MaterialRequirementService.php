@@ -99,11 +99,11 @@ class MaterialRequirementService
         $this->updateOverallDeliveryStatus($item->materialRequirement);
     }
 
-    public function createPurchaseRequisition(MaterialRequirementItem $item, float $qtyToRequest, ?int $warehouseId, ?string $notes): PurchaseRequisition
+    public function createPurchaseRequisition(MaterialRequirementItem $item, float $qtyToRequest, ?int $warehouseId, ?string $notes, ?string $expectedDate = null): PurchaseRequisition
     {
         $tenantId = require_tenant_id();
 
-        return DB::transaction(function () use ($item, $qtyToRequest, $warehouseId, $notes, $tenantId) {
+        return DB::transaction(function () use ($item, $qtyToRequest, $warehouseId, $notes, $expectedDate, $tenantId) {
             $year = now()->format('Y');
             $prefix = "PR-{$year}-";
             $lastPr = PurchaseRequisition::where('tenant_id', $tenantId)
@@ -121,6 +121,7 @@ class MaterialRequirementService
                 'tenant_id' => $tenantId,
                 'requisition_number' => $requisitionNumber,
                 'requisition_date' => now()->toDateString(),
+                'expected_date' => $expectedDate ? date('Y-m-d', strtotime($expectedDate)) : null,
                 'status' => 'Draft',
                 'source_type' => 'material_requirement',
                 'source_id' => $item->material_requirement_id,

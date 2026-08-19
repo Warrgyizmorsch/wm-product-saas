@@ -139,7 +139,7 @@ class ProductSampleExport implements FromCollection, WithHeadings, WithEvents
                 '',
                 'raw_material',
                 'Goods',
-                'buy',
+                'trade',
                 'MTR',
                 '800.00',
                 '550.00',
@@ -198,7 +198,7 @@ class ProductSampleExport implements FromCollection, WithHeadings, WithEvents
                 $validationItemType->setFormula1($itemTypesList);
 
                 // Supplier Method validation (Column H)
-                $supplierMethodsList = '"buy,manufacture"';
+                $supplierMethodsList = '"trade,manufacture"';
                 $validationSupplierMethod = $sheet->getCell('H2')->getDataValidation();
                 $validationSupplierMethod->setType(DataValidation::TYPE_LIST);
                 $validationSupplierMethod->setErrorStyle(DataValidation::STYLE_STOP);

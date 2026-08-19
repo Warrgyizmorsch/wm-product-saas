@@ -169,7 +169,7 @@
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Supplier Method</td>
-                                            <td class="fw-semibold text-capitalize">{{ $product->supplier_method ?: 'Buy' }}</td>
+                                            <td class="fw-semibold text-capitalize">{{ strtolower($product->supplier_method ?? '') === 'buy' || strtolower($product->supplier_method ?? '') === 'trade' || empty($product->supplier_method) ? 'Trade' : ucfirst($product->supplier_method) }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Planning Type</td>

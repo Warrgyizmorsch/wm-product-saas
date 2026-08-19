@@ -15,7 +15,7 @@ class PurchaseRequisitionRepository
         $tenantId = require_tenant_id();
 
         $query = PurchaseRequisition::where('tenant_id', $tenantId)
-            ->with(['requester', 'sourceable']);
+            ->with(['requester', 'sourceable', 'reminders.user']);
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -30,9 +30,25 @@ class PurchaseRequisitionRepository
             $query->where('requisition_number', 'like', $search);
         }
 
+        if (!empty($filters['reminder_date_from'])) {
+            $query->whereDate('last_reminded_at', '>=', $filters['reminder_date_from']);
+        }
+
+        if (!empty($filters['reminder_date_to'])) {
+            $query->whereDate('last_reminded_at', '<=', $filters['reminder_date_to']);
+        }
+
+        if (isset($filters['has_reminders']) && $filters['has_reminders'] !== '') {
+            if ($filters['has_reminders'] == '1') {
+                $query->where('reminder_count', '>', 0);
+            } elseif ($filters['has_reminders'] == '0') {
+                $query->where('reminder_count', 0);
+            }
+        }
+
         $sortBy = $filters['sort_by'] ?? 'id';
         $sortOrder = $filters['sort_order'] ?? 'desc';
-        $allowedSorts = ['id', 'requisition_number', 'requisition_date', 'status'];
+        $allowedSorts = ['id', 'requisition_number', 'requisition_date', 'status', 'last_reminded_at'];
 
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortOrder);
@@ -49,7 +65,7 @@ class PurchaseRequisitionRepository
 
         $query = PurchaseRequisition::where('tenant_id', $tenantId)
             ->where('status', 'Draft')
-            ->with(['requester', 'sourceable']);
+            ->with(['requester', 'sourceable', 'reminders.user']);
 
         if (!empty($filters['source_type'])) {
             $query->where('source_type', $filters['source_type']);
@@ -58,6 +74,22 @@ class PurchaseRequisitionRepository
         if (!empty($filters['search'])) {
             $search = '%' . trim($filters['search']) . '%';
             $query->where('requisition_number', 'like', $search);
+        }
+
+        if (!empty($filters['reminder_date_from'])) {
+            $query->whereDate('last_reminded_at', '>=', $filters['reminder_date_from']);
+        }
+
+        if (!empty($filters['reminder_date_to'])) {
+            $query->whereDate('last_reminded_at', '<=', $filters['reminder_date_to']);
+        }
+
+        if (isset($filters['has_reminders']) && $filters['has_reminders'] !== '') {
+            if ($filters['has_reminders'] == '1') {
+                $query->where('reminder_count', '>', 0);
+            } elseif ($filters['has_reminders'] == '0') {
+                $query->where('reminder_count', 0);
+            }
         }
 
         $sortBy = $filters['sort_by'] ?? 'id';
@@ -145,6 +177,7 @@ class PurchaseRequisitionRepository
                         'requisition_number' => $pr->requisition_number,
                         'requisition_id' => $pr->id,
                         'requisition_date' => $pr->requisition_date,
+                        'expected_date' => $pr->expected_date,
                         'quantity_requested' => (float) $item->quantity,
                         'quantity_ordered' => $alreadyOrderedQty,
                         'quantity_pending' => $pendingQty,

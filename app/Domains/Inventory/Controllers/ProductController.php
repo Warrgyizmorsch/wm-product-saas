@@ -95,7 +95,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'item_type' => 'required|in:Goods,Service',
-            'supplier_method' => 'nullable|in:buy,manufacture',
+            'supplier_method' => 'nullable|in:buy,trade,manufacture',
             'type' => 'required|in:finished_good,semi_finished,raw_material,component,service',
             'variation_type' => 'required|in:Single,Variant',
             'sku' => [

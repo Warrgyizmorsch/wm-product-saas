@@ -143,7 +143,11 @@
 
         @foreach($stages as $stageKey => $info)
             @php
-                $config = $stageHeaderConfigs[$stageKey] ?? ['color' => '#64748b', 'badge' => 'bg-soft-secondary text-secondary', 'title' => $info['label']];
+                $config = $stageHeaderConfigs[$stageKey] ?? [
+                    'color' => '#3b82f6',
+                    'badge' => 'bg-soft-primary text-primary',
+                    'title' => $info['label'] . ' (' . ($info['prob'] ?? 50) . '%)'
+                ];
                 $columnData = $kanbanData[$stageKey] ?? ['deals' => collect(), 'total' => 0];
                 $deals = $columnData['deals'];
             @endphp

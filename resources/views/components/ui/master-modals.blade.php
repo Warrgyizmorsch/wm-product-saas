@@ -45,7 +45,7 @@ $masterDefinitions = [
                 'service'        => 'Service',
             ]]],
             ['component' => 'select', 'props' => ['label' => 'Supplier Method / Source', 'name' => 'supplier_method', 'required' => true, 'selected' => 'buy', 'options' => [
-                'buy'          => 'Buy (Purchase / Procurement)',
+                'buy'          => 'Trade (Purchase / Procurement)',
                 'manufacture'  => 'Manufacture (Produce)',
             ]]],
             ['component' => 'select', 'props' => ['label' => 'Unit of Measure (UOM)',  'name' => 'uom_id',    'required' => true, 'options' => $uomOptions]],
@@ -186,7 +186,7 @@ $masterDefinitions = [
                                 name="supplier_method"
                                 :required="true"
                             >
-                                <option value="buy" selected>Buy (Purchase / Procurement)</option>
+                                <option value="buy" selected>Trade (Purchase / Procurement)</option>
                                 <option value="manufacture">Manufacture (Produce)</option>
                             </x-ui.odoo-form-ui>
 
