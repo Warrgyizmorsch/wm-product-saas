@@ -17,6 +17,9 @@ use App\Domains\HRMS\Controllers\OvertimeRequestController;
 use App\Domains\HRMS\Controllers\ShiftOvertimeController;
 use App\Domains\HRMS\Controllers\AttendanceController;
 use App\Domains\HRMS\Controllers\BiometricDeviceController;
+use App\Domains\HRMS\Controllers\ExpenseCategoryController;
+use App\Domains\HRMS\Controllers\ExpensePolicyController;
+use App\Domains\HRMS\Controllers\TravelExpenseController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -309,7 +312,54 @@ Route::prefix('hrms')
         Route::prefix('holidays')->group(function (): void {
             Route::get('/', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'index'])->name('holidays.index');
             Route::post('/store', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'store'])->name('holidays.store');
-            Route::post('/update/{holiday}', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'update'])->name('holidays.update');
+            Route::post('/update/{holiday}', [\App\Domains\HolidayCalendarController::class, 'update'])->name('holidays.update');
             Route::delete('/delete/{holiday}', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'destroy'])->name('holidays.destroy');
+        });
+
+        // Expense Category Master
+        Route::prefix('expense-categories')->group(function (): void {
+            Route::get('/', [ExpenseCategoryController::class, 'index'])->name('expense-categories.index');
+            Route::post('/', [ExpenseCategoryController::class, 'store'])->name('expense-categories.store');
+            Route::put('/{category}', [ExpenseCategoryController::class, 'update'])->name('expense-categories.update');
+            Route::delete('/{category}', [ExpenseCategoryController::class, 'destroy'])->name('expense-categories.destroy');
+        });
+
+        // Expense Policy Master (2-layer: named policy → category limits)
+        Route::prefix('expense-policy')->group(function (): void {
+            Route::get('/', [ExpensePolicyController::class, 'index'])->name('expense-policy.index');
+            Route::post('/', [ExpensePolicyController::class, 'store'])->name('expense-policy.store');
+            Route::put('/{policy}', [ExpensePolicyController::class, 'update'])->name('expense-policy.update');
+            Route::delete('/{policy}', [ExpensePolicyController::class, 'destroy'])->name('expense-policy.destroy');
+
+            // Category-level rules within a policy
+            Route::get('/{policy}/rules', [ExpensePolicyController::class, 'showRules'])->name('expense-policy.rules');
+            Route::post('/{policy}/rules', [ExpensePolicyController::class, 'storeRule'])->name('expense-policy.rules.store');
+            Route::delete('/{policy}/rules/{rule}', [ExpensePolicyController::class, 'destroyRule'])->name('expense-policy.rules.destroy');
+        });
+
+        // Travel & Expense Management Workspace
+        Route::prefix('travel-expense')->group(function (): void {
+            Route::get('/', [TravelExpenseController::class, 'index'])->name('travel-expense.index');
+            
+            // Expense Policy Management
+            Route::post('/policy/save', [TravelExpenseController::class, 'saveExpensePolicy'])->name('travel-expense.policy.save');
+            Route::delete('/policy/{expensePolicy}', [TravelExpenseController::class, 'deleteExpensePolicy'])->name('travel-expense.policy.destroy');
+
+            // Travel Requests
+            Route::post('/travel/store', [TravelExpenseController::class, 'storeTravelRequest'])->name('travel-expense.travel.store');
+            Route::post('/travel/{travelRequest}/approve', [TravelExpenseController::class, 'approveTravelRequest'])->name('travel-expense.travel.approve');
+            Route::post('/travel/{travelRequest}/reject', [TravelExpenseController::class, 'rejectTravelRequest'])->name('travel-expense.travel.reject');
+            
+            // Cash Advances
+            Route::post('/advance/store', [TravelExpenseController::class, 'storeCashAdvance'])->name('travel-expense.advance.store');
+            Route::post('/advance/{cashAdvance}/approve', [TravelExpenseController::class, 'approveCashAdvance'])->name('travel-expense.advance.approve');
+            Route::post('/advance/{cashAdvance}/reject', [TravelExpenseController::class, 'rejectCashAdvance'])->name('travel-expense.advance.reject');
+            
+            // Expense Reports
+            Route::post('/report/store', [TravelExpenseController::class, 'storeExpenseReport'])->name('travel-expense.report.store');
+            Route::post('/report/{expenseReport}/submit', [TravelExpenseController::class, 'submitExpenseReport'])->name('travel-expense.report.submit');
+            Route::post('/report/{expenseReport}/approve', [TravelExpenseController::class, 'approveExpenseReport'])->name('travel-expense.report.approve');
+            Route::post('/report/{expenseReport}/reject', [TravelExpenseController::class, 'rejectExpenseReport'])->name('travel-expense.report.reject');
+            Route::post('/report/{expenseReport}/pay', [TravelExpenseController::class, 'payExpenseReport'])->name('travel-expense.report.pay');
         });
     });

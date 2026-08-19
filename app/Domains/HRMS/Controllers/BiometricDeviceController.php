@@ -22,6 +22,13 @@ class BiometricDeviceController extends Controller
 
     public function index(Request $request): View
     {
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $hasBiometricRule = \App\Domains\HRMS\Models\AttendanceRule::where('office_biometric', true)
+            ->where('tenant_id', $tenantId)
+            ->exists();
+
+        abort_unless($hasBiometricRule, 403, 'Biometric device master is disabled. Enable biometric rules in Attendance Rules first.');
+
         $data = $this->repository->getIndexData($request->all());
         
         $data['allEmployeesForSim'] = Employee::where('status', true)->orderBy('full_name')->get();
