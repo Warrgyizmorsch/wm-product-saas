@@ -75,6 +75,7 @@ class TenantService
             'billing_email' => $data['billing_email'] ?: null,
             'status' => $data['status'],
             'plan' => $data['plan'],
+            'plan_id' => $data['plan_id'] ?: null,
             'subscription_status' => $data['subscription_status'],
             'max_users' => $data['max_users'] ?: null,
             'max_storage_mb' => $data['max_storage_mb'] ?: null,

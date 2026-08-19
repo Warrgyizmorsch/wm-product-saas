@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domains\Platform\Models\Plan;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +39,7 @@ class Tenant extends Model
         'billing_email',
         'status',
         'plan',
+        'plan_id',
         'subscription_status',
         'max_users',
         'max_storage_mb',
@@ -111,6 +113,11 @@ class Tenant extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function planCatalog(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'plan_id');
     }
 
     public function users(): HasMany

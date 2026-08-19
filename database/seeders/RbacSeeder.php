@@ -215,6 +215,8 @@ class RbacSeeder extends Seeder
     {
         $definitions = [
             ['name' => 'platform.tenants.manage', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'manage'],
+            ['name' => 'platform.plans.manage', 'module' => 'platform', 'entity' => 'plans', 'action' => 'manage'],
+            ['name' => 'platform.usage.view', 'module' => 'platform', 'entity' => 'usage', 'action' => 'view'],
             ['name' => 'access.roles.manage', 'module' => 'access', 'entity' => 'roles', 'action' => 'manage'],
             ['name' => 'access.permissions.manage', 'module' => 'access', 'entity' => 'permissions', 'action' => 'manage'],
             ['name' => 'access.users.manage', 'module' => 'access', 'entity' => 'users', 'action' => 'manage'],

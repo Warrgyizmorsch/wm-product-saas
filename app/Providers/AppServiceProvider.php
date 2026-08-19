@@ -409,6 +409,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Platform\Policies\TenantPolicy::class
         );
 
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Platform\Models\Plan::class,
+            \App\Domains\Platform\Policies\PlanPolicy::class
+        );
+
         // ── Inventory Policies ────────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Inventory\Models\Product::class,

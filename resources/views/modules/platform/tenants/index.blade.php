@@ -111,6 +111,7 @@
             'modal' => true,
             'formId' => 'createTenantForm',
             'formContext' => 'create',
+            'planOptions' => $planOptions,
         ])
     </x-ui.modal>
 
@@ -125,6 +126,7 @@
                 'formId' => 'editTenantForm'.$tenant->id,
                 'formContext' => 'edit',
                 'tenantId' => $tenant->id,
+                'planOptions' => $planOptions,
             ])
         </x-ui.modal>
     @endforeach

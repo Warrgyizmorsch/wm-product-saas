@@ -2,6 +2,7 @@
 
 namespace App\Domains\Access\Services;
 
+use App\Domains\Platform\Services\UsageLimitService;
 use App\Models\Access\Role;
 use App\Models\Access\UserRole;
 use App\Models\User;
@@ -11,8 +12,10 @@ use Illuminate\Support\Facades\DB;
 
 class UserService
 {
-    public function __construct(private readonly AccessService $access)
-    {
+    public function __construct(
+        private readonly AccessService $access,
+        private readonly UsageLimitService $usageLimits,
+    ) {
     }
 
     public function all(): Collection
@@ -42,6 +45,11 @@ class UserService
     public function create(User $actor, array $data): User
     {
         $this->guardRoleAssignable($actor, (int) $data['role_id']);
+
+        $tenant = tenant();
+        if ($tenant !== null) {
+            $this->usageLimits->assertCanAddUser($tenant);
+        }
 
         return DB::transaction(function () use ($data) {
             $user = User::create([

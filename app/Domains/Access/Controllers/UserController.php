@@ -3,6 +3,8 @@
 namespace App\Domains\Access\Controllers;
 
 use App\Domains\Access\Services\UserService;
+use App\Domains\Platform\Exceptions\UsageLimitExceededException;
+use App\Domains\Platform\Services\UsageLimitService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +16,7 @@ class UserController extends Controller
 {
     public function __construct(
         private readonly UserService $users,
+        private readonly UsageLimitService $usageLimits,
     ) {
     }
 
@@ -24,6 +27,8 @@ class UserController extends Controller
         return view('modules.access.users.index', [
             'users' => $this->users->all(),
             'roles' => $this->users->assignableRoles(auth()->user(), tenant_id()),
+            'userLimit' => tenant() ? $this->usageLimits->maxUsers(tenant()) : null,
+            'userLimitRemaining' => tenant() ? $this->usageLimits->remainingUserSlots(tenant()) : null,
         ]);
     }
 
@@ -41,7 +46,14 @@ class UserController extends Controller
     {
         $this->authorize('create', User::class);
 
-        $this->users->create(auth()->user(), $this->validated($request));
+        try {
+            $this->users->create(auth()->user(), $this->validated($request));
+        } catch (UsageLimitExceededException $e) {
+            return redirect()
+                ->route('access.users.create')
+                ->withInput()
+                ->with('error', $e->getMessage());
+        }
 
         return redirect()
             ->route('access.users.index')
