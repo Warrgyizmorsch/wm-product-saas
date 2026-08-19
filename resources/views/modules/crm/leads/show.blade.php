@@ -5,6 +5,39 @@
 @section('breadcrumb', 'CRM / ' . __('crm.leads') . ' / ' . __('crm.profile'))
 
 @section('content')
+    <style>
+        .requirement-clickable-box {
+            cursor: pointer;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-left: 4px solid var(--bs-primary) !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .requirement-clickable-box:hover {
+            border-color: var(--bs-primary) !important;
+            border-left: 4px solid var(--bs-primary) !important;
+            background: #ffffff !important;
+            box-shadow: 0 6px 20px rgba(30, 64, 175, 0.1) !important;
+            transform: translateY(-1px);
+        }
+        .requirement-clickable-box:hover .edit-hint-badge {
+            background-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            border-color: var(--bs-primary) !important;
+        }
+        .requirement-clickable-box:hover .edit-hint-badge i {
+            color: #ffffff !important;
+        }
+        .requirement-empty-box {
+            border: 2px dashed #cbd5e1 !important;
+            background-color: #f8fafc;
+            transition: all 0.25s ease;
+        }
+        .requirement-empty-box:hover {
+            border-color: var(--bs-primary) !important;
+            background-color: #eff6ff !important;
+        }
+    </style>
+
     <!-- Hidden form for stage status updates via clickable/action triggers -->
     <form id="statusChangeForm" action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" style="display: none;">
         @csrf
@@ -53,36 +86,49 @@
             
             <!-- Right-side Action Buttons -->
             <div class="d-flex align-items-center gap-2 flex-wrap">
+                <!-- Back Button (Arrow only) -->
+                <a href="{{ route('crm.leads.index') }}" class="btn btn-xs btn-light text-dark border py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center me-1" title="Back to Leads" style="font-size: 11px;">
+                    <i class="feather-arrow-left"></i>
+                </a>
+
                 @if($lead->crm_account_id)
-                    <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2.5 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-briefcase me-1"></i> View Account
+                    <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
+                        <i class="feather-briefcase me-1"></i> Account
                     </a>
                     @if($lead->crm_deal_id)
-                        <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="btn btn-xs btn-soft-success fw-bold py-1 px-2.5 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                            <i class="feather-git-branch me-1"></i> View Deal
+                        <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="btn btn-xs btn-soft-success fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
+                            <i class="feather-git-branch me-1"></i> Deal
                         </a>
                     @endif
                 @elseif($lead->status === 'Qualified')
                     <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST" class="d-inline m-0 p-0">
                         @csrf
                         @method('PATCH')
-                        <x-ui.button type="submit" variant="warning" size="xs" icon="feather-user-check" class="text-dark fw-bold py-1 px-2.5 rounded shadow-sm">
-                            CONVERT TO ACCOUNT & DEAL
-                        </x-ui.button>
+                        <button type="submit" class="btn btn-xs btn-warning text-dark fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
+                            <i class="feather-user-check me-1"></i> Convert
+                        </button>
                     </form>
                 @endif
 
+                <!-- Log / Schedule Followup Offcanvas Button -->
+                <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-followup-offcanvas" 
+                        data-bs-toggle="offcanvas" 
+                        data-bs-target="#leadFollowupOffcanvas" 
+                        data-lead-id="{{ $lead->id }}" 
+                        data-lead-name="{{ $lead->company_name }}" 
+                        data-lead-status="{{ $lead->status }}" 
+                        data-lead-priority="{{ $lead->priority }}" 
+                        data-next-followup="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}"
+                        style="background-color: var(--bs-primary); border-color: var(--bs-primary); font-size: 11px;">
+                    <i class="feather-calendar me-1"></i> + Followup
+                </button>
+
                 <!-- Send Email Button -->
                 @if ($lead->email)
-                    <a href="mailto:{{ $lead->email }}" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-sm d-inline-flex align-items-center text-white" style="background-color: #1e40af; border-color: #1e40af; font-family: 'Inter', sans-serif; font-size: 11px;">
-                        <i class="feather-mail me-1"></i> {{ __('crm.email') }}
+                    <a href="mailto:{{ $lead->email }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-2 rounded d-inline-flex align-items-center" style="font-size: 11px;">
+                        <i class="feather-mail me-1"></i> Email
                     </a>
                 @endif
-                
-                <!-- Back Button -->
-                <a href="{{ route('crm.leads.index') }}" class="btn btn-xs btn-outline-secondary fw-bold py-1 px-2.5 rounded bg-white text-dark border-secondary d-inline-flex align-items-center" style="font-family: 'Inter', sans-serif; font-size: 11px;">
-                    <i class="feather-arrow-left me-1"></i> {{ __('crm.back') }}
-                </a>
 
                 <!-- More Actions 3-Dot Dropdown using common component -->
                 <x-ui.action-dropdown id="leadProfileActionsDropdown">
@@ -127,22 +173,25 @@
                     <h6 class="text-uppercase fw-bold text-muted mb-3" style="font-size: 10px; letter-spacing: 0.8px;">{{ __('crm.related_list') }}</h6>
                     <ul class="nav flex-column zoho-sidebar-nav gap-1" id="zohoSidebarLinks">
                         <li class="nav-item">
-                            <a href="#sectionNotes" class="nav-link active py-1.5 px-2 fs-12 rounded text-dark fw-medium">{{ __('crm.notes') }}</a>
+                            <a href="#sectionLeadInfo" class="nav-link active py-1.5 px-2 fs-12 rounded text-dark fw-medium">{{ __('crm.lead_information') }}</a>
                         </li>
                         <li class="nav-item">
-                            <a href="#subtab-interactions" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.activities') }}</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#subtab-history" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.history') }}</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionLeadInfo" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.lead_information') }}</a>
+                            <a href="#sectionLeadProducts" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Products & Quantities</a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionAddressInfo" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.address_details') }}</a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionRequirements" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.requirements') }}</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionNotes" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.notes') }}</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#subtab-interactions" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.activities') }}</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#subtab-history" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.history') }}</a>
                         </li>
                         <li class="nav-item">
                             <a href="#sectionDocuments" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.lead_documents') }}</a>
@@ -246,6 +295,8 @@
                                                 <x-ui.odoo-form-ui type="input" label="Company Phone" name="company_phone" id="edit_company_phone_input" :value="old('company_phone', $lead->company_phone ?? '')" placeholder="Company Landline / Phone" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.contact_person')" name="contact_person" :value="old('contact_person', $lead->contact_person)" :placeholder="__('crm.contact_person')" :errorText="$errors->first('contact_person')" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Designation / Role" name="designation" :value="old('designation', $lead->designation)" placeholder="e.g. Purchase Manager / Doctor" :errorText="$errors->first('designation')" />
 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" :errorText="$errors->first('email')" />
 
@@ -580,6 +631,11 @@
                                                  </div>
 
                                                  <div class="zoho-field-row">
+                                                      <div class="zoho-field-label">Designation / Role</div>
+                                                      <div class="zoho-field-value text-dark">{{ $lead->designation ?: '—' }}</div>
+                                                  </div>
+
+                                                 <div class="zoho-field-row">
                                                      <div class="zoho-field-label">Contact Email</div>
                                                      <div class="zoho-field-value">
                                                          @if($lead->email)
@@ -618,10 +674,16 @@
                                                                          <div class="d-flex align-items-center justify-content-between border-bottom pb-1 mb-1">
                                                                              <span class="fw-bold text-dark fs-12">
                                                                                  <i class="feather-user me-1 text-primary fs-11"></i>{{ $ac['name'] ?: 'N/A' }}
+                                                                                 @if(!empty($ac['designation']))
+                                                                                     <span class="text-muted fw-normal ms-1 fs-11">({{ $ac['designation'] }})</span>
+                                                                                 @endif
                                                                              </span>
                                                                              <span class="badge bg-soft-primary text-primary fs-10 fw-semibold">Contact #{{ $loop->iteration }}</span>
                                                                          </div>
                                                                          <div class="d-flex flex-wrap gap-3 fs-11 text-muted">
+                                                                             @if(!empty($ac['designation']))
+                                                                                 <span><i class="feather-briefcase me-1 text-primary fs-10"></i><strong class="text-dark">{{ $ac['designation'] }}</strong></span>
+                                                                             @endif
                                                                              @if(!empty($ac['phone']))
                                                                                  <span><i class="feather-phone me-1 text-success fs-10"></i><strong class="text-dark">{{ $ac['phone'] }}</strong></span>
                                                                              @endif
@@ -690,41 +752,81 @@
                                                          <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ ($lead->source && $lead->source !== 'Select an Option') ? __('crm.sources.' . $lead->source) : '—' }}</span>
                                                      </div>
                                                  </div>
-                                                 <div class="zoho-field-row align-items-start">
-                                                     <div class="zoho-field-label mt-1">{{ __('crm.product_interest') }}</div>
-                                                     <div class="zoho-field-value text-dark">
-                                                         @php
-                                                             $pItems = $lead->product_items ?: [];
-                                                         @endphp
-                                                         @if(!empty($pItems))
-                                                             <div class="d-flex flex-column gap-1">
-                                                                 @foreach($pItems as $pi)
-                                                                     @php
-                                                                         $prod = $products->firstWhere('id', $pi['product_id']);
-                                                                     @endphp
-                                                                     @if($prod)
-                                                                         <div class="d-flex align-items-center justify-content-between bg-soft-primary border border-primary-subtle rounded px-2 py-1" style="font-size: 11px; max-width: 280px;">
-                                                                             <span class="text-primary fw-medium text-truncate me-2" title="{{ $prod->name }}">{{ $prod->name }}</span>
-                                                                             <span class="badge bg-primary text-white font-mono px-1.5 py-0.5">x{{ $pi['quantity'] ?? 1 }}</span>
-                                                                         </div>
-                                                                     @endif
-                                                                 @endforeach
-                                                             </div>
-                                                         @elseif($lead->products->count())
-                                                             <div class="d-flex flex-column gap-1">
-                                                                 @foreach($lead->products as $p)
-                                                                     <div class="bg-soft-primary border border-primary-subtle rounded px-2 py-1 text-primary fw-medium" style="font-size: 11px; max-width: 280px;">
-                                                                         {{ $p->name }}
-                                                                     </div>
-                                                                 @endforeach
-                                                             </div>
-                                                         @else
-                                                             —
-                                                         @endif
-                                                     </div>
-                                                 </div>
+                                                 
                                              </div>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <!-- Lead Interested Products & Quantities Section -->
+                                @php
+                                    $leadItems = $lead->product_items ?: [];
+                                    if (empty($leadItems) && !empty($lead->product_ids)) {
+                                        foreach ($lead->product_ids as $pid) {
+                                            $leadItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
+                                        }
+                                    }
+                                    $leadPIds = !empty($leadItems) ? array_column($leadItems, 'product_id') : [];
+                                    $leadProductsMap = !empty($leadPIds) ? \App\Domains\Inventory\Models\Product::whereIn('id', $leadPIds)->get()->keyBy('id') : collect();
+                                @endphp
+
+                                <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionLeadProducts">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
+                                            <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="border-bottom: none;">
+                                                <i class="feather-box text-primary me-1.5"></i>Interested Products & Quantities
+                                            </h5>
+                                            @if($leadProductsMap->isNotEmpty())
+                                                <span class="badge bg-soft-primary text-primary fs-11 fw-semibold">{{ count($leadItems) }} Product(s) Selected</span>
+                                            @endif
+                                        </div>
+                                        @if($leadProductsMap->isNotEmpty())
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-bordered align-middle mb-0 fs-13">
+                                                    <thead class="table-light text-muted">
+                                                        <tr>
+                                                            <th>Product / Item Name</th>
+                                                            <th>SKU</th>
+                                                            <th class="text-center">Quantity</th>
+                                                            <th class="text-end">Unit Price (₹)</th>
+                                                            <th class="text-end">Total Estimated Value (₹)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @php $grandLeadProductTotal = 0; @endphp
+                                                        @foreach($leadItems as $item)
+                                                            @php
+                                                                $pObj = $leadProductsMap->get($item['product_id']);
+                                                                if (!$pObj) continue;
+                                                                $pQty = floatval($item['quantity'] ?? 1);
+                                                                $pPrice = floatval($pObj->selling_price ?: $pObj->unit_cost ?: 0);
+                                                                $lineVal = $pQty * $pPrice;
+                                                                $grandLeadProductTotal += $lineVal;
+                                                            @endphp
+                                                            <tr>
+                                                                <td class="fw-bold text-dark">
+                                                                    <a href="{{ route('inventory.products.show', $pObj) }}" class="text-dark hover-underline" target="_blank">{{ $pObj->name }}</a>
+                                                                </td>
+                                                                <td class="font-monospace text-muted">{{ $pObj->sku ?: '—' }}</td>
+                                                                <td class="text-center fw-bold text-primary">{{ number_format($pQty, 0) }} {{ $pObj->uom ? $pObj->uom->code : 'Pcs' }}</td>
+                                                                <td class="text-end">₹{{ number_format($pPrice, 2) }}</td>
+                                                                <td class="text-end fw-bold text-success">₹{{ number_format($lineVal, 2) }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                    @if($grandLeadProductTotal > 0)
+                                                        <tfoot class="table-light fw-bold">
+                                                            <tr>
+                                                                <td colspan="4" class="text-end text-uppercase fs-12">Total Estimated Product Value:</td>
+                                                                <td class="text-end text-success fs-14">₹{{ number_format($grandLeadProductTotal, 2) }}</td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    @endif
+                                                </table>
+                                            </div>
+                                        @else
+                                            <p class="text-muted fs-12 mb-0 py-2">No specific products selected for this lead.</p>
+                                        @endif
                                     </div>
                                 </div>
 
@@ -760,12 +862,57 @@
                                 <!-- Requirements Details Card -->
                                 <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionRequirements">
                                     <div class="card-body p-3">
-                                        <h5 class="zoho-section-title fs-13 text-dark fw-bold pb-2 border-bottom mb-3" style="font-family: 'Inter', sans-serif;">{{ __('crm.requirements_details') }}</h5>
-                                        @if ($lead->requirement)
-                                            <div class="text-dark fs-13 bg-light-50 p-3 border rounded" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;">{{ $lead->requirement }}</div>
-                                        @else
-                                            <p class="text-muted fs-12 italic mb-0">{{ __('crm.no_requirements_specified') }}</p>
-                                        @endif
+                                        <div class="d-flex align-items-center justify-content-between pb-2 border-bottom mb-3">
+                                            <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="font-family: 'Inter', sans-serif; border-bottom: none;">
+                                                <i class="feather-file-text text-primary me-1.5"></i>{{ __('crm.requirements_details') }}
+                                            </h5>
+                                            <span class="text-muted fs-11 d-none d-sm-inline-block"><i class="feather-info me-1 text-primary"></i>Click box below to edit</span>
+                                        </div>
+
+                                        <!-- View Mode (Clickable to Edit) -->
+                                        <div id="viewRequirementBlock">
+                                            @if ($lead->requirement)
+                                                <div class="position-relative requirement-clickable-box p-3 rounded shadow-2xs" onclick="enableRequirementEdit()" title="Click anywhere to edit requirement">
+                                                    <div class="d-flex align-items-start justify-content-between gap-3">
+                                                        <div class="text-dark fs-13 flex-grow-1" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;" id="viewRequirementText">{{ $lead->requirement }}</div>
+                                                        <span class="badge bg-white text-primary border shadow-2xs px-2.5 py-1.5 fs-11 flex-shrink-0 edit-hint-badge" style="border-color: #cbd5e1 !important; transition: all 0.2s ease;">
+                                                            <i class="feather-edit-2 me-1"></i>Click to Edit
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            @else
+                                                <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableRequirementEdit()" title="Click to add requirement">
+                                                    <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2">
+                                                        <i class="feather-edit-3 fs-5"></i>
+                                                    </div>
+                                                    <h6 class="fw-bold text-dark fs-13 mb-1">No Requirements Details Specified</h6>
+                                                    <p class="text-muted fs-12 mb-0">Click here to add client requirements, scope of work, or project specifications.</p>
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        <!-- Edit Mode -->
+                                        <div id="editRequirementBlock" style="display: none;">
+                                            <form id="ajaxRequirementForm" action="{{ route('crm.leads.updateRequirement', $lead->id) }}" method="POST">
+                                                @csrf
+                                                @method('PATCH')
+                                                <div class="mb-2">
+                                                    <textarea name="requirement" id="requirementInput" rows="4" class="form-control form-control-sm shadow-2xs fs-13" placeholder="Enter detailed requirements or specifications for this lead..." style="border-color: var(--bs-primary); border-radius: 6px; font-family: 'Inter', sans-serif;" oninput="updateReqCharCount(this)">{{ old('requirement', $lead->requirement) }}</textarea>
+                                                </div>
+                                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                                    <span class="text-muted fs-11">
+                                                        <i class="feather-corner-down-left me-1"></i>Press <kbd class="bg-light text-dark border px-1 py-0.5 rounded fs-10">Ctrl + Enter</kbd> or click save
+                                                    </span>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span class="text-muted fs-11 me-2" id="reqCharCounter">0 chars</span>
+                                                        <button type="button" class="btn btn-xs btn-light border px-3 py-1.5 fw-bold rounded" onclick="cancelRequirementEdit()">CANCEL</button>
+                                                        <button type="submit" id="btnSaveRequirement" class="btn btn-xs btn-primary px-3 py-1.5 fw-bold shadow-2xs text-white rounded d-inline-flex align-items-center" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
+                                                            <i class="feather-check me-1"></i> SAVE REQUIREMENT
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -2397,7 +2544,7 @@
             var activeTabKey = 'lead_active_tab_' + {{ $lead->id }};
             var activeSubTabKey = 'lead_active_subtab_' + {{ $lead->id }};
             
-            // Check URL Hash first if present
+            // Check URL Hash first if present and clean it up from address bar
             var hash = window.location.hash;
             if (hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
                 localStorage.setItem(activeTabKey, 'timeline-tab');
@@ -2412,45 +2559,37 @@
                 localStorage.setItem(activeTabKey, 'quotation-tab');
             }
 
-            if (hasParam) {
-                // If loaded with parameters, set active tab in localStorage
-                if (urlParams.has('create_quotation') || urlParams.has('edit_quotation') || urlParams.has('view_quotation')) {
-                    localStorage.setItem(activeTabKey, 'quotation-tab');
-                } else if (urlParams.has('edit_lead')) {
-                    localStorage.setItem(activeTabKey, 'overview-tab');
-                }
-                
-                // Clean up query parameters from the address bar to prevent stuck refresh state
-                if (window.history.replaceState) {
-                    var cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                    window.history.replaceState({path: cleanUrl}, '', cleanUrl);
-                }
-            } else {
-                // Restore tab from localStorage
-                var savedTabId = localStorage.getItem(activeTabKey);
-                if (savedTabId && $('#' + savedTabId).length) {
-                    setTimeout(function() {
-                        var mainTabEl = document.getElementById(savedTabId);
-                        if (mainTabEl) {
-                            bootstrap.Tab.getOrCreateInstance(mainTabEl).show();
+            // Always clean up hash or temporary query params from address bar so URL remains clean
+            if (window.history && window.history.replaceState) {
+                var cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState(null, '', cleanUrl);
+            }
+
+            // Restore tab from localStorage
+            var savedTabId = localStorage.getItem(activeTabKey);
+            if (savedTabId && $('#' + savedTabId).length) {
+                setTimeout(function() {
+                    var mainTabEl = document.getElementById(savedTabId);
+                    if (mainTabEl) {
+                        bootstrap.Tab.getOrCreateInstance(mainTabEl).show();
+                    }
+                    
+                    // If it's timeline tab, also restore the subtab
+                    if (savedTabId === 'timeline-tab') {
+                        var savedSubTabId = localStorage.getItem(activeSubTabKey) || 'subtab-interactions-tab';
+                        var subTabEl = document.getElementById(savedSubTabId);
+                        if (subTabEl) {
+                            bootstrap.Tab.getOrCreateInstance(subTabEl).show();
                         }
-                        
-                        // If it's timeline tab, also restore the subtab
-                        if (savedTabId === 'timeline-tab') {
-                            var savedSubTabId = localStorage.getItem(activeSubTabKey) || 'subtab-interactions-tab';
-                            var subTabEl = document.getElementById(savedSubTabId);
-                            if (subTabEl) {
-                                bootstrap.Tab.getOrCreateInstance(subTabEl).show();
-                            }
-                        }
-                    }, 50);
-                }
+                    }
+                }, 50);
             }
 
             var scrollTargetOnTabShown = null;
 
             function scrollToElement(targetEl) {
                 var scrollContainer = $('#zohoMainScrollable');
+                if (!scrollContainer.length || !targetEl.length) return;
                 var relativeTop = targetEl.offset().top - scrollContainer.offset().top;
                 var scrollTopPosition = scrollContainer.scrollTop() + relativeTop - 50; // Offset for sticky tabs
 
@@ -2459,57 +2598,55 @@
                 }, 400);
             }
 
-            // Scroll behavior for related lists links
+            // Smooth Related List Sidebar Navigation & Tab Synchronization (Zero URL hash modification)
             $('#zohoSidebarLinks a').on('click', function(e) {
+                e.preventDefault();
                 var targetId = $(this).attr('href');
+                if (!targetId || !targetId.startsWith('#')) return;
 
-                if (targetId.startsWith('#')) {
-                    var targetEl = $(targetId);
-                    if (targetEl.length) {
-                        e.preventDefault();
-                        
-                        // Remove active class from all links and add to clicked one
-                        $('#zohoSidebarLinks a').removeClass('active');
-                        $(this).addClass('active');
+                // Remove active class from all sidebar links and add to clicked one
+                $('#zohoSidebarLinks a').removeClass('active');
+                $(this).addClass('active');
 
-                        var needTabSwitch = false;
-                        if (targetId === '#sectionLeadInfo' || targetId === '#sectionAddressInfo' || targetId === '#sectionRequirements' || targetId === '#sectionNotes' || targetId === '#sectionDocuments') {
-                            if (!$('#overview-tab').hasClass('active')) {
-                                scrollTargetOnTabShown = targetEl;
-                                $('#overview-tab').tab('show');
-                                needTabSwitch = true;
-                            }
-                        } else if (targetId === '#subtab-history') {
-                            if (!$('#timeline-tab').hasClass('active')) {
-                                scrollTargetOnTabShown = targetEl;
-                                $('#timeline-tab').tab('show');
-                                $('#subtab-history-tab').tab('show');
-                                needTabSwitch = true;
-                            } else {
-                                $('#subtab-history-tab').tab('show');
-                            }
-                        } else if (targetId === '#subtab-interactions') {
-                            if (!$('#timeline-tab').hasClass('active')) {
-                                scrollTargetOnTabShown = targetEl;
-                                $('#timeline-tab').tab('show');
-                                $('#subtab-interactions-tab').tab('show');
-                                needTabSwitch = true;
-                            } else {
-                                $('#subtab-interactions-tab').tab('show');
-                            }
-                        } else if (targetId === '#sectionQuotationHistory') {
-                            if (!$('#quotation-tab').hasClass('active')) {
-                                scrollTargetOnTabShown = targetEl;
-                                $('#quotation-tab').tab('show');
-                                needTabSwitch = true;
-                            }
-                        }
+                // Ensure URL hash is removed from browser bar
+                if (window.history && window.history.replaceState) {
+                    var cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                    window.history.replaceState(null, '', cleanUrl);
+                }
 
-                        if (!needTabSwitch) {
-                            // If tab is already active, scroll immediately
-                            scrollToElement(targetEl);
-                        }
+                var targetTabBtnId = null;
+                var targetSubtabBtnId = null;
+
+                if (['#sectionNotes', '#sectionLeadInfo', '#sectionLeadProducts', '#sectionAddressInfo', '#sectionRequirements', '#sectionDocuments'].includes(targetId)) {
+                    targetTabBtnId = 'overview-tab';
+                } else if (targetId === '#sectionQuotationHistory') {
+                    targetTabBtnId = 'quotation-tab';
+                } else if (targetId === '#subtab-interactions' || targetId === '#subtab-history') {
+                    targetTabBtnId = 'timeline-tab';
+                    targetSubtabBtnId = (targetId === '#subtab-interactions') ? 'subtab-interactions-tab' : 'subtab-history-tab';
+                }
+
+                // Activate subtab first if target is a subtab
+                if (targetSubtabBtnId) {
+                    var subTabEl = document.getElementById(targetSubtabBtnId);
+                    if (subTabEl) {
+                        bootstrap.Tab.getOrCreateInstance(subTabEl).show();
                     }
+                }
+
+                var targetEl = $(targetId);
+                var mainTabEl = targetTabBtnId ? document.getElementById(targetTabBtnId) : null;
+                var isAlreadyActive = mainTabEl && mainTabEl.classList.contains('active');
+
+                if (isAlreadyActive) {
+                    if (targetEl.length) {
+                        scrollToElement(targetEl);
+                    }
+                } else if (mainTabEl) {
+                    if (targetEl.length) {
+                        scrollTargetOnTabShown = targetEl;
+                    }
+                    bootstrap.Tab.getOrCreateInstance(mainTabEl).show();
                 }
             });
 
@@ -2975,6 +3112,8 @@
             $(document).on('click', '#showAdditionalContactsRepeaterContainer .remove-contact-btn', function() {
                 $(this).closest('.addl-contact-card').remove();
                 updateShowContactNumbersAndNames();
+            });
+
             window.toggleLeadType = function(type) {
                 var fieldNames = ['company_name', 'gstin', 'company_email', 'company_phone'];
                 fieldNames.forEach(function(name) {
@@ -3007,6 +3146,155 @@
                     form[0].submit();
                 }
             });
+            // Toggle Offcanvas Mode (Log Activity & Next Followup vs Schedule Direct Activity)
+            function switchOffcanvasMode(mode) {
+                $('.offcanvas-mode-btn').removeClass('active btn-primary text-white shadow-sm').css({'background-color': 'transparent', 'color': '#64748b', 'box-shadow': 'none'});
+                var activeBtn = $('.offcanvas-mode-btn[data-mode="' + mode + '"]');
+                activeBtn.addClass('active btn-primary text-white shadow-sm').css({'background-color': 'var(--bs-primary)', 'color': '#ffffff'});
+                $('#offcanvasActionMode').val(mode);
+
+                if (mode === 'log_note') {
+                    $('#sectionPastInteraction').show();
+                    $('#sectionDirectSchedule').hide();
+                    $('#offcanvasFollowupDate').removeAttr('required');
+                } else {
+                    $('#sectionPastInteraction').hide();
+                    $('#sectionDirectSchedule').show();
+                    $('#offcanvasFollowupDate').attr('required', 'required');
+                }
+            }
+
+            $(document).on('click', '.offcanvas-mode-btn', function() {
+                switchOffcanvasMode($(this).attr('data-mode'));
+            });
+
+            window.enableRequirementEdit = function() {
+                $('#viewRequirementBlock').hide();
+                $('#editRequirementBlock').show();
+                var el = document.getElementById('requirementInput');
+                if (el) {
+                    updateReqCharCount(el);
+                    el.focus();
+                }
+            };
+
+            window.cancelRequirementEdit = function() {
+                $('#editRequirementBlock').hide();
+                $('#viewRequirementBlock').show();
+            };
+
+            window.updateReqCharCount = function(el) {
+                var len = el ? el.value.length : 0;
+                $('#reqCharCounter').text(len + ' chars');
+            };
+
+            function escapeHtml(text) {
+                return text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            $(document).on('keydown', '#requirementInput', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
+                    e.preventDefault();
+                    $('#ajaxRequirementForm').submit();
+                }
+            });
+
+            $(document).on('submit', '#ajaxRequirementForm', function(e) {
+                e.preventDefault();
+                var form = $(this);
+                var btn = $('#btnSaveRequirement');
+                var originalHtml = btn.html();
+
+                btn.attr('disabled', true).html('<i class="feather-loader me-1"></i> SAVING...');
+
+                $.ajax({
+                    url: form.attr('action'),
+                    type: 'POST',
+                    data: form.serialize(),
+                    dataType: 'json',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    success: function(res) {
+                        btn.attr('disabled', false).html(originalHtml);
+                        if (res.success) {
+                            var reqText = res.requirement || '';
+                            var viewBlock = $('#viewRequirementBlock');
+
+                            if (reqText.trim().length > 0) {
+                                viewBlock.html(`
+                                    <div class="position-relative requirement-clickable-box p-3 rounded shadow-2xs" onclick="enableRequirementEdit()" title="Click anywhere to edit requirement">
+                                        <div class="d-flex align-items-start justify-content-between gap-3">
+                                            <div class="text-dark fs-13 flex-grow-1" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;" id="viewRequirementText">${escapeHtml(reqText)}</div>
+                                            <span class="badge bg-white text-primary border shadow-2xs px-2.5 py-1.5 fs-11 flex-shrink-0 edit-hint-badge" style="border-color: #cbd5e1 !important; transition: all 0.2s ease;">
+                                                <i class="feather-edit-2 me-1"></i>Click to Edit
+                                            </span>
+                                        </div>
+                                    </div>
+                                `);
+                            } else {
+                                viewBlock.html(`
+                                    <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableRequirementEdit()" title="Click to add requirement">
+                                        <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2">
+                                            <i class="feather-edit-3 fs-5"></i>
+                                        </div>
+                                        <h6 class="fw-bold text-dark fs-13 mb-1">No Requirements Details Specified</h6>
+                                        <p class="text-muted fs-12 mb-0">Click here to add client requirements, scope of work, or project specifications.</p>
+                                    </div>
+                                `);
+                            }
+
+                            cancelRequirementEdit();
+                            if (typeof Toast !== 'undefined' && Toast.fire) {
+                                Toast.fire({ icon: 'success', title: res.message || 'Requirements updated successfully!' });
+                            } else if (typeof toastr !== 'undefined') {
+                                toastr.success(res.message || 'Requirements updated successfully!');
+                            }
+                        }
+                    },
+                    error: function(xhr) {
+                        btn.attr('disabled', false).html(originalHtml);
+                        alert('Failed to save requirements. Please try again.');
+                    }
+                });
+            });
+
+            // Open and populate Offcanvas drawer for Lead Followup / Schedule Activity
+            $(document).on('click', '.btn-open-followup-offcanvas', function() {
+                var leadId = $(this).attr('data-lead-id') || '{{ $lead->id }}';
+                var leadName = $(this).attr('data-lead-name') || '{{ $lead->company_name }}';
+                var leadStatus = $(this).attr('data-lead-status') || '{{ $lead->status }}';
+                var leadPriority = $(this).attr('data-lead-priority') || '{{ $lead->priority }}';
+                var nextFollowup = $(this).attr('data-next-followup') || '{{ $lead->next_followup_date ? $lead->next_followup_date->format("Y-m-d\TH:i") : "" }}';
+
+                $('#leadFollowupForm').attr('action', '{{ url("crm/leads") }}/' + leadId + '/followups');
+                $('#leadFollowupOffcanvasTitle').text('Edit Followup for ' + leadName);
+
+                $('#offcanvasLeadStatus').val(leadStatus || 'New');
+                $('#offcanvasLeadPriority').val(leadPriority || 'Medium');
+                $('#offcanvasFollowupDate, #offcanvasNextFollowupDate').val(nextFollowup || '');
+                $('#offcanvasNotes, #offcanvasScheduleNotes').val('');
+
+                if ($('#offcanvasTagUser').length && $.fn.select2) {
+                    if ($('#offcanvasTagUser').hasClass('select2-hidden-accessible')) {
+                        $('#offcanvasTagUser').select2('destroy');
+                    }
+                    $('#offcanvasTagUser').select2({
+                        theme: "bootstrap-5",
+                        width: "100%",
+                        dropdownParent: $('#leadFollowupOffcanvas'),
+                        placeholder: "Select persons to tag..."
+                    });
+                    $('#offcanvasTagUser').val(null).trigger('change');
+                }
+
+                switchOffcanvasMode('log_note');
+            });
         });
 
         function openRejectModal(actionUrl, quotationNumber = '') {
@@ -3025,6 +3313,122 @@
             modal.show();
         }
     </script>
+
+    <!-- Offcanvas Drawer: Edit Followup / Schedule Activity -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg d-print-none" tabindex="-1" id="leadFollowupOffcanvas" aria-labelledby="leadFollowupOffcanvasLabel" style="width: 490px; max-width: 92vw;">
+        <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle">
+                    <i class="feather-calendar"></i>
+                </div>
+                <div>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="leadFollowupOffcanvasTitle">Edit Followup for {{ $lead->company_name }}</h5>
+                    <span class="text-muted fs-11">Log interaction & next followup or schedule activity</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        
+        <div class="offcanvas-body p-4 bg-white">
+            <form action="{{ route('crm.leads.followups.store', $lead->id) }}" method="POST" id="leadFollowupForm" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="action_mode" id="offcanvasActionMode" value="log_note">
+
+                <!-- 2-Mode Switcher Tabs -->
+                <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
+                        LOG DISCUSSION & NEXT
+                    </button>
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 offcanvas-mode-btn" data-mode="schedule" style="font-size: 12px; padding: 8px 6px; color: #64748b; background-color: transparent; border-radius: 6px; transition: all 0.2s ease;">
+                        DIRECT SCHEDULE ACTIVITY
+                    </button>
+                </div>
+
+                <!-- Past Interaction Section (Tab 1: Log Activity) -->
+                <div id="sectionPastInteraction">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up / Interaction Type</label>
+                        <select name="type" id="offcanvasFollowupType" class="form-select form-select-sm shadow-2xs">
+                            <option value="Call">Call</option>
+                            <option value="Email">Email</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up Status / Outcome</label>
+                        <select name="status" id="offcanvasFollowupStatus" class="form-select form-select-sm shadow-2xs">
+                            <option value="Connected">Connected</option>
+                            <option value="Not Connected">Not Connected</option>
+                            <option value="Not Answering">Not Answering</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Discussion Notes / Summary</label>
+                        <textarea name="notes" id="offcanvasNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Write discussion notes..."></textarea>
+                    </div>
+
+                    <!-- Next Follow-up Section inside Log Mode -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type (Optional)</label>
+                        <select name="next_activity_type" id="offcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
+                            <option value="Call">Call</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="Email">Email</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
+                        <input type="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}">
+                    </div>
+                </div>
+
+                <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
+                <div id="sectionDirectSchedule" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
+                        <select name="schedule_type" id="offcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#offcanvasFollowupType').val(this.value)">
+                            <option value="Call">Call</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="Email">Email</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
+                        <input type="datetime-local" name="followup_date" id="offcanvasFollowupDate" class="form-control form-control-sm shadow-2xs" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Description / Plan</label>
+                        <textarea name="schedule_notes" id="offcanvasScheduleNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Agenda / plan for upcoming activity..." oninput="$('#offcanvasNotes').val(this.value)"></textarea>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">Tag / Assign Persons</label>
+                    <select name="tagged_user_ids[]" id="offcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="Select persons to tag...">
+                        @foreach($users as $u)
+                            <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">UPDATE DETAILS</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Rejection Reason Modal -->
     <div class="modal fade" id="rejectQuotationModal" tabindex="-1" aria-labelledby="rejectQuotationModalLabel" aria-hidden="true">

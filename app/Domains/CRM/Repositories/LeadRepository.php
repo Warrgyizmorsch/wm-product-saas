@@ -232,6 +232,7 @@ class LeadRepository
                     'tenant_id'      => $tenantId,
                     'crm_account_id' => $account->id,
                     'name'           => $contactName,
+                    'designation'    => $lead->designation,
                     'role'           => 'Primary Contact',
                     'email'          => $contactEmail,
                     'phone'          => $contactPhone,
@@ -239,6 +240,28 @@ class LeadRepository
                     'is_primary'     => $account->contacts()->count() === 0,
                     'status'         => 'active',
                 ]);
+            }
+        }
+
+        // 2b. Create CrmContact records for Lead's Additional Contacts
+        if (!empty($lead->additional_contacts) && is_array($lead->additional_contacts)) {
+            foreach ($lead->additional_contacts as $addContact) {
+                if (empty($addContact['name'])) continue;
+                $existingAdd = CrmContact::where('crm_account_id', $account->id)->where('name', $addContact['name'])->first();
+                if (!$existingAdd) {
+                    CrmContact::create([
+                        'tenant_id'      => $tenantId,
+                        'crm_account_id' => $account->id,
+                        'name'           => $addContact['name'],
+                        'designation'    => $addContact['designation'] ?? null,
+                        'role'           => 'Additional Contact',
+                        'email'          => $addContact['email'] ?? null,
+                        'phone'          => $addContact['phone'] ?? null,
+                        'mobile'         => $addContact['phone'] ?? null,
+                        'is_primary'     => false,
+                        'status'         => 'active',
+                    ]);
+                }
             }
         }
 
@@ -264,6 +287,8 @@ class LeadRepository
                 'lead_source'     => ($lead->source && !in_array($lead->source, ['Select an Option', 'Select an option', 'Select Option'], true)) ? $lead->source : null,
                 'probability'     => 40,
                 'owner_id'        => $lead->lead_owner_id ?: (auth()->id() ?: 1),
+                'product_ids'     => $lead->product_ids,
+                'product_items'   => $lead->product_items,
             ]);
         } else {
             $deal->update([

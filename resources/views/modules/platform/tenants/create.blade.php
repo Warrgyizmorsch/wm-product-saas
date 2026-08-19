@@ -16,5 +16,6 @@
         'action' => route('platform.tenants.store'),
         'method' => 'POST',
         'submitLabel' => 'Create Tenant',
+        'planOptions' => $planOptions,
     ])
 @endsection

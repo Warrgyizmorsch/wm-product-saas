@@ -379,6 +379,24 @@
                             </td>
                             <td class="text-end pe-3">
                                 <x-ui.action-dropdown :viewUrl="route('crm.deals.show', $deal)">
+                                    <x-slot:extraActions>
+                                        <button type="button" 
+                                                class="action-dropdown-btn btn-open-deal-followup-offcanvas" 
+                                                title="Schedule Activity / Log Followup" 
+                                                data-bs-toggle="offcanvas" 
+                                                data-bs-target="#dealFollowupOffcanvas"
+                                                data-deal-id="{{ $deal->id }}"
+                                                data-deal-title="{{ addslashes($deal->title) }}"
+                                                data-deal-stage="{{ $deal->stage }}">
+                                            <i class="feather-calendar text-primary"></i>
+                                        </button>
+                                    </x-slot:extraActions>
+
+                                    <li>
+                                        <a href="javascript:void(0)" class="dropdown-item btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-deal-id="{{ $deal->id }}" data-deal-title="{{ addslashes($deal->title) }}" data-deal-stage="{{ $deal->stage }}">
+                                            <i class="feather-calendar me-2 text-primary fs-12"></i>Log & Schedule Followup
+                                        </a>
+                                    </li>
                                     <li>
                                         <a href="{{ route('crm.deals.edit', $deal) }}" class="dropdown-item">
                                             <i class="feather-edit me-2 text-muted fs-12"></i>Edit Deal
@@ -409,6 +427,131 @@
             </x-ui.odoo-form-ui>
         </div>
     </div>
+
+    <!-- Offcanvas Drawer: Edit Followup / Schedule Activity (Exact Replica of Leads Offcanvas) -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg" tabindex="-1" id="dealFollowupOffcanvas" aria-labelledby="dealFollowupOffcanvasLabel" style="width: 490px; max-width: 92vw;">
+        <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle">
+                    <i class="feather-calendar"></i>
+                </div>
+                <div>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="dealFollowupOffcanvasTitle">Edit Followup</h5>
+                    <span class="text-muted fs-11">Log interaction & next followup or schedule activity</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        
+        <div class="offcanvas-body p-4 bg-white">
+            <form action="" method="POST" id="dealFollowupForm" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="action_mode" id="dealOffcanvasActionMode" value="log_note">
+
+                <!-- 2-Mode Switcher Tabs (Exact Lead Replica) -->
+                <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
+                        LOG DISCUSSION & NEXT
+                    </button>
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn" data-mode="schedule" style="font-size: 12px; padding: 8px 6px; color: #64748b; background-color: transparent; border-radius: 6px; transition: all 0.2s ease;">
+                        DIRECT SCHEDULE ACTIVITY
+                    </button>
+                </div>
+
+                <!-- Past Interaction Section (Tab 1: Log Activity) -->
+                <div id="dealSectionPastInteraction">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up / Interaction Type</label>
+                        <select name="type" id="dealOffcanvasFollowupType" class="form-select form-select-sm shadow-2xs">
+                            <option value="Call">Call</option>
+                            <option value="Email">Email</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up Status / Outcome</label>
+                        <select name="status" id="dealOffcanvasFollowupStatus" class="form-select form-select-sm shadow-2xs">
+                            <option value="Connected">Connected</option>
+                            <option value="Not Connected">Not Connected</option>
+                            <option value="Not Answering">Not Answering</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Discussion Notes / Summary</label>
+                        <textarea name="notes" id="dealOffcanvasNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Write discussion notes..."></textarea>
+                    </div>
+
+                    <!-- Next Follow-up Section inside Log Mode -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type (Optional)</label>
+                        <select name="next_activity_type" id="dealOffcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
+                            <option value="Call">Call</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="Email">Email</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
+                        <input type="datetime-local" name="next_followup_date" id="dealOffcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs">
+                    </div>
+                </div>
+
+                <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
+                <div id="dealSectionDirectSchedule" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
+                        <select name="schedule_type" id="dealOffcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#dealOffcanvasFollowupType').val(this.value)">
+                            <option value="Call">Call</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="Email">Email</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
+                        <input type="datetime-local" name="followup_date" id="dealOffcanvasFollowupDate" class="form-control form-control-sm shadow-2xs">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Description / Plan</label>
+                        <textarea name="schedule_notes" id="dealOffcanvasScheduleNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Agenda / plan for upcoming activity..." oninput="$('#dealOffcanvasNotes').val(this.value)"></textarea>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">Deal Stage</label>
+                    <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
+                        @foreach(['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost'] as $stg)
+                            <option value="{{ $stg }}">{{ $stg }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">Tag / Assign Persons</label>
+                    <select name="tagged_user_ids[]" id="dealOffcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="Select persons to tag...">
+                        @foreach((\App\Models\User::orderBy('name')->get()) as $u)
+                            <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">UPDATE DETAILS</button>
+                </div>
+            </form>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -419,6 +562,60 @@
             if (form.length) {
                 form[0].submit();
             }
+        });
+
+        // Toggle Offcanvas Mode (Exact replica of Lead switchOffcanvasMode)
+        function switchDealOffcanvasMode(mode) {
+            $('.deal-offcanvas-mode-btn').removeClass('active btn-primary text-white shadow-sm').css({'background-color': 'transparent', 'color': '#64748b', 'box-shadow': 'none'});
+            var activeBtn = $('.deal-offcanvas-mode-btn[data-mode="' + mode + '"]');
+            activeBtn.addClass('active btn-primary text-white shadow-sm').css({'background-color': 'var(--bs-primary)', 'color': '#ffffff', 'box-shadow': '0 2px 4px rgba(0,0,0,0.15)'});
+            
+            $('#dealOffcanvasActionMode').val(mode);
+
+            if (mode === 'log_note') {
+                $('#dealSectionPastInteraction').show();
+                $('#dealSectionDirectSchedule').hide();
+                $('#dealOffcanvasFollowupDate').removeAttr('required');
+            } else if (mode === 'schedule') {
+                $('#dealSectionPastInteraction').hide();
+                $('#dealSectionDirectSchedule').show();
+                $('#dealOffcanvasFollowupDate').attr('required', 'required');
+            }
+        }
+
+        $(document).on('click', '.deal-offcanvas-mode-btn', function() {
+            switchDealOffcanvasMode($(this).attr('data-mode'));
+        });
+
+        // Open and populate Offcanvas drawer for Deal Followup / Schedule Activity
+        $(document).on('click', '.btn-open-deal-followup-offcanvas', function() {
+            var dealId = $(this).attr('data-deal-id');
+            var dealTitle = $(this).attr('data-deal-title') || 'Deal';
+            var dealStage = $(this).attr('data-deal-stage');
+
+            $('#dealFollowupOffcanvasTitle').text('Edit Followup for ' + dealTitle);
+            $('#dealFollowupForm').attr('action', '/crm/deals/' + dealId + '/followups');
+            $('#dealOffcanvasNotes, #dealOffcanvasScheduleNotes').val('');
+
+            if (dealStage) {
+                $('#dealOffcanvasStage').val(dealStage);
+            }
+
+            if ($('#dealOffcanvasTagUser').length && $.fn.select2) {
+                if ($('#dealOffcanvasTagUser').hasClass('select2-hidden-accessible')) {
+                    $('#dealOffcanvasTagUser').select2('destroy');
+                }
+                $('#dealOffcanvasTagUser').select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Select persons to tag...',
+                    allowClear: true,
+                    dropdownParent: $('#dealFollowupOffcanvas'),
+                    width: '100%'
+                });
+                $('#dealOffcanvasTagUser').val(null).trigger('change');
+            }
+
+            switchDealOffcanvasMode('log_note');
         });
     });
 </script>

@@ -47,7 +47,7 @@ Route::prefix('sales')
 
         // Dispatch Orders Routes (Alias Redirects to /inventory/dispatches)
         Route::get('dispatches', fn() => redirect()->route('inventory.dispatches.index'))->name('dispatches.index');
-        Route::get('dispatches/create', fn() => redirect()->route('inventory.dispatches.create'))->name('dispatches.create');
+        Route::get('dispatches/create', fn() => redirect()->route('inventory.dispatches.create', request()->query()))->name('dispatches.create');
         Route::post('dispatches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'store'])->name('dispatches.store');
         Route::get('dispatches/material-requirements', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'pendingMaterialRequirements'])->name('dispatches.pending-mr');
         Route::get('dispatches/available-serials', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'getAvailableSerials'])->name('dispatches.available-serials');

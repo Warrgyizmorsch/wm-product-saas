@@ -696,13 +696,28 @@
                 calculateExpectedDuration();
             });
 
+            function getSelectedEmployeeId() {
+                var select = document.getElementById('employee_select');
+                if (select && select.value) {
+                    return select.value;
+                }
+                return "{{ (isset($employee) && $employee) ? $employee->id : '' }}";
+            }
+
+            var lastCalculatedDuration = 0;
+            var durationXhr = null;
+
             function calculateExpectedDuration() {
                 var startDateStr = $('#start_date').val();
                 var endDateStr = $('#end_date').val();
                 var startType = $('#start_date_type').val() || 'full_day';
                 var endType = $('#end_date_type').val() || 'full_day';
+                var empId = getSelectedEmployeeId();
 
-                if (!startDateStr || !endDateStr) return 0;
+                if (!startDateStr || !endDateStr || !empId) {
+                    $('#calculated_duration_display').text("0.0 Day(s)");
+                    return 0;
+                }
 
                 var startParts = startDateStr.split('-');
                 var endParts = endDateStr.split('-');
@@ -714,36 +729,61 @@
                     return 0;
                 }
 
-                var duration = 0;
-                var current = new Date(start);
+                // Show calculation indicator and disable submit
+                $('#calculated_duration_display').html('<span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span>Calculating duration...');
+                $('#applyLeaveModal form button[type="submit"]').prop('disabled', true);
 
-                if (start.getTime() === end.getTime()) {
-                    // Single day
-                    if (start.getDay() !== 0) { // Exclude Sunday (0)
-                        duration = (startType === 'full_day') ? 1.0 : 0.5;
-                    }
-                } else {
-                    while (current <= end) {
-                        if (current.getDay() !== 0) { // Exclude Sunday
-                            var isStart = current.getTime() === start.getTime();
-                            var isEnd = current.getTime() === end.getTime();
-
-                            if (isStart) {
-                                duration += (startType === 'full_day') ? 1.0 : 0.5;
-                            } else if (isEnd) {
-                                duration += (endType === 'full_day') ? 1.0 : 0.5;
-                            } else {
-                                duration += 1.0;
-                            }
-                        }
-                        current.setDate(current.getDate() + 1);
-                    }
+                if (durationXhr) {
+                    durationXhr.abort();
                 }
 
-                var estTpl = "{{ __('hrms.leave.app.estimated_duration', ['duration' => '__duration__']) }}";
-                $('#calculated_duration_display').html(estTpl.replace('__duration__', '<strong>' + duration + '</strong>'));
+                durationXhr = $.ajax({
+                    url: '{{ route("hrms.leaves.calculate-duration") }}',
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        employee_id: empId,
+                        start_date: startDateStr,
+                        end_date: endDateStr,
+                        start_date_type: startType,
+                        end_date_type: endType
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var duration = response.duration;
+                            lastCalculatedDuration = duration;
 
-                // Real-time dynamic attachment warning constraint
+                            var estTpl = "{{ __('hrms.leave.app.estimated_duration_simple', ['duration' => '__duration__']) }}";
+                            var displayText = estTpl.replace('__duration__', '<strong>' + duration + '</strong>');
+
+                            if (response.holidays && response.holidays.length > 0) {
+                                displayText += ' <span class="badge bg-soft-success text-success ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.holidays.join(', ') + '"><i class="feather-calendar me-1"></i>Excludes ' + response.holidays.length + ' Holiday(s)</span>';
+                            }
+                            if (response.rest_days && response.rest_days.length > 0) {
+                                displayText += ' <span class="badge bg-soft-secondary text-secondary ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.rest_days.join(', ') + '"><i class="feather-coffee me-1"></i>Excludes ' + response.rest_days.length + ' Rest Day(s)</span>';
+                            }
+
+                            $('#calculated_duration_display').html(displayText);
+
+                            evaluateAttachmentRules(duration);
+                        } else {
+                            $('#calculated_duration_display').text("Error calculating duration");
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        if (status !== 'abort') {
+                            $('#calculated_duration_display').text("Error calculating duration");
+                        }
+                    },
+                    complete: function() {
+                        $('#applyLeaveModal form button[type="submit"]').prop('disabled', false);
+                    }
+                });
+
+                return lastCalculatedDuration;
+            }
+
+            function evaluateAttachmentRules(duration) {
                 var selectedOption = $('#leave_type_select').find('option:selected');
                 var rulesStr = selectedOption.attr('data-rules');
                 if (rulesStr) {
@@ -767,9 +807,8 @@
                         console.error("Error evaluating real-time attachment rules", e);
                     }
                 }
-
-                return duration;
             }
+
 
             function loadLeaveApplications(page = 1) {
                 var search = $('#leaves_search').val() || '';

@@ -354,6 +354,7 @@
     <form action="#" method="POST" id="quickScheduleForm">
         @csrf
         <input type="hidden" name="status" value="Pending">
+        <input type="hidden" name="action_mode" value="schedule">
 
         <x-ui.odoo-form-ui 
             type="select" 
@@ -423,14 +424,21 @@
 
 @push('scripts')
 <script>
+    let lockedCalendarDate = null;
+
     function openScheduleModalForDate(dateStr, event) {
         if (event) {
             event.stopPropagation();
         }
+        lockedCalendarDate = dateStr;
         const dateInput = document.querySelector('#scheduleActivityModal input[name="followup_date"]');
         if (dateInput) {
-            dateInput.value = dateStr + 'T09:00';
+            const currentTimeVal = dateInput.value && dateInput.value.includes('T') ? dateInput.value.split('T')[1] : '09:00';
+            dateInput.value = dateStr + 'T' + currentTimeVal;
+            dateInput.setAttribute('min', dateStr + 'T00:00');
+            dateInput.setAttribute('max', dateStr + 'T23:59');
         }
+
         const modalEl = document.getElementById('scheduleActivityModal');
         if (modalEl) {
             const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -438,7 +446,43 @@
         }
     }
 
-    document.getElementById('quickScheduleForm').addEventListener('submit', function(e) {
+    document.addEventListener('DOMContentLoaded', function() {
+        const modalEl = document.getElementById('scheduleActivityModal');
+        const dateInput = document.querySelector('#scheduleActivityModal input[name="followup_date"]');
+
+        if (modalEl) {
+            modalEl.addEventListener('show.bs.modal', function() {
+                if (!lockedCalendarDate && dateInput) {
+                    dateInput.removeAttribute('min');
+                    dateInput.removeAttribute('max');
+                }
+            });
+
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                lockedCalendarDate = null;
+                if (dateInput) {
+                    dateInput.removeAttribute('min');
+                    dateInput.removeAttribute('max');
+                }
+            });
+        }
+
+        if (dateInput) {
+            dateInput.addEventListener('change', function() {
+                if (lockedCalendarDate && this.value) {
+                    const currentVal = this.value;
+                    const timePart = currentVal.includes('T') ? currentVal.split('T')[1] : '09:00';
+                    const newDatePart = currentVal.split('T')[0];
+                    if (newDatePart !== lockedCalendarDate) {
+                        // Lock date to clicked calendar date, allowing user to only modify time!
+                        this.value = lockedCalendarDate + 'T' + timePart;
+                    }
+                }
+            });
+        }
+    });
+
+    document.getElementById('quickScheduleForm')?.addEventListener('submit', function(e) {
         const leadSelect = document.getElementById('modal_lead_id');
         const leadId = leadSelect ? leadSelect.value : '';
 

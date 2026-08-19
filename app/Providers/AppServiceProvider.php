@@ -122,6 +122,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(
+            \App\Domains\HRMS\Repositories\BiometricDeviceRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\BiometricDeviceRepository::class
+        );
+
+        $this->app->bind(
             \App\Domains\HRMS\Repositories\LeaveStructureRepositoryInterface::class,
             \App\Domains\HRMS\Repositories\LeaveStructureRepository::class
         );
@@ -144,6 +149,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Domains\HRMS\Repositories\DocumentMasterRepositoryInterface::class,
             \App\Domains\HRMS\Repositories\DocumentMasterRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\HolidayCalendarRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\HolidayCalendarRepository::class
         );
 
         $this->app->bind(
@@ -397,6 +407,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Models\Tenant::class,
             \App\Domains\Platform\Policies\TenantPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Platform\Models\Plan::class,
+            \App\Domains\Platform\Policies\PlanPolicy::class
         );
 
         // ── Inventory Policies ────────────────────────────────────────────────

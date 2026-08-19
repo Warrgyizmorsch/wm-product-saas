@@ -16,6 +16,7 @@ use App\Domains\HRMS\Controllers\ShiftChangeRequestController;
 use App\Domains\HRMS\Controllers\OvertimeRequestController;
 use App\Domains\HRMS\Controllers\ShiftOvertimeController;
 use App\Domains\HRMS\Controllers\AttendanceController;
+use App\Domains\HRMS\Controllers\BiometricDeviceController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -168,6 +169,7 @@ Route::prefix('hrms')
             Route::get('/', [LeaveRequestController::class, 'index'])->name('leaves.index');
             Route::get('/export', [LeaveRequestController::class, 'export'])->name('leaves.export');
             Route::post('/store', [LeaveRequestController::class, 'store'])->name('leaves.store');
+            Route::post('/calculate-duration', [LeaveRequestController::class, 'calculateDuration'])->name('leaves.calculate-duration');
             Route::post('/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])->name('leaves.approve');
             Route::post('/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])->name('leaves.reject');
             Route::post('/{leaveRequest}/update-status', [LeaveRequestController::class, 'updateStatus'])->name('leaves.update-status');
@@ -202,6 +204,15 @@ Route::prefix('hrms')
             // Admin cancellation decision
             Route::post('/{wfhRequest}/approve-cancellation', [WfhRequestController::class, 'approveCancellation'])->name('wfh.approve-cancellation');
             Route::post('/{wfhRequest}/deny-cancellation', [WfhRequestController::class, 'denyCancellation'])->name('wfh.deny-cancellation');
+        });
+
+        // Biometric Device Management
+        Route::prefix('biometric-devices')->group(function (): void {
+            Route::get('/', [BiometricDeviceController::class, 'index'])->name('biometric-devices.index');
+            Route::post('/', [BiometricDeviceController::class, 'store'])->name('biometric-devices.store');
+            Route::post('/simulate-punch', [BiometricDeviceController::class, 'simulatePunch'])->name('biometric-devices.simulate-punch');
+            Route::put('/{biometricDevice}', [BiometricDeviceController::class, 'update'])->name('biometric-devices.update');
+            Route::delete('/{biometricDevice}', [BiometricDeviceController::class, 'destroy'])->name('biometric-devices.destroy');
         });
 
         // Combined Shift & Overtime Management
@@ -293,4 +304,12 @@ Route::prefix('hrms')
         });
 
         Route::view('/track-status', 'modules.hrms.track-status')->name('track-status');
+
+        // Holiday Calendar Management
+        Route::prefix('holidays')->group(function (): void {
+            Route::get('/', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'index'])->name('holidays.index');
+            Route::post('/store', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'store'])->name('holidays.store');
+            Route::post('/update/{holiday}', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'update'])->name('holidays.update');
+            Route::delete('/delete/{holiday}', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'destroy'])->name('holidays.destroy');
+        });
     });

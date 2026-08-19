@@ -92,16 +92,16 @@
                 <!-- Right Quick Metric Cards -->
                 <div class="d-flex gap-3 text-end mt-3 mt-md-0 flex-wrap">
                     <div class="bg-light p-3 rounded-3 border text-center px-4">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-dollar-sign me-1 text-success"></i>Lifetime Revenue</span>
-                        <h4 class="fw-bold text-success mb-0">₹{{ number_format($lifetimeRevenue, 2) }}</h4>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-trending-up me-1 text-primary"></i>Pipeline Value</span>
+                        <h4 class="fw-bold text-primary mb-0">₹{{ number_format($pipelineValue, 2) }}</h4>
                     </div>
                     <div class="bg-light p-3 rounded-3 border text-center px-4">
                         <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-layers me-1 text-info"></i>Open Deals</span>
                         <h4 class="fw-bold text-info mb-0">{{ $openDealsCount }}</h4>
                     </div>
                     <div class="bg-light p-3 rounded-3 border text-center px-4">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-pie-chart me-1 text-primary"></i>Avg Order Value</span>
-                        <h4 class="fw-bold text-primary mb-0">₹{{ number_format($aov, 2) }}</h4>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-check-circle me-1 text-success"></i>Won Deals</span>
+                        <h4 class="fw-bold text-success mb-0">{{ $wonDealsCount }}</h4>
                     </div>
                 </div>
             </div>
@@ -129,11 +129,6 @@
                     <li class="nav-item">
                         <a class="nav-link zoho-tab-link" id="quotations-tab" data-bs-toggle="tab" href="#quotations-pane" role="tab">
                             <i class="feather-file-text me-1.5"></i>Quotations ({{ $account->quotations->count() }})
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link zoho-tab-link" id="orders-tab" data-bs-toggle="tab" href="#orders-pane" role="tab">
-                            <i class="feather-shopping-cart me-1.5"></i>Sales Orders ({{ $salesOrders->count() }})
                         </a>
                     </li>
                 </ul>
@@ -192,23 +187,23 @@
                             </div>
 
                             <div class="col-lg-6 ps-lg-4">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-bar-chart-2 me-1.5"></i>Financial Overview & Stats</h6>
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-bar-chart-2 me-1.5"></i>Deals & Opportunity Stats</h6>
                                 <div class="row g-3 fs-13">
                                     <div class="col-6">
-                                        <div class="zoho-field-label">Total Lifetime Revenue</div>
-                                        <div class="zoho-field-value fw-bold text-success fs-16">₹{{ number_format($lifetimeRevenue, 2) }}</div>
+                                        <div class="zoho-field-label">Pipeline Value</div>
+                                        <div class="zoho-field-value fw-bold text-primary fs-16">₹{{ number_format($pipelineValue, 2) }}</div>
                                     </div>
                                     <div class="col-6">
                                         <div class="zoho-field-label">Active Deals Count</div>
                                         <div class="zoho-field-value fw-bold text-info fs-16">{{ $openDealsCount }} Deals</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="zoho-field-label">Total Quotations</div>
-                                        <div class="zoho-field-value text-dark fw-bold">{{ $account->quotations->count() }} Quotes</div>
+                                        <div class="zoho-field-label">Won Deals Count</div>
+                                        <div class="zoho-field-value text-success fw-bold">{{ $wonDealsCount }} Deals</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="zoho-field-label">Sales Orders</div>
-                                        <div class="zoho-field-value text-dark fw-bold">{{ $salesOrders->count() }} Orders</div>
+                                        <div class="zoho-field-label">Total Quotations</div>
+                                        <div class="zoho-field-value text-dark fw-bold">{{ $account->quotations->count() }} Quotes</div>
                                     </div>
                                 </div>
 
@@ -227,8 +222,12 @@
                                             <div><strong>Email:</strong> {{ $primaryContact->email ?: 'N/A' }}</div>
                                             <div><strong>Phone:</strong> {{ $primaryContact->mobile ?: ($primaryContact->phone ?: 'N/A') }}</div>
                                         @else
-                                            <div class="text-muted">No primary contact added yet. Click on <strong>Personnel Contacts</strong> tab to add.</div>
+                                            <div class="text-muted mb-2">No primary contact added yet. Click on <strong>Personnel Contacts</strong> tab to add.</div>
                                         @endif
+                                        <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between">
+                                            <span class="text-muted fw-semibold">Account Manager / Owner:</span>
+                                            <span class="badge bg-soft-primary text-primary fs-12 fw-bold"><i class="feather-user me-1"></i>{{ $account->owner?->name ?: 'Unassigned' }}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -386,44 +385,6 @@
                                     @empty
                                         <tr>
                                             <td colspan="6" class="text-center py-4 text-muted">No quotations linked to this account.</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Tab 4: Sales Orders -->
-                    <div class="tab-pane fade" id="orders-pane" role="tabpanel">
-                        <div class="table-responsive">
-                            <table class="table odoo-table align-middle">
-                                <thead class="table-light text-muted fs-12 text-uppercase">
-                                    <tr>
-                                        <th>SO Number #</th>
-                                        <th>Order Date</th>
-                                        <th>Total Amount (₹)</th>
-                                        <th>Status</th>
-                                        <th class="text-end pe-3">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="fs-13 text-dark">
-                                    @forelse($salesOrders as $so)
-                                        <tr>
-                                            <td class="font-monospace fw-bold text-primary">{{ $so->so_number }}</td>
-                                            <td>{{ $so->order_date ? \Illuminate\Support\Carbon::parse($so->order_date)->format('d M Y') : '—' }}</td>
-                                            <td class="fw-bold text-success">₹{{ number_format($so->total_amount, 2) }}</td>
-                                            <td>
-                                                <span class="badge bg-soft-success text-success px-2 py-0.5">{{ $so->status }}</span>
-                                            </td>
-                                            <td class="text-end pe-3">
-                                                <a href="{{ route('sales.orders.show', $so) }}" class="btn btn-sm btn-soft-primary">
-                                                    <i class="feather-eye me-1"></i>View SO
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="5" class="text-center py-4 text-muted">No sales orders generated yet.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>

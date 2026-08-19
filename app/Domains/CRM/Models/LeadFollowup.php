@@ -13,6 +13,7 @@ class LeadFollowup extends Model
     protected $fillable = [
         'tenant_id',
         'lead_id',
+        'crm_deal_id',
         'followup_date',
         'type',
         'status',
@@ -58,6 +59,14 @@ class LeadFollowup extends Model
     public function lead(): BelongsTo
     {
         return $this->belongsTo(Lead::class);
+    }
+
+    /**
+     * Get the deal that owns the followup.
+     */
+    public function deal(): BelongsTo
+    {
+        return $this->belongsTo(CrmDeal::class, 'crm_deal_id');
     }
 
     /**

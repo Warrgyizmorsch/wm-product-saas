@@ -46,11 +46,15 @@ class CrmDeal extends BaseModel
         'probability',
         'owner_id',
         'notes',
+        'product_ids',
+        'product_items',
     ];
 
     protected $casts = [
         'closing_date'    => 'date',
         'estimated_value' => 'decimal:2',
+        'product_ids'     => 'array',
+        'product_items'   => 'array',
     ];
 
     public function account(): BelongsTo
@@ -76,6 +80,16 @@ class CrmDeal extends BaseModel
     public function salesOrders(): HasMany
     {
         return $this->hasMany(SalesOrder::class, 'crm_deal_id');
+    }
+
+    public function followups(): HasMany
+    {
+        return $this->hasMany(LeadFollowup::class, 'crm_deal_id')->orderBy('followup_date', 'desc');
+    }
+
+    public function lead(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Lead::class, 'crm_deal_id');
     }
 
     public function getActualValueAttribute(): float

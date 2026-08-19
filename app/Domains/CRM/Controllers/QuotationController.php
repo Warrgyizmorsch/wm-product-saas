@@ -75,24 +75,33 @@ class QuotationController extends Controller
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
 
         $prefilledItems = [];
-        if ($selectedLead) {
+        $rawItems = [];
+        if ($selectedDeal) {
+            $rawItems = $selectedDeal->product_items ?: [];
+            if (empty($rawItems) && !empty($selectedDeal->product_ids)) {
+                foreach ($selectedDeal->product_ids as $pid) {
+                    $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
+                }
+            }
+        }
+        if (empty($rawItems) && $selectedLead) {
             $rawItems = $selectedLead->product_items ?: [];
             if (empty($rawItems) && !empty($selectedLead->product_ids)) {
                 foreach ($selectedLead->product_ids as $pid) {
                     $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
                 }
             }
-            foreach ($rawItems as $it) {
-                if (empty($it['product_id'])) continue;
-                $productObj = Product::find($it['product_id']);
-                if ($productObj) {
-                    $prefilledItems[] = [
-                        'product_id' => $productObj->id,
-                        'quantity'   => floatval($it['quantity'] ?? 1),
-                        'price'      => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
-                        'tax_rate'   => floatval($productObj->gst_rate ?: 18),
-                    ];
-                }
+        }
+        foreach ($rawItems as $it) {
+            if (empty($it['product_id'])) continue;
+            $productObj = Product::find($it['product_id']);
+            if ($productObj) {
+                $prefilledItems[] = [
+                    'product_id' => $productObj->id,
+                    'quantity'   => floatval($it['quantity'] ?? 1),
+                    'price'      => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
+                    'tax_rate'   => floatval($productObj->gst_rate ?: 18),
+                ];
             }
         }
 

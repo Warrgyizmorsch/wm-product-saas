@@ -23,6 +23,7 @@
                         'tenant' => $tenant,
                         'settings' => $settings,
                         'isCreate' => strtoupper($method) === 'POST',
+                        'planOptions' => $planOptions ?? collect(),
                     ])
 
                     <div class="pt-4 d-flex justify-content-end gap-2">
@@ -36,6 +37,7 @@
                         'tenant' => $tenant,
                         'settings' => $settings,
                         'isCreate' => strtoupper($method) === 'POST',
+                        'planOptions' => $planOptions ?? collect(),
                     ])
 
                     <x-slot name="footer">

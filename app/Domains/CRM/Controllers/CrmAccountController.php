@@ -39,7 +39,8 @@ class CrmAccountController extends Controller
 
     public function create(): View
     {
-        return view('modules.crm.accounts.create');
+        $users = \App\Models\User::orderBy('name')->get();
+        return view('modules.crm.accounts.create', compact('users'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -54,6 +55,7 @@ class CrmAccountController extends Controller
             'website'       => 'nullable|string|max:255',
             'industry_type' => 'nullable|string|max:255',
             'credit_limit'  => 'nullable|numeric|min:0',
+            'owner_id'      => 'nullable|exists:users,id',
             'street'        => 'nullable|string|max:255',
             'city'          => 'nullable|string|max:100',
             'state'         => 'nullable|string|max:100',
@@ -105,7 +107,7 @@ class CrmAccountController extends Controller
             'country'       => $validated['country'] ?? null,
             'zip_code'      => $validated['zip_code'] ?? null,
             'status'        => 'active',
-            'owner_id'      => auth()->id(),
+            'owner_id'      => $validated['owner_id'] ?? (auth()->id() ?: 1),
         ]);
 
         // 3. Create Primary Contact if name provided
@@ -129,36 +131,27 @@ class CrmAccountController extends Controller
 
     public function show(CrmAccount $account): View
     {
-        $account->load(['contacts', 'deals.quotations', 'quotations', 'customer']);
+        $account->load(['contacts', 'deals.quotations', 'quotations', 'customer', 'owner']);
 
-        $salesOrders = collect();
-        if ($account->customer_id) {
-            $salesOrders = SalesOrder::where('customer_id', $account->customer_id)->latest()->get();
-        }
-
-        $lifetimeRevenue = $account->lifetime_revenue;
         $openDealsCount = $account->deals->whereNotIn('stage', ['Closed Won', 'Closed Lost'])->count();
         $wonDealsCount = $account->deals->where('stage', 'Closed Won')->count();
         $lostDealsCount = $account->deals->where('stage', 'Closed Lost')->count();
-        $aov = $wonDealsCount > 0 ? ($lifetimeRevenue / $wonDealsCount) : 0;
-        $lastPurchaseDate = $account->last_purchase_date;
+        $pipelineValue = $account->deals->whereNotIn('stage', ['Closed Lost'])->sum('estimated_value');
 
         return view('modules.crm.accounts.show', compact(
             'account',
-            'salesOrders',
-            'lifetimeRevenue',
             'openDealsCount',
             'wonDealsCount',
             'lostDealsCount',
-            'aov',
-            'lastPurchaseDate'
+            'pipelineValue'
         ));
     }
 
     public function edit(CrmAccount $account): View
     {
         $account->load('primaryContact');
-        return view('modules.crm.accounts.edit', compact('account'));
+        $users = \App\Models\User::orderBy('name')->get();
+        return view('modules.crm.accounts.edit', compact('account', 'users'));
     }
 
     public function update(Request $request, CrmAccount $account): RedirectResponse
@@ -171,6 +164,7 @@ class CrmAccountController extends Controller
             'website'       => 'nullable|string|max:255',
             'industry_type' => 'nullable|string|max:255',
             'credit_limit'  => 'nullable|numeric|min:0',
+            'owner_id'      => 'nullable|exists:users,id',
             'street'        => 'nullable|string|max:255',
             'city'          => 'nullable|string|max:100',
             'state'         => 'nullable|string|max:100',

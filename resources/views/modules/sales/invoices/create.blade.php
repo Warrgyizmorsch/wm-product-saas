@@ -105,7 +105,7 @@
                             <x-ui.odoo-form-ui type="select" label="Customer / Client" name="customer_id" id="directCustomerSelect" class="odoo-select2" :required="true">
                                 <option value="">Select Customer...</option>
                                 @foreach ($customers as $c)
-                                    <option value="{{ $c->id }}" @selected(old('customer_id') == $c->id)>
+                                    <option value="{{ $c->id }}" @selected(old('customer_id', $customerId ?? request('customer_id')) == $c->id)>
                                         {{ $c->name }} ({{ $c->company_name ?: 'Individual' }})
                                     </option>
                                 @endforeach

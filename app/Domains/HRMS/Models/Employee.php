@@ -475,12 +475,17 @@ class Employee extends BaseModel
             return \App\Domains\Production\Models\ProductionShift::find($roster->shift_id);
         }
 
-        // 2. Check for weekly pattern default
+        // 2. Check for weekly pattern default (fallback to 'off' for Sunday if not set)
+        $weeklyShiftId = null;
         if (isset($this->weekly_pattern) && isset($this->weekly_pattern[$dayOfWeek])) {
             $weeklyShiftId = $this->weekly_pattern[$dayOfWeek];
-            if ($weeklyShiftId === 'off') {
-                return null; // Weekly Off
-            }
+        } elseif ($dayOfWeek === 0) {
+            $weeklyShiftId = 'off';
+        }
+
+        if ($weeklyShiftId === 'off') {
+            return null; // Weekly Off
+        } elseif ($weeklyShiftId) {
             return \App\Domains\Production\Models\ProductionShift::find($weeklyShiftId);
         }
 

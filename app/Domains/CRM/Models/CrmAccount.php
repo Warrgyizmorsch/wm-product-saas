@@ -59,6 +59,11 @@ class CrmAccount extends BaseModel
         return $this->belongsTo(Customer::class, 'customer_id');
     }
 
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'owner_id');
+    }
+
     public function contacts(): HasMany
     {
         return $this->hasMany(CrmContact::class, 'crm_account_id');

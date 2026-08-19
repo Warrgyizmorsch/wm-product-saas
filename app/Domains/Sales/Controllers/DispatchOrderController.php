@@ -31,7 +31,7 @@ class DispatchOrderController extends Controller
         return view('modules.sales.dispatches.index', compact('dispatches'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $this->authorize('create', DispatchOrder::class);
 
@@ -40,6 +40,8 @@ class DispatchOrderController extends Controller
         $pendingDOs = $this->dispatchRepo->getAllPendingMaterialRequirements();
         $customers  = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->orderBy('name')->get();
         $products   = Product::where('tenant_id', $tenantId)->with(['uom'])->orderBy('name')->get();
+
+        $mrId = $request->input('material_requirement_id') ?: $request->input('mr_id');
 
         $formattedWarehouses = $warehouses->map(fn ($w) => ['id' => $w->id, 'name' => $w->name])->values()->all();
         $formattedProducts   = $products->map(fn ($p) => [
@@ -50,7 +52,7 @@ class DispatchOrderController extends Controller
             'track_batch' => (bool) $p->track_batch,
         ])->values()->all();
 
-        return view('modules.sales.dispatches.create', compact('warehouses', 'pendingDOs', 'customers', 'products', 'formattedWarehouses', 'formattedProducts'));
+        return view('modules.sales.dispatches.create', compact('warehouses', 'pendingDOs', 'customers', 'products', 'formattedWarehouses', 'formattedProducts', 'mrId'));
     }
 
     public function pendingMaterialRequirements(Request $request): JsonResponse

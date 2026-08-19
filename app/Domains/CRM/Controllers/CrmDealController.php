@@ -137,7 +137,8 @@ class CrmDealController extends Controller
             : collect();
 
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
-        return view('modules.crm.deals.create', compact('accounts', 'contacts', 'selectedAccountId', 'products'));
+        $users = \App\Models\User::orderBy('name')->get();
+        return view('modules.crm.deals.create', compact('accounts', 'contacts', 'selectedAccountId', 'products', 'users'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -152,6 +153,7 @@ class CrmDealController extends Controller
             'stage'           => 'nullable|string|in:Qualification,Needs Analysis,Proposal,Negotiation,Won,Lost,Closed Won,Closed Lost,New,Qualified',
             'closing_date'    => 'nullable|date',
             'lead_source'     => 'nullable|string|max:100',
+            'owner_id'        => 'nullable|exists:users,id',
             'notes'           => 'nullable|string',
         ]);
 
@@ -191,6 +193,7 @@ class CrmDealController extends Controller
             'probability'     => $probMap[$stage] ?? 20,
             'closing_date'    => $validated['closing_date'] ?? null,
             'lead_source'     => $validated['lead_source'] ?? null,
+            'owner_id'        => $validated['owner_id'] ?? (auth()->id() ?: 1),
             'notes'           => $validated['notes'] ?? null,
             'product_ids'     => $processed['product_ids'],
             'product_items'   => $processed['product_items'],
@@ -205,6 +208,7 @@ class CrmDealController extends Controller
                     'tenant_id'      => $tenantId,
                     'crm_account_id' => $validated['crm_account_id'],
                     'name'           => $add['name'],
+                    'designation'    => $add['designation'] ?? null,
                     'role'           => 'Additional Contact',
                     'email'          => $add['email'] ?? null,
                     'phone'          => $add['phone'] ?? null,
@@ -221,7 +225,7 @@ class CrmDealController extends Controller
     public function show(Request $request, CrmDeal $deal): View
     {
         $tenantId = tenant_id() ?? 1;
-        $deal->load(['account.contacts', 'contact', 'quotations.items.product', 'salesOrders']);
+        $deal->load(['account.contacts', 'account.owner', 'contact', 'quotations.items.product', 'salesOrders', 'owner']);
         $nextQuotationNumber = app(\App\Domains\CRM\Services\QuotationService::class)->getNextQuotationNumber();
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
         $users = \App\Models\User::orderBy('name')->get();
@@ -245,10 +249,14 @@ class CrmDealController extends Controller
                     $q->where('crm_account_id', $deal->crm_account_id);
                 }
             })
-            ->with(['followups.taggedUser', 'histories.user', 'leadDocuments'])
+            ->with(['histories.user', 'leadDocuments'])
             ->first();
 
-        $followups = $linkedLead ? $linkedLead->followups : collect();
+        $followupsQuery = \App\Domains\CRM\Models\LeadFollowup::where('crm_deal_id', $deal->id);
+        if ($linkedLead) {
+            $followupsQuery->orWhere('lead_id', $linkedLead->id);
+        }
+        $followups = $followupsQuery->with(['taggedUser', 'rescheduledFrom', 'rescheduledTo'])->orderBy('followup_date', 'desc')->get();
         $histories = $linkedLead ? $linkedLead->histories : collect();
         $leadDocuments = $linkedLead ? $linkedLead->leadDocuments : collect();
 
@@ -291,8 +299,9 @@ class CrmDealController extends Controller
             ? CrmContact::where('crm_account_id', $deal->crm_account_id)->orderBy('name')->get()
             : collect();
         $products = \App\Domains\Inventory\Models\Product::sellable()->with('parent')->orderBy('name')->get();
+        $users = \App\Models\User::orderBy('name')->get();
 
-        return view('modules.crm.deals.edit', compact('deal', 'accounts', 'contacts', 'products'));
+        return view('modules.crm.deals.edit', compact('deal', 'accounts', 'contacts', 'products', 'users'));
     }
 
     public function update(Request $request, CrmDeal $deal): RedirectResponse
@@ -306,6 +315,7 @@ class CrmDealController extends Controller
             'close_reason'    => 'nullable|string|max:255',
             'closing_date'    => 'nullable|date',
             'lead_source'     => 'nullable|string|max:100',
+            'owner_id'        => 'nullable|exists:users,id',
             'notes'           => 'nullable|string',
         ]);
 
@@ -459,5 +469,35 @@ class CrmDealController extends Controller
         app(\App\Domains\CRM\Services\LeadService::class)->uploadDocuments($linkedLead, $request->file('documents'));
 
         return redirect()->back()->with('success', 'Document uploaded successfully!');
+    }
+
+    public function updateRequirement(Request $request, CrmDeal $deal)
+    {
+        $validated = $request->validate([
+            'notes'       => 'nullable|string',
+            'requirement' => 'nullable|string',
+        ]);
+
+        $notes = $validated['notes'] ?? $validated['requirement'] ?? null;
+        $deal->notes = $notes;
+        $deal->save();
+
+        // Also update linked lead requirement if exists
+        $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)->first();
+        if ($linkedLead) {
+            $linkedLead->requirement = $notes;
+            $linkedLead->save();
+        }
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success'     => true,
+                'message'     => 'Requirements updated successfully!',
+                'requirement' => $deal->notes,
+                'notes'       => $deal->notes,
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Deal requirements updated successfully!');
     }
 }

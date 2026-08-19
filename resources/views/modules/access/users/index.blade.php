@@ -12,6 +12,18 @@
 
 @section('content')
 
+    @if ($userLimit !== null)
+        <div class="row g-4 mb-1">
+            <div class="col-xxl-3 col-md-6">
+                <x-ui.card stretch>
+                    <span class="text-muted fs-12 text-uppercase">User Seats</span>
+                    <h3 class="mb-0 mt-2">{{ $users->count() }} / {{ $userLimit }}</h3>
+                    <span class="fs-11 text-muted">{{ $userLimitRemaining }} remaining on current plan</span>
+                </x-ui.card>
+            </div>
+        </div>
+    @endif
+
     <x-ui.card title="Users" bodyClass="p-0">
         <x-ui.table>
             <thead class="table-light fs-11 text-uppercase text-muted">

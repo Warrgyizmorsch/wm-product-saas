@@ -40,8 +40,12 @@ class LeadHistory extends Model
     /**
      * Log a lead history event.
      */
-    public static function logEvent(Lead $lead, string $eventType, ?string $oldValue = null, ?string $newValue = null, ?string $notes = null): void
+    public static function logEvent(?Lead $lead, string $eventType, ?string $oldValue = null, ?string $newValue = null, ?string $notes = null): void
     {
+        if (!$lead) {
+            return;
+        }
+
         self::create([
             'tenant_id' => $lead->tenant_id,
             'lead_id' => $lead->id,

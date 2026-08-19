@@ -67,6 +67,15 @@
         @error('subscription_status')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
     <div class="col-md-4">
+        <x-ui.odoo-form-ui type="select" label="Plan (catalog)" name="plan_id" :searchable="false" helperText="Links this tenant to a plan-catalog row for its limits/pricing. The legacy Plan field above is kept for backward compatibility." class="@error('plan_id') is-invalid @enderror">
+            <option value="">Not linked</option>
+            @foreach ($planOptions as $planOption)
+                <option value="{{ $planOption->id }}" @selected((string) old('plan_id', $tenant->plan_id) === (string) $planOption->id)>{{ $planOption->name }}{{ $planOption->is_demo ? ' (Demo)' : '' }}</option>
+            @endforeach
+        </x-ui.odoo-form-ui>
+        @error('plan_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+    </div>
+    <div class="col-md-4">
         <x-ui.odoo-form-ui type="input" inputType="email" label="Billing Email" name="billing_email" :value="old('billing_email', $tenant->billing_email)" placeholder="billing@company.com" class="@error('billing_email') is-invalid @enderror" />
         @error('billing_email')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>

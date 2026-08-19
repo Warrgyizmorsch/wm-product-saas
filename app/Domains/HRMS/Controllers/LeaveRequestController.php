@@ -43,34 +43,37 @@ class LeaveRequestController extends Controller
             'notified_contacts.*' => 'exists:employees,id',
         ]);
 
-        // Calculate duration server-side from dates + session types
+        $employee = Employee::findOrFail($validated['employee_id']);
+
+        // Calculate duration server-side from dates + session types, excluding holidays & rest days
         $startDate = Carbon::parse($validated['start_date']);
         $endDate   = Carbon::parse($validated['end_date']);
         $startType = $validated['start_date_type'] ?? 'full_day';
         $endType   = $validated['end_date_type']   ?? 'full_day';
-        $duration  = 0;
+        $duration  = 0.0;
 
-        if ($startDate->isSameDay($endDate)) {
-            $duration = ($startType === 'full_day') ? 1.0 : 0.5;
-        } else {
-            $daysDiff = $startDate->diffInDays($endDate);
-            if ($daysDiff === 1) {
-                $duration  = ($startType === 'full_day') ? 1.0 : 0.5;
-                $duration += ($endType   === 'full_day') ? 1.0 : 0.5;
-            } else {
-                $duration  = ($startType === 'full_day') ? 1.0 : 0.5;
-                $duration += ($daysDiff - 1);
-                $duration += ($endType   === 'full_day') ? 1.0 : 0.5;
+        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+            $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
+            $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
+
+            if (!$isHoliday && $isActiveWorkDay) {
+                if ($startDate->isSameDay($endDate)) {
+                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                } elseif ($date->isSameDay($startDate)) {
+                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                } elseif ($date->isSameDay($endDate)) {
+                    $duration += ($endType === 'full_day') ? 1.0 : 0.5;
+                } else {
+                    $duration += 1.0;
+                }
             }
         }
 
         if ($duration < 0.5) {
-            return redirect()->back()->withInput()->with('error', 'Duration cannot be less than 0.5 days.');
+            return redirect()->back()->withInput()->with('error', 'Duration cannot be less than 0.5 days. Ensure you are not applying for leave entirely on weekends or holidays.');
         }
 
         $validated['duration'] = $duration;
-
-        $employee = Employee::findOrFail($validated['employee_id']);
 
         // Session-aware conflict check (covers both Leave & WFH, same employee)
         $conflict = SessionConflictChecker::hasConflict(
@@ -256,4 +259,55 @@ class LeaveRequestController extends Controller
 
         return XlsxHelper::export($headers, $data, $filename);
     }
+
+    public function calculateDuration(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'employee_id'     => 'required|exists:employees,id',
+            'start_date'      => 'required|date',
+            'end_date'        => 'required|date|after_or_equal:start_date',
+            'start_date_type' => 'required|string|in:full_day,first_half,second_half',
+            'end_date_type'   => 'required|string|in:full_day,first_half,second_half',
+        ]);
+
+        $employee = Employee::findOrFail($validated['employee_id']);
+        $startDate = Carbon::parse($validated['start_date']);
+        $endDate   = Carbon::parse($validated['end_date']);
+        $startType = $validated['start_date_type'];
+        $endType   = $validated['end_date_type'];
+
+        $duration = 0.0;
+        $holidays = [];
+        $restDays = [];
+
+        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+            $dateStr = $date->toDateString();
+            $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
+            $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
+
+            if ($isHoliday) {
+                $holidays[] = $dateStr;
+            } elseif (!$isActiveWorkDay) {
+                $restDays[] = $dateStr;
+            } else {
+                if ($startDate->isSameDay($endDate)) {
+                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                } elseif ($date->isSameDay($startDate)) {
+                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                } elseif ($date->isSameDay($endDate)) {
+                    $duration += ($endType === 'full_day') ? 1.0 : 0.5;
+                } else {
+                    $duration += 1.0;
+                }
+            }
+        }
+
+        return response()->json([
+            'success'   => true,
+            'duration'  => $duration,
+            'holidays'  => $holidays,
+            'rest_days' => $restDays,
+        ]);
+    }
 }
+

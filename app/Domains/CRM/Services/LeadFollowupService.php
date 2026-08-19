@@ -75,6 +75,7 @@ class LeadFollowupService
 
                 $this->followupRepo->create([
                     'lead_id' => $followup->lead_id,
+                    'crm_deal_id' => $followup->crm_deal_id,
                     'type' => $validated['type'] ?? $followup->type,
                     'followup_date' => $newFollowupDateTime,
                     'status' => 'Pending',

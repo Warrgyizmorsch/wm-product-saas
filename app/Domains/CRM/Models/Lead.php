@@ -45,6 +45,7 @@ class Lead extends Model
         'gstin',
         'lead_type',
         'contact_person',
+        'designation',
         'email',
         'phone',
         'requirement',
@@ -120,7 +121,7 @@ class Lead extends Model
      */
     public function followups(): HasMany
     {
-        return $this->hasMany(LeadFollowup::class)->orderBy('followup_date', 'desc');
+        return $this->hasMany(LeadFollowup::class)->whereNull('crm_deal_id')->orderBy('followup_date', 'desc');
     }
 
     /**
