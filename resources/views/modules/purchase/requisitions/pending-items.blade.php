@@ -147,7 +147,12 @@
                                                     </td>
                                                     <td>
                                                         <span class="fw-bold text-dark fs-13">{{ $pi['requisition_number'] }}</span>
-                                                        <div class="text-muted fs-11">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d M Y') : '—' }}</div>
+                                                        <div class="text-muted fs-11" title="Create Date">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d M Y') : '—' }}</div>
+                                                        @if(!empty($pi['expected_date']))
+                                                            <div class="text-info fs-11 fw-medium mt-0.5" title="Expected Date">
+                                                                Exp: {{ \Carbon\Carbon::parse($pi['expected_date'])->format('d M Y') }}
+                                                            </div>
+                                                        @endif
                                                     </td>
                                                     <td>
                                                         <span class="text-dark fs-13">{{ $pi['warehouse_name'] }}</span>
@@ -220,7 +225,12 @@
                                                     </td>
                                                     <td>
                                                         <span class="fw-bold text-dark fs-13">{{ $pi['requisition_number'] }}</span>
-                                                        <div class="text-muted fs-11">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d M Y') : '—' }}</div>
+                                                        <div class="text-muted fs-11" title="Create Date">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d M Y') : '—' }}</div>
+                                                        @if(!empty($pi['expected_date']))
+                                                            <div class="text-info fs-11 fw-medium mt-0.5" title="Expected Date">
+                                                                Exp: {{ \Carbon\Carbon::parse($pi['expected_date'])->format('d M Y') }}
+                                                            </div>
+                                                        @endif
                                                     </td>
                                                     <td>
                                                         <span class="text-dark fs-13">{{ $pi['warehouse_name'] }}</span>
@@ -294,7 +304,12 @@
                                             </td>
                                             <td>
                                                 <span class="fw-bold text-dark fs-13">{{ $pi['requisition_number'] }}</span>
-                                                <div class="text-muted fs-11">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d M Y') : '—' }}</div>
+                                                <div class="text-muted fs-11" title="Create Date">{{ $pi['requisition_date'] ? \Carbon\Carbon::parse($pi['requisition_date'])->format('d M Y') : '—' }}</div>
+                                                @if(!empty($pi['expected_date']))
+                                                    <div class="text-info fs-11 fw-medium mt-0.5" title="Expected Date">
+                                                        Exp: {{ \Carbon\Carbon::parse($pi['expected_date'])->format('d M Y') }}
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td>
                                                 <span class="text-dark fs-13">{{ $pi['warehouse_name'] }}</span>

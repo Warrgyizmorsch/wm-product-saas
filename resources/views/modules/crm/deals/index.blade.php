@@ -155,12 +155,9 @@
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Pipeline Stage</label>
                             <x-ui.odoo-form-ui type="select" name="stage">
                                 <option value="">All Stages</option>
-                                <option value="Qualification" {{ request('stage') === 'Qualification' ? 'selected' : '' }}>Qualification</option>
-                                <option value="Needs Analysis" {{ request('stage') === 'Needs Analysis' ? 'selected' : '' }}>Needs Analysis</option>
-                                <option value="Proposal" {{ request('stage') === 'Proposal' ? 'selected' : '' }}>Proposal</option>
-                                <option value="Negotiation" {{ request('stage') === 'Negotiation' ? 'selected' : '' }}>Negotiation</option>
-                                <option value="Won" {{ request('stage') === 'Won' ? 'selected' : '' }}>Won</option>
-                                <option value="Lost" {{ request('stage') === 'Lost' ? 'selected' : '' }}>Lost</option>
+                                @foreach($dealStatuses as $st)
+                                    <option value="{{ $st->name }}" {{ request('stage') === $st->name ? 'selected' : '' }}>{{ $st->name }}</option>
+                                @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="row g-2 mb-3">
@@ -182,30 +179,24 @@
             </div>
         </div>
 
-        {{-- 2. Stage Filter Tabs (Exact like Lead listing) --}}
+        {{-- 2. Stage Filter Tabs --}}
         <div class="mb-2" style="border-bottom: 2px solid #e2e8f0;">
             <div class="crm-status-tabs-wrapper">
                 <a href="{{ request()->fullUrlWithQuery(['stage' => null, 'page' => null]) }}" class="crm-status-tab {{ empty($stage) ? 'active' : '' }}">
                     ALL ({{ $stageCounts['all'] ?? 0 }})
                 </a>
-                <a href="{{ request()->fullUrlWithQuery(['stage' => 'Qualification', 'page' => null]) }}" class="crm-status-tab {{ $stage === 'Qualification' ? 'active' : '' }}">
-                    QUALIFICATION ({{ $stageCounts['Qualification'] ?? 0 }})
-                </a>
-                <a href="{{ request()->fullUrlWithQuery(['stage' => 'Needs Analysis', 'page' => null]) }}" class="crm-status-tab {{ $stage === 'Needs Analysis' ? 'active' : '' }}">
-                    NEEDS ANALYSIS ({{ $stageCounts['Needs Analysis'] ?? 0 }})
-                </a>
-                <a href="{{ request()->fullUrlWithQuery(['stage' => 'Proposal', 'page' => null]) }}" class="crm-status-tab {{ $stage === 'Proposal' ? 'active' : '' }}">
-                    PROPOSAL ({{ $stageCounts['Proposal'] ?? 0 }})
-                </a>
-                <a href="{{ request()->fullUrlWithQuery(['stage' => 'Negotiation', 'page' => null]) }}" class="crm-status-tab {{ $stage === 'Negotiation' ? 'active' : '' }}">
-                    NEGOTIATION ({{ $stageCounts['Negotiation'] ?? 0 }})
-                </a>
-                <a href="{{ request()->fullUrlWithQuery(['stage' => 'Won', 'page' => null]) }}" class="crm-status-tab crm-status-tab--won {{ $stage === 'Won' ? 'active' : '' }}">
-                    WON ({{ $stageCounts['Won'] ?? 0 }})
-                </a>
-                <a href="{{ request()->fullUrlWithQuery(['stage' => 'Lost', 'page' => null]) }}" class="crm-status-tab crm-status-tab--lost {{ $stage === 'Lost' ? 'active' : '' }}">
-                    LOST ({{ $stageCounts['Lost'] ?? 0 }})
-                </a>
+                @foreach($dealStatuses as $st)
+                    @php
+                        $tabClass = match(strtolower($st->name)) {
+                            'won', 'closed won' => 'crm-status-tab--won',
+                            'lost', 'closed lost' => 'crm-status-tab--lost',
+                            default => '',
+                        };
+                    @endphp
+                    <a href="{{ request()->fullUrlWithQuery(['stage' => $st->name, 'page' => null]) }}" class="crm-status-tab {{ $tabClass }} {{ $stage === $st->name ? 'active' : '' }}">
+                        {{ strtoupper($st->name) }} ({{ $stageCounts[$st->name] ?? 0 }})
+                    </a>
+                @endforeach
             </div>
         </div>
 
@@ -358,18 +349,23 @@
                                             @csrf
                                             @method('PATCH')
                                             <select name="stage" class="form-control status-select" data-select2-selector="status" onchange="this.form.submit()" style="width: 145px;">
-                                                @foreach(['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost'] as $stageOption)
+                                                @foreach($dealStatuses as $stOption)
                                                     @php
-                                                        $bgClass = 'bg-info';
-                                                        if ($stageOption === 'Qualification') $bgClass = 'bg-info';
-                                                        elseif ($stageOption === 'Needs Analysis') $bgClass = 'bg-primary';
-                                                        elseif ($stageOption === 'Proposal') $bgClass = 'bg-warning';
-                                                        elseif ($stageOption === 'Negotiation') $bgClass = 'bg-teal';
-                                                        elseif ($stageOption === 'Won') $bgClass = 'bg-success';
-                                                        elseif ($stageOption === 'Lost') $bgClass = 'bg-danger';
+                                                        $bgClass = match(strtolower($stOption->name)) {
+                                                            'qualification' => 'bg-info',
+                                                            'needs analysis' => 'bg-primary',
+                                                            'proposal' => 'bg-warning',
+                                                            'negotiation' => 'bg-teal',
+                                                            'won', 'closed won' => 'bg-success',
+                                                            'lost', 'closed lost' => 'bg-danger',
+                                                            default => str_replace('bg-', '', $stOption->color ?: 'bg-primary'),
+                                                        };
+                                                        if (!str_starts_with($bgClass, 'bg-')) {
+                                                            $bgClass = 'bg-' . $bgClass;
+                                                        }
                                                     @endphp
-                                                    <option value="{{ $stageOption }}" data-bg="{{ $bgClass }}" {{ $normalizedStage === $stageOption ? 'selected' : '' }}>
-                                                        {{ $stageOption }}
+                                                    <option value="{{ $stOption->name }}" data-bg="{{ $bgClass }}" {{ $normalizedStage === $stOption->name ? 'selected' : '' }}>
+                                                        {{ $stOption->name }}
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -530,8 +526,8 @@
                 <div class="mb-3">
                     <label class="form-label fw-bold text-dark fs-12 mb-1">Deal Stage</label>
                     <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
-                        @foreach(['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost'] as $stg)
-                            <option value="{{ $stg }}">{{ $stg }}</option>
+                        @foreach($dealStatuses as $stg)
+                            <option value="{{ $stg->name }}">{{ $stg->name }}</option>
                         @endforeach
                     </select>
                 </div>

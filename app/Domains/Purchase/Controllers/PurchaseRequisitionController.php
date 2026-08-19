@@ -59,6 +59,7 @@ class PurchaseRequisitionController extends Controller
 
         $validated = $request->validate([
             'requisition_date' => 'required|date',
+            'expected_date' => 'nullable|date',
             'source_type' => 'required|string|in:direct,so,mo,material_request,material_requirement,requisition_slip',
             'sales_order_id' => 'nullable|integer|exists:sales_orders,id',
             'production_order_id' => 'nullable|integer|exists:production_orders,id',
@@ -88,6 +89,9 @@ class PurchaseRequisitionController extends Controller
     public function detailPartial(int $id)
     {
         $requisition = $this->requisitionRepo->findWithDetails($id);
+        if ($requisition) {
+            $requisition->load('reminders.user');
+        }
         return view('modules.purchase.requisitions.detail-partial', compact('requisition'));
     }
 
@@ -134,6 +138,7 @@ class PurchaseRequisitionController extends Controller
 
         $validated = $request->validate([
             'requisition_date' => 'required|date',
+            'expected_date' => 'nullable|date',
             'source_type' => 'required|string|in:direct,so,mo,material_request,material_requirement,requisition_slip',
             'sales_order_id' => 'nullable|integer|exists:sales_orders,id',
             'production_order_id' => 'nullable|integer|exists:production_orders,id',
@@ -233,5 +238,42 @@ class PurchaseRequisitionController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
+    }
+
+    public function remind(Request $request, int $id)
+    {
+        $requisition = $this->requisitionRepo->find($id);
+        if (!$requisition) abort(404);
+
+        if ($requisition->status !== 'Draft') {
+            return redirect()->back()->with('error', 'Reminders can only be sent for pending Purchase Requisitions.');
+        }
+
+        if ($requisition->last_reminded_at && $requisition->last_reminded_at->diffInSeconds(now()) < 900) {
+            $secondsLeft = 900 - $requisition->last_reminded_at->diffInSeconds(now());
+            if ($secondsLeft >= 60) {
+                $mins = (int)ceil($secondsLeft / 60);
+                $timeStr = "{$mins} minute" . ($mins > 1 ? 's' : '');
+            } else {
+                $secs = max(1, (int)$secondsLeft);
+                $timeStr = "{$secs} second" . ($secs > 1 ? 's' : '');
+            }
+            return redirect()->back()->with('error', "Reminder already sent recently! Please wait {$timeStr} before sending another reminder.");
+        }
+
+        $note = $request->input('note');
+
+        \App\Domains\Purchase\Models\ApprovalReminder::create([
+            'tenant_id' => require_tenant_id(),
+            'remindable_type' => get_class($requisition),
+            'remindable_id' => $requisition->id,
+            'user_id' => auth()->id(),
+            'note' => $note,
+        ]);
+
+        $requisition->increment('reminder_count');
+        $requisition->update(['last_reminded_at' => now()]);
+
+        return redirect()->back()->with('success', "Quick reminder successfully sent to approvers for PR #{$requisition->requisition_number}!");
     }
 }

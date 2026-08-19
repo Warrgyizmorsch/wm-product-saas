@@ -20,18 +20,24 @@ class PurchaseRequisition extends BaseModel
         'requisition_number',
         'requested_by',
         'requisition_date',
+        'expected_date',
         'status', // Draft, Approved, Cancelled
         'rejection_reason',
         'notes',
         'source_type',
         'source_id',
         'requisition_slip_number',
+        'reminder_count',
+        'last_reminded_at',
     ];
 
     protected $casts = [
         'requisition_date' => 'date',
+        'expected_date' => 'date',
+        'last_reminded_at' => 'datetime',
         'requested_by' => 'integer',
         'source_id' => 'integer',
+        'reminder_count' => 'integer',
     ];
 
     public function items(): HasMany
@@ -47,5 +53,10 @@ class PurchaseRequisition extends BaseModel
     public function sourceable(): \Illuminate\Database\Eloquent\Relations\MorphTo
     {
         return $this->morphTo(__FUNCTION__, 'source_type', 'source_id');
+    }
+
+    public function reminders(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(ApprovalReminder::class, 'remindable')->orderBy('created_at', 'desc');
     }
 }

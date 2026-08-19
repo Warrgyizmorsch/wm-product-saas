@@ -24,18 +24,38 @@
             </span>
             <h5 class="fw-bold text-dark mb-0">{{ $requisition->requisition_number }}</h5>
         </div>
-        <span class="badge fs-11 fw-semibold px-3 py-1 rounded-pill"
-              style="background:{{ $sc['bg'] }}; color:{{ $sc['color'] }}; border:1px solid {{ $sc['border'] }};">
-            {{ __('purchase.status_' . strtolower($requisition->status)) }}
-        </span>
+        <div class="d-flex align-items-center gap-1.5">
+            <span class="badge fs-11 fw-semibold px-3 py-1 rounded-pill"
+                  style="background:{{ $sc['bg'] }}; color:{{ $sc['color'] }}; border:1px solid {{ $sc['border'] }};">
+                {{ __('purchase.status_' . strtolower($requisition->status)) }}
+            </span>
+            @if($requisition->reminder_count > 0)
+                @php
+                    $remData = $requisition->reminders->map(fn($r) => [
+                        'user' => $r->user->name ?? 'User',
+                        'time' => $r->created_at->format('d M Y h:i A'),
+                        'note' => $r->note
+                    ]);
+                @endphp
+                <button type="button" class="btn btn-xs btn-soft-danger border border-danger-subtle px-2 py-1 fs-11 fw-bold"
+                        onclick="showReminderHistoryModal('{{ $requisition->requisition_number }}', {{ json_encode($remData) }})">
+                    <i class="feather-bell me-1"></i>Reminded ({{ $requisition->reminder_count }})
+                </button>
+            @endif
+        </div>
     </div>
     <div class="d-flex flex-wrap gap-3 fs-12 text-muted mt-2">
         <span><i class="feather-user me-1"></i>
             <strong class="text-dark">{{ $requisition->requester->name ?? __('purchase.system') }}</strong>
         </span>
         <span><i class="feather-calendar me-1"></i>
-            <strong class="text-dark">{{ $requisition->requisition_date ? $requisition->requisition_date->format('d M Y') : '—' }}</strong>
+            Req Date: <strong class="text-dark">{{ $requisition->requisition_date ? $requisition->requisition_date->format('d M Y') : '—' }}</strong>
         </span>
+        @if($requisition->expected_date)
+            <span><i class="feather-clock me-1 text-primary"></i>
+                Exp Date: <strong class="text-primary">{{ $requisition->expected_date->format('d M Y') }}</strong>
+            </span>
+        @endif
     </div>
 </div>
 

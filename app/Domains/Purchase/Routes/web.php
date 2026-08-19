@@ -19,6 +19,7 @@ Route::prefix('purchase')
         Route::post('requisitions/pending-items/create-po', [PurchaseRequisitionController::class, 'createPosFromPendingItems'])->name('requisitions.pending-items.create-po');
         Route::post('requisitions/{requisition}/approve', [PurchaseRequisitionController::class, 'approve'])->name('requisitions.approve');
         Route::post('requisitions/{requisition}/reject', [PurchaseRequisitionController::class, 'reject'])->name('requisitions.reject');
+        Route::post('requisitions/{requisition}/remind', [PurchaseRequisitionController::class, 'remind'])->name('requisitions.remind');
         Route::get('requisitions/{requisition}/detail-partial', [PurchaseRequisitionController::class, 'detailPartial'])->name('requisitions.detail-partial');
         Route::get('pr-approvals', [PurchaseRequisitionController::class, 'prApprovals'])->name('pr-approvals.index');
         Route::resource('requisitions', PurchaseRequisitionController::class);
@@ -37,6 +38,7 @@ Route::prefix('purchase')
         Route::get('orders/get-requisition-items', [PurchaseOrderController::class, 'getRequisitionItems'])->name('orders.get-requisition-items');
         Route::post('orders/{order}/approve', [PurchaseOrderController::class, 'approve'])->name('orders.approve');
         Route::post('orders/{order}/reject', [PurchaseOrderController::class, 'reject'])->name('orders.reject');
+        Route::post('orders/{order}/remind', [PurchaseOrderController::class, 'remind'])->name('orders.remind');
         Route::get('orders/{order}/download', [PurchaseOrderController::class, 'downloadPdf'])->name('orders.download');
         Route::get('orders/{order}/po-detail-partial', [PurchaseOrderController::class, 'poDetailPartial'])->name('orders.po-detail-partial');
         Route::get('po-approvals', [PurchaseOrderController::class, 'poApprovals'])->name('po-approvals.index');

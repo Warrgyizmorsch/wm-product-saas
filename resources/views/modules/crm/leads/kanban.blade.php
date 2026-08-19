@@ -183,7 +183,25 @@
 
         @foreach($statuses as $status)
             @php
-                $config = $columnConfigs[$status] ?? ['color' => '#64748b', 'badge' => 'bg-soft-secondary text-secondary', 'title' => $status];
+                if (isset($columnConfigs[$status])) {
+                    $config = $columnConfigs[$status];
+                } else {
+                    $lsObj = isset($leadStatuses) ? $leadStatuses->firstWhere('name', $status) : null;
+                    $color = match(strtolower($lsObj?->color ?? '')) {
+                        'bg-info' => '#06b6d4',
+                        'bg-warning' => '#f59e0b',
+                        'bg-danger' => '#ef4444',
+                        'bg-success' => '#22c55e',
+                        'bg-teal' => '#14b8a6',
+                        'bg-dark' => '#1e293b',
+                        default => '#6366f1',
+                    };
+                    $config = [
+                        'color' => $color,
+                        'badge' => 'bg-soft-primary text-primary',
+                        'title' => $status,
+                    ];
+                }
                 $columnData = $kanbanData[$status] ?? ['leads' => collect(), 'count' => 0, 'total_amount' => 0];
                 $leads = $columnData['leads'];
             @endphp

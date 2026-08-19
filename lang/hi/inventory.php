@@ -87,7 +87,7 @@ return [
     'single_item' => 'एकल वस्तु',
     'contains_variants' => 'वेरिएंट मौजूद हैं (जैसे: आकार, रंग)',
     'supplier_method' => 'आपूर्ति विधि',
-    'buy' => 'खरीदें',
+    'buy' => 'ट्रेड (Trade)',
     'manufacture' => 'निर्माण',
 
     // Form detail sections

@@ -708,11 +708,25 @@
                                                              <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
                                                                  @csrf
                                                                  @method('PATCH')
-                                                                 <select class="form-select odoo-select2 status-select" name="status" onchange="this.form.submit()" style="border-radius:0;">
-                                                                     <option value="New" @selected($lead->status === 'New' || !$lead->status)>{{ __('crm.statuses.New') }}</option>
-                                                                     <option value="Qualified" @selected($lead->status === 'Qualified')>{{ __('crm.statuses.Qualified') }}</option>
-                                                                     <option value="Won" @selected($lead->status === 'Won')>{{ __('crm.statuses.Won') }}</option>
-                                                                     <option value="Lost" @selected($lead->status === 'Lost')>{{ __('crm.statuses.Lost') }}</option>
+                                                                 <select name="status" class="form-control status-select" data-select2-selector="status" onchange="this.form.submit()" style="width: 100%;">
+                                                                     @php
+                                                                         $statusesList = $leadStatuses ?? \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses();
+                                                                     @endphp
+                                                                     @foreach($statusesList as $ls)
+                                                                         @php
+                                                                             $statusOption = $ls->name;
+                                                                             $bgClass = match(strtolower($statusOption)) {
+                                                                                 'new' => 'bg-primary',
+                                                                                 'qualified' => 'bg-teal',
+                                                                                 'won' => 'bg-success',
+                                                                                 'lost' => 'bg-danger',
+                                                                                 default => ($ls->color ?: 'bg-primary'),
+                                                                             };
+                                                                         @endphp
+                                                                         <option value="{{ $statusOption }}" data-bg="{{ $bgClass }}" {{ ($lead->status ?: 'New') === $statusOption ? 'selected' : '' }}>
+                                                                             {{ $statusOption }}
+                                                                         </option>
+                                                                     @endforeach
                                                                  </select>
                                                              </form>
                                                          @endif
@@ -752,11 +766,82 @@
                                                          <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ ($lead->source && $lead->source !== 'Select an Option') ? __('crm.sources.' . $lead->source) : '—' }}</span>
                                                      </div>
                                                  </div>
-                                                 
                                              </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                @if(!empty($lead->utm_source) || !empty($lead->utm_medium) || !empty($lead->utm_campaign) || !empty($lead->utm_term) || !empty($lead->utm_content))
+                                <!-- UTM Parameters (Marketing Attribution) Card -->
+                                <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionUtmParams">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
+                                            <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="border-bottom: none;">
+                                                <i class="feather-compass text-primary me-1.5"></i>UTM Parameters (Marketing Attribution)
+                                            </h5>
+                                            @if($lead->utm_source || $lead->utm_medium || $lead->utm_campaign || $lead->utm_term || $lead->utm_content)
+                                                <span class="badge bg-soft-success text-success fs-10 fw-semibold px-2 py-0.5"><i class="feather-check-circle me-1"></i>Tracked</span>
+                                            @else
+                                                <span class="badge bg-light text-muted border fs-10 fw-normal px-2 py-0.5">No UTM Data</span>
+                                            @endif
+                                        </div>
+                                        <div class="row g-2">
+                                            <div class="col-md-4">
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">UTM Source</div>
+                                                    <div class="zoho-field-value">
+                                                        @if($lead->utm_source)
+                                                            <span class="badge bg-soft-primary text-primary font-monospace px-2 py-1 fs-11 border border-primary-subtle">{{ $lead->utm_source }}</span>
+                                                        @else
+                                                            <span class="text-muted">—</span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">UTM Medium</div>
+                                                    <div class="zoho-field-value">
+                                                        @if($lead->utm_medium)
+                                                            <span class="badge bg-soft-info text-info font-monospace px-2 py-1 fs-11 border border-info-subtle">{{ $lead->utm_medium }}</span>
+                                                        @else
+                                                            <span class="text-muted">—</span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">UTM Campaign</div>
+                                                    <div class="zoho-field-value">
+                                                        @if($lead->utm_campaign)
+                                                            <span class="badge bg-soft-teal text-teal font-monospace px-2 py-1 fs-11 border border-teal-subtle">{{ $lead->utm_campaign }}</span>
+                                                        @else
+                                                            <span class="text-muted">—</span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">UTM Term</div>
+                                                    <div class="zoho-field-value text-dark font-monospace fs-12">
+                                                        {{ $lead->utm_term ?: '—' }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">UTM Content</div>
+                                                    <div class="zoho-field-value text-dark font-monospace fs-12">
+                                                        {{ $lead->utm_content ?: '—' }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endif
 
                                 <!-- Lead Interested Products & Quantities Section -->
                                 @php

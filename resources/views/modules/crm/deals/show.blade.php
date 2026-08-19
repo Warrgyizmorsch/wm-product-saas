@@ -324,15 +324,31 @@
     $isQuotationTabActive = request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('quotation_id') || old('form_type') === 'quotation_create' || old('form_type') === 'quotation_edit';
     $isSalesOrdersTabActive = request()->has('sales_orders_tab');
     
-    // Stages array with probabilities
-    $allStages = [
-        'Qualification'  => 10,
-        'Needs Analysis' => 30,
-        'Proposal'       => 60,
-        'Negotiation'    => 80,
-        'Won'            => 100,
-        'Lost'           => 0,
-    ];
+    // Stages array with probabilities dynamically built from DealStatus master
+    if (isset($dealStatuses) && $dealStatuses->isNotEmpty()) {
+        $allStages = [];
+        foreach ($dealStatuses as $st) {
+            $prob = $st->probability ?? match(strtolower($st->name)) {
+                'qualification' => 10,
+                'needs analysis' => 30,
+                'proposal' => 60,
+                'negotiation' => 80,
+                'won', 'closed won' => 100,
+                'lost', 'closed lost' => 0,
+                default => 50,
+            };
+            $allStages[$st->name] = $prob;
+        }
+    } else {
+        $allStages = [
+            'Qualification'  => 10,
+            'Needs Analysis' => 30,
+            'Proposal'       => 60,
+            'Negotiation'    => 80,
+            'Won'            => 100,
+            'Lost'           => 0,
+        ];
+    }
     
     $currentStageKey = $deal->stage;
     if ($currentStageKey === 'New') $currentStageKey = 'Qualification';
@@ -1982,8 +1998,11 @@
                 <div class="mb-3">
                     <label class="form-label fw-bold text-dark fs-12 mb-1">Deal Stage</label>
                     <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
-                        @foreach(['Qualification', 'Needs Analysis', 'Proposal', 'Negotiation', 'Won', 'Lost'] as $stg)
-                            <option value="{{ $stg }}" @selected(old('stage', $deal->stage) === $stg)>{{ $stg }}</option>
+                        @php
+                            $dStatuses = $dealStatuses ?? \App\Domains\CRM\Models\DealStatus::getOrderedStatuses();
+                        @endphp
+                        @foreach($dStatuses as $stg)
+                            <option value="{{ $stg->name }}" @selected(old('stage', $deal->stage) === $stg->name)>{{ $stg->name }}</option>
                         @endforeach
                     </select>
                 </div>
