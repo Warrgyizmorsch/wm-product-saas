@@ -12,6 +12,7 @@ use App\Domains\HRMS\Controllers\Api\LeaveRequestApiController;
 use App\Domains\HRMS\Controllers\Api\LeaveEncashmentApiController;
 use App\Domains\HRMS\Controllers\Api\WfhRequestApiController;
 use App\Domains\HRMS\Controllers\Api\ShiftChangeRequestApiController;
+use App\Domains\HRMS\Controllers\Api\BiometricWebhookController;
 use App\Domains\HRMS\Controllers\Api\OvertimeRequestApiController;
 
 /*
@@ -271,6 +272,7 @@ Route::prefix('api/hrms/leave-requests')
         // Leave Application & Approval Workflows
         Route::get('/', [LeaveRequestApiController::class, 'indexRequests'])->name('index');
         Route::post('/', [LeaveRequestApiController::class, 'storeRequest'])->name('store');
+        Route::post('/calculate-duration', [LeaveRequestApiController::class, 'calculateDuration'])->name('calculate-duration');
         Route::get('/{leaveRequest}', [LeaveRequestApiController::class, 'showRequest'])->name('show');
         Route::post('/{leaveRequest}/approve', [LeaveRequestApiController::class, 'approveRequest'])->name('approve');
         Route::post('/{leaveRequest}/reject', [LeaveRequestApiController::class, 'rejectRequest'])->name('reject');
@@ -343,3 +345,33 @@ Route::prefix('api/hrms/leave-encashments')
         Route::post('/{leaveEncashment}/reject', [LeaveEncashmentApiController::class, 'rejectEncashment'])->name('reject');
         Route::delete('/{leaveEncashment}', [LeaveEncashmentApiController::class, 'destroyEncashment'])->name('destroy');
     });
+
+// ==========================================
+// 10. HOLIDAY CALENDAR API ROUTES
+// ==========================================
+Route::prefix('api/hrms/holidays')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.holidays.')
+    ->group(function () {
+        Route::get('/', [\App\Domains\HRMS\Controllers\Api\HolidayCalendarApiController::class, 'index'])->name('index');
+        Route::post('/', [\App\Domains\HRMS\Controllers\Api\HolidayCalendarApiController::class, 'store'])->name('store');
+        Route::get('/{holiday}', [\App\Domains\HRMS\Controllers\Api\HolidayCalendarApiController::class, 'show'])->name('show');
+        Route::put('/{holiday}', [\App\Domains\HRMS\Controllers\Api\HolidayCalendarApiController::class, 'update'])->name('update');
+        Route::delete('/{holiday}', [\App\Domains\HRMS\Controllers\Api\HolidayCalendarApiController::class, 'destroy'])->name('destroy');
+    });
+
+// ==========================================
+// 11. BIOMETRIC INTEGRATION API ROUTES
+// ==========================================
+Route::prefix('api/hrms/attendance')
+    ->middleware(['auth:sanctum', 'throttle:100,1'])
+    ->name('api.hrms.attendance.')
+    ->group(function () {
+        Route::post('/biometric-sync', [BiometricWebhookController::class, 'syncLogs'])->name('biometric-sync');
+    });
+
+// Public Webhook route for ADMS devices
+Route::post('api/hrms/biometric/webhook', [BiometricWebhookController::class, 'handleAdmsRequest'])
+    ->middleware(['throttle:100,1'])
+    ->name('api.hrms.biometric.webhook');
+

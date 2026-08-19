@@ -198,19 +198,17 @@ class LeaveRequestApiController extends Controller
         $startType = $validated['start_date_type'];
         $endType   = $validated['end_date_type'];
 
-        $duration = 0;
-        if ($startDate->equalTo($endDate)) {
-            if ($startDate->dayOfWeek !== Carbon::SUNDAY) {
-                $duration = ($startType === 'full_day') ? 1.0 : 0.5;
-            }
-        } else {
-            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                if ($date->dayOfWeek === Carbon::SUNDAY) {
-                    continue;
-                }
-                if ($date->equalTo($startDate)) {
+        $duration = 0.0;
+        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+            $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
+            $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
+
+            if (!$isHoliday && $isActiveWorkDay) {
+                if ($startDate->isSameDay($endDate)) {
                     $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                } elseif ($date->equalTo($endDate)) {
+                } elseif ($date->isSameDay($startDate)) {
+                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                } elseif ($date->isSameDay($endDate)) {
                     $duration += ($endType === 'full_day') ? 1.0 : 0.5;
                 } else {
                     $duration += 1.0;
@@ -522,4 +520,66 @@ class LeaveRequestApiController extends Controller
 
         return $this->sendSuccess($balances, 'Leave balances retrieved successfully');
     }
+
+    /**
+     * POST /api/hrms/leave-requests/calculate-duration
+     * Calculate leave duration excluding holidays and rest days.
+     */
+    public function calculateDuration(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'employee_id'     => 'required|exists:employees,id',
+            'start_date'      => 'required|date',
+            'end_date'        => 'required|date|after_or_equal:start_date',
+            'start_date_type' => 'required|string|in:full_day,first_half,second_half',
+            'end_date_type'   => 'required|string|in:full_day,first_half,second_half',
+        ]);
+
+        $employee = Employee::find($validated['employee_id']);
+        if (!$employee) {
+            return $this->sendError(__('hrms.leave.app.emp_not_found'), 404);
+        }
+
+        $startDate = Carbon::parse($validated['start_date']);
+        $endDate   = Carbon::parse($validated['end_date']);
+        $startType = $validated['start_date_type'];
+        $endType   = $validated['end_date_type'];
+
+        $duration = 0.0;
+        $holidays = [];
+        $restDays = [];
+
+        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+            $dateStr = $date->toDateString();
+            $isHoliday = \App\Domains\HRMS\Models\HolidayCalendar::isHolidayForEmployee($employee, $date);
+            $isActiveWorkDay = !is_null($employee->resolveShiftForDate($date));
+
+            if ($isHoliday) {
+                $holidays[] = $dateStr;
+            } elseif (!$isActiveWorkDay) {
+                $restDays[] = $dateStr;
+            } else {
+                if ($startDate->isSameDay($endDate)) {
+                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                } elseif ($date->isSameDay($startDate)) {
+                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
+                } elseif ($date->isSameDay($endDate)) {
+                    $duration += ($endType === 'full_day') ? 1.0 : 0.5;
+                } else {
+                    $duration += 1.0;
+                }
+            }
+        }
+
+        return $this->sendSuccess([
+            'duration'  => $duration,
+            'holidays'  => $holidays,
+            'rest_days' => $restDays,
+        ], 'Leave duration calculated successfully');
+    }
 }
+

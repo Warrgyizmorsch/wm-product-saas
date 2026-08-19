@@ -129,6 +129,8 @@
                 ['label' => 'Penalization Policy', 'route' => 'hrms.penalization-policy.index'],
                 ['label' => 'Asset Management', 'route' => 'hrms.assets.index'],
                 ['label' => 'Document Master', 'route' => 'hrms.documents-master.index'],
+                ['label' => 'Holiday Calendar', 'route' => 'hrms.holidays.index'],
+                ['label' => 'Biometric Devices', 'route' => 'hrms.biometric-devices.index'],
             ]],
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
             ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'],
