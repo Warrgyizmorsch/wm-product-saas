@@ -50,7 +50,7 @@ class DatabaseSeeder extends Seeder
             InventoryMasterDemoSeeder::class,
             PoonaRadiatorsProductSeeder::class,
             PoonaRadiatorsProductionSeeder::class,
-            HrmsDemoSeeder::class,
+            // HrmsDemoSeeder::class,
             AccountingChartOfAccountsSeeder::class,
         ]);
 
