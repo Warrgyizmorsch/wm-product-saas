@@ -121,6 +121,11 @@
                         <x-ui.badge :soft="true" :variant="$statusVariant" class="px-2.5 py-1 fs-11 fw-bold">
                             {{ $order->status }}
                         </x-ui.badge>
+                        @if($order->is_subcontract)
+                            <x-ui.badge :soft="true" variant="warning" class="px-2.5 py-1 fs-11 fw-bold">
+                                <i class="feather-truck me-1"></i>Subcontract PO
+                            </x-ui.badge>
+                        @endif
                     </div>
                     <span class="fs-13 text-muted">
                         Supplier:&nbsp;<strong class="text-dark">{{ $order->vendor->name ?? '—' }}</strong>
@@ -137,6 +142,27 @@
                     <h3 class="fw-bold text-primary mb-0 font-monospace">{{ $currencySymbol }}{{ number_format($order->grand_total, 2) }}</h3>
                 </div>
             </div>
+
+            @if($order->is_subcontract)
+                <div class="alert alert-info border-0 border-start border-4 border-info m-4 mb-0 rounded-3 shadow-sm bg-soft-info">
+                    <div class="d-flex align-items-top justify-content-between flex-wrap gap-2">
+                        <div class="d-flex align-items-top">
+                            <i class="feather-info fs-18 text-info me-3 mt-0.5"></i>
+                            <div>
+                                <h6 class="fw-bold text-info mb-1">Subcontract Service Order</h6>
+                                <p class="fs-12 text-dark mb-0">
+                                    This Purchase Order purchases vendor processing/service. Any company-owned material or WIP sent to this vendor is managed separately through <strong>Stock Transfer</strong>.
+                                </p>
+                            </div>
+                        </div>
+                        @if($order->production_order_id && \Illuminate\Support\Facades\Route::has('inventory.transfers.index'))
+                            <a href="{{ route('inventory.transfers.index', ['search' => 'MO-' . $order->production_order_id]) }}" class="btn btn-xs btn-outline-primary fw-bold shadow-sm align-self-center">
+                                <i class="feather-arrow-right-circle me-1"></i>View Material Transfers
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            @endif
 
             @if (in_array($order->status, ['Cancelled', 'Rejected']) && !empty($order->rejection_reason))
                 <div class="alert alert-danger border-0 border-start border-4 border-danger m-4 mb-0 rounded-3 shadow-sm bg-soft-danger">

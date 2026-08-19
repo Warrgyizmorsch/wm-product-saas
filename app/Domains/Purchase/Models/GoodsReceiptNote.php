@@ -21,6 +21,7 @@ class GoodsReceiptNote extends BaseModel
         'tenant_id',
         'grn_number',
         'purchase_order_id',
+        'production_order_id',
         'vendor_id',
         'warehouse_id',
         'received_date',
@@ -40,11 +41,17 @@ class GoodsReceiptNote extends BaseModel
         'received_date' => 'date',
         'challan_date' => 'date',
         'approved_at' => 'datetime',
+        'production_order_id' => 'integer',
     ];
 
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id');
+    }
+
+    public function productionOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionOrder::class, 'production_order_id');
     }
 
     public function vendor(): BelongsTo

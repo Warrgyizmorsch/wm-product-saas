@@ -265,6 +265,10 @@
                                     <td class="align-middle">
                                         <span class="fw-semibold text-dark">{{ $op->orderOperation->name ?? '—' }}</span>
                                         <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
+                                        @if($op->orderOperation && $op->orderOperation->is_external)
+                                            <br><span class="badge bg-soft-warning text-dark border border-warning font-monospace mt-1"><i class="feather-external-link me-1"></i>SUBCONTRACT — {{ $op->orderOperation->vendor->name ?? 'Vendor' }}</span>
+                                            <br><small class="text-warning font-monospace fs-11">Lead: {{ $op->orderOperation->subcontract_lead_time_days ?? 0 }}d | Buffer: {{ $op->orderOperation->dispatch_buffer_days ?? 0 }}d / {{ $op->orderOperation->return_buffer_days ?? 0 }}d</small>
+                                        @endif
                                         @if($op->orderOperation && $op->orderOperation->overlap_enabled)
                                             @php
                                                 $trTime = app(\App\Domains\Production\Services\SchedulingService::class)->calculateTransferReadyAt(

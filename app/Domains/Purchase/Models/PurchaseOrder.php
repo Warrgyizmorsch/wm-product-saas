@@ -15,6 +15,17 @@ class PurchaseOrder extends BaseModel
 {
     use HasFactory, SoftDeletes;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($po) {
+            if ($po->vendor_id && $po->vendor && (int) $po->vendor->tenant_id !== (int) $po->tenant_id) {
+                throw new \InvalidArgumentException("Vendor #{$po->vendor_id} does not belong to tenant #{$po->tenant_id}.");
+            }
+        });
+    }
+
     protected $table = 'purchase_orders';
 
     protected $fillable = [
@@ -39,6 +50,8 @@ class PurchaseOrder extends BaseModel
         'tax_amount',
         'grand_total',
         'status', // Draft, Approved, Cancelled
+        'is_subcontract',
+        'production_order_id',
         'rejection_reason',
         'notes',
         'created_by',
@@ -47,8 +60,10 @@ class PurchaseOrder extends BaseModel
     protected $casts = [
         'date' => 'date',
         'delivery_date' => 'date',
+        'is_subcontract' => 'boolean',
         'purchase_requisition_id' => 'integer',
         'vendor_id' => 'integer',
+        'production_order_id' => 'integer',
         'created_by' => 'integer',
         'subtotal' => 'decimal:2',
         'discount_amount' => 'decimal:2',
@@ -58,6 +73,11 @@ class PurchaseOrder extends BaseModel
         'tax_amount' => 'decimal:2',
         'grand_total' => 'decimal:2',
     ];
+
+    public function productionOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionOrder::class, 'production_order_id');
+    }
 
     public function items(): HasMany
     {

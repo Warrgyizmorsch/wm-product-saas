@@ -13,6 +13,18 @@ class Product extends BaseModel
 
     protected $table = 'products';
 
+    public const MODEL_PURE_MANUFACTURING = 'pure_manufacturing';
+    public const MODEL_SUBCONTRACT_COMPLETE = 'subcontract_complete';
+    public const MODEL_SUBCONTRACT_COMPANY_MATERIAL = 'subcontract_company_material';
+    public const MODEL_HYBRID = 'hybrid';
+
+    public const PRODUCTION_MODELS = [
+        self::MODEL_PURE_MANUFACTURING,
+        self::MODEL_SUBCONTRACT_COMPLETE,
+        self::MODEL_SUBCONTRACT_COMPANY_MATERIAL,
+        self::MODEL_HYBRID,
+    ];
+
     protected $fillable = [
         'tenant_id',
         'parent_id',
@@ -20,6 +32,7 @@ class Product extends BaseModel
         'sku',
         'type', // finished_good, raw_material, component, etc.
         'planning_type', // stock, manufacture, purchase, manual
+        'default_production_model', // pure_manufacturing, subcontract_complete, subcontract_company_material, hybrid
         'supplier_method',
         'item_type', // Goods, Service
         'variation_type', // Single, Variant

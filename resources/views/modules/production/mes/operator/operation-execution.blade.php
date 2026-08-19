@@ -122,7 +122,87 @@
             </div>
 
             {{-- Execution Controls --}}
-            <div class="row g-4 mb-4">
+            @if($op->is_external)
+                @php
+                    $user = auth()->user();
+                    $accessService = app(\App\Services\Access\AccessService::class);
+                    $canPurchase = $user && ($accessService->allows($user, 'purchase.orders.view') || $accessService->allows($user, 'purchase.requisitions.view'));
+                    $canQuality = $user && $accessService->allows($user, 'production.quality.view');
+                    $canInventory = $user && $accessService->allows($user, 'inventory.transfers.view');
+
+                    $poItem = $op->purchaseOrderItem ?? \App\Domains\Purchase\Models\PurchaseOrderItem::where('production_order_operation_id', $op->id)->first();
+                    $po = $poItem?->purchaseOrder ?? $op->purchaseOrder;
+                    $prItem = \App\Domains\Purchase\Models\PurchaseRequisitionItem::whereHas('requisition', function($q) use ($order) {
+                        $q->where('source_type', 'ProductionOrder')->where('source_id', $order->id);
+                    })->first();
+                    $pr = $prItem?->requisition;
+
+                    $opWips = $order->wips->where('current_routing_operation_id', $op->id);
+                    $sentQty = $op->quantity_transferred_out ?? 0;
+                    $atVendorQty = $opWips->sum('quantity_available');
+                    $receivedQty = $op->quantity_produced ?? 0;
+                    $rejectedQty = $op->quantity_rejected ?? 0;
+                    $scrappedQty = $op->quantity_scrapped ?? 0;
+                    $qcPending = $order->wips->where('current_routing_operation_id', $op->id)->where('status', 'quality_hold')->sum('quantity_available');
+
+                    $plannedDispatch = $order->start_date ? \Carbon\Carbon::parse($order->start_date)->subDays($op->dispatch_buffer_days ?? 0)->format('d/m/Y') : '—';
+                    $actualDispatch = $op->actual_start_time ? $op->actual_start_time->format('d/m/Y H:i') : '—';
+                    $expectedReturn = $order->start_date ? \Carbon\Carbon::parse($order->start_date)->addDays(($op->subcontract_lead_time_days ?? 0) + ($op->return_buffer_days ?? 0))->format('d/m/Y') : '—';
+                    $actualReceipt = $op->actual_end_time ? $op->actual_end_time->format('d/m/Y H:i') : '—';
+                @endphp
+
+                <div class="alert alert-warning border border-warning bg-soft-warning p-4 rounded-3 mb-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3 border-bottom border-warning-subtle pb-3">
+                        <div class="d-flex align-items-center">
+                            <i class="feather-external-link text-warning fs-24 me-3"></i>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">External Subcontracted Operation</h5>
+                                <small class="text-dark">This operation is executed off-site by vendor <strong>{{ $op->vendor->name ?? 'Subcontractor' }}</strong>. Shop-floor machine execution is disabled; execution is tracked via Procurement & GRN.</small>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            @if($canPurchase && $po && \Illuminate\Support\Facades\Route::has('purchase.orders.show'))
+                                <a href="{{ route('purchase.orders.show', $po->id) }}" class="btn btn-sm btn-outline-dark fw-semibold">
+                                    <i class="feather-shopping-cart me-1"></i>View PO
+                                </a>
+                            @endif
+                            @if($canQuality && \Illuminate\Support\Facades\Route::has('production.quality.rework.index'))
+                                <a href="{{ route('production.quality.rework.index') }}" class="btn btn-sm btn-outline-warning fw-semibold">
+                                    <i class="feather-shield me-1"></i>Quality & Rework
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="row g-3 fs-12">
+                        <div class="col-md-3">
+                            <span class="text-muted text-uppercase fs-10 fw-bold d-block">Subcontractor</span>
+                            <strong class="text-dark">{{ $op->vendor->name ?? 'N/A' }} ({{ $op->vendor->code ?? '' }})</strong>
+                            <div class="text-muted fs-11 mt-0.5">Supply: {{ ucwords(str_replace('_', ' ', $op->material_supply_type ?? 'company_supplied')) }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="text-muted text-uppercase fs-10 fw-bold d-block">Procurement Status</span>
+                            <div>PR: <strong>{{ $pr ? $pr->requisition_number . ' (' . ucfirst($pr->status) . ')' : 'Awaiting PR' }}</strong></div>
+                            <div>PO: <strong>{{ $po ? $po->po_number . ' (' . ucfirst($po->status) . ')' : 'Awaiting PO' }}</strong></div>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="text-muted text-uppercase fs-10 fw-bold d-block">Dispatch & Timing</span>
+                            <div>Disp: <strong>{{ $plannedDispatch }}</strong> <small class="text-muted">({{ $actualDispatch }})</small></div>
+                            <div>Ret: <strong>{{ $expectedReturn }}</strong> <small class="text-muted">({{ $actualReceipt }})</small></div>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="text-muted text-uppercase fs-10 fw-bold d-block">Quantity & QC Status</span>
+                            <div>Sent: <strong>{{ number_format($sentQty, 2) }}</strong> | At Vendor: <strong class="text-warning">{{ number_format($atVendorQty, 2) }}</strong></div>
+                            <div>Rec: <strong class="text-success">{{ number_format($receivedQty, 2) }}</strong> | QC Pend: <strong class="text-info">{{ number_format($qcPending, 2) }}</strong></div>
+                            @if($rejectedQty > 0 || $scrappedQty > 0)
+                                <div class="text-danger">Rej: {{ number_format($rejectedQty, 2) }} | Scrap: {{ number_format($scrappedQty, 2) }}</div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            <div class="row g-4 mb-4" @if($op->is_external) style="display:none;" @endif>
                 <div class="col-lg-6">
                     <x-ui.card :title="__('production.touch_controls')" class="h-100 border">
                         <div class="d-flex flex-column h-100 justify-content-between p-2">

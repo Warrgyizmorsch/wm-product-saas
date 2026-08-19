@@ -662,4 +662,19 @@ class ProductionOrderController extends Controller
 
         return redirect()->back()->with($successCount > 0 ? 'success' : 'error', $message);
     }
+
+    public function generateSubcontractPr(ProductionOrder $order, ProductionOrderOperation $operation)
+    {
+        Gate::authorize('update', $order);
+        $tenantId = require_tenant_id();
+
+        if (!$operation->is_external) {
+            return redirect()->back()->with('error', 'Operation is not an outsourced operation.');
+        }
+
+        $pr = app(\App\Domains\Production\Services\SubcontractProcurementOrchestrator::class)
+            ->generateSubcontractRequisition($operation, $tenantId, Auth::id());
+
+        return redirect()->back()->with('success', "Purchase Requisition {$pr->requisition_number} generated successfully for Subcontract Operation #{$operation->sequence}.");
+    }
 }

@@ -653,7 +653,7 @@ class ProductionWipService
                     ->whereIn('transaction_type', ['operation_completed', 'progress_logged', 'rework_completed'])
                     ->sum('quantity');
 
-                $goodOutput = max($logQty, $txQty, $batchId ? 0.0 : (float) ($sourceOp->quantity_produced ?? 0));
+                $goodOutput = max($logQty, $txQty, ($batchId && !$sourceOp->is_external) ? 0.0 : (float) ($sourceOp->quantity_produced ?? 0));
 
                 $alreadyTransferred = (float) ProductionWipTransaction::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
@@ -730,11 +730,11 @@ class ProductionWipService
 
                 // Get batch-and-operation-specific WIP records
                 $sourceWip = $batchId
-                    ? $this->getOrCreateWipForBatchOperation($sourceOp->production_order_id, $batchId, $sourceOp->routing_operation_id, $userId)
+                    ? $this->getOrCreateWipForBatchOperation($sourceOp->production_order_id, $batchId, $sourceOp->routing_operation_id ?? $sourceOp->id, $userId)
                     : ProductionWip::where('tenant_id', $tenantId)->where('production_order_id', $sourceOp->production_order_id)->first();
 
                 $destWip = $batchId
-                    ? $this->getOrCreateWipForBatchOperation($sourceOp->production_order_id, $batchId, $nextOp->routing_operation_id, $userId)
+                    ? $this->getOrCreateWipForBatchOperation($sourceOp->production_order_id, $batchId, $nextOp->routing_operation_id ?? $nextOp->id, $userId)
                     : $sourceWip;
 
                 foreach ($chunks as $chunkQty) {
@@ -746,6 +746,14 @@ class ProductionWipService
                         $nextOp->status = ProductionOrderOperation::STATUS_READY;
                     }
                     $nextOp->save();
+
+                    if ($nextOp->is_external) {
+                        try {
+                            app(\App\Domains\Production\Services\SubcontractProcurementOrchestrator::class)->generateSubcontractRequisition($nextOp, $tenantId, $userId);
+                        } catch (\Throwable $e) {
+                            // Requisition fallback
+                        }
+                    }
 
                     ProductionScheduleOperation::where('tenant_id', $tenantId)
                         ->where('production_order_id', $sourceOp->production_order_id)
@@ -853,7 +861,7 @@ class ProductionWipService
             ->where('transaction_type', 'transferred')
             ->sum('quantity');
 
-        $transferredIn = max((float) ($batchId ? 0.0 : $op->quantity_transferred_in), $txTransferredIn);
+        $transferredIn = max((float) $op->quantity_transferred_in, $txTransferredIn);
         $logProduced = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
             ->where('production_order_id', $op->production_order_id)
             ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))

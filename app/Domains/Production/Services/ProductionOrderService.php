@@ -45,6 +45,9 @@ class ProductionOrderService
             $productionMode = !empty($plan->production_mode)
                 ? $plan->production_mode
                 : ($product ? $product->getDefaultProductionMode() : 'standard');
+            $productionModel = !empty($plan->production_model)
+                ? $plan->production_model
+                : ($product->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING);
 
             // 1. Create order header
             $order = ProductionOrder::create([
@@ -60,6 +63,7 @@ class ProductionOrderService
                 'start_date' => $plan->start_date,
                 'end_date' => $plan->end_date,
                 'production_mode' => $productionMode,
+                'production_model' => $productionModel,
                 'status' => ProductionOrder::STATUS_DRAFT,
                 'created_by' => $userId,
             ]);
@@ -108,6 +112,13 @@ class ProductionOrderService
                     'quantity_produced' => 0.0000,
                     'quantity_rejected' => 0.0000,
                     'quantity_scrapped' => 0.0000,
+                    'is_external' => (bool) (($planOp->is_external ?? $routingOp?->is_external ?? false) || in_array($order->production_model, ['complete_subcontracting', 'subcontract_company_material'])),
+                    'subcontract_lead_time_days' => (int) ($routingOp?->subcontract_lead_time_days ?? 0),
+                    'subcontract_cost_per_unit' => (float) ($routingOp?->subcontract_cost_per_unit ?? 0.0),
+                    'subcontract_service_product_id' => $routingOp?->subcontract_service_product_id,
+                    'material_supply_type' => $routingOp?->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
+                    'dispatch_buffer_days' => (int) ($routingOp?->dispatch_buffer_days ?? 0),
+                    'return_buffer_days' => (int) ($routingOp?->return_buffer_days ?? 0),
                     'overlap_enabled' => (bool) ($routingOp?->overlap_enabled ?? false),
                     'transfer_batch_quantity' => (float) ($routingOp?->transfer_batch_quantity ?? 0.0000),
                     'transfer_lag_minutes' => (int) ($routingOp?->transfer_lag_minutes ?? 0),
@@ -119,6 +130,17 @@ class ProductionOrderService
             for ($i = 1; $i < count($createdOps); $i++) {
                 $createdOps[$i]->previous_operation_id = $createdOps[$i - 1]->id;
                 $createdOps[$i]->save();
+            }
+
+            // Auto-generate Subcontract Purchase Requisitions for external operations
+            foreach ($createdOps as $createdOp) {
+                if ($createdOp->is_external) {
+                    try {
+                        app(SubcontractProcurementOrchestrator::class)->generateSubcontractRequisition($createdOp, $order->tenant_id, $userId);
+                    } catch (\Throwable $e) {
+                        // Requisition fallback
+                    }
+                }
             }
 
             // 4. Progress Production Plan status
@@ -189,7 +211,21 @@ class ProductionOrderService
                     ->where('tenant_id', $tenantId)
                     ->where('product_id', $productId)
                     ->where('status', 'approved')
+                    ->whereIn('bom_type', ['manufacturing', 'subcontracting'])
+                    ->orderByRaw("CASE WHEN bom_type = 'manufacturing' THEN 1 WHEN bom_type = 'subcontracting' THEN 2 ELSE 3 END")
                     ->first();
+
+            if (! $bom) {
+                throw new InvalidArgumentException('Cannot create order: No approved Manufacturing or Subcontracting BOM exists for this product.');
+            }
+
+            // BOM Guardrails
+            if ($bom->bom_type === 'engineering') {
+                throw new InvalidArgumentException('Engineering BOMs cannot be selected for live Production Orders. Please convert or release as a Manufacturing BOM.');
+            }
+            if ($bom->bom_type === 'sales') {
+                throw new InvalidArgumentException('Sales BOMs are sales kits and cannot generate manufacturing orders.');
+            }
 
             $routingId = $data['routing_id'] ?? null;
             $routing = $routingId
@@ -200,13 +236,16 @@ class ProductionOrderService
                     ->where('status', 'active')
                     ->first();
 
-            if (! $bom || ! $routing) {
-                throw new InvalidArgumentException('Cannot create order: No approved BOM and/or active Routing exists for this product.');
+            if (! $routing) {
+                throw new InvalidArgumentException('Cannot create order: No active Routing exists for this product.');
             }
 
             $product = Product::find($productId);
             $defaultMode = $product ? $product->getDefaultProductionMode() : 'standard';
             $productionMode = !empty($data['production_mode']) ? $data['production_mode'] : $defaultMode;
+            $productionModel = !empty($data['production_model'])
+                ? $data['production_model']
+                : ($product->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING);
 
             $order = ProductionOrder::create([
                 'tenant_id' => $tenantId,
@@ -221,6 +260,7 @@ class ProductionOrderService
                 'start_date' => $data['start_date'],
                 'end_date' => $data['end_date'],
                 'production_mode' => $productionMode,
+                'production_model' => $productionModel,
                 'status' => ProductionOrder::STATUS_DRAFT,
                 'description' => $data['description'] ?? null,
                 'created_by' => $userId,
@@ -296,6 +336,14 @@ class ProductionOrderService
                     'quantity_produced' => 0.0000,
                     'quantity_rejected' => 0.0000,
                     'quantity_scrapped' => 0.0000,
+                    'is_external' => (bool) (($routingOp->is_external ?? false) || in_array($order->production_model, ['complete_subcontracting', 'subcontract_company_material'])),
+                    'vendor_id' => $routingOp->vendor_id,
+                    'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
+                    'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
+                    'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
+                    'material_supply_type' => $routingOp->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
+                    'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
+                    'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
                     'overlap_enabled' => (bool) ($routingOp->overlap_enabled ?? false),
                     'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
                     'transfer_lag_minutes' => (int) ($routingOp->transfer_lag_minutes ?? 0),
@@ -307,6 +355,17 @@ class ProductionOrderService
             for ($i = 1; $i < count($createdOps); $i++) {
                 $createdOps[$i]->previous_operation_id = $createdOps[$i - 1]->id;
                 $createdOps[$i]->save();
+            }
+
+            // Auto-generate Subcontract Purchase Requisitions for external operations
+            foreach ($createdOps as $createdOp) {
+                if ($createdOp->is_external) {
+                    try {
+                        app(SubcontractProcurementOrchestrator::class)->generateSubcontractRequisition($createdOp, $tenantId, $userId);
+                    } catch (\Throwable $e) {
+                        // Requisition fallback
+                    }
+                }
             }
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [

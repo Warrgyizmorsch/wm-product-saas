@@ -22,6 +22,10 @@ class PurchaseOrderRepository
             $query->where('vendor_id', $filters['vendor_id']);
         }
 
+        if (isset($filters['is_subcontract']) && $filters['is_subcontract'] !== '') {
+            $query->where('is_subcontract', (bool) $filters['is_subcontract']);
+        }
+
         if (!empty($filters['search'])) {
             $search = '%' . trim($filters['search']) . '%';
             $query->where('purchase_order_number', 'like', $search);

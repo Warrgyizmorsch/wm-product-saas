@@ -18,6 +18,9 @@ class PurchaseOrderItem extends Model
     protected $fillable = [
         'purchase_order_id',
         'product_id',
+        'production_order_id',
+        'production_order_operation_id',
+        'production_batch_id',
         'requisition_item_allocations',
         'quantity',
         'received_qty',
@@ -39,6 +42,9 @@ class PurchaseOrderItem extends Model
     protected $casts = [
         'purchase_order_id' => 'integer',
         'product_id' => 'integer',
+        'production_order_id' => 'integer',
+        'production_order_operation_id' => 'integer',
+        'production_batch_id' => 'integer',
         'requisition_item_allocations' => 'array',
         'quantity' => 'decimal:4',
         'received_qty' => 'decimal:4',
@@ -70,6 +76,21 @@ class PurchaseOrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    public function productionOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionOrder::class, 'production_order_id');
+    }
+
+    public function productionOrderOperation(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionOrderOperation::class, 'production_order_operation_id');
+    }
+
+    public function productionBatch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionBatch::class, 'production_batch_id');
     }
 
     public function warehouse(): BelongsTo

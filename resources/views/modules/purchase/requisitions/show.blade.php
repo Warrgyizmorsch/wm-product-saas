@@ -63,6 +63,27 @@
                 </div>
             </div>
 
+            @php
+                $isSubcontractPr = in_array($requisition->source_type, ['mo', 'ProductionOrder']) 
+                    && (str_contains($requisition->notes ?? '', 'Subcontract') 
+                        || $requisition->items->contains(fn($i) => $i->product?->product_type === 'service')
+                        || ($requisition->sourceable && method_exists($requisition->sourceable, 'operations') && $requisition->sourceable->operations->contains('is_external', true)));
+            @endphp
+
+            @if ($isSubcontractPr)
+                <div class="alert alert-info border-0 border-start border-4 border-info m-4 mb-0 rounded-3 shadow-sm bg-soft-info">
+                    <div class="d-flex align-items-top">
+                        <i class="feather-info fs-18 text-info me-3 mt-0.5"></i>
+                        <div>
+                            <h6 class="fw-bold text-info mb-1">Subcontract Service Requisition</h6>
+                            <p class="fs-12 text-dark mb-0">
+                                This requisition purchases an external processing service. Material or WIP dispatch to the vendor is handled separately through <strong>Inventory / Stock Transfer</strong>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             @if ($requisition->status === 'Cancelled' && !empty($requisition->rejection_reason))
                 <div class="alert alert-danger border-0 border-start border-4 border-danger m-4 mb-0 rounded-3 shadow-sm bg-soft-danger">
                     <div class="d-flex align-items-top">
@@ -82,8 +103,16 @@
                         <h6 class="fw-bold text-dark text-uppercase fs-11 letter-spacing-1 mb-3">{{ __('purchase.traceability') }}</h6>
                         <table class="table table-borderless table-sm mb-0 text-dark">
                             <tr>
-                                <td class="text-muted ps-0" style="width: 35%">{{ __('purchase.source_type') }}:</td>
-                                <td class="fw-semibold text-uppercase">{{ __('purchase.source_' . $requisition->source_type) }}</td>
+                                <td class="text-muted ps-0" style="width: 35%">Document Purpose:</td>
+                                <td>
+                                    @if($isSubcontractPr)
+                                        <x-ui.badge :soft="true" variant="warning" class="fs-11 text-uppercase fw-bold">
+                                            <i class="feather-truck me-1"></i>Subcontract Service
+                                        </x-ui.badge>
+                                    @else
+                                        <span class="fw-semibold text-uppercase">{{ __('purchase.source_' . $requisition->source_type) }}</span>
+                                    @endif
+                                </td>
                             </tr>
                             <tr>
                                 <td class="text-muted ps-0">{{ __('purchase.origin_document') }}:</td>

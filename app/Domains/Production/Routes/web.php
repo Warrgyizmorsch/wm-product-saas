@@ -128,6 +128,7 @@ Route::prefix('production')
         Route::put('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'update'])->name('cost-adjustments.update');
         Route::delete('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'destroy'])->name('cost-adjustments.destroy');
         Route::get('cost-adjustments/{adjustment}/download', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'downloadAttachment'])->name('cost-adjustments.download');
+        Route::post('orders/{order}/generate-subcontract-pr/{operation}', [ProductionOrderController::class, 'generateSubcontractPr'])->name('orders.generate-subcontract-pr');
         Route::resource('orders', ProductionOrderController::class);
 
         // ── Work-in-Progress (WIP) Management ───────────────────────────────

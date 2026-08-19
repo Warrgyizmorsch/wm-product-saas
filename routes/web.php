@@ -35,12 +35,12 @@ Route::middleware(['tenant'])->group(function (): void {
             return view('dashboard');
         })->name('dashboard');
 
-        foreach (glob(app_path('Domains/*/Routes/web.php')) as $moduleRoutes) {
+        foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/web.php'))) as $moduleRoutes) {
             require $moduleRoutes;
         }
     });
 
-    foreach (glob(app_path('Domains/*/Routes/api.php')) as $moduleApiRoutes) {
+    foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/api.php'))) as $moduleApiRoutes) {
         require $moduleApiRoutes;
     }
 });

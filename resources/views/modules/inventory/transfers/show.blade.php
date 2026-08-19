@@ -8,6 +8,11 @@
 <div class="erp-single-panel text-dark">
     <x-ui.odoo-form-ui type="sheet">
 
+        @php
+            $isSubcontractTransfer = ($transfer->toWarehouse?->type === 'subcontractor') || str_contains($transfer->notes ?? '', 'Subcontract') || str_contains($transfer->notes ?? '', 'MO-');
+            $isWipDispatch = $isSubcontractTransfer && (str_contains($transfer->notes ?? '', 'WIP') || str_contains($transfer->notes ?? '', 'Op'));
+        @endphp
+
         <!-- Top Header & Actions Bar -->
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom flex-wrap gap-3">
             <div>
@@ -17,6 +22,17 @@
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <h3 class="fw-bold text-dark mb-0">{{ $transfer->transfer_number }}</h3>
                     <x-ui.status-badge :status="$transfer->status" size="md" />
+                    @if($isSubcontractTransfer)
+                        @if($isWipDispatch)
+                            <span class="badge bg-soft-warning text-dark border border-warning px-2.5 py-1 fs-11 fw-bold me-2">
+                                <i class="feather-truck me-1"></i>Subcontract WIP Dispatch
+                            </span>
+                        @else
+                            <span class="badge bg-soft-info text-info border border-info px-2.5 py-1 fs-11 fw-bold me-2">
+                                <i class="feather-box me-1"></i>Subcontract Material Dispatch
+                            </span>
+                        @endif
+                    @endif
                 </div>
                 <small class="text-muted fs-12">
                     <i class="feather-clock me-1"></i>Created on {{ \Carbon\Carbon::parse($transfer->created_at)->format('d M Y, h:i A') }}
@@ -58,6 +74,20 @@
                 </x-ui.button>
             </div>
         </div>
+
+        @if($isSubcontractTransfer)
+            <div class="alert alert-info border-0 border-start border-4 border-info mb-4 rounded-3 shadow-sm bg-soft-info">
+                <div class="d-flex align-items-top">
+                    <i class="feather-info fs-18 text-info me-3 mt-0.5"></i>
+                    <div>
+                        <h6 class="fw-bold text-info mb-1">Subcontract Material / WIP Dispatch</h6>
+                        <p class="fs-12 text-dark mb-0">
+                            This document represents company-owned material or WIP physically dispatched to subcontractor <strong>{{ $transfer->toWarehouse?->name ?? 'Vendor Warehouse' }}</strong> for processing. It is an internal stock movement, <strong>not</strong> a purchase or consumption transaction.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <!-- Transfer Metadata Summary Cards -->
         <div class="row g-3 mb-4">

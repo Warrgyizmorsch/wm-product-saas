@@ -237,14 +237,49 @@
                                 default => 'bg-soft-secondary text-secondary border-secondary-subtle',
                             };
                         @endphp
+                        @php
+                            $isSubcontractGrn = (bool) ($grn->purchaseOrder?->is_subcontract || $grn->production_order_id || str_contains($grn->notes ?? '', 'Subcontract'));
+                            $orderId = $grn->production_order_id ?? $grn->purchaseOrder?->production_order_id;
+                            $opId = $grn->items->first()?->production_order_operation_id ?? $grn->items->first()?->purchaseOrderItem?->production_order_operation_id;
+                            
+                            $isFinalOp = false;
+                            if ($orderId && $opId) {
+                                $currOp = \App\Domains\Production\Models\ProductionOrderOperation::find($opId);
+                                if ($currOp) {
+                                    $hasSuccessor = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $orderId)
+                                        ->where('sequence', '>', $currOp->sequence)
+                                        ->exists();
+                                    $isFinalOp = !$hasSuccessor;
+                                }
+                            }
+                        @endphp
                         <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11 me-2">Store: {{ $statusLabel }}</span>
+                        @if($isSubcontractGrn)
+                            <span class="badge bg-soft-warning text-dark border border-warning px-2.5 py-1 fw-bold fs-11 me-2">
+                                <i class="feather-truck me-1"></i>Subcontract Receipt
+                            </span>
+                        @endif
                         @if(in_array($grn->status, ['Approved', 'Completed']))
                             <span class="badge {{ $bClass }} border px-2.5 py-1 fw-bold fs-11">Bill: {{ $bStatus }}</span>
                         @endif
                     </div>
-
-
                 </div>
+
+                @if($isSubcontractGrn)
+                    <div class="alert alert-warning border-0 border-start border-4 border-warning m-4 mb-0 rounded-3 shadow-sm bg-soft-warning">
+                        <div class="d-flex align-items-top">
+                            <i class="feather-truck fs-18 text-dark me-3 mt-0.5"></i>
+                            <div>
+                                <h6 class="fw-bold text-dark mb-1">Subcontract Vendor Receipt</h6>
+                                <p class="fs-12 text-dark mb-0">
+                                    Receipt Result: <strong>{{ $isFinalOp ? 'Final Subcontract Output' : 'Processed WIP' }}</strong>
+                                    &nbsp;·&nbsp;Next Step: <strong>{{ $isFinalOp ? 'QC Clearance ➔ Finished Goods Receipt' : 'QC Clearance ➔ Next Routing Operation' }}</strong>.
+                                    This receipt credits processed goods from vendor <strong>{{ $grn->vendor?->name ?? 'Subcontractor' }}</strong>.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 <div class="card-body p-4 p-md-5">
                     <!-- Top Details Grid -->

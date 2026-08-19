@@ -64,6 +64,14 @@
                             <option value="subcontracting" @selected(old('bom_type') === 'subcontracting')>
                                 {{ __('production.bom_type_subcontracting') }}</option>
                         </x-ui.odoo-form-ui>
+                        <small class="form-text text-muted fs-11 mb-3 d-block">
+                            <i class="feather-info me-1 text-primary"></i>
+                            <strong>Manufacturing:</strong> Standard live production & MRP. 
+                            <strong>Engineering:</strong> Design review only. 
+                            <strong>Sales Kit:</strong> Sales bundles. 
+                            <strong>Phantom:</strong> Blow-through sub-assembly. 
+                            <strong>Subcontracting:</strong> Outsourced structure.
+                        </small>
 
                         <x-ui.odoo-form-ui type="select" :label="__('production.usage_context')" name="usage_context"
                             :required="true" :error-text="$errors->first('usage_context')"

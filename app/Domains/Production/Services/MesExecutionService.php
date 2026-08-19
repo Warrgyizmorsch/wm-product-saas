@@ -44,6 +44,10 @@ class MesExecutionService
 
             $orderOp = ProductionOrderOperation::find($schedOp->production_order_operation_id);
 
+            if ($orderOp && $orderOp->is_external) {
+                throw new InvalidArgumentException("Operation {$orderOp->operation_number} is an external subcontract operation. Internal machine execution is disabled.");
+            }
+
             // Auto-heal schedule operation status if underlying order operation is ready or has transferred WIP
             if ($schedOp->isWaiting() && $orderOp) {
                 if ($orderOp->status === ProductionOrderOperation::STATUS_READY || (float) $orderOp->quantity_transferred_in > 0) {
