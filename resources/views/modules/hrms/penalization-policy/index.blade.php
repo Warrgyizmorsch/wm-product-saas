@@ -352,7 +352,7 @@
                                         'under_hours' => [__('hrms.penalization.under_hours'), 'feather-trending-down'],
                                         'missing_logs' => [__('hrms.penalization.missing_logs'), 'feather-alert-triangle'],
                                         'attendance_rules' => [__('hrms.penalization.attendance_rules'), 'feather-check-square'],
-                                        'overtime_rules' => [__('hrms.overtime.title') ?? 'Overtime Policy', 'feather-briefcase']
+                                        'overtime_rules' => [__('hrms.overtime.title') ?? 'Overtime Policy', 'feather-briefcase'],
                                     ];
                                     $lateArrivalRule = $rules->get('late_arrival');
                                     $savedLateTiers = ($lateArrivalRule && $lateArrivalRule->penalty_tiers) ? $lateArrivalRule->penalty_tiers : null;
@@ -391,7 +391,7 @@
                                     $statusVal = $rule ? ($rule->status ? '1' : '0') : '1';
                                 @endphp
                                 <div class="policy-details-pane" id="policy-details-{{ $typeKey }}" style="{{ $isPaneActive ? '' : 'display:none;' }}">
-                                    <form action="{{ $typeKey === 'attendance_rules' ? route('hrms.attendance-rules.save') : ($typeKey === 'overtime_rules' ? route('hrms.overtime.update-settings') : route('hrms.penalization-policy.store')) }}" method="POST" class="p-4">
+                                    <form action="{{ $typeKey === 'attendance_rules' ? route('hrms.attendance-rules.save') : ($typeKey === 'overtime_rules' ? route('hrms.overtime.update-settings') : ($typeKey === 'expense_rules' ? route('hrms.travel-expense.policy.save') : route('hrms.penalization-policy.store'))) }}" method="POST" class="p-4">
                                         @csrf
                                         @if($typeKey !== 'overtime_rules')
                                             <input type="hidden" name="rule_type" value="{{ $typeKey }}">
@@ -696,14 +696,14 @@
                                                               <span class="text-muted fs-11 d-block ms-4 ps-1">Allow employees to check in/out via the web portal or mobile app.</span>
 
                                                               {{-- Sub-options shown when office_web is enabled --}}
-                                                              <div class="ms-4 ps-1 mt-3 flex-column gap-3" id="office_geofence_fields" style="display:none;">
+                                                              <div class="ms-4 ps-1 mt-3 flex-column gap-3 d-none" id="office_geofence_fields">
 
                                                                   {{-- Geofence toggle --}}
                                                                       <x-ui.checkbox name="office_geofence" id="office_geofence" label="Require Location Coordinate Capture" onchange="toggleOfficeCoordinateFields()" />
                                                                       <span class="text-muted fs-11 d-block ms-4 ps-1">Only allow check-in when employee is within the office geofence radius.</span>
 
                                                                       {{-- Lat/Lng/Radius shown when office_geofence is enabled --}}
-                                                                      <div class="row g-2 mt-1 align-items-end d-none" id="office_coordinate_fields">
+                                                                      <div class="row g-2 mt-3 mb-3 align-items-end d-none" id="office_coordinate_fields">
                                                                            <div class="col-md-3">
                                                                                <label class="form-label fs-12 text-muted mb-1">Office Latitude</label>
                                                                                <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="e.g. 28.6139">
@@ -731,10 +731,9 @@
                                                                                <div id="office_map_picker" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #ced4da; z-index: 1;"></div>
                                                                            </div>
                                                                       </div>
-                                                                  </div>
 
                                                                   {{-- Live tracking toggle --}}
-                                                                  <div>
+                                                                  <div class="mt-4">
                                                                       <x-ui.checkbox name="office_tracking" id="office_tracking" label="Enable Live Location Tracking During Shift" onchange="toggleOfficeTrackingMinutes()" />
                                                                       <span class="text-muted fs-11 d-block ms-4 ps-1">Periodically log employee GPS coordinates while checked in at the office.</span>
                                                                       <div class="ms-4 ps-1 mt-2 d-none" id="office_tracking_minutes_wrap">
@@ -747,10 +746,10 @@
                                                               </div>
                                                           </div>
                                                       </div>
-                                                 
+                                                    </div>
 
                                                   <!-- WFH Rules -->
-                                                  <div class="col-12 border-bottom pb-4 mb-4">
+                                                  <div class="col-12 border-bottom pt-4 pb-4 mb-4">
                                                       <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
                                                           <i class="feather-rss text-primary fs-16"></i> WFH Settings
                                                       </h6>
@@ -773,7 +772,7 @@
                                                               <x-ui.checkbox name="wfh_tracking" id="wfh_tracking" label="Enable Live Location Tracking during Shift" onchange="toggleTrackingThreshold('wfh')" />
                                                               <span class="text-muted fs-11 d-block ms-4 ps-1">Track and record location updates in the background. Note: Live movement tracking requires this to be enabled.</span>
                                                           </div>
-                                                          <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13 d-none" id="wfh_tracking_meters_container">
+                                                          <div class="alert bg-light border-0 p-3 mt-3 mb-2 rounded-3 text-dark fs-13 d-none" id="wfh_tracking_meters_container">
                                                               <div class="d-flex align-items-center gap-2">
                                                                   <i class="feather-map-pin text-primary fs-16"></i>
                                                                   <p class="mb-0 text-dark" style="line-height: 1.6;">
@@ -789,7 +788,7 @@
                                                   </div>
 
                                                   <!-- On-Site Rules -->
-                                                  <div class="col-12 mb-2">
+                                                  <div class="col-12 pt-4 mb-2">
                                                       <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
                                                           <i class="feather-map text-primary fs-16"></i> On-Site Settings
                                                       </h6>
@@ -808,7 +807,7 @@
                                                               <x-ui.checkbox name="site_tracking" id="site_tracking" label="Enable Live Location Tracking during Shift" onchange="toggleTrackingThreshold('site')" />
                                                               <span class="text-muted fs-11 d-block ms-4 ps-1">Track and record location updates in the background. Note: Live movement tracking requires this to be enabled.</span>
                                                           </div>
-                                                          <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13 d-none" id="site_tracking_meters_container">
+                                                          <div class="alert bg-light border-0 p-3 mt-3 mb-2 rounded-3 text-dark fs-13 d-none" id="site_tracking_meters_container">
                                                               <div class="d-flex align-items-center gap-2">
                                                                   <i class="feather-map-pin text-primary fs-16"></i>
                                                                   <p class="mb-0 text-dark" style="line-height: 1.6;">
@@ -822,7 +821,144 @@
                                                           </div>
                                                       </div>
                                                   </div>
-                                              @endif
+                                               @endif
+
+                                               @if($typeKey === 'expense_rules')
+                                                    <div class="col-12">
+                                                        {{-- Section header --}}
+                                                        <div class="alert bg-light border-0 p-3 mb-4 rounded-3 text-dark fs-13">
+                                                            <div class="d-flex align-items-start gap-2">
+                                                                <i class="feather-info text-primary fs-16 mt-0"></i>
+                                                                <p class="mb-0" style="line-height:1.6;">
+                                                                    Define expense limits per <strong>category</strong> and optionally per <strong>designation</strong>.
+                                                                    Scope can be restricted to a specific Company, Business Unit, or Branch.
+                                                                    Multiple rules can coexist — a more specific rule (e.g. by designation) will take priority over a global one.
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {{-- Row 1: Scope --}}
+                                                        <div class="row g-3 mb-3">
+                                                            <div class="col-md-4 col-12">
+                                                                <x-ui.odoo-form-ui type="select" label="Company (Optional)" name="company_id" select2-selector="default" id="expense_company_id">
+                                                                    <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
+                                                                    @foreach($companies as $company)
+                                                                        <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                            </div>
+                                                            <div class="col-md-4 col-12">
+                                                                <x-ui.odoo-form-ui type="select" label="Business Unit (Optional)" name="business_unit_id" select2-selector="default" id="expense_bu_id">
+                                                                    <option value="">All Business Units</option>
+                                                                    @foreach($businessUnits as $bu)
+                                                                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                            </div>
+                                                            <div class="col-md-4 col-12">
+                                                                <x-ui.odoo-form-ui type="select" label="Branch (Optional)" name="branch_id" select2-selector="default" id="expense_branch_id">
+                                                                    <option value="">All Branches</option>
+                                                                    @foreach($branches as $branch)
+                                                                        <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                            </div>
+                                                        </div>
+
+                                                        {{-- Row 2: Category, Designation, Rule Name --}}
+                                                        <div class="row g-3 mb-3">
+                                                            <div class="col-md-4 col-12">
+                                                                <x-ui.odoo-form-ui type="select" label="Expense Category *" name="expense_category_id" select2-selector="default" id="expense_category_sel" :required="true">
+                                                                    <option value="" disabled selected>-- Select Category --</option>
+                                                                    @foreach($expenseCategories as $category)
+                                                                        <option value="{{ $category->id }}">{{ $category->name }} ({{ $category->code }})</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                            </div>
+                                                            <div class="col-md-4 col-12">
+                                                                <x-ui.odoo-form-ui type="select" label="Designation (Optional)" name="designation_id" select2-selector="default" id="expense_designation_sel">
+                                                                    <option value="">Apply Globally (All Grades)</option>
+                                                                    @foreach($designations as $desig)
+                                                                        <option value="{{ $desig->id }}">{{ $desig->name }}</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                            </div>
+                                                            <div class="col-md-4 col-12">
+                                                                <x-ui.odoo-form-ui type="text" label="Rule Name *" name="name" id="expense_rule_name" placeholder="e.g. Executive Food Policy" :required="true" />
+                                                            </div>
+                                                        </div>
+
+                                                        {{-- Row 3: Limits --}}
+                                                        <div class="row g-3 mb-3">
+                                                            <div class="col-md-4 col-12">
+                                                                <x-ui.odoo-form-ui type="number" label="Max Limit per Claim (₹)" name="max_limit_per_claim" id="expense_max_claim" placeholder="e.g. 500" step="0.01" min="0" />
+                                                            </div>
+                                                            <div class="col-md-4 col-12">
+                                                                <x-ui.odoo-form-ui type="number" label="Max Monthly Limit (₹)" name="max_monthly_limit" id="expense_max_monthly" placeholder="e.g. 5000" step="0.01" min="0" />
+                                                            </div>
+                                                            <div class="col-md-4 col-12">
+                                                                <x-ui.odoo-form-ui type="number" label="Receipt Required Above (₹)" name="receipt_required_threshold" id="expense_receipt_threshold" placeholder="e.g. 250" step="0.01" min="0" />
+                                                            </div>
+                                                        </div>
+
+                                                        {{-- List of current policies --}}
+                                                        <div class="border-top pt-4 mt-2">
+                                                            <h6 class="fw-bold text-dark mb-3" style="font-size: 13px;">Currently Configured Expense Policies</h6>
+                                                            <div class="table-responsive">
+                                                                <table class="table table-hover align-middle mb-0" style="font-size: 12.5px;">
+                                                                    <thead class="table-light">
+                                                                        <tr>
+                                                                            <th>Category</th>
+                                                                            <th>Scope</th>
+                                                                            <th>Designation</th>
+                                                                            <th>Rule Name</th>
+                                                                            <th>Claim Limit</th>
+                                                                            <th>Monthly Limit</th>
+                                                                            <th>Receipt Above</th>
+                                                                            <th>Status</th>
+                                                                            <th class="text-end">Action</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @forelse($expensePolicies as $policy)
+                                                                            <tr>
+                                                                                <td class="fw-bold text-primary">{{ $policy->category->name }}</td>
+                                                                                <td class="text-muted fs-12">
+                                                                                    @if($policy->company_id && isset($policy->company))
+                                                                                        {{ $policy->company->company_name }}
+                                                                                        @if($policy->businessUnit) / {{ $policy->businessUnit->name }} @endif
+                                                                                        @if($policy->branch) / {{ $policy->branch->name }} @endif
+                                                                                    @else
+                                                                                        Global
+                                                                                    @endif
+                                                                                </td>
+                                                                                <td class="text-dark">{{ $policy->designation ? $policy->designation->name : 'All Grades' }}</td>
+                                                                                <td class="text-muted">{{ $policy->name }}</td>
+                                                                                <td>{{ $policy->max_limit_per_claim ? '₹' . number_format($policy->max_limit_per_claim, 2) : 'No Limit' }}</td>
+                                                                                <td>{{ $policy->max_monthly_limit ? '₹' . number_format($policy->max_monthly_limit, 2) : 'No Limit' }}</td>
+                                                                                <td>{{ $policy->receipt_required_threshold ? '₹' . number_format($policy->receipt_required_threshold, 2) : 'Always' }}</td>
+                                                                                <td>
+                                                                                    <x-ui.badge variant="{{ $policy->status ? 'success' : 'danger' }}" soft class="px-2 py-1">
+                                                                                        {{ $policy->status ? 'Active' : 'Inactive' }}
+                                                                                    </x-ui.badge>
+                                                                                </td>
+                                                                                <td class="text-end">
+                                                                                    <button type="button" class="btn btn-sm btn-light border text-danger btn-delete-policy" data-id="{{ $policy->id }}">
+                                                                                        <i class="feather-trash-2"></i>
+                                                                                    </button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        @empty
+                                                                            <tr>
+                                                                                <td colspan="9" class="text-center text-muted py-3">No expense policies defined yet. Use the form above to add one.</td>
+                                                                            </tr>
+                                                                        @endforelse
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                               @endif
                                            </div>
 
                                            <div class="row mt-4 border-top pt-4">
@@ -847,26 +983,47 @@
     @push('scripts')
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            let lastOpenTime = 0;
 
+            window.unbindSelect2ClickBlocker = function() {
+                $(document).off('click', '.select2-container, .select2-dropdown');
+            };
 
+            window.unbindSelect2ClickBlocker();
+            setTimeout(window.unbindSelect2ClickBlocker, 100);
+            setTimeout(window.unbindSelect2ClickBlocker, 300);
+            setTimeout(window.unbindSelect2ClickBlocker, 600);
+            setTimeout(window.unbindSelect2ClickBlocker, 1000);
 
             // Close Select2 dropdowns when any parent scrollable container scrolls
             document.addEventListener('scroll', function(e) {
-                if (e.target && e.target.classList && e.target.classList.contains('table-responsive')) {
-                    $('.tier-action-select, .tier-leave-select').each(function() {
-                        if ($(this).hasClass('select2-hidden-accessible')) {
-                            $(this).select2('close');
-                        }
-                    });
+                // Ignore scroll events for 250ms after opening a Select2 dropdown to prevent auto-scroll closing
+                if (Date.now() - lastOpenTime < 250) {
+                    return;
                 }
+                if ($(e.target).closest('.select2-dropdown').length) {
+                    return;
+                }
+                $('.select2-hidden-accessible').select2('close');
             }, true); // Use capture phase because scroll events do not bubble
+
+            // Close other Select2 dropdowns when a new one is opened
+            $(document).on('select2:opening', 'select', function() {
+                lastOpenTime = Date.now();
+                $('.select2-hidden-accessible').not(this).select2('close');
+            });
+
+            // Unbind the propagation blocker registered by hrms-settings-helpers for select2
+            setTimeout(function() {
+                $(document).off('click', '.select2-container, .select2-dropdown');
+            }, 150);
+
 
             function buildPolicySelect2Options($select, $pane) {
                 let selectorType = $select.attr('data-select2-selector') || 'default';
                 let options = {
                     theme: 'bootstrap-5',
-                    width: '100%',
-                    dropdownParent: $pane
+                    width: '100%'
                 };
 
                 if (selectorType === 'status' && typeof bgformat === 'function') {
@@ -891,6 +1048,10 @@
                 let $pane = $(paneSelector);
                 if (!$pane.length) return;
 
+                if (typeof window.unbindSelect2ClickBlocker === 'function') {
+                    window.unbindSelect2ClickBlocker();
+                }
+
                 $pane.find('select[data-select2-selector]').each(function() {
                     let $select = $(this);
                     if ($select.hasClass('select2-hidden-accessible')) {
@@ -903,6 +1064,14 @@
             // Client-side Policy Pane Switching (Zero reloads)
             $(document).on('click', '.policy-switch-btn', function(e) {
                 e.preventDefault();
+
+                if (typeof window.unbindSelect2ClickBlocker === 'function') {
+                    window.unbindSelect2ClickBlocker();
+                }
+
+                // Close any open select2 dropdowns
+                $('.select2-hidden-accessible').select2('close');
+
                 let clicked = $(this);
                 let targetPaneId = clicked.attr('data-target');
                 let policyType = clicked.attr('data-policy-type');
@@ -981,8 +1150,7 @@
                 tbody.append(row);
                 
                 row.find('.tier-action-select').select2({
-                    theme: 'bootstrap-5',
-                    dropdownParent: $(document.body)
+                    theme: 'bootstrap-5'
                 });
 
                 tierIndex++;
@@ -1056,8 +1224,7 @@
                 tbody.append(row);
                 
                 row.find('.tier-action-select').select2({
-                    theme: 'bootstrap-5',
-                    dropdownParent: $(document.body)
+                    theme: 'bootstrap-5'
                 });
 
                 deficitTierIndex++;
@@ -1124,8 +1291,7 @@
                 tbody.append(row);
                 
                 row.find('.tier-action-select').select2({
-                    theme: 'bootstrap-5',
-                    dropdownParent: $(document.body)
+                    theme: 'bootstrap-5'
                 });
 
                 missingTierIndex++;
@@ -1356,7 +1522,8 @@
 
                         document.getElementById('site_location').checked = !!rule.site_location;
                         document.getElementById('site_selfie').checked = !!rule.site_selfie;
-                        document.getElementById('site_geofence').checked = !!rule.site_geofence;
+                        let siteGeofenceEl = document.getElementById('site_geofence');
+                        if (siteGeofenceEl) siteGeofenceEl.checked = !!rule.site_geofence;
                         document.getElementById('site_tracking').checked = !!rule.site_tracking;
                         document.getElementById('site_tracking_meters').value = rule.site_tracking_meters || 50;
                         document.getElementById('site_tracking_minutes').value = rule.site_tracking_minutes || 15;
@@ -1385,7 +1552,8 @@
 
                         document.getElementById('site_location').checked = false;
                         document.getElementById('site_selfie').checked = false;
-                        document.getElementById('site_geofence').checked = false;
+                        let siteGeofenceEl = document.getElementById('site_geofence');
+                        if (siteGeofenceEl) siteGeofenceEl.checked = false;
                         document.getElementById('site_tracking').checked = false;
                         document.getElementById('site_tracking_meters').value = 50;
                         document.getElementById('site_tracking_minutes').value = 15;
@@ -1660,6 +1828,10 @@
             if (isUpdatingScope) return;
             isUpdatingScope = true;
 
+            if (typeof window.unbindSelect2ClickBlocker === 'function') {
+                window.unbindSelect2ClickBlocker();
+            }
+
             var companyId = $('#sel_company_id').val();
             var $buSelect = $('#sel_business_unit_id');
             var $branchSelect = $('#sel_branch_id');
@@ -1839,6 +2011,7 @@
                 var policyType = $(this).attr('id').replace('company_id_', '');
                 window.location.href = "{{ route('hrms.penalization-policy.index') }}?policy_type=" + policyType + "&company_id=" + companyId;
             });
+
         });
     </script>
     @endpush

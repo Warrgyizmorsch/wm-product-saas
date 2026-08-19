@@ -122,17 +122,22 @@
             ]],
         ],
         'HRMS' => [
-            ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
+            ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => array_filter([
                 ['label' => 'Org Structure', 'route' => 'hrms.org.index'],
                 ['label' => 'Salary Structure', 'route' => 'hrms.salary-structure.index'],
                 ['label' => 'Leave Structure', 'route' => 'hrms.leave-structure.index'],
                 ['label' => 'Shift Roster', 'route' => 'hrms.roster.index'],
                 ['label' => 'Penalization Policy', 'route' => 'hrms.penalization-policy.index'],
+                (\App\Domains\HRMS\Models\AttendanceRule::where('office_biometric', true)
+                    ->when($resolvedTenant, fn($q) => $q->where('tenant_id', $resolvedTenant->id))
+                    ->exists())
+                    ? ['label' => 'Biometric Devices', 'route' => 'hrms.biometric-devices.index']
+                    : null,
                 ['label' => 'Asset Management', 'route' => 'hrms.assets.index'],
                 ['label' => 'Document Master', 'route' => 'hrms.documents-master.index'],
                 ['label' => 'Holiday Calendar', 'route' => 'hrms.holidays.index'],
-                ['label' => 'Biometric Devices', 'route' => 'hrms.biometric-devices.index'],
-            ]],
+                ['label' => 'Expense Policies', 'route' => 'hrms.expense-policy.index'],
+            ])],
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
             ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'],
             ['label' => 'Assets', 'icon' => 'feather-package', 'url' => '#', 'children' => [
@@ -146,6 +151,7 @@
             ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
+            ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
             ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#'],
         ],
         'Finance & People' => [
