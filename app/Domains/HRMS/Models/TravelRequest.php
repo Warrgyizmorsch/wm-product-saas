@@ -16,6 +16,7 @@ class TravelRequest extends BaseModel
         'start_date',
         'end_date',
         'estimated_budget',
+        'approved_budget',
         'status',
     ];
 

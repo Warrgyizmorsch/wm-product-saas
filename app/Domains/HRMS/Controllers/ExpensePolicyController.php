@@ -218,10 +218,59 @@ class ExpensePolicyController extends Controller
     /**
      * Show the rules (category limits) for a specific policy.
      */
-    public function showRules(ExpensePolicy $policy): View
+    public function showRules(Request $request, ExpensePolicy $policy): View
     {
         $tenantId  = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $policy->load(['rules.category', 'designation', 'department']);
+        $policy->load(['designation', 'department']);
+
+        // Base query for rules belonging to this policy
+        $rulesQuery = $policy->rules()->with('category');
+
+        // Apply Search (by Category Name or Code)
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $rulesQuery->whereHas('category', function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                  ->orWhere('code', 'like', '%' . $search . '%');
+            });
+        }
+
+        // Apply Filter (Receipt Required: 'always', 'threshold', 'not_required')
+        if ($request->filled('receipt')) {
+            $receipt = $request->input('receipt');
+            if ($receipt === 'always') {
+                $rulesQuery->where('receipt_required', true);
+            } elseif ($receipt === 'threshold') {
+                $rulesQuery->where('receipt_required', false)
+                           ->whereNotNull('receipt_required_threshold')
+                           ->where('receipt_required_threshold', '>', 0);
+            } elseif ($receipt === 'not_required') {
+                $rulesQuery->where('receipt_required', false)
+                           ->where(function ($q) {
+                               $q->whereNull('receipt_required_threshold')
+                                 ->orWhere('receipt_required_threshold', 0);
+                           });
+            }
+        }
+
+        // Apply Sorting
+        $sort = $request->input('sort', 'category_asc');
+        if ($sort === 'category_desc') {
+            $rulesQuery->join('expense_categories', 'expense_policy_rules.expense_category_id', '=', 'expense_categories.id')
+                       ->select('expense_policy_rules.*')
+                       ->orderBy('expense_categories.name', 'desc');
+        } elseif ($sort === 'limit_desc') {
+            $rulesQuery->orderByRaw('COALESCE(max_limit_per_claim, 0) desc');
+        } elseif ($sort === 'limit_asc') {
+            $rulesQuery->orderByRaw('COALESCE(max_limit_per_claim, 99999999) asc');
+        } else {
+            // Default category_asc
+            $rulesQuery->join('expense_categories', 'expense_policy_rules.expense_category_id', '=', 'expense_categories.id')
+                       ->select('expense_policy_rules.*')
+                       ->orderBy('expense_categories.name', 'asc');
+        }
+
+        $rules = $rulesQuery->get();
 
         $categories = ExpenseCategory::where('tenant_id', $tenantId)
             ->where('status', true)
@@ -229,10 +278,16 @@ class ExpensePolicyController extends Controller
             ->get();
 
         // Categories not yet added to this policy
-        $usedCategoryIds  = $policy->rules->pluck('expense_category_id')->toArray();
+        $usedCategoryIds  = $policy->rules()->pluck('expense_category_id')->toArray();
         $availableCategories = $categories->whereNotIn('id', $usedCategoryIds)->values();
 
-        return view('modules.hrms.expense-policy.rules', compact('policy', 'availableCategories'));
+        $filters = [
+            'search'  => $request->input('search', ''),
+            'sort'    => $sort,
+            'receipt' => $request->input('receipt', ''),
+        ];
+
+        return view('modules.hrms.expense-policy.rules', compact('policy', 'rules', 'availableCategories', 'filters'));
     }
 
     /**

@@ -129,7 +129,62 @@
                 </div>
             </div>
 
-
+            <!-- Adhoc Components Card -->
+            <div class="card-custom">
+                <div class="card-custom-header d-flex justify-content-between align-items-center py-3">
+                    <h5 class="card-custom-title mb-0 fs-14 fw-bold"><i class="feather-plus-circle text-success me-1"></i> Ad-hoc Components</h5>
+                    <button type="button" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2.5 rounded-pill fs-11" data-bs-toggle="modal" data-bs-target="#addAdhocModal">
+                        <i class="feather-plus me-1"></i> Add
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    @if(($adhocComponents ?? collect())->isEmpty())
+                        <div class="p-4 text-center text-muted">
+                            <i class="feather-alert-circle fs-24 d-block mb-2 text-secondary"></i>
+                            <div class="fs-12">No ad-hoc earnings or deductions applied.</div>
+                        </div>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 fs-12">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="py-2 px-3">Component</th>
+                                        <th class="py-2">Month</th>
+                                        <th class="py-2 px-3 text-end">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @php
+                                        $months = [
+                                            '01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr',
+                                            '05' => 'May', '06' => 'Jun', '07' => 'Jul', '08' => 'Aug',
+                                            '09' => 'Sep', '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'
+                                        ];
+                                    @endphp
+                                    @foreach($adhocComponents as $adhoc)
+                                        @php
+                                            $mParts = explode('-', $adhoc->payroll_month);
+                                            $mName = count($mParts) === 2 ? ($months[$mParts[1]] ?? $mParts[1]) . ' ' . $mParts[0] : $adhoc->payroll_month;
+                                        @endphp
+                                        <tr>
+                                            <td class="py-2 px-3">
+                                                <div class="fw-bold text-dark">{{ $adhoc->component?->name ?? 'Unknown' }}</div>
+                                                @if($adhoc->remarks)
+                                                    <small class="text-muted d-block text-truncate" style="max-width: 140px;" title="{{ $adhoc->remarks }}">{{ $adhoc->remarks }}</small>
+                                                @endif
+                                            </td>
+                                            <td class="py-2 text-muted fw-medium">{{ $mName }}</td>
+                                            <td class="py-2 px-3 text-end fw-bold {{ ($adhoc->component?->type === 'deduction') ? 'text-danger' : 'text-success' }}">
+                                                {{ ($adhoc->component?->type === 'deduction') ? '-' : '+' }}₹{{ number_format($adhoc->amount, 2) }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
         </div>
     </div>
 </div>

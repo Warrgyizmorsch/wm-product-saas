@@ -181,7 +181,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             }
         }
 
-        $adhocComponents = \App\Domains\HRMS\Models\EmployeeAdhocComponent::where('employee_id', $employee->id)->get();
+        $adhocComponents = \App\Domains\HRMS\Models\EmployeeAdhocComponent::where('employee_id', $employee->id)->with('component')->get();
         $penalties = \App\Domains\HRMS\Models\EmployeePenalty::where('employee_id', $employee->id)->get();
 
         // Initialize missing leave balances for active types in the employee's assigned leave plan
