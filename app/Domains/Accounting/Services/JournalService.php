@@ -136,6 +136,16 @@ class JournalService
     }
 
     /**
+     * Cumulative account balances since inception, up to and including
+     * $asOfDate — the basis for a Balance Sheet (point-in-time), unlike
+     * trialBalance() which is scoped to one period's movements.
+     */
+    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection
+    {
+        return $this->journals->balancesAsOf($tenantId, $asOfDate);
+    }
+
+    /**
      * @return array{opening: array{debit: float, credit: float}, entries: Collection}
      */
     public function generalLedger(int $chartOfAccountId, AccountingPeriod $period): array

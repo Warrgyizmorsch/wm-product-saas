@@ -135,4 +135,18 @@ class JournalRepository implements JournalRepositoryInterface
             'credit' => (float) ($totals->credit ?? 0),
         ];
     }
+
+    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection
+    {
+        return JournalEntry::query()
+            ->select('chart_of_account_id')
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->whereHas('journal', fn ($q) => $q
+                ->where('tenant_id', $tenantId)
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->where('journal_date', '<=', $asOfDate))
+            ->groupBy('chart_of_account_id')
+            ->with('account')
+            ->get();
+    }
 }

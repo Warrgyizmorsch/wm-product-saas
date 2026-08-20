@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\Accounting\Controllers\AccountingPeriodController;
+use App\Domains\Accounting\Controllers\BalanceSheetController;
 use App\Domains\Accounting\Controllers\ChartOfAccountController;
 use App\Domains\Accounting\Controllers\FiscalYearController;
 use App\Domains\Accounting\Controllers\GeneralLedgerController;
@@ -40,6 +41,7 @@ Route::prefix('accounting')
 
         Route::get('reports/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.trial-balance');
         Route::get('reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
+        Route::get('reports/balance-sheet', [BalanceSheetController::class, 'index'])->name('reports.balance-sheet');
 
         foreach (VoucherType::ALL as $voucherType) {
             Route::prefix("vouchers/{$voucherType}")

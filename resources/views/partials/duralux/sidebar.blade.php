@@ -172,6 +172,7 @@
                 ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index'],
                 ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
                 ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
+                ['label' => 'Balance Sheet', 'route' => 'accounting.reports.balance-sheet'],
             ]],
             ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],
