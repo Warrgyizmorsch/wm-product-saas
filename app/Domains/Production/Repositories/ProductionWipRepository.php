@@ -127,6 +127,7 @@ class ProductionWipRepository implements ProductionWipRepositoryInterface
             'hold_count' => (int) ($summary->hold_count ?? 0),
             'rework_count' => (int) ($summary->rework_count ?? 0),
             'completed_count' => (int) ($summary->completed_count ?? 0),
+            'subcontract_count' => ProductionWip::where('tenant_id', $tenantId)->whereHas('currentRoutingOperation', fn($op) => $op->where('is_external', true))->count(),
         ];
     }
 }

@@ -115,7 +115,7 @@
                             <h6 class="fw-bold text-primary mb-3">{{ __('purchase.dates_options') }}</h6>
 
                             <x-ui.odoo-form-ui type="input" label="{{ __('purchase.order_date') }}" name="date" inputType="date" :value="old('date', date('Y-m-d'))" required="true" />
-                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.delivery_date') }}" name="delivery_date" inputType="date" :value="old('delivery_date')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.delivery_date') }}" name="delivery_date" id="deliveryDateInput" inputType="date" :value="old('delivery_date', $prefilledExpectedDate ?? '')" />
 
                             <x-ui.odoo-form-ui type="select" label="{{ __('purchase.discount_option') }}" name="discount_type" id="discountTypeSelect" required="true">
                                 <option value="without_discount" @selected(old('discount_type') === 'without_discount')>{{ __('purchase.without_discount') }}</option>
@@ -745,6 +745,9 @@
                     data: { requisition_id: prId },
                     success: function(res) {
                         if (res.success && res.items.length > 0) {
+                            if (res.expected_date) {
+                                $('#deliveryDateInput').val(res.expected_date);
+                            }
                             if (res.items[0] && res.items[0].warehouse_name && res.items[0].warehouse_name !== '—') {
                                 $('#locationSelect').val(res.items[0].warehouse_name).trigger('change');
                             }

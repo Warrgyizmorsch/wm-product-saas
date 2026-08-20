@@ -88,7 +88,7 @@ class ProductExport implements FromCollection, WithHeadings, WithMapping
             $attributesStr,
             $product->type,
             $product->item_type,
-            $product->supplier_method ?? 'buy',
+            in_array(strtolower($product->supplier_method ?? ''), ['buy', 'trade'], true) || empty($product->supplier_method) ? 'trade' : $product->supplier_method,
             $product->uom?->name ?? $product->uom?->code ?? 'PCS',
             $product->selling_price,
             $product->cost_price,

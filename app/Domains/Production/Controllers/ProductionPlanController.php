@@ -350,6 +350,10 @@ class ProductionPlanController extends Controller
         $productId = $request->input('product_id');
         $tenantId = require_tenant_id();
 
+        $product = Product::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->find($productId);
+
         $boms = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('product_id', $productId)
@@ -365,6 +369,7 @@ class ProductionPlanController extends Controller
         return response()->json([
             'boms' => $boms,
             'routings' => $routings,
+            'default_production_model' => $product?->default_production_model ?? 'pure_manufacturing',
         ]);
     }
 

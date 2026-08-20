@@ -50,6 +50,46 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             ->toArray();
     }
 
+    public function getSubcontractDashboardMetrics(int $tenantId): array
+    {
+        $awaitingPr = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('is_external', true)
+            ->where('status', 'ready')
+            ->count();
+
+        $atVendor = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('is_external', true)
+            ->whereIn('status', ['in_process', 'sent_to_vendor'])
+            ->count();
+
+        $vendorDelayed = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('is_external', true)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereNotNull('actual_start_time')
+            ->whereDate('actual_start_time', '<', now()->subDays(3))
+            ->count();
+
+        $qcPending = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('is_external', true)
+            ->where('status', 'subcontract_qc_pending')
+            ->count();
+
+        $vendorRework = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $tenantId)
+            ->where('status', 'pending')
+            ->whereHas('operation', function ($q) {
+                $q->where('is_external', true);
+            })
+            ->count();
+
+        return [
+            'awaiting_subcontract_pr' => $awaitingPr,
+            'at_vendor' => $atVendor,
+            'vendor_delayed' => $vendorDelayed,
+            'subcontract_qc_pending' => $qcPending,
+            'vendor_rework' => $vendorRework,
+        ];
+    }
+
     public function find(int $id): ?ProductionOrder
     {
         return ProductionOrder::find($id);
@@ -67,6 +107,10 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             'closer',
             'operations.workCenter',
             'operations.machine',
+            'operations.vendor',
+            'operations.subcontractServiceProduct',
+            'operations.purchaseOrder',
+            'operations.purchaseOrderItem',
             'operations.scheduleOperation',
             'operations.operatorAssignments.user',
             'reservations.product',

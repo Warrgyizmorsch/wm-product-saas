@@ -86,11 +86,6 @@
             <span class="badge bg-primary text-white px-2.5 py-1.5 fs-11 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
                 <i class="feather-git-commit me-1"></i> {{ __('production.mfg_flow') }}
             </span>
-            <span class="text-muted fs-12 fw-medium d-none d-md-inline-block">
-                @foreach($steps as $idx => $st)
-                    {{ $st['name'] }}@if(!$loop->last) <i class="feather-arrow-right fs-10 mx-1"></i> @endif
-                @endforeach
-            </span>
         </div>
 
         <div class="d-flex align-items-center gap-2 ms-auto">

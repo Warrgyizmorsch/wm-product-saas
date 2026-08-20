@@ -109,7 +109,7 @@ class QualityInspectionService
                 'quality_plan_id' => $planId,
                 'inspection_number' => 'INSP-OP-' . date('Ymd') . '-' . rand(1000, 9999),
                 'stage' => $data['stage'] ?? 'in_process',
-                'status' => 'approved',
+                'status' => ($result === 'pending') ? 'submitted' : 'approved',
                 'result' => $result,
                 'production_order_id' => $orderId,
                 'production_order_operation_id' => $orderOpId,
@@ -214,6 +214,11 @@ class QualityInspectionService
                 throw new \InvalidArgumentException('Only submitted inspections can be approved.');
             }
 
+            $user = \App\Models\User::find($userId);
+            if ($user && !empty($user->role) && !in_array($user->role, ['admin', 'super_admin', 'production_manager', 'quality_inspector', 'quality_manager'], true)) {
+                throw new \InvalidArgumentException("User #{$userId} with role '{$user->role}' is not authorized to approve quality inspections.");
+            }
+
             $newResult = ($inspection->result === 'failed') ? 'failed' : 'passed';
 
             $inspection->update([
@@ -238,6 +243,11 @@ class QualityInspectionService
             // Auto NCR creation if failed
             if ($newResult === 'failed') {
                 $this->ncrService->createAutoNcr($inspection->id);
+            }
+
+            // Handle subcontract operation QC disposition
+            if ($inspection->production_order_operation_id) {
+                app(SubcontractReceiptOrchestrator::class)->processQcApproval($inspection);
             }
 
             // If inspection passed, clear quarantine status on receipts and transfer stock from Quarantine Warehouse to Main FG Warehouse

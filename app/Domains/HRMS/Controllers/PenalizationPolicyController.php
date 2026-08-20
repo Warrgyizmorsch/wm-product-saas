@@ -7,7 +7,6 @@ use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\LeaveType;
 use App\Domains\HRMS\Models\AttendancePenalty;
 use Illuminate\Http\Request;
-
 use App\Models\Tenant;
 
 class PenalizationPolicyController extends Controller
@@ -50,7 +49,10 @@ class PenalizationPolicyController extends Controller
             }
         }
 
-        return view('modules.hrms.penalization-policy.index', compact('companies', 'leaveTypes', 'rules', 'selectedType', 'businessUnits', 'branches', 'attendanceRules', 'tenantSettings'));
+        return view('modules.hrms.penalization-policy.index', compact(
+            'companies', 'leaveTypes', 'rules', 'selectedType',
+            'businessUnits', 'branches', 'attendanceRules', 'tenantSettings'
+        ));
     }
 
     public function store(Request $request)

@@ -292,7 +292,7 @@
                             <tbody class="text-dark">
                                 @foreach ($delivery->items as $item)
                                     @php
-                                        $method      = strtolower($item->product?->supplier_method ?? 'buy');
+                                        $method      = strtolower($item->product?->supplier_method ?? 'trade');
                                         $isService   = $item->product?->item_type === 'Service';
                                         $orderedQty    = (float)($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
                                         $reservedQty   = (float)$item->quantity_reserved;
@@ -336,7 +336,7 @@
                                                 </x-ui.badge>
                                             @else
                                                 <x-ui.badge :soft="true" variant="success" class="fs-11 px-2 py-1 fw-bold">
-                                                    <i class="feather-shopping-cart me-1"></i>Buy
+                                                    <i class="feather-shopping-cart me-1"></i>Trade
                                                 </x-ui.badge>
                                             @endif
                                         </td>
@@ -404,7 +404,7 @@
                                                             ><i class="feather-archive me-1"></i>Reserve</button>
                                                         </div>
 
-                                                        @if ($method === 'buy')
+                                                        @if ($method === 'buy' || $method === 'trade')
                                                             @php
                                                                 $prRaised = (float)($item->quantity_pr_raised ?? 0);
                                                                 $remainingPrQty = $item->remaining_pr_qty;
@@ -475,7 +475,7 @@
     {{-- ============================================================ --}}
     @foreach ($delivery->items as $item)
         @php
-            $method       = strtolower($item->product?->supplier_method ?? 'buy');
+            $method       = strtolower($item->product?->supplier_method ?? 'trade');
             $isService    = $item->product?->item_type === 'Service';
             $orderedQty   = (float)($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
             $reservedQty  = (float)$item->quantity_reserved;
@@ -485,7 +485,7 @@
             $shortageQty  = max(0, $pendingQty - $availableQty);
         @endphp
 
-        @if (($method === 'buy' || $method === 'manufacture') && $pendingQty > 0)
+        @if (($method === 'buy' || $method === 'trade' || $method === 'manufacture') && $pendingQty > 0)
 
             {{-- Reserve Stock Modal --}}
             <x-ui.modal
@@ -582,7 +582,7 @@
                 $remainingPrQty = $item->remaining_pr_qty;
             @endphp
 
-            @if ($method === 'buy' && $item->status !== 'Waiting Purchase' && $remainingPrQty > 0)
+            @if (($method === 'buy' || $method === 'trade') && $item->status !== 'Waiting Purchase' && $remainingPrQty > 0)
                 {{-- Create Indent Modal --}}
                 <x-ui.modal
                     id="indentModal-{{ $item->id }}"
@@ -651,6 +651,14 @@
                                     @endforeach
                                 </select>
                                 <div class="text-muted fs-11 mt-1">Select the target warehouse for procurement.</div>
+                            </div>
+                        </div>
+
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label">Expected Date</label>
+                            <div class="flex-grow-1">
+                                <input type="date" class="odoo-form-control" name="expected_date">
+                                <div class="text-muted fs-11 mt-1">Target date by which required items should arrive.</div>
                             </div>
                         </div>
 

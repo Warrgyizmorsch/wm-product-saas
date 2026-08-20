@@ -130,9 +130,24 @@
                                     <input type="checkbox" class="form-check-input">
                                 </td>
                                 <td>
+                                    @php
+                                        $isSubcontractTransfer = ($transfer->toWarehouse?->type === 'subcontractor') || str_contains($transfer->notes ?? '', 'Subcontract') || str_contains($transfer->notes ?? '', 'MO-');
+                                        $isWipDispatch = $isSubcontractTransfer && (str_contains($transfer->notes ?? '', 'WIP') || str_contains($transfer->notes ?? '', 'Op'));
+                                    @endphp
                                     <a href="{{ route('inventory.transfers.show', $transfer->id) }}" class="fw-bold text-primary text-decoration-none">
                                         <i class="feather-box text-primary me-1 fs-12"></i>{{ $transfer->transfer_number }}
                                     </a>
+                                    @if($isSubcontractTransfer)
+                                        @if($isWipDispatch)
+                                            <span class="badge bg-soft-warning text-dark border border-warning px-1.5 py-0.5 fs-10 fw-bold d-block mt-1">
+                                                <i class="feather-truck me-1"></i>Subcontract WIP Dispatch
+                                            </span>
+                                        @else
+                                            <span class="badge bg-soft-info text-info border border-info px-1.5 py-0.5 fs-10 fw-bold d-block mt-1">
+                                                <i class="feather-box me-1"></i>Subcontract Material Dispatch
+                                            </span>
+                                        @endif
+                                    @endif
                                 </td>
                                 <td>
                                     <span class="fw-semibold text-dark fs-12">

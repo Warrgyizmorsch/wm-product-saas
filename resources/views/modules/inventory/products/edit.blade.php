@@ -158,6 +158,13 @@
                                 <option value="service" {{ $product->type === 'service' ? 'selected' : '' }}>Service</option>
                             </x-ui.odoo-form-ui>
 
+                            <x-ui.odoo-form-ui type="select" label="Default Production Model" name="default_production_model" :errorText="$errors->first('default_production_model')">
+                                <option value="pure_manufacturing" {{ old('default_production_model', $product->default_production_model ?? 'pure_manufacturing') === 'pure_manufacturing' ? 'selected' : '' }}>Pure Manufacturing</option>
+                                <option value="subcontract_complete" {{ old('default_production_model', $product->default_production_model) === 'subcontract_complete' ? 'selected' : '' }}>Complete Subcontracting</option>
+                                <option value="subcontract_company_material" {{ old('default_production_model', $product->default_production_model) === 'subcontract_company_material' ? 'selected' : '' }}>Subcontracting with Company Material</option>
+                                <option value="hybrid" {{ old('default_production_model', $product->default_production_model) === 'hybrid' ? 'selected' : '' }}>Hybrid Manufacturing + Subcontracting</option>
+                            </x-ui.odoo-form-ui>
+
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.status')" name="status" required="true">
                                 <option value="active" {{ $product->status === 'active' ? 'selected' : '' }}>Active</option>
                                 <option value="inactive" {{ $product->status === 'inactive' ? 'selected' : '' }}>Inactive</option>

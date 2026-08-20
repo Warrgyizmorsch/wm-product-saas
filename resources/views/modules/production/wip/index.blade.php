@@ -66,6 +66,12 @@
                     </div>
                 </div>
                 <div class="col">
+                    <div class="bg-soft-warning border rounded p-3 text-center">
+                        <span class="text-warning fs-11 text-uppercase fw-bold">At Vendor (Subcontract)</span>
+                        <h4 class="text-dark fw-bold mt-1 mb-0">{{ number_format($wipSummary['subcontract_count'] ?? 0) }}</h4>
+                    </div>
+                </div>
+                <div class="col">
                     <div class="bg-soft-success border rounded p-3 text-center">
                         <span class="text-success fs-11 text-uppercase fw-bold">Completed</span>
                         <h4 class="text-success fw-bold mt-1 mb-0">{{ number_format($wipSummary['completed_count']) }}</h4>

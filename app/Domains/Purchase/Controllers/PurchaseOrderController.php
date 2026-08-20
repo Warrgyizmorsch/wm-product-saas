@@ -146,6 +146,12 @@ class PurchaseOrderController extends Controller
             $prefilledItems = array_values($mergedItems);
         }
 
+        $prefilledExpectedDate = null;
+        if ($selectedRequisitionId) {
+            $selectedReq = PurchaseRequisition::find($selectedRequisitionId);
+            $prefilledExpectedDate = $selectedReq?->expected_date ? $selectedReq->expected_date->format('Y-m-d') : null;
+        }
+
         return view('modules.purchase.orders.create', compact(
             'vendors',
             'products',
@@ -153,7 +159,8 @@ class PurchaseOrderController extends Controller
             'requisitions',
             'selectedRequisitionId',
             'requisitionItemIds',
-            'prefilledItems'
+            'prefilledItems',
+            'prefilledExpectedDate'
         ));
     }
 
@@ -359,7 +366,46 @@ class PurchaseOrderController extends Controller
 
         return response()->json([
             'success' => true,
+            'requisition_number' => $requisition->requisition_number,
+            'expected_date' => $requisition->expected_date ? $requisition->expected_date->format('Y-m-d') : null,
             'items' => $items,
         ]);
+    }
+
+    public function remind(Request $request, int $id)
+    {
+        $order = $this->orderRepo->find($id);
+        if (!$order) abort(404);
+
+        if ($order->status !== 'Draft') {
+            return redirect()->back()->with('error', 'Reminders can only be sent for pending Purchase Orders.');
+        }
+
+        if ($order->last_reminded_at && $order->last_reminded_at->diffInSeconds(now()) < 900) {
+            $secondsLeft = 900 - $order->last_reminded_at->diffInSeconds(now());
+            if ($secondsLeft >= 60) {
+                $mins = (int)ceil($secondsLeft / 60);
+                $timeStr = "{$mins} minute" . ($mins > 1 ? 's' : '');
+            } else {
+                $secs = max(1, (int)$secondsLeft);
+                $timeStr = "{$secs} second" . ($secs > 1 ? 's' : '');
+            }
+            return redirect()->back()->with('error', "Reminder already sent recently! Please wait {$timeStr} before sending another reminder.");
+        }
+
+        $note = $request->input('note');
+
+        \App\Domains\Purchase\Models\ApprovalReminder::create([
+            'tenant_id' => require_tenant_id(),
+            'remindable_type' => get_class($order),
+            'remindable_id' => $order->id,
+            'user_id' => auth()->id(),
+            'note' => $note,
+        ]);
+
+        $order->increment('reminder_count');
+        $order->update(['last_reminded_at' => now()]);
+
+        return redirect()->back()->with('success', "Quick reminder successfully sent to approvers for PO #{$order->purchase_order_number}!");
     }
 }

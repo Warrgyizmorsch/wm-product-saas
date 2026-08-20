@@ -83,12 +83,11 @@
                     <h6 class="fw-bold text-primary mb-3"><i class="feather-grid me-2"></i>Deal Classification</h6>
 
                     <x-ui.odoo-form-ui type="select" label="Pipeline Stage *" name="stage" required="true">
-                        <option value="Qualification" selected>Qualification (20%)</option>
-                        <option value="Needs Analysis">Needs Analysis (40%)</option>
-                        <option value="Proposal">Proposal Sent (60%)</option>
-                        <option value="Negotiation">Negotiation (80%)</option>
-                        <option value="Closed Won">Closed Won (100%)</option>
-                        <option value="Closed Lost">Closed Lost (0%)</option>
+                        @foreach($dealStatuses as $st)
+                            <option value="{{ $st->name }}" @selected(old('stage', $dealStatuses->first()?->name) == $st->name)>
+                                {{ $st->name }}
+                            </option>
+                        @endforeach
                     </x-ui.odoo-form-ui>
 
                     <x-ui.odoo-form-ui type="input" inputType="date" label="Expected Closing Date" name="closing_date" :value="old('closing_date')" />

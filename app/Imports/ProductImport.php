@@ -97,9 +97,9 @@ class ProductImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmp
             ? (strcasecmp($variationInput, 'Variant') === 0 ? 'Variant' : 'Single')
             : ($parentId ? 'Single' : 'Single');
 
-        // Supplier Method normalization (buy, manufacture)
+        // Supplier Method normalization (buy, trade, manufacture)
         $supplierMethodInput = strtolower(trim($row['supplier_method'] ?? ($row['supplier'] ?? ($row['sourcing_method'] ?? 'buy'))));
-        $supplierMethod = in_array($supplierMethodInput, ['buy', 'manufacture']) ? $supplierMethodInput : 'buy';
+        $supplierMethod = in_array($supplierMethodInput, ['buy', 'trade', 'manufacture']) ? $supplierMethodInput : 'buy';
         $planningType = $supplierMethod === 'manufacture' ? 'manufacture' : 'purchase';
 
         // Auto-resolve UOM / Unit

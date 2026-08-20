@@ -156,6 +156,66 @@ class ProductionCostService
     }
 
     /**
+     * Calculate subcontract cost for a ProductionOrder using authoritative cost hierarchy:
+     * Actual (Vendor Bill) -> Committed (Approved PO) -> Estimated (Routing Snapshot).
+     */
+    public function calculateSubcontractCost(\App\Domains\Production\Models\ProductionOrder $order): array
+    {
+        $tenantId = $order->tenant_id;
+        $externalOps = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('production_order_id', $order->id)
+            ->where('is_external', true)
+            ->get();
+
+        $estimatedCost = 0.0;
+        $committedCost = 0.0;
+        $actualCost = 0.0;
+
+        foreach ($externalOps as $op) {
+            $opEstimated = (float) ($op->subcontract_cost_per_unit * ($op->quantity_ordered ?: $order->quantity_ordered));
+            $estimatedCost += $opEstimated;
+
+            $poItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('purchase_order_id', function ($q) use ($tenantId, $order) {
+                $q->select('id')->from('purchase_orders')
+                    ->where('tenant_id', $tenantId)
+                    ->where('production_order_id', $order->id);
+            })->where('production_order_operation_id', $op->id)->first();
+
+            if ($poItem) {
+                $opCommitted = (float) ($poItem->total_amount ?? ($poItem->quantity * $poItem->rate));
+                $committedCost += $opCommitted;
+
+                $vendorBillItem = \Illuminate\Support\Facades\DB::table('vendor_bill_items')
+                    ->where('purchase_order_item_id', $poItem->id)
+                    ->first();
+
+                if ($vendorBillItem && isset($vendorBillItem->total_amount)) {
+                    $actualCost += (float) $vendorBillItem->total_amount;
+                } else {
+                    $actualCost += $opCommitted;
+                }
+            } else {
+                $committedCost += $opEstimated;
+                $actualCost += $opEstimated;
+            }
+        }
+
+        // Authoritative cost selection: alternatives by lifecycle stage, NOT additive!
+        $authoritativeCost = match (true) {
+            $actualCost > 0.0 => $actualCost,
+            $committedCost > 0.0 => $committedCost,
+            default => $estimatedCost,
+        };
+
+        return [
+            'estimated' => $estimatedCost,
+            'committed' => $committedCost,
+            'actual' => $actualCost,
+            'authoritative' => $authoritativeCost,
+        ];
+    }
+
+    /**
      * Calculate cost summary details.
      */
     public function calculateCost(ProductionBom $bom): array

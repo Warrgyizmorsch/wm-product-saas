@@ -106,10 +106,11 @@
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="status">
                                     <option value="">{{ __('crm.all_statuses') }}</option>
-                                    <option value="New" {{ request('status') === 'New' ? 'selected' : '' }}>{{ __('crm.statuses.New') }}</option>
-                                    <option value="Qualified" {{ request('status') === 'Qualified' ? 'selected' : '' }}>{{ __('crm.statuses.Qualified') }}</option>
-                                    <option value="Won" {{ request('status') === 'Won' ? 'selected' : '' }}>{{ __('crm.statuses.Won') }}</option>
-                                    <option value="Lost" {{ request('status') === 'Lost' ? 'selected' : '' }}>{{ __('crm.statuses.Lost') }}</option>
+                                    @foreach($leadStatuses as $ls)
+                                        <option value="{{ $ls->name }}" {{ request('status') === $ls->name ? 'selected' : '' }}>
+                                            {{ $ls->name }}
+                                        </option>
+                                    @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3">
@@ -184,22 +185,16 @@
                        class="crm-status-tab {{ $isAll ? 'active' : '' }}">
                         ALL ({{ $totalLeadsCount ?? $leads->total() }})
                     </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'New', 'duplicates_only' => null]) }}"
-                       class="crm-status-tab {{ $activeStatus === 'New' ? 'active' : '' }}">
-                        UNTOUCHED LEADS ({{ $statusCounts['New'] ?? 0 }})
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'Qualified', 'duplicates_only' => null]) }}"
-                       class="crm-status-tab {{ $activeStatus === 'Qualified' ? 'active' : '' }}">
-                        QUALIFIED ({{ $statusCounts['Qualified'] ?? 0 }})
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'Won', 'duplicates_only' => null]) }}"
-                       class="crm-status-tab {{ $activeStatus === 'Won' ? 'active' : '' }}">
-                        WON ({{ $statusCounts['Won'] ?? 0 }})
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['status' => 'Lost', 'duplicates_only' => null]) }}"
-                       class="crm-status-tab {{ $activeStatus === 'Lost' ? 'active' : '' }}">
-                        LOST ({{ $statusCounts['Lost'] ?? 0 }})
-                    </a>
+                    @foreach($leadStatuses as $ls)
+                        @php
+                            $tabLabel = strtoupper($ls->name);
+                            if ($ls->name === 'New') $tabLabel = 'UNTOUCHED LEADS';
+                        @endphp
+                        <a href="{{ request()->fullUrlWithQuery(['status' => $ls->name, 'duplicates_only' => null]) }}"
+                           class="crm-status-tab {{ $activeStatus === $ls->name ? 'active' : '' }}">
+                            {{ $tabLabel }} ({{ $statusCounts[$ls->name] ?? 0 }})
+                        </a>
+                    @endforeach
                     <a href="{{ request()->fullUrlWithQuery(['duplicates_only' => '1', 'status' => null]) }}"
                        class="crm-status-tab crm-status-tab--duplicates {{ $isDuplicatesOnly ? 'active' : '' }}">
                         <i class="feather-copy me-1 fs-11"></i>DUPLICATES ({{ $duplicatesCount ?? 0 }})
@@ -367,15 +362,19 @@
                                                 @csrf
                                                 @method('PATCH')
                                                 <select name="status" class="form-control status-select" data-select2-selector="status" onchange="this.form.submit()" style="width: 150px;">
-                                                    @foreach(['New', 'Qualified', 'Won', 'Lost'] as $statusOption)
+                                                    @foreach($leadStatuses as $ls)
                                                         @php
-                                                            $bgClass = 'bg-primary';
-                                                            if($statusOption === 'Qualified') $bgClass = 'bg-teal';
-                                                            elseif($statusOption === 'Won') $bgClass = 'bg-success';
-                                                            elseif($statusOption === 'Lost') $bgClass = 'bg-danger';
+                                                            $statusOption = $ls->name;
+                                                            $bgClass = match(strtolower($statusOption)) {
+                                                                'new' => 'bg-primary',
+                                                                'qualified' => 'bg-teal',
+                                                                'won' => 'bg-success',
+                                                                'lost' => 'bg-danger',
+                                                                default => ($ls->color ?: 'bg-primary'),
+                                                            };
                                                         @endphp
                                                         <option value="{{ $statusOption }}" data-bg="{{ $bgClass }}" {{ ($lead->status ?: 'New') === $statusOption ? 'selected' : '' }}>
-                                                            {{ __('crm.statuses.' . $statusOption) ?? $statusOption }}
+                                                            {{ $statusOption }}
                                                         </option>
                                                     @endforeach
                                                 </select>

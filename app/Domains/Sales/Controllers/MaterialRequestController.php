@@ -7,6 +7,7 @@ use App\Domains\Sales\Services\MaterialRequestService;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\ProductionRequisitionSlip;
+use App\Domains\Production\Models\ProductionRequisitionSlipItem;
 use App\Domains\Purchase\Models\PurchaseRequisitionItem;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;

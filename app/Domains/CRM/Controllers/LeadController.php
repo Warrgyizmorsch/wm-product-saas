@@ -45,6 +45,8 @@ class LeadController extends Controller
         $quotations = $this->quotationService->latest();
         $users = \App\Models\User::orderBy('name')->get();
 
+        $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses($tenantId);
+
         $statusCounts = Lead::query()
             ->where('tenant_id', $tenantId)
             ->select('status', \DB::raw('count(*) as aggregate'))
@@ -62,7 +64,7 @@ class LeadController extends Controller
         $this->duplicateService->annotateDuplicates($allTenantLeads, $tenantId);
         $duplicatesCount = $allTenantLeads->where('is_duplicate', true)->count();
 
-        return view('modules.crm.leads.index', compact('leads', 'quotations', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users'));
+        return view('modules.crm.leads.index', compact('leads', 'quotations', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users', 'leadStatuses'));
     }
 
     public function kanban(Request $request)
@@ -70,7 +72,8 @@ class LeadController extends Controller
         $this->authorize('viewAny', Lead::class);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
-        $statuses = ['Lost', 'New', 'Qualified', 'Won'];
+        $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses($tenantId);
+        $statuses = $leadStatuses->pluck('name')->toArray();
 
         $query = Lead::query()
             ->where('tenant_id', $tenantId)
@@ -380,7 +383,8 @@ class LeadController extends Controller
         $lead = new Lead();
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
-        return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
+        $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses();
+        return view('modules.crm.leads.create', compact('lead', 'users', 'products', 'leadStatuses'));
     }
 
     public function show(Lead $lead)
@@ -390,9 +394,10 @@ class LeadController extends Controller
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
         $nextQuotationNumber = $this->quotationService->getNextQuotationNumber();
+        $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses();
 
         return view('modules.crm.leads.show', array_merge(
-            compact('lead', 'users', 'products', 'nextQuotationNumber'),
+            compact('lead', 'users', 'products', 'nextQuotationNumber', 'leadStatuses'),
             $details
         ));
     }
@@ -411,7 +416,8 @@ class LeadController extends Controller
         $this->authorize('update', $lead);
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
-        return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
+        $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses();
+        return view('modules.crm.leads.create', compact('lead', 'users', 'products', 'leadStatuses'));
     }
 
     public function update(Request $request, Lead $lead)
@@ -426,7 +432,9 @@ class LeadController extends Controller
     public function updateStatus(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
-        $validated = $request->validate(['status' => 'required|string|in:New,Qualified,Won,Lost']);
+        $dbStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses()->pluck('name')->toArray();
+        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Won', 'Lost'], $dbStatuses)));
+        $validated = $request->validate(['status' => 'required|string|in:' . $allowedStatuses]);
 
         $res = $this->leadService->updateLeadStatus($lead, $validated['status']);
 

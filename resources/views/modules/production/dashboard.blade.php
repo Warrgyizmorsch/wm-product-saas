@@ -155,6 +155,48 @@
             </div>
         </div>
 
+        {{-- Subcontracting Execution KPI Row --}}
+        @if(isset($subcontractMetrics))
+            <div class="card border shadow-sm p-3 mb-4 bg-light">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h6 class="fw-bold text-dark mb-0"><i class="feather-truck text-primary me-2"></i>Multi-Model Subcontracting & Vendor Execution Metrics</h6>
+                    <span class="badge bg-soft-primary text-primary fs-11">Turnkey & Subcontract Linkage</span>
+                </div>
+                <div class="row g-3 text-center">
+                    <div class="col">
+                        <div class="p-2 bg-white rounded border">
+                            <span class="fs-11 text-muted text-uppercase fw-bold">Awaiting PR</span>
+                            <h4 class="text-dark fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['awaiting_subcontract_pr'] ?? 0) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="p-2 bg-white rounded border border-warning">
+                            <span class="fs-11 text-warning text-uppercase fw-bold">At Vendor</span>
+                            <h4 class="text-warning fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['at_vendor']) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="p-2 bg-white rounded border border-danger">
+                            <span class="fs-11 text-danger text-uppercase fw-bold">Vendor Delayed</span>
+                            <h4 class="text-danger fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['vendor_delayed']) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="p-2 bg-white rounded border border-info">
+                            <span class="fs-11 text-info text-uppercase fw-bold">QC Pending</span>
+                            <h4 class="text-info fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['subcontract_qc_pending']) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="p-2 bg-white rounded border border-secondary">
+                            <span class="fs-11 text-secondary text-uppercase fw-bold">Vendor Rework</span>
+                            <h4 class="text-secondary fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['vendor_rework']) }}</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- ── 2. Production Alert Banners (Fully Issued, Partially Issued, Pending Store Request) ── --}}
         @if($fullyIssuedCount > 0)
             @php

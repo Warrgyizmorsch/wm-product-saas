@@ -51,6 +51,7 @@ class PurchaseRequisitionService
                 'tenant_id' => $tenantId,
                 'requisition_number' => $requisitionNumber,
                 'requisition_date' => $validated['requisition_date'],
+                'expected_date' => $validated['expected_date'] ?? null,
                 'status' => 'Draft',
                 'source_type' => $validated['source_type'],
                 'source_id' => $sourceId,
@@ -89,6 +90,7 @@ class PurchaseRequisitionService
         return DB::transaction(function () use ($validated, $sourceId, $requisition) {
             $requisition->update([
                 'requisition_date' => $validated['requisition_date'],
+                'expected_date' => $validated['expected_date'] ?? null,
                 'source_type' => $validated['source_type'],
                 'source_id' => $sourceId,
                 'requisition_slip_number' => $validated['requisition_slip_number'] ?? null,
@@ -198,14 +200,24 @@ class PurchaseRequisitionService
                     $defaultWarehouse = Warehouse::find($firstPrItem->warehouse_id);
                     $locationName = $defaultWarehouse?->name ?: '';
 
+                    $isSubcontract = false;
+                    $moId = null;
+                    if ($firstPrItem->requisition && $firstPrItem->requisition->source_type === 'mo') {
+                        $isSubcontract = true;
+                        $moId = $firstPrItem->requisition->source_id;
+                    }
+
                     $po = PurchaseOrder::create([
                         'tenant_id' => $tenantId,
                         'purchase_order_number' => $poNumber,
                         'purchase_requisition_id' => $firstPrItem->purchase_requisition_id,
                         'source_type' => 'requisition',
+                        'is_subcontract' => $isSubcontract,
+                        'production_order_id' => $moId,
                         'vendor_id' => $vendorId,
                         'location' => $locationName,
                         'date' => now()->toDateString(),
+                        'delivery_date' => $firstPrItem->requisition?->expected_date?->format('Y-m-d'),
                         'discount_type' => 'without_discount',
                         'tax_type' => 'order_wise_tax',
                         'gst_type' => 'cgst_sgst',
@@ -232,6 +244,7 @@ class PurchaseRequisitionService
                         PurchaseOrderItem::create([
                             'purchase_order_id' => $po->id,
                             'product_id' => $item->product_id,
+                            'production_order_id' => $moId,
                             'requisition_item_allocations' => [
                                 [
                                     'pr_item_id' => $item->id,

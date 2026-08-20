@@ -54,6 +54,10 @@ class GoodsReceiptNoteService
 
                 $orderedQty = (float) $poItem->quantity;
                 $prevReceived = (float) ($poItem->received_qty ?? 0.0);
+
+                if (($prevReceived + $qtyReceived) > $orderedQty + 0.0001) {
+                    throw new \InvalidArgumentException("Cannot receive {$qtyReceived} units. Total received would exceed ordered quantity {$orderedQty}.");
+                }
                 $remainingQty = max(0.0, $orderedQty - ($prevReceived + $qtyReceived));
                 $unitRate = (float) ($poItem->rate ?? $poItem->unit_price ?? 0.00);
                 $totalAmount = round($qtyAccepted * $unitRate, 2);
@@ -74,6 +78,9 @@ class GoodsReceiptNoteService
                     'goods_receipt_note_id'  => $grn->id,
                     'purchase_order_item_id' => $poItem->id,
                     'product_id'             => $poItem->product_id,
+                    'production_order_id'           => $poItem->production_order_id ?? $po?->production_order_id,
+                    'production_order_operation_id' => $poItem->production_order_operation_id,
+                    'production_batch_id'           => $poItem->production_batch_id,
                     'ordered_qty'            => $orderedQty,
                     'previous_received_qty'  => $prevReceived,
                     'received_qty'           => $qtyReceived,
@@ -152,11 +159,18 @@ class GoodsReceiptNoteService
                 }
 
                 if ($allReceived) {
-                    $po->update(['status' => 'Completed']);
+                    $po->update([
+                        'status' => 'Completed',
+                        'completed_at' => now(),
+                    ]);
                 } elseif ($partiallyReceived) {
                     $po->update(['status' => 'Partially Received']);
                 }
             }
+
+            DB::afterCommit(function () use ($grn) {
+                event(new \App\Domains\Purchase\Events\GoodsReceiptNoteApproved($grn));
+            });
 
             return $grn;
         });
