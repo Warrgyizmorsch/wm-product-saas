@@ -74,6 +74,7 @@
                 ['label' => 'Pending Bills', 'route' => 'purchase.bills.pending'],
                 ['label' => __('purchase.vendor_bills'), 'route' => 'purchase.bills.index'],
                 ['label' => __('purchase.vendor_payments'), 'route' => 'purchase.payments.index'],
+                ['label' => 'Purchase Returns', 'route' => 'purchase.returns.index'],
             ]],
             ['label' => 'GRN (Goods Receipts)', 'icon' => 'feather-package', 'url' => '#', 'children' => [
                 ['label' => __('purchase.pending_grns'), 'route' => 'grns.pending'],
@@ -162,6 +163,11 @@
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
                 ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
                 ['label' => 'Journals', 'route' => 'accounting.journals.index'],
+                ['label' => 'Payment Vouchers', 'route' => 'accounting.vouchers.payment.index'],
+                ['label' => 'Receipt Vouchers', 'route' => 'accounting.vouchers.receipt.index'],
+                ['label' => 'Contra Vouchers', 'route' => 'accounting.vouchers.contra.index'],
+                ['label' => 'Credit Notes', 'route' => 'accounting.vouchers.credit_note.index'],
+                ['label' => 'Debit Notes', 'route' => 'accounting.vouchers.debit_note.index'],
                 ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index'],
                 ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index'],
                 ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],

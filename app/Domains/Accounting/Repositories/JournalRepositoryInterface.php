@@ -16,7 +16,7 @@ interface JournalRepositoryInterface
 
     public function findByReference(string $referenceType, int $referenceId): Collection;
 
-    public function nextJournalNumber(int $tenantId): string;
+    public function nextJournalNumber(int $tenantId, string $prefix = 'JNL'): string;
 
     public function create(array $data): Journal;
 

@@ -49,9 +49,11 @@ class ChartOfAccountController extends Controller
             'parent_id' => ['nullable', 'integer', 'exists:chart_of_accounts,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
+            'is_cash_or_bank' => ['nullable', 'boolean'],
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
+        $validated['is_cash_or_bank'] = $request->boolean('is_cash_or_bank');
         $validated['created_by'] = auth()->id();
 
         try {
@@ -77,9 +79,11 @@ class ChartOfAccountController extends Controller
             'parent_id' => ['nullable', 'integer', 'exists:chart_of_accounts,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
+            'is_cash_or_bank' => ['nullable', 'boolean'],
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
+        $validated['is_cash_or_bank'] = $request->boolean('is_cash_or_bank');
 
         try {
             $this->accounts->update($account->id, $validated);

@@ -87,7 +87,8 @@
                                     data-parent-id="{{ $account->parent_id }}"
                                     data-description="{{ $account->description }}"
                                     data-is-active="{{ $account->is_active ? '1' : '0' }}"
-                                    data-is-system="{{ $account->is_system ? '1' : '0' }}" />
+                                    data-is-system="{{ $account->is_system ? '1' : '0' }}"
+                                    data-is-cash-or-bank="{{ $account->is_cash_or_bank ? '1' : '0' }}" />
                             @can('delete', $account)
                                 <form action="{{ route('accounting.chart-of-accounts.destroy', $account) }}" method="POST" class="d-inline">
                                     @csrf
@@ -172,10 +173,13 @@
         <x-ui.textarea label="Description" name="description" id="coaDescription" rows="2" :value="old('description', $editingAccount?->description)" />
 
         <div class="row">
-            <div class="col-md-4"></div>
-            <div class="col-md-8">
+            <div class="col-md-6">
                 <input type="hidden" name="is_active" value="0">
                 <x-ui.checkbox label="Active" name="is_active" id="coaIsActive" :checked="old('is_active', $editingAccount?->is_active ?? true)" />
+            </div>
+            <div class="col-md-6">
+                <input type="hidden" name="is_cash_or_bank" value="0">
+                <x-ui.checkbox label="Cash / Bank Account" name="is_cash_or_bank" id="coaIsCashOrBank" :checked="old('is_cash_or_bank', $editingAccount?->is_cash_or_bank ?? false)" />
             </div>
         </div>
     </x-ui.modal>
@@ -228,6 +232,7 @@
                 $('#coaParentId').val(data.parentId || '');
                 $('#coaDescription').val(data.description);
                 $('#coaIsActive').prop('checked', data.isActive === '1');
+                $('#coaIsCashOrBank').prop('checked', data.isCashOrBank === '1');
                 $('#coaSystemNotice').toggle(data.isSystem === '1');
             });
 

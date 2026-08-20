@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -25,6 +26,14 @@ class Journal extends BaseModel
     public const SOURCE_PRODUCTION = 'production';
     public const SOURCE_PAYROLL = 'payroll';
 
+    // What kind of accounting document this journal represents — orthogonal to
+    // `source` (which module triggered it). Null means a plain manual journal.
+    public const VOUCHER_TYPE_PAYMENT = 'payment';
+    public const VOUCHER_TYPE_RECEIPT = 'receipt';
+    public const VOUCHER_TYPE_CONTRA = 'contra';
+    public const VOUCHER_TYPE_CREDIT_NOTE = 'credit_note';
+    public const VOUCHER_TYPE_DEBIT_NOTE = 'debit_note';
+
     protected $table = 'journals';
 
     protected $fillable = [
@@ -33,6 +42,7 @@ class Journal extends BaseModel
         'journal_number',
         'journal_date',
         'source',
+        'voucher_type',
         'reference_type',
         'reference_id',
         'memo',
@@ -64,6 +74,11 @@ class Journal extends BaseModel
     public function reversedJournal(): BelongsTo
     {
         return $this->belongsTo(self::class, 'reversed_journal_id');
+    }
+
+    public function voucherDetail(): HasOne
+    {
+        return $this->hasOne(VoucherDetail::class, 'journal_id');
     }
 
     /**

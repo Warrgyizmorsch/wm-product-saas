@@ -46,10 +46,10 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call([
-            RbacSeeder::class,
-            InventoryMasterDemoSeeder::class,
-            PoonaRadiatorsProductSeeder::class,
-            PoonaRadiatorsProductionSeeder::class,
+            // RbacSeeder::class,
+            // InventoryMasterDemoSeeder::class,
+            // PoonaRadiatorsProductSeeder::class,
+            // PoonaRadiatorsProductionSeeder::class,
             // HrmsDemoSeeder::class,
             AccountingChartOfAccountsSeeder::class,
         ]);

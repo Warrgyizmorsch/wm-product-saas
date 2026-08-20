@@ -9,6 +9,7 @@ use App\Domains\Purchase\Models\GoodsReceiptNote;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Purchase\Events\BillPosted;
 use Illuminate\Http\Request;
 
 class VendorBillController extends Controller
@@ -129,6 +130,8 @@ class VendorBillController extends Controller
         }
 
         $bill = $this->billService->storeBill($validated, $tenantId);
+
+        event(new BillPosted($bill));
 
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Vendor Bill {$bill->bill_number} created successfully.");

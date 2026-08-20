@@ -8,6 +8,7 @@ use App\Domains\Purchase\Controllers\GoodsReceiptNoteController;
 use App\Domains\Purchase\Controllers\PurchaseAdvancePaymentController;
 use App\Domains\Purchase\Controllers\VendorBillController;
 use App\Domains\Purchase\Controllers\VendorPaymentController;
+use App\Domains\Purchase\Controllers\PurchaseReturnController;
 
 use App\Domains\Purchase\Controllers\LandedCostController;
 
@@ -56,6 +57,12 @@ Route::prefix('purchase')
         Route::resource('payments', VendorPaymentController::class);
         Route::resource('advances', PurchaseAdvancePaymentController::class);
         Route::resource('advance-payments', PurchaseAdvancePaymentController::class);
+
+        Route::get('returns', [PurchaseReturnController::class, 'index'])->name('returns.index');
+        Route::get('returns/create', [PurchaseReturnController::class, 'create'])->name('returns.create');
+        Route::post('returns', [PurchaseReturnController::class, 'store'])->name('returns.store');
+        Route::get('returns/{return}', [PurchaseReturnController::class, 'show'])->name('returns.show');
+        Route::post('returns/{return}/approve', [PurchaseReturnController::class, 'approve'])->name('returns.approve');
     });
 
 // Standalone Top-Level GRN Routes (/grns/...)

@@ -95,6 +95,7 @@ class ChartOfAccount extends BaseModel
         'type',
         'subtype',
         'normal_balance',
+        'is_cash_or_bank',
         'parent_id',
         'description',
         'is_system',
@@ -105,6 +106,7 @@ class ChartOfAccount extends BaseModel
     protected $casts = [
         'is_system' => 'boolean',
         'is_active' => 'boolean',
+        'is_cash_or_bank' => 'boolean',
         'parent_id' => 'integer',
     ];
 
@@ -139,6 +141,11 @@ class ChartOfAccount extends BaseModel
     public function scopeActive(Builder $query): void
     {
         $query->where('is_active', true);
+    }
+
+    public function scopeCashOrBank(Builder $query): void
+    {
+        $query->where('is_cash_or_bank', true);
     }
 
     public function scopeOfType(Builder $query, string $type): void
