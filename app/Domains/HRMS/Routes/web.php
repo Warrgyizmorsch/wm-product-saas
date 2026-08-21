@@ -353,13 +353,16 @@ Route::prefix('hrms')
             // Cash Advances
             Route::post('/advance/store', [TravelExpenseController::class, 'storeCashAdvance'])->name('travel-expense.advance.store');
             Route::post('/advance/{cashAdvance}/approve', [TravelExpenseController::class, 'approveCashAdvance'])->name('travel-expense.advance.approve');
+            Route::post('/advance/{cashAdvance}/disburse', [TravelExpenseController::class, 'disburseCashAdvance'])->name('travel-expense.advance.disburse');
             Route::post('/advance/{cashAdvance}/reject', [TravelExpenseController::class, 'rejectCashAdvance'])->name('travel-expense.advance.reject');
             
             // Expense Reports
             Route::post('/report/store', [TravelExpenseController::class, 'storeExpenseReport'])->name('travel-expense.report.store');
+            Route::post('/report/{expenseReport}/update', [TravelExpenseController::class, 'updateExpenseReport'])->name('travel-expense.report.update');
             Route::post('/report/{expenseReport}/submit', [TravelExpenseController::class, 'submitExpenseReport'])->name('travel-expense.report.submit');
             Route::post('/report/{expenseReport}/approve', [TravelExpenseController::class, 'approveExpenseReport'])->name('travel-expense.report.approve');
             Route::post('/report/{expenseReport}/reject', [TravelExpenseController::class, 'rejectExpenseReport'])->name('travel-expense.report.reject');
             Route::post('/report/{expenseReport}/pay', [TravelExpenseController::class, 'payExpenseReport'])->name('travel-expense.report.pay');
+            Route::get('/employee-policy/{employee}', [TravelExpenseController::class, 'getEmployeePolicy'])->name('travel-expense.employee-policy');
         });
     });

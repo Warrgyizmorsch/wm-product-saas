@@ -14,12 +14,14 @@ class CashAdvance extends BaseModel
         'travel_request_id',
         'expense_report_id',
         'amount',
+        'approved_amount',
         'purpose',
         'status',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'approved_amount' => 'decimal:2',
     ];
 
     /**

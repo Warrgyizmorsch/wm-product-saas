@@ -16,13 +16,18 @@ class ExpenseReport extends BaseModel
         'total_amount',
         'advance_adjusted',
         'net_reimbursement',
+        'approved_amount',
+        'approved_net_reimbursement',
         'status',
+        'payout_channel',
     ];
 
     protected $casts = [
         'total_amount' => 'decimal:2',
         'advance_adjusted' => 'decimal:2',
         'net_reimbursement' => 'decimal:2',
+        'approved_amount' => 'decimal:2',
+        'approved_net_reimbursement' => 'decimal:2',
     ];
 
     /**
