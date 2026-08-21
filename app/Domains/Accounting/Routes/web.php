@@ -1,12 +1,15 @@
 <?php
 
 use App\Domains\Accounting\Controllers\AccountingPeriodController;
+use App\Domains\Accounting\Controllers\BalanceSheetController;
 use App\Domains\Accounting\Controllers\ChartOfAccountController;
 use App\Domains\Accounting\Controllers\FiscalYearController;
 use App\Domains\Accounting\Controllers\GeneralLedgerController;
 use App\Domains\Accounting\Controllers\JournalController;
 use App\Domains\Accounting\Controllers\TaxRateController;
 use App\Domains\Accounting\Controllers\TrialBalanceController;
+use App\Domains\Accounting\Controllers\VoucherController;
+use App\Domains\Accounting\Support\VoucherType;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('accounting')
@@ -38,4 +41,17 @@ Route::prefix('accounting')
 
         Route::get('reports/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.trial-balance');
         Route::get('reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
+        Route::get('reports/balance-sheet', [BalanceSheetController::class, 'index'])->name('reports.balance-sheet');
+
+        foreach (VoucherType::ALL as $voucherType) {
+            Route::prefix("vouchers/{$voucherType}")
+                ->as("vouchers.{$voucherType}.")
+                ->group(function () use ($voucherType): void {
+                    Route::get('/', [VoucherController::class, 'index'])->name('index')->defaults('type', $voucherType);
+                    Route::get('/create', [VoucherController::class, 'create'])->name('create')->defaults('type', $voucherType);
+                    Route::post('/', [VoucherController::class, 'store'])->name('store')->defaults('type', $voucherType);
+                    Route::get('/{journal}', [VoucherController::class, 'show'])->name('show')->defaults('type', $voucherType);
+                    Route::post('/{journal}/reverse', [VoucherController::class, 'reverse'])->name('reverse')->defaults('type', $voucherType);
+                });
+        }
     });

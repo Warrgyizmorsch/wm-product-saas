@@ -21,6 +21,10 @@ class JournalRepository implements JournalRepositoryInterface
             $query->where('source', $filters['source']);
         }
 
+        if (array_key_exists('voucher_type', $filters)) {
+            $query->where('voucher_type', $filters['voucher_type']);
+        }
+
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search): void {
@@ -59,19 +63,19 @@ class JournalRepository implements JournalRepositoryInterface
      * so the count-based sequence and the unique (tenant_id, journal_number)
      * constraint stay consistent under concurrent posting.
      */
-    public function nextJournalNumber(int $tenantId): string
+    public function nextJournalNumber(int $tenantId, string $prefix = 'JNL'): string
     {
         $yearMonth = now()->format('Ym');
 
         $count = Journal::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->where('journal_number', 'like', "JNL-{$yearMonth}-%")
+            ->where('journal_number', 'like', "{$prefix}-{$yearMonth}-%")
             ->lockForUpdate()
             ->count();
 
         $sequence = str_pad((string) ($count + 1), 5, '0', STR_PAD_LEFT);
 
-        return "JNL-{$yearMonth}-{$sequence}";
+        return "{$prefix}-{$yearMonth}-{$sequence}";
     }
 
     public function create(array $data): Journal
@@ -130,5 +134,19 @@ class JournalRepository implements JournalRepositoryInterface
             'debit' => (float) ($totals->debit ?? 0),
             'credit' => (float) ($totals->credit ?? 0),
         ];
+    }
+
+    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection
+    {
+        return JournalEntry::query()
+            ->select('chart_of_account_id')
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->whereHas('journal', fn ($q) => $q
+                ->where('tenant_id', $tenantId)
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->where('journal_date', '<=', $asOfDate))
+            ->groupBy('chart_of_account_id')
+            ->with('account')
+            ->get();
     }
 }

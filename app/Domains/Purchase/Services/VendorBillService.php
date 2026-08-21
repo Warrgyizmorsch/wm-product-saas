@@ -173,11 +173,11 @@ class VendorBillService
     protected function postAdvanceSettlementJournal(VendorBill $bill, float $appliedAmount, int $tenantId): void
     {
         try {
-            $payableAccount = $this->accountRepo->findByCode('2100', $tenantId)
+            $payableAccount = $this->accountRepo->findByCode('2010', $tenantId)
                 ?? $this->accountRepo->getByType('liability')->first();
 
-            $advanceAccount = $this->accountRepo->findByCode('1400', $tenantId)
-                ?? $this->accountRepo->findByCode('2100', $tenantId)
+            $advanceAccount = $this->accountRepo->findByCode('1410', $tenantId)
+                ?? $this->accountRepo->findByCode('1400', $tenantId)
                 ?? $this->accountRepo->getByType('asset')->last();
 
             if ($payableAccount && $advanceAccount) {

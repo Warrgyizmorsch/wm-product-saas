@@ -183,7 +183,7 @@ class RbacSeeder extends Seeder
         ], RolePermission::SCOPE_TENANT);
 
         // Day-to-day bookkeeping only — deleting accounts/tax rates, closing fiscal
-        // years/periods, and reversing posted journals stay reserved for
+        // years/periods, and reversing posted journals or vouchers stay reserved for
         // tenant_owner/company_admin (segregation of duties over the ledger).
         $this->grant($roles['accountant'], [
             'accounting.chart_of_accounts.view' => $permissions['accounting.chart_of_accounts.view'],
@@ -197,12 +197,27 @@ class RbacSeeder extends Seeder
             'accounting.tax_rates.create' => $permissions['accounting.tax_rates.create'],
             'accounting.tax_rates.update' => $permissions['accounting.tax_rates.update'],
             'accounting.reports.view' => $permissions['accounting.reports.view'],
+            'accounting.vouchers.payment.view' => $permissions['accounting.vouchers.payment.view'],
+            'accounting.vouchers.payment.post' => $permissions['accounting.vouchers.payment.post'],
+            'accounting.vouchers.receipt.view' => $permissions['accounting.vouchers.receipt.view'],
+            'accounting.vouchers.receipt.post' => $permissions['accounting.vouchers.receipt.post'],
+            'accounting.vouchers.contra.view' => $permissions['accounting.vouchers.contra.view'],
+            'accounting.vouchers.contra.post' => $permissions['accounting.vouchers.contra.post'],
+            'accounting.vouchers.credit_note.view' => $permissions['accounting.vouchers.credit_note.view'],
+            'accounting.vouchers.credit_note.post' => $permissions['accounting.vouchers.credit_note.post'],
+            'accounting.vouchers.debit_note.view' => $permissions['accounting.vouchers.debit_note.view'],
+            'accounting.vouchers.debit_note.post' => $permissions['accounting.vouchers.debit_note.post'],
         ], RolePermission::SCOPE_TENANT);
 
         // Auditor is a read-only oversight role (existing but previously had zero
         // grants anywhere in this seeder) — financial reports are exactly what it's for.
         $this->grant($roles['auditor'], [
             'accounting.reports.view' => $permissions['accounting.reports.view'],
+            'accounting.vouchers.payment.view' => $permissions['accounting.vouchers.payment.view'],
+            'accounting.vouchers.receipt.view' => $permissions['accounting.vouchers.receipt.view'],
+            'accounting.vouchers.contra.view' => $permissions['accounting.vouchers.contra.view'],
+            'accounting.vouchers.credit_note.view' => $permissions['accounting.vouchers.credit_note.view'],
+            'accounting.vouchers.debit_note.view' => $permissions['accounting.vouchers.debit_note.view'],
         ], RolePermission::SCOPE_TENANT);
 
         $this->assignDemoAdmin($roles['tenant_owner']);
@@ -323,6 +338,21 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.tax_rates.update', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'update'],
             ['name' => 'accounting.tax_rates.delete', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'delete'],
             ['name' => 'accounting.reports.view', 'module' => 'accounting', 'entity' => 'reports', 'action' => 'view'],
+            ['name' => 'accounting.vouchers.payment.view', 'module' => 'accounting', 'entity' => 'vouchers_payment', 'action' => 'view'],
+            ['name' => 'accounting.vouchers.payment.post', 'module' => 'accounting', 'entity' => 'vouchers_payment', 'action' => 'post'],
+            ['name' => 'accounting.vouchers.payment.reverse', 'module' => 'accounting', 'entity' => 'vouchers_payment', 'action' => 'reverse'],
+            ['name' => 'accounting.vouchers.receipt.view', 'module' => 'accounting', 'entity' => 'vouchers_receipt', 'action' => 'view'],
+            ['name' => 'accounting.vouchers.receipt.post', 'module' => 'accounting', 'entity' => 'vouchers_receipt', 'action' => 'post'],
+            ['name' => 'accounting.vouchers.receipt.reverse', 'module' => 'accounting', 'entity' => 'vouchers_receipt', 'action' => 'reverse'],
+            ['name' => 'accounting.vouchers.contra.view', 'module' => 'accounting', 'entity' => 'vouchers_contra', 'action' => 'view'],
+            ['name' => 'accounting.vouchers.contra.post', 'module' => 'accounting', 'entity' => 'vouchers_contra', 'action' => 'post'],
+            ['name' => 'accounting.vouchers.contra.reverse', 'module' => 'accounting', 'entity' => 'vouchers_contra', 'action' => 'reverse'],
+            ['name' => 'accounting.vouchers.credit_note.view', 'module' => 'accounting', 'entity' => 'vouchers_credit_note', 'action' => 'view'],
+            ['name' => 'accounting.vouchers.credit_note.post', 'module' => 'accounting', 'entity' => 'vouchers_credit_note', 'action' => 'post'],
+            ['name' => 'accounting.vouchers.credit_note.reverse', 'module' => 'accounting', 'entity' => 'vouchers_credit_note', 'action' => 'reverse'],
+            ['name' => 'accounting.vouchers.debit_note.view', 'module' => 'accounting', 'entity' => 'vouchers_debit_note', 'action' => 'view'],
+            ['name' => 'accounting.vouchers.debit_note.post', 'module' => 'accounting', 'entity' => 'vouchers_debit_note', 'action' => 'post'],
+            ['name' => 'accounting.vouchers.debit_note.reverse', 'module' => 'accounting', 'entity' => 'vouchers_debit_note', 'action' => 'reverse'],
         ];
 
         $permissions = [];

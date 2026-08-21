@@ -16,7 +16,7 @@ interface JournalRepositoryInterface
 
     public function findByReference(string $referenceType, int $referenceId): Collection;
 
-    public function nextJournalNumber(int $tenantId): string;
+    public function nextJournalNumber(int $tenantId, string $prefix = 'JNL'): string;
 
     public function create(array $data): Journal;
 
@@ -46,4 +46,15 @@ interface JournalRepositoryInterface
      * @return array{debit: float, credit: float}
      */
     public function openingBalance(int $chartOfAccountId, \DateTimeInterface $before): array;
+
+    /**
+     * One row per account with summed debit/credit across every posted
+     * journal dated on or before $asOfDate, for a point-in-time Balance
+     * Sheet (unlike trialBalance(), which is scoped to a single period's
+     * movements — a Balance Sheet needs the cumulative balance since
+     * inception for every asset/liability/equity/income/expense account).
+     *
+     * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
+     */
+    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection;
 }

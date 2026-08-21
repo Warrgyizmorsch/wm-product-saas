@@ -26,6 +26,8 @@ class JournalService
      *     tenant_id?: int,
      *     journal_date?: string|\DateTimeInterface,
      *     source?: string,
+     *     voucher_type?: string,
+     *     journal_number_prefix?: string,
      *     reference_type?: string,
      *     reference_id?: int,
      *     memo?: string,
@@ -45,7 +47,7 @@ class JournalService
             $totalDebit = array_sum(array_column($lines, 'debit'));
             $totalCredit = array_sum(array_column($lines, 'credit'));
 
-            $journalNumber = $this->journals->nextJournalNumber($tenantId);
+            $journalNumber = $this->journals->nextJournalNumber($tenantId, $meta['journal_number_prefix'] ?? 'JNL');
 
             return $this->journals->createWithEntries([
                 'tenant_id' => $tenantId,
@@ -53,6 +55,7 @@ class JournalService
                 'journal_number' => $journalNumber,
                 'journal_date' => $journalDate,
                 'source' => $meta['source'] ?? Journal::SOURCE_MANUAL,
+                'voucher_type' => $meta['voucher_type'] ?? null,
                 'reference_type' => $meta['reference_type'] ?? null,
                 'reference_id' => $meta['reference_id'] ?? null,
                 'memo' => $meta['memo'] ?? null,
@@ -93,6 +96,10 @@ class JournalService
                 'tenant_id' => $original->tenant_id,
                 'journal_date' => now(),
                 'source' => $original->source,
+                'voucher_type' => $original->voucher_type,
+                'journal_number_prefix' => $original->voucher_type
+                    ? \App\Domains\Accounting\Support\VoucherType::prefix($original->voucher_type)
+                    : 'JNL',
                 'reference_type' => $original->reference_type,
                 'reference_id' => $original->reference_id,
                 'memo' => $reason ?? "Reversal of {$original->journal_number}",
@@ -126,6 +133,16 @@ class JournalService
     public function trialBalance(AccountingPeriod $period): Collection
     {
         return $this->journals->trialBalance($period->id);
+    }
+
+    /**
+     * Cumulative account balances since inception, up to and including
+     * $asOfDate — the basis for a Balance Sheet (point-in-time), unlike
+     * trialBalance() which is scoped to one period's movements.
+     */
+    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection
+    {
+        return $this->journals->balancesAsOf($tenantId, $asOfDate);
     }
 
     /**

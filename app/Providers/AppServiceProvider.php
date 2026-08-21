@@ -248,6 +248,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Repositories\TaxRateRepositoryInterface::class,
             \App\Domains\Accounting\Repositories\TaxRateRepository::class
         );
+
+        // ── Accounting: Voucher Detail ──────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\VoucherDetailRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\VoucherDetailRepository::class
+        );
     }
 
     public function boot(): void
@@ -306,6 +312,21 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Event::listen(
             \App\Domains\Sales\Events\SalesReturnApproved::class,
             \App\Domains\Accounting\Listeners\PostSalesReturnJournal::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Purchase\Events\BillPosted::class,
+            \App\Domains\Accounting\Listeners\PostPurchaseBillJournal::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Purchase\Events\VendorPaymentRecorded::class,
+            \App\Domains\Accounting\Listeners\PostVendorPaymentJournal::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Purchase\Events\PurchaseReturnApproved::class,
+            \App\Domains\Accounting\Listeners\PostPurchaseReturnJournal::class
         );
 
         // ── Production Policies ───────────────────────────────────────────────
