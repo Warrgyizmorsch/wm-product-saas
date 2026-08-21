@@ -187,7 +187,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'nullable|in:finished_good,semi_finished,raw_material,component,service',
-            'supplier_method' => 'nullable|in:buy,manufacture',
+            'supplier_method' => 'nullable|in:buy,trade,manufacture',
             'sku' => [
                 'required',
                 'string',
@@ -320,7 +320,7 @@ class ProductController extends Controller
                 }
             ],
             'type' => 'required|in:finished_good,semi_finished,raw_material,component,service',
-            'supplier_method' => 'required|in:buy,manufacture',
+            'supplier_method' => 'required|in:buy,trade,manufacture',
             'uom_id' => 'required|exists:uoms,id',
             'inventory_valuation_method' => 'required|in:FIFO,Weighted Average',
             'unit_cost' => 'nullable|numeric|min:0',

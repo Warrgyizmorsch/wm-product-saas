@@ -30,15 +30,39 @@ class PurchaseReturnController extends Controller
 
     public function create(Request $request): View
     {
+        $tenantId = require_tenant_id();
         $purchaseOrderId = $request->input('purchase_order_id');
+        $goodsReceiptNoteId = $request->input('goods_receipt_note_id');
+
+        $mode = $request->input('mode');
+        if (!$mode || $mode === 'po') {
+            $mode = 'grn';
+        }
+
+        $goodsReceiptNote = null;
+        if ($goodsReceiptNoteId) {
+            $goodsReceiptNote = \App\Domains\Purchase\Models\GoodsReceiptNote::with(['items.product', 'vendor', 'purchaseOrder'])->find($goodsReceiptNoteId);
+        } elseif ($purchaseOrderId) {
+            $goodsReceiptNote = \App\Domains\Purchase\Models\GoodsReceiptNote::with(['items.product', 'vendor', 'purchaseOrder'])
+                ->where('purchase_order_id', $purchaseOrderId)
+                ->latest()
+                ->first();
+            if ($goodsReceiptNote) {
+                $goodsReceiptNoteId = $goodsReceiptNote->id;
+            }
+        }
+
         $purchaseOrder = null;
         if ($purchaseOrderId) {
             $purchaseOrder = PurchaseOrder::with('items.product', 'vendor')->find($purchaseOrderId);
+        } elseif ($goodsReceiptNote?->purchase_order_id) {
+            $purchaseOrder = $goodsReceiptNote->purchaseOrder;
+            $purchaseOrderId = $goodsReceiptNote->purchase_order_id;
         }
 
-        $tenantId = require_tenant_id();
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
-        $purchaseOrders = PurchaseOrder::whereIn('status', ['Approved', 'Partially Received', 'Received'])->latest()->get();
+        $purchaseOrders = PurchaseOrder::with('vendor')->whereIn('status', ['Approved', 'Partially Received', 'Received', 'Completed'])->latest()->get();
+        $goodsReceiptNotes = \App\Domains\Purchase\Models\GoodsReceiptNote::with('vendor')->latest()->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get();
         $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->orderBy('name')->get();
 
@@ -47,11 +71,45 @@ class PurchaseReturnController extends Controller
         $nextReturnNumber = 'PRET-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
 
         $prefillPurchaseOrderId = $purchaseOrderId;
-        $prefillVendorId = $purchaseOrder?->vendor_id;
+        $prefillGrnId = $goodsReceiptNoteId;
+        $prefillVendorId = $goodsReceiptNote?->vendor_id ?: $purchaseOrder?->vendor_id;
+
+        $firstWhId = $warehouses->first()?->id;
+
+        $productsJson = $products->map(fn($p) => [
+            'id' => $p->id,
+            'name' => $p->name,
+            'sku' => $p->sku ?: '',
+            'price' => floatval($p->cost_price ?: $p->unit_cost ?? 0),
+        ])->values()->toArray();
+
+        $warehousesJson = $warehouses->map(fn($w) => [
+            'id' => $w->id,
+            'name' => $w->name,
+        ])->values()->toArray();
+
+        $prefillItemsJson = [];
+        if ($mode === 'grn' && $goodsReceiptNote && $goodsReceiptNote->items) {
+            $grnWhId = $goodsReceiptNote->warehouse_id ?? $firstWhId;
+            $prefillItemsJson = $goodsReceiptNote->items->map(fn($i) => [
+                'product_id'   => $i->product_id,
+                'warehouse_id' => $i->warehouse_id ?? $grnWhId,
+                'quantity'     => floatval(($i->accepted_qty > 0) ? $i->accepted_qty : (($i->received_qty > 0) ? $i->received_qty : 1)),
+                'unit_price'   => floatval($i->unit_rate ?? 0),
+            ])->values()->toArray();
+        } elseif ($mode === 'po' && $purchaseOrder && $purchaseOrder->items) {
+            $prefillItemsJson = $purchaseOrder->items->map(fn($i) => [
+                'product_id'   => $i->product_id,
+                'warehouse_id' => $i->warehouse_id ?? $firstWhId,
+                'quantity'     => floatval($i->quantity),
+                'unit_price'   => floatval($i->unit_price),
+            ])->values()->toArray();
+        }
 
         return view('modules.purchase.returns.create', compact(
-            'vendors', 'purchaseOrders', 'purchaseOrder', 'warehouses', 'nextReturnNumber',
-            'prefillPurchaseOrderId', 'prefillVendorId', 'products'
+            'vendors', 'purchaseOrders', 'goodsReceiptNotes', 'purchaseOrder', 'goodsReceiptNote', 'warehouses', 'nextReturnNumber',
+            'prefillPurchaseOrderId', 'prefillGrnId', 'prefillVendorId', 'products', 'mode',
+            'productsJson', 'warehousesJson', 'prefillItemsJson'
         ));
     }
 
@@ -61,6 +119,12 @@ class PurchaseReturnController extends Controller
             $po = PurchaseOrder::find($request->input('purchase_order_id'));
             if ($po) {
                 $request->merge(['vendor_id' => $po->vendor_id]);
+            }
+        }
+        if (!$request->filled('vendor_id') && $request->filled('goods_receipt_note_id')) {
+            $grn = \App\Domains\Purchase\Models\GoodsReceiptNote::find($request->input('goods_receipt_note_id'));
+            if ($grn) {
+                $request->merge(['vendor_id' => $grn->vendor_id]);
             }
         }
 

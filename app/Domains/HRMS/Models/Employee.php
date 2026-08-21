@@ -490,6 +490,11 @@ class Employee extends BaseModel
         }
 
         // 3. Fall back to general default shift
-        return $this->shift;
+        return $this->defaultShift;
+    }
+
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(SalaryRevision::class, 'employee_id')->orderBy('effective_date', 'desc');
     }
 }

@@ -18,6 +18,15 @@
             <i class="feather feather-download"></i>
         </a>
 
+        @if (in_array($order->status, ['Approved', 'Partially Received', 'Received', 'Completed']))
+            @php
+                $latestGrn = \App\Domains\Purchase\Models\GoodsReceiptNote::where('purchase_order_id', $order->id)->latest()->first();
+            @endphp
+            <x-ui.button href="{{ route('purchase.returns.create', $latestGrn ? ['goods_receipt_note_id' => $latestGrn->id, 'mode' => 'grn'] : ['purchase_order_id' => $order->id, 'mode' => 'grn']) }}" variant="primary" size="sm" class="fw-bold px-3 me-1" icon="feather-corner-up-left">
+                Create Return
+            </x-ui.button>
+        @endif
+
         @if($order->status === 'Draft')
             <!-- Action Dropdown -->
             <x-ui.action-dropdown id="poDetailsActions-{{ $order->id }}">

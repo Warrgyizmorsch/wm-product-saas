@@ -762,7 +762,7 @@ class TravelExpenseController extends Controller
             if ($employee) {
                 $companyId = $employee->company_id ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
                 $payGroupId = $employee->pay_group_id;
-                $nextMonth = now()->addMonth()->format('Y-m');
+                $currentMonth = now()->format('Y-m');
 
                 if ($approvedAmount < $totalAdvance) {
                     // Surplus refund deduction
@@ -785,7 +785,7 @@ class TravelExpenseController extends Controller
                             'employee_id' => $employee->id,
                             'salary_component_id' => $comp->id,
                             'amount' => $surplus,
-                            'payroll_month' => $nextMonth,
+                            'payroll_month' => $currentMonth,
                             'status' => 'pending',
                             'remarks' => "Deduction for T&E Advance Surplus - Claim: " . $expenseReport->title
                         ]);
@@ -811,7 +811,7 @@ class TravelExpenseController extends Controller
                             'employee_id' => $employee->id,
                             'salary_component_id' => $comp->id,
                             'amount' => $reimbursement,
-                            'payroll_month' => $nextMonth,
+                            'payroll_month' => $currentMonth,
                             'status' => 'pending',
                             'remarks' => "Reimbursement for Travel Expense Claim: " . $expenseReport->title
                         ]);

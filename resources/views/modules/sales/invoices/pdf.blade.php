@@ -352,6 +352,10 @@
                     <span style="float:right; font-weight:600;">Rajasthan (08)</span>
                 </div>
                 <div class="ref-row">
+                    <span style="color:#64748b;">GST Option:</span>
+                    <span style="float:right; font-weight:bold;">{{ $invoice->gst_type === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</span>
+                </div>
+                <div class="ref-row">
                     <span style="color:#64748b;">Payment Status:</span>
                     <span style="float:right; font-weight:bold; color:{{ $balanceDue > 0 ? '#dc2626' : '#16a34a' }};">{{ $balanceDue > 0 ? 'Balance Outstanding' : 'Fully Paid' }}</span>
                 </div>
@@ -401,8 +405,84 @@
     <!-- ═══ 4. BANK + SUMMARY ═══ -->
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px;">
         <tr>
-            <!-- Bank Details -->
+            <!-- Left: GST Summary, Bank Details, Notes -->
             <td class="bank-box">
+                @php
+                    $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
+                @endphp
+                @if ($taxGroups->count() > 0 && $invoice->tax_amount > 0)
+                    <div style="margin-bottom: 8px;">
+                        <div style="font-size: 8.5px; font-weight: bold; text-transform: uppercase; color: #1e40af; margin-bottom: 3px; letter-spacing: 0.5px;">
+                            GST Tax Summary
+                        </div>
+                        <table class="items-table" cellpadding="0" cellspacing="0" style="margin-bottom: 6px; font-size: 8.5px; width: 100%;">
+                            <thead>
+                                @if($invoice->gst_type === 'igst')
+                                    <tr>
+                                        <th style="width: 30%;">Tax Rate</th>
+                                        <th class="text-right" style="width: 35%;">Total Tax</th>
+                                        <th class="text-right" style="width: 35%;">IGST Amt</th>
+                                    </tr>
+                                @else
+                                    <tr>
+                                        <th style="width: 25%;">Tax Rate</th>
+                                        <th class="text-right" style="width: 25%;">Total Tax</th>
+                                        <th class="text-right" style="width: 25%;">CGST Amt</th>
+                                        <th class="text-right" style="width: 25%;">SGST Amt</th>
+                                    </tr>
+                                @endif
+                            </thead>
+                            <tbody>
+                                @php
+                                    $totCgst = 0; $totSgst = 0; $totIgst = 0; $totTax = 0;
+                                @endphp
+                                @foreach($taxGroups as $rateStr => $gItems)
+                                    @php
+                                        $rate = floatval($rateStr);
+                                        $grpTax = $gItems->sum('tax_amount');
+                                        $totTax += $grpTax;
+                                    @endphp
+                                    @if($invoice->gst_type === 'igst')
+                                        @php
+                                            $grpIgst = $gItems->sum('igst_amount') > 0 ? $gItems->sum('igst_amount') : $grpTax;
+                                            $totIgst += $grpIgst;
+                                        @endphp
+                                        <tr>
+                                            <td style="font-weight: bold;">GST {{ $rate }}%</td>
+                                            <td class="text-right" style="font-weight: bold;">&#8377;{{ number_format($grpTax, 2) }}</td>
+                                            <td class="text-right">&#8377;{{ number_format($grpIgst, 2) }}</td>
+                                        </tr>
+                                    @else
+                                        @php
+                                            $grpCgst = $gItems->sum('cgst_amount') > 0 ? $gItems->sum('cgst_amount') : round($grpTax / 2, 2);
+                                            $grpSgst = $gItems->sum('sgst_amount') > 0 ? $gItems->sum('sgst_amount') : round($grpTax - $grpCgst, 2);
+                                            $totCgst += $grpCgst; $totSgst += $grpSgst;
+                                        @endphp
+                                        <tr>
+                                            <td style="font-weight: bold;">GST {{ $rate }}%</td>
+                                            <td class="text-right" style="font-weight: bold;">&#8377;{{ number_format($grpTax, 2) }}</td>
+                                            <td class="text-right">&#8377;{{ number_format($grpCgst, 2) }}</td>
+                                            <td class="text-right">&#8377;{{ number_format($grpSgst, 2) }}</td>
+                                        </tr>
+                                    @endif
+                                @endforeach
+                                <tr style="background-color: #f8fafc; font-weight: bold;">
+                                    @if($invoice->gst_type === 'igst')
+                                        <td>Total</td>
+                                        <td class="text-right" style="color: #1e40af;">&#8377;{{ number_format($totTax, 2) }}</td>
+                                        <td class="text-right">&#8377;{{ number_format($totIgst, 2) }}</td>
+                                    @else
+                                        <td>Total</td>
+                                        <td class="text-right" style="color: #1e40af;">&#8377;{{ number_format($totTax, 2) }}</td>
+                                        <td class="text-right">&#8377;{{ number_format($totCgst, 2) }}</td>
+                                        <td class="text-right">&#8377;{{ number_format($totSgst, 2) }}</td>
+                                    @endif
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
                 <div class="bank-label">Bank Payment Details:</div>
                 <table class="bank-grid" cellpadding="0" cellspacing="0">
                     <tr>
@@ -416,14 +496,14 @@
                 </table>
                 @if($invoice->notes)
                     <div class="notes-box">
-                        <strong style="font-size:9px; text-transform:uppercase; letter-spacing:0.4px;">Customer Notes / Terms:</strong><br>
-                        {{ $invoice->notes }}
+                        <strong style="font-size:9px; text-transform:uppercase; letter-spacing:0.4px;">Terms & Conditions / Customer Notes:</strong><br>
+                        {!! $invoice->notes !!}
                     </div>
                 @endif
             </td>
             <td style="width:3%; vertical-align:top;"></td>
-            <!-- Summary -->
-            <td style="width:42%; vertical-align:top;">
+            <!-- Right: Subtotal Calculations -->
+            <td style="width:45%; vertical-align:top;">
                 <table class="summary-table" cellpadding="0" cellspacing="0">
                     <tr>
                         <td>Sub Total:</td>
@@ -435,10 +515,26 @@
                             <td class="amount" style="color:#dc2626;">-&#8377;{{ number_format($invoice->discount_amount, 2) }}</td>
                         </tr>
                     @endif
-                    <tr>
-                        <td>Tax Amount:</td>
-                        <td class="amount">&#8377;{{ number_format($invoice->tax_amount, 2) }}</td>
-                    </tr>
+                    @if($invoice->gst_type === 'igst' || $invoice->igst_amount > 0)
+                        <tr>
+                            <td>IGST Amount:</td>
+                            <td class="amount">&#8377;{{ number_format($invoice->igst_amount > 0 ? $invoice->igst_amount : $invoice->tax_amount, 2) }}</td>
+                        </tr>
+                    @elseif($invoice->gst_type === 'cgst_sgst' || ($invoice->cgst_amount > 0 || $invoice->sgst_amount > 0))
+                        <tr>
+                            <td>CGST Amount:</td>
+                            <td class="amount">&#8377;{{ number_format($invoice->cgst_amount > 0 ? $invoice->cgst_amount : round($invoice->tax_amount / 2, 2), 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td>SGST Amount:</td>
+                            <td class="amount">&#8377;{{ number_format($invoice->sgst_amount > 0 ? $invoice->sgst_amount : round($invoice->tax_amount / 2, 2), 2) }}</td>
+                        </tr>
+                    @else
+                        <tr>
+                            <td>Tax Amount:</td>
+                            <td class="amount">&#8377;{{ number_format($invoice->tax_amount, 2) }}</td>
+                        </tr>
+                    @endif
                     <tr class="grand-total">
                         <td>Total Amount:</td>
                         <td class="amount" style="color:#1e40af; font-size:13px;">&#8377;{{ number_format($invoice->total_amount, 2) }}</td>
