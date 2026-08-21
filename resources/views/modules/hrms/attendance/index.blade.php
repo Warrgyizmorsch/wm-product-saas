@@ -24,6 +24,16 @@
             </x-ui.button>
         @endif
 
+        @if(($view ?? 'date') === 'corrections')
+            <x-ui.button type="button" onclick="switchView('date')" variant="warning" class="text-white fw-semibold text-uppercase px-3 py-2" icon="feather-edit-3" style="height: 38px; display: inline-flex; align-items: center; font-size: 11px;">
+                Correction Requests
+            </x-ui.button>
+        @else
+            <x-ui.button type="button" onclick="switchView('corrections')" variant="light" class="border fw-semibold text-uppercase px-3 py-2" icon="feather-edit-3" style="height: 38px; display: inline-flex; align-items: center; font-size: 11px;">
+                Correction Requests
+            </x-ui.button>
+        @endif
+
         <x-ui.button href="{{ route('hrms.attendance.create') }}" variant="primary" icon="feather-plus" style="height: 38px; display: inline-flex; align-items: center;">
             Add Attendance
         </x-ui.button>
@@ -158,7 +168,96 @@
         <div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    @if(($view ?? 'date') === 'date')
+                    @if(($view ?? 'date') === 'corrections')
+                        <thead class="bg-light text-uppercase fs-10 tracking-wider">
+                            <tr>
+                                <th class="ps-4">Employee Details</th>
+                                <th>Date</th>
+                                <th>Requested Check In</th>
+                                <th>Requested Check Out</th>
+                                <th>Reason</th>
+                                <th>Status</th>
+                                <th class="pe-4 text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($corrections as $correction)
+                                <tr>
+                                    <!-- Employee Details -->
+                                    <td class="ps-4">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="avatar-sm rounded-circle bg-light d-flex align-items-center justify-content-center text-dark fw-bold border" style="width: 32px; height: 32px; font-size: 11px;">
+                                                @if($correction->employee->photo)
+                                                    <img src="{{ asset('storage/' . $correction->employee->photo) }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
+                                                @else
+                                                    {{ strtoupper(substr($correction->employee->first_name, 0, 1) . substr($correction->employee->last_name, 0, 1)) ?: 'EM' }}
+                                                @endif
+                                            </div>
+                                            <div>
+                                                <a href="{{ route('hrms.employees.show', $correction->employee->id) }}" class="fw-bold text-dark fs-13 d-block text-decoration-none hover-primary">
+                                                    {{ $correction->employee->display_name }}
+                                                </a>
+                                                <span class="text-muted fs-11 d-block">{{ $correction->employee->designation ? $correction->employee->designation->name : 'No Designation' }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <!-- Date -->
+                                    <td class="fw-bold text-dark fs-12">
+                                        {{ $correction->date->format('M d, Y') }}
+                                    </td>
+                                    <!-- Requested Check-in -->
+                                    <td class="fs-12 text-dark fw-semibold">
+                                        {{ $correction->requested_check_in ? $correction->requested_check_in->format('h:i A') : '-' }}
+                                    </td>
+                                    <!-- Requested Check-out -->
+                                    <td class="fs-12 text-dark fw-semibold">
+                                        {{ $correction->requested_check_out ? $correction->requested_check_out->format('h:i A') : '-' }}
+                                    </td>
+                                    <!-- Reason -->
+                                    <td class="fs-12 text-muted" style="max-width: 250px; white-space: normal; word-break: break-word;">
+                                        {{ $correction->reason }}
+                                    </td>
+                                    <!-- Status -->
+                                    <td>
+                                        @if($correction->status === 'pending')
+                                            <span class="badge bg-soft-warning text-warning px-3 py-1.5 fs-11 rounded-pill fw-bold">Pending</span>
+                                        @elseif($correction->status === 'approved')
+                                            <span class="badge bg-soft-success text-success px-3 py-1.5 fs-11 rounded-pill fw-bold">Approved</span>
+                                        @else
+                                            <span class="badge bg-soft-danger text-danger px-3 py-1.5 fs-11 rounded-pill fw-bold" title="Reason: {{ $correction->rejected_reason }}">Rejected</span>
+                                        @endif
+                                    </td>
+                                    <!-- Actions -->
+                                    <td class="pe-4 text-end">
+                                        @if($correction->status === 'pending')
+                                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                                <button type="button" 
+                                                        class="btn btn-xs btn-soft-success text-uppercase fw-bold" 
+                                                        style="font-size: 9px; padding: 4px 8px;"
+                                                        data-id="{{ $correction->id }}"
+                                                        data-employee="{{ $correction->employee->display_name }}"
+                                                        data-date="{{ $correction->date->format('M d, Y') }}"
+                                                        data-check-in="{{ $correction->requested_check_in ? $correction->requested_check_in->format('H:i') : '' }}"
+                                                        data-check-out="{{ $correction->requested_check_out ? $correction->requested_check_out->format('H:i') : '' }}"
+                                                        onclick="openApproveModal(this)">
+                                                    Approve
+                                                </button>
+                                                <button type="button" class="btn btn-xs btn-soft-danger text-uppercase fw-bold" style="font-size: 9px; padding: 4px 8px;" onclick="openRejectModal({{ $correction->id }})">
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        @else
+                                            <span class="text-muted fs-11">-</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted fs-13">No correction requests found.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    @elseif(($view ?? 'date') === 'date')
                         <thead class="bg-light text-uppercase fs-10 tracking-wider">
                             <tr>
                                 <th class="ps-4">Date</th>
@@ -373,6 +472,15 @@
                         :total-pages="$employees->lastPage()"
                         :total-results="$employees->total()"
                         :per-page="$employees->perPage()"
+                    />
+                </div>
+            @elseif(($view ?? 'date') === 'corrections' && method_exists($corrections, 'currentPage'))
+                <div class="p-3">
+                    <x-ui.pagination 
+                        :current-page="$corrections->currentPage()"
+                        :total-pages="$corrections->lastPage()"
+                        :total-results="$corrections->total()"
+                        :per-page="$corrections->perPage()"
                     />
                 </div>
             @endif
@@ -1038,6 +1146,33 @@
         submitCleanForm(form);
     }
 
+    function openRejectModal(correctionId) {
+        const form = document.getElementById('rejectCorrectionForm');
+        form.action = `/hrms/attendance/corrections/${correctionId}/reject`;
+        document.getElementById('reject_reason_input').value = '';
+        const modal = new bootstrap.Modal(document.getElementById('rejectCorrectionModal'));
+        modal.show();
+    }
+
+    function openApproveModal(btn) {
+        const id = btn.getAttribute('data-id');
+        const employee = btn.getAttribute('data-employee');
+        const date = btn.getAttribute('data-date');
+        const checkIn = btn.getAttribute('data-check-in');
+        const checkOut = btn.getAttribute('data-check-out');
+
+        const form = document.getElementById('approveCorrectionForm');
+        form.action = `/hrms/attendance/corrections/${id}/approve`;
+
+        document.getElementById('approve_employee_name').textContent = employee;
+        document.getElementById('approve_date').textContent = date;
+        document.getElementById('approve_check_in_input').value = checkIn;
+        document.getElementById('approve_check_out_input').value = checkOut;
+
+        const modal = new bootstrap.Modal(document.getElementById('approveCorrectionModal'));
+        modal.show();
+    }
+
     // Live Search with Debounce and Focus cursor position restore
     document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('attendanceFilterForm');
@@ -1085,6 +1220,16 @@
                 }
             });
         }
+
+        const rejectModal = document.getElementById('rejectCorrectionModal');
+        if (rejectModal) {
+            document.body.appendChild(rejectModal);
+        }
+
+        const approveModal = document.getElementById('approveCorrectionModal');
+        if (approveModal) {
+            document.body.appendChild(approveModal);
+        }
     });
 </script>
 
@@ -1126,6 +1271,72 @@
                         <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-sm btn-primary text-white px-3">Import CSV</button>
                     </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Rejection Reason Modal -->
+<div class="modal fade" id="rejectCorrectionModal" tabindex="-1" aria-labelledby="rejectCorrectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4 text-dark">
+            <div class="modal-header border-0 pt-4 px-4 pb-2">
+                <h5 class="modal-title fw-bold text-dark fs-15" id="rejectCorrectionModalLabel">
+                    <i class="feather-alert-triangle text-danger me-2"></i>Reject Correction Request
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="rejectCorrectionForm" method="POST" action="">
+                @csrf
+                <div class="modal-body px-4 py-3">
+                    <p class="text-muted fs-12 mb-3">Please provide a reason for rejecting this attendance correction request. This will be visible to the employee.</p>
+                    
+                    <x-ui.odoo-form-ui type="textarea" label="Rejection Reason" name="rejected_reason" id="reject_reason_input" placeholder="Type reason here..." :required="true" />
+                </div>
+                <div class="modal-footer border-0 pb-4 px-4 pt-2">
+                    <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-danger text-white px-3">Reject Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Approval Time Edit Modal -->
+<div class="modal fade" id="approveCorrectionModal" tabindex="-1" aria-labelledby="approveCorrectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4 text-dark">
+            <div class="modal-header border-0 pt-4 px-4 pb-2">
+                <h5 class="modal-title fw-bold text-dark fs-15" id="approveCorrectionModalLabel">
+                    <i class="feather-check-circle text-success me-2"></i>Approve Correction Request
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="approveCorrectionForm" method="POST" action="">
+                @csrf
+                <div class="modal-body px-4 py-3 d-flex flex-column gap-3">
+                    <p class="text-muted fs-12 mb-0">Review or adjust the check-in and check-out times before approving this request.</p>
+                    
+                    <div class="bg-light border rounded-3 p-3 mb-1">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <span class="text-muted fs-10 d-block text-uppercase">Employee</span>
+                                <span class="fw-bold text-dark fs-12" id="approve_employee_name">-</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted fs-10 d-block text-uppercase">Date</span>
+                                <span class="fw-bold text-dark fs-12" id="approve_date">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <x-ui.odoo-form-ui type="input" inputType="time" label="Approved Check-In Time" name="approved_check_in" id="approve_check_in_input" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="time" label="Approved Check-Out Time" name="approved_check_out" id="approve_check_out_input" :required="true" />
+                </div>
+                <div class="modal-footer border-0 pb-4 px-4 pt-2">
+                    <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-success text-white px-3">Approve & Save</button>
                 </div>
             </form>
         </div>

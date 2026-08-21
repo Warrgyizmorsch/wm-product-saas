@@ -4,6 +4,12 @@
 @section('page-title', 'My Attendance')
 @section('breadcrumb', 'HRMS / My Attendance')
 
+@section('page-actions')
+    <button type="button" onclick="openCorrectionModal()" class="btn btn-sm btn-warning text-white fw-bold text-uppercase px-3" style="height: 38px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; border-radius: 6px;">
+        <i class="feather-edit-3"></i> Request Correction
+    </button>
+@endsection
+
 @push('styles')
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <style>
@@ -42,7 +48,7 @@
                 
                 <!-- Search & Filters Toolbar (Standard Theme) -->
                 <form method="GET" action="{{ route('hrms.attendance.myAttendance') }}" id="myAttendanceFilterForm" class="d-flex align-items-center gap-2 flex-wrap">
-                    <input type="hidden" name="sort" id="myAttendanceSortInput" value="{{ $sort ?? 'date_desc' }}">
+                        <input type="hidden" name="sort" id="myAttendanceSortInput" value="{{ $sort ?? 'date_desc' }}">
 
                     <!-- Search Field -->
                     <div class="d-flex align-items-center bg-light border rounded px-3 py-1" style="height: 38px;">
@@ -238,8 +244,20 @@
 
                                 <!-- Actions (Eye Button for Drawer Details) -->
                                 <td class="text-end pe-4">
+                                    @php
+                                        $dateKey = $attendance->date->format('Y-m-d');
+                                        $hasPending = isset($correctionRequests[$dateKey]) && $correctionRequests[$dateKey]->where('status', 'pending')->isNotEmpty();
+                                        $hasApproved = isset($correctionRequests[$dateKey]) && $correctionRequests[$dateKey]->where('status', 'approved')->isNotEmpty();
+                                    @endphp
+
+                                    @if($hasPending)
+                                        <span class="badge bg-soft-warning text-warning fs-10 border-0 me-1">Correction Pending</span>
+                                    @elseif($hasApproved)
+                                        <span class="badge bg-soft-success text-success fs-10 border-0 me-1">Regularized</span>
+                                    @endif
+
                                     <button type="button" 
-                                            class="btn btn-sm btn-soft-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center" 
+                                             class="btn btn-sm btn-soft-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center" 
                                             style="width: 28px; height: 28px;" 
                                             data-date="{{ $attendance->date->format('M d, Y') }}"
                                             data-status="{{ ucfirst($statusVal) }}"
@@ -360,6 +378,36 @@
         </div>
     </div>
 </x-ui.drawer>
+
+<!-- Attendance Correction Request Modal -->
+<div class="modal fade" id="requestCorrectionModal" tabindex="-1" aria-labelledby="requestCorrectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content text-dark">
+            <form method="POST" action="{{ route('hrms.attendance.corrections.store') }}" id="correctionRequestForm">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="requestCorrectionModalLabel">Request Attendance Correction</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body d-flex flex-column gap-3">
+                    <div class="alert alert-info py-2 px-3 mb-0 fs-12">
+                        <i class="feather-info me-1"></i> Submit a request to correct your clock-in, clock-out, or request regularization for an absent day.
+                    </div>
+                    
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="Date of Correction" name="date" id="correction_date_val" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="time" label="Requested Check-In" name="requested_check_in" id="correction_check_in" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="time" label="Requested Check-Out" name="requested_check_out" id="correction_check_out" :required="true" />
+                    
+                    <x-ui.odoo-form-ui type="textarea" label="Reason for Correction" name="reason" id="correction_reason" placeholder="Explain why the check-in/out times need to be corrected..." :required="true" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary text-uppercase fw-bold fs-12">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 @push('scripts')
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -764,6 +812,11 @@
             });
         }
 
+        const modalEl = document.getElementById('requestCorrectionModal');
+        if (modalEl) {
+            document.body.appendChild(modalEl);
+        }
+
         // Live input search without page reloads
         const searchInput = document.getElementById('myAttendanceSearchInput');
         if (searchInput) {
@@ -797,6 +850,17 @@
         var url = form.attr('action') + '?' + formData;
         loadAttendanceList(url);
     }
+
+    window.openCorrectionModal = function() {
+        document.getElementById('correction_date_val').value = '';
+        document.getElementById('correction_check_in').value = '';
+        document.getElementById('correction_check_out').value = '';
+        document.getElementById('correction_reason').value = '';
+
+        const modalEl = document.getElementById('requestCorrectionModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    };
 </script>
 @endpush
 @endsection

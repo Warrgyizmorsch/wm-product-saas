@@ -18,8 +18,8 @@ use App\Domains\HRMS\Controllers\ShiftOvertimeController;
 use App\Domains\HRMS\Controllers\AttendanceController;
 use App\Domains\HRMS\Controllers\BiometricDeviceController;
 use App\Domains\HRMS\Controllers\ExpenseCategoryController;
-use App\Domains\HRMS\Controllers\ExpensePolicyController;
 use App\Domains\HRMS\Controllers\TravelExpenseController;
+use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -89,6 +89,11 @@ Route::prefix('hrms')
 
             // Employee Attendance
             Route::get('/my-attendance', [AttendanceController::class, 'myAttendance'])->name('attendance.myAttendance');
+
+            // Correction Requests
+            Route::post('/corrections', [AttendanceCorrectionController::class, 'store'])->name('attendance.corrections.store');
+            Route::post('/corrections/{correction}/approve', [AttendanceCorrectionController::class, 'approve'])->name('attendance.corrections.approve');
+            Route::post('/corrections/{correction}/reject', [AttendanceCorrectionController::class, 'reject'])->name('attendance.corrections.reject');
             
             // Import / Export
             Route::post('/import', [AttendanceController::class, 'import'])->name('attendance.import');
@@ -136,8 +141,12 @@ Route::prefix('hrms')
             Route::delete('/structure/delete/{salaryStructure}', [SalaryStructureController::class, 'destroyStructure'])->name('salary-structure.structure.destroy');
 
             Route::post('/pay-group/store', [SalaryStructureController::class, 'storePayGroup'])->name('salary-structure.pay-group.store');
-            Route::post('/pay-group/update/{payGroup}', [SalaryStructureController::class, 'updatePayGroup'])->name('salary-structure.pay-group.update');
-            Route::delete('/pay-group/delete/{payGroup}', [SalaryStructureController::class, 'destroyPayGroup'])->name('salary-structure.pay-group.destroy');
+            Route::post('/pay-group/update/{payGroup}', [SalaryStructureController::class, 'updatePayGroup'])
+                ->name('salary-structure.pay-group.update');
+            Route::post('/pay-group/update-rules/{payGroup}', [SalaryStructureController::class, 'updatePayGroupRules'])
+                ->name('salary-structure.pay-group.update-rules');
+            Route::delete('/pay-group/delete/{payGroup}', [SalaryStructureController::class, 'destroyPayGroup'])
+                ->name('salary-structure.pay-group.destroy');
         });
 
         // Leave Structure Management
@@ -362,7 +371,16 @@ Route::prefix('hrms')
             Route::post('/report/{expenseReport}/submit', [TravelExpenseController::class, 'submitExpenseReport'])->name('travel-expense.report.submit');
             Route::post('/report/{expenseReport}/approve', [TravelExpenseController::class, 'approveExpenseReport'])->name('travel-expense.report.approve');
             Route::post('/report/{expenseReport}/reject', [TravelExpenseController::class, 'rejectExpenseReport'])->name('travel-expense.report.reject');
-            Route::post('/report/{expenseReport}/pay', [TravelExpenseController::class, 'payExpenseReport'])->name('travel-expense.report.pay');
             Route::get('/employee-policy/{employee}', [TravelExpenseController::class, 'getEmployeePolicy'])->name('travel-expense.employee-policy');
+        });
+
+        // Payroll Execution Dashboard & Runs
+        Route::prefix('payroll')->group(function (): void {
+            Route::get('/', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'index'])->name('payroll.index');
+            Route::get('/my-salary', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'mySalary'])->name('payroll.mySalary');
+            Route::post('/run/store', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'storeRun'])->name('payroll.run.store');
+            Route::post('/run/{run}/lock', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'lockRun'])->name('payroll.run.lock');
+            Route::post('/run/{run}/release', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'releasePayouts'])->name('payroll.run.release');
+            Route::post('/hold/{employee}/{month}', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'toggleHold'])->name('payroll.hold.toggle');
         });
     });
