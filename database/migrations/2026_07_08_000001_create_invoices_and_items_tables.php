@@ -10,7 +10,7 @@ return new class extends Migration {
         Schema::create('invoices', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('tenant_id');
-            $table->foreignId('sales_order_id')->constrained('sales_orders')->cascadeOnDelete();
+            $table->foreignId('sales_order_id')->nullable()->constrained('sales_orders')->cascadeOnDelete();
             $table->unsignedBigInteger('delivery_order_id')->nullable(); // linked DO
             $table->string('invoice_number')->index();
             $table->date('invoice_date');

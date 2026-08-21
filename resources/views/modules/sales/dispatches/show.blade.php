@@ -50,7 +50,7 @@
                             </button>
                         </form>
                     @elseif (in_array($dispatch->status, ['Dispatched', 'Delivered']) && $dispatch->material_requirement_id)
-                        <a href="{{ route('sales.invoices.create', ['material_requirement_id' => $dispatch->material_requirement_id]) }}" class="btn btn-primary fw-bold px-3">
+                        <a href="{{ route('sales.invoices.create', ['dispatch_order_id' => $dispatch->id, 'material_requirement_id' => $dispatch->material_requirement_id, 'mode' => 'dispatch_order']) }}" class="btn btn-primary fw-bold px-3">
                             <i class="feather-file-text me-1.5"></i> Create Invoice
                         </a>
                     @endif

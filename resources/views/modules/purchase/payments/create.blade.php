@@ -50,14 +50,25 @@
 
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_vendor') }}" name="vendor_id" required="true" :errorText="$errors->first('vendor_id')">
-                        <option value="">{{ __('purchase.select_vendor_placeholder') }}</option>
-                        @foreach($vendors as $vendor)
-                            <option value="{{ $vendor->id }}" @selected(old('vendor_id', $selectedBill?->vendor_id) == $vendor->id)>
-                                {{ $vendor->name }}
-                            </option>
-                        @endforeach
-                    </x-ui.odoo-form-ui>
+                    @if($selectedBill)
+                        <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_vendor') }}" name="vendor_id_disabled" required="true" disabled="disabled">
+                            @foreach($vendors as $vendor)
+                                @if($selectedBill->vendor_id == $vendor->id)
+                                    <option value="{{ $vendor->id }}" selected>{{ $vendor->name }}</option>
+                                @endif
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                        <input type="hidden" name="vendor_id" value="{{ $selectedBill->vendor_id }}">
+                    @else
+                        <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_vendor') }}" name="vendor_id" required="true" :errorText="$errors->first('vendor_id')">
+                            <option value="">{{ __('purchase.select_vendor_placeholder') }}</option>
+                            @foreach($vendors as $vendor)
+                                <option value="{{ $vendor->id }}" @selected(old('vendor_id') == $vendor->id)>
+                                    {{ $vendor->name }}
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    @endif
                 </div>
 
                 <div class="col-md-4">

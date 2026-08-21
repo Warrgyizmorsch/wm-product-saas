@@ -151,6 +151,12 @@
                             <option value="item_wise_tax" @selected(old('tax_type', 'item_wise_tax') === 'item_wise_tax')>Item Wise Tax</option>
                             <option value="order_wise_tax" @selected(old('tax_type') === 'order_wise_tax')>Order Wise Tax</option>
                         </x-ui.odoo-form-ui>
+
+                        <!-- GST Option (CGST/SGST vs IGST) -->
+                        <x-ui.odoo-form-ui type="select" label="GST Option" name="gst_type" id="gstTypeSelect" :required="true">
+                            <option value="cgst_sgst" @selected(old('gst_type', 'cgst_sgst') === 'cgst_sgst')>CGST + SGST (Intra-State)</option>
+                            <option value="igst" @selected(old('gst_type') === 'igst')>IGST (Inter-State)</option>
+                        </x-ui.odoo-form-ui>
                     </div>
                 </div>
 
@@ -253,10 +259,33 @@
                 <!-- Bottom Details & Totals Summary (PO Card Style) -->
                 <div class="row mt-5 pt-3 border-top g-4">
                     <div class="col-md-7">
-                        <x-ui.odoo-form-ui type="textarea" label="Invoice Notes / Terms" name="notes" rows="3" placeholder="e.g. Please wire payments to Bank details...">{{ old('notes') }}</x-ui.odoo-form-ui>
+                        <!-- GST Rate Breakdown Card (Spacious Left Alignment) -->
+                        <div class="card border-0 shadow-sm mb-3 w-100" id="gstBreakdownContainer" style="border-radius: 8px; border: 1px solid #cbd5e1 !important; overflow: hidden; display: none;">
+                            <div class="fw-bold py-2 px-3 bg-light border-bottom text-dark fs-12 text-uppercase d-flex justify-content-between align-items-center">
+                                <span><i class="feather-pie-chart text-primary me-1"></i>GST Tax Summary</span>
+                                <span class="badge bg-soft-primary text-primary fs-11" id="gstBreakdownModeBadge">CGST + SGST</span>
+                            </div>
+                            <div class="p-0 table-responsive" style="overflow-x: visible;">
+                                <table class="table table-sm table-bordered mb-0 align-middle fs-12 text-center w-100">
+                                    <thead class="bg-light text-muted fw-bold">
+                                        <tr id="gstBreakdownHeader">
+                                            <!-- Dynamic Header -->
+                                        </tr>
+                                    </thead>
+                                    <tbody id="gstBreakdownBody" class="fs-12 text-dark">
+                                        <!-- Dynamic Grouped Rows -->
+                                    </tbody>
+                                    <tfoot class="bg-light fw-bold text-dark border-top" id="gstBreakdownFooter">
+                                        <!-- Dynamic Footers -->
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+                        <x-ui.odoo-form-ui type="editor" label="Invoice Notes / Terms & Conditions" name="notes" editorHeight="ht-150">{!! old('notes') !!}</x-ui.odoo-form-ui>
                     </div>
 
-                    <!-- Right Side: Order Summary Card (PO Style) -->
+                    <!-- Right Side: Order Summary Card -->
                     <div class="col-md-5 d-flex flex-column align-items-end fs-13">
                         <div class="card border-0 shadow-sm w-100" style="max-width: 380px; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1 !important; overflow: hidden;">
                             <div class="fw-bold py-3 px-3 text-white" style="background-color: #2563eb; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;">
@@ -289,8 +318,26 @@
 
                                 <!-- Tax Amount -->
                                 <div class="d-flex justify-content-between align-items-center mb-3" id="summaryTaxRow">
-                                    <span class="text-muted fs-13 fw-semibold">Tax Amount</span>
+                                    <span class="text-muted fs-13 fw-semibold">Total Tax Amount</span>
                                     <input type="text" id="summaryTaxText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
+                                </div>
+
+                                <!-- CGST Row -->
+                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryCgstRow">
+                                    <span class="text-muted fs-13 fw-semibold">CGST Amount</span>
+                                    <input type="text" id="summaryCgstText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
+                                </div>
+
+                                <!-- SGST Row -->
+                                <div class="d-flex justify-content-between align-items-center mb-3" id="summarySgstRow">
+                                    <span class="text-muted fs-13 fw-semibold">SGST Amount</span>
+                                    <input type="text" id="summarySgstText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
+                                </div>
+
+                                <!-- IGST Row -->
+                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryIgstRow">
+                                    <span class="text-muted fs-13 fw-semibold">IGST Amount</span>
+                                    <input type="text" id="summaryIgstText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                 </div>
 
                                 <!-- Grand Total -->
@@ -374,10 +421,23 @@
                     $('#summaryTaxRow').addClass('d-none').removeClass('d-flex');
                 }
 
+                const gstType = $('#gstTypeSelect').val() || 'cgst_sgst';
+                if (taxType !== 'without_tax') {
+                    if (gstType === 'igst') {
+                        $('#summaryIgstRow').removeClass('d-none').addClass('d-flex');
+                        $('#summaryCgstRow, #summarySgstRow').addClass('d-none').removeClass('d-flex');
+                    } else {
+                        $('#summaryCgstRow, #summarySgstRow').removeClass('d-none').addClass('d-flex');
+                        $('#summaryIgstRow').addClass('d-none').removeClass('d-flex');
+                    }
+                } else {
+                    $('#summaryCgstRow, #summarySgstRow, #summaryIgstRow').addClass('d-none').removeClass('d-flex');
+                }
+
                 recalculateInvoiceTotals();
             }
 
-            $('#discountTypeSelect, #taxTypeSelect').on('change', function() {
+            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect').on('change', function() {
                 toggleTaxAndDiscountDisplay();
             });
 
@@ -469,6 +529,7 @@
             function recalculateInvoiceTotals() {
                 const discountType = $('#discountTypeSelect').val();
                 const taxType      = $('#taxTypeSelect').val();
+                const gstType      = $('#gstTypeSelect').val() || 'cgst_sgst';
 
                 let subtotal = 0;
                 let itemTaxTotal = 0;
@@ -510,14 +571,137 @@
                     totalTax = grossBeforeTax * (taxPercent / 100);
                 }
 
+                let cgstAmt = 0, sgstAmt = 0, igstAmt = 0;
+                if (taxType !== 'without_tax' && totalTax > 0) {
+                    if (gstType === 'igst') {
+                        igstAmt = totalTax;
+                    } else {
+                        cgstAmt = Math.round((totalTax / 2) * 100) / 100;
+                        sgstAmt = Math.round((totalTax - cgstAmt) * 100) / 100;
+                    }
+                }
+
                 const grandTotal = grossBeforeTax + totalTax;
                 const balanceDue = Math.max(0, grandTotal - advanceAllocated);
 
                 $('#summarySubtotalText').val(subtotal.toFixed(2));
                 $('#summaryGrossText').val(grossBeforeTax.toFixed(2));
                 $('#summaryTaxText').val(totalTax.toFixed(2));
+                $('#summaryCgstText').val(cgstAmt.toFixed(2));
+                $('#summarySgstText').val(sgstAmt.toFixed(2));
+                $('#summaryIgstText').val(igstAmt.toFixed(2));
                 $('#summaryGrandtotalText').val(grandTotal.toFixed(2));
                 $('#summaryBalanceDueText').text(balanceDue.toFixed(2));
+
+                // Build Tally-Style Tax Rate Breakdown Analysis Table
+                const taxGroups = {};
+                if (taxType === 'item_wise_tax') {
+                    $('#invoiceItemsTable tbody tr.item-row').each(function() {
+                        const q = parseFloat($(this).find('.qty-input').val()) || 0;
+                        const p = parseFloat($(this).find('.rate-input').val()) || 0;
+                        const d = (discountType === 'item_wise') ? (parseFloat($(this).find('.disc-input').val()) || 0) : 0;
+                        const t = parseFloat($(this).find('.tax-input').val()) || 0;
+
+                        const lineAmount = q * p;
+                        const lineTaxable = Math.max(0, lineAmount - d);
+                        const lineTax = lineTaxable * (t / 100);
+
+                        const key = t.toFixed(2);
+                        if (!taxGroups[key]) {
+                            taxGroups[key] = { rate: t, taxable: 0, tax: 0 };
+                        }
+                        taxGroups[key].taxable += lineTaxable;
+                        taxGroups[key].tax += lineTax;
+                    });
+                }
+
+                const taxRates = Object.keys(taxGroups).sort((a, b) => parseFloat(a) - parseFloat(b));
+                if (taxType === 'item_wise_tax' && taxRates.length > 0) {
+                    $('#gstBreakdownContainer').show();
+                    $('#gstBreakdownModeBadge').text(gstType === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)');
+
+                    let headerHtml = '';
+                    let bodyHtml = '';
+                    let footerHtml = '';
+
+                    let totalTaxableVal = 0;
+                    let totalCgstVal = 0;
+                    let totalSgstVal = 0;
+                    let totalIgstVal = 0;
+                    let totalTaxVal = 0;
+
+                    if (gstType === 'igst') {
+                        headerHtml = `
+                            <th class="py-1">Tax Rate</th>
+                            <th class="py-1 text-end">Total Tax</th>
+                            <th class="py-1 text-end">IGST Amt</th>
+                        `;
+
+                        taxRates.forEach(key => {
+                            const grp = taxGroups[key];
+                            const igstAmt = grp.tax;
+                            totalIgstVal += igstAmt;
+                            totalTaxVal += grp.tax;
+
+                            bodyHtml += `
+                                <tr>
+                                    <td class="py-1 fw-bold">GST ${parseFloat(grp.rate)}%</td>
+                                    <td class="py-1 text-end fw-bold text-dark">₹${grp.tax.toFixed(2)}</td>
+                                    <td class="py-1 text-end">₹${igstAmt.toFixed(2)}</td>
+                                </tr>
+                            `;
+                        });
+
+                        footerHtml = `
+                            <tr>
+                                <td class="py-1">Total</td>
+                                <td class="py-1 text-end text-primary">₹${totalTaxVal.toFixed(2)}</td>
+                                <td class="py-1 text-end">₹${totalIgstVal.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    } else {
+                        headerHtml = `
+                            <th class="py-1">Tax Rate</th>
+                            <th class="py-1 text-end">Total Tax</th>
+                            <th class="py-1 text-end">CGST Amt</th>
+                            <th class="py-1 text-end">SGST Amt</th>
+                        `;
+
+                        taxRates.forEach(key => {
+                            const grp = taxGroups[key];
+                            const cgstAmt = Math.round((grp.tax / 2) * 100) / 100;
+                            const sgstAmt = Math.round((grp.tax - cgstAmt) * 100) / 100;
+
+                            totalCgstVal += cgstAmt;
+                            totalSgstVal += sgstAmt;
+                            totalTaxVal += grp.tax;
+
+                            bodyHtml += `
+                                <tr>
+                                    <td class="py-1 fw-bold">GST ${parseFloat(grp.rate)}%</td>
+                                    <td class="py-1 text-end fw-bold text-dark">₹${grp.tax.toFixed(2)}</td>
+                                    <td class="py-1 text-end">₹${cgstAmt.toFixed(2)}</td>
+                                    <td class="py-1 text-end">₹${sgstAmt.toFixed(2)}</td>
+                                </tr>
+                            `;
+                        });
+
+                        footerHtml = `
+                            <tr>
+                                <td class="py-1">Total</td>
+                                <td class="py-1 text-end text-primary">₹${totalTaxVal.toFixed(2)}</td>
+                                <td class="py-1 text-end">₹${totalCgstVal.toFixed(2)}</td>
+                                <td class="py-1 text-end">₹${totalSgstVal.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    }
+
+                    $('#gstBreakdownHeader').html(headerHtml);
+                    $('#gstBreakdownBody').html(bodyHtml);
+                    $('#gstBreakdownFooter').html(footerHtml);
+                } else {
+                    $('#gstBreakdownContainer').hide();
+                }
             }
 
             // Initial calculation

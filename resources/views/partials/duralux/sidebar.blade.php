@@ -71,7 +71,6 @@
                 ['label' => __('purchase.rfqs'), 'route' => 'purchase.rfqs.index'],
                 ['label' => __('purchase.purchase_orders'), 'route' => 'purchase.orders.index'],
                 ['label' => 'Landed Cost Vouchers', 'route' => 'purchase.landed-costs.index'],
-                ['label' => 'Pending Bills', 'route' => 'purchase.bills.pending'],
                 ['label' => __('purchase.vendor_bills'), 'route' => 'purchase.bills.index'],
                 ['label' => __('purchase.vendor_payments'), 'route' => 'purchase.payments.index'],
                 ['label' => 'Purchase Returns', 'route' => 'purchase.returns.index'],

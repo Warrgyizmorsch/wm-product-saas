@@ -12,15 +12,13 @@
         <x-ui.button href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" variant="light" size="sm" class="border" icon="feather-external-link">
             SO Details
         </x-ui.button>
-        <x-ui.button href="{{ route('inventory.mrp-shortage.index', ['mr_ids' => [$delivery->id]]) }}" variant="warning" size="sm" class="fw-bold px-3 text-dark border me-1" icon="feather-cpu">
-            MRP Shortage Analysis
-        </x-ui.button>
-
-        @if (in_array($delivery->status, ['Ready', 'Partially Ready', 'Processing', 'Picked', 'Packed']))
+        @if (!in_array($delivery->status, ['Delivered', 'Cancelled']))
             <x-ui.button href="{{ route('sales.dispatches.create', ['material_requirement_id' => $delivery->id, 'sales_order_id' => $delivery->sales_order_id]) }}" variant="primary" size="sm" class="fw-bold px-3" icon="feather-truck">
-                Create Dispatch
+                Dispatch Order
             </x-ui.button>
-        @elseif ($delivery->status === 'Dispatched')
+        @endif
+
+        @if ($delivery->status === 'Dispatched')
             <form action="{{ route('sales.material-requirements.deliver', $delivery->id) }}" method="POST" class="d-inline">
                 @csrf
                 <x-ui.button type="submit" variant="success" size="sm" class="fw-bold px-3" icon="feather-check-circle">
@@ -31,13 +29,18 @@
 
         <x-ui.action-dropdown id="mrActionsDropdown">
             <li>
+                <a href="{{ route('inventory.mrp-shortage.index', ['mr_ids' => [$delivery->id]]) }}" class="dropdown-item py-2">
+                    <i class="feather-cpu me-2 text-muted fs-12"></i>MRP Shortage Analysis
+                </a>
+            </li>
+            <li>
                 <a href="javascript:void(0)" onclick="window.print()" class="dropdown-item py-2">
                     <i class="feather-printer me-2 text-muted fs-12"></i>Print Requirement Sheet
                 </a>
             </li>
             <li>
                 <a href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" class="dropdown-item py-2">
-                    <i class="feather-shopping-cart me-2 text-muted fs-12"></i>View Sales Order #{{ $delivery->salesOrder->sales_order_number }}
+                    <i class="feather-shopping-cart me-2 text-muted fs-12"></i>View Sales Order #{{ $delivery->salesOrder?->sales_order_number }}
                 </a>
             </li>
         </x-ui.action-dropdown>
