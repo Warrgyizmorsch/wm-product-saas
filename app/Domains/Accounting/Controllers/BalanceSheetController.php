@@ -33,11 +33,15 @@ class BalanceSheetController extends Controller
             : $this->periods->periodForDate(now());
 
         $sections = [
-            'asset' => collect(),
-            'liability' => collect(),
+            'asset' => ['current' => collect(), 'non_current' => collect()],
+            'liability' => ['current' => collect(), 'non_current' => collect()],
             'equity' => collect(),
         ];
-        $totals = ['asset' => 0.0, 'liability' => 0.0, 'equity' => 0.0];
+        $totals = [
+            'asset' => 0.0, 'asset_current' => 0.0, 'asset_non_current' => 0.0,
+            'liability' => 0.0, 'liability_current' => 0.0, 'liability_non_current' => 0.0,
+            'equity' => 0.0,
+        ];
         $netIncome = 0.0;
         $isBalanced = true;
 
@@ -58,11 +62,15 @@ class BalanceSheetController extends Controller
                 $balance = $account->signedMovement((float) $row->debit, (float) $row->credit);
 
                 if ($account->type === ChartOfAccount::TYPE_ASSET) {
-                    $sections['asset']->push(['account' => $account, 'balance' => $balance]);
+                    $bucket = $account->isNonCurrent() ? 'non_current' : 'current';
+                    $sections['asset'][$bucket]->push(['account' => $account, 'balance' => $balance]);
                     $totals['asset'] += $balance;
+                    $totals["asset_{$bucket}"] += $balance;
                 } elseif ($account->type === ChartOfAccount::TYPE_LIABILITY) {
-                    $sections['liability']->push(['account' => $account, 'balance' => $balance]);
+                    $bucket = $account->isNonCurrent() ? 'non_current' : 'current';
+                    $sections['liability'][$bucket]->push(['account' => $account, 'balance' => $balance]);
                     $totals['liability'] += $balance;
+                    $totals["liability_{$bucket}"] += $balance;
                 } elseif ($account->type === ChartOfAccount::TYPE_EQUITY) {
                     $sections['equity']->push(['account' => $account, 'balance' => $balance]);
                     $totals['equity'] += $balance;
@@ -76,9 +84,12 @@ class BalanceSheetController extends Controller
             $netIncome = $incomeTotal - $expenseTotal;
             $totals['equity'] += $netIncome;
 
-            foreach (['asset', 'liability', 'equity'] as $key) {
-                $sections[$key] = $sections[$key]->sortBy(fn ($row) => $row['account']->code)->values();
+            $sortByCode = fn ($row) => $row['account']->code;
+            foreach (['asset', 'liability'] as $key) {
+                $sections[$key]['current'] = $sections[$key]['current']->sortBy($sortByCode)->values();
+                $sections[$key]['non_current'] = $sections[$key]['non_current']->sortBy($sortByCode)->values();
             }
+            $sections['equity'] = $sections['equity']->sortBy($sortByCode)->values();
 
             $isBalanced = abs($totals['asset'] - ($totals['liability'] + $totals['equity'])) < 0.01;
         }

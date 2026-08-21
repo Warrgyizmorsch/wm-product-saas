@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\Services;
 
 use App\Domains\Accounting\Models\AccountingPeriod;
+use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\JournalRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
@@ -190,6 +191,23 @@ class JournalService
 
             $totalDebit += $debit;
             $totalCredit += $credit;
+        }
+
+        $accountIds = array_values(array_unique(array_column($lines, 'chart_of_account_id')));
+        $groupAccountIds = ChartOfAccount::withoutGlobalScopes()
+            ->whereIn('parent_id', $accountIds)
+            ->pluck('parent_id')
+            ->unique();
+
+        if ($groupAccountIds->isNotEmpty()) {
+            $groupAccountCodes = ChartOfAccount::withoutGlobalScopes()
+                ->whereIn('id', $groupAccountIds)
+                ->pluck('code')
+                ->implode(', ');
+
+            throw new InvalidArgumentException(
+                "Cannot post directly to a group account with sub-accounts: {$groupAccountCodes}. Select a specific account instead."
+            );
         }
 
         if (round($totalDebit, 2) !== round($totalCredit, 2)) {

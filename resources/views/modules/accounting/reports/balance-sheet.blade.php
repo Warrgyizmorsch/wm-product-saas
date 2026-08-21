@@ -46,7 +46,10 @@
                             </tr>
                         </thead>
                         <tbody class="fs-13 text-dark">
-                            @forelse ($sections['asset'] as $row)
+                            <tr class="table-light">
+                                <td class="ps-4 fw-bold text-uppercase fs-11 text-muted" colspan="3">Current Assets</td>
+                            </tr>
+                            @forelse ($sections['asset']['current'] as $row)
                                 <tr>
                                     <td class="ps-4 fw-bold font-monospace">{{ $row['account']->code }}</td>
                                     <td>{{ $row['account']->name }}</td>
@@ -54,9 +57,32 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="3" class="text-center py-4 text-muted">No asset balances.</td>
+                                    <td colspan="3" class="text-center py-3 text-muted">No current asset balances.</td>
                                 </tr>
                             @endforelse
+                            <tr class="fw-semibold">
+                                <td class="ps-4" colspan="2">Total Current Assets</td>
+                                <td class="text-end pe-4">{{ number_format($totals['asset_current'], 2) }}</td>
+                            </tr>
+
+                            <tr class="table-light">
+                                <td class="ps-4 fw-bold text-uppercase fs-11 text-muted" colspan="3">Non-Current Assets</td>
+                            </tr>
+                            @forelse ($sections['asset']['non_current'] as $row)
+                                <tr>
+                                    <td class="ps-4 fw-bold font-monospace">{{ $row['account']->code }}</td>
+                                    <td>{{ $row['account']->name }}</td>
+                                    <td class="text-end pe-4">{{ number_format($row['balance'], 2) }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="text-center py-3 text-muted">No non-current asset balances.</td>
+                                </tr>
+                            @endforelse
+                            <tr class="fw-semibold">
+                                <td class="ps-4" colspan="2">Total Non-Current Assets</td>
+                                <td class="text-end pe-4">{{ number_format($totals['asset_non_current'], 2) }}</td>
+                            </tr>
                         </tbody>
                         <tfoot>
                             <tr class="fw-bold fs-13 bg-light">
@@ -79,7 +105,10 @@
                             </tr>
                         </thead>
                         <tbody class="fs-13 text-dark">
-                            @forelse ($sections['liability'] as $row)
+                            <tr class="table-light">
+                                <td class="ps-4 fw-bold text-uppercase fs-11 text-muted" colspan="3">Current Liabilities</td>
+                            </tr>
+                            @forelse ($sections['liability']['current'] as $row)
                                 <tr>
                                     <td class="ps-4 fw-bold font-monospace">{{ $row['account']->code }}</td>
                                     <td>{{ $row['account']->name }}</td>
@@ -87,9 +116,32 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="3" class="text-center py-4 text-muted">No liability balances.</td>
+                                    <td colspan="3" class="text-center py-3 text-muted">No current liability balances.</td>
                                 </tr>
                             @endforelse
+                            <tr class="fw-semibold">
+                                <td class="ps-4" colspan="2">Total Current Liabilities</td>
+                                <td class="text-end pe-4">{{ number_format($totals['liability_current'], 2) }}</td>
+                            </tr>
+
+                            <tr class="table-light">
+                                <td class="ps-4 fw-bold text-uppercase fs-11 text-muted" colspan="3">Non-Current Liabilities</td>
+                            </tr>
+                            @forelse ($sections['liability']['non_current'] as $row)
+                                <tr>
+                                    <td class="ps-4 fw-bold font-monospace">{{ $row['account']->code }}</td>
+                                    <td>{{ $row['account']->name }}</td>
+                                    <td class="text-end pe-4">{{ number_format($row['balance'], 2) }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="text-center py-3 text-muted">No non-current liability balances.</td>
+                                </tr>
+                            @endforelse
+                            <tr class="fw-semibold">
+                                <td class="ps-4" colspan="2">Total Non-Current Liabilities</td>
+                                <td class="text-end pe-4">{{ number_format($totals['liability_non_current'], 2) }}</td>
+                            </tr>
                         </tbody>
                         <tfoot>
                             <tr class="fw-bold fs-13 bg-light">
