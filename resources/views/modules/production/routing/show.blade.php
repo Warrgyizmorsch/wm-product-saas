@@ -230,7 +230,7 @@
                             <th class="text-end" style="width: 8%">{{ __('production.run') }}</th>
                             <th class="text-end" style="width: 8%">{{ __('production.yield') }}</th>
                             <th class="text-center" style="width: 5%">{{ __('production.qc_gate') }}</th>
-                            <th class="text-center" style="width: 8%">Overlap</th>
+                            <th class="text-center" style="width: 8%">Queue Threshold</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -281,8 +281,8 @@
                                     @endif
                                 </td>
                                 <td class="text-center align-middle">
-                                    @if ($op->overlap_enabled)
-                                        <span class="badge bg-soft-info text-info" title="Overlapping Enabled (Partial Transfer Batch: {{ number_format($op->transfer_batch_quantity, 2) }})">
+                                    @if ($op->queue_threshold_enabled ?? $op->overlap_enabled)
+                                        <span class="badge bg-soft-info text-info" title="Queue Threshold Enabled (Partial Transfer Batch: {{ number_format($op->transfer_batch_quantity, 2) }})">
                                             <i class="feather-zap me-1"></i>{{ number_format($op->transfer_batch_quantity, 2) }}
                                         </span>
                                     @else

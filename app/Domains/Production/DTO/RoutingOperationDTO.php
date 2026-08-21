@@ -22,6 +22,7 @@ class RoutingOperationDTO
         public readonly bool    $quality_required = false,
         public readonly bool    $is_external = false,
         public readonly ?int    $vendor_id = null,
+        public readonly bool    $queue_threshold_enabled = false,
         public readonly bool    $overlap_enabled = false,
         public readonly float   $transfer_batch_quantity = 0.0,
         public readonly int     $transfer_lag_minutes = 0,
@@ -36,6 +37,7 @@ class RoutingOperationDTO
     public static function fromArray(array $data): self
     {
         $sequence = (int) ($data['sequence'] ?? 10);
+        $queueEnabled = filter_var($data['queue_threshold_enabled'] ?? $data['overlap_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
         return new self(
             sequence:                       $sequence,
             operation_number:               $data['operation_number'] ?? 'OP-' . str_pad((string) $sequence, 3, '0', STR_PAD_LEFT),
@@ -54,7 +56,8 @@ class RoutingOperationDTO
             quality_required:               !empty($data['quality_required']),
             is_external:                    !empty($data['is_external']),
             vendor_id:                      !empty($data['vendor_id']) ? (int) $data['vendor_id'] : null,
-            overlap_enabled:               filter_var($data['overlap_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            queue_threshold_enabled:        $queueEnabled,
+            overlap_enabled:                $queueEnabled,
             transfer_batch_quantity:        isset($data['transfer_batch_quantity']) ? (float) $data['transfer_batch_quantity'] : 0.0,
             transfer_lag_minutes:           isset($data['transfer_lag_minutes']) ? (int) $data['transfer_lag_minutes'] : 0,
             subcontract_lead_time_days:     isset($data['subcontract_lead_time_days']) ? (int) $data['subcontract_lead_time_days'] : 0,
@@ -86,6 +89,7 @@ class RoutingOperationDTO
             'quality_required'               => $this->quality_required,
             'is_external'                    => $this->is_external,
             'vendor_id'                      => $this->vendor_id,
+            'queue_threshold_enabled'        => $this->queue_threshold_enabled,
             'overlap_enabled'               => $this->overlap_enabled,
             'transfer_batch_quantity'        => $this->transfer_batch_quantity,
             'transfer_lag_minutes'           => $this->transfer_lag_minutes,

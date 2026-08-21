@@ -816,7 +816,7 @@ class ProductionForwardOverlapSchedulingTest extends TestCase
             ->get(route('production.schedules.show', $schedule->id));
 
         $response->assertStatus(200);
-        $response->assertSee('⚡ Overlap Enabled');
+        $response->assertSee('⚡ Queue Threshold Enabled');
     }
 
     /** 27. Existing scheduling regression tests pass. */

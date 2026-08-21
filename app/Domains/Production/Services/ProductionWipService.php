@@ -704,7 +704,7 @@ class ProductionWipService
                     ? $sourceOp->transfer_batch_quantity
                     : ($sourceOp->routingOperation?->transfer_batch_quantity ?? 0));
 
-                $batchSize = ($sourceOp->overlap_enabled || $transferBatchQty > 0)
+                $batchSize = (($sourceOp->queue_threshold_enabled ?? $sourceOp->overlap_enabled) || $transferBatchQty > 0)
                     ? $transferBatchQty
                     : 0.0;
 
