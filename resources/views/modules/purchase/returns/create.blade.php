@@ -26,17 +26,67 @@
                     <x-ui.button href="{{ route('purchase.returns.index') }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
                 </div>
 
+                <!-- 2-Mode Selection Radio Bar -->
+                <div class="mb-4 bg-light p-3 rounded border">
+                    <label class="form-label fw-bold fs-11 text-uppercase text-muted d-block mb-2">Create Purchase Return Based On:</label>
+                    <div class="d-flex gap-4 flex-wrap align-items-center">
+                        <div class="form-check">
+                            <input class="form-check-input mode-radio" type="radio" name="mode_option" id="modeGRN" value="grn" {{ $mode !== 'direct' ? 'checked' : '' }}>
+                            <label class="form-check-label fw-bold text-dark fs-13" for="modeGRN">
+                                <i class="feather-truck me-1 text-info"></i>Against Goods Receipt (GRN)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input mode-radio" type="radio" name="mode_option" id="modeDirect" value="direct" {{ $mode === 'direct' ? 'checked' : '' }}>
+                            <label class="form-check-label fw-bold text-dark fs-13" for="modeDirect">
+                                <i class="feather-user me-1 text-success"></i>Direct Return (Standalone)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row g-4 fs-13 text-dark">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <x-ui.odoo-form-ui type="input" label="Return Number" name="return_number" :value="old('return_number', $nextReturnNumber)" :required="true" />
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <x-ui.odoo-form-ui type="input" inputType="date" label="Return Date" name="return_date" :value="old('return_date', date('Y-m-d'))" :required="true" />
                     </div>
-                    <div class="col-md-4">
-                        <x-ui.select label="Vendor" name="vendor_id" :selected="old('vendor_id', $prefillVendorId)"
-                                     :options="['' => 'Select Vendor...'] + $vendors->pluck('name', 'id')->all()" required="true" />
-                    </div>
+
+                    @if ($mode !== 'direct')
+                        <div class="col-md-3">
+                            <x-ui.odoo-form-ui type="select" label="Goods Receipt (GRN) Reference" name="goods_receipt_note_id" id="grnSelect" class="odoo-select2" :required="true">
+                                <option value="">Select GRN...</option>
+                                @foreach ($goodsReceiptNotes as $g)
+                                    <option value="{{ $g->id }}" {{ (string)$prefillGrnId === (string)$g->id ? 'selected' : '' }}>
+                                        {{ $g->grn_number }} (Vendor: {{ $g->vendor?->name ?? '—' }})
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <input type="hidden" name="purchase_order_id" value="{{ $prefillPurchaseOrderId }}">
+                        <div class="col-md-3">
+                            <x-ui.odoo-form-ui type="select" label="Vendor" name="vendor_id" id="vendorSelect" class="odoo-select2" :required="true">
+                                <option value="">Select Vendor...</option>
+                                @foreach ($vendors as $v)
+                                    <option value="{{ $v->id }}" {{ (string)$prefillVendorId === (string)$v->id ? 'selected' : '' }}>
+                                        {{ $v->name }}
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                    @else
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Vendor" name="vendor_id" id="vendorSelect" class="odoo-select2" :required="true">
+                                <option value="">Select Vendor...</option>
+                                @foreach ($vendors as $v)
+                                    <option value="{{ $v->id }}" {{ (string)$prefillVendorId === (string)$v->id ? 'selected' : '' }}>
+                                        {{ $v->name }}
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                    @endif
                 </div>
                 <div class="row g-4 fs-13 text-dark mt-1">
                     <div class="col-md-12">
@@ -85,8 +135,9 @@
         $(document).ready(function() {
             let rowIndex = 0;
 
-            const productsList = @json($products->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku ?: '']));
-            const warehousesList = @json($warehouses->map(fn ($w) => ['id' => $w->id, 'name' => $w->name]));
+            const productsList = @json($productsJson);
+            const warehousesList = @json($warehousesJson);
+            const prefillItems = @json($prefillItemsJson);
 
             function escapeHtml(string) {
                 return String(string).replace(/[&<>"']/g, function (s) {
@@ -94,32 +145,38 @@
                 });
             }
 
-            function buildOptions(list, labelFn) {
+            function buildOptions(list, labelFn, selectedVal) {
                 let opts = '<option value="">Select...</option>';
                 list.forEach(function(o) {
-                    opts += `<option value="${o.id}">${escapeHtml(labelFn(o))}</option>`;
+                    const sel = (selectedVal && selectedVal == o.id) ? 'selected' : '';
+                    opts += `<option value="${o.id}" ${sel}>${escapeHtml(labelFn(o))}</option>`;
                 });
                 return opts;
             }
 
-            function getRowHtml(index) {
+            function getRowHtml(index, data = {}) {
+                const prodId = data.product_id || '';
+                const whId = data.warehouse_id || (warehousesList[0] ? warehousesList[0].id : '');
+                const qty = data.quantity !== undefined ? data.quantity : 1;
+                const price = data.unit_price !== undefined ? data.unit_price : 0.00;
+
                 return `
                     <tr class="item-row" data-row-id="${index}">
                         <td class="ps-3">
                             <select name="items[${index}][product_id]" class="form-select odoo-table-select odoo-select2 product-select" required>
-                                ${buildOptions(productsList, p => p.sku ? `${p.sku} - ${p.name}` : p.name)}
+                                ${buildOptions(productsList, p => p.sku ? `${p.sku} - ${p.name}` : p.name, prodId)}
                             </select>
                         </td>
                         <td>
                             <select name="items[${index}][warehouse_id]" class="form-select odoo-table-select odoo-select2 warehouse-select" required>
-                                ${buildOptions(warehousesList, w => w.name)}
+                                ${buildOptions(warehousesList, w => w.name, whId)}
                             </select>
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end" value="1" min="0.0001" step="0.0001" style="width: 90px; margin-left: auto;">
+                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end" value="${qty}" min="0.0001" step="0.0001" style="width: 90px; margin-left: auto;">
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end" value="0.00" min="0" step="0.01" style="width: 110px; margin-left: auto;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end" value="${parseFloat(price).toFixed(2)}" min="0" step="0.01" style="width: 110px; margin-left: auto;">
                         </td>
                         <td class="text-center">
                             <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn mt-1">
@@ -129,6 +186,15 @@
                     </tr>
                 `;
             }
+
+            $('.mode-radio').on('change', function() {
+                window.location.href = "{{ route('purchase.returns.create') }}?mode=" + $(this).val();
+            });
+
+            $('#grnSelect').on('change', function() {
+                const grnId = $(this).val();
+                window.location.href = "{{ route('purchase.returns.create') }}?mode=grn&goods_receipt_note_id=" + grnId;
+            });
 
             $('#addItemRow').on('click', function() {
                 addRow();
@@ -143,8 +209,8 @@
                 }
             });
 
-            function addRow() {
-                const newRow = $(getRowHtml(rowIndex));
+            function addRow(data = {}) {
+                const newRow = $(getRowHtml(rowIndex, data));
                 $('#itemsTable tbody').append(newRow);
 
                 if (typeof $.fn.select2 === 'function') {
@@ -154,7 +220,11 @@
                 rowIndex++;
             }
 
-            addRow();
+            if (prefillItems && prefillItems.length > 0) {
+                prefillItems.forEach(item => addRow(item));
+            } else {
+                addRow();
+            }
         });
     </script>
 @endpush

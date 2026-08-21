@@ -178,12 +178,12 @@ class ProductService
                 'track_serial_number' => $isService ? false : !empty($validated['track_serial_number']),
                 'track_batch' => $isService ? false : !empty($validated['track_batch']),
                 'inventory_valuation_method' => $validated['inventory_valuation_method'] ?? 'FIFO',
-                'supplier_method' => $validated['supplier_method'] ?? 'buy',
+                'supplier_method' => ($validated['supplier_method'] ?? 'trade') === 'buy' ? 'trade' : ($validated['supplier_method'] ?? 'trade'),
             ]);
 
             Product::where('parent_id', $product->id)->update([
                 'type' => $isService ? 'service' : ($validated['type'] ?? $product->type),
-                'supplier_method' => $validated['supplier_method'] ?? 'buy'
+                'supplier_method' => ($validated['supplier_method'] ?? 'trade') === 'buy' ? 'trade' : ($validated['supplier_method'] ?? 'trade')
             ]);
 
             if ($product->variation_type === 'Variant') {

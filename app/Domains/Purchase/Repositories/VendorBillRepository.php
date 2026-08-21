@@ -12,7 +12,7 @@ class VendorBillRepository
         $tenantId = require_tenant_id();
 
         $query = VendorBill::where('tenant_id', $tenantId)
-            ->with(['vendor', 'purchaseOrder']);
+            ->with(['vendor', 'purchaseOrder', 'goodsReceiptNote', 'items.product']);
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);

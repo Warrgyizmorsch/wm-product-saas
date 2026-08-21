@@ -37,7 +37,7 @@ class InvoiceController extends Controller
         $customerId = $request->input('customer_id');
         $mode = $request->input('mode', $customerId ? 'direct' : 'sales_order');
         $salesOrderId = $request->input('sales_order_id');
-        $dispatchOrderId = $request->input('dispatch_order_id') ?? $request->input('material_requirement_id');
+        $dispatchOrderId = $request->input('dispatch_order_id') ?? $request->input('dispatch_id') ?? $request->input('material_requirement_id');
 
         // Fetch Sales Orders that have unbilled quantities remaining
         $allSalesOrders = SalesOrder::with(['customer', 'items.product', 'items.warehouse', 'invoices' => function($q) {
@@ -57,18 +57,37 @@ class InvoiceController extends Controller
             ->latest()->get();
 
         $dispatchOrders = $allDispatchOrders->filter(function ($do) {
-            $totalDispatched = $do->items->sum(fn($i) => floatval($i->quantity_dispatched > 0 ? $i->quantity_dispatched : $i->quantity_ordered));
-            $mrId = $do->material_requirement_id;
-            
-            $invoiced = InvoiceItem::whereHas('invoice', function ($q) use ($mrId, $do) {
-                $q->where('status', '!=', 'Cancelled')
-                  ->where(function($sub) use ($mrId, $do) {
-                      $sub->where('material_requirement_id', $mrId)
-                          ->orWhere('sales_order_id', $do->sales_order_id);
-                  });
-            })->sum('quantity');
+            foreach ($do->items as $doItem) {
+                $doQty = floatval($doItem->quantity_dispatched > 0 ? $doItem->quantity_dispatched : $doItem->quantity_ordered);
+                
+                $cumulativeDispatched = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function($q) use ($do) {
+                    $q->where('sales_order_id', $do->sales_order_id)
+                      ->where('id', '<=', $do->id);
+                })->where(function($q) use ($doItem) {
+                    if ($doItem->material_requirement_item_id) {
+                        $q->where('material_requirement_item_id', $doItem->material_requirement_item_id);
+                    } else {
+                        $q->where('product_id', $doItem->product_id);
+                    }
+                })->sum(DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
 
-            return ($totalDispatched - $invoiced) > 0.0001;
+                $mrItemId = $doItem->material_requirement_item_id;
+                $alreadyInvoiced = InvoiceItem::whereHas('invoice', fn($q) => $q->where('status', '!=', 'Cancelled')->where('sales_order_id', $do->sales_order_id))
+                    ->where(function($q) use ($mrItemId, $doItem) {
+                        if ($mrItemId) {
+                            $q->where('material_requirement_item_id', $mrItemId);
+                        } else {
+                            $q->where('product_id', $doItem->product_id);
+                        }
+                    })
+                    ->sum('quantity');
+
+                $unbilledQty = min($doQty, max(0, $cumulativeDispatched - $alreadyInvoiced));
+                if ($unbilledQty > 0.0001) {
+                    return true;
+                }
+            }
+            return false;
         });
 
         $customers  = \App\Domains\CRM\Models\Customer::query()->orderBy('name')->get();
@@ -79,11 +98,25 @@ class InvoiceController extends Controller
         $materialRequirement = null;
         if ($dispatchOrderId) {
             $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])->find($dispatchOrderId);
+            if (!$dispatchOrder) {
+                $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])
+                    ->where('material_requirement_id', $dispatchOrderId)
+                    ->latest()
+                    ->first();
+            }
             if ($dispatchOrder) {
                 $salesOrderId = $dispatchOrder->sales_order_id;
                 $materialRequirementId = $dispatchOrder->material_requirement_id;
                 $mode = 'dispatch_order';
+
+                if (!$dispatchOrders->contains('id', $dispatchOrder->id)) {
+                    $dispatchOrders->push($dispatchOrder);
+                }
             }
+        }
+
+        if ($request->input('mode') === 'dispatch' || $request->input('mode') === 'dispatch_order') {
+            $mode = 'dispatch_order';
         }
 
         $salesOrder = $salesOrderId ? SalesOrder::with('items.product', 'items.warehouse', 'customer')->find($salesOrderId) : null;
@@ -111,18 +144,29 @@ class InvoiceController extends Controller
                 $soItem = $salesOrder?->items->firstWhere('product_id', $doItem->product_id);
                 $dispatchedQty = floatval($doItem->quantity_dispatched > 0 ? $doItem->quantity_dispatched : $doItem->quantity_ordered);
 
+                $cumulativeDispatched = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function($q) use ($dispatchOrder) {
+                    $q->where('sales_order_id', $dispatchOrder->sales_order_id)
+                      ->where('id', '<=', $dispatchOrder->id);
+                })->where(function($q) use ($doItem) {
+                    if ($doItem->material_requirement_item_id) {
+                        $q->where('material_requirement_item_id', $doItem->material_requirement_item_id);
+                    } else {
+                        $q->where('product_id', $doItem->product_id);
+                    }
+                })->sum(DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
+
                 $mrItemId = $doItem->material_requirement_item_id;
-                $alreadyInvoiced = InvoiceItem::whereHas('invoice', fn($q) => $q->where('status', '!=', 'Cancelled'))
-                    ->where(function($q) use ($mrItemId, $doItem, $dispatchOrder) {
-                        $q->where('material_requirement_item_id', $mrItemId)
-                          ->orWhere(function($sub) use ($doItem, $dispatchOrder) {
-                              $sub->where('product_id', $doItem->product_id)
-                                  ->whereHas('invoice', fn($inv) => $inv->where('sales_order_id', $dispatchOrder->sales_order_id));
-                          });
+                $alreadyInvoiced = InvoiceItem::whereHas('invoice', fn($q) => $q->where('status', '!=', 'Cancelled')->where('sales_order_id', $dispatchOrder->sales_order_id))
+                    ->where(function($q) use ($mrItemId, $doItem) {
+                        if ($mrItemId) {
+                            $q->where('material_requirement_item_id', $mrItemId);
+                        } else {
+                            $q->where('product_id', $doItem->product_id);
+                        }
                     })
                     ->sum('quantity');
 
-                $unbilledQty = max(0, $dispatchedQty - $alreadyInvoiced);
+                $unbilledQty = min($dispatchedQty, max(0, $cumulativeDispatched - $alreadyInvoiced));
                 if ($unbilledQty <= 0.0001) {
                     continue; // Skip items already fully invoiced
                 }
@@ -215,6 +259,7 @@ class InvoiceController extends Controller
             'invoice_number'          => ['required', 'string', 'max:255', 'unique:invoices,invoice_number'],
             'invoice_date'            => ['required', 'date'],
             'due_date'                => ['required', 'date', 'after_or_equal:invoice_date'],
+            'gst_type'                => ['nullable', 'string', 'in:cgst_sgst,igst'],
             'notes'                   => ['nullable', 'string'],
             'items'                   => ['required', 'array', 'min:1'],
             'items.*.sales_order_item_id'          => ['nullable', 'exists:sales_order_items,id'],
@@ -248,8 +293,9 @@ class InvoiceController extends Controller
 
         $taxType      = $request->input('tax_type', 'item_wise_tax');
         $discountType = $request->input('discount_type', 'without_discount');
+        $gstType      = $request->input('gst_type', 'cgst_sgst');
 
-        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $taxType, $discountType, $request) {
+        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $taxType, $discountType, $gstType, $request) {
             $subtotal = 0;
             $taxAmount = 0;
             $discountAmount = 0;
@@ -283,6 +329,19 @@ class InvoiceController extends Controller
                 $taxAmount = 0;
             }
 
+            $cgstAmount = 0;
+            $sgstAmount = 0;
+            $igstAmount = 0;
+
+            if ($taxAmount > 0) {
+                if ($gstType === 'igst') {
+                    $igstAmount = $taxAmount;
+                } else {
+                    $cgstAmount = round($taxAmount / 2, 2);
+                    $sgstAmount = round($taxAmount - $cgstAmount, 2);
+                }
+            }
+
             $totalAmount = max(0, $subtotal - $discountAmount + $taxAmount);
 
             $invoice = Invoice::create([
@@ -296,6 +355,10 @@ class InvoiceController extends Controller
                 'status'                  => 'Draft',
                 'subtotal'                => $subtotal,
                 'tax_amount'              => $taxAmount,
+                'gst_type'                => $gstType,
+                'cgst_amount'             => $cgstAmount,
+                'sgst_amount'             => $sgstAmount,
+                'igst_amount'             => $igstAmount,
                 'discount_amount'         => $discountAmount,
                 'total_amount'            => $totalAmount,
                 'amount_paid'             => 0,
@@ -313,6 +376,25 @@ class InvoiceController extends Controller
                 $lineTaxable = max(0, $lineSubtotal - $disc);
                 $lineTax = $lineTaxable * ($taxR / 100);
 
+                $lineCgstPercent = 0;
+                $lineSgstPercent = 0;
+                $lineIgstPercent = 0;
+                $lineCgstAmt = 0;
+                $lineSgstAmt = 0;
+                $lineIgstAmt = 0;
+
+                if ($lineTax > 0 || $taxR > 0) {
+                    if ($gstType === 'igst') {
+                        $lineIgstPercent = $taxR;
+                        $lineIgstAmt = $lineTax;
+                    } else {
+                        $lineCgstPercent = round($taxR / 2, 2);
+                        $lineSgstPercent = round($taxR / 2, 2);
+                        $lineCgstAmt = round($lineTax / 2, 2);
+                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 2);
+                    }
+                }
+
                 InvoiceItem::create([
                     'invoice_id'                   => $invoice->id,
                     'sales_order_item_id'          => $item['sales_order_item_id'] ?? null,
@@ -326,14 +408,20 @@ class InvoiceController extends Controller
                     'discount'                     => $disc,
                     'tax_rate'                     => $taxR,
                     'tax_amount'                   => $lineTax,
+                    'cgst_percent'                 => $lineCgstPercent,
+                    'sgst_percent'                 => $lineSgstPercent,
+                    'igst_percent'                 => $lineIgstPercent,
+                    'cgst_amount'                  => $lineCgstAmt,
+                    'sgst_amount'                  => $lineSgstAmt,
+                    'igst_amount'                  => $lineIgstAmt,
                     'subtotal'                     => $lineSubtotal,
                     'total_amount'                 => $lineTaxable + $lineTax,
                 ]);
             }
 
-            $unallocatedAdvances = PaymentAllocation::where('sales_order_id', $salesOrder->id)
+            $unallocatedAdvances = $salesOrder ? PaymentAllocation::where('sales_order_id', $salesOrder->id)
                 ->whereNull('invoice_id')
-                ->get();
+                ->get() : collect();
 
             $remainingBalance = $invoice->balance_due;
             foreach ($unallocatedAdvances as $allocation) {
