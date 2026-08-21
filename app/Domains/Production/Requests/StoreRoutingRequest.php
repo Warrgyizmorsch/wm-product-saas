@@ -60,6 +60,7 @@ class StoreRoutingRequest extends FormRequest
             'operations.*.material_supply_type'               => 'nullable|in:company_supplied,vendor_supplied,none',
             'operations.*.dispatch_buffer_days'               => 'nullable|numeric|min:0',
             'operations.*.return_buffer_days'                 => 'nullable|numeric|min:0',
+            'operations.*.queue_threshold_enabled'            => 'nullable|boolean',
             'operations.*.overlap_enabled'                    => 'nullable|boolean',
             'operations.*.transfer_batch_quantity'            => 'nullable|numeric|min:0',
             'operations.*.transfer_lag_minutes'               => 'nullable|integer|min:0',
@@ -88,21 +89,21 @@ class StoreRoutingRequest extends FormRequest
                     }
                 }
 
-                // Rule 2: Overlap validation
-                $overlapEnabled = filter_var($op['overlap_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                // Rule 2: Queue Threshold validation
+                $queueEnabled = filter_var($op['queue_threshold_enabled'] ?? $op['overlap_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
                 $batchQty = (float) ($op['transfer_batch_quantity'] ?? 0);
 
-                if ($overlapEnabled) {
+                if ($queueEnabled) {
                     if ($batchQty <= 0) {
                         $validator->errors()->add(
                             "operations.{$index}.transfer_batch_quantity",
-                            "Transfer batch quantity must be greater than zero when overlapping is enabled."
+                            "Transfer batch quantity must be greater than zero when Queue Threshold is enabled."
                         );
                     }
                     if ($index === $totalOps - 1) {
                         $validator->errors()->add(
-                            "operations.{$index}.overlap_enabled",
-                            "Overlapping cannot be enabled on the final operation because it has no successor operation."
+                            "operations.{$index}.queue_threshold_enabled",
+                            "Queue Threshold cannot be enabled on the final operation because it has no successor operation."
                         );
                     }
                 }

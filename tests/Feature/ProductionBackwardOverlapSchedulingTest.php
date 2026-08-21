@@ -780,7 +780,7 @@ class ProductionBackwardOverlapSchedulingTest extends TestCase
             ->get(route('production.schedules.show', $schedule->id));
         $response->assertStatus(200);
         $response->assertSee('Backward / JIT');
-        $response->assertSee('⚡ Overlap Enabled');
+        $response->assertSee('⚡ Queue Threshold Enabled');
         $response->assertSee('Transfer-Ready:');
     }
 

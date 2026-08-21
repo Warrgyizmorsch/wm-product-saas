@@ -66,6 +66,7 @@ class ProductionOrderOperation extends BaseModel
         'parallel_group',
         'is_parallel',
         'parallel_type',
+        'queue_threshold_enabled',
         'overlap_enabled',
         'transfer_batch_quantity',
         'transfer_lag_minutes',
@@ -91,12 +92,27 @@ class ProductionOrderOperation extends BaseModel
         'quantity_scrapped'       => 'float',
         'actual_start_time'       => 'datetime',
         'actual_end_time'         => 'datetime',
+        'queue_threshold_enabled' => 'boolean',
         'overlap_enabled'         => 'boolean',
         'transfer_batch_quantity' => 'float',
         'transfer_lag_minutes'    => 'integer',
         'quantity_transferred_out'=> 'float',
         'quantity_transferred_in' => 'float',
     ];
+
+    public function getOverlapEnabledAttribute(): bool
+    {
+        return (bool) ($this->attributes['queue_threshold_enabled'] ?? $this->attributes['overlap_enabled'] ?? false);
+    }
+
+    public function setOverlapEnabledAttribute($value): void
+    {
+        $bool = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        $this->attributes['queue_threshold_enabled'] = $bool;
+        if (array_key_exists('overlap_enabled', $this->attributes)) {
+            $this->attributes['overlap_enabled'] = $bool;
+        }
+    }
 
     public function order(): BelongsTo
     {
