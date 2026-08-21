@@ -13,6 +13,8 @@ trait HasHrPermissions
 {
     public function hasHrPermission(string $permission): bool
     {
-        return true;
+        return app(AccessService::class)->allows($this, $permission, [
+            'tenant_id' => $this->tenant_id,
+        ]);
     }
 }
