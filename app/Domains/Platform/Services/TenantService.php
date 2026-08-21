@@ -2,6 +2,7 @@
 
 namespace App\Domains\Platform\Services;
 
+use App\Domains\Accounting\Services\ChartOfAccountsService;
 use App\Domains\Platform\Repositories\TenantRepository;
 use App\Models\Access\Role;
 use App\Models\Tenant;
@@ -15,6 +16,7 @@ class TenantService
 {
     public function __construct(
         private readonly TenantRepository $tenants,
+        private readonly ChartOfAccountsService $chartOfAccounts,
     ) {
     }
 
@@ -37,6 +39,7 @@ class TenantService
     {
         return DB::transaction(function () use ($data): Tenant {
             $tenant = $this->tenants->create($this->payload($data));
+            $this->chartOfAccounts->provisionDefaults($tenant->id);
             $owner = $this->createOwnerUser($tenant, $data);
 
             if ($owner !== null) {

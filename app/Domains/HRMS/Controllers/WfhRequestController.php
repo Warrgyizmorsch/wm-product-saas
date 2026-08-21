@@ -108,6 +108,8 @@ class WfhRequestController extends Controller
 
     public function updateStatus(Request $request, WfhRequest $wfhRequest, ?string $overrideAction = null): RedirectResponse
     {
+        abort_unless($request->user()->hasHrPermission('hr.settings.manage'), 403);
+
         if ($wfhRequest->status === 'cancelled') {
             return redirect()->back()->with('error', 'Cannot change the status of a cancelled WFH application.');
         }
@@ -181,6 +183,8 @@ class WfhRequestController extends Controller
 
     public function approveCancellation(WfhRequest $wfhRequest): RedirectResponse
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         if ($wfhRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
         }
@@ -196,6 +200,8 @@ class WfhRequestController extends Controller
 
     public function denyCancellation(WfhRequest $wfhRequest): RedirectResponse
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         if ($wfhRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
         }

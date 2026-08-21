@@ -97,6 +97,8 @@ class LeaveRequestController extends Controller
 
     public function updateStatus(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
+        abort_unless($request->user()->hasHrPermission('hr.settings.manage'), 403);
+
         if ($leaveRequest->status === 'cancelled') {
             return redirect()->back()->with('error', 'Cannot change the status of a cancelled leave application.');
         }
@@ -177,6 +179,8 @@ class LeaveRequestController extends Controller
 
     public function approveCancellation(LeaveRequest $leaveRequest): RedirectResponse
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         if ($leaveRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
         }
@@ -193,6 +197,8 @@ class LeaveRequestController extends Controller
 
     public function denyCancellation(LeaveRequest $leaveRequest): RedirectResponse
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         if ($leaveRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
         }
