@@ -783,8 +783,8 @@
 
                             <!-- Integrated Cash Advance Option -->
                             <div class="border-top pt-3 mt-1">
-                                <div class="form-check form-switch mb-2 d-flex align-items-center gap-2">
-                                    <input class="form-check-input" type="checkbox" id="request_advance_toggle" name="request_advance" value="1" onchange="toggleTravelAdvanceAmount(this)">
+                                <div class="form-check mb-2 d-flex align-items-center gap-2 ps-0">
+                                    <input class="form-check-input mt-0 ms-0" type="checkbox" id="request_advance_toggle" name="request_advance" value="1" onchange="toggleTravelAdvanceAmount(this)" style="float: none;">
                                     <label class="form-check-label fw-bold fs-12 text-dark mb-0" for="request_advance_toggle">Request Cash Advance for this trip</label>
                                 </div>
                                 <div id="travel_advance_amount_wrapper" class="d-none mt-3">

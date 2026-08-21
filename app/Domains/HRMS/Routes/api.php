@@ -14,6 +14,7 @@ use App\Domains\HRMS\Controllers\Api\WfhRequestApiController;
 use App\Domains\HRMS\Controllers\Api\ShiftChangeRequestApiController;
 use App\Domains\HRMS\Controllers\Api\BiometricWebhookController;
 use App\Domains\HRMS\Controllers\Api\OvertimeRequestApiController;
+use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -358,6 +359,18 @@ Route::prefix('api/hrms/holidays')
         Route::get('/{holiday}', [\App\Domains\HRMS\Controllers\Api\HolidayCalendarApiController::class, 'show'])->name('show');
         Route::put('/{holiday}', [\App\Domains\HRMS\Controllers\Api\HolidayCalendarApiController::class, 'update'])->name('update');
         Route::delete('/{holiday}', [\App\Domains\HRMS\Controllers\Api\HolidayCalendarApiController::class, 'destroy'])->name('destroy');
+    });
+
+// ==========================================
+// 10B. ATTENDANCE CORRECTION REQUESTS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/attendance-corrections')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.attendance-corrections.')
+    ->group(function () {
+        Route::post('/', [AttendanceCorrectionController::class, 'store'])->name('store');
+        Route::post('/{correction}/approve', [AttendanceCorrectionController::class, 'approve'])->name('approve');
+        Route::post('/{correction}/reject', [AttendanceCorrectionController::class, 'reject'])->name('reject');
     });
 
 // ==========================================

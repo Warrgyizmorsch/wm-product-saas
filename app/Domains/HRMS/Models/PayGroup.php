@@ -11,10 +11,12 @@ class PayGroup extends BaseModel
         'name',
         'description',
         'status',
+        'payroll_rules',
     ];
 
     protected $casts = [
         'status' => 'boolean',
+        'payroll_rules' => 'array',
     ];
 
     /**

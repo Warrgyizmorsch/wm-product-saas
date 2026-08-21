@@ -38,6 +38,29 @@ class AttendanceController extends Controller
         ];
         $departments = Department::where('status', true)->orderBy('name')->get();
 
+        if ($view === 'corrections') {
+            $corrections = \App\Domains\HRMS\Models\AttendanceCorrection::with(['employee', 'attendance'])
+                ->orderBy('created_at', 'desc')
+                ->paginate(10)
+                ->withQueryString();
+
+            $employees = collect();
+            $dates = collect();
+            $statsByDate = collect();
+
+            return view('modules.hrms.attendance.index', compact(
+                'corrections',
+                'employees',
+                'dates',
+                'statsByDate',
+                'view',
+                'departments',
+                'filters',
+                'stats',
+                'sort'
+            ));
+        }
+
         if ($view === 'date') {
             $dateQuery = Attendance::select('date')
                 ->groupBy('date')
@@ -281,6 +304,12 @@ class AttendanceController extends Controller
 
         $attendances = $query->get();
 
+        $correctionRequests = \App\Domains\HRMS\Models\AttendanceCorrection::where('employee_id', $employee->id)
+            ->get()
+            ->groupBy(function($c) {
+                return $c->date instanceof \Carbon\Carbon ? $c->date->format('Y-m-d') : \Carbon\Carbon::parse($c->date)->format('Y-m-d');
+            });
+
         return view(
             'modules.hrms.attendance.myAttendance',
             compact(
@@ -290,7 +319,8 @@ class AttendanceController extends Controller
                 'status',
                 'sort',
                 'search',
-                'monthFilter'
+                'monthFilter',
+                'correctionRequests'
             )
         );
     }

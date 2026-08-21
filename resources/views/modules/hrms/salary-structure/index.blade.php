@@ -392,6 +392,11 @@
                                                 <i class="feather-list me-2"></i>{{ __('hrms.salary.salary_components_tab') }}
                                             </button>
                                         </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link {{ request()->get('tab') === 'rules' ? 'active' : '' }} px-4 py-3" id="rules-tab" data-bs-toggle="tab" data-bs-target="#rules-pane" type="button" role="tab" aria-controls="rules-pane" aria-selected="false">
+                                                <i class="feather-settings me-2"></i>{{ __('Payroll Rules') }}
+                                            </button>
+                                        </li>
                                     </ul>
  
                                     <div class="tab-content" id="settingsSubSidebarContent">
@@ -400,6 +405,9 @@
                                         </div>
                                         <div class="tab-pane fade {{ request()->get('tab') === 'components' ? 'show active' : '' }}" id="components-pane" role="tabpanel" aria-labelledby="components-tab">
                                             @include('modules.hrms.salary-structure.tabs.salary-components')
+                                        </div>
+                                        <div class="tab-pane fade {{ request()->get('tab') === 'rules' ? 'show active' : '' }}" id="rules-pane" role="tabpanel" aria-labelledby="rules-tab">
+                                            @include('modules.hrms.salary-structure.tabs.payroll-rules')
                                         </div>
                                     </div>
                                 </div>
