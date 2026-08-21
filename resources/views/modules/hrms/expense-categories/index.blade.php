@@ -1,5 +1,10 @@
 @extends('layouts.duralux')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
 @section('title', 'Expense Categories | SaaS ERP')
 @section('page-title', 'Expense Categories Master')
 @section('breadcrumb', 'HRMS / Masters / Expense Categories')
@@ -93,25 +98,17 @@
                     <input type="hidden" name="sort"   value="{{ $filters['sort'] }}">
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Status</label>
-                        <select name="status" class="form-select" style="border-radius:6px; border:1px solid #cbd5e1; font-size:13px;">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                        <x-ui.odoo-form-ui type="select" name="status" id="cat_filter_status">
                             <option value="">All Statuses</option>
                             <option value="1" @selected($filters['status'] === '1')>Active</option>
                             <option value="0" @selected($filters['status'] === '0')>Inactive</option>
-                        </select>
+                        </x-ui.odoo-form-ui>
                     </div>
-
-                    <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('hrms.expense-categories.index') }}"
-                           class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3"
-                           style="border-radius:6px; font-size:11px; letter-spacing:0.05em; background-color:#f1f5f9; border:1px solid #e2e8f0; color:#475569;">
-                            Reset
-                        </a>
-                        <button type="submit"
-                                class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3"
-                                style="border-radius:6px; font-size:11px;">
-                            Apply
-                        </button>
+                    <div class="dropdown-divider my-3"></div>
+                    <div class="d-flex gap-2">
+                        <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
+                        <a href="{{ route('hrms.expense-categories.index') }}" class="btn btn-sm btn-light border flex-grow-1 d-flex align-items-center justify-content-center" style="font-size: 12px; font-weight: 500;">Reset</a>
                     </div>
                 </form>
             </x-ui.filter>
@@ -148,7 +145,7 @@
                         <th style="width: 12%;" class="text-end">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="categoriesTableBody">
                     @forelse($categories as $category)
                         <tr>
                             <td class="fw-bold text-primary">{{ $category->code }}</td>
@@ -160,13 +157,14 @@
                                 </x-ui.badge>
                             </td>
                             <td class="text-end">
-                                <div class="d-flex justify-content-end gap-2">
-                                    <x-ui.button
+                                <div class="d-flex justify-content-end gap-1">
+                                    <x-ui.icon-btn
                                         type="button"
-                                        variant="light"
+                                        variant="soft-primary"
                                         size="sm"
-                                        class="border btn-edit-category"
+                                        class="btn-edit-category"
                                         icon="feather-edit-3"
+                                        title="Edit Category"
                                         data-id="{{ $category->id }}"
                                         data-name="{{ $category->name }}"
                                         data-code="{{ $category->code }}"
@@ -175,10 +173,10 @@
                                         data-bs-toggle="modal"
                                         data-bs-target="#editCategoryModal"
                                     />
-                                    <form method="POST" action="{{ route('hrms.expense-categories.destroy', $category) }}" onsubmit="return confirm('Delete this category?');" class="d-inline">
+                                    <form method="POST" action="{{ route('hrms.expense-categories.destroy', $category) }}" onsubmit="return confirm('Delete this category?');" class="m-0 d-flex">
                                         @csrf
                                         @method('DELETE')
-                                        <x-ui.button type="submit" variant="light" size="sm" class="border text-danger" icon="feather-trash-2" />
+                                        <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="Delete Category" />
                                     </form>
                                 </div>
                             </td>
@@ -200,11 +198,13 @@
             </table>
         </div>
 
-        @if($categories->hasPages())
-            <div class="mt-4">
-                <x-ui.pagination :paginator="$categories" />
-            </div>
-        @endif
+        <div id="categoriesPaginationWrapper">
+            @if($categories->hasPages())
+                <div class="mt-4">
+                    <x-ui.pagination :paginator="$categories" />
+                </div>
+            @endif
+        </div>
     </div>
 @endsection
 
@@ -258,42 +258,129 @@
 </x-ui.modal>
 
 @push('scripts')
+<script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+<script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Submit search on Enter (form already handles it via submit button click)
-        var searchForm = document.getElementById('categorySearchForm');
-        if (searchForm) {
-            searchForm.querySelector('input[name="search"]').addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') searchForm.submit();
+        // Re-initialize select2 on load
+        if (window.$ && $.fn.select2) {
+            $('.odoo-select2').select2({ theme: 'bootstrap-5', width: '100%' });
+        }
+        var searchTimeout;
+        var activeRequest = null;
+
+        function refreshCategoriesList(url) {
+            if (activeRequest) {
+                activeRequest.abort();
+            }
+            var controller = new AbortController();
+            activeRequest = controller;
+
+            var tbody = document.getElementById('categoriesTableBody');
+            var pagWrapper = document.getElementById('categoriesPaginationWrapper');
+            if (tbody) tbody.style.opacity = '0.5';
+
+            fetch(url.toString(), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                signal: controller.signal
+            })
+            .then(function(response) {
+                if (!response.ok) throw new Error('Error reloading categories.');
+                return response.text();
+            })
+            .then(function(html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var newTbody = doc.getElementById('categoriesTableBody');
+                var oldTbody = document.getElementById('categoriesTableBody');
+                if (newTbody && oldTbody) {
+                    oldTbody.innerHTML = newTbody.innerHTML;
+                }
+
+                var newPag = doc.getElementById('categoriesPaginationWrapper');
+                var oldPag = document.getElementById('categoriesPaginationWrapper');
+                if (newPag && oldPag) {
+                    oldPag.innerHTML = newPag.innerHTML;
+                }
+                
+                history.pushState(null, '', url.toString());
+            })
+            .catch(function(err) {
+                if (err.name !== 'AbortError') {
+                    window.location.href = url.toString();
+                }
+            })
+            .finally(function() {
+                if (tbody) tbody.style.opacity = '1';
             });
         }
 
-        // Populate edit modal with row data
-        document.querySelectorAll('.btn-edit-category').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var id          = this.getAttribute('data-id');
-                var code        = this.getAttribute('data-code');
-                var name        = this.getAttribute('data-name');
-                var description = this.getAttribute('data-description');
-                var status      = this.getAttribute('data-status');
+        // Real-time search with debounce (no Enter key required, no page reload)
+        $(document).on('input keyup search', '#categorySearchForm input[name="search"]', function() {
+            var form = this.closest('form');
+            var url = new URL(form.action || window.location.href);
+            var formData = new FormData(form);
+            for (var [key, val] of formData.entries()) {
+                url.searchParams.set(key, val);
+            }
 
-                // Update form action for this specific record
-                var form = document.querySelector('#editCategoryModal form');
-                if (form) form.action = '{{ url('hrms/expense-categories') }}/' + id;
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                refreshCategoriesList(url);
+            }, 300);
+        });
 
-                document.getElementById('edit_code').value        = code        || '';
-                document.getElementById('edit_name').value        = name        || '';
-                document.getElementById('edit_description').value = description || '';
+        // Intercept sorting links (no page reload)
+        $(document).on('click', '.dropdown-item[href*="sort="]', function(e) {
+            var href = $(this).attr('href');
+            if (href && href.indexOf('expense-categories') !== -1) {
+                e.preventDefault();
+                var url = new URL(href, window.location.origin);
+                refreshCategoriesList(url);
 
-                // Update select2 status dropdown
-                var statusSelect = document.getElementById('edit_status');
-                if (statusSelect) {
-                    statusSelect.value = parseInt(status) === 1 ? '1' : '0';
-                    if (window.$ && $(statusSelect).hasClass('select2-hidden-accessible')) {
-                        $(statusSelect).trigger('change.select2');
-                    }
+                $('.dropdown-item[href*="sort="]').removeClass('active');
+                $(this).addClass('active');
+            }
+        });
+
+        // Intercept filter form submit (no page reload)
+        $(document).on('submit', '#categoryFilterForm', function(e) {
+            e.preventDefault();
+            var form = this;
+            var url = new URL(form.action || window.location.href);
+            var formData = new FormData(form);
+            for (var [key, val] of formData.entries()) {
+                url.searchParams.set(key, val);
+            }
+            refreshCategoriesList(url);
+            $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
+        });
+
+        // Populate edit modal with row data (using delegation)
+        $(document).on('click', '.btn-edit-category', function () {
+            var id          = this.getAttribute('data-id');
+            var code        = this.getAttribute('data-code');
+            var name        = this.getAttribute('data-name');
+            var description = this.getAttribute('data-description');
+            var status      = this.getAttribute('data-status');
+
+            // Update form action for this specific record
+            var form = document.querySelector('#editCategoryModal form');
+            if (form) form.action = '{{ url('hrms/expense-categories') }}/' + id;
+
+            document.getElementById('edit_code').value        = code        || '';
+            document.getElementById('edit_name').value        = name        || '';
+            document.getElementById('edit_description').value = description || '';
+
+            // Update select2 status dropdown
+            var statusSelect = document.getElementById('edit_status');
+            if (statusSelect) {
+                statusSelect.value = parseInt(status) === 1 ? '1' : '0';
+                if (window.$ && $(statusSelect).hasClass('select2-hidden-accessible')) {
+                    $(statusSelect).trigger('change.select2');
                 }
-            });
+            }
         });
     });
 </script>
