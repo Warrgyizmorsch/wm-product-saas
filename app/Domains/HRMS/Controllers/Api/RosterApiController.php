@@ -159,8 +159,8 @@ class RosterApiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
-            'name'             => 'required|max:255',
-            'code'             => [
+            'name'                  => 'required|max:255',
+            'code'                  => [
                 'required',
                 'max:50',
                 Rule::unique('production_shifts', 'code')
@@ -169,24 +169,31 @@ class RosterApiController extends Controller
                             ->where('company_id', $request->company_id);
                     })
             ],
-            'company_id'       => 'nullable|exists:companies,id',
-            'start_time'       => 'required',
-            'end_time'         => 'required',
-            'break_minutes'    => 'required|integer|min:0',
-            'overtime_allowed' => 'required|boolean',
-            'active'           => 'required|boolean',
+            'company_id'            => 'required|exists:companies,id',
+            'start_time'            => 'required|date_format:H:i',
+            'end_time'              => 'required|date_format:H:i',
+            'break_minutes'         => 'nullable|integer|min:0',
+            'grace_period_minutes'  => 'nullable|integer|min:0',
+            'overtime_allowed'      => 'nullable|boolean',
+            'active'                => 'nullable|boolean',
+            'description'           => 'nullable|string',
         ]);
 
+        $overtimeAllowed = $request->boolean('overtime_allowed');
+        $active          = $request->boolean('active');
+
         $shift = ProductionShift::create([
-            'tenant_id'        => $tenantId,
-            'company_id'       => $validated['company_id'] ?? null,
-            'name'             => $validated['name'],
-            'code'             => $validated['code'],
-            'start_time'       => $validated['start_time'],
-            'end_time'         => $validated['end_time'],
-            'break_minutes'    => $validated['break_minutes'],
-            'overtime_allowed' => $validated['overtime_allowed'],
-            'active'           => $validated['active'],
+            'tenant_id'            => $tenantId,
+            'company_id'           => $validated['company_id'],
+            'name'                 => $validated['name'],
+            'code'                 => $validated['code'],
+            'start_time'           => $validated['start_time'],
+            'end_time'             => $validated['end_time'],
+            'break_minutes'        => $validated['break_minutes'] ?? 0,
+            'grace_period_minutes' => $validated['grace_period_minutes'] ?? 0,
+            'overtime_allowed'     => $overtimeAllowed,
+            'active'               => $active,
+            'description'          => $validated['description'] ?? null,
         ]);
 
         return $this->sendSuccess($shift, 'Production shift created successfully', 201);
@@ -201,8 +208,8 @@ class RosterApiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
-            'name'             => 'required|max:255',
-            'code'             => [
+            'name'                  => 'required|max:255',
+            'code'                  => [
                 'required',
                 'max:50',
                 Rule::unique('production_shifts', 'code')
@@ -212,23 +219,30 @@ class RosterApiController extends Controller
                     })
                     ->ignore($shift->id)
             ],
-            'company_id'       => 'nullable|exists:companies,id',
-            'start_time'       => 'required',
-            'end_time'         => 'required',
-            'break_minutes'    => 'required|integer|min:0',
-            'overtime_allowed' => 'required|boolean',
-            'active'           => 'required|boolean',
+            'company_id'            => 'required|exists:companies,id',
+            'start_time'            => 'required|date_format:H:i',
+            'end_time'              => 'required|date_format:H:i',
+            'break_minutes'         => 'nullable|integer|min:0',
+            'grace_period_minutes'  => 'nullable|integer|min:0',
+            'overtime_allowed'      => 'nullable|boolean',
+            'active'                => 'nullable|boolean',
+            'description'           => 'nullable|string',
         ]);
 
+        $overtimeAllowed = $request->boolean('overtime_allowed');
+        $active          = $request->boolean('active');
+
         $shift->update([
-            'company_id'       => $validated['company_id'] ?? null,
-            'name'             => $validated['name'],
-            'code'             => $validated['code'],
-            'start_time'       => $validated['start_time'],
-            'end_time'         => $validated['end_time'],
-            'break_minutes'    => $validated['break_minutes'],
-            'overtime_allowed' => $validated['overtime_allowed'],
-            'active'           => $validated['active'],
+            'company_id'           => $validated['company_id'],
+            'name'                 => $validated['name'],
+            'code'                 => $validated['code'],
+            'start_time'           => $validated['start_time'],
+            'end_time'             => $validated['end_time'],
+            'break_minutes'        => $validated['break_minutes'] ?? 0,
+            'grace_period_minutes' => $validated['grace_period_minutes'] ?? 0,
+            'overtime_allowed'     => $overtimeAllowed,
+            'active'               => $active,
+            'description'          => $validated['description'] ?? null,
         ]);
 
         return $this->sendSuccess($shift, 'Production shift updated successfully');
@@ -563,5 +577,54 @@ class RosterApiController extends Controller
             'start_date'      => $startDate,
             'end_date'        => $endDate,
         ], 'Roster entries cleared successfully');
+    }
+
+    public function assignWeekly(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'employee_ids'   => 'required|array|min:1',
+            'employee_ids.*' => 'exists:employees,id',
+            'pattern'        => 'required|array',
+        ]);
+
+        $updatedCount = 0;
+        foreach ($validated['employee_ids'] as $empId) {
+            $employee = Employee::find($empId);
+            if ($employee) {
+                $pattern = [];
+                foreach ($validated['pattern'] as $day => $shiftId) {
+                    $pattern[(int)$day] = $shiftId === 'off' ? 'off' : (int)$shiftId;
+                }
+                ksort($pattern);
+                $employee->update(['weekly_pattern' => $pattern]);
+                $updatedCount++;
+            }
+        }
+
+        return $this->sendSuccess([
+            'updated_count' => $updatedCount
+        ], 'Weekly shift patterns assigned successfully');
+    }
+
+    public function clearWeekly(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'employee_ids'   => 'required|array|min:1',
+            'employee_ids.*' => 'exists:employees,id',
+        ]);
+
+        $clearedCount = Employee::whereIn('id', $validated['employee_ids'])->update(['weekly_pattern' => null]);
+
+        return $this->sendSuccess([
+            'cleared_count' => $clearedCount
+        ], 'Weekly patterns cleared successfully');
     }
 }

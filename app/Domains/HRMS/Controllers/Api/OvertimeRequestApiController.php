@@ -133,6 +133,14 @@ class OvertimeRequestApiController extends Controller
             return $this->sendError('Employee record not found.', 404);
         }
 
+        // Check if an overtime request already exists for this employee on this date
+        $exists = OvertimeRequest::where('employee_id', $employee->id)
+            ->where('date', $validated['date'])
+            ->exists();
+        if ($exists) {
+            return $this->sendError(__('hrms.overtime.request_exists') ?? 'An overtime request already exists for this date.', 422);
+        }
+
         $startTime = Carbon::parse($validated['start_time']);
         $endTime   = Carbon::parse($validated['end_time']);
         if ($endTime->lessThan($startTime)) {
@@ -140,8 +148,15 @@ class OvertimeRequestApiController extends Controller
         }
         $durationHours = $startTime->diffInMinutes($endTime) / 60.0;
 
-        if ($durationHours < 0.5) {
-            return $this->sendError('Overtime duration must be at least 30 minutes.', 400);
+        // Fetch minimum overtime request hours setting
+        $minHours = 0.5;
+        $tenant = \App\Models\Tenant::find(auth()->user()->tenant_id);
+        if ($tenant && is_array($tenant->settings)) {
+            $minHours = (float) ($tenant->settings['min_overtime_request_hours'] ?? 0.5);
+        }
+
+        if ($durationHours < $minHours) {
+            return $this->sendError(__('hrms.overtime.duration_error', ['min' => $minHours]) ?? "Overtime duration must be at least {$minHours} hours.", 422);
         }
 
         $validated['duration_hours']          = $durationHours;
@@ -201,5 +216,25 @@ class OvertimeRequestApiController extends Controller
         ], $request);
 
         return $this->sendSuccess($overtimeRequest, 'Overtime request status updated successfully');
+    }
+
+    public function destroy(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $overtimeRequest = OvertimeRequest::find($id);
+        if (!$overtimeRequest) {
+            return $this->sendError("Overtime request with ID '{$id}' not found.", 404);
+        }
+
+        if ($overtimeRequest->status === 'approved') {
+            return $this->sendError(__('hrms.overtime.approved_no_delete') ?? 'Approved request cannot be deleted.', 422);
+        }
+
+        $overtimeRequest->delete();
+
+        return $this->sendSuccess(null, 'Overtime request deleted successfully');
     }
 }

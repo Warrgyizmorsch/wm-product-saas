@@ -134,6 +134,8 @@ class WfhRequestApiController extends Controller
             'start_date_type'   => 'required|string|in:full_day,first_half,second_half',
             'end_date_type'     => 'required|string|in:full_day,first_half,second_half',
             'reason'            => 'required|string|max:1000',
+            'wfh_latitude'      => 'nullable|numeric|between:-90,90',
+            'wfh_longitude'     => 'nullable|numeric|between:-180,180',
             'attachment'        => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
             'notified_contacts' => 'nullable|array',
             'notified_contacts.*' => 'exists:employees,id'
@@ -151,40 +153,34 @@ class WfhRequestApiController extends Controller
         $endType   = $validated['end_date_type'];
 
         $duration = 0;
-        if ($startDate->equalTo($endDate)) {
-            if ($startDate->dayOfWeek !== Carbon::SUNDAY) {
-                $duration = ($startType === 'full_day') ? 1.0 : 0.5;
-            }
+        if ($startDate->isSameDay($endDate)) {
+            $duration = ($startType === 'full_day') ? 1.0 : 0.5;
         } else {
-            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                if ($date->dayOfWeek === Carbon::SUNDAY) {
-                    continue;
-                }
-                if ($date->equalTo($startDate)) {
-                    $duration += ($startType === 'full_day') ? 1.0 : 0.5;
-                } elseif ($date->equalTo($endDate)) {
-                    $duration += ($endType === 'full_day') ? 1.0 : 0.5;
-                } else {
-                    $duration += 1.0;
-                }
+            $daysDiff = $startDate->diffInDays($endDate);
+            if ($daysDiff === 1) {
+                $duration  = ($startType === 'full_day') ? 1.0 : 0.5;
+                $duration += ($endType   === 'full_day') ? 1.0 : 0.5;
+            } else {
+                $duration  = ($startType === 'full_day') ? 1.0 : 0.5;
+                $duration += ($daysDiff - 1);
+                $duration += ($endType   === 'full_day') ? 1.0 : 0.5;
             }
         }
 
-        if ($duration == 0) {
-            return $this->sendError('WFH duration cannot be 0 days.', 422);
+        if ($duration < 0.5) {
+            return $this->sendError('Duration cannot be less than 0.5 days.', 422);
         }
 
-        // Check overlapping requests
-        $overlapExists = WfhRequest::where('employee_id', $employee->id)
-            ->whereIn('status', ['pending', 'approved'])
-            ->where(function ($q) use ($startDate, $endDate) {
-                $q->where('start_date', '<=', $endDate->format('Y-m-d'))
-                  ->where('end_date', '>=', $startDate->format('Y-m-d'));
-            })
-            ->exists();
+        $conflict = \App\Domains\HRMS\Helpers\SessionConflictChecker::hasConflict(
+            employeeId:   $employee->id,
+            newStart:     $startDate,
+            newEnd:       $endDate,
+            newStartType: $startType,
+            newEndType:   $endType
+        );
 
-        if ($overlapExists) {
-            return $this->sendError('A WFH request already exists for the specified date range.', 422);
+        if ($conflict) {
+            return $this->sendError($conflict, 422);
         }
 
         $attachmentPath = null;
@@ -203,6 +199,8 @@ class WfhRequestApiController extends Controller
             'end_date_type'     => $endType,
             'notified_contacts'=> $validated['notified_contacts'] ?? null,
             'reason'            => $validated['reason'],
+            'wfh_latitude'      => $validated['wfh_latitude'] ?? null,
+            'wfh_longitude'     => $validated['wfh_longitude'] ?? null,
             'status'            => 'pending',
             'current_level'     => '1',
             'attachment_path'   => $attachmentPath,
@@ -267,6 +265,10 @@ class WfhRequestApiController extends Controller
             return $this->sendError("WFH request with ID '{$id}' not found.", 404);
         }
 
+        if ($wfhRequest->status === 'cancelled') {
+            return $this->sendError('Cannot change the status of a cancelled WFH application.', 422);
+        }
+
         $validated = $request->validate([
             'status'           => 'required|string|in:approved,rejected,pending',
             'rejection_reason' => 'nullable|string|max:500'
@@ -299,5 +301,106 @@ class WfhRequestApiController extends Controller
         }
 
         return $this->sendSuccess($wfhRequest, "WFH request status updated to '{$status}' successfully.");
+    }
+
+    public function withdrawRequest(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $wfhRequest = WfhRequest::find($id);
+        if (!$wfhRequest) {
+            return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$wfhRequest->canWithdraw()) {
+            return $this->sendError('Only pending applications can be withdrawn.', 400);
+        }
+
+        $wfhRequest->delete();
+
+        return $this->sendSuccess(null, 'WFH application withdrawn successfully.');
+    }
+
+    public function requestCancellation(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $wfhRequest = WfhRequest::find($id);
+        if (!$wfhRequest) {
+            return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$wfhRequest->canRequestCancellation()) {
+            return $this->sendError('Only approved applications can have a cancellation requested.', 400);
+        }
+
+        $validated = $request->validate([
+            'cancellation_reason' => 'required|string|max:1000',
+        ]);
+
+        $wfhRequest->update([
+            'status'              => 'cancellation_requested',
+            'cancellation_reason' => $validated['cancellation_reason'],
+        ]);
+
+        return $this->sendSuccess($wfhRequest, 'Cancellation request submitted. Awaiting admin approval.');
+    }
+
+    public function approveCancellation(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        if (!auth()->user()->hasHrPermission('hr.settings.manage')) {
+            return $this->sendError('Unauthorized.', 403);
+        }
+
+        $wfhRequest = WfhRequest::find($id);
+        if (!$wfhRequest) {
+            return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+        }
+
+        if ($wfhRequest->status !== 'cancellation_requested') {
+            return $this->sendError('This application does not have a pending cancellation request.', 400);
+        }
+
+        $wfhRequest->update([
+            'status'        => 'cancelled',
+            'current_level' => 'cancelled',
+        ]);
+
+        return $this->sendSuccess($wfhRequest, 'WFH cancellation approved.');
+    }
+
+    public function denyCancellation(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        if (!auth()->user()->hasHrPermission('hr.settings.manage')) {
+            return $this->sendError('Unauthorized.', 403);
+        }
+
+        $wfhRequest = WfhRequest::find($id);
+        if (!$wfhRequest) {
+            return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+        }
+
+        if ($wfhRequest->status !== 'cancellation_requested') {
+            return $this->sendError('This application does not have a pending cancellation request.', 400);
+        }
+
+        $wfhRequest->update([
+            'status'              => 'approved',
+            'cancellation_reason' => null,
+        ]);
+
+        return $this->sendSuccess($wfhRequest, 'Cancellation request denied. Application remains approved.');
     }
 }

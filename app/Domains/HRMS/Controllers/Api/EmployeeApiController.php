@@ -498,52 +498,86 @@ class EmployeeApiController extends Controller
 
     public function uploadDocument(Request $request, Employee $employee): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $request->validate([
-            'document_id' => 'nullable|exists:documents,id',
-            'name'        => 'nullable|required_without:document_id|string|max:255',
-            'file'        => 'required|file|max:10240', // Max 10MB
-            'expiry_date' => 'nullable|date',
+            'document_id'        => 'nullable|exists:documents,id',
+            'document_master_id' => 'required_without:document_id|exists:document_masters,id',
+            'file'               => 'required|file|max:10240', // Max 10MB
+            'expiry_date'        => 'nullable|date',
         ]);
 
         $tenantId = auth()->user()->tenant_id;
         $file = $request->file('file');
 
         if ($request->filled('document_id')) {
-            $document = Document::findOrFail($request->integer('document_id'));
+            $document = \App\Domains\HRMS\Models\Document::findOrFail($request->integer('document_id'));
             
-            if ($document->has_expiry && !$request->filled('expiry_date')) {
-                return $this->sendError('Expiry date is required for this requested document.', 422, [
-                    'expiry_date' => ['Expiry date is required for this requested document.']
+            $expiryApplicable = $document->has_expiry;
+            if ($document->document_master_id) {
+                $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::find($document->document_master_id);
+                if ($documentMaster) {
+                    $expiryApplicable = $documentMaster->expiry_applicable;
+                }
+            }
+
+            if ($expiryApplicable && !$request->filled('expiry_date')) {
+                return $this->sendError('Expiry date is required for this document.', 422, [
+                    'expiry_date' => ['Expiry date is required for this document.']
                 ]);
             }
 
             $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+
+            $approvalRequired = true;
+            if ($document->document_master_id) {
+                $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::find($document->document_master_id);
+                if ($documentMaster) {
+                    $approvalRequired = (bool) $documentMaster->approval_required;
+                }
+            }
+            $status = $approvalRequired ? 'uploaded' : 'approved';
 
             $document->update([
                 'file_name'       => $file->getClientOriginalName(),
                 'file_path'       => $path,
                 'file_type'       => $file->getClientMimeType(),
                 'file_size'       => $file->getSize(),
-                'expiry_date'     => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                'status'          => 'uploaded',
+                'expiry_date'     => $expiryApplicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status'          => $status,
                 'requested_by_id' => auth()->id(),
             ]);
         } else {
+            $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::findOrFail($request->integer('document_master_id'));
+            
+            if ($documentMaster->expiry_applicable && !$request->filled('expiry_date')) {
+                return $this->sendError('Expiry date is required for this document template.', 422, [
+                    'expiry_date' => ['Expiry date is required for this document template.']
+                ]);
+            }
+
             $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
-            $document = Document::create([
-                'tenant_id'         => $tenantId,
-                'documentable_id'   => $employee->id,
-                'documentable_type' => Employee::class,
-                'name'              => $request->string('name')->value(),
-                'file_name'         => $file->getClientOriginalName(),
-                'file_path'         => $path,
-                'file_type'         => $file->getClientMimeType(),
-                'file_size'         => $file->getSize(),
-                'expiry_date'       => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                'status'            => 'uploaded',
-                'has_expiry'        => $request->filled('expiry_date'),
-                'requested_by_id'   => auth()->id(),
+            $approvalRequired = (bool) $documentMaster->approval_required;
+            $status = $approvalRequired ? 'uploaded' : 'approved';
+
+            $document = \App\Domains\HRMS\Models\Document::create([
+                'tenant_id'          => $tenantId,
+                'documentable_id'    => $employee->id,
+                'documentable_type'  => Employee::class,
+                'document_master_id' => $documentMaster->id,
+                'name'               => $documentMaster->name,
+                'description'        => $documentMaster->description,
+                'file_name'          => $file->getClientOriginalName(),
+                'file_path'          => $path,
+                'file_type'          => $file->getClientMimeType(),
+                'file_size'          => $file->getSize(),
+                'status'             => $status,
+                'has_expiry'         => $documentMaster->expiry_applicable,
+                'expiry_date'        => $documentMaster->expiry_applicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'requested_by_id'    => auth()->id(),
             ]);
         }
 
@@ -811,7 +845,7 @@ class EmployeeApiController extends Controller
             'leave_transition_action'     => ['nullable', 'string', 'in:transfer,prorate'],
             'leave_transition_unused'     => ['nullable', 'string', 'in:carry,lapse'],
             'employee_id'                 => ['nullable', 'string', 'max:255', Rule::unique('employees', 'employee_id')->ignore($employee?->id)],
-            'user_id'                     => ['nullable', Rule::unique('employees', 'user_id')->ignore($employee?->id)],
+            'user_id'                     => ['required', Rule::unique('employees', 'user_id')->ignore($employee?->id)],
             'role_id'                     => ['nullable', 'exists:roles,id'],
             'full_name'                   => ['required', 'string', 'max:255'],
             'nick_name'                   => ['nullable', 'string', 'max:255'],
@@ -821,7 +855,9 @@ class EmployeeApiController extends Controller
             'role'                        => ['nullable', 'string', 'max:255'],
             'employment_type'             => ['nullable', 'string', 'max:255'],
             'date_of_joining'             => ['required', 'date'],
-            'office'                      => ['nullable', 'string', 'max:255'],
+            'office'                      => ['nullable', 'string', 'in:office,wfh,onsite'],
+            'wfh_latitude'                => ['nullable', 'numeric', 'between:-90,90'],
+            'wfh_longitude'               => ['nullable', 'numeric', 'between:-180,180'],
             'gender'                      => ['required', Rule::in(['male', 'female', 'other', 'Male', 'Female', 'Other'])],
             'marital_status'              => ['nullable', Rule::in(['single', 'married', 'divorced', 'widowed', 'Single', 'Married', 'Divorced', 'Widowed'])],
             'diet_preference'             => ['nullable', Rule::in(['veg', 'non veg', 'vegan', 'Veg', 'Non Veg', 'Vegan'])],
@@ -926,6 +962,21 @@ class EmployeeApiController extends Controller
         $validated['leave_plan_id']    = $leavePlan?->id;
 
         return $validated;
+    }
+
+    public function updateStatus(Request $request, Employee $employee): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|boolean',
+        ]);
+
+        $employee->update(['status' => $validated['status']]);
+
+        return $this->sendSuccess($employee, 'Employee status updated successfully');
     }
 
     private function failHierarchy(string $field, string $message): never

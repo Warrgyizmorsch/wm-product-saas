@@ -78,11 +78,17 @@ class PenalizationPolicyApiController extends Controller
             ->values();
 
         $rules = AttendancePenalty::all()->keyBy('rule_type');
+        $businessUnits = \App\Domains\HRMS\Models\BusinessUnit::all();
+        $branches = \App\Domains\HRMS\Models\Branch::all();
+        $attendanceRules = \App\Domains\HRMS\Models\AttendanceRule::with(['company', 'businessUnit', 'branch'])->get();
 
         return $this->sendSuccess([
-            'rules'       => $rules,
-            'companies'   => $companies,
-            'leave_types' => $leaveTypes,
+            'rules'            => $rules,
+            'companies'        => $companies,
+            'leave_types'      => $leaveTypes,
+            'business_units'   => $businessUnits,
+            'branches'         => $branches,
+            'attendance_rules' => $attendanceRules,
         ], 'Penalization policies loaded successfully');
     }
 
@@ -218,10 +224,12 @@ class PenalizationPolicyApiController extends Controller
             $updateData['penalty_value']       = 0.00;
         }
 
+        $companyId = $request->company_id ?: null;
+
         $policy = AttendancePenalty::updateOrCreate(
             [
                 'rule_type'  => $request->rule_type,
-                'company_id' => $request->company_id,
+                'company_id' => $companyId,
             ],
             $updateData
         );
@@ -242,5 +250,81 @@ class PenalizationPolicyApiController extends Controller
         $attendancePenalty->delete();
 
         return $this->sendSuccess(null, 'Penalization policy rule deleted successfully');
+    }
+
+    public function queryAttendanceRule(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $companyId = $request->query('company_id');
+        $buId      = $request->query('business_unit_id');
+        $branchId  = $request->query('branch_id');
+
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::where('company_id', $companyId)
+            ->where('business_unit_id', $buId ?: null)
+            ->where('branch_id', $branchId ?: null)
+            ->first();
+
+        if (!$rule) {
+            return $this->sendError('No attendance rule found for this scope', 404);
+        }
+
+        return $this->sendSuccess($rule, 'Attendance rule retrieved successfully');
+    }
+
+    public function saveAttendanceRule(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'company_id'             => 'required|integer|exists:companies,id',
+            'business_unit_id'       => 'nullable|integer|exists:business_units,id',
+            'branch_id'              => 'nullable|integer|exists:branches,id',
+            'office_latitude'        => 'nullable|string',
+            'office_longitude'       => 'nullable|string',
+            'office_radius'          => 'required|integer|min:1',
+            'office_tracking_minutes'=> 'nullable|integer|min:1|max:120',
+            'wfh_tracking_meters'    => 'required|integer|min:1',
+            'wfh_tracking_minutes'   => 'nullable|integer|min:1|max:120',
+            'site_tracking_meters'   => 'required|integer|min:1',
+            'site_tracking_minutes'  => 'nullable|integer|min:1|max:120',
+            'status'                 => 'required',
+        ]);
+
+        $validated['office_biometric']       = $request->boolean('office_biometric');
+        $validated['office_web']             = $request->boolean('office_web');
+        $validated['office_geofence']        = $request->boolean('office_geofence');
+        $validated['office_tracking']        = $request->boolean('office_tracking');
+        $validated['office_tracking_minutes']= $request->filled('office_tracking_minutes') ? (int) $request->office_tracking_minutes : 15;
+        $validated['wfh_location']           = $request->boolean('wfh_location');
+        $validated['wfh_selfie']             = $request->boolean('wfh_selfie');
+        $validated['wfh_geofence']           = $request->boolean('wfh_geofence');
+        $validated['wfh_tracking']           = $request->boolean('wfh_tracking');
+        $validated['wfh_tracking_minutes']   = $request->filled('wfh_tracking_minutes') ? (int) $request->wfh_tracking_minutes : 15;
+        $validated['site_location']          = $request->boolean('site_location');
+        $validated['site_selfie']            = $request->boolean('site_selfie');
+        $validated['site_geofence']          = false;
+        $validated['site_tracking']          = $request->boolean('site_tracking');
+        $validated['site_tracking_minutes']  = $request->filled('site_tracking_minutes') ? (int) $request->site_tracking_minutes : 15;
+
+        $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
+
+        // Normalize empty strings to null for integer foreign keys
+        $validated['business_unit_id'] = $validated['business_unit_id'] ?: null;
+        $validated['branch_id'] = $validated['branch_id'] ?: null;
+
+        // Clean up historical duplicate entries for this exact scope
+        \App\Domains\HRMS\Models\AttendanceRule::where('company_id', $validated['company_id'])
+            ->where('business_unit_id', $validated['business_unit_id'])
+            ->where('branch_id', $validated['branch_id'])
+            ->delete();
+
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::create($validated);
+
+        return $this->sendSuccess($rule, 'Attendance rules saved successfully');
     }
 }

@@ -148,20 +148,20 @@ class OrgApiController extends Controller
         $validated = $request->validate([
             'company_name'        => 'required|max:255',
             'legal_name'          => 'required|max:255',
-            'gst_number'          => 'nullable|max:50',
-            'pan_number'          => 'nullable|max:50',
-            'cin_number'          => 'nullable|max:100',
-            'registration_number' => 'nullable|max:100',
-            'email'               => 'nullable|email',
-            'phone'               => 'nullable|max:20',
-            'website'             => 'nullable',
-            'address'             => 'nullable',
+            'gst_number'          => 'nullable|max:255',
+            'pan_number'          => 'nullable|max:255',
+            'cin_number'          => 'nullable|max:255',
+            'registration_number' => 'nullable|max:255',
+            'email'               => 'required|email|max:255',
+            'phone'               => 'nullable|max:50',
+            'website'             => 'nullable|max:255',
+            'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
-            'currency'            => 'required|string|max:255',
-            'time_zone'           => 'required|string|max:100',
+            'currency'            => 'required|string|max:10',
+            'time_zone'           => 'required|string|max:50',
             'status'              => 'required',
             'logo'                => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
@@ -213,20 +213,20 @@ class OrgApiController extends Controller
         $validated = $request->validate([
             'company_name'        => 'required|max:255',
             'legal_name'          => 'required|max:255',
-            'gst_number'          => 'nullable|max:50',
-            'pan_number'          => 'nullable|max:50',
-            'cin_number'          => 'nullable|max:100',
-            'registration_number' => 'nullable|max:100',
-            'email'               => 'nullable|email',
-            'phone'               => 'nullable|max:20',
-            'website'             => 'nullable',
-            'address'             => 'nullable',
+            'gst_number'          => 'nullable|max:255',
+            'pan_number'          => 'nullable|max:255',
+            'cin_number'          => 'nullable|max:255',
+            'registration_number' => 'nullable|max:255',
+            'email'               => 'required|email|max:255',
+            'phone'               => 'nullable|max:50',
+            'website'             => 'nullable|max:255',
+            'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
-            'currency'            => 'required|string|max:255',
-            'time_zone'           => 'required|string|max:100',
+            'currency'            => 'required|string|max:10',
+            'time_zone'           => 'required|string|max:50',
             'status'              => 'required',
             'logo'                => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
@@ -496,8 +496,8 @@ class OrgApiController extends Controller
             'code'                => 'required|max:50',
             'manager_employee_id' => 'nullable|exists:employees,id',
             'phone'               => 'nullable|max:20',
-            'email'               => 'nullable|email',
-            'address'             => 'nullable',
+            'email'               => 'nullable|email|max:255',
+            'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
@@ -547,8 +547,8 @@ class OrgApiController extends Controller
             'code'                => 'required|max:50',
             'manager_employee_id' => 'nullable|exists:employees,id',
             'phone'               => 'nullable|max:20',
-            'email'               => 'nullable|email',
-            'address'             => 'nullable',
+            'email'               => 'nullable|email|max:255',
+            'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
@@ -674,14 +674,15 @@ class OrgApiController extends Controller
         }
 
         $validated = $request->validate([
-            'company_id'       => 'required_without_all:branch_id,business_unit_id|nullable|exists:companies,id',
-            'business_unit_id' => 'nullable|exists:business_units,id',
-            'branch_id'        => 'nullable|exists:branches,id',
-            'name'             => 'required|max:255',
-            'code'             => 'required|max:50',
-            'head_employee_id' => 'nullable|exists:employees,id',
-            'description'      => 'nullable',
-            'status'           => 'required',
+            'company_id'           => 'required_without_all:branch_id,business_unit_id|nullable|exists:companies,id',
+            'business_unit_id'     => 'required_without_all:company_id,branch_id|nullable|exists:business_units,id',
+            'branch_id'            => 'required_without_all:company_id,business_unit_id|nullable|exists:branches,id',
+            'name'                 => 'required|max:255',
+            'code'                 => 'required|max:50',
+            'head_employee_id'     => 'nullable|exists:employees,id',
+            'parent_department_id' => 'nullable|exists:departments,id',
+            'description'          => 'nullable',
+            'status'               => 'required',
         ]);
 
         $companyId      = $validated['company_id'] ?? null;
@@ -704,14 +705,15 @@ class OrgApiController extends Controller
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $department = Department::create([
-            'company_id'       => $companyId,
-            'business_unit_id' => $businessUnitId ?: null,
-            'branch_id'        => $branchId ?: null,
-            'name'             => $validated['name'],
-            'code'             => $validated['code'],
-            'head_employee_id' => $validated['head_employee_id'] ?? null,
-            'description'      => $validated['description'] ?? null,
-            'status'           => $status,
+            'company_id'           => $companyId,
+            'business_unit_id'     => $businessUnitId ?: null,
+            'branch_id'            => $branchId ?: null,
+            'name'                 => $validated['name'],
+            'code'                 => $validated['code'],
+            'head_employee_id'     => $validated['head_employee_id'] ?? null,
+            'parent_department_id' => $validated['parent_department_id'] ?? null,
+            'description'          => $validated['description'] ?? null,
+            'status'               => $status,
         ]);
 
         return $this->sendSuccess($department, 'Department created successfully', 201);
@@ -724,14 +726,15 @@ class OrgApiController extends Controller
         }
 
         $validated = $request->validate([
-            'company_id'       => 'required_without_all:branch_id,business_unit_id|nullable|exists:companies,id',
-            'business_unit_id' => 'nullable|exists:business_units,id',
-            'branch_id'        => 'nullable|exists:branches,id',
-            'name'             => 'required|max:255',
-            'code'             => 'required|max:50',
-            'head_employee_id' => 'nullable|exists:employees,id',
-            'description'      => 'nullable',
-            'status'           => 'required',
+            'company_id'           => 'required_without_all:branch_id,business_unit_id|nullable|exists:companies,id',
+            'business_unit_id'     => 'required_without_all:company_id,branch_id|nullable|exists:business_units,id',
+            'branch_id'            => 'required_without_all:company_id,business_unit_id|nullable|exists:branches,id',
+            'name'                 => 'required|max:255',
+            'code'                 => 'required|max:50',
+            'head_employee_id'     => 'nullable|exists:employees,id',
+            'parent_department_id' => 'nullable|exists:departments,id',
+            'description'          => 'nullable',
+            'status'               => 'required',
         ]);
 
         $companyId      = $validated['company_id'] ?? null;
@@ -754,14 +757,15 @@ class OrgApiController extends Controller
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $department->update([
-            'company_id'       => $companyId,
-            'business_unit_id' => $businessUnitId ?: null,
-            'branch_id'        => $branchId ?: null,
-            'name'             => $validated['name'],
-            'code'             => $validated['code'],
-            'head_employee_id' => $validated['head_employee_id'] ?? null,
-            'description'      => $validated['description'] ?? null,
-            'status'           => $status,
+            'company_id'           => $companyId,
+            'business_unit_id'     => $businessUnitId ?: null,
+            'branch_id'            => $branchId ?: null,
+            'name'                 => $validated['name'],
+            'code'                 => $validated['code'],
+            'head_employee_id'     => $validated['head_employee_id'] ?? null,
+            'parent_department_id' => $validated['parent_department_id'] ?? null,
+            'description'          => $validated['description'] ?? null,
+            'status'               => $status,
         ]);
 
         return $this->sendSuccess($department, 'Department updated successfully');
