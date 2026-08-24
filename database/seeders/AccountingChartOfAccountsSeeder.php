@@ -14,7 +14,9 @@ class AccountingChartOfAccountsSeeder extends Seeder
 {
     public function run(): void
     {
-        $tenant = Tenant::where('slug', 'demo')->first() ?? Tenant::first();
+        $tenant = Tenant::where('slug', config('tenancy.local_fallback_slug', 'demo'))->first()
+            ?? Tenant::where('slug', 'demo')->first()
+            ?? Tenant::first();
 
         if (!$tenant) {
             return;
