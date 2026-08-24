@@ -157,6 +157,15 @@
                             <option value="cgst_sgst" @selected(old('gst_type', 'cgst_sgst') === 'cgst_sgst')>CGST + SGST (Intra-State)</option>
                             <option value="igst" @selected(old('gst_type') === 'igst')>IGST (Inter-State)</option>
                         </x-ui.odoo-form-ui>
+
+                        <x-ui.odoo-form-ui type="select" label="Freight Terms" name="freight_terms" id="invFreightTermsSelect">
+                            <option value="To Pay" @selected(old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? 'To Pay') == 'To Pay')>To Pay (Freight Collect by Driver)</option>
+                            <option value="To Be Billed" @selected(old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? '') == 'To Be Billed')>To Be Billed (Prepaid & Added to Invoice)</option>
+                            <option value="Prepaid" @selected(old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? '') == 'Prepaid')>Prepaid (Freight Included / Seller Paid)</option>
+                            <option value="Customer Pickup" @selected(old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? '') == 'Customer Pickup')>Customer Pickup (Self Vehicle)</option>
+                        </x-ui.odoo-form-ui>
+
+                        <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="invFreightAmountInput" :value="old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
                     </div>
                 </div>
 
@@ -334,10 +343,10 @@
                                     <input type="text" id="summarySgstText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                 </div>
 
-                                <!-- IGST Row -->
-                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryIgstRow">
-                                    <span class="text-muted fs-13 fw-semibold">IGST Amount</span>
-                                    <input type="text" id="summaryIgstText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
+                                <!-- Freight Charges Row -->
+                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryFreightRow">
+                                    <span class="text-muted fs-13 fw-semibold">Freight Charges (₹)</span>
+                                    <input type="number" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" step="0.01" value="{{ old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0) }}">
                                 </div>
 
                                 <!-- Grand Total -->
@@ -517,7 +526,21 @@
             });
 
             // Event listeners for recalculating
-            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent', function() {
+            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect', function() {
+                recalculateInvoiceTotals();
+            });
+
+            $(document).on('input change', '#summaryFreightText', function() {
+                const val = parseFloat($(this).val()) || 0;
+                $('#invFreightAmountInput').val(val);
+                recalculateInvoiceTotals();
+            });
+
+            $(document).on('input change', '#invFreightAmountInput', function() {
+                const val = parseFloat($(this).val()) || 0;
+                if (!$('#summaryFreightText').is(':focus')) {
+                    $('#summaryFreightText').val(val);
+                }
                 recalculateInvoiceTotals();
             });
 
@@ -571,6 +594,18 @@
                     totalTax = grossBeforeTax * (taxPercent / 100);
                 }
 
+                const freightTerms = $('#invFreightTermsSelect').val() || 'To Pay';
+                const summaryFreight = parseFloat($('#summaryFreightText').val()) || 0;
+                const hiddenFreight = parseFloat($('#invFreightAmountInput').val()) || 0;
+                const freightAmount = $('#summaryFreightText').is(':focus') ? summaryFreight : (summaryFreight > 0 ? summaryFreight : hiddenFreight);
+
+                $('#invFreightAmountInput').val(freightAmount);
+
+                const effectiveFreight = (freightTerms === 'To Be Billed') ? freightAmount : 0;
+                const freightTax = (effectiveFreight > 0 && taxType !== 'without_tax') ? Math.round(effectiveFreight * 0.18 * 100) / 100 : 0;
+
+                totalTax = totalTax + freightTax;
+
                 let cgstAmt = 0, sgstAmt = 0, igstAmt = 0;
                 if (taxType !== 'without_tax' && totalTax > 0) {
                     if (gstType === 'igst') {
@@ -581,7 +616,11 @@
                     }
                 }
 
-                const grandTotal = grossBeforeTax + totalTax;
+                if (!$('#summaryFreightText').is(':focus')) {
+                    $('#summaryFreightText').val(effectiveFreight.toFixed(2));
+                }
+
+                const grandTotal = grossBeforeTax + totalTax + effectiveFreight;
                 const balanceDue = Math.max(0, grandTotal - advanceAllocated);
 
                 $('#summarySubtotalText').val(subtotal.toFixed(2));

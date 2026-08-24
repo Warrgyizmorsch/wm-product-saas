@@ -80,7 +80,14 @@
 
                     <x-ui.odoo-form-ui type="input" inputType="date" label="Shipment Date" name="shipment_date" :value="old('shipment_date')" />
 
-                    <x-ui.odoo-form-ui type="input" label="Payment Terms" name="payment_terms" :value="old('payment_terms', $prefillQuotation?->terms_conditions ? 'As per Quotation Terms' : '')" placeholder="e.g. Net 30, Due on Receipt" />
+                    <x-ui.odoo-form-ui type="select" label="Freight Terms" name="freight_terms" id="freightTermsSelect">
+                        <option value="To Pay" @selected(old('freight_terms') == 'To Pay')>To Pay (Freight Collect by Driver from Customer)</option>
+                        <option value="To Be Billed" @selected(old('freight_terms') == 'To Be Billed')>To Be Billed (Prepaid & Added to Invoice)</option>
+                        <option value="Prepaid" @selected(old('freight_terms') == 'Prepaid')>Prepaid (Freight Included / Seller Paid)</option>
+                        <option value="Customer Pickup" @selected(old('freight_terms') == 'Customer Pickup')>Customer Pickup (Self Vehicle)</option>
+                    </x-ui.odoo-form-ui>
+
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', 0)" min="0" step="0.01" />
                 </div>
             </div>
 
@@ -96,16 +103,7 @@
 
             <!-- Order Lines Table -->
             <div class="border-top pt-4">
-                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                    <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-layers me-2 text-primary"></i>Order Lines</h5>
-                    <div class="d-flex align-items-center gap-2" style="width: 420px;">
-                        <div class="input-group input-group-sm shadow-2xs rounded overflow-hidden" style="border: 1px solid #cbd5e1 !important;">
-                            <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
-                            <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
-                            <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
-                        </div>
-                    </div>
-                </div>
+                <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
                 <div class="table-responsive">
                     <x-ui.odoo-form-ui type="table" id="itemsTable">
                         <thead>
@@ -124,7 +122,7 @@
                         </tbody>
                     </x-ui.odoo-form-ui>
                 </div>
-                <div class="mt-3">
+                <div class="mt-2.5">
                     <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
                         <i class="feather-plus me-1"></i>Add a product
                     </button>
@@ -134,14 +132,8 @@
             <!-- Totals & Sub-elements -->
             <div class="row mt-4 pt-3 border-top text-dark fs-13">
                 <div class="col-md-7">
-                    <div class="pe-md-4">
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions', $prefillQuotation?->terms_conditions) !!}</x-ui.odoo-form-ui>
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-semibold text-muted mb-1 fs-12">Internal Notes</label>
-                            <textarea name="notes" class="form-control" rows="2" placeholder="Private internal remarks..." style="border-radius: 4px; font-size: 13px;">{{ old('notes', $prefillQuotation?->notes) }}</textarea>
-                        </div>
+                    <div class="pe-md-4 mb-3">
+                        <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions') !!}</x-ui.odoo-form-ui>
                     </div>
                 </div>
                 <div class="col-md-5">
@@ -162,8 +154,8 @@
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                            <span class="text-muted fw-semibold fs-13">Shipping Charges (₹):</span>
-                            <input type="number" name="shipping_charges" id="shippingChargesInput" class="odoo-table-input text-end fw-bold fs-13" style="width: 110px;" value="{{ old('shipping_charges', 0) }}" min="0" step="0.01">
+                            <span class="text-muted fw-semibold fs-13">Freight Charges (₹):</span>
+                            <input type="number" name="freight_amount_display" id="freightAmountDisplay" class="odoo-table-input text-end fw-bold fs-13" style="width: 110px;" readonly value="0.00">
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -399,15 +391,21 @@
                 });
 
                 const discount = parseFloat($('#discountInput').val()) || 0;
-                const shipping = parseFloat($('#shippingChargesInput').val()) || 0;
+                const freightTerms = $('#freightTermsSelect').val() || 'To Pay';
+                const freightAmount = parseFloat($('#freightAmountInput').val()) || 0;
                 const adjustment = parseFloat($('#adjustmentInput').val()) || 0;
 
-                const grandTotal = subtotal + taxTotal - discount + shipping + adjustment;
+                const effectiveFreight = (freightTerms === 'To Be Billed') ? freightAmount : 0;
+                $('#freightAmountDisplay').val(effectiveFreight.toFixed(2));
+
+                const grandTotal = subtotal + taxTotal - discount + effectiveFreight + adjustment;
 
                 $('#calcSubtotal').text('₹' + subtotal.toFixed(2));
                 $('#calcTax').text('₹' + taxTotal.toFixed(2));
                 $('#calcTotal').text('₹' + Math.max(0, grandTotal).toFixed(2));
             }
+
+            $('#freightTermsSelect, #freightAmountInput, #discountInput, #adjustmentInput').on('input change', calculateTotals);
 
             // Customer select address prefill
             $('#customerSelect').on('change', function() {

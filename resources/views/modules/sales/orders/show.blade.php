@@ -76,6 +76,7 @@
     @php
         $soTabs = [
             ['id' => 'tab-order', 'label' => 'Sales Order Details', 'active' => true, 'icon' => 'feather-shopping-cart'],
+            ['id' => 'tab-dispatches', 'label' => 'Delivery Challans / DO (' . $order->dispatches->count() . ')', 'active' => false, 'icon' => 'feather-truck'],
             ['id' => 'tab-invoices', 'label' => 'Invoices (' . $order->invoices->count() . ')', 'active' => false, 'icon' => 'feather-file-text'],
             ['id' => 'tab-payments', 'label' => 'Payments (' . $order->allocations->count() . ')', 'active' => false, 'icon' => 'feather-dollar-sign'],
             ['id' => 'tab-returns', 'label' => 'Returns (' . $order->returns->count() . ')', 'active' => false, 'icon' => 'feather-rotate-ccw'],
@@ -400,10 +401,19 @@
                                         <span>-₹{{ number_format($order->discount, 2) }}</span>
                                     </div>
                                 @endif
-                                @if($order->shipping_charges > 0)
+                                <div class="d-flex justify-content-between mb-1.5 fs-12">
+                                    <span class="text-muted">Freight Terms:</span>
+                                    <span class="badge bg-soft-primary text-primary fw-semibold">{{ $order->freight_terms ?: 'To Pay' }}</span>
+                                </div>
+                                @if(($order->freight_amount > 0 || $order->shipping_charges > 0) && $order->freight_terms === 'To Be Billed')
                                     <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                        <span class="text-muted">Shipping Charges:</span>
-                                        <span class="fw-semibold text-dark">₹{{ number_format($order->shipping_charges, 2) }}</span>
+                                        <span class="text-muted">Freight Amount (Billed):</span>
+                                        <span class="fw-semibold text-dark">₹{{ number_format($order->freight_amount ?: $order->shipping_charges, 2) }}</span>
+                                    </div>
+                                @elseif($order->freight_amount > 0 || $order->shipping_charges > 0)
+                                    <div class="d-flex justify-content-between mb-1.5 fs-12">
+                                        <span class="text-muted">Freight Amount:</span>
+                                        <span class="fw-semibold text-muted">₹{{ number_format($order->freight_amount ?: $order->shipping_charges, 2) }}</span>
                                     </div>
                                 @endif
                                 @if($order->adjustment != 0)
@@ -426,6 +436,96 @@
                         <div class="col-6 text-start">
                             <p class="fs-10 text-muted mb-0">For queries regarding fulfillment, please refer to the sales department.</p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- TAB: Delivery Challans (Dispatches) -->
+                <div class="tab-pane fade" id="tab-dispatches">
+                    <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light bg-opacity-20">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="feather-truck fs-16 text-primary"></i>
+                            <h6 class="mb-0 fw-bold text-dark fs-14">Delivery Challans / Dispatches (DO)</h6>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <x-ui.odoo-form-ui type="table" id="soDispatchesTable">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4" style="width: 17%;">Dispatch #</th>
+                                    <th style="width: 12%;">Date</th>
+                                    <th style="width: 22%;">Transporter / Carrier</th>
+                                    <th style="width: 14%;">Vehicle No</th>
+                                    <th style="width: 10%;">Status</th>
+                                    <th class="text-end pe-4" style="width: 25%;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="fs-13 text-dark">
+                                @forelse ($order->dispatches as $dispatch)
+                                    @php
+                                        $dispBadge = 'bg-soft-secondary text-secondary';
+                                        if ($dispatch->status === 'Pending') $dispBadge = 'bg-soft-warning text-warning';
+                                        elseif ($dispatch->status === 'Confirmed') $dispBadge = 'bg-soft-primary text-primary';
+                                        elseif ($dispatch->status === 'Dispatched' || $dispatch->status === 'Shipped') $dispBadge = 'bg-soft-info text-info';
+                                        elseif ($dispatch->status === 'Delivered') $dispBadge = 'bg-soft-success text-success';
+                                        elseif ($dispatch->status === 'Cancelled') $dispBadge = 'bg-soft-danger text-danger';
+
+                                        $isDispatchInvoiced = false;
+                                        if ($dispatch->status === 'Invoiced') {
+                                            $isDispatchInvoiced = true;
+                                        } elseif ($order->invoices) {
+                                            $isDispatchInvoiced = $order->invoices->where('status', '!=', 'Cancelled')->contains(function($inv) use ($dispatch) {
+                                                return ($dispatch->material_requirement_id && $inv->material_requirement_id == $dispatch->material_requirement_id);
+                                            });
+                                        }
+                                    @endphp
+                                    <tr>
+                                        <td class="ps-4 fw-bold">
+                                            <a href="{{ route('sales.dispatches.show', $dispatch->id) }}" class="text-primary">{{ $dispatch->dispatch_number }}</a>
+                                        </td>
+                                        <td class="text-muted">{{ $dispatch->dispatch_date ? $dispatch->dispatch_date->format('d/m/Y') : '—' }}</td>
+                                        <td>
+                                            <span class="fw-semibold text-dark">{{ $dispatch->transporter?->name ?: ($dispatch->carrier ?: '—') }}</span>
+                                        </td>
+                                        <td class="font-monospace text-muted">{{ $dispatch->vehicle_number ?: '—' }}</td>
+                                        <td>
+                                            <span class="badge {{ $dispBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $dispatch->status }}</span>
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <div class="hstack gap-2 justify-content-end align-items-center">
+                                                @if(!$isDispatchInvoiced && in_array($dispatch->status, ['Confirmed', 'Shipped', 'Dispatched', 'Delivered']))
+                                                    <x-ui.button href="{!! route('sales.invoices.create', ['dispatch_order_id' => $dispatch->id, 'material_requirement_id' => $dispatch->material_requirement_id, 'sales_order_id' => $order->id, 'mode' => 'dispatch_order']) !!}" variant="soft-primary" size="xs" icon="feather-file-text" class="fw-bold px-2.5 py-1 fs-11 text-nowrap" title="Create Invoice against this Dispatch Order">
+                                                        Create Invoice
+                                                    </x-ui.button>
+                                                @elseif($isDispatchInvoiced)
+                                                    <span class="badge bg-soft-success text-success fs-10 fw-semibold px-2 py-0.5"><i class="feather-check me-1"></i>Invoiced</span>
+                                                @endif
+
+                                                <x-ui.action-dropdown :viewUrl="route('sales.dispatches.show', $dispatch->id)" id="dispAction-{{ $dispatch->id }}">
+                                                    <x-ui.dropdown-item href="{{ route('sales.dispatches.show', $dispatch->id) }}" icon="feather-eye me-2">
+                                                        View Dispatch
+                                                    </x-ui.dropdown-item>
+                                                    @if(!$isDispatchInvoiced && in_array($dispatch->status, ['Confirmed', 'Shipped', 'Dispatched', 'Delivered']))
+                                                        <x-ui.dropdown-item href="{!! route('sales.invoices.create', ['dispatch_order_id' => $dispatch->id, 'material_requirement_id' => $dispatch->material_requirement_id, 'sales_order_id' => $order->id, 'mode' => 'dispatch_order']) !!}" icon="feather-file-text me-2" class="text-success fw-semibold">
+                                                            Create Invoice
+                                                        </x-ui.dropdown-item>
+                                                    @endif
+                                                    <x-ui.dropdown-item href="{{ route('sales.dispatches.download-challan', $dispatch->id) }}" icon="feather-download me-2" target="_blank">
+                                                        Download Challan PDF
+                                                    </x-ui.dropdown-item>
+                                                </x-ui.action-dropdown>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" class="text-center py-5 text-muted">
+                                            <i class="feather-truck fs-1 mb-2 d-block text-gray-300"></i>
+                                            No Delivery Challans (Dispatches) generated for this Sales Order yet.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </x-ui.odoo-form-ui>
                     </div>
                 </div>
 
@@ -708,4 +808,21 @@
             }
         }
     </style>
+@endpush
+
+@push('scripts')
+    <script>
+        $(function () {
+            // Switch tab based on URL hash if present
+            var hash = window.location.hash;
+            if (hash) {
+                var triggerEl = document.querySelector('#salesOrderTabs button[data-bs-target="' + hash + '"]') 
+                             || document.querySelector('#salesOrderTabs a[href="' + hash + '"]');
+                if (triggerEl) {
+                    var tab = new bootstrap.Tab(triggerEl);
+                    tab.show();
+                }
+            }
+        });
+    </script>
 @endpush

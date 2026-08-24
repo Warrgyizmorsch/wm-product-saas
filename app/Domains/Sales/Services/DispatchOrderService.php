@@ -57,13 +57,15 @@ class DispatchOrderService
                 'sales_order' => $requirement->salesOrder?->sales_order_number ?? 'N/A',
                 'customer_name' => $requirement->salesOrder?->customer?->name ?? 'N/A',
                 'customer' => $requirement->salesOrder?->customer?->name ?? 'N/A',
+                'freight_terms' => $requirement->salesOrder?->freight_terms ?? 'To Pay',
+                'freight_amount' => (float) ($requirement->salesOrder?->freight_amount ?? 0),
                 'items' => $itemsData,
             ];
         })->filter(fn ($do) => count($do['items']) > 0)->values()->toArray();
     }
 
     /**
-     * Validate and create a new Dispatch Order.
+     * Validate and create a new Dispatch Order, reserving stock immediately in Pending state.
      *
      * @throws Exception
      */
@@ -99,28 +101,219 @@ class DispatchOrderService
         // 2. Generate dispatch number
         $dispatchNumber = $this->dispatchRepo->getNextDispatchNumber();
 
-        // 3. Prepare data & save via repository
+        // 3. Generate Gate Pass Number
+        $year = date('Y');
+        $lastGp = DispatchOrder::where('tenant_id', $tenantId)
+            ->whereNotNull('gate_pass_number')
+            ->orderBy('id', 'desc')
+            ->value('gate_pass_number');
+        $gpSeq = $lastGp ? ((int) preg_replace('/[^0-9]/', '', substr($lastGp, -4))) + 1 : 1;
+        $gatePassNumber = 'GP-' . $year . '-' . str_pad($gpSeq, 4, '0', STR_PAD_LEFT);
+
+        // 4. Prepare data & save via repository inside transaction
         $dispatchData = [
             'tenant_id' => $tenantId,
             'customer_id' => $validated['customer_id'] ?? ($req?->salesOrder?->customer_id),
+            'transporter_id' => $validated['transporter_id'] ?? null,
             'material_requirement_id' => $req?->id,
             'sales_order_id' => $req?->sales_order_id,
             'dispatch_number' => $dispatchNumber,
             'dispatch_date' => $validated['dispatch_date'],
             'status' => 'Pending',
+            'carrier' => $validated['carrier'] ?? null,
+            'tracking_number' => $validated['tracking_number'] ?? null,
+            'eway_bill_number' => $validated['eway_bill_number'] ?? null,
+            'eway_bill_date' => $validated['eway_bill_date'] ?? null,
+            'lr_number' => $validated['lr_number'] ?? null,
+            'lr_date' => $validated['lr_date'] ?? null,
+            'freight_terms' => $validated['freight_terms'] ?? $req?->salesOrder?->freight_terms ?? 'To Pay',
+            'freight_amount' => $validated['freight_amount'] ?? $req?->salesOrder?->freight_amount ?? 0.00,
+            'shipping_address' => $validated['shipping_address'] ?? null,
+            'total_packages' => $validated['total_packages'] ?? null,
+            'gross_weight' => $validated['gross_weight'] ?? null,
+            'net_weight' => $validated['net_weight'] ?? null,
+            'volume_cbm' => $validated['volume_cbm'] ?? null,
+            'gate_pass_number' => $gatePassNumber,
             'vehicle_number' => $validated['vehicle_number'] ?? null,
             'driver_name' => $validated['driver_name'] ?? null,
             'driver_phone' => $validated['driver_phone'] ?? null,
-            'shipping_agent' => $validated['shipping_agent'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'created_by' => $userId,
         ];
 
-        return $this->dispatchRepo->createDispatchOrder($dispatchData, $validated['items']);
+        return DB::transaction(function () use ($dispatchData, $validated, $tenantId) {
+            $dispatch = $this->dispatchRepo->createDispatchOrder($dispatchData, $validated['items']);
+
+            // Immediately reserve stock in Pending state, transferring any existing MR reservation
+            foreach ($dispatch->items as $item) {
+                $qtyToReserve = (float) ($item->quantity_dispatched ?? $item->quantity_ordered);
+                $mrItem = $item->material_requirement_item_id ? MaterialRequirementItem::find($item->material_requirement_item_id) : null;
+                $mrReserved = $mrItem ? (float) ($mrItem->quantity_reserved ?? 0) : 0;
+
+                $coveredByMR = min($qtyToReserve, $mrReserved);
+                $netNewReservation = max(0.0, $qtyToReserve - $coveredByMR);
+
+                if ($mrItem && $coveredByMR > 0) {
+                    // Consume MR reservation so it transfers into DO reservation without double counting
+                    $mrItem->decrement('quantity_reserved', $coveredByMR);
+
+                    $mrRes = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+                        ->where('product_id', $item->product_id)
+                        ->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement'])
+                        ->where('reference_id', $mrItem->material_requirement_id)
+                        ->where('status', 'Active')
+                        ->first();
+
+                    if ($mrRes) {
+                        $remQty = max(0.0, (float)$mrRes->reserved_qty - $coveredByMR);
+                        if ($remQty <= 0.0001) {
+                            $mrRes->update(['reserved_qty' => 0, 'status' => 'Completed']);
+                        } else {
+                            $mrRes->update(['reserved_qty' => $remQty]);
+                        }
+                    }
+                }
+
+                if ($netNewReservation > 0) {
+                    // Reserve additional unreserved stock
+                    StockService::reserveStock(
+                        $tenantId,
+                        (int) $item->product_id,
+                        (int) $item->warehouse_id,
+                        $netNewReservation,
+                        'DispatchOrder',
+                        (int) $dispatch->id,
+                        (int) $item->id
+                    );
+                } else {
+                    // Create active StockReservation record for DO without adding duplicate warehouse reserved_qty
+                    \App\Domains\Inventory\Models\StockReservation::create([
+                        'tenant_id' => $tenantId,
+                        'product_id' => $item->product_id,
+                        'warehouse_id' => $item->warehouse_id,
+                        'reference_type' => 'DispatchOrder',
+                        'reference_id' => $dispatch->id,
+                        'reference_item_id' => $item->id,
+                        'reserved_qty' => $qtyToReserve,
+                        'status' => 'Active',
+                    ]);
+                }
+
+                $item->update(['status' => 'Reserved']);
+            }
+
+            return $dispatch;
+        });
     }
 
     /**
-     * Confirm dispatch order, deduct stock, and update sales order status.
+     * Update an existing Dispatch Order and dynamically adjust stock reservations.
+     * E.g. If qty updated from 10 to 8 -> releases 2 units to available stock.
+     * If qty updated from 10 to 12 -> reserves 2 additional units from available stock.
+     *
+     * @throws Exception
+     */
+    public function updateDispatchOrder(DispatchOrder $dispatch, array $validated): DispatchOrder
+    {
+        if (in_array($dispatch->status, ['Shipped', 'Dispatched', 'Delivered', 'Cancelled'])) {
+            throw new Exception("Cannot edit Dispatch Order in {$dispatch->status} status.");
+        }
+
+        $tenantId = $dispatch->tenant_id ?: (tenant_id() ?? 1);
+
+        return DB::transaction(function () use ($dispatch, $validated, $tenantId) {
+            $dispatch->update([
+                'dispatch_date' => $validated['dispatch_date'] ?? $dispatch->dispatch_date,
+                'transporter_id' => $validated['transporter_id'] ?? $dispatch->transporter_id,
+                'carrier' => $validated['carrier'] ?? $dispatch->carrier,
+                'vehicle_number' => $validated['vehicle_number'] ?? $dispatch->vehicle_number,
+                'driver_name' => $validated['driver_name'] ?? $dispatch->driver_name,
+                'driver_phone' => $validated['driver_phone'] ?? $dispatch->driver_phone,
+                'tracking_number' => $validated['tracking_number'] ?? $dispatch->tracking_number,
+                'eway_bill_number' => $validated['eway_bill_number'] ?? $dispatch->eway_bill_number,
+                'eway_bill_date' => $validated['eway_bill_date'] ?? $dispatch->eway_bill_date,
+                'lr_number' => $validated['lr_number'] ?? $dispatch->lr_number,
+                'lr_date' => $validated['lr_date'] ?? $dispatch->lr_date,
+                'freight_terms' => $validated['freight_terms'] ?? $dispatch->freight_terms,
+                'freight_amount' => $validated['freight_amount'] ?? $dispatch->freight_amount,
+                'shipping_address' => $validated['shipping_address'] ?? $dispatch->shipping_address,
+                'total_packages' => $validated['total_packages'] ?? $dispatch->total_packages,
+                'gross_weight' => $validated['gross_weight'] ?? $dispatch->gross_weight,
+                'net_weight' => $validated['net_weight'] ?? $dispatch->net_weight,
+                'volume_cbm' => $validated['volume_cbm'] ?? $dispatch->volume_cbm,
+                'notes' => $validated['notes'] ?? $dispatch->notes,
+            ]);
+
+            if (isset($validated['items']) && is_array($validated['items'])) {
+                foreach ($validated['items'] as $itemData) {
+                    $doItem = null;
+                    if (isset($itemData['id'])) {
+                        $doItem = $dispatch->items->find($itemData['id']);
+                    }
+
+                    if ($doItem) {
+                        $oldQty = (float) ($doItem->quantity_dispatched ?? $doItem->quantity_ordered);
+                        $newQty = (float) ($itemData['quantity'] ?? $oldQty);
+
+                        if (abs($newQty - $oldQty) > 0.0001) {
+                            $mrItem = $doItem->material_requirement_item_id ? MaterialRequirementItem::find($doItem->material_requirement_item_id) : null;
+
+                            if ($newQty < $oldQty) {
+                                // Qty decreased (10 -> 8): Release difference (2 units) back to available stock
+                                $diff = $oldQty - $newQty;
+                                StockService::releaseStock(
+                                    $tenantId,
+                                    (int) $doItem->product_id,
+                                    (int) $doItem->warehouse_id,
+                                    $diff,
+                                    'DispatchOrder',
+                                    (int) $dispatch->id,
+                                    (int) $doItem->id
+                                );
+
+                                if ($mrItem && (float) $mrItem->quantity_reserved >= $diff) {
+                                    $mrItem->decrement('quantity_reserved', $diff);
+                                }
+                            } else {
+                                // Qty increased (10 -> 12): Reserve additional difference (2 units)
+                                $diff = $newQty - $oldQty;
+                                $unreservedAvail = StockService::getAvailableStock((int) $doItem->product_id, (int) $doItem->warehouse_id);
+
+                                if ($diff > $unreservedAvail) {
+                                    throw new Exception("Cannot increase quantity by {$diff} units for product '{$doItem->product?->name}'. Insufficient available stock ({$unreservedAvail}).");
+                                }
+
+                                StockService::reserveStock(
+                                    $tenantId,
+                                    (int) $doItem->product_id,
+                                    (int) $doItem->warehouse_id,
+                                    $diff,
+                                    'DispatchOrder',
+                                    (int) $dispatch->id,
+                                    (int) $doItem->id
+                                );
+
+                                if ($mrItem) {
+                                    $mrItem->increment('quantity_reserved', $diff);
+                                }
+                            }
+
+                            $doItem->update([
+                                'quantity_ordered' => $newQty,
+                                'quantity_dispatched' => $newQty,
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            return $dispatch->fresh(['items.product', 'items.warehouse']);
+        });
+    }
+
+    /**
+     * Stage 1: Confirm Dispatch Order (Enables Sales Team Invoice Creation).
+     * Status transitions: Pending -> Confirmed
      *
      * @throws Exception
      */
@@ -130,20 +323,38 @@ class DispatchOrderService
             throw new Exception('Only Pending Dispatch Orders can be confirmed.');
         }
 
-        // 1. Stock Availability Validation
-        foreach ($dispatch->items as $item) {
-            $mrItem = $item->material_requirement_item_id ? MaterialRequirementItem::find($item->material_requirement_item_id) : null;
-            $reservedForThisItem = $mrItem ? (float) ($mrItem->quantity_reserved ?? 0) : 0;
-            $unreservedAvail = StockService::getAvailableStock((int) $item->product_id, (int) $item->warehouse_id);
-            $totalPhysicalStock = $unreservedAvail + $reservedForThisItem;
-            $qtyToDispatch = (float) ($item->quantity_dispatched ?? $item->quantity_ordered);
-
-            if ($qtyToDispatch > $totalPhysicalStock) {
-                throw new Exception("Insufficient physical stock for product '{$item->product?->name}'. Total Stock: {$totalPhysicalStock} (Available: {$unreservedAvail} + Reserved: {$reservedForThisItem}), Required: {$qtyToDispatch}");
+        return DB::transaction(function () use ($dispatch) {
+            foreach ($dispatch->items as $item) {
+                $item->update(['status' => 'Confirmed']);
             }
+
+            $dispatch->update(['status' => 'Confirmed']);
+
+            if ($dispatch->materialRequirement) {
+                $dispatch->materialRequirement->update(['status' => 'Processing']);
+            }
+
+            return $dispatch;
+        });
+    }
+
+    /**
+     * Stage 2: Ship / Outward Dispatch Order & Deduct Physical Stock from Warehouse.
+     * Status transitions: Confirmed -> Shipped (or Dispatched)
+     *
+     * @throws Exception
+     */
+    public function shipDispatchOrder(DispatchOrder $dispatch): DispatchOrder
+    {
+        if (!in_array($dispatch->status, ['Confirmed', 'Pending'])) {
+            throw new Exception('Only Confirmed or Pending Dispatch Orders can be shipped.');
         }
 
-        // 2. Transaction execution
+        // Auto confirm & reserve if called on a pending dispatch
+        if ($dispatch->status === 'Pending') {
+            $dispatch = $this->confirmDispatchOrder($dispatch);
+        }
+
         return DB::transaction(function () use ($dispatch) {
             $tenantId = $dispatch->tenant_id ?: (tenant_id() ?? 1);
 
@@ -151,69 +362,40 @@ class DispatchOrderService
                 $mrItem = $item->material_requirement_item_id ? MaterialRequirementItem::find($item->material_requirement_item_id) : null;
                 $qtyToDispatch = (float) ($item->quantity_dispatched ?? $item->quantity_ordered);
 
-                if ($mrItem && (float) $mrItem->quantity_reserved > 0) {
-                    $consumeReserved = min($qtyToDispatch, (float) $mrItem->quantity_reserved);
-                    $mrItem->decrement('quantity_reserved', $consumeReserved);
+                // Release reserved stock before physical outflow deduction
+                $whStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                    ->where('product_id', $item->product_id)
+                    ->where('warehouse_id', $item->warehouse_id)
+                    ->first();
 
-                    // Release reserved_qty from warehouse stock
-                    $whStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                        ->where('product_id', $item->product_id)
-                        ->where('warehouse_id', $item->warehouse_id)
-                        ->first();
+                if ($whStock && (float) $whStock->reserved_qty > 0) {
+                    $consumeReserved = min($qtyToDispatch, (float) $whStock->reserved_qty);
+                    $newReserved = max(0.0, (float) $whStock->reserved_qty - $consumeReserved);
+                    $whStock->update([
+                        'reserved_qty' => $newReserved,
+                        'available_qty' => max(0.0, (float) $whStock->quantity - $newReserved),
+                    ]);
+                }
 
-                    if ($whStock && (float) $whStock->reserved_qty > 0) {
-                        $whReleaseQty = min($consumeReserved, (float) $whStock->reserved_qty);
-                        $newReserved = max(0.0, (float) $whStock->reserved_qty - $whReleaseQty);
-                        $whStock->update([
-                            'reserved_qty' => $newReserved,
-                            'available_qty' => max(0.0, (float) $whStock->quantity - $newReserved),
-                        ]);
-                    }
+                // Fulfill active StockReservation records ONLY for this Dispatch Order
+                $reservations = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+                    ->where('product_id', $item->product_id)
+                    ->where('reference_type', 'DispatchOrder')
+                    ->where('reference_id', $dispatch->id)
+                    ->where('status', 'Active')
+                    ->get();
 
-                    // Fulfill active StockReservation records in stock_reservations table
-                    if ($consumeReserved > 0) {
-                        $reservations = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
-                            ->where('product_id', $item->product_id)
-                            ->where('status', 'Active')
-                            ->where(function ($q) use ($dispatch, $mrItem) {
-                                if ($mrItem) {
-                                    $q->where('reference_item_id', $mrItem->id)
-                                      ->orWhere(function($q2) use ($mrItem) {
-                                          $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement'])
-                                             ->where('reference_id', $mrItem->material_requirement_id);
-                                      });
-                                }
-                                if ($dispatch->material_requirement_id) {
-                                    $q->orWhere(function($q2) use ($dispatch) {
-                                        $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement'])
-                                           ->where('reference_id', $dispatch->material_requirement_id);
-                                    });
-                                }
-                            })
-                            ->get();
-
-                        $qtyToFulfill = $consumeReserved;
-                        foreach ($reservations as $res) {
-                            if ($qtyToFulfill <= 0) break;
-
-                            $resQty = (float) $res->reserved_qty;
-                            if ($resQty <= $qtyToFulfill) {
-                                $qtyToFulfill -= $resQty;
-                                $res->update([
-                                    'reserved_qty' => 0,
-                                    'status' => 'Completed',
-                                ]);
-                            } else {
-                                $res->decrement('reserved_qty', $qtyToFulfill);
-                                $qtyToFulfill = 0;
-                            }
-                        }
-                    }
+                foreach ($reservations as $res) {
+                    $res->update([
+                        'reserved_qty' => 0,
+                        'status' => 'Completed',
+                    ]);
                 }
 
                 $snRaw = $item->serial_numbers ?? '';
                 $serialNumbers = is_array($snRaw) ? $snRaw : array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)$snRaw))));
 
+                // Physical Stock Outflow Deduction
                 StockService::recordOutflow(
                     $tenantId,
                     (int) $item->product_id,
@@ -224,51 +406,36 @@ class DispatchOrderService
                     $serialNumbers
                 );
 
-                $item->update(['status' => 'Dispatched']);
+                $item->update(['status' => 'Shipped']);
 
                 if ($mrItem) {
                     $mrOrdered = (float)($mrItem->quantity_ordered > 0 ? $mrItem->quantity_ordered : $mrItem->quantity);
                     $mrDispatched = (float)$mrItem->dispatched_qty;
-                    $mrReserved = (float)$mrItem->quantity_reserved;
-
                     if ($mrDispatched >= $mrOrdered) {
                         $mrItem->update(['status' => 'Dispatched']);
-                    } elseif ($mrDispatched > 0) {
-                        $mrItem->update(['status' => 'Partially Dispatched']);
-                    } elseif ($mrReserved >= $mrOrdered) {
-                        $mrItem->update(['status' => 'Reserved']);
-                    } elseif ($mrReserved > 0) {
-                        $mrItem->update(['status' => 'Partially Reserved']);
                     } else {
-                        $mrItem->update(['status' => 'Pending']);
+                        $mrItem->update(['status' => 'Partially Dispatched']);
                     }
                 }
             }
 
-            $dispatch->update(['status' => 'Dispatched']);
+            $dispatch->update(['status' => 'Shipped']);
 
             // Update linked Material Requirement document status
             if ($dispatch->materialRequirement) {
                 $mr = $dispatch->materialRequirement;
                 $allFullyDispatched = true;
-                $anyDispatchedOrReserved = false;
-
                 foreach ($mr->items as $mi) {
                     $mOrdered = (float)($mi->quantity_ordered > 0 ? $mi->quantity_ordered : $mi->quantity);
                     $mDispatched = (float)$mi->dispatched_qty;
-                    $mReserved = (float)$mi->quantity_reserved;
-
                     if ($mDispatched < $mOrdered) {
                         $allFullyDispatched = false;
-                    }
-                    if ($mDispatched > 0 || $mReserved > 0) {
-                        $anyDispatchedOrReserved = true;
                     }
                 }
 
                 if ($allFullyDispatched) {
                     $mr->update(['status' => 'Dispatched']);
-                } elseif ($anyDispatchedOrReserved) {
+                } else {
                     $mr->update(['status' => 'Processing']);
                 }
             }
@@ -284,6 +451,12 @@ class DispatchOrderService
                 } else if ($totalDispatched > 0) {
                     $so->update(['status' => 'Partially Shipped']);
                 }
+            }
+
+            try {
+                app(\App\Domains\Sales\Services\SalesAccountingService::class)->postDispatchOrderCogsJournal($dispatch);
+            } catch (\Throwable $e) {
+                // Keep dispatch flow resilient
             }
 
             return $dispatch;

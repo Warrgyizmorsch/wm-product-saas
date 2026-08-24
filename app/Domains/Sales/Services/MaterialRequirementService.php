@@ -51,6 +51,7 @@ class MaterialRequirementService
                 }
 
                 MaterialRequirementItem::create([
+                    'tenant_id'               => $delivery->tenant_id,
                     'material_requirement_id' => $delivery->id,
                     'sales_order_item_id'     => $itemData['sales_order_item_id'] ?? null,
                     'product_id'              => $itemData['product_id'],
