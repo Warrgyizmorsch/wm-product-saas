@@ -50,6 +50,7 @@
                 ['label' => 'MRP & Shortage Analysis', 'route' => 'inventory.mrp-shortage.index'],
                 ['label' => 'Material Requests (Prod)', 'route' => 'inventory.material-requests.index'],
                 ['label' => 'Dispatch Orders', 'route' => 'inventory.dispatches.index'],
+                ['label' => 'Transporters Master', 'route' => 'sales.transporters.index'],
             ]],
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => [
                 ['label' => __('inventory.products'), 'route' => 'inventory.products.index'],

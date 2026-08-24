@@ -113,10 +113,12 @@
                             <input type="checkbox" class="form-check-input" id="selectAllCheckbox">
                         </th>
                         <th>Invoice # & Date</th>
-                        <th>Sales Order</th>
+                        <th>Reference DO / SO</th>
                         <th>Customer</th>
                         <th class="text-end">Total Amount</th>
                         <th>Status</th>
+                        <th>E-Invoice Status</th>
+                        <th>E-Way Bill Status</th>
                         <th class="text-end pe-4">Actions</th>
                     </tr>
                 </thead>
@@ -153,10 +155,14 @@
                             </td>
                             <td>
                                 @if ($inv->salesOrder)
-                                    <a href="{{ route('sales.orders.show', $inv->sales_order_id) }}" class="text-muted fw-semibold">
+                                    <a href="{{ route('sales.orders.show', $inv->sales_order_id) }}" class="text-muted fw-semibold d-block">
                                         {{ $inv->salesOrder->sales_order_number }}
                                     </a>
-                                @else
+                                @endif
+                                @if ($inv->dispatchOrder)
+                                    <span class="badge bg-light text-dark font-monospace border fs-10">DO: {{ $inv->dispatchOrder->dispatch_number }}</span>
+                                @endif
+                                @if(!$inv->salesOrder && !$inv->dispatchOrder)
                                     <span class="text-muted">—</span>
                                 @endif
                             </td>
@@ -174,6 +180,12 @@
                             </td>
                             <td>
                                 <span class="badge {{ $badgeClass }} px-2.5 py-1 fs-11 fw-bold">{{ $inv->status }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-soft-warning text-warning border border-warning fs-11 fw-semibold px-2 py-1"><i class="feather-clock me-1"></i>Pending</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-soft-warning text-warning border border-warning fs-11 fw-semibold px-2 py-1"><i class="feather-clock me-1"></i>Pending</span>
                             </td>
                             <td class="text-end pe-4">
                                 <div class="hstack gap-2 justify-content-end">

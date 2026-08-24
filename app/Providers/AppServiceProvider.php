@@ -291,7 +291,7 @@ class AppServiceProvider extends ServiceProvider
 
         \Illuminate\Support\Facades\Event::listen(
             \App\Domains\Sales\Events\InvoicePosted::class,
-            \App\Domains\Accounting\Listeners\PostInvoiceJournal::class
+            \App\Domains\Sales\Listeners\PostSalesInvoiceJournal::class
         );
 
         \Illuminate\Support\Facades\Event::listen(
@@ -475,6 +475,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Sales\Models\DispatchOrder::class,
             \App\Domains\Sales\Policies\DispatchOrderPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Sales\Models\Transporter::class,
+            \App\Domains\Sales\Policies\TransporterPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(

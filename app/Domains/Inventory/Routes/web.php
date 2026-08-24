@@ -111,6 +111,13 @@ Route::prefix('inventory')
         Route::post('material-requests/items/{id}/create-pr', [MaterialRequestController::class, 'createPurchaseRequisition'])->name('material-requests.create-pr');
         Route::post('material-requests/{id}/bulk-action', [MaterialRequestController::class, 'bulkAction'])->name('material-requests.bulk-action');
 
+        // Transporter Master Routes (/inventory/transporters)
+        Route::get('transporters', [\App\Domains\Sales\Controllers\TransporterController::class, 'index'])->name('transporters.index');
+        Route::post('transporters', [\App\Domains\Sales\Controllers\TransporterController::class, 'store'])->name('transporters.store');
+        Route::put('transporters/{transporter}', [\App\Domains\Sales\Controllers\TransporterController::class, 'update'])->name('transporters.update');
+        Route::delete('transporters/{transporter}', [\App\Domains\Sales\Controllers\TransporterController::class, 'destroy'])->name('transporters.destroy');
+        Route::post('transporters/quick-create', [\App\Domains\Sales\Controllers\TransporterController::class, 'quickCreate'])->name('transporters.quick-create');
+
         // Dispatch Orders Routes (/inventory/dispatches)
         Route::get('dispatches', [DispatchOrderController::class, 'index'])->name('dispatches.index');
         Route::get('dispatches/create', [DispatchOrderController::class, 'create'])->name('dispatches.create');
@@ -119,8 +126,11 @@ Route::prefix('inventory')
         Route::get('dispatches/available-serials', [DispatchOrderController::class, 'getAvailableSerials'])->name('dispatches.available-serials');
         Route::get('dispatches/available-batches', [DispatchOrderController::class, 'getAvailableBatches'])->name('dispatches.available-batches');
         Route::get('dispatches/warehouse/{warehouse}/address', [DispatchOrderController::class, 'warehouseAddress'])->name('dispatches.warehouse-address');
+        Route::get('dispatches/{dispatch}/pdf', [DispatchOrderController::class, 'downloadChallan'])->name('dispatches.download-challan');
+        Route::post('dispatches/{dispatch}/pod', [DispatchOrderController::class, 'uploadPod'])->name('dispatches.upload-pod');
         Route::get('dispatches/{dispatch}', [DispatchOrderController::class, 'show'])->name('dispatches.show');
         Route::post('dispatches/{dispatch}/confirm', [DispatchOrderController::class, 'confirm'])->name('dispatches.confirm');
+        Route::post('dispatches/{dispatch}/ship', [DispatchOrderController::class, 'ship'])->name('dispatches.ship');
     });
 
 Route::post('products/quick-create', [ProductController::class, 'quickCreate'])

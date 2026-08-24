@@ -38,6 +38,11 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link pb-3 px-3 @if(Route::is('sales.transporters.*')) active fw-bold text-primary border-bottom border-primary border-2 @else text-muted border-0 @endif" href="{{ route('sales.transporters.index') }}">
+                        <i class="feather-truck me-1"></i> Transporters
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link pb-3 px-3 @if(Route::is('sales.invoices.*')) active fw-bold text-primary border-bottom border-primary border-2 @else text-muted border-0 @endif" href="{{ route('sales.invoices.index') }}">
                         <i class="feather-file me-1"></i> Invoices
                     </a>

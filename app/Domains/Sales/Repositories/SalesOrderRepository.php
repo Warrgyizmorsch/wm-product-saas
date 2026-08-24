@@ -26,6 +26,8 @@ class SalesOrderRepository
             'items.product', 
             'items.warehouse',
             'materialRequirements.items', 
+            'dispatches.items.product',
+            'dispatches.transporter',
             'invoices.items', 
             'allocations.payment', 
             'returns.items',
@@ -66,7 +68,7 @@ class SalesOrderRepository
      */
     public function getPaginatedOrders(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
-        $query = SalesOrder::query()->with(['customer', 'quotation']);
+        $query = SalesOrder::query()->with(['customer', 'quotation', 'invoices', 'dispatches']);
 
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);
@@ -119,6 +121,7 @@ class SalesOrderRepository
 
             foreach ($order->items as $soItem) {
                 MaterialRequirementItem::create([
+                    'tenant_id' => $order->tenant_id,
                     'material_requirement_id' => $delivery->id,
                     'sales_order_item_id' => $soItem->id,
                     'product_id' => $soItem->product_id,
