@@ -127,11 +127,17 @@ class OvertimeRequestController extends Controller
         $validated = $request->validate([
             'auto_overtime_threshold_hours' => 'required_without:min_overtime_request_hours|nullable|numeric|min:0',
             'min_overtime_request_hours'    => 'required_without:auto_overtime_threshold_hours|nullable|numeric|min:0.5',
+            'overtime_max_monthly_hours'    => 'nullable|numeric|min:0',
+            'overtime_weekend_multiplier'   => 'nullable|numeric|min:1.0',
+            'overtime_holiday_multiplier'   => 'nullable|numeric|min:1.0',
+            'overtime_tiers'                => 'nullable|array',
+            'overtime_tiers.*.min_hours'    => 'required|numeric|min:0',
+            'overtime_tiers.*.max_hours'    => 'nullable|numeric|min:0',
+            'overtime_tiers.*.multiplier'   => 'required|numeric|min:1.0',
         ], [
             'auto_overtime_threshold_hours.required_without' => 'Either the Auto Overtime Threshold Hours or the Minimum Overtime Request Hours must be specified.',
             'min_overtime_request_hours.required_without' => 'Either the Auto Overtime Threshold Hours or the Minimum Overtime Request Hours must be specified.',
         ]);
-        $validated['overtime_rate_multiplier'] = 1.0;
 
         $this->overtimeRepository->updateGlobalSettings($validated);
 

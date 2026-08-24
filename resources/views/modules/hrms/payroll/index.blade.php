@@ -72,6 +72,11 @@
                         <div>
                             <h5 class="fw-bold text-dark mb-1">
                                 Payroll Register &mdash; {{ Carbon\Carbon::parse($selectedRun->payroll_month . '-01')->format('F Y') }}
+                                @if($selectedRun->payGroup)
+                                    <span class="badge bg-soft-info text-info fs-12 ms-2 fw-semibold">{{ $selectedRun->payGroup->name }}</span>
+                                @else
+                                    <span class="badge bg-soft-secondary text-secondary fs-12 ms-2 fw-semibold">All Pay Groups</span>
+                                @endif
                             </h5>
                             <div class="text-muted fs-12">
                                 Cycle dates: {{ $selectedRun->start_date->format('F d, Y') }} to {{ $selectedRun->end_date->format('F d, Y') }}
@@ -94,6 +99,41 @@
                         </div>
                     </div>
 
+                    <!-- PENDING PRIOR HOLDS ALERTS -->
+                    @if(!empty($pendingPriorHolds))
+                        <div class="alert alert-warning border-warning-subtle rounded-3 p-3.5 mb-4 animate__animated animate__fadeIn">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <i class="feather-alert-triangle text-warning fs-18"></i>
+                                <h6 class="fw-bold text-dark mb-0">Pending Withheld Salaries Detected</h6>
+                            </div>
+                            <p class="fs-12 text-muted mb-3">The following employees have active holds on their payouts from previous months. You can release them directly into the current <strong>{{ Carbon\Carbon::parse($selectedRun->payroll_month . '-01')->format('F Y') }}</strong> payroll cycle as Arrears:</p>
+                            <div class="list-group list-group-flush border rounded-3 bg-white overflow-hidden" style="max-width: 650px;">
+                                @foreach($pendingPriorHolds as $prior)
+                                    <div class="list-group-item d-flex justify-content-between align-items-center py-2.5 px-3 fs-12 text-dark">
+                                        <div>
+                                            <span class="fw-bold">{{ $prior['employee']->full_name }}</span> 
+                                            <span class="text-muted">({{ $prior['employee']->employee_id }}) &bull; Withheld for {{ Carbon\Carbon::parse($prior['hold']->payroll_month . '-01')->format('F Y') }}</span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <span class="fw-bold text-primary">₹{{ number_format($prior['net_payout'], 2) }}</span>
+                                            @if($selectedRun->status === 'draft')
+                                                <form action="{{ route('hrms.payroll.hold.toggle', [$prior['employee']->id, $prior['hold']->payroll_month]) }}" method="POST" class="m-0">
+                                                    @csrf
+                                                    <input type="hidden" name="target_month" value="{{ $selectedRun->payroll_month }}">
+                                                    <button type="submit" class="btn btn-xs btn-primary text-white fw-bold px-2.5 py-1 fs-11">
+                                                        <i class="feather-plus me-1"></i>Release to {{ Carbon\Carbon::parse($selectedRun->payroll_month . '-01')->format('M') }} Payout
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <span class="text-muted fs-11"><i class="feather-lock me-1"></i>Cycle Locked</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Calculations Register Table -->
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0 text-dark">
@@ -102,12 +142,13 @@
                                     <th>Employee Details</th>
                                     <th class="text-center">LOP Days</th>
                                     <th class="text-end">Base Gross</th>
-                                    <th class="text-end">Ad-hoc Earnings</th>
-                                    <th class="text-end">Ad-hoc Deductions</th>
+                                    <th class="text-end">Salary Deductions</th>
+                                    <th class="text-end">Ad-hoc</th>
+                                    <th class="text-end">Overtime</th>
                                     <th class="text-end">Retro Refunds</th>
-                                    <th class="text-end">Penalties</th>
                                     <th class="text-end">Net Payout</th>
                                     <th class="text-center">Payout Status</th>
+                                    <th class="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -124,26 +165,68 @@
                                             </span>
                                         </td>
                                         <td class="text-end fw-semibold">₹{{ number_format($summary['base_gross_earnings'] ?? 0, 2) }}</td>
-                                        <td class="text-end text-success">₹{{ number_format($summary['adhoc_earnings'] ?? 0, 2) }}</td>
-                                        <td class="text-end text-danger">₹{{ number_format($summary['adhoc_deductions'] ?? 0, 2) }}</td>
-                                        <td class="text-end text-primary">₹{{ number_format($summary['retro_lop_reversals'] ?? 0, 2) }}</td>
-                                        <td class="text-end text-danger">₹{{ number_format($summary['attendance_penalties'] ?? 0, 2) }}</td>
-                                        <td class="text-end fw-bold text-primary">₹{{ number_format($summary['net_payout'] ?? 0, 2) }}</td>
-                                        <td class="text-center">
-                                            @if($row['is_held'])
-                                                <span class="badge bg-soft-danger text-danger px-2.5 py-1.5 rounded-pill fs-11">Withheld</span>
+                                        <td class="text-end text-danger">₹{{ number_format($summary['base_deductions'] ?? 0, 2) }}</td>
+                                        @php
+                                            $netAdhoc = ($summary['adhoc_earnings'] ?? 0) - ($summary['adhoc_deductions'] ?? 0);
+                                        @endphp
+                                        <td class="text-end fw-semibold @if($netAdhoc > 0) text-success @elseif($netAdhoc < 0) text-danger @else text-secondary @endif">
+                                            @if($netAdhoc > 0)
+                                                +₹{{ number_format($netAdhoc, 2) }}
+                                            @elseif($netAdhoc < 0)
+                                                -₹{{ number_format(abs($netAdhoc), 2) }}
                                             @else
-                                                <span class="badge bg-soft-success text-success px-2.5 py-1.5 rounded-pill fs-11">Approved</span>
+                                                ₹0.00
                                             @endif
+                                        </td>
+                                        <td class="text-end fw-semibold text-success">
+                                            @if(($summary['overtime_payout'] ?? 0) > 0)
+                                                ₹{{ number_format($summary['overtime_payout'], 2) }}
+                                                <div class="fs-10 text-muted" style="font-size: 10px;">{{ number_format($summary['overtime_hours'] ?? 0, 1) }} hrs</div>
+                                            @else
+                                                <span class="text-secondary">₹0.00</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end text-primary">₹{{ number_format($summary['retro_lop_reversals'] ?? 0, 2) }}</td>
+                                        <td class="text-end fw-bold text-primary">₹{{ number_format($summary['net_payout'] ?? 0, 2) }}</td>
+                                        <td class="text-center text-nowrap">
+                                            @if($selectedRun->status === 'paid')
+                                                @if($row['hold_status'] === 'on_hold')
+                                                    <span class="badge bg-soft-danger text-danger px-2.5 py-1.5 rounded-pill fs-11">Withheld</span>
+                                                @elseif($row['hold_status'] === 'released')
+                                                    <span class="badge bg-soft-info text-info px-2.5 py-1.5 rounded-pill fs-11">Released (Paid)</span>
+                                                @else
+                                                    <span class="badge bg-soft-success text-success px-2.5 py-1.5 rounded-pill fs-11">Paid</span>
+                                                @endif
+                                            @else
+                                                @if($row['is_held'])
+                                                    <span class="badge bg-soft-danger text-danger px-2.5 py-1.5 rounded-pill fs-11">Withheld</span>
+                                                @else
+                                                    <span class="badge bg-soft-success text-success px-2.5 py-1.5 rounded-pill fs-11">Approved</span>
+                                                @endif
+                                            @endif
+                                        </td>
+                                        <td class="text-center text-nowrap">
+                                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                                <button type="button" class="btn btn-icon btn-sm btn-soft-primary rounded-circle show-salary-details" 
+                                                        data-employee-name="{{ $row['employee']->full_name }}" 
+                                                        data-month="{{ Carbon\Carbon::parse($selectedRun->payroll_month . '-01')->format('F Y') }}" 
+                                                        data-items='@json($row['items'] ?? [])'
+                                                        title="View salary components breakdown">
+                                                    <i class="feather-eye"></i>
+                                                </button>
 
-                                            @if($selectedRun->status === 'draft')
-                                                <form action="{{ route('hrms.payroll.hold.toggle', [$row['employee']->id, $selectedRun->payroll_month]) }}" method="POST" class="d-inline ms-1">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-xs {{ $row['is_held'] ? 'btn-soft-success' : 'btn-soft-danger' }} rounded-circle py-0.5 px-1.5 fs-10" title="{{ $row['is_held'] ? 'Release' : 'Hold' }}">
-                                                        <i class="feather-{{ $row['is_held'] ? 'play' : 'pause' }}"></i>
-                                                    </button>
-                                                </form>
-                                            @endif
+                                                @if($selectedRun->status === 'draft' || ($selectedRun->status === 'paid' && $row['hold_status'] === 'on_hold'))
+                                                    <form action="{{ route('hrms.payroll.hold.toggle', [$row['employee']->id, $selectedRun->payroll_month]) }}" method="POST" class="m-0">
+                                                        @csrf
+                                                        @if($selectedRun->status === 'paid')
+                                                            <input type="hidden" name="target_month" value="{{ $selectedRun->payroll_month }}">
+                                                        @endif
+                                                        <button type="submit" class="btn btn-icon btn-sm {{ $row['is_held'] ? 'btn-soft-success' : 'btn-soft-danger' }} rounded-circle" title="{{ $row['is_held'] ? 'Release Payout' : 'Hold' }}">
+                                                            <i class="feather-{{ $row['is_held'] ? 'play' : 'pause' }}"></i>
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -175,13 +258,21 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="Payroll Month (YYYY-MM)" name="payroll_month" :required="true" placeholder="e.g. 2026-08" />
+                            <x-ui.odoo-form-ui type="input" inputType="month" label="Payroll Month (YYYY-MM)" name="payroll_month" id="initiate_payroll_month" :required="true" placeholder="e.g. 2026-08" />
                         </div>
-                        <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" subtype="date" label="Start Date" name="start_date" :required="true" />
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Pay Group" name="pay_group_id" id="initiate_pay_group_id" helperText="Select a specific pay group to process or leave as all pay groups.">
+                                <option value="">All Pay Groups (Process All Employees)</option>
+                                @foreach($payGroups as $pg)
+                                    <option value="{{ $pg->id }}">{{ $pg->name }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" subtype="date" label="End Date" name="end_date" :required="true" />
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" id="initiate_start_date" :required="true" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="End Date" name="end_date" id="initiate_end_date" :required="true" />
                         </div>
                     </div>
                 </div>
@@ -190,6 +281,61 @@
                     <button type="submit" class="btn btn-primary text-white">Start Calculations</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- SALARY DETAILS MODAL -->
+<div class="modal fade" id="salaryDetailsModal" tabindex="-1" aria-labelledby="salaryDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="salaryDetailsModalLabel"><i class="feather-info me-2 text-primary"></i>Salary Breakdown - <span id="modalEmployeeName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3 text-muted fs-12">
+                    Payroll Month: <strong id="modalPayrollMonth"></strong>
+                </div>
+                <div class="row g-4">
+                    <!-- Earnings Column -->
+                    <div class="col-md-6">
+                        <h6 class="fw-bold text-success border-bottom pb-2 mb-3"><i class="feather-trending-up me-1"></i>Earnings</h6>
+                        <table class="table table-sm align-middle fs-12 text-dark">
+                            <thead>
+                                <tr class="table-light">
+                                    <th>Component</th>
+                                    <th class="text-end">Base</th>
+                                    <th class="text-end">LOP Ded.</th>
+                                    <th class="text-end">Net</th>
+                                </tr>
+                            </thead>
+                            <tbody id="earningsTableBody">
+                                <!-- Filled dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Deductions Column -->
+                    <div class="col-md-6">
+                        <h6 class="fw-bold text-danger border-bottom pb-2 mb-3"><i class="feather-trending-down me-1"></i>Deductions</h6>
+                        <table class="table table-sm align-middle fs-12 text-dark">
+                            <thead>
+                                <tr class="table-light">
+                                    <th>Component</th>
+                                    <th class="text-end">Base</th>
+                                    <th class="text-end">Net</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deductionsTableBody">
+                                <!-- Filled dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>
@@ -202,6 +348,86 @@
         if (modal) {
             document.body.appendChild(modal);
         }
+
+        const salaryModal = document.getElementById('salaryDetailsModal');
+        if (salaryModal) {
+            document.body.appendChild(salaryModal);
+        }
+
+        const payrollMonthInput = document.getElementById('initiate_payroll_month');
+        if (payrollMonthInput) {
+            const updateDates = function() {
+                const value = payrollMonthInput.value.trim();
+                if (/^\d{4}-\d{2}$/.test(value)) {
+                    const parts = value.split('-');
+                    const year = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10);
+
+                    const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+                    const lastDay = new Date(year, month, 0).getDate();
+                    const endDateStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+                    const startDateEl = document.getElementById('initiate_start_date');
+                    const endDateEl = document.getElementById('initiate_end_date');
+                    
+                    if (startDateEl) startDateEl.value = startDateStr;
+                    if (endDateEl) endDateEl.value = endDateStr;
+                }
+            };
+            payrollMonthInput.addEventListener('input', updateDates);
+            payrollMonthInput.addEventListener('change', updateDates);
+        }
+
+        // Handle salary breakdown click
+        $(document).on('click', '.show-salary-details', function() {
+            const employeeName = $(this).data('employee-name');
+            const month = $(this).data('month');
+            const items = $(this).data('items') || {};
+
+            $('#modalEmployeeName').text(employeeName);
+            $('#modalPayrollMonth').text(month);
+
+            let earningsHtml = '';
+            let deductionsHtml = '';
+
+            Object.keys(items).forEach(code => {
+                const item = items[code];
+                const base = parseFloat(item.base_monthly || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const calculated = parseFloat(item.calculated_value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                
+                if (item.type === 'earning') {
+                    const deduction = parseFloat(item.deduction || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    earningsHtml += `
+                        <tr>
+                            <td><strong>${code}</strong> <span class="text-muted d-block fs-10">${item.name}</span></td>
+                            <td class="text-end">₹${base}</td>
+                            <td class="text-end text-danger">-₹${deduction}</td>
+                            <td class="text-end fw-bold">₹${calculated}</td>
+                        </tr>
+                    `;
+                } else {
+                    deductionsHtml += `
+                        <tr>
+                            <td><strong>${code}</strong> <span class="text-muted d-block fs-10">${item.name}</span></td>
+                            <td class="text-end">₹${base}</td>
+                            <td class="text-end fw-bold text-danger">₹${calculated}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            if (!earningsHtml) {
+                earningsHtml = '<tr><td colspan="4" class="text-center text-muted py-3">No earnings items defined.</td></tr>';
+            }
+            if (!deductionsHtml) {
+                deductionsHtml = '<tr><td colspan="3" class="text-center text-muted py-3">No deductions items defined.</td></tr>';
+            }
+
+            $('#earningsTableBody').html(earningsHtml);
+            $('#deductionsTableBody').html(deductionsHtml);
+
+            $('#salaryDetailsModal').modal('show');
+        });
     });
 </script>
 @endpush
