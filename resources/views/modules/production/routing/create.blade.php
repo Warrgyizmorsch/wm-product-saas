@@ -128,7 +128,7 @@
                                             
                                             <div class="d-flex align-items-center gap-2 mt-1 fs-11 text-muted text-nowrap flex-nowrap overflow-hidden">
                                                 <div class="form-check m-0 p-0 d-inline-flex align-items-center me-1">
-                                                    <input type="checkbox" class="form-check-input mt-0 me-1 ms-0" x-model="operation.is_external" x-bind:name="'operations['+index+'][is_external]'" x-bind:id="'ext_' + operation.uid" value="1">
+                                                    <input type="checkbox" class="form-check-input mt-0 me-1 ms-0" x-model="operation.is_external" @change="if (operation.is_external) { operation.work_center_id = ''; operation.machine_id = ''; }" x-bind:name="'operations['+index+'][is_external]'" x-bind:id="'ext_' + operation.uid" value="1">
                                                     <label class="form-check-label fs-11 text-secondary c-pointer mb-0" x-bind:for="'ext_' + operation.uid">{{ __('production.outsourced') }}</label>
                                                 </div>
 
@@ -142,13 +142,13 @@
                                                 <span class="text-black-50 me-1">|</span>
 
                                                 <div class="form-check m-0 p-0 d-inline-flex align-items-center me-1">
-                                                    <input type="checkbox" class="form-check-input mt-0 me-1 ms-0" x-model="operation.overlap_enabled" x-bind:name="'operations['+index+'][overlap_enabled]'" x-bind:id="'ovl_' + operation.uid" value="1">
-                                                    <label class="form-check-label fs-11 text-info fw-semibold c-pointer mb-0" x-bind:for="'ovl_' + operation.uid">Overlap</label>
+                                                    <input type="checkbox" class="form-check-input mt-0 me-1 ms-0" x-model="operation.queue_threshold_enabled" x-bind:name="'operations['+index+'][queue_threshold_enabled]'" x-bind:id="'ovl_' + operation.uid" value="1">
+                                                    <label class="form-check-label fs-11 text-info fw-semibold c-pointer mb-0" x-bind:for="'ovl_' + operation.uid" title="Next machine starts when queue threshold is hit">Queue Threshold</label>
                                                 </div>
 
                                                 <div class="align-items-center gap-1"
-                                                        :class="(operation.overlap_enabled == 1 || operation.overlap_enabled === true) ? 'd-inline-flex' : 'd-none'"
-                                                        x-show="operation.overlap_enabled == 1 || operation.overlap_enabled === true"
+                                                        :class="(operation.queue_threshold_enabled == 1 || operation.queue_threshold_enabled === true || operation.overlap_enabled == 1 || operation.overlap_enabled === true) ? 'd-inline-flex' : 'd-none'"
+                                                        x-show="operation.queue_threshold_enabled == 1 || operation.queue_threshold_enabled === true || operation.overlap_enabled == 1 || operation.overlap_enabled === true"
                                                         x-transition:enter="transition ease-out duration-300"
                                                         x-transition:enter-start="opacity-0 transform -translate-x-2"
                                                         x-transition:enter-end="opacity-100 transform translate-x-0"
@@ -172,7 +172,7 @@
                                         
                                         <!-- Work Center -->
                                         <td class="align-middle">
-                                            <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][work_center_id]'" class="odoo-table-select" x-model="operation.work_center_id" x-bind:required="!operation.is_external" select2Selector="default">
+                                             <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][work_center_id]'" class="odoo-table-select" x-model="operation.work_center_id" x-bind:required="!operation.is_external" x-bind:disabled="operation.is_external" select2Selector="default">
                                                 <option value="">{{ __('production.select_work_center') }}</option>
                                                 @foreach ($workCenters as $wc)
                                                     <option value="{{ $wc->id }}">{{ $wc->name }} ({{ $wc->code }})</option>
@@ -335,6 +335,7 @@
                         subcontract_service_product_id: '',
                         dispatch_buffer_days: 0,
                         return_buffer_days: 0,
+                        queue_threshold_enabled: false,
                         overlap_enabled: false,
                         transfer_batch_quantity: '0.00',
                         availableMachines: []

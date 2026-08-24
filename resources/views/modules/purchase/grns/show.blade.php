@@ -26,8 +26,17 @@
                 </x-ui.button>
             </form>
         @else
-            <a href="{{ route('purchase.bills.create', ['grn_id' => $grn->id]) }}" class="btn btn-success text-white fs-12 fw-bold shadow-sm">
-                <i class="feather-file-text me-1.5"></i>{{ __('purchase.create_vendor_bill') }}
+            @if ($grn->vendorBill)
+                <a href="{{ route('purchase.bills.show', $grn->vendorBill->id) }}" class="btn btn-info text-white fs-12 fw-bold shadow-sm me-2">
+                    <i class="feather-file-text me-1.5"></i>View Vendor Bill
+                </a>
+            @else
+                <a href="{{ route('purchase.bills.create', ['grn_id' => $grn->id]) }}" class="btn btn-success text-white fs-12 fw-bold shadow-sm me-2">
+                    <i class="feather-file-text me-1.5"></i>{{ __('purchase.create_vendor_bill') }}
+                </a>
+            @endif
+            <a href="{{ route('purchase.returns.create', ['goods_receipt_note_id' => $grn->id, 'mode' => 'grn']) }}" class="btn btn-primary text-white fs-12 fw-bold shadow-sm">
+                <i class="feather-corner-up-left me-1.5"></i>Create Return
             </a>
         @endif
     </div>

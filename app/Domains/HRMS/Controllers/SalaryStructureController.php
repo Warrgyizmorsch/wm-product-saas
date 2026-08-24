@@ -214,6 +214,25 @@ class SalaryStructureController extends Controller
         return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay group updated successfully.');
     }
 
+    public function updatePayGroupRules(Request $request, PayGroup $payGroup)
+    {
+        $validated = $request->validate([
+            'proration_rule'      => 'required|in:calendar_days,fixed_30_days,working_days',
+            'lop_splicing_rule'   => 'required|in:proportionate_gross,basic_hra_only',
+            'attendance_lock_day' => 'required|integer|min:1|max:31',
+            'variable_lock_day'   => 'required|integer|min:1|max:31',
+        ]);
+
+        $payGroup->update([
+            'payroll_rules' => $validated,
+        ]);
+
+        return redirect()->route('hrms.salary-structure.index', [
+            'pay_group_id' => $payGroup->id,
+            'tab'          => 'rules'
+        ])->with('success', 'Payroll rules updated successfully.');
+    }
+
     public function destroyPayGroup(PayGroup $payGroup)
     {
         $payGroup->delete();

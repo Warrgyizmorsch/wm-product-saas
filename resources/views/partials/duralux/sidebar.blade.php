@@ -71,7 +71,6 @@
                 ['label' => __('purchase.rfqs'), 'route' => 'purchase.rfqs.index'],
                 ['label' => __('purchase.purchase_orders'), 'route' => 'purchase.orders.index'],
                 ['label' => 'Landed Cost Vouchers', 'route' => 'purchase.landed-costs.index'],
-                ['label' => 'Pending Bills', 'route' => 'purchase.bills.pending'],
                 ['label' => __('purchase.vendor_bills'), 'route' => 'purchase.bills.index'],
                 ['label' => __('purchase.vendor_payments'), 'route' => 'purchase.payments.index'],
                 ['label' => 'Purchase Returns', 'route' => 'purchase.returns.index'],
@@ -157,7 +156,10 @@
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
             ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
-            ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#'],
+            ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => [
+                ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'],
+                ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary'],
+            ]],
         ],
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [

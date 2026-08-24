@@ -92,7 +92,7 @@ class MesExecutionService
 
             $blockingPredecessors = $incompletePredecessors->filter(function (ProductionScheduleOperation $predOp) use ($orderOp, $schedOp): bool {
                 $predOrderOp = $predOp->orderOperation;
-                if ($predOrderOp && $predOrderOp->overlap_enabled) {
+                if ($predOrderOp && ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled)) {
                     if (($orderOp && (float) $orderOp->quantity_transferred_in > 0) || ((float) $predOrderOp->quantity_transferred_out > 0) || ($schedOp->status === ProductionScheduleOperation::STATUS_READY)) {
                         return false;
                     }

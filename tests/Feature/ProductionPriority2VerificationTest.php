@@ -174,21 +174,23 @@ class ProductionPriority2VerificationTest extends TestCase
         $schedule = $this->schedulingService->generateForwardSchedule($order, now());
         $schedOp = $schedule->operations->first();
 
-        // Downtime is tomorrow from 14:00 to 16:00
+        $targetDay = \Illuminate\Support\Carbon::parse('next monday');
+
+        // Downtime is targetDay from 14:00 to 16:00
         ProductionMachineDowntime::create([
             'tenant_id' => $this->tenantA->id,
             'machine_id' => $this->machine->id,
             'work_center_id' => $this->workCenter->id,
             'reason' => 'Planned Calibration',
             'category' => 'Maintenance',
-            'start_time' => now()->tomorrow()->setHour(14)->setMinute(0),
-            'end_time' => now()->tomorrow()->setHour(16)->setMinute(0),
+            'start_time' => $targetDay->copy()->setHour(14)->setMinute(0),
+            'end_time' => $targetDay->copy()->setHour(16)->setMinute(0),
             'status' => ProductionMachineDowntime::STATUS_OPEN,
             'created_by' => $this->userA->id,
         ]);
 
-        // Reschedule to tomorrow 09:00 - 10:00 (outside downtime)
-        $newStart = now()->tomorrow()->setHour(9)->setMinute(0);
+        // Reschedule to targetDay 09:00 - 10:00 (outside downtime)
+        $newStart = $targetDay->copy()->setHour(9)->setMinute(0);
         $this->capacityService->rescheduleOperation($schedOp->id, $newStart, $this->machine->id, 'Normal move', $this->userA->id);
 
         $this->assertEquals($newStart->toDateTimeString(), $schedOp->fresh()->planned_start->toDateTimeString());
@@ -213,15 +215,17 @@ class ProductionPriority2VerificationTest extends TestCase
 
         $origStart = $schedOp->planned_start->copy();
 
-        // Downtime tomorrow 10:00 to 12:00
+        $targetDay = \Illuminate\Support\Carbon::parse('next monday');
+
+        // Downtime targetDay 10:00 to 12:00
         ProductionMachineDowntime::create([
             'tenant_id' => $this->tenantA->id,
             'machine_id' => $this->machine->id,
             'work_center_id' => $this->workCenter->id,
             'reason' => 'Emergency Spindle Repair',
             'category' => 'Breakdown',
-            'start_time' => now()->tomorrow()->setHour(10)->setMinute(0),
-            'end_time' => now()->tomorrow()->setHour(12)->setMinute(0),
+            'start_time' => $targetDay->copy()->setHour(10)->setMinute(0),
+            'end_time' => $targetDay->copy()->setHour(12)->setMinute(0),
             'status' => ProductionMachineDowntime::STATUS_OPEN,
             'created_by' => $this->userA->id,
         ]);
@@ -231,7 +235,7 @@ class ProductionPriority2VerificationTest extends TestCase
         $this->expectExceptionMessage('active downtime or maintenance');
 
         try {
-            $newStart = now()->tomorrow()->setHour(11)->setMinute(0);
+            $newStart = $targetDay->copy()->setHour(11)->setMinute(0);
             $this->capacityService->rescheduleOperation($schedOp->id, $newStart, $this->machine->id, 'Overlap test', $this->userA->id);
         } finally {
             // Verify original start time remains unchanged in database
@@ -256,6 +260,8 @@ class ProductionPriority2VerificationTest extends TestCase
         $schedule = $this->schedulingService->generateForwardSchedule($order, now());
         $schedOp = $schedule->operations->first();
 
+        $targetDay = \Illuminate\Support\Carbon::parse('next monday');
+
         // Downtime is closed
         ProductionMachineDowntime::create([
             'tenant_id' => $this->tenantA->id,
@@ -263,13 +269,13 @@ class ProductionPriority2VerificationTest extends TestCase
             'work_center_id' => $this->workCenter->id,
             'reason' => 'Finished Repair',
             'category' => 'Breakdown',
-            'start_time' => now()->tomorrow()->setHour(10)->setMinute(0),
-            'end_time' => now()->tomorrow()->setHour(12)->setMinute(0),
+            'start_time' => $targetDay->copy()->setHour(10)->setMinute(0),
+            'end_time' => $targetDay->copy()->setHour(12)->setMinute(0),
             'status' => ProductionMachineDowntime::STATUS_CLOSED,
             'created_by' => $this->userA->id,
         ]);
 
-        $newStart = now()->tomorrow()->setHour(10)->setMinute(30);
+        $newStart = $targetDay->copy()->setHour(10)->setMinute(30);
         $this->capacityService->rescheduleOperation($schedOp->id, $newStart, $this->machine->id, 'Move over closed downtime', $this->userA->id);
 
         $this->assertEquals($newStart->toDateTimeString(), $schedOp->fresh()->planned_start->toDateTimeString());

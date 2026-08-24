@@ -12,7 +12,7 @@
             </x-ui.badge>
         </div>
         <div class="col-md-3 border-end">
-            <span class="text-muted fs-11 uppercase font-semibold d-block">Transfer / Overlap Rules</span>
+            <span class="text-muted fs-11 uppercase font-semibold d-block">Transfer / Queue Rules</span>
             <span class="text-dark fs-13 font-monospace">
                 {{ $op->routingOperation?->transfer_batch_quantity > 0 ? 'Batch Transfer (' . number_format($op->routingOperation->transfer_batch_quantity, 2) . ' units)' : 'Standard Transfer' }}
             </span>

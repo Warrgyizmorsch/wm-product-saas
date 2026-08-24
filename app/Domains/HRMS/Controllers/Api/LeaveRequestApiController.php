@@ -216,21 +216,20 @@ class LeaveRequestApiController extends Controller
             }
         }
 
-        if ($duration == 0) {
-            return $this->sendError(__('hrms.leave.app.duration_zero'), 422);
+        if ($duration < 0.5) {
+            return $this->sendError('Duration cannot be less than 0.5 days. Ensure you are not applying for leave entirely on weekends or holidays.', 422);
         }
 
-        // Check overlapping requests
-        $overlapExists = LeaveRequest::where('employee_id', $employee->id)
-            ->whereIn('status', ['pending', 'approved'])
-            ->where(function ($q) use ($startDate, $endDate) {
-                $q->where('start_date', '<=', $endDate->format('Y-m-d'))
-                  ->where('end_date', '>=', $startDate->format('Y-m-d'));
-            })
-            ->exists();
+        $conflict = \App\Domains\HRMS\Helpers\SessionConflictChecker::hasConflict(
+            employeeId:   $employee->id,
+            newStart:     $startDate,
+            newEnd:       $endDate,
+            newStartType: $startType,
+            newEndType:   $endType
+        );
 
-        if ($overlapExists) {
-            return $this->sendError(__('hrms.leave.app.overlap_exists'), 422);
+        if ($conflict) {
+            return $this->sendError($conflict, 422);
         }
 
         $appRules = $rules['application'] ?? [];
@@ -423,6 +422,10 @@ class LeaveRequestApiController extends Controller
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
         }
 
+        if ($leaveRequest->status === 'cancelled') {
+            return $this->sendError('Cannot change the status of a cancelled leave application.', 422);
+        }
+
         $validated = $request->validate([
             'status'           => 'required|string|in:approved,rejected,unauthorized,unpaid',
             'rejection_reason' => 'nullable|string|max:500'
@@ -580,6 +583,112 @@ class LeaveRequestApiController extends Controller
             'holidays'  => $holidays,
             'rest_days' => $restDays,
         ], 'Leave duration calculated successfully');
+    }
+
+    public function getRules(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $employeeId  = $request->integer('employee_id');
+        $leaveTypeId = $request->integer('leave_type_id');
+
+        $repo = app(\App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface::class);
+        $rules = $repo->getPolicyRules($employeeId, $leaveTypeId);
+
+        return $this->sendSuccess($rules, 'Leave policy rules retrieved successfully');
+    }
+
+    public function withdraw(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
+        if (!$leaveRequest) {
+            return $this->sendError("Leave request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$leaveRequest->canWithdraw()) {
+            return $this->sendError('Only pending applications can be withdrawn.', 422);
+        }
+
+        $leaveRequest->delete();
+
+        return $this->sendSuccess(null, 'Leave application withdrawn successfully');
+    }
+
+    public function requestCancellation(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
+        if (!$leaveRequest) {
+            return $this->sendError("Leave request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$leaveRequest->canRequestCancellation()) {
+            return $this->sendError('Only approved applications can have a cancellation requested.', 422);
+        }
+
+        $validated = $request->validate([
+            'cancellation_reason' => 'required|string|max:1000',
+        ]);
+
+        $leaveRequest->update([
+            'status'              => 'cancellation_requested',
+            'cancellation_reason' => $validated['cancellation_reason'],
+        ]);
+
+        return $this->sendSuccess($leaveRequest, 'Cancellation request submitted. Awaiting admin approval.');
+    }
+
+    public function approveCancellation(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
+        if (!$leaveRequest) {
+            return $this->sendError("Leave request with ID '{$id}' not found.", 404);
+        }
+
+        if ($leaveRequest->status !== 'cancellation_requested') {
+            return $this->sendError('This application does not have a pending cancellation request.', 422);
+        }
+
+        $repo = app(\App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface::class);
+        $repo->cancelLeaveRequest($leaveRequest);
+
+        return $this->sendSuccess($leaveRequest, 'Leave cancellation approved. Balance has been restored.');
+    }
+
+    public function denyCancellation(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
+        if (!$leaveRequest) {
+            return $this->sendError("Leave request with ID '{$id}' not found.", 404);
+        }
+
+        if ($leaveRequest->status !== 'cancellation_requested') {
+            return $this->sendError('This application does not have a pending cancellation request.', 422);
+        }
+
+        $leaveRequest->update([
+            'status'              => 'approved',
+            'cancellation_reason' => null,
+        ]);
+
+        return $this->sendSuccess($leaveRequest, 'Cancellation request denied. Application remains approved.');
     }
 }
 

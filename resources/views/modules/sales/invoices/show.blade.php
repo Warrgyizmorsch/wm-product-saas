@@ -100,107 +100,188 @@
             letter-spacing: 0.5px;
             border-top: 1px solid #e2e8f0;
             border-bottom: 2px solid #cbd5e1;
-            padding: 10px 14px;
+            padding: 8px 12px;
         }
         .invoice-table td {
-            padding: 12px 14px;
+            padding: 8px 12px;
             border-bottom: 1px solid #f1f5f9;
-            font-size: 13px;
+            font-size: 12px;
             color: #1e293b;
         }
 
         .summary-table td {
-            padding: 6px 12px;
-            font-size: 13px;
+            padding: 4px 10px;
+            font-size: 12px;
         }
 
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 0;
+                margin: 6mm 8mm;
             }
 
-            /* Hide all layout elements */
-            body > *,
-            .nxl-container,
-            .nxl-content,
-            .page-header,
-            .main-content,
+            /* Hide top header, sidebar, buttons, and navigation */
             .nxl-navigation,
             .nxl-header,
+            .page-header,
+            .page-actions,
+            .action-dropdown-btn,
             footer,
-            .loader-bg {
-                visibility: hidden;
+            .invoice-corner-ribbon,
+            .d-print-none,
+            .btn {
+                display: none !important;
             }
 
-            /* Show only invoice sheet */
-            .invoice-sheet,
-            .invoice-sheet * {
-                visibility: visible;
-            }
-
-            /* Reset layout wrappers */
+            /* Reset page wrappers for full height & width printing */
             html, body {
+                background: #ffffff !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                background: #fff !important;
+                height: auto !important;
+                overflow: visible !important;
+                font-size: 11px !important;
             }
+
             .nxl-container,
             .nxl-content,
-            .main-content,
-            .page-header,
-            .row, .col-12 {
+            .main-content {
                 margin: 0 !important;
                 padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
             }
 
-            /* Invoice fills the page from top with proper spacing */
+            /* Invoice sheet: static layout so browser can split across pages */
             .invoice-sheet {
-                position: fixed;
-                top: 0;
-                left: 0;
+                position: static !important;
                 width: 100% !important;
                 max-width: 100% !important;
                 margin: 0 !important;
-                padding: 36px 44px !important;
+                padding: 0 !important;
                 border: none !important;
                 box-shadow: none !important;
                 border-radius: 0 !important;
                 background: #ffffff !important;
+                overflow: visible !important;
             }
 
-            /* Remove grey backgrounds from boxes — keep only the border */
+            /* Ensure background colors in cards & headers print cleanly */
             .invoice-sheet .bg-light,
-            .invoice-sheet [class*="bg-light"],
-            .invoice-sheet [class*="bg-opacity"],
-            .invoice-sheet .p-3.bg-light,
-            .invoice-sheet .p-3.rounded.border {
-                background-color: #ffffff !important;
-                background: #ffffff !important;
+            .invoice-sheet [class*="bg-light"] {
+                background-color: #f8fafc !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
 
-            /* Keep box borders clean and visible */
-            .invoice-sheet .rounded.border,
-            .invoice-sheet .p-3.rounded.border,
-            .invoice-sheet .border {
-                border-color: #e2e8f0 !important;
-            }
-
-            /* Keep table header bg for readability */
             .invoice-sheet .invoice-table thead th {
                 background-color: #f8fafc !important;
+                padding: 4px 6px !important;
+                font-size: 10px !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
 
-            /* Ensure summary total row bg is visible */
-            .invoice-sheet tr[style*="background-color"] {
-                background-color: #f8fafc !important;
+            .invoice-sheet .invoice-table td {
+                padding: 4px 6px !important;
+                font-size: 11px !important;
             }
 
-            /* Hide UI-only elements */
-            .d-print-none,
-            .invoice-corner-ribbon {
-                display: none !important;
-                visibility: hidden !important;
+            .invoice-sheet .p-3 {
+                padding: 6px 10px !important;
+            }
+
+            .invoice-sheet .mb-4,
+            .invoice-sheet .mb-3 {
+                margin-bottom: 8px !important;
+            }
+
+            .invoice-sheet .mt-4,
+            .invoice-sheet .mt-5 {
+                margin-top: 8px !important;
+            }
+
+            .invoice-sheet .pb-4 {
+                padding-bottom: 6px !important;
+            }
+
+            .invoice-sheet fs-12,
+            .invoice-sheet .fs-12,
+            .invoice-sheet .fs-13 {
+                font-size: 11px !important;
+            }
+
+            /* Avoid breaking inside table rows */
+            tr {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            /* Strict Page Break Protection for Cards */
+            .bank-details-box,
+            .gst-summary-box,
+            .summary-table-box {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            /* Terms Box & Lists: Allow natural splitting across pages without card border clipping */
+            .terms-box {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                margin-top: 6px !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+
+            .terms-box ol {
+                list-style-type: decimal !important;
+                padding-left: 20px !important;
+                margin-left: 0 !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+
+            .terms-box ul {
+                list-style-type: disc !important;
+                padding-left: 20px !important;
+                margin-left: 0 !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }
+
+            /* Restore list-item display so numbers (1., 2., 3...) show cleanly in print */
+            .terms-box ol > li,
+            .terms-box ul > li,
+            .terms-box li {
+                display: list-item !important;
+                list-style-position: outside !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                break-inside: avoid-page !important;
+                margin-bottom: 4px !important;
+            }
+
+            .terms-box p {
+                display: block !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                break-inside: avoid-page !important;
+                margin-bottom: 4px !important;
+            }
+
+            .terms-box li *,
+            .terms-box p * {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            .signature-footer-block {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-top: 10px !important;
+                padding-top: 8px !important;
             }
         }
     </style>
@@ -319,6 +400,11 @@
                                 <span class="fw-semibold text-dark">Rajasthan (08)</span>
                             </div>
 
+                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                <span class="text-muted">GST Option:</span>
+                                <span class="fw-bold text-dark">{{ $invoice->gst_type === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</span>
+                            </div>
+
                             <div class="d-flex justify-content-between">
                                 <span class="text-muted">Payment Status:</span>
                                 <span class="fw-bold {{ $balanceDue > 0 ? 'text-danger' : 'text-success' }}">{{ $balanceDue > 0 ? 'Balance Outstanding' : 'Fully Paid' }}</span>
@@ -372,31 +458,101 @@
                     </div>
                 </div>
 
-                <!-- 4. Summary & Bank Details Section (Zoho Standard Stacked Alignment) -->
-                <div class="row pt-2 fs-13 text-dark mb-4">
-                    <!-- Left: Bank Details & Terms / Notes -->
+                <!-- 4. Summary & Calculations Row -->
+                <div class="row pt-2 fs-13 text-dark mb-3">
+                    <!-- Left: GST Tax Rate Summary -->
                     <div class="col-7">
-                        <div class="p-3 bg-light bg-opacity-30 rounded border mb-3">
-                            <h6 class="fw-bold text-dark fs-11 text-uppercase mb-2" style="letter-spacing: 0.5px;">Bank Payment Details:</h6>
-                            <div class="row fs-11 text-secondary g-2">
-                                <div class="col-6"><strong>Bank Name:</strong> State Bank of India</div>
-                                <div class="col-6"><strong>Account Name:</strong> {{ tenant() ? tenant()->name : 'SaaS ERP' }}</div>
-                                <div class="col-6"><strong>Account No:</strong> 398402948201</div>
-                                <div class="col-6"><strong>IFSC Code:</strong> SBIN0001234</div>
-                            </div>
-                        </div>
-
-                        @if ($invoice->notes)
-                            <div class="p-3 bg-light bg-opacity-30 rounded border">
-                                <h6 class="fw-bold text-dark fs-11 text-uppercase mb-1" style="letter-spacing: 0.5px;">Customer Notes / Terms:</h6>
-                                <p class="mb-0 text-muted fs-12" style="white-space: pre-wrap;">{{ $invoice->notes }}</p>
+                        @php
+                            $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
+                        @endphp
+                        @if ($taxGroups->count() > 0 && $invoice->tax_amount > 0)
+                            <div class="card border shadow-none mb-0 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
+                                <div class="py-1 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
+                                    <span><i class="feather-pie-chart me-1 text-primary"></i>GST Tax Summary</span>
+                                    <span class="badge bg-soft-primary text-primary fs-10" style="font-size: 10px;">{{ $invoice->gst_type === 'igst' ? 'IGST' : 'CGST + SGST' }}</span>
+                                </div>
+                                <div class="table-responsive" style="overflow-x: visible;">
+                                    <table class="table table-sm table-bordered align-middle text-center fs-11 mb-0 w-100">
+                                        <thead class="bg-light text-secondary fw-bold">
+                                            @if($invoice->gst_type === 'igst')
+                                                <tr>
+                                                    <th class="py-1" style="width: 30%;">Tax Rate</th>
+                                                    <th class="py-1 text-end" style="width: 35%;">Total Tax</th>
+                                                    <th class="py-1 text-end" style="width: 35%;">IGST Amt</th>
+                                                </tr>
+                                            @else
+                                                <tr>
+                                                    <th class="py-1" style="width: 25%;">Tax Rate</th>
+                                                    <th class="py-1 text-end" style="width: 25%;">Total Tax</th>
+                                                    <th class="py-1 text-end" style="width: 25%;">CGST Amt</th>
+                                                    <th class="py-1 text-end" style="width: 25%;">SGST Amt</th>
+                                                </tr>
+                                            @endif
+                                        </thead>
+                                        <tbody>
+                                            @php
+                                                $totCgst = 0;
+                                                $totSgst = 0;
+                                                $totIgst = 0;
+                                                $totTax = 0;
+                                            @endphp
+                                            @foreach($taxGroups as $rateStr => $gItems)
+                                                @php
+                                                    $rate = floatval($rateStr);
+                                                    $grpTax = $gItems->sum('tax_amount');
+                                                    $totTax += $grpTax;
+                                                @endphp
+                                                @if($invoice->gst_type === 'igst')
+                                                    @php
+                                                        $grpIgst = $gItems->sum('igst_amount') > 0 ? $gItems->sum('igst_amount') : $grpTax;
+                                                        $totIgst += $grpIgst;
+                                                    @endphp
+                                                    <tr>
+                                                        <td class="py-1 fw-bold">GST {{ $rate }}%</td>
+                                                        <td class="py-1 text-end fw-bold text-dark">₹{{ number_format($grpTax, 2) }}</td>
+                                                        <td class="py-1 text-end">₹{{ number_format($grpIgst, 2) }}</td>
+                                                    </tr>
+                                                @else
+                                                    @php
+                                                        $grpCgst = $gItems->sum('cgst_amount') > 0 ? $gItems->sum('cgst_amount') : round($grpTax / 2, 2);
+                                                        $grpSgst = $gItems->sum('sgst_amount') > 0 ? $gItems->sum('sgst_amount') : round($grpTax - $grpCgst, 2);
+                                                        $totCgst += $grpCgst;
+                                                        $totSgst += $grpSgst;
+                                                    @endphp
+                                                    <tr>
+                                                        <td class="py-1 fw-bold">GST {{ $rate }}%</td>
+                                                        <td class="py-1 text-end fw-bold text-dark">₹{{ number_format($grpTax, 2) }}</td>
+                                                        <td class="py-1 text-end">₹{{ number_format($grpCgst, 2) }}</td>
+                                                        <td class="py-1 text-end">₹{{ number_format($grpSgst, 2) }}</td>
+                                                    </tr>
+                                                @endif
+                                            @endforeach
+                                        </tbody>
+                                        <tfoot class="bg-light fw-bold text-dark">
+                                            @if($invoice->gst_type === 'igst')
+                                                <tr>
+                                                    <td class="py-1">Total</td>
+                                                    <td class="py-1 text-end text-primary">₹{{ number_format($totTax, 2) }}</td>
+                                                    <td class="py-1 text-end">₹{{ number_format($totIgst, 2) }}</td>
+                                                </tr>
+                                            @else
+                                                <tr>
+                                                    <td class="py-1">Total</td>
+                                                    <td class="py-1 text-end text-primary">₹{{ number_format($totTax, 2) }}</td>
+                                                    <td class="py-1 text-end">₹{{ number_format($totCgst, 2) }}</td>
+                                                    <td class="py-1 text-end">₹{{ number_format($totSgst, 2) }}</td>
+                                                </tr>
+                                            @endif
+                                        </tfoot>
+                                    </table>
+                                </div>
                             </div>
                         @endif
                     </div>
 
-                    <!-- Right: Invoice Calculations Summary -->
-                    <div class="col-5">
-                        <table class="table table-sm border-0 summary-table w-100">
+                    <!-- Right: Subtotal Calculations -->
+                    <div class="col-5 summary-table-box">
+                        <table class="table table-sm border-0 summary-table w-100 mb-0">
                             <tbody>
                                 <tr>
                                     <td class="text-muted fw-semibold">Sub Total:</td>
@@ -408,10 +564,26 @@
                                         <td class="text-end fw-bold text-danger">-₹{{ number_format($invoice->discount_amount, 2) }}</td>
                                     </tr>
                                 @endif
-                                <tr>
-                                    <td class="text-muted fw-semibold">Tax Amount:</td>
-                                    <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->tax_amount, 2) }}</td>
-                                </tr>
+                                @if ($invoice->gst_type === 'igst' || $invoice->igst_amount > 0)
+                                    <tr>
+                                        <td class="text-muted fw-semibold">IGST Amount:</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->igst_amount > 0 ? $invoice->igst_amount : $invoice->tax_amount, 2) }}</td>
+                                    </tr>
+                                @elseif ($invoice->gst_type === 'cgst_sgst' || ($invoice->cgst_amount > 0 || $invoice->sgst_amount > 0))
+                                    <tr>
+                                        <td class="text-muted fw-semibold">CGST Amount:</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->cgst_amount > 0 ? $invoice->cgst_amount : round($invoice->tax_amount / 2, 2), 2) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted fw-semibold">SGST Amount:</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->sgst_amount > 0 ? $invoice->sgst_amount : round($invoice->tax_amount / 2, 2), 2) }}</td>
+                                    </tr>
+                                @else
+                                    <tr>
+                                        <td class="text-muted fw-semibold">Tax Amount:</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->tax_amount, 2) }}</td>
+                                    </tr>
+                                @endif
                                 <tr class="border-top border-bottom" style="background-color: #f8fafc;">
                                     <td class="fw-bold fs-14" style="color: #1e40af;">Total Amount:</td>
                                     <td class="text-end fw-black fs-15" style="color: #1e40af;">₹{{ number_format($invoice->total_amount, 2) }}</td>
@@ -431,8 +603,30 @@
                     </div>
                 </div>
 
+                <!-- 4.5 Bank Details & Terms Row -->
+                <div class="row fs-13 text-dark mb-4">
+                    <div class="col-7">
+                        <div class="p-3 bg-light bg-opacity-30 rounded border mb-3 bank-details-box">
+                            <h6 class="fw-bold text-dark fs-11 text-uppercase mb-2" style="letter-spacing: 0.5px;">Bank Payment Details:</h6>
+                            <div class="row fs-11 text-secondary g-2">
+                                <div class="col-6"><strong>Bank Name:</strong> State Bank of India</div>
+                                <div class="col-6"><strong>Account Name:</strong> {{ tenant() ? tenant()->name : 'SaaS ERP' }}</div>
+                                <div class="col-6"><strong>Account No:</strong> 398402948201</div>
+                                <div class="col-6"><strong>IFSC Code:</strong> SBIN0001234</div>
+                            </div>
+                        </div>
+
+                        @if ($invoice->notes)
+                            <div class="p-3 bg-light bg-opacity-30 rounded border terms-box">
+                                <h6 class="fw-bold text-dark fs-11 text-uppercase mb-1" style="letter-spacing: 0.5px;">Terms & Conditions / Customer Notes:</h6>
+                                <div class="mb-0 text-muted fs-12">{!! $invoice->notes !!}</div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
                 <!-- 5. Signature Footer Block -->
-                <div class="row pt-4 border-top fs-11 text-muted align-items-end mt-4">
+                <div class="row pt-4 border-top fs-11 text-muted align-items-end mt-4 signature-footer-block">
                     <div class="col-7">
                         <div>Thank you for your business!</div>
                         <div class="mt-1">This is a computer generated invoice and does not require physical signature.</div>

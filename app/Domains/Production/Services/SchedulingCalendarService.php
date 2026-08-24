@@ -551,7 +551,7 @@ class SchedulingCalendarService
         foreach ($orderOps as $otherOp) {
             if ($otherOp->sequence < $op->sequence) {
                 $predOrderOp = $otherOp->orderOperation;
-                if ($predOrderOp && (bool) $predOrderOp->overlap_enabled) {
+                if ($predOrderOp && (bool) ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled)) {
                     $setupMinutes = (float) ($predOrderOp->setup_time_planned ?? 0);
                     $batchQty = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
                     $lagMinutes = (float) ($predOrderOp->transfer_lag_minutes ?? 0);

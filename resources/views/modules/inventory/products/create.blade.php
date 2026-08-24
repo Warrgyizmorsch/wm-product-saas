@@ -120,7 +120,7 @@
                     <!-- Supplier Method Selector in Zoho style -->
                     <div class="custom-radio-group mb-4 supplier-method-container">
                         <span class="custom-radio-label">{{ __('inventory.supplier_method') }} <span class="text-danger">*</span></span>
-                        <x-ui.radio name="supplier_method" value="buy" :label="__('inventory.buy')" :checked="old('supplier_method', 'buy') === 'buy'" />
+                        <x-ui.radio name="supplier_method" value="trade" :label="__('inventory.buy')" :checked="in_array(old('supplier_method', 'trade'), ['trade', 'buy'], true)" />
                         <x-ui.radio name="supplier_method" value="manufacture" :label="__('inventory.manufacture')" :checked="old('supplier_method') === 'manufacture'" />
                     </div>
 

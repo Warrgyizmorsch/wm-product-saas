@@ -119,7 +119,8 @@ class ProductionOrderService
                     'material_supply_type' => $routingOp?->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
                     'dispatch_buffer_days' => (int) ($routingOp?->dispatch_buffer_days ?? 0),
                     'return_buffer_days' => (int) ($routingOp?->return_buffer_days ?? 0),
-                    'overlap_enabled' => (bool) ($routingOp?->overlap_enabled ?? false),
+                    'queue_threshold_enabled' => (bool) ($routingOp?->queue_threshold_enabled ?? $routingOp?->overlap_enabled ?? false),
+                    'overlap_enabled' => (bool) ($routingOp?->queue_threshold_enabled ?? $routingOp?->overlap_enabled ?? false),
                     'transfer_batch_quantity' => (float) ($routingOp?->transfer_batch_quantity ?? 0.0000),
                     'transfer_lag_minutes' => (int) ($routingOp?->transfer_lag_minutes ?? 0),
                 ]);
@@ -344,7 +345,8 @@ class ProductionOrderService
                     'material_supply_type' => $routingOp->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
                     'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
                     'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
-                    'overlap_enabled' => (bool) ($routingOp->overlap_enabled ?? false),
+                    'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
+                    'overlap_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
                     'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
                     'transfer_lag_minutes' => (int) ($routingOp->transfer_lag_minutes ?? 0),
                 ]);

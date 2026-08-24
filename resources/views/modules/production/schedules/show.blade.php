@@ -269,7 +269,7 @@
                                             <br><span class="badge bg-soft-warning text-dark border border-warning font-monospace mt-1"><i class="feather-external-link me-1"></i>SUBCONTRACT — {{ $op->orderOperation->vendor->name ?? 'Vendor' }}</span>
                                             <br><small class="text-warning font-monospace fs-11">Lead: {{ $op->orderOperation->subcontract_lead_time_days ?? 0 }}d | Buffer: {{ $op->orderOperation->dispatch_buffer_days ?? 0 }}d / {{ $op->orderOperation->return_buffer_days ?? 0 }}d</small>
                                         @endif
-                                        @if($op->orderOperation && $op->orderOperation->overlap_enabled)
+                                        @if($op->orderOperation && ($op->orderOperation->queue_threshold_enabled ?? $op->orderOperation->overlap_enabled))
                                             @php
                                                 $trTime = app(\App\Domains\Production\Services\SchedulingService::class)->calculateTransferReadyAt(
                                                     $op->orderOperation,
@@ -277,7 +277,7 @@
                                                     (float) ($schedule->order?->quantity_ordered ?? 1)
                                                 );
                                             @endphp
-                                            <br><span class="badge bg-soft-info text-info font-monospace mt-1">⚡ Overlap Enabled (Batch: {{ (float) $op->orderOperation->transfer_batch_quantity }}, Lag: {{ (int) $op->orderOperation->transfer_lag_minutes }}m)</span>
+                                            <br><span class="badge bg-soft-info text-info font-monospace mt-1">⚡ Queue Threshold Enabled (Batch: {{ (float) $op->orderOperation->transfer_batch_quantity }}, Lag: {{ (int) $op->orderOperation->transfer_lag_minutes }}m)</span>
                                             <br><small class="text-primary font-monospace fs-11">Transfer-Ready: {{ $trTime->format('d/m/Y H:i') }}</small>
                                         @endif
                                     </td>

@@ -120,8 +120,8 @@
                     <!-- Supplier Method Selector -->
                     <div class="custom-radio-group mb-4 supplier-method-container">
                         <span class="custom-radio-label">{{ __('inventory.supplier_method') }} <span class="text-danger">*</span></span>
-                        <x-ui.radio name="supplier_method" value="buy" :label="__('inventory.buy')" :checked="$product->supplier_method === 'buy' || is_null($product->supplier_method)" />
-                        <x-ui.radio name="supplier_method" value="manufacture" :label="__('inventory.manufacture')" :checked="$product->supplier_method === 'manufacture'" />
+                        <x-ui.radio name="supplier_method" value="trade" :label="__('inventory.buy')" :checked="in_array(strtolower($product->supplier_method ?? ''), ['trade', 'buy'], true) || empty($product->supplier_method)" />
+                        <x-ui.radio name="supplier_method" value="manufacture" :label="__('inventory.manufacture')" :checked="strtolower($product->supplier_method ?? '') === 'manufacture'" />
                     </div>
 
                     <div class="row g-4 mb-4 fs-13 text-dark">

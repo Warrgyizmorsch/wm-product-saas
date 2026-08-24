@@ -14,6 +14,10 @@ use App\Domains\HRMS\Controllers\Api\WfhRequestApiController;
 use App\Domains\HRMS\Controllers\Api\ShiftChangeRequestApiController;
 use App\Domains\HRMS\Controllers\Api\BiometricWebhookController;
 use App\Domains\HRMS\Controllers\Api\OvertimeRequestApiController;
+use App\Domains\HRMS\Controllers\Api\DocumentApiController;
+use App\Domains\HRMS\Controllers\Api\DocumentMasterApiController;
+use App\Domains\HRMS\Controllers\Api\AttendanceApiController;
+use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -85,6 +89,7 @@ Route::prefix('api/hrms/salary-structure')
         Route::get('/pay-groups/{payGroup}', [SalaryStructureApiController::class, 'showPayGroup'])->name('pay-groups.show');
         Route::put('/pay-groups/{payGroup}', [SalaryStructureApiController::class, 'updatePayGroup'])->name('pay-groups.update');
         Route::delete('/pay-groups/{payGroup}', [SalaryStructureApiController::class, 'destroyPayGroup'])->name('pay-groups.destroy');
+        Route::put('/pay-groups/{payGroup}/rules', [SalaryStructureApiController::class, 'updatePayGroupRules'])->name('pay-groups.rules');
 
         // Salary Components APIs (Recurring & Ad-hoc)
         Route::get('/components', [SalaryStructureApiController::class, 'indexComponents'])->name('components.index');
@@ -151,6 +156,10 @@ Route::prefix('api/hrms/penalization-policy')
 
         // Delete Policy Rule API
         Route::delete('/rules/{attendancePenalty}', [PenalizationPolicyApiController::class, 'destroyRule'])->name('rules.destroy');
+
+        // Attendance Rules / Geofencing Configuration APIs
+        Route::get('/attendance-rules/query', [PenalizationPolicyApiController::class, 'queryAttendanceRule'])->name('attendance-rules.query');
+        Route::post('/attendance-rules/save', [PenalizationPolicyApiController::class, 'saveAttendanceRule'])->name('attendance-rules.save');
     });
 
 // ==========================================
@@ -176,6 +185,8 @@ Route::prefix('api/hrms/roster')
         Route::post('/assign', [RosterApiController::class, 'assign'])->name('assign');
         Route::put('/cell', [RosterApiController::class, 'updateCell'])->name('cell.update');
         Route::put('/weekly-pattern', [RosterApiController::class, 'updateWeeklyPattern'])->name('weekly-pattern.update');
+        Route::post('/weekly-pattern/assign', [RosterApiController::class, 'assignWeekly'])->name('weekly-pattern.assign');
+        Route::post('/weekly-pattern/clear', [RosterApiController::class, 'clearWeekly'])->name('weekly-pattern.clear');
         Route::post('/clear', [RosterApiController::class, 'clear'])->name('clear');
     });
 
@@ -206,12 +217,28 @@ Route::prefix('api/hrms/assets')
         Route::put('/categories/{category}', [AssetApiController::class, 'updateCategory'])->name('categories.update');
         Route::delete('/categories/{category}', [AssetApiController::class, 'destroyCategory'])->name('categories.destroy');
 
+        // Asset Items APIs
+        Route::get('/items', [AssetApiController::class, 'indexItems'])->name('items.index');
+        Route::post('/items', [AssetApiController::class, 'storeItem'])->name('items.store');
+        Route::get('/items/{assetItem}', [AssetApiController::class, 'showItem'])->name('items.show');
+        Route::put('/items/{assetItem}', [AssetApiController::class, 'updateItem'])->name('items.update');
+        Route::delete('/items/{assetItem}', [AssetApiController::class, 'destroyItem'])->name('items.destroy');
+        Route::post('/items/{assetItem}/allocate', [AssetApiController::class, 'allocateItem'])->name('items.allocate');
+        Route::post('/items/{assetItem}/return', [AssetApiController::class, 'returnItem'])->name('items.return');
+
         // Asset Requests APIs
         Route::get('/requests', [AssetApiController::class, 'indexRequests'])->name('requests.index');
         Route::post('/requests', [AssetApiController::class, 'storeRequest'])->name('requests.store');
         Route::post('/requests/{assetRequest}/reject', [AssetApiController::class, 'rejectRequest'])->name('requests.reject');
         Route::post('/requests/{assetRequest}/allocate-direct', [AssetApiController::class, 'allocateDirectRequest'])->name('requests.allocate-direct');
+        Route::post('/requests/{assetRequest}/allocate', [AssetApiController::class, 'allocateRequest'])->name('requests.allocate');
         Route::post('/requests/bulk-allocate', [AssetApiController::class, 'bulkAllocateRequests'])->name('requests.bulk-allocate');
+        Route::post('/requests/bulk-reject', [AssetApiController::class, 'bulkRejectRequests'])->name('requests.bulk-reject');
+
+        // Employee Dashboard & direct bulk allocations routes
+        Route::get('/my-assets', [AssetApiController::class, 'myAssets'])->name('my-assets');
+        Route::post('/allocate-direct', [AssetApiController::class, 'allocateDirect'])->name('allocate-direct');
+        Route::post('/return-direct-multi', [AssetApiController::class, 'returnDirectMulti'])->name('return-direct-multi');
     });
 
 // ==========================================
@@ -234,6 +261,7 @@ Route::prefix('api/hrms/employees')
         Route::post('/', [EmployeeApiController::class, 'storeEmployee'])->name('store');
         Route::get('/{employee}', [EmployeeApiController::class, 'showEmployee'])->name('show');
         Route::put('/{employee}', [EmployeeApiController::class, 'updateEmployee'])->name('update');
+        Route::put('/{employee}/status', [EmployeeApiController::class, 'updateStatus'])->name('status.update');
         Route::delete('/{employee}', [EmployeeApiController::class, 'destroyEmployee'])->name('destroy');
 
         // Ad-hoc Salary Components APIs
@@ -268,7 +296,8 @@ Route::prefix('api/hrms/leave-requests')
         // Summary & Balances APIs
         Route::get('/summary', [LeaveRequestApiController::class, 'summary'])->name('summary');
         Route::get('/balances', [LeaveRequestApiController::class, 'balances'])->name('balances');
-
+        Route::get('/rules', [LeaveRequestApiController::class, 'getRules'])->name('rules');
+ 
         // Leave Application & Approval Workflows
         Route::get('/', [LeaveRequestApiController::class, 'indexRequests'])->name('index');
         Route::post('/', [LeaveRequestApiController::class, 'storeRequest'])->name('store');
@@ -277,6 +306,10 @@ Route::prefix('api/hrms/leave-requests')
         Route::post('/{leaveRequest}/approve', [LeaveRequestApiController::class, 'approveRequest'])->name('approve');
         Route::post('/{leaveRequest}/reject', [LeaveRequestApiController::class, 'rejectRequest'])->name('reject');
         Route::put('/{leaveRequest}/status', [LeaveRequestApiController::class, 'updateStatus'])->name('status.update');
+        Route::post('/{leaveRequest}/withdraw', [LeaveRequestApiController::class, 'withdraw'])->name('withdraw');
+        Route::post('/{leaveRequest}/request-cancellation', [LeaveRequestApiController::class, 'requestCancellation'])->name('request-cancellation');
+        Route::post('/{leaveRequest}/approve-cancellation', [LeaveRequestApiController::class, 'approveCancellation'])->name('approve-cancellation');
+        Route::post('/{leaveRequest}/deny-cancellation', [LeaveRequestApiController::class, 'denyCancellation'])->name('deny-cancellation');
     });
 
 // ==========================================
@@ -293,6 +326,10 @@ Route::prefix('api/hrms/wfh-requests')
         Route::post('/{wfhRequest}/approve', [WfhRequestApiController::class, 'approveRequest'])->name('approve');
         Route::post('/{wfhRequest}/reject', [WfhRequestApiController::class, 'rejectRequest'])->name('reject');
         Route::put('/{wfhRequest}/status', [WfhRequestApiController::class, 'updateStatus'])->name('status.update');
+        Route::post('/{wfhRequest}/withdraw', [WfhRequestApiController::class, 'withdrawRequest'])->name('withdraw');
+        Route::post('/{wfhRequest}/request-cancellation', [WfhRequestApiController::class, 'requestCancellation'])->name('request-cancellation');
+        Route::post('/{wfhRequest}/approve-cancellation', [WfhRequestApiController::class, 'approveCancellation'])->name('approve-cancellation');
+        Route::post('/{wfhRequest}/deny-cancellation', [WfhRequestApiController::class, 'denyCancellation'])->name('deny-cancellation');
     });
 
 // ==========================================
@@ -308,6 +345,8 @@ Route::prefix('api/hrms/shift-change-requests')
         Route::get('/{shiftChangeRequest}', [ShiftChangeRequestApiController::class, 'showRequest'])->name('show');
         Route::post('/{shiftChangeRequest}/approve', [ShiftChangeRequestApiController::class, 'approveRequest'])->name('approve');
         Route::post('/{shiftChangeRequest}/reject', [ShiftChangeRequestApiController::class, 'rejectRequest'])->name('reject');
+        Route::put('/{shiftChangeRequest}/status', [ShiftChangeRequestApiController::class, 'updateStatus'])->name('status.update');
+        Route::delete('/{shiftChangeRequest}', [ShiftChangeRequestApiController::class, 'destroy'])->name('destroy');
     });
 
 // ==========================================
@@ -323,6 +362,8 @@ Route::prefix('api/hrms/overtime-requests')
         Route::get('/{overtimeRequest}', [OvertimeRequestApiController::class, 'showRequest'])->name('show');
         Route::post('/{overtimeRequest}/approve', [OvertimeRequestApiController::class, 'approveRequest'])->name('approve');
         Route::post('/{overtimeRequest}/reject', [OvertimeRequestApiController::class, 'rejectRequest'])->name('reject');
+        Route::put('/{overtimeRequest}/status', [OvertimeRequestApiController::class, 'updateStatus'])->name('status.update');
+        Route::delete('/{overtimeRequest}', [OvertimeRequestApiController::class, 'destroy'])->name('destroy');
     });
 
 
@@ -361,17 +402,70 @@ Route::prefix('api/hrms/holidays')
     });
 
 // ==========================================
-// 11. BIOMETRIC INTEGRATION API ROUTES
+// 10B. ATTENDANCE CORRECTION REQUESTS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/attendance-corrections')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.attendance-corrections.')
+    ->group(function () {
+        Route::post('/', [AttendanceCorrectionController::class, 'store'])->name('store');
+        Route::post('/{correction}/approve', [AttendanceCorrectionController::class, 'approve'])->name('approve');
+        Route::post('/{correction}/reject', [AttendanceCorrectionController::class, 'reject'])->name('reject');
+    });
+
+// ==========================================
+// 11. ATTENDANCE & BIOMETRIC INTEGRATION API ROUTES
 // ==========================================
 Route::prefix('api/hrms/attendance')
     ->middleware(['auth:sanctum', 'throttle:100,1'])
     ->name('api.hrms.attendance.')
     ->group(function () {
         Route::post('/biometric-sync', [BiometricWebhookController::class, 'syncLogs'])->name('biometric-sync');
+        Route::get('/summary', [AttendanceApiController::class, 'summary'])->name('summary');
+        Route::get('/', [AttendanceApiController::class, 'index'])->name('index');
+        Route::get('/my-attendance', [AttendanceApiController::class, 'myAttendance'])->name('my-attendance');
+        Route::post('/check-in', [AttendanceApiController::class, 'checkIn'])->name('check-in');
+        Route::post('/{attendance}/check-out', [AttendanceApiController::class, 'checkOut'])->name('check-out');
+        Route::post('/{attendance}/break-in', [AttendanceApiController::class, 'breakIn'])->name('break-in');
+        Route::post('/{attendance}/break-out', [AttendanceApiController::class, 'breakOut'])->name('break-out');
+        Route::post('/manual', [AttendanceApiController::class, 'storeManual'])->name('manual.store');
+        Route::delete('/date/{date}', [AttendanceApiController::class, 'destroyDate'])->name('destroy-date');
+        Route::post('/track-location', [AttendanceApiController::class, 'trackLocation'])->name('track-location');
     });
 
 // Public Webhook route for ADMS devices
 Route::post('api/hrms/biometric/webhook', [BiometricWebhookController::class, 'handleAdmsRequest'])
     ->middleware(['throttle:100,1'])
     ->name('api.hrms.biometric.webhook');
+
+// ==========================================
+// 12. EMPLOYEE DOCUMENTS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/documents')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.documents.')
+    ->group(function () {
+        Route::get('/', [DocumentApiController::class, 'index'])->name('index');
+        Route::post('/upload', [DocumentApiController::class, 'upload'])->name('upload');
+        Route::post('/{document}/approve', [DocumentApiController::class, 'approve'])->name('approve');
+        Route::post('/{document}/reject', [DocumentApiController::class, 'reject'])->name('reject');
+        Route::put('/{document}/status', [DocumentApiController::class, 'updateStatus'])->name('status.update');
+    });
+
+// ==========================================
+// 13. DOCUMENT MASTERS & CATEGORIES API ROUTES
+// ==========================================
+Route::prefix('api/hrms/documents-master')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.documents-master.')
+    ->group(function () {
+        Route::get('/', [DocumentMasterApiController::class, 'index'])->name('index');
+        Route::post('/categories', [DocumentMasterApiController::class, 'storeCategory'])->name('categories.store');
+        Route::put('/categories/{category}', [DocumentMasterApiController::class, 'updateCategory'])->name('categories.update');
+        Route::delete('/categories/{category}', [DocumentMasterApiController::class, 'destroyCategory'])->name('categories.destroy');
+        Route::post('/documents', [DocumentMasterApiController::class, 'storeDocument'])->name('documents.store');
+        Route::put('/documents/{document}', [DocumentMasterApiController::class, 'updateDocument'])->name('documents.update');
+        Route::delete('/documents/{document}', [DocumentMasterApiController::class, 'destroyDocument'])->name('documents.destroy');
+        Route::patch('/documents/{document}/toggle', [DocumentMasterApiController::class, 'toggleStatus'])->name('documents.toggle');
+    });
 

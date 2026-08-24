@@ -142,7 +142,7 @@ class LeaveStructureApiController extends Controller
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $newPlan = LeavePlan::create([
-            'company_id'     => $validated['company_id'] ?? null,
+            'company_id'     => $validated['company_id'] ?: (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
             'name'           => $validated['name'],
             'effective_from' => $validated['effective_from'],
             'description'    => $validated['description'] ?? null,
@@ -169,7 +169,7 @@ class LeaveStructureApiController extends Controller
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $leavePlan->update([
-            'company_id'     => $validated['company_id'] ?? null,
+            'company_id'     => $validated['company_id'] ?: $leavePlan->company_id ?: (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
             'name'           => $validated['name'],
             'effective_from' => $validated['effective_from'],
             'description'    => $validated['description'] ?? null,
@@ -253,7 +253,7 @@ class LeaveStructureApiController extends Controller
             'name'          => 'required|max:255',
             'code'          => 'required|max:50',
             'type'          => 'required|in:paid,unpaid',
-            'color'         => 'required|max:20',
+            'color'         => 'nullable|string|max:20',
             'quota'         => 'required|numeric|min:0',
             'description'   => 'nullable',
             'status'        => 'required',
@@ -266,7 +266,7 @@ class LeaveStructureApiController extends Controller
             'name'          => $validated['name'],
             'code'          => $validated['code'],
             'type'          => $validated['type'],
-            'color'         => $validated['color'],
+            'color'         => $validated['color'] ?: '#3b82f6',
             'quota'         => $validated['quota'],
             'description'   => $validated['description'] ?? null,
             'status'        => $status,
@@ -286,7 +286,7 @@ class LeaveStructureApiController extends Controller
             'name'          => 'required|max:255',
             'code'          => 'required|max:50',
             'type'          => 'required|in:paid,unpaid',
-            'color'         => 'required|max:20',
+            'color'         => 'nullable|string|max:20',
             'quota'         => 'required|numeric|min:0',
             'description'   => 'nullable',
             'status'        => 'required',
@@ -299,7 +299,7 @@ class LeaveStructureApiController extends Controller
             'name'          => $validated['name'],
             'code'          => $validated['code'],
             'type'          => $validated['type'],
-            'color'         => $validated['color'],
+            'color'         => $validated['color'] ?: '#3b82f6',
             'quota'         => $validated['quota'],
             'description'   => $validated['description'] ?? null,
             'status'        => $status,
