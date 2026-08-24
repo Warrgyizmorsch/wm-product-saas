@@ -44,6 +44,8 @@ class SalesOrder extends BaseModel
         'subtotal',
         'tax',
         'discount',
+        'freight_terms',
+        'freight_amount',
         'shipping_charges',
         'adjustment',
         'total_amount',
@@ -57,6 +59,7 @@ class SalesOrder extends BaseModel
         'subtotal'         => 'decimal:2',
         'tax'              => 'decimal:2',
         'discount'         => 'decimal:2',
+        'freight_amount'   => 'decimal:2',
         'shipping_charges' => 'decimal:2',
         'adjustment'       => 'decimal:2',
         'total_amount'     => 'decimal:2',
@@ -85,6 +88,11 @@ class SalesOrder extends BaseModel
     public function materialRequirements(): HasMany
     {
         return $this->hasMany(MaterialRequirement::class);
+    }
+
+    public function dispatches(): HasMany
+    {
+        return $this->hasMany(DispatchOrder::class, 'sales_order_id');
     }
 
     public function invoices(): HasMany

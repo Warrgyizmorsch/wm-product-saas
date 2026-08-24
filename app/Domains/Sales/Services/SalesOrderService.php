@@ -94,10 +94,16 @@ class SalesOrderService
             }
 
             $discountVal = floatval($data['discount'] ?? 0);
-            $shippingCharges = floatval($data['shipping_charges'] ?? 0);
+            $freightTerms = $data['freight_terms'] ?? 'To Pay';
+            $freightAmount = floatval($data['freight_amount'] ?? $data['shipping_charges'] ?? 0);
             $adjustment = floatval($data['adjustment'] ?? 0);
-            $totalAmount = $subtotal + $tax - $discountVal + $shippingCharges + $adjustment;
 
+            $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
+            $totalAmount = $subtotal + $tax - $discountVal + $effectiveFreight + $adjustment;
+
+            $data['freight_terms'] = $freightTerms;
+            $data['freight_amount'] = $freightAmount;
+            $data['shipping_charges'] = $freightAmount;
             $data['subtotal'] = $subtotal;
             $data['tax'] = $tax;
             $data['total_amount'] = max(0, $totalAmount);
@@ -168,10 +174,16 @@ class SalesOrderService
             }
 
             $discountVal = floatval($data['discount'] ?? 0);
-            $shippingCharges = floatval($data['shipping_charges'] ?? 0);
+            $freightTerms = $data['freight_terms'] ?? $salesOrder->freight_terms ?? 'To Pay';
+            $freightAmount = floatval($data['freight_amount'] ?? $data['shipping_charges'] ?? 0);
             $adjustment = floatval($data['adjustment'] ?? 0);
-            $totalAmount = $subtotal + $tax - $discountVal + $shippingCharges + $adjustment;
 
+            $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
+            $totalAmount = $subtotal + $tax - $discountVal + $effectiveFreight + $adjustment;
+
+            $data['freight_terms'] = $freightTerms;
+            $data['freight_amount'] = $freightAmount;
+            $data['shipping_charges'] = $freightAmount;
             $data['subtotal'] = $subtotal;
             $data['tax'] = $tax;
             $data['total_amount'] = max(0, $totalAmount);

@@ -584,6 +584,17 @@
                                         <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->tax_amount, 2) }}</td>
                                     </tr>
                                 @endif
+
+                                <tr>
+                                    <td class="text-muted fw-semibold">Freight Terms:</td>
+                                    <td class="text-end font-monospace fw-semibold fs-11">{{ $invoice->freight_terms ?: 'To Pay' }}</td>
+                                </tr>
+                                @if ($invoice->freight_terms === 'To Be Billed' && $invoice->freight_amount > 0)
+                                    <tr>
+                                        <td class="text-muted fw-semibold">Freight Charges:</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->freight_amount, 2) }}</td>
+                                    </tr>
+                                @endif
                                 <tr class="border-top border-bottom" style="background-color: #f8fafc;">
                                     <td class="fw-bold fs-14" style="color: #1e40af;">Total Amount:</td>
                                     <td class="text-end fw-black fs-15" style="color: #1e40af;">₹{{ number_format($invoice->total_amount, 2) }}</td>

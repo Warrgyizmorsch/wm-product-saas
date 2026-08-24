@@ -57,6 +57,15 @@
                     <x-ui.odoo-form-ui type="input" inputType="date" label="Shipment Date" name="shipment_date" :value="old('shipment_date', $order->shipment_date ? $order->shipment_date->format('Y-m-d') : '')" />
 
                     <x-ui.odoo-form-ui type="input" label="Payment Terms" name="payment_terms" :value="old('payment_terms', $order->payment_terms)" placeholder="e.g. Net 30, Due on Receipt" />
+
+                    <x-ui.odoo-form-ui type="select" label="Freight Terms" name="freight_terms" id="freightTermsSelect">
+                        <option value="To Pay" @selected(old('freight_terms', $order->freight_terms ?? 'To Pay') == 'To Pay')>To Pay (Freight Collect by Driver from Customer)</option>
+                        <option value="To Be Billed" @selected(old('freight_terms', $order->freight_terms ?? '') == 'To Be Billed')>To Be Billed (Prepaid & Added to Invoice)</option>
+                        <option value="Prepaid" @selected(old('freight_terms', $order->freight_terms ?? '') == 'Prepaid')>Prepaid (Freight Included / Seller Paid)</option>
+                        <option value="Customer Pickup" @selected(old('freight_terms', $order->freight_terms ?? '') == 'Customer Pickup')>Customer Pickup (Self Vehicle)</option>
+                    </x-ui.odoo-form-ui>
+
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', $order->freight_amount ?? 0)" min="0" step="0.01" />
                 </div>
             </div>
 
@@ -125,8 +134,8 @@
                         <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('discount', $order->discount) }}" min="0" step="0.01">
                     </div>
                     <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                        <span class="text-muted fw-semibold">Shipping Charges (₹):</span>
-                        <input type="number" name="shipping_charges" id="shippingChargesInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('shipping_charges', $order->shipping_charges) }}" min="0" step="0.01">
+                        <span class="text-muted fw-semibold">Freight Charges (₹):</span>
+                        <input type="number" name="freight_amount_display" id="freightAmountDisplay" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px; background-color: #f8fafc;" readonly value="0.00">
                     </div>
                     <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                         <span class="text-muted fw-semibold">Adjustment (₹):</span>
@@ -281,7 +290,7 @@
             });
 
             // Input listeners for calculations
-            $(document).on('input', '.qty-input, .price-input, .tax-input, .line-discount-input, #discountInput, #shippingChargesInput, #adjustmentInput', function() {
+            $(document).on('input change', '.qty-input, .price-input, .tax-input, .line-discount-input, #discountInput, #freightTermsSelect, #freightAmountInput, #adjustmentInput', function() {
                 calculateTotals();
             });
 
@@ -347,10 +356,14 @@
                 });
 
                 const discount = parseFloat($('#discountInput').val()) || 0;
-                const shipping = parseFloat($('#shippingChargesInput').val()) || 0;
+                const freightTerms = $('#freightTermsSelect').val() || 'To Pay';
+                const freightAmount = parseFloat($('#freightAmountInput').val()) || 0;
                 const adjustment = parseFloat($('#adjustmentInput').val()) || 0;
 
-                const grandTotal = subtotal + taxTotal - discount + shipping + adjustment;
+                const effectiveFreight = (freightTerms === 'To Be Billed') ? freightAmount : 0;
+                $('#freightAmountDisplay').val(effectiveFreight.toFixed(2));
+
+                const grandTotal = subtotal + taxTotal - discount + effectiveFreight + adjustment;
 
                 $('#calcSubtotal').text('₹' + subtotal.toFixed(2));
                 $('#calcTax').text('₹' + taxTotal.toFixed(2));
