@@ -54,6 +54,6 @@ class DatabaseSeeder extends Seeder
             AccountingChartOfAccountsSeeder::class,
         ]);
 
-        $this->callWith(ProjectsDemoSeeder::class, ['options' => ['wipe' => true]]);
+        // $this->callWith(ProjectsDemoSeeder::class, ['options' => ['wipe' => true]]);
     }
 }
