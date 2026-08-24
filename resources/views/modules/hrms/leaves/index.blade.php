@@ -1495,26 +1495,45 @@
                                                                      <span>{{ $statusBadge['lbl'] }}</span>
                                                                  </button>
                                                                  <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 130px; border-radius: 8px; left: auto; right: 0; background: #ffffff; z-index: 1050;">
-                                                                     @php
-                                                                         $actionsList = [
-                                                                             'pending' => __('hrms.leave.app.status_pending'),
-                                                                             'approved' => __('hrms.leave.app.status_approved'),
-                                                                             'rejected' => __('hrms.leave.app.status_rejected'),
-                                                                             'unauthorized' => __('hrms.leave.app.status_unauthorized'),
-                                                                             'unpaid' => __('hrms.leave.app.status_unpaid')
-                                                                         ];
-                                                                     @endphp
-                                                                     @foreach($actionsList as $actionKey => $actionLabel)
+                                                                     @if($req->status === 'cancellation_requested')
                                                                          <li>
-                                                                             <form action="{{ route('hrms.leaves.update-status', $req->id) }}" method="POST">
+                                                                             <form action="{{ route('hrms.leaves.approve-cancellation', $req->id) }}" method="POST">
                                                                                  @csrf
-                                                                                 <input type="hidden" name="action" value="{{ $actionKey }}">
-                                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === $actionKey ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $req->status === $actionKey ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                                     <span>{{ $actionLabel }}</span>
+                                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-success fw-medium d-flex align-items-center justify-content-between">
+                                                                                     <span>Approve Cancellation</span>
                                                                                  </button>
                                                                              </form>
                                                                          </li>
-                                                                     @endforeach
+                                                                         <li>
+                                                                             <form action="{{ route('hrms.leaves.deny-cancellation', $req->id) }}" method="POST">
+                                                                                 @csrf
+                                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-danger fw-medium d-flex align-items-center justify-content-between">
+                                                                                     <span>Deny Cancellation</span>
+                                                                                 </button>
+                                                                             </form>
+                                                                         </li>
+                                                                     @else
+                                                                         @php
+                                                                             $actionsList = [
+                                                                                 'pending' => __('hrms.leave.app.status_pending'),
+                                                                                 'approved' => __('hrms.leave.app.status_approved'),
+                                                                                 'rejected' => __('hrms.leave.app.status_rejected'),
+                                                                                 'unauthorized' => __('hrms.leave.app.status_unauthorized'),
+                                                                                 'unpaid' => __('hrms.leave.app.status_unpaid')
+                                                                             ];
+                                                                         @endphp
+                                                                         @foreach($actionsList as $actionKey => $actionLabel)
+                                                                             <li>
+                                                                                 <form action="{{ route('hrms.leaves.update-status', $req->id) }}" method="POST">
+                                                                                     @csrf
+                                                                                     <input type="hidden" name="action" value="{{ $actionKey }}">
+                                                                                     <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === $actionKey ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $req->status === $actionKey ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                                         <span>{{ $actionLabel }}</span>
+                                                                                     </button>
+                                                                                 </form>
+                                                                             </li>
+                                                                         @endforeach
+                                                                     @endif
                                                                  </ul>
                                                              </div>
                                                          @endif

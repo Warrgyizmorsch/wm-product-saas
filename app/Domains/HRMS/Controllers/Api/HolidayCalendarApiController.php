@@ -133,9 +133,7 @@ class HolidayCalendarApiController extends Controller
             'status' => 'nullable|boolean',
         ]);
 
-        if ($request->has('status')) {
-            $validated['status'] = (bool) $request->status;
-        }
+        $validated['status'] = $request->has('status') ? (bool) $request->status : false;
 
         $this->holidayCalendarRepository->updateHoliday($holiday, $validated);
         return $this->sendSuccess($holiday->fresh(), 'Holiday updated successfully.');

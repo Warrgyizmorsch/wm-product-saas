@@ -138,8 +138,18 @@ class ShiftChangeRequestApiController extends Controller
         // Set current shift
         $targetDate = Carbon::parse($validated['start_date']);
         $currentShift = $employee->resolveShiftForDate($targetDate);
-        $validated['current_shift_id'] = $currentShift ? $currentShift->id : null;
+        $currentShiftId = $currentShift ? $currentShift->id : null;
 
+        // Prevent requesting same shift
+        $requestedShiftId = $validated['requested_shift_id'] ?? null;
+        if ($requestedShiftId && (int)$requestedShiftId === (int)$currentShiftId) {
+            return $this->sendError(__('hrms.shift_change.same_shift_error') ?? 'You are already scheduled for this shift on the start date.', 422);
+        }
+        if (!$requestedShiftId && !$currentShiftId) {
+            return $this->sendError(__('hrms.shift_change.same_day_off_error') ?? 'The employee is already off on this day.', 422);
+        }
+
+        $validated['current_shift_id'] = $currentShiftId;
         $validated['employee_id'] = $employee->id;
         $validated['company_id']  = $employee->company_id;
 
@@ -191,5 +201,25 @@ class ShiftChangeRequestApiController extends Controller
         ], $request);
 
         return $this->sendSuccess($shiftChangeRequest, 'Shift Change request status updated successfully');
+    }
+
+    public function destroy(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $shiftChangeRequest = ShiftChangeRequest::find($id);
+        if (!$shiftChangeRequest) {
+            return $this->sendError("Shift Change request with ID '{$id}' not found.", 404);
+        }
+
+        if ($shiftChangeRequest->status === 'approved') {
+            return $this->sendError(__('hrms.shift_change.approved_no_delete') ?? 'Approved request cannot be deleted.', 422);
+        }
+
+        $shiftChangeRequest->delete();
+
+        return $this->sendSuccess(null, 'Shift Change request deleted successfully');
     }
 }
