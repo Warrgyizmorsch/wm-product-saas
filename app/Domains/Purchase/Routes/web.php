@@ -45,7 +45,7 @@ Route::prefix('purchase')
         Route::get('po-approvals', [PurchaseOrderController::class, 'poApprovals'])->name('po-approvals.index');
         Route::post('orders/advance-payments', [PurchaseAdvancePaymentController::class, 'store'])->name('orders.advance-payments.store');
         Route::match(['get', 'post'], 'orders/create', [PurchaseOrderController::class, 'create'])->name('orders.create');
-        Route::resource('orders', PurchaseOrderController::class);
+        Route::resource('orders', PurchaseOrderController::class)->except(['create']);
 
         Route::get('landed-costs/get-grn-items', [LandedCostController::class, 'getGrnItems'])->name('landed-costs.get-grn-items');
         Route::post('landed-costs/{landed_cost}/post', [LandedCostController::class, 'post'])->name('landed-costs.post');

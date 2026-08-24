@@ -162,7 +162,9 @@ class FurnitureManufacturingDemoSeeder extends Seeder
         Schema::enableForeignKeyConstraints();
 
         // ─── Step 1: Resolve Tenant & Users ─────────────────────────────────
-        $tenant = Tenant::where('slug', 'demo')->first() ?? Tenant::first();
+        $tenant = Tenant::where('slug', config('tenancy.local_fallback_slug', 'demo'))->first()
+            ?? Tenant::where('slug', 'demo')->first()
+            ?? Tenant::first();
         if (! $tenant) {
             $this->command->warn('No tenant found. Run DatabaseSeeder first.');
 
