@@ -1,11 +1,14 @@
 <?php
 
 use App\Domains\Accounting\Controllers\AccountingPeriodController;
+use App\Domains\Accounting\Controllers\ApAgingController;
+use App\Domains\Accounting\Controllers\ArAgingController;
 use App\Domains\Accounting\Controllers\BalanceSheetController;
 use App\Domains\Accounting\Controllers\ChartOfAccountController;
 use App\Domains\Accounting\Controllers\FiscalYearController;
 use App\Domains\Accounting\Controllers\GeneralLedgerController;
 use App\Domains\Accounting\Controllers\JournalController;
+use App\Domains\Accounting\Controllers\ProfitLossController;
 use App\Domains\Accounting\Controllers\TaxRateController;
 use App\Domains\Accounting\Controllers\TrialBalanceController;
 use App\Domains\Accounting\Controllers\VoucherController;
@@ -42,6 +45,9 @@ Route::prefix('accounting')
         Route::get('reports/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.trial-balance');
         Route::get('reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
         Route::get('reports/balance-sheet', [BalanceSheetController::class, 'index'])->name('reports.balance-sheet');
+        Route::get('reports/profit-loss', [ProfitLossController::class, 'index'])->name('reports.profit-loss');
+        Route::get('reports/ar-aging', [ArAgingController::class, 'index'])->name('reports.ar-aging');
+        Route::get('reports/ap-aging', [ApAgingController::class, 'index'])->name('reports.ap-aging');
 
         foreach (VoucherType::ALL as $voucherType) {
             Route::prefix("vouchers/{$voucherType}")
