@@ -317,6 +317,32 @@ class PayrollCalculationService
             $totalOtPayout += round($payout, 2);
         }
 
+        // 9.75. Process Leave Encashments
+        $leaveEncashments = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)
+            ->whereIn('status', ['approved', 'processed'])
+            ->whereMonth('approved_at', $carbonMonth->month)
+            ->whereYear('approved_at', $carbonMonth->year)
+            ->get();
+
+        $totalEncashmentPayout = 0.00;
+        $totalEncashmentDays = 0.0;
+        $processedEncashIds = [];
+
+        $monthlyBasic = $computedSalaryItems['BASIC']['base_monthly'] ?? (($employee->current_salary * 0.5) / 12);
+        $divisorValue = $divisor > 0 ? $divisor : $totalDaysInMonth;
+        $dailyBasicRate = $monthlyBasic / $divisorValue;
+
+        foreach ($leaveEncashments as $encash) {
+            $days = (float) $encash->requested_days;
+            if ($days <= 0) {
+                continue;
+            }
+            $payout = $days * $dailyBasicRate;
+            $totalEncashmentPayout += round($payout, 2);
+            $totalEncashmentDays += $days;
+            $processedEncashIds[] = $encash->id;
+        }
+
         // 10. Compute final sums
         $grossEarnings = 0.00;
         $grossDeductions = 0.00;
@@ -329,7 +355,7 @@ class PayrollCalculationService
             }
         }
 
-        $finalEarnings = $grossEarnings + $adhocEarnings + $totalRetroReversal + $totalOtPayout;
+        $finalEarnings = $grossEarnings + $adhocEarnings + $totalRetroReversal + $totalOtPayout + $totalEncashmentPayout;
         $finalDeductions = $grossDeductions + $adhocDeductions + $penaltyDeductionAmount;
         $netPayout = max(0.00, $finalEarnings - $finalDeductions);
 
@@ -369,6 +395,17 @@ class PayrollCalculationService
             ];
         }
 
+        if ($totalEncashmentPayout > 0) {
+            $computedSalaryItems['LEAVE_ENCASHMENT'] = [
+                'name'             => 'Leave Encashment (' . number_format($totalEncashmentDays, 1) . ' days)',
+                'type'             => 'earning',
+                'base_monthly'     => $totalEncashmentPayout,
+                'calculated_value' => $totalEncashmentPayout,
+                'deduction'        => 0.00,
+                'reversal'         => 0.00,
+            ];
+        }
+
         $isHeld = PayrollHold::where('employee_id', $employee->id)
             ->where('payroll_month', $payrollMonth)
             ->where('status', 'on_hold')
@@ -389,6 +426,9 @@ class PayrollCalculationService
                 'overtime_payout'      => round($totalOtPayout, 2),
                 'overtime_hours'       => round($accumulatedOtHours, 2),
                 'processed_ot_ids'     => $processedOtIds,
+                'leave_encashment_payout' => round($totalEncashmentPayout, 2),
+                'leave_encashment_days'   => round($totalEncashmentDays, 2),
+                'processed_encash_ids'    => $processedEncashIds,
                 'total_earnings'       => round($finalEarnings, 2),
                 'base_deductions'      => round($grossDeductions, 2),
                 'adhoc_deductions'     => round($adhocDeductions, 2),

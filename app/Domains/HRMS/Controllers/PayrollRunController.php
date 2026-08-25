@@ -9,6 +9,10 @@ use App\Domains\HRMS\Services\PayrollCalculationService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Domains\HRMS\Models\LeaveRequest;
+use App\Domains\HRMS\Models\AttendanceCorrection;
+use App\Domains\HRMS\Models\OvertimeRequest;
+use Illuminate\Support\Facades\Log;
 
 class PayrollRunController extends Controller
 {
@@ -97,7 +101,78 @@ class PayrollRunController extends Controller
             }
         }
 
-        return view('modules.hrms.payroll.index', compact('runs', 'selectedRun', 'registerData', 'payGroups', 'pendingPriorHolds'));
+        $pendingIssues = $selectedRun ? $this->getPendingIssues($selectedRun) : ['leaves' => 0, 'corrections' => 0, 'overtime' => 0, 'total' => 0];
+        $salaryComponents = \App\Domains\HRMS\Models\SalaryComponent::where('status', true)
+            ->where('is_adhoc', true)
+            ->get();
+        $allEmployees = Employee::where('status', true)->orderBy('full_name')->get();
+        $departments = \App\Domains\HRMS\Models\Department::orderBy('name')->get();
+
+        // Apply search, sort, and status/department filters to registerData
+        $registerCollection = collect($registerData);
+        
+        $search = $request->get('search');
+        if ($search) {
+            $search = strtolower(trim($search));
+            $registerCollection = $registerCollection->filter(function($row) use ($search) {
+                $name = strtolower($row['employee']->full_name);
+                $empId = strtolower($row['employee']->employee_id);
+                return str_contains($name, $search) || str_contains($empId, $search);
+            });
+        }
+
+        $status = $request->get('status');
+        if ($status) {
+            $registerCollection = $registerCollection->filter(function($row) use ($status, $selectedRun) {
+                if ($status === 'held') {
+                    return $selectedRun->status === 'paid' ? ($row['hold_status'] === 'on_hold') : $row['is_held'];
+                } elseif ($status === 'approved') {
+                    return $selectedRun->status === 'paid' ? ($row['hold_status'] !== 'on_hold') : !$row['is_held'];
+                }
+                return true;
+            });
+        }
+
+        $deptId = $request->get('department_id');
+        if ($deptId) {
+            $registerCollection = $registerCollection->filter(function($row) use ($deptId) {
+                return $row['employee']->department_id == $deptId;
+            });
+        }
+
+        $sort = $request->get('sort', 'name_asc');
+        if ($sort === 'name_asc') {
+            $registerCollection = $registerCollection->sortBy(function($row) {
+                return strtolower($row['employee']->full_name);
+            });
+        } elseif ($sort === 'name_desc') {
+            $registerCollection = $registerCollection->sortByDesc(function($row) {
+                return strtolower($row['employee']->full_name);
+            });
+        } elseif ($sort === 'net_desc') {
+            $registerCollection = $registerCollection->sortByDesc(function($row) {
+                return (float)($row['calc']['net_payout'] ?? 0);
+            });
+        } elseif ($sort === 'net_asc') {
+            $registerCollection = $registerCollection->sortBy(function($row) {
+                return (float)($row['calc']['net_payout'] ?? 0);
+            });
+        } elseif ($sort === 'lop_desc') {
+            $registerCollection = $registerCollection->sortByDesc(function($row) {
+                return (float)($row['calc']['lop_days'] ?? 0);
+            });
+        }
+
+        $registerData = $registerCollection->values()->all();
+
+        $filters = [
+            'search'        => $request->get('search'),
+            'sort'          => $request->get('sort', 'name_asc'),
+            'status'        => $request->get('status'),
+            'department_id' => $request->get('department_id'),
+        ];
+
+        return view('modules.hrms.payroll.index', compact('runs', 'selectedRun', 'registerData', 'payGroups', 'pendingPriorHolds', 'pendingIssues', 'salaryComponents', 'allEmployees', 'departments', 'filters'));
     }
 
     public function storeRun(Request $request)
@@ -147,8 +222,152 @@ class PayrollRunController extends Controller
 
     public function lockRun(PayrollRun $run)
     {
+        $pending = $this->getPendingIssues($run);
+        if ($pending['total'] > 0) {
+            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
+                ->with('error', "Cannot lock payroll: There are {$pending['total']} pending requests (Leaves: {$pending['leaves']}, Corrections: {$pending['corrections']}, Overtime: {$pending['overtime']}). Please resolve them first.");
+        }
+
         $run->update(['status' => 'locked']);
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll run locked successfully.');
+    }
+
+    public function resolvePending(Request $request, PayrollRun $run)
+    {
+        $validated = $request->validate([
+            'resolution_action' => 'required|string|in:approve_all,reject_all',
+        ]);
+
+        $resolution = $validated['resolution_action'];
+        $startDate = $run->start_date;
+        $endDate = $run->end_date;
+
+        DB::beginTransaction();
+        try {
+            if ($resolution === 'approve_all') {
+                // 1. Approve Leave Requests
+                $leaves = LeaveRequest::where('status', 'pending')
+                    ->where('start_date', '<=', $endDate)
+                    ->where('end_date', '>=', $startDate)
+                    ->get();
+                
+                $leaveRepo = app(\App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface::class);
+                foreach ($leaves as $leave) {
+                    $leaveRepo->updateStatus($leave, ['action' => 'approved'], $request);
+                }
+
+                // 2. Approve Attendance Corrections
+                $corrections = AttendanceCorrection::where('status', 'pending')
+                    ->whereBetween('date', [$startDate, $endDate])
+                    ->get();
+
+                $correctionController = app(\App\Domains\HRMS\Controllers\AttendanceCorrectionController::class);
+                foreach ($corrections as $correction) {
+                    $correctionController->approve($request, $correction);
+                }
+
+                // 3. Approve Overtime Requests
+                $overtimes = OvertimeRequest::where('status', 'pending')
+                    ->whereBetween('date', [$startDate, $endDate])
+                    ->get();
+
+                $otRepo = app(\App\Domains\HRMS\Repositories\OvertimeRequestRepositoryInterface::class);
+                foreach ($overtimes as $ot) {
+                    $otRepo->updateStatus($ot, [
+                        'action' => 'approved',
+                        'approved_duration_hours' => $ot->duration_hours
+                    ], $request);
+                }
+
+                $message = "All pending requests approved and payroll calculations updated.";
+            } else {
+                // reject_all
+                // 1. Reject Leave Requests
+                $leaves = LeaveRequest::where('status', 'pending')
+                    ->where('start_date', '<=', $endDate)
+                    ->where('end_date', '>=', $startDate)
+                    ->get();
+                
+                $leaveRepo = app(\App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface::class);
+                foreach ($leaves as $leave) {
+                    $leaveRepo->updateStatus($leave, [
+                        'action' => 'rejected',
+                        'rejection_reason' => 'Auto-rejected during payroll run execution.'
+                    ], $request);
+                }
+
+                // 2. Reject Attendance Corrections
+                $corrections = AttendanceCorrection::where('status', 'pending')
+                    ->whereBetween('date', [$startDate, $endDate])
+                    ->get();
+
+                $correctionController = app(\App\Domains\HRMS\Controllers\AttendanceCorrectionController::class);
+                foreach ($corrections as $correction) {
+                    $fakeRequest = clone $request;
+                    $fakeRequest->merge(['rejected_reason' => 'Auto-rejected during payroll run execution.']);
+                    $correctionController->reject($fakeRequest, $correction);
+                }
+
+                // 3. Reject Overtime Requests
+                $overtimes = OvertimeRequest::where('status', 'pending')
+                    ->whereBetween('date', [$startDate, $endDate])
+                    ->get();
+
+                $otRepo = app(\App\Domains\HRMS\Repositories\OvertimeRequestRepositoryInterface::class);
+                foreach ($overtimes as $ot) {
+                    $otRepo->updateStatus($ot, [
+                        'action' => 'rejected',
+                        'rejection_reason' => 'Auto-rejected during payroll run execution.'
+                    ], $request);
+                }
+
+                $message = "All pending requests rejected. Unresolved days calculated as LOP/zeros.";
+            }
+
+            DB::commit();
+            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', $message);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to auto-resolve payroll issues", [
+                'run_id' => $run->id,
+                'error' => $e->getMessage()
+            ]);
+            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
+                ->with('error', "Failed to resolve pending requests: " . $e->getMessage());
+        }
+    }
+
+    private function getPendingIssues(PayrollRun $run): array
+    {
+        $startDate = $run->start_date;
+        $endDate = $run->end_date;
+
+        $pendingLeaves = LeaveRequest::with(['employee', 'leaveType'])
+            ->where('status', 'pending')
+            ->where('start_date', '<=', $endDate)
+            ->where('end_date', '>=', $startDate)
+            ->get();
+
+        $pendingCorrections = AttendanceCorrection::with('employee')
+            ->where('status', 'pending')
+            ->whereBetween('date', [$startDate, $endDate])
+            ->get();
+
+        $pendingOvertime = OvertimeRequest::with('employee')
+            ->where('status', 'pending')
+            ->whereBetween('date', [$startDate, $endDate])
+            ->get();
+
+        return [
+            'leaves'            => $pendingLeaves->count(),
+            'corrections'       => $pendingCorrections->count(),
+            'overtime'          => $pendingOvertime->count(),
+            'total'             => $pendingLeaves->count() + $pendingCorrections->count() + $pendingOvertime->count(),
+            'leaves_list'       => $pendingLeaves,
+            'corrections_list'  => $pendingCorrections,
+            'overtime_list'     => $pendingOvertime,
+        ];
     }
 
     public function releasePayouts(PayrollRun $run)
@@ -187,16 +406,26 @@ class PayrollRunController extends Controller
         $employees = $employeesQuery->get();
 
         $allOtIds = [];
+        $allEncashIds = [];
         foreach ($employees as $employee) {
             $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
             if (!empty($calc['summary']['processed_ot_ids'])) {
                 $allOtIds = array_merge($allOtIds, $calc['summary']['processed_ot_ids']);
+            }
+            if (!empty($calc['summary']['processed_encash_ids'])) {
+                $allEncashIds = array_merge($allEncashIds, $calc['summary']['processed_encash_ids']);
             }
         }
 
         if (!empty($allOtIds)) {
             DB::table('overtime_requests')
                 ->whereIn('id', $allOtIds)
+                ->update(['status' => 'processed']);
+        }
+
+        if (!empty($allEncashIds)) {
+            DB::table('leave_encashments')
+                ->whereIn('id', $allEncashIds)
                 ->update(['status' => 'processed']);
         }
 
@@ -309,5 +538,49 @@ class PayrollRunController extends Controller
         }
 
         return view('modules.hrms.payroll.my_salary', compact('employee', 'salaryHistory'));
+    }
+
+    public function storeBulkAdhoc(Request $request)
+    {
+        $validated = $request->validate([
+            'salary_component_id' => 'required|exists:salary_components,id',
+            'payroll_month'       => 'required|string',
+            'employee_ids'        => 'required|array',
+            'employee_ids.*'      => 'exists:employees,id',
+            'amount'              => 'required|numeric|min:0',
+            'remarks'             => 'nullable|string',
+        ]);
+
+        $employees = Employee::whereIn('id', $validated['employee_ids'])->get();
+
+        if ($employees->isEmpty()) {
+            return redirect()->back()->with('error', 'No selected employees found.');
+        }
+
+        DB::beginTransaction();
+        try {
+            $insertData = [];
+            foreach ($employees as $employee) {
+                $insertData[] = [
+                    'tenant_id'           => auth()->user()->tenant_id ?? 1,
+                    'employee_id'         => $employee->id,
+                    'salary_component_id' => $validated['salary_component_id'],
+                    'amount'              => $validated['amount'],
+                    'payroll_month'       => $validated['payroll_month'],
+                    'status'              => 'pending',
+                    'remarks'             => $validated['remarks'],
+                    'created_at'          => now(),
+                    'updated_at'          => now(),
+                ];
+            }
+
+            DB::table('employee_adhoc_components')->insert($insertData);
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Bulk ad-hoc adjustments created successfully for ' . $employees->count() . ' employees.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Failed to create bulk adjustments: ' . $e->getMessage());
+        }
     }
 }
