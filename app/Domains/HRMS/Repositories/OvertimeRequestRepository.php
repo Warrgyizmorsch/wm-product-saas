@@ -306,8 +306,31 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         if ($tenant) {
             $currentSettings = $tenant->settings ?: [];
             $currentSettings['auto_overtime_threshold_hours'] = (isset($settings['auto_overtime_threshold_hours']) && $settings['auto_overtime_threshold_hours'] !== '' && $settings['auto_overtime_threshold_hours'] !== null) ? (float) $settings['auto_overtime_threshold_hours'] : null;
-            $currentSettings['overtime_rate_multiplier']      = (isset($settings['overtime_rate_multiplier']) && $settings['overtime_rate_multiplier'] !== '' && $settings['overtime_rate_multiplier'] !== null) ? (float) $settings['overtime_rate_multiplier'] : 1.5;
             $currentSettings['min_overtime_request_hours']    = (isset($settings['min_overtime_request_hours']) && $settings['min_overtime_request_hours'] !== '' && $settings['min_overtime_request_hours'] !== null) ? (float) $settings['min_overtime_request_hours'] : null;
+            $currentSettings['overtime_max_monthly_hours']    = (isset($settings['overtime_max_monthly_hours']) && $settings['overtime_max_monthly_hours'] !== '' && $settings['overtime_max_monthly_hours'] !== null) ? (float) $settings['overtime_max_monthly_hours'] : null;
+            $currentSettings['overtime_weekend_multiplier']   = (isset($settings['overtime_weekend_multiplier']) && $settings['overtime_weekend_multiplier'] !== '' && $settings['overtime_weekend_multiplier'] !== null) ? (float) $settings['overtime_weekend_multiplier'] : 2.0;
+            $currentSettings['overtime_holiday_multiplier']   = (isset($settings['overtime_holiday_multiplier']) && $settings['overtime_holiday_multiplier'] !== '' && $settings['overtime_holiday_multiplier'] !== null) ? (float) $settings['overtime_holiday_multiplier'] : 2.5;
+
+            $tiers = [];
+            if (isset($settings['overtime_tiers']) && is_array($settings['overtime_tiers'])) {
+                foreach ($settings['overtime_tiers'] as $tier) {
+                    $min = (isset($tier['min_hours']) && $tier['min_hours'] !== '') ? (float) $tier['min_hours'] : 0.0;
+                    $max = (isset($tier['max_hours']) && $tier['max_hours'] !== '') ? (float) $tier['max_hours'] : null;
+                    $mult = (isset($tier['multiplier']) && $tier['multiplier'] !== '') ? (float) $tier['multiplier'] : 1.0;
+                    $tiers[] = [
+                        'min_hours'  => $min,
+                        'max_hours'  => $max,
+                        'multiplier' => $mult
+                    ];
+                }
+            } else {
+                $tiers = [
+                    ['min_hours' => 0, 'max_hours' => 2, 'multiplier' => 1.5],
+                    ['min_hours' => 2, 'max_hours' => null, 'multiplier' => 2.0]
+                ];
+            }
+            $currentSettings['overtime_tiers'] = $tiers;
+
             $tenant->update(['settings' => $currentSettings]);
             return true;
         }
@@ -317,8 +340,25 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
 
     public function processAutoOvertime(Employee $employee, string $date, float $extraHours): ?OvertimeRequest
     {
-        $tenant = Tenant::find($employee->tenant_id);
-        $settings = $tenant ? ($tenant->settings ?: []) : [];
+        $otRule = \App\Domains\HRMS\Models\AttendancePenalty::where('rule_type', 'overtime_rules')
+            ->where('company_id', $employee->company_id)
+            ->where('status', true)
+            ->first();
+
+        if (!$otRule) {
+            $otRule = \App\Domains\HRMS\Models\AttendancePenalty::where('rule_type', 'overtime_rules')
+                ->whereNull('company_id')
+                ->where('status', true)
+                ->first();
+        }
+
+        $settings = [];
+        if ($otRule && is_array($otRule->penalty_tiers)) {
+            $settings = $otRule->penalty_tiers;
+        } else {
+            $tenant = Tenant::find($employee->tenant_id);
+            $settings = $tenant ? ($tenant->settings ?: []) : [];
+        }
 
         if (!isset($settings['auto_overtime_threshold_hours']) || $settings['auto_overtime_threshold_hours'] === '' || $settings['auto_overtime_threshold_hours'] === null) {
             return null;

@@ -387,15 +387,12 @@
                                     $isPaneActive = ($selectedType === $typeKey);
                                     $rule = $rules->get($typeKey);
                                     $action = $rule ? $rule->penalty_action : 'salary_deduction';
-                                    $val = $rule ? floatval($rule->penalty_value) : 0.5;
                                     $statusVal = $rule ? ($rule->status ? '1' : '0') : '1';
                                 @endphp
                                 <div class="policy-details-pane" id="policy-details-{{ $typeKey }}" style="{{ $isPaneActive ? '' : 'display:none;' }}">
-                                    <form action="{{ $typeKey === 'attendance_rules' ? route('hrms.attendance-rules.save') : ($typeKey === 'overtime_rules' ? route('hrms.overtime.update-settings') : ($typeKey === 'expense_rules' ? route('hrms.travel-expense.policy.save') : route('hrms.penalization-policy.store'))) }}" method="POST" class="p-4">
+                                    <form action="{{ $typeKey === 'attendance_rules' ? route('hrms.attendance-rules.save') : ($typeKey === 'overtime_rules' ? route('hrms.penalization-policy.store') : ($typeKey === 'expense_rules' ? route('hrms.travel-expense.policy.save') : route('hrms.penalization-policy.store'))) }}" method="POST" class="p-4">
                                         @csrf
-                                        @if($typeKey !== 'overtime_rules')
-                                            <input type="hidden" name="rule_type" value="{{ $typeKey }}">
-                                        @endif
+                                        <input type="hidden" name="rule_type" value="{{ $typeKey }}">
 
                                         <!-- Panel Header Details -->
                                         <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
@@ -418,44 +415,40 @@
                                                      @endif
                                                 </span>
                                             </div>
-                                            @if($typeKey !== 'overtime_rules')
-                                                <div>
-                                                    <x-ui.badge variant="{{ $statusVal === '1' ? 'success' : 'danger' }}" soft class="px-2 py-1">
-                                                        {{ $statusVal === '1' ? __('hrms.employees.frm_status_active') : __('hrms.employees.frm_status_inactive') }}
-                                                    </x-ui.badge>
-                                                </div>
-                                            @endif
+                                            <div>
+                                                <x-ui.badge variant="{{ $statusVal === '1' ? 'success' : 'danger' }}" soft class="px-2 py-1">
+                                                    {{ $statusVal === '1' ? __('hrms.employees.frm_status_active') : __('hrms.employees.frm_status_inactive') }}
+                                                </x-ui.badge>
+                                            </div>
                                         </div>
 
                                         <div class="row g-3 mb-4">
-                                            @if($typeKey !== 'overtime_rules')
-                                                <!-- Entity Scope -->
-                                                <div class="col-md-6 col-12">
-                                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_scope') }}" name="company_id" select2-selector="default" id="{{ $typeKey === 'attendance_rules' ? 'sel_company_id' : 'company_id_' . $typeKey }}">
-                                                        @if($typeKey === 'attendance_rules')
-                                                            <option value="" disabled selected>-- Select a Company (Required) --</option>
-                                                        @else
-                                                            <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
-                                                        @endif
-                                                        @foreach($companies as $company)
-                                                            <option value="{{ $company->id }}" {{ (($typeKey === 'attendance_rules' ? request('company_id') : ($rule ? $rule->company_id : null)) == $company->id) ? 'selected' : '' }}>
-                                                                {{ $company->company_name }}
-                                                            </option>
-                                                        @endforeach
-                                                    </x-ui.odoo-form-ui>
-                                                </div>
+                                            <!-- Entity Scope -->
+                                            <div class="col-md-6 col-12">
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_scope') }}" name="company_id" select2-selector="default" id="{{ $typeKey === 'attendance_rules' ? 'sel_company_id' : 'company_id_' . $typeKey }}">
+                                                    @if($typeKey === 'attendance_rules')
+                                                        <option value="" disabled selected>-- Select a Company (Required) --</option>
+                                                    @else
+                                                        <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
+                                                    @endif
+                                                    @foreach($companies as $company)
+                                                        <option value="{{ $company->id }}" {{ (request('company_id', $rule ? $rule->company_id : '') == $company->id) ? 'selected' : '' }}>
+                                                            {{ $company->company_name }}
+                                                        </option>
+                                                    @endforeach
+                                                </x-ui.odoo-form-ui>
+                                            </div>
 
-                                                <!-- Status -->
-                                                <div class="col-md-6 col-12">
-                                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.policy_status') }}" name="status" select2-selector="default" :required="true" id="{{ $typeKey === 'attendance_rules' ? 'sel_status' : 'status_' . $typeKey }}">
-                                                        <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>{{ __('hrms.penalization.active_enforce') }}</option>
-                                                        <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>{{ __('hrms.penalization.inactive_ignore') }}</option>
-                                                    </x-ui.odoo-form-ui>
-                                                </div>
-                                            @endif
+                                            <!-- Status -->
+                                            <div class="col-md-6 col-12">
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.policy_status') }}" name="status" select2-selector="default" :required="true" id="{{ $typeKey === 'attendance_rules' ? 'sel_status' : 'status_' . $typeKey }}">
+                                                    <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>{{ __('hrms.penalization.active_enforce') }}</option>
+                                                    <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>{{ __('hrms.penalization.inactive_ignore') }}</option>
+                                                </x-ui.odoo-form-ui>
+                                            </div>
 
-                                             @if($typeKey === 'overtime_rules')
-                                                 <div class="col-12 d-flex flex-column gap-3">
+                                            @if($typeKey === 'overtime_rules')
+                                                <div class="col-12 d-flex flex-column gap-3">
                                                      {{-- Overtime Threshold Rule --}}
                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
                                                          <div class="d-flex align-items-start gap-2">
@@ -463,13 +456,13 @@
                                                              <div>
                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
                                                                      System automatically logs and approves overtime if actual worked extra hours equal or exceed 
-                                                                     <input type="number" name="auto_overtime_threshold_hours" step="0.5" min="0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['auto_overtime_threshold_hours'] }}" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                     <input type="number" name="auto_overtime_threshold_hours" step="0.5" min="0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['auto_overtime_threshold_hours'] }}" placeholder="2.0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
                                                                      hours.
                                                                  </p>
                                                              </div>
                                                          </div>
                                                      </div>
-
+ 
                                                      {{-- Minimum Overtime Request Rule --}}
                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
                                                          <div class="d-flex align-items-start gap-2">
@@ -477,10 +470,97 @@
                                                              <div>
                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
                                                                      Minimum hours required for a manual overtime request is 
-                                                                     <input type="number" name="min_overtime_request_hours" step="0.5" min="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['min_overtime_request_hours'] }}" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                     <input type="number" name="min_overtime_request_hours" step="0.5" min="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['min_overtime_request_hours'] }}" placeholder="1.5" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
                                                                      hours.
                                                                  </p>
                                                              </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {{-- Monthly Maximum Paid Overtime Hours Cap --}}
+                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                         <div class="d-flex align-items-start gap-2">
+                                                             <i class="feather-clock text-primary fs-16 mt-0.5"></i>
+                                                             <div>
+                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                     Maximum paid overtime hours allowed per employee in a month is 
+                                                                     <input type="number" name="overtime_max_monthly_hours" step="0.5" min="0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['overtime_max_monthly_hours'] ?? '' }}" placeholder="No Limit" style="width: 80px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                     hours. (Leave blank for no limit)
+                                                                 </p>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {{-- Weekend Multiplier --}}
+                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                         <div class="d-flex align-items-start gap-2">
+                                                             <i class="feather-calendar text-primary fs-16 mt-0.5"></i>
+                                                             <div>
+                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                     Overtime worked on a <strong>Weekly Off / Weekend</strong> is calculated at a multiplier of 
+                                                                     <input type="number" name="overtime_weekend_multiplier" step="0.1" min="1.0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['overtime_weekend_multiplier'] ?? '' }}" placeholder="2.0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                     times the standard hourly rate.
+                                                                 </p>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {{-- Public Holiday Multiplier --}}
+                                                     <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                         <div class="d-flex align-items-start gap-2">
+                                                             <i class="feather-award text-primary fs-16 mt-0.5"></i>
+                                                             <div>
+                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                     Overtime worked on a <strong>Public Holiday</strong> is calculated at a multiplier of 
+                                                                     <input type="number" name="overtime_holiday_multiplier" step="0.1" min="1.0" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $tenantSettings['overtime_holiday_multiplier'] ?? '' }}" placeholder="2.5" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                     times the standard hourly rate.
+                                                                 </p>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {{-- Duration Slabs Table --}}
+                                                     <div class="card border mt-2">
+                                                         <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                                                             <span class="fw-bold text-dark fs-13"><i class="feather-list me-1 text-primary"></i>Regular Work Days OT Tiers</span>
+                                                             <button type="button" class="btn btn-xs btn-primary text-white" id="btnAddOtTier"><i class="feather-plus me-1"></i>Add Slab</button>
+                                                         </div>
+                                                         <div class="card-body p-0">
+                                                             <table class="table table-sm align-middle fs-12 mb-0" id="otTiersTable">
+                                                                 <thead>
+                                                                     <tr class="table-light">
+                                                                         <th class="ps-3" style="width: 30%;">Min Hours</th>
+                                                                         <th style="width: 30%;">Max Hours</th>
+                                                                         <th style="width: 30%;">Multiplier (e.g. 1.5)</th>
+                                                                         <th class="text-center" style="width: 10%;">Action</th>
+                                                                     </tr>
+                                                                 </thead>
+                                                                 <tbody id="otTiersBody">
+                                                                     @php
+                                                                         $hasSavedTiers = isset($tenantSettings['overtime_tiers']);
+                                                                         $tiers = $tenantSettings['overtime_tiers'] ?? [
+                                                                             ['min_hours' => null, 'max_hours' => 2.0, 'multiplier' => 1.5, 'placeholder_min' => '0', 'placeholder_max' => '2', 'placeholder_mult' => '1.5'],
+                                                                             ['min_hours' => 2.0, 'max_hours' => null, 'multiplier' => 2.0, 'placeholder_min' => '2', 'placeholder_max' => 'Any', 'placeholder_mult' => '2.0']
+                                                                         ];
+                                                                     @endphp
+                                                                     @foreach($tiers as $index => $tier)
+                                                                         <tr>
+                                                                             <td class="ps-3">
+                                                                                 <input type="number" name="overtime_tiers[{{ $index }}][min_hours]" step="0.5" min="0" class="form-control form-control-sm text-center fw-semibold" value="{{ $hasSavedTiers ? $tier['min_hours'] : '' }}" placeholder="{{ $tier['placeholder_min'] ?? '0' }}" required style="height: 30px;">
+                                                                             </td>
+                                                                             <td>
+                                                                                 <input type="number" name="overtime_tiers[{{ $index }}][max_hours]" step="0.5" min="0" class="form-control form-control-sm text-center fw-semibold" value="{{ $hasSavedTiers ? $tier['max_hours'] : '' }}" placeholder="{{ $tier['placeholder_max'] ?? 'Any' }}" style="height: 30px;">
+                                                                             </td>
+                                                                             <td>
+                                                                                 <input type="number" name="overtime_tiers[{{ $index }}][multiplier]" step="0.1" min="1.0" class="form-control form-control-sm text-center fw-semibold" value="{{ $hasSavedTiers ? $tier['multiplier'] : '' }}" placeholder="{{ $tier['placeholder_mult'] ?? '1.5' }}" required style="height: 30px;">
+                                                                             </td>
+                                                                             <td class="text-center">
+                                                                                 <button type="button" class="btn btn-icon btn-sm rounded-circle btn-soft-danger btn-remove-ot-tier"><i class="feather-trash-2"></i></button>
+                                                                             </td>
+                                                                         </tr>
+                                                                     @endforeach
+                                                                 </tbody>
+                                                             </table>
                                                          </div>
                                                      </div>
                                                  </div>
@@ -2010,6 +2090,47 @@
                 var companyId = $(this).val() || '';
                 var policyType = $(this).attr('id').replace('company_id_', '');
                 window.location.href = "{{ route('hrms.penalization-policy.index') }}?policy_type=" + policyType + "&company_id=" + companyId;
+            });
+
+            // Add OT tier row dynamically
+            $(document).on('click', '#btnAddOtTier', function() {
+                var rowCount = $('#otTiersBody tr').length;
+                var html = `
+                    <tr>
+                        <td class="ps-3">
+                            <input type="number" name="overtime_tiers[${rowCount}][min_hours]" step="0.5" min="0" class="form-control form-control-sm text-center fw-semibold" value="" placeholder="0" required style="height: 30px;">
+                        </td>
+                        <td>
+                            <input type="number" name="overtime_tiers[${rowCount}][max_hours]" step="0.5" min="0" class="form-control form-control-sm text-center fw-semibold" value="" placeholder="Any" style="height: 30px;">
+                        </td>
+                        <td>
+                            <input type="number" name="overtime_tiers[${rowCount}][multiplier]" step="0.1" min="1.0" class="form-control form-control-sm text-center fw-semibold" value="" placeholder="1.5" required style="height: 30px;">
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-icon btn-sm rounded-circle btn-soft-danger btn-remove-ot-tier"><i class="feather-trash-2"></i></button>
+                        </td>
+                    </tr>
+                `;
+                $('#otTiersBody').append(html);
+            });
+
+            // Remove OT tier row
+            $(document).on('click', '.btn-remove-ot-tier', function() {
+                if ($('#otTiersBody tr').length <= 1) {
+                    alert('At least one overtime tier slab must be configured.');
+                    return;
+                }
+                $(this).closest('tr').remove();
+                // Reindex inputs
+                $('#otTiersBody tr').each(function(index) {
+                    $(this).find('input').each(function() {
+                        var name = $(this).attr('name');
+                        if (name) {
+                            var newName = name.replace(/overtime_tiers\\[\\d+\\]/, 'overtime_tiers[' + index + ']');
+                            $(this).attr('name', newName);
+                        }
+                    });
+                });
             });
 
         });
