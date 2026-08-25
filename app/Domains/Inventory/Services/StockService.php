@@ -398,8 +398,70 @@ class StockService
             $transaction->created_batch = $batch;
             $transaction->created_serials = $createdSerials;
 
+            // 5. Post Accounting Journal Entry for Opening Stock
+            if ($referenceType === 'Opening Stock' && ($quantity * $unitCost) > 0) {
+                self::postOpeningStockAccountingJournal($tenantId, $productId, $quantity * $unitCost);
+            }
+
             return $transaction;
         });
+    }
+
+    /**
+     * Post Accounting Journal Entry for Opening Stock Inflow to General Ledger.
+     */
+    public static function postOpeningStockAccountingJournal(int $tenantId, int $productId, float $totalValue): void
+    {
+        try {
+            $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
+                ->where(function ($q) {
+                    $q->where('code', '1200')->orWhere('name', 'like', '%Inventory%');
+                })->first();
+
+            $equityAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)
+                ->where(function ($q) {
+                    $q->where('code', '3010')->orWhere('code', '3020');
+                })->first();
+
+            if (!$inventoryAcc || !$equityAcc) {
+                return;
+            }
+
+            /** @var \App\Domains\Accounting\Services\JournalService $journalService */
+            $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
+
+            $product = Product::find($productId);
+            $productName = $product ? $product->name : "Product #{$productId}";
+
+            $lines = [
+                [
+                    'chart_of_account_id' => $inventoryAcc->id,
+                    'debit' => round($totalValue, 2),
+                    'credit' => 0,
+                    'description' => "Opening Stock Valuation - Inventory Asset ({$productName})",
+                ],
+                [
+                    'chart_of_account_id' => $equityAcc->id,
+                    'debit' => 0,
+                    'credit' => round($totalValue, 2),
+                    'description' => "Opening Stock Valuation - Owner Equity / Capital ({$productName})",
+                ],
+            ];
+
+            $meta = [
+                'tenant_id' => $tenantId,
+                'journal_date' => now(),
+                'source' => \App\Domains\Accounting\Models\Journal::SOURCE_INVENTORY,
+                'reference_type' => 'ProductOpeningStock',
+                'reference_id' => $productId,
+                'memo' => "Opening Stock Entry for {$productName}",
+                'journal_number_prefix' => 'OP-JNL',
+            ];
+
+            $journalService->post($lines, $meta);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("StockService: Failed posting opening stock journal for product {$productId}: " . $e->getMessage());
+        }
     }
 
     /**
