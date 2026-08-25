@@ -308,9 +308,20 @@
                                                     @foreach($pipelines as $pipeline)
                                                         <div class="mb-2.5 last:mb-0 p-2.5 bg-light rounded border">
                                                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                                                <span class="fw-bold text-dark fs-12">
-                                                                    <i class="feather-box text-primary me-1"></i> Batch #{{ $pipeline['batch_number'] }}
-                                                                </span>
+                                                                <div class="d-flex align-items-center gap-2">
+                                                                    <span class="fw-bold text-dark fs-12">
+                                                                        <i class="feather-box text-primary me-1"></i> Batch #{{ $pipeline['batch_number'] }}
+                                                                    </span>
+                                                                    @if($pipeline['is_sfg'] ?? false)
+                                                                        <span class="badge bg-soft-warning text-warning border fs-10" title="Semi-Finished Good Batch">
+                                                                            <i class="feather-layers me-1"></i> SFG: {{ $pipeline['product_name'] ?? 'Sub-Assembly' }}
+                                                                        </span>
+                                                                    @else
+                                                                        <span class="badge bg-soft-primary text-primary border fs-10" title="Finished Good Batch">
+                                                                            <i class="feather-check-circle me-1"></i> FG: {{ $pipeline['product_name'] ?? 'Finished Good' }}
+                                                                        </span>
+                                                                    @endif
+                                                                </div>
                                                                 <span class="badge bg-soft-info text-info border fs-10">
                                                                     Planned: {{ number_format($pipeline['planned_quantity'], 2) }} units
                                                                 </span>

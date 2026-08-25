@@ -187,7 +187,10 @@ class ProductionOrder extends BaseModel
 
     public function operations(): HasMany
     {
-        return $this->hasMany(ProductionOrderOperation::class, 'production_order_id')->orderBy('sequence');
+        return $this->hasMany(ProductionOrderOperation::class, 'production_order_id')
+            ->orderBy('bom_level', 'desc')
+            ->orderBy('sequence', 'asc')
+            ->orderBy('id', 'asc');
     }
 
     public function reservations(): HasMany

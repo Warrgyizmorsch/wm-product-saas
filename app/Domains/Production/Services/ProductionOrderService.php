@@ -20,6 +20,8 @@ use App\Domains\Production\Models\Routing;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
+use App\Domains\Production\Models\ProductionOrderOperationDependency;
+use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Repositories\ProductionOrderRepositoryInterface;
 
 class ProductionOrderService
@@ -311,64 +313,8 @@ class ProductionOrderService
             }
             $this->createRequisitionSlip($order, $itemsToResolve);
 
-            // 2. Resolve & Snapshot operations directly from Routing operations
-            $createdOps = [];
-            foreach ($routing->operations as $idx => $routingOp) {
-                $status = ($idx === 0) ? ProductionOrderOperation::STATUS_READY : ProductionOrderOperation::STATUS_WAITING;
-
-                $processingTime = ($routingOp->processing_time_minutes * $quantity);
-                $totalTime = $routingOp->setup_time_minutes + $processingTime;
-
-                $op = ProductionOrderOperation::create([
-                    'tenant_id' => $tenantId,
-                    'production_order_id' => $order->id,
-                    'routing_operation_id' => $routingOp->id,
-                    'sequence' => $routingOp->sequence,
-                    'operation_number' => $routingOp->operation_number,
-                    'name' => $routingOp->name,
-                    'work_center_id' => $routingOp->work_center_id,
-                    'machine_id' => $routingOp->machine_id,
-                    'status' => $status,
-                    'setup_time_planned' => $routingOp->setup_time_minutes,
-                    'processing_time_planned' => $processingTime,
-                    'total_time_planned' => $totalTime,
-                    'setup_time_actual' => 0.00,
-                    'processing_time_actual' => 0.00,
-                    'quantity_produced' => 0.0000,
-                    'quantity_rejected' => 0.0000,
-                    'quantity_scrapped' => 0.0000,
-                    'is_external' => (bool) (($routingOp->is_external ?? false) || in_array($order->production_model, ['complete_subcontracting', 'subcontract_company_material'])),
-                    'vendor_id' => $routingOp->vendor_id,
-                    'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
-                    'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
-                    'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
-                    'material_supply_type' => $routingOp->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
-                    'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
-                    'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
-                    'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
-                    'overlap_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
-                    'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
-                    'transfer_lag_minutes' => (int) ($routingOp->transfer_lag_minutes ?? 0),
-                ]);
-                $createdOps[] = $op;
-            }
-
-            // Bind sequence dependencies
-            for ($i = 1; $i < count($createdOps); $i++) {
-                $createdOps[$i]->previous_operation_id = $createdOps[$i - 1]->id;
-                $createdOps[$i]->save();
-            }
-
-            // Auto-generate Subcontract Purchase Requisitions for external operations
-            foreach ($createdOps as $createdOp) {
-                if ($createdOp->is_external) {
-                    try {
-                        app(SubcontractProcurementOrchestrator::class)->generateSubcontractRequisition($createdOp, $tenantId, $userId);
-                    } catch (\Throwable $e) {
-                        // Requisition fallback
-                    }
-                }
-            }
+            // 2. Resolve & Snapshot multi-level operations and dependencies recursively
+            $this->snapshotMultiLevelRoutings($order, $bom, $routing, $quantity, $tenantId, $userId);
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
@@ -632,25 +578,34 @@ class ProductionOrderService
 
         $warehouseId = $this->resolveReservationWarehouseId($order->tenant_id, $productId);
 
-        $reservation = ProductionOrderReservation::create([
-            'tenant_id' => $order->tenant_id,
-            'production_order_id' => $order->id,
-            'bom_item_id' => $bomItemId,
-            'product_id' => $productId,
-            'warehouse_id' => $warehouseId,
-            'quantity_planned' => $plannedQty,
-            'quantity_reserved' => 0.0000,
-            'quantity_issued' => 0.0000,
-            'uom_id' => $uomId,
-        ]);
-
-        // If product is semi-finished or has child BOM, explode and create reservations for child components based on shortage
         $product = \App\Domains\Inventory\Models\Product::withoutGlobalScopes()
             ->where('tenant_id', $order->tenant_id)
             ->find($productId);
 
+        $availableQty = 0.0;
+        $effectiveReservationQty = $plannedQty;
         if ($product && ($product->type === 'semi_finished' || $childBomId)) {
             $availableQty = $warehouseId ? StockService::getAvailableStock($productId, $warehouseId) : 0.0;
+            $effectiveReservationQty = min($plannedQty, $availableQty);
+        }
+
+        $reservation = null;
+        if ($effectiveReservationQty > 0 || !($product && ($product->type === 'semi_finished' || $childBomId))) {
+            $reservation = ProductionOrderReservation::create([
+                'tenant_id' => $order->tenant_id,
+                'production_order_id' => $order->id,
+                'bom_item_id' => $bomItemId,
+                'product_id' => $productId,
+                'warehouse_id' => $warehouseId,
+                'quantity_planned' => $effectiveReservationQty,
+                'quantity_reserved' => 0.0000,
+                'quantity_issued' => 0.0000,
+                'uom_id' => $uomId,
+            ]);
+        }
+
+        // If product is semi-finished or has child BOM, explode and create reservations for child components based on shortage
+        if ($product && ($product->type === 'semi_finished' || $childBomId)) {
             $shortageQty = max(0.0, $plannedQty - $availableQty);
 
             if ($shortageQty > 0) {
@@ -696,7 +651,7 @@ class ProductionOrderService
             }
         }
 
-        return $reservation;
+        return $reservation ?? ProductionOrderReservation::where('production_order_id', $order->id)->first();
     }
 
     private function resolveReservationWarehouseId(int $tenantId, int $productId): ?int
@@ -861,8 +816,12 @@ class ProductionOrderService
             ->find($productId);
 
         if ($product && $product->type === 'semi_finished') {
-            // Always create requisition slip item for the FULL planned quantity of the semi-finished item
-            $this->createRequisitionSlipItem($slip, $productId, $plannedQty, $uomId, $warehouseId);
+            $sfgToRequest = min($plannedQty, $availableQty);
+
+            // Only create requisition slip item for available semi-finished stock in store
+            if ($sfgToRequest > 0) {
+                $this->createRequisitionSlipItem($slip, $productId, $sfgToRequest, $uomId, $warehouseId);
+            }
 
             if ($availableQty >= $plannedQty) {
                 return;
@@ -931,5 +890,235 @@ class ProductionOrderService
             'quantity_issued' => 0.0000,
             'uom_id' => $uomId,
         ]);
+    }
+
+    /**
+     * Recursively snapshot multi-level routing operations and cross-assembly dependencies into the order.
+     */
+    public function snapshotMultiLevelRoutings(
+        ProductionOrder $order,
+        ProductionBom $topBom,
+        Routing $topRouting,
+        float $orderQuantity,
+        int $tenantId,
+        ?int $userId = null
+    ): void {
+        $visited = [];
+        $createdComponentOps = [];
+        $this->buildMultiLevelSnapshot(
+            $order,
+            $topBom->product_id,
+            $topBom,
+            $topRouting,
+            $orderQuantity,
+            1, // bom_level
+            false, // is_intermediate
+            $tenantId,
+            $visited,
+            $createdComponentOps,
+            $userId
+        );
+    }
+
+    protected function buildMultiLevelSnapshot(
+        ProductionOrder $order,
+        int $productId,
+        ProductionBom $bom,
+        Routing $routing,
+        float $targetQty,
+        int $level,
+        bool $isIntermediate,
+        int $tenantId,
+        array &$visited,
+        array &$createdComponentOps,
+        ?int $userId = null
+    ): array {
+        if (isset($createdComponentOps[$productId])) {
+            return $createdComponentOps[$productId];
+        }
+
+        if (isset($visited[$productId])) {
+            throw new InvalidArgumentException("Circular dependency loop detected in BOM/Routing for product ID {$productId}.");
+        }
+        $visited[$productId] = true;
+
+        // 1. Snapshot operations for THIS routing node (FG or SFG)
+        $createdOps = [];
+        foreach ($routing->operations as $idx => $routingOp) {
+            $status = ($idx === 0) ? ProductionOrderOperation::STATUS_READY : ProductionOrderOperation::STATUS_WAITING;
+
+            $processingTime = ($routingOp->processing_time_minutes * $targetQty);
+            $totalTime = $routingOp->setup_time_minutes + $processingTime;
+
+            $op = ProductionOrderOperation::create([
+                'tenant_id' => $tenantId,
+                'production_order_id' => $order->id,
+                'routing_operation_id' => $routingOp->id,
+                'source_product_id' => $productId,
+                'source_bom_id' => $bom->id,
+                'source_routing_id' => $routing->id,
+                'bom_level' => $level,
+                'target_produced_qty' => $targetQty,
+                'is_intermediate' => $isIntermediate,
+                'quantity_claimed' => 0.0000,
+                'sequence' => $routingOp->sequence,
+                'operation_number' => $routingOp->operation_number,
+                'name' => $routingOp->name,
+                'work_center_id' => $routingOp->work_center_id,
+                'machine_id' => $routingOp->machine_id,
+                'status' => $status,
+                'setup_time_planned' => $routingOp->setup_time_minutes,
+                'processing_time_planned' => $processingTime,
+                'total_time_planned' => $totalTime,
+                'setup_time_actual' => 0.00,
+                'processing_time_actual' => 0.00,
+                'quantity_produced' => 0.0000,
+                'quantity_rejected' => 0.0000,
+                'quantity_scrapped' => 0.0000,
+                'is_external' => (bool) (($routingOp->is_external ?? false) || in_array($order->production_model, ['complete_subcontracting', 'subcontract_company_material'])),
+                'vendor_id' => $routingOp->vendor_id,
+                'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
+                'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
+                'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
+                'material_supply_type' => $routingOp->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
+                'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
+                'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
+                'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
+                'overlap_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
+                'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
+                'transfer_lag_minutes' => (int) ($routingOp->transfer_lag_minutes ?? 0),
+            ]);
+            $createdOps[] = $op;
+        }
+
+        // Bind intra-routing sequential dependencies (previous_operation_id)
+        for ($i = 1; $i < count($createdOps); $i++) {
+            $createdOps[$i]->previous_operation_id = $createdOps[$i - 1]->id;
+            $createdOps[$i]->save();
+        }
+
+        // Auto-generate Subcontract Purchase Requisitions for external operations
+        foreach ($createdOps as $createdOp) {
+            if ($createdOp->is_external) {
+                try {
+                    app(SubcontractProcurementOrchestrator::class)->generateSubcontractRequisition($createdOp, $tenantId, $userId);
+                } catch (\Throwable $e) {
+                    // Requisition fallback
+                }
+            }
+        }
+
+        // 2. Recursively inspect component BOM items for child SFGs
+        $bomBaseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
+        $multiplier = $targetQty / $bomBaseQty;
+
+        foreach ($bom->items as $item) {
+            $childProductId = $item->material_id;
+            $totalRequired = $item->quantity * $multiplier;
+            if ($item->material_scrap_percentage > 0) {
+                $totalRequired *= (1 + ($item->material_scrap_percentage / 100));
+            }
+
+            // Calculate available warehouse stock/reservation for child SFG (Clarification Rule 2)
+            $reservedStock = (float) ProductWarehouseStock::where('tenant_id', $tenantId)
+                ->where('product_id', $childProductId)
+                ->sum('reserved_qty');
+            if ($reservedStock > 0) {
+                $warehouseAvailable = $reservedStock;
+            } else {
+                $warehouseId = $this->resolveReservationWarehouseId($tenantId, $childProductId);
+                $warehouseAvailable = $warehouseId ? (float) StockService::getAvailableStock($childProductId, $warehouseId) : 0.0;
+                if ($warehouseAvailable <= 0) {
+                    $stockSum = ProductWarehouseStock::where('tenant_id', $tenantId)
+                        ->where('product_id', $childProductId)
+                        ->sum('quantity');
+                    if ($stockSum > 0) {
+                        $warehouseAvailable = (float) $stockSum;
+                    }
+                }
+            }
+
+            $netManufacturingQty = max(0.0, $totalRequired - $warehouseAvailable);
+
+            // Find child BOM and Routing if component is manufactured
+            $childBom = null;
+            if ($item->child_bom_id) {
+                $childBom = ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('id', $item->child_bom_id)
+                    ->first();
+            } else {
+                $childBom = ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_id', $childProductId)
+                    ->where('status', 'approved')
+                    ->whereIn('bom_type', ['manufacturing', 'subcontracting'])
+                    ->first();
+            }
+
+            if ($childBom && $netManufacturingQty > 0) {
+                $childRouting = Routing::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_id', $childProductId)
+                    ->where('status', 'active')
+                    ->first();
+
+                if ($childRouting && $childRouting->operations->isNotEmpty()) {
+                    // Recursively snapshot child SFG routing
+                    $childOps = $this->buildMultiLevelSnapshot(
+                        $order,
+                        $childProductId,
+                        $childBom,
+                        $childRouting,
+                        $netManufacturingQty,
+                        $level + 1,
+                        true, // is_intermediate
+                        $tenantId,
+                        $visited,
+                        $createdComponentOps,
+                        $userId
+                    );
+
+                    // Clarification Rule 1: Find the actual consuming parent operation
+                    $sfgFinalOp = end($childOps);
+
+                    $consumingParentOp = null;
+                    // Check if any operation in parent routing has explicit RoutingOperationMaterial matching childProductId
+                    foreach ($createdOps as $parentOp) {
+                        if ($parentOp->routing_operation_id) {
+                            $hasMaterial = RoutingOperationMaterial::where('routing_operation_id', $parentOp->routing_operation_id)
+                                ->where('material_id', $childProductId)
+                                ->exists();
+                            if ($hasMaterial) {
+                                $consumingParentOp = $parentOp;
+                                break;
+                            }
+                        }
+                    }
+                    // Fallback to first parent operation if no explicit mapping
+                    if (!$consumingParentOp) {
+                        $consumingParentOp = $createdOps[0] ?? null;
+                    }
+
+                    if ($sfgFinalOp && $consumingParentOp) {
+                        ProductionOrderOperationDependency::firstOrCreate(
+                            [
+                                'operation_id' => $consumingParentOp->id,
+                                'predecessor_operation_id' => $sfgFinalOp->id,
+                            ],
+                            [
+                                'tenant_id' => $tenantId,
+                                'production_order_id' => $order->id,
+                                'dependency_type' => 'cross_assembly',
+                            ]
+                        );
+                    }
+                }
+            }
+        }
+
+        $createdComponentOps[$productId] = $createdOps;
+        unset($visited[$productId]);
+        return $createdOps;
     }
 }

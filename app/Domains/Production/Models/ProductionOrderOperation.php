@@ -34,6 +34,14 @@ class ProductionOrderOperation extends BaseModel
         'production_order_id',
         'routing_operation_id',
         'previous_operation_id',
+        'source_product_id',
+        'source_bom_id',
+        'source_routing_id',
+        'bom_level',
+        'target_produced_qty',
+        'is_intermediate',
+        'quantity_claimed',
+        'quantity_consumed',
         'sequence',
         'operation_number',
         'name',
@@ -76,6 +84,11 @@ class ProductionOrderOperation extends BaseModel
 
     protected $casts = [
         'sequence'                => 'integer',
+        'bom_level'               => 'integer',
+        'target_produced_qty'     => 'float',
+        'is_intermediate'         => 'boolean',
+        'quantity_claimed'        => 'float',
+        'quantity_consumed'       => 'float',
         'setup_time_planned'      => 'float',
         'processing_time_planned' => 'float',
         'total_time_planned'      => 'float',
@@ -99,6 +112,41 @@ class ProductionOrderOperation extends BaseModel
         'quantity_transferred_out'=> 'float',
         'quantity_transferred_in' => 'float',
     ];
+
+    public function sourceProduct(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'source_product_id');
+    }
+
+    public function sourceBom(): BelongsTo
+    {
+        return $this->belongsTo(ProductionBom::class, 'source_bom_id');
+    }
+
+    public function sourceRouting(): BelongsTo
+    {
+        return $this->belongsTo(Routing::class, 'source_routing_id');
+    }
+
+    public function predecessorDependencies(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            self::class,
+            'production_order_operation_dependencies',
+            'operation_id',
+            'predecessor_operation_id'
+        )->withPivot('dependency_type')->withTimestamps();
+    }
+
+    public function successorDependencies(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            self::class,
+            'production_order_operation_dependencies',
+            'predecessor_operation_id',
+            'operation_id'
+        )->withPivot('dependency_type')->withTimestamps();
+    }
 
     public function getOverlapEnabledAttribute(): bool
     {

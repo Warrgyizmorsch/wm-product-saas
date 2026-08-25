@@ -79,12 +79,38 @@ class ProductionExecutionService
             // Prevent logging total processed quantity beyond available input WIP
             $isFirstOp = !ProductionOrderOperation::where('tenant_id', $op->tenant_id)
                 ->where('production_order_id', $op->production_order_id)
-                ->where('sequence', '<', $op->sequence)
+                ->where(function ($q) use ($op) {
+                    if ($op->previous_operation_id) {
+                        $q->where('id', $op->previous_operation_id);
+                    } else {
+                        $q->where('sequence', '<', $op->sequence)
+                          ->where(function ($w) use ($op) {
+                              if ($op->source_product_id) {
+                                  $w->where('source_product_id', $op->source_product_id);
+                              } else {
+                                  $w->whereNull('source_product_id');
+                              }
+                          });
+                    }
+                })
                 ->exists();
 
             $isFinalOp = !ProductionOrderOperation::where('tenant_id', $op->tenant_id)
                 ->where('production_order_id', $op->production_order_id)
-                ->where('sequence', '>', $op->sequence)
+                ->where(function ($q) use ($op) {
+                    $q->where('previous_operation_id', $op->id)
+                      ->orWhereHas('predecessorDependencies', fn($d) => $d->where('predecessor_operation_id', $op->id))
+                      ->orWhere(function ($sub) use ($op) {
+                          $sub->where('sequence', '>', $op->sequence)
+                              ->where(function ($w) use ($op) {
+                                  if ($op->source_product_id) {
+                                      $w->where('source_product_id', $op->source_product_id);
+                                  } else {
+                                      $w->whereNull('source_product_id');
+                                  }
+                              });
+                      });
+                })
                 ->exists();
 
             // Resolve deterministic target Production Batch
@@ -97,11 +123,36 @@ class ProductionExecutionService
 
             if ($isFirstOp) {
                 if ($newConsumed > 0 && ($orderAvailableWip <= 0 || $newConsumed > $orderAvailableWip)) {
-                    throw new InvalidArgumentException("Cannot log progress: Target production capacity of " . number_format($order->quantity_ordered, 2) . " units has already been reached for Order #{$order->order_number}.");
+                    $targetCapacity = $op->target_produced_qty > 0 ? (float) $op->target_produced_qty : (float) $order->quantity_ordered;
+                    throw new InvalidArgumentException("Cannot log progress: Target production capacity of " . number_format($targetCapacity, 2) . " units has already been reached for Order #{$order->order_number}.");
                 }
             } else {
-                if ($newConsumed > 0 && $newConsumed > $availableWip) {
-                    throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available transferred input WIP of {$availableWip} units for Batch #{$batch->batch_number}.");
+                $opFresh = $op->fresh();
+                $opWip = ProductionWip::where('tenant_id', $opFresh->tenant_id)
+                    ->where('production_order_id', $opFresh->production_order_id)
+                    ->where(function ($q) use ($opFresh) {
+                        $q->where('current_routing_operation_id', $opFresh->routing_operation_id)
+                            ->orWhere('current_routing_operation_id', $opFresh->id);
+                    })
+                    ->where('available_quantity', '>', 0)
+                    ->first();
+
+                if (!$opWip) {
+                    $opWip = ProductionWip::where('tenant_id', $opFresh->tenant_id)
+                        ->where('production_order_id', $opFresh->production_order_id)
+                        ->where(function ($q) use ($opFresh) {
+                            $q->where('current_routing_operation_id', $opFresh->routing_operation_id)
+                                ->orWhere('current_routing_operation_id', $opFresh->id);
+                        })
+                        ->first();
+                }
+                $availableWipFromWip = max(0.0, (float) ($opWip?->available_quantity ?? $opWip?->quantity_available ?? 0.0) - (float) $opFresh->quantity_produced);
+                $availableWipFromService = app(ProductionWipService::class)->getAvailableInputWip($opFresh, $batch->id);
+
+                $availableWip = max($availableWipFromWip, $availableWipFromService);
+
+                if ($produced > 0 && $produced > ($availableWip + 0.0001)) {
+                    throw new InvalidArgumentException("Cannot process {$produced} units: Exceeds available transferred input WIP of {$availableWip} units for Batch #{$batch->batch_number}.");
                 }
             }
 
@@ -162,6 +213,11 @@ class ProductionExecutionService
             $op->quantity_produced += $produced;
             $op->quantity_rejected += $rejected;
             $op->save();
+
+            // Record physical SFG consumption for cross-assembly dependencies (Rule 7 & Rule 8, F-03)
+            if ($produced > 0) {
+                app(ProductionWipService::class)->recordSfgConsumption($op, $produced, $userId, $batch->id);
+            }
 
             // 4. Update Batch actual_quantity ONLY on final routing operation (or on initial op when overproduction occurs)
             $isAlreadyCompleted = $batch->status === ProductionBatch::STATUS_COMPLETED || ($batch->actual_quantity >= $batch->planned_quantity && $batch->planned_quantity > 0);
@@ -284,11 +340,23 @@ class ProductionExecutionService
                 $op->status = ProductionOrderOperation::STATUS_COMPLETED;
                 $op->actual_end_time = now();
 
-                // Advance next sequential operation to READY
+                // Advance next sequential operation in the same routing to READY
                 $nextOp = ProductionOrderOperation::where('production_order_id', $op->production_order_id)
-                    ->where('sequence', '>', $op->sequence)
-                    ->orderBy('sequence')
+                    ->where('previous_operation_id', $op->id)
                     ->first();
+                if (!$nextOp) {
+                    $nextOp = ProductionOrderOperation::where('production_order_id', $op->production_order_id)
+                        ->where(function ($q) use ($op) {
+                            if ($op->routing_id) {
+                                $q->where('routing_id', $op->routing_id);
+                            } else {
+                                $q->where('source_product_id', $op->source_product_id);
+                            }
+                        })
+                        ->where('sequence', '>', $op->sequence)
+                        ->orderBy('sequence')
+                        ->first();
+                }
                 if ($nextOp && $nextOp->status === ProductionOrderOperation::STATUS_WAITING) {
                     $nextOp->status = ProductionOrderOperation::STATUS_READY;
                     $nextOp->save();
@@ -310,14 +378,15 @@ class ProductionExecutionService
                         'last_paused_at' => null,
                     ]);
 
-                    // Also advance the NEXT sequential schedule operation to READY!
-                    $nextSchedOp = \App\Domains\Production\Models\ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                        ->where('sequence', '>', $schedOp->sequence)
-                        ->orderBy('sequence')
-                        ->first();
-                    if ($nextSchedOp && $nextSchedOp->status === \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_WAITING) {
-                        $nextSchedOp->status = \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_READY;
-                        $nextSchedOp->save();
+                    // Also advance the NEXT sequential schedule operation in the same routing to READY!
+                    if ($nextOp) {
+                        $nextSchedOp = \App\Domains\Production\Models\ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                            ->where('production_order_operation_id', $nextOp->id)
+                            ->first();
+                        if ($nextSchedOp && $nextSchedOp->status === \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_WAITING) {
+                            $nextSchedOp->status = \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_READY;
+                            $nextSchedOp->save();
+                        }
                     }
                 }
             } else {
