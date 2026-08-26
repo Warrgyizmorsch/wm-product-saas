@@ -320,6 +320,29 @@ class ProductionOrder extends BaseModel
 
     public function isHybrid(): bool
     {
-        return $this->production_model === self::MODEL_HYBRID;
+        return $this->effective_production_model === self::MODEL_HYBRID;
+    }
+
+    public function getEffectiveProductionModelAttribute(): string
+    {
+        if ($this->production_model && $this->production_model !== self::MODEL_PURE_MANUFACTURING) {
+            return $this->production_model;
+        }
+
+        $ops = $this->relationLoaded('operations') ? $this->operations : $this->operations()->get();
+        if (!$ops || $ops->isEmpty()) {
+            return $this->production_model ?? self::MODEL_PURE_MANUFACTURING;
+        }
+
+        $hasExt = $ops->contains('is_external', true);
+        $hasInt = $ops->contains('is_external', false);
+
+        if ($hasExt && $hasInt) {
+            return self::MODEL_HYBRID;
+        } elseif ($hasExt && !$hasInt) {
+            return self::MODEL_SUBCONTRACT_COMPANY_MATERIAL;
+        }
+
+        return self::MODEL_PURE_MANUFACTURING;
     }
 }

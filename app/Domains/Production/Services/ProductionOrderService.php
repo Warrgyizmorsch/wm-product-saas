@@ -135,13 +135,13 @@ class ProductionOrderService
                 $createdOps[$i]->save();
             }
 
-            // Auto-generate Subcontract Purchase Requisitions for external operations
+            // Auto-orchestrate Subcontract Procurement according to tenant settings (Manual PR/PO, Auto Draft PO, Auto Approved PO)
             foreach ($createdOps as $createdOp) {
                 if ($createdOp->is_external) {
                     try {
-                        app(SubcontractProcurementOrchestrator::class)->generateSubcontractRequisition($createdOp, $order->tenant_id, $userId);
+                        app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($createdOp, $order->tenant_id, $userId);
                     } catch (\Throwable $e) {
-                        // Requisition fallback
+                        // Procurement orchestration fallback
                     }
                 }
             }
@@ -345,42 +345,55 @@ class ProductionOrderService
      */
     public function release(int $id, ?int $userId = null, bool $force = false): void
     {
-        $order = $this->orderRepository->find($id);
-        abort_if(!$order, 404, 'Production Order not found.');
+        try {
+            $order = $this->orderRepository->find($id);
+            abort_if(!$order, 404, 'Production Order not found.');
 
-        if (! $order->isDraft()) {
-            throw new InvalidArgumentException('Only draft orders can be released.');
-        }
+            if ($order->status !== ProductionOrder::STATUS_DRAFT) {
+                throw new InvalidArgumentException('Only draft orders can be released.');
+            }
 
-        if (!$force) {
-            $latestSlip = $order->requisitionSlips()->latest('id')->first();
-            if ($latestSlip) {
-                $slipStatusLower = strtolower($latestSlip->status ?? '');
-                $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
+            if (!$force) {
+                $latestSlip = $order->requisitionSlips()->latest('id')->first();
+                if ($latestSlip) {
+                    $slipStatusLower = strtolower($latestSlip->status ?? '');
+                    $hasIssuedMaterial = in_array($slipStatusLower, ['fully issued', 'partially issued', 'completed', 'issued', 'partial']);
 
-                if (!$hasIssuedMaterial) {
-                    throw new InvalidArgumentException('Cannot release order: Raw materials must be fully or partially issued by the store department first.');
+                    if (!$hasIssuedMaterial) {
+                        throw new InvalidArgumentException('Cannot release order: Raw materials must be fully or partially issued by the store department first.');
+                    }
                 }
             }
+
+            $order->status = ProductionOrder::STATUS_RELEASED;
+            $order->released_by = $userId;
+            $order->released_at = now();
+            $order->save();
+
+            // Initialize Work-in-Progress (WIP) tracking
+            app(ProductionWipService::class)->initializeWip($order->id, null, $userId);
+
+            // Orchestrate subcontract procurement for external operations
+            $externalOps = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $order->id)
+                ->where('is_external', true)
+                ->get();
+
+            foreach ($externalOps as $externalOp) {
+                app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($externalOp, $order->tenant_id, $userId);
+            }
+
+            app(ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type' => 'Order Released',
+                'title' => 'Production Order Released',
+                'description' => "Production order {$order->order_number} released to the shop floor.",
+                'severity' => 'success',
+                'event_source' => 'ProductionOrderService',
+                'triggered_by' => $userId,
+            ]);
+        } catch (\Throwable $e) {
+            dd("RELEASE_EXCEPTION", $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
         }
-
-        $order->status = ProductionOrder::STATUS_RELEASED;
-        $order->released_by = $userId;
-        $order->released_at = now();
-        $order->save();
-
-        // Initialize Work-in-Progress (WIP) tracking
-        app(ProductionWipService::class)->initializeWip($order->id, null, $userId);
-
-        app(ProductionEventService::class)->writeEvent($order->tenant_id, [
-            'production_order_id' => $order->id,
-            'event_type' => 'Order Released',
-            'title' => 'Production Order Released',
-            'description' => "Production order {$order->order_number} released to the shop floor.",
-            'severity' => 'success',
-            'event_source' => 'ProductionOrderService',
-            'triggered_by' => $userId,
-        ]);
     }
 
     /**
@@ -566,7 +579,7 @@ class ProductionOrderService
         float $plannedQty,
         int $uomId,
         ?int $childBomId = null
-    ): ProductionOrderReservation {
+    ): ?ProductionOrderReservation {
         // Prevent duplicate reservation if already created for this order & product
         $existingRes = ProductionOrderReservation::where('production_order_id', $order->id)
             ->where('product_id', $productId)
@@ -997,13 +1010,13 @@ class ProductionOrderService
             $createdOps[$i]->save();
         }
 
-        // Auto-generate Subcontract Purchase Requisitions for external operations
+        // Auto-orchestrate Subcontract Procurement according to tenant settings (Manual PR/PO, Auto Draft PO, Auto Approved PO)
         foreach ($createdOps as $createdOp) {
             if ($createdOp->is_external) {
                 try {
-                    app(SubcontractProcurementOrchestrator::class)->generateSubcontractRequisition($createdOp, $tenantId, $userId);
+                    app(SubcontractProcurementOrchestrator::class)->orchestrateSubcontractProcurement($createdOp, $tenantId, $userId);
                 } catch (\Throwable $e) {
-                    // Requisition fallback
+                    // Procurement orchestration fallback
                 }
             }
         }

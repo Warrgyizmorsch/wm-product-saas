@@ -579,6 +579,9 @@
                                     <span class="fs-12 text-muted">Turnkey procurement, vendor dispatches, GRN receipts, quality clearance, and subcontract costing.</span>
                                 </div>
                                 <div class="d-flex gap-2">
+                                     <x-ui.button href="{{ route('production.subcontract.delivery-challans.index') }}" variant="outline-info" size="sm" icon="feather-truck me-1">
+                                         Delivery Challans
+                                     </x-ui.button>
                                     @if($canPurchase && \Illuminate\Support\Facades\Route::has('purchase.orders.index'))
                                         <x-ui.button href="{{ route('purchase.orders.index') }}" variant="outline-primary" size="sm" icon="feather-shopping-cart me-1">
                                             Purchase Orders
@@ -597,7 +600,7 @@
                                 <div class="col-md-3">
                                     <div class="card shadow-sm border p-3 bg-light h-100">
                                         <span class="fs-11 text-uppercase text-muted fw-bold">Subcontract Model</span>
-                                        <div class="fs-14 fw-bold text-dark mt-1">{{ str_replace('_', ' ', ucfirst($order->production_model ?? 'subcontract')) }}</div>
+                                        <div class="fs-14 fw-bold text-dark mt-1">{{ str_replace('_', ' ', ucfirst($order->effective_production_model ?? $order->production_model ?? 'subcontract')) }}</div>
                                         <small class="text-muted fs-11 mt-1">{{ $order->operations->where('is_external', true)->count() }} outsourced step(s)</small>
                                     </div>
                                 </div>
@@ -723,15 +726,32 @@
                                                          @endif
                                                     </td>
                                                     <td class="align-top fs-11 font-monospace">
-                                                        <div>Disp: {{ $plannedDispatch }} <small class="text-muted">({{ $actualDispatch }})</small></div>
-                                                        <div>Ret: {{ $expectedReturn }} <small class="text-muted">({{ $actualReturn }})</small></div>
+                                                         @php
+                                                             $expectedReturnDate = $order->start_date ? \Carbon\Carbon::parse($order->start_date)->addDays(($extOp->subcontract_lead_time_days ?? 0) + ($extOp->return_buffer_days ?? 0)) : null;
+                                                             $isOverdue = $expectedReturnDate && $expectedReturnDate->isPast() && !in_array($extOp->status, ['completed', 'cancelled']);
+                                                             $isDueToday = $expectedReturnDate && $expectedReturnDate->isToday() && !in_array($extOp->status, ['completed', 'cancelled']);
+                                                         @endphp
+                                                         <div>Disp: {{ $plannedDispatch }} <small class="text-muted">({{ $actualDispatch }})</small></div>
+                                                         <div>Ret: {{ $expectedReturn }} <small class="text-muted">({{ $actualReturn }})</small></div>
+                                                         @if($isOverdue)
+                                                             <span class="badge bg-danger text-white fs-10 mt-1" title="Vendor return date exceeded expected lead time"><i class="feather-alert-circle me-1"></i>Overdue</span>
+                                                         @elseif($isDueToday)
+                                                             <span class="badge bg-warning text-dark fs-10 mt-1" title="Vendor return expected today"><i class="feather-clock me-1"></i>Due Today</span>
+                                                         @elseif($extOp->status === 'completed')
+                                                             <span class="badge bg-soft-success text-success fs-10 mt-1"><i class="feather-check-circle me-1"></i>On Time</span>
+                                                         @endif
                                                     </td>
                                                     <td class="align-top fs-11">
-                                                        <div>Req: <strong>{{ number_format($order->quantity_ordered, 2) }}</strong> | Rec: <strong class="text-success">{{ number_format($receivedQty, 2) }}</strong></div>
-                                                        <div>At Vendor: <strong class="text-warning">{{ number_format($atVendorQty, 2) }}</strong> | QC Pend: <strong class="text-info">{{ number_format($qcPending, 2) }}</strong></div>
-                                                        @if($rejectedQty > 0 || $scrappedQty > 0)
-                                                            <div class="text-danger fs-10">Rej: {{ number_format($rejectedQty, 2) }} | Scrap: {{ number_format($scrappedQty, 2) }}</div>
-                                                        @endif
+                                                         <div>Req: <strong>{{ number_format($order->quantity_ordered, 2) }}</strong> | Rec: <strong class="text-success">{{ number_format($receivedQty, 2) }} / {{ number_format($order->quantity_ordered, 2) }}</strong></div>
+                                                         <div>At Vendor: <strong class="text-warning">{{ number_format($atVendorQty, 2) }}</strong> | QC Pend: <strong class="text-info">{{ number_format($qcPending, 2) }}</strong></div>
+                                                         @if($receivedQty > 0 && $receivedQty < $order->quantity_ordered)
+                                                             <div class="badge bg-soft-warning text-warning-emphasis border border-warning fs-10 mt-1">
+                                                                 Partial Receipt: {{ number_format($receivedQty, 0) }}/{{ number_format($order->quantity_ordered, 0) }} units
+                                                             </div>
+                                                         @endif
+                                                         @if($rejectedQty > 0 || $scrappedQty > 0)
+                                                             <div class="text-danger fs-10 fw-bold mt-1">Accepted: {{ number_format($receivedQty - $rejectedQty, 2) }} | Rej: {{ number_format($rejectedQty, 2) }} | Scrap: {{ number_format($scrappedQty, 2) }}</div>
+                                                         @endif
                                                     </td>
                                                     <td class="align-top font-monospace fw-bold text-end">
                                                         {{ format_currency($extOp->subcontract_cost_per_unit * $order->quantity_ordered) }}
@@ -1189,11 +1209,41 @@
                                                 @endif
                                                 @if($op->is_external)
                                                     <span class="badge bg-soft-warning text-dark border border-warning ms-1"><i class="feather-external-link me-1"></i>Subcontract</span>
+                                                    @if($op->purchaseOrder)
+                                                        @if($op->purchaseOrder->status === 'Approved')
+                                                            <a href="{{ route('purchase.orders.show', $op->purchaseOrder->id) }}" class="badge bg-soft-success text-success border border-success-subtle text-decoration-none ms-1" title="Subcontract PO Approved">
+                                                                <i class="feather-check-circle me-1"></i>PO Approved (#{{ $op->purchaseOrder->purchase_order_number }})
+                                                            </a>
+                                                        @else
+                                                            <a href="{{ route('purchase.orders.show', $op->purchaseOrder->id) }}" class="badge bg-soft-info text-info border border-info-subtle text-decoration-none ms-1" title="Subcontract PO {{ $op->purchaseOrder->status }}">
+                                                                <i class="feather-file-text me-1"></i>PO {{ $op->purchaseOrder->status }} (#{{ $op->purchaseOrder->purchase_order_number }})
+                                                            </a>
+                                                        @endif
+                                                    @endif
                                                     @if(($op->material_supply_type ?? 'company_supplied') === 'company_supplied')
                                                         <div class="mt-1">
-                                                            <a href="{{ route('inventory.transfers.create', ['production_order_id' => $order->id, 'vendor_id' => $op->vendor_id]) }}" class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 text-decoration-none" title="Generate Subcontract Material Delivery Challan / Gate Pass to Vendor">
-                                                                <i class="feather-truck me-1"></i>Dispatch Material (Delivery Challan)
-                                                            </a>
+                                                            @php
+                                                                $existingChallan = $op->latestDeliveryChallan;
+                                                            @endphp
+                                                            @if($existingChallan)
+                                                                @if($existingChallan->status === 'draft')
+                                                                    <a href="{{ route('production.subcontract.delivery-challans.show', $existingChallan->id) }}" class="badge bg-soft-warning text-dark border border-warning fs-10 text-decoration-none" title="Draft Gate Pass pending dispatch">
+                                                                        <i class="feather-clock me-1"></i>Draft Gate Pass (#{{ $existingChallan->challan_number }})
+                                                                    </a>
+                                                                @elseif($existingChallan->status === 'dispatched')
+                                                                    <a href="{{ route('production.subcontract.delivery-challans.show', $existingChallan->id) }}" class="badge bg-soft-info text-info border border-info-subtle fs-10 text-decoration-none" title="Material Dispatched to Vendor">
+                                                                        <i class="feather-truck me-1"></i>Dispatched (#{{ $existingChallan->challan_number }})
+                                                                    </a>
+                                                                @else
+                                                                    <a href="{{ route('production.subcontract.delivery-challans.show', $existingChallan->id) }}" class="badge bg-soft-success text-success border border-success-subtle fs-10 text-decoration-none" title="Delivery Challan Completed">
+                                                                        <i class="feather-check-circle me-1"></i>Challan Completed (#{{ $existingChallan->challan_number }})
+                                                                    </a>
+                                                                @endif
+                                                            @else
+                                                                <a href="{{ route('production.subcontract.delivery-challans.create', ['production_order_id' => $order->id, 'operation_id' => $op->id]) }}" class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 text-decoration-none" title="Generate Subcontract Material Delivery Challan / Gate Pass to Vendor">
+                                                                    <i class="feather-truck me-1"></i>Dispatch Material (Delivery Challan)
+                                                                </a>
+                                                            @endif
                                                         </div>
                                                     @endif
                                                 @endif
@@ -1302,13 +1352,15 @@
                                                     <span class="badge bg-primary text-white">Ready</span>
                                                 @elseif($op->status === 'running')
                                                     <span class="badge bg-info text-white">Running</span>
+                                                @elseif($op->status === 'vendor_dispatched')
+                                                    <span class="badge bg-soft-info text-info border border-info-subtle"><i class="feather-truck me-1"></i>At Vendor (Dispatched)</span>
                                                 @elseif($op->status === 'paused')
                                                     <span class="badge bg-warning text-dark">Paused</span>
                                                 @elseif($op->status === 'completed')
                                                     <span
                                                         class="badge bg-success text-white">{{ __('production.completed') }}</span>
                                                 @else
-                                                    <span class="badge bg-light text-dark">{{ $op->status }}</span>
+                                                    <span class="badge bg-light text-dark">{{ ucfirst(str_replace('_', ' ', $op->status)) }}</span>
                                                 @endif
 
                                                 @if($op->scheduleOperation && ($op->scheduleOperation->status === 'running' || $op->scheduleOperation->status === 'paused'))

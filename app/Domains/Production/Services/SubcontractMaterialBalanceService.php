@@ -34,7 +34,7 @@ class SubcontractMaterialBalanceService
 
         // Outflows to Subcontractor Warehouse linked to this order/operation
         $sentQty = (float) StockTransaction::where('tenant_id', $tenantId)
-            ->where('reference_type', 'StockTransfer')
+            ->whereIn('reference_type', ['StockTransfer', 'DeliveryChallan'])
             ->where('reference_id', $op->production_order_id)
             ->where('type', 'OUT')
             ->sum('quantity');

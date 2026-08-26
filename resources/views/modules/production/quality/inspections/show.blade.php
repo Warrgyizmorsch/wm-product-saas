@@ -13,11 +13,42 @@
 @section('content')
     <div class="erp-single-panel bg-white">
 
+        {{-- Subcontract Operational Linkage Card --}}
+        @php
+            $subOp = $inspection->productionOrderOperation;
+            $subMo = $inspection->productionOrder ?? $subOp?->order;
+            $vendor = $subOp?->vendor;
+        @endphp
+        @if($subOp && $subOp->is_external)
+            <div class="card border border-info bg-soft-info p-3 mb-4 rounded-3">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                        <span class="badge bg-info text-white font-monospace fs-10 mb-1">Subcontract Vendor Receipt Inspection</span>
+                        <h6 class="fw-bold text-dark mb-1">
+                            Vendor: <span class="text-primary">{{ $vendor?->name ?? 'Subcontract Vendor' }}</span>
+                            @if($subMo)
+                                | MO: <a href="{{ route('production.orders.show', $subMo->id) }}" class="fw-bold text-primary">{{ $subMo->order_number }}</a>
+                            @endif
+                            | Op: <span class="font-monospace fw-bold">{{ $subOp->operation_number }} — {{ $subOp->name }}</span>
+                        </h6>
+                        <div class="fs-12 text-muted">
+                            Sample Inspected: <strong>{{ number_format($inspection->sample_size ?? 0, 0) }} units</strong> | 
+                            Passed: <strong class="text-success">{{ number_format($inspection->passed_qty ?? 0, 0) }}</strong> | 
+                            Failed/Rejected: <strong class="text-danger">{{ number_format($inspection->failed_qty ?? 0, 0) }}</strong>
+                        </div>
+                    </div>
+                    @if($subMo)
+                        <a href="{{ route('production.orders.show', $subMo->id) }}" class="btn btn-sm btn-outline-primary shadow-sm"><i class="feather-external-link me-1"></i>View Production Order</a>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         {{-- Detail Header --}}
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <div>
                 <h4 class="fw-bold text-dark mb-1">Inspection Checklist #{{ $inspection->id }}</h4>
-                <div class="text-muted fs-12">Quality Plan Template: <strong class="text-dark">{{ $inspection->plan->name }}</strong></div>
+                <div class="text-muted fs-12">Quality Plan Template: <strong class="text-dark">{{ $inspection->plan?->name ?? 'Default Plan' }}</strong></div>
             </div>
             <div>
                 <span class="badge bg-soft-primary text-primary px-3 py-1.5 rounded-pill text-uppercase">{{ $inspection->stage }}</span>

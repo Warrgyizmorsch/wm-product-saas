@@ -506,41 +506,20 @@ class BatchProductionService
         $orderId = $operation->production_order_id;
         $opProductId = $operation->source_product_id ?? $operation->order?->product_id;
 
-        // Determine if initial routing operation for this product routing
+        // Determine if initial routing operation for this production order
         $isFirstOp = !\App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
-            ->where(function ($q) use ($operation, $opProductId) {
-                if ($operation->routing_id) {
-                    $q->where('routing_id', $operation->routing_id);
-                } else {
-                    $q->where('source_product_id', $opProductId);
-                }
-            })
             ->where('sequence', '<', $operation->sequence)
             ->exists();
 
         $prevOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
-            ->where(function ($q) use ($operation, $opProductId) {
-                if ($operation->routing_id) {
-                    $q->where('routing_id', $operation->routing_id);
-                } else {
-                    $q->where('source_product_id', $opProductId);
-                }
-            })
             ->where('sequence', '<', $operation->sequence)
             ->orderBy('sequence', 'desc')
             ->first();
 
         $nextOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
-            ->where(function ($q) use ($operation, $opProductId) {
-                if ($operation->routing_id) {
-                    $q->where('routing_id', $operation->routing_id);
-                } else {
-                    $q->where('source_product_id', $opProductId);
-                }
-            })
             ->where('sequence', '>', $operation->sequence)
             ->orderBy('sequence', 'asc')
             ->first();
@@ -610,23 +589,28 @@ class BatchProductionService
             $rejectedAtOp = max($reworkAtOp, $logRejectedAtOp);
             $pendingRejectedAtOp = max(0.0, $rejectedAtOp - $reworkCompletedAtOp - $reworkFailedScrappedAtOp);
 
-            // Transferred IN into current operation's routing_operation_id
-            $transferredIn = (float) $batchWip->where('to_operation_id', $operation->routing_operation_id)
-                ->where('transaction_type', 'transferred')
+            $opRoutingId = (int) ($operation->routing_operation_id ?? $operation->id);
+            $transferredIn = (float) $batchWip
+                ->filter(fn($w) => (int) $w->to_operation_id === $opRoutingId && $w->transaction_type === 'transferred')
                 ->sum('quantity');
 
-            if ($prevOp && $transferredIn <= 0) {
-                // Good output produced at previous operation in same routing for this batch is available input
-                $reworkCompletedAtPrev = (float) $batchWip->where('from_operation_id', $prevOp->routing_operation_id)
-                    ->where('transaction_type', 'rework_completed')
+            $prevOverlap = (bool) ($prevOp?->queue_threshold_enabled ?? $prevOp?->overlap_enabled ?? false);
+            if ($prevOp && $transferredIn <= 0 && $prevOverlap) {
+                $prevRoutingId = (int) ($prevOp->routing_operation_id ?? $prevOp->id);
+                $reworkCompletedAtPrev = (float) $batchWip
+                    ->filter(fn($w) => (int) $w->from_operation_id === $prevRoutingId && $w->transaction_type === 'rework_completed')
                     ->sum('quantity');
                 $goodAtPrevOp = (float) $batchLogs->where('operation_id', $prevOp->id)->sum('quantity_produced') + $reworkCompletedAtPrev;
-                $transferredIn = max($transferredIn, $goodAtPrevOp);
+                
+                $transferThreshold = (float) ($prevOp->transfer_batch_quantity > 0 ? $prevOp->transfer_batch_quantity : 0);
+                if ($transferThreshold <= 0 || $goodAtPrevOp >= $transferThreshold || $prevOp->status === \App\Domains\Production\Models\ProductionOrderOperation::STATUS_COMPLETED) {
+                    $transferredIn = max($transferredIn, $goodAtPrevOp);
+                }
             }
 
             // Transferred OUT from current operation to successor OR converted to Finished Goods
-            $transferredOut = (float) $batchWip->where('from_operation_id', $operation->routing_operation_id)
-                ->whereIn('transaction_type', ['transferred', 'converted_to_finished_goods'])
+            $transferredOut = (float) $batchWip
+                ->filter(fn($w) => (int) $w->from_operation_id === $opRoutingId && in_array($w->transaction_type, ['transferred', 'converted_to_finished_goods'], true))
                 ->sum('quantity');
 
             // If final operation, also sum finished goods conversion transactions for this batch

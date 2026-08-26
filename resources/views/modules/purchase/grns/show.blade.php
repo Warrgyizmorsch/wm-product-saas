@@ -207,7 +207,26 @@
         <div class="col-12">
             <!-- Toast Notifications -->
 
-            @if($grn->status === 'Approved')
+            @php
+                $hasSubcontractItem = $grn->items ? $grn->items->contains(function($i) {
+                    return !empty($i->purchaseOrderItem?->production_order_operation_id) 
+                        || strtolower($i->product?->item_type ?? '') === 'service' 
+                        || strtolower($i->product?->type ?? '') === 'service';
+                }) : false;
+            @endphp
+
+            @if($hasSubcontractItem)
+                <div class="alert alert-info border-0 shadow-sm d-flex align-items-center justify-content-between mb-4">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="feather-info fs-18 text-info"></i>
+                        <div>
+                            <strong class="text-dark">Service Receipt — No Physical Inventory</strong>
+                            <div class="fs-12 text-muted">This receipt processes outsourced subcontract operations or service products without increasing physical warehouse stock count.</div>
+                        </div>
+                    </div>
+                    <span class="badge bg-info text-white font-monospace fs-11 px-3 py-1.5">Subcontract Receipt</span>
+                </div>
+            @elseif($grn->status === 'Approved')
                 <div class="alert alert-success d-flex align-items-center mb-4 border-0 shadow-sm">
                     <div class="d-flex align-items-center gap-2">
                         <i class="feather-check-circle fs-18 text-success"></i>

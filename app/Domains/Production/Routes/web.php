@@ -50,6 +50,22 @@ Route::prefix('production')
         // ── Main Dashboard ────────────────────────────────────────────────────
         Route::get('dashboard', [ProductionDashboardController::class, 'index'])->name('dashboard');
 
+        // ── Tenant Subcontract Settings ───────────────────────────────────────
+        Route::get('settings', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'index'])->name('settings.index');
+        Route::post('settings/subcontract', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'updateSubcontract'])->name('settings.subcontract.update');
+
+        // ── Subcontract Analytics & Vendor SLA ──────────────────────────────
+        Route::get('subcontract/analytics', [\App\Domains\Production\Controllers\SubcontractAnalyticsController::class, 'index'])->name('subcontract.analytics');
+
+        // ── Subcontract Delivery Challans (Gate Pass) ─────────────────────────
+        Route::get('subcontract/delivery-challans', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'index'])->name('subcontract.delivery-challans.index');
+        Route::get('subcontract/delivery-challans/create', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'create'])->name('subcontract.delivery-challans.create');
+        Route::get('subcontract/delivery-challans/check-stock', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'checkStock'])->name('subcontract.delivery-challans.check-stock');
+        Route::post('subcontract/delivery-challans', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'store'])->name('subcontract.delivery-challans.store');
+        Route::get('subcontract/delivery-challans/{challan}', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'show'])->name('subcontract.delivery-challans.show');
+        Route::get('subcontract/delivery-challans/{challan}/print', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'print'])->name('subcontract.delivery-challans.print');
+        Route::post('subcontract/delivery-challans/{challan}/dispatch', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'dispatch'])->name('subcontract.delivery-challans.dispatch');
+
         // ── Import/Export (Centralized Master Data) ───────────────────────────
         Route::get('import-export/download-template/{type}', [ProductionImportExportController::class, 'downloadTemplate'])
             ->name('import-export.download-template');
