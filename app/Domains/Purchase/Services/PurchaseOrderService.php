@@ -90,6 +90,8 @@ class PurchaseOrderService
                 'discount_type' => $discountType,
                 'tax_type' => $taxType,
                 'gst_type' => $gstType,
+                'freight_terms' => $validated['freight_terms'] ?? 'to_pay',
+                'freight_amount' => (float)($validated['freight_amount'] ?? 0),
                 'subtotal' => $subtotal,
                 'discount_amount' => $discountAmount,
                 'cgst_amount' => $cgstAmount,
