@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Purchase\Events\BillPosted;
 use Illuminate\Support\Facades\Log;
 
@@ -13,6 +14,7 @@ class PostPurchaseBillJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly PostingFailureRecorder $failures,
     ) {
     }
 
@@ -33,10 +35,12 @@ class PostPurchaseBillJournal
             $purchaseExpense = $this->accounts->findByCode('5900', $tenantId);
 
             if (!$accountsPayable || (!$inventory && !$purchaseExpense) || ((float) $bill->tax_amount > 0 && !$inputGst)) {
-                Log::warning('PostPurchaseBillJournal: missing chart of accounts, skipping auto-post', [
+                $message = 'Missing chart of accounts (Accounts Payable/Inventory/Expense/Input GST), skipping auto-post';
+                Log::warning("PostPurchaseBillJournal: {$message}", [
                     'bill_id' => $bill->id,
                     'tenant_id' => $tenantId,
                 ]);
+                $this->failures->record($tenantId, BillPosted::class, $bill, $message);
                 return;
             }
 
@@ -64,10 +68,12 @@ class PostPurchaseBillJournal
 
             if ($goodsSubtotal > 0) {
                 if (!$inventory) {
-                    Log::warning('PostPurchaseBillJournal: missing Inventory (1200) account, skipping auto-post', [
+                    $message = 'Missing Inventory (1200) account, skipping auto-post';
+                    Log::warning("PostPurchaseBillJournal: {$message}", [
                         'bill_id' => $bill->id,
                         'tenant_id' => $tenantId,
                     ]);
+                    $this->failures->record($tenantId, BillPosted::class, $bill, $message);
                     return;
                 }
                 $lines[] = [
@@ -79,10 +85,12 @@ class PostPurchaseBillJournal
 
             if ($serviceSubtotal > 0) {
                 if (!$purchaseExpense) {
-                    Log::warning('PostPurchaseBillJournal: missing Expense (5900) account, skipping auto-post', [
+                    $message = 'Missing Expense (5900) account, skipping auto-post';
+                    Log::warning("PostPurchaseBillJournal: {$message}", [
                         'bill_id' => $bill->id,
                         'tenant_id' => $tenantId,
                     ]);
+                    $this->failures->record($tenantId, BillPosted::class, $bill, $message);
                     return;
                 }
                 $lines[] = [
@@ -119,6 +127,7 @@ class PostPurchaseBillJournal
                 'bill_id' => $bill->id,
                 'error' => $e->getMessage(),
             ]);
+            $this->failures->record($bill->tenant_id, BillPosted::class, $bill, $e->getMessage());
         }
     }
 }

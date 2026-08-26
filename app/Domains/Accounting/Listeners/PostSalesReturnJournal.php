@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Sales\Events\SalesReturnApproved;
 use Illuminate\Support\Facades\Log;
 
@@ -13,6 +14,7 @@ class PostSalesReturnJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly PostingFailureRecorder $failures,
     ) {
     }
 
@@ -49,10 +51,12 @@ class PostSalesReturnJournal
             $igstAccount = $this->accounts->findByCode('2100', $tenantId);
 
             if (!$accountsReceivable || !$salesReturnAccount) {
-                Log::warning('PostSalesReturnJournal: missing chart of accounts, skipping auto-post', [
+                $message = 'Missing chart of accounts (Accounts Receivable/Sales Returns/Sales Revenue), skipping auto-post';
+                Log::warning("PostSalesReturnJournal: {$message}", [
                     'sales_return_id' => $salesReturn->id,
                     'tenant_id'       => $tenantId,
                 ]);
+                $this->failures->record($tenantId, SalesReturnApproved::class, $salesReturn, $message);
                 return;
             }
 
@@ -197,6 +201,7 @@ class PostSalesReturnJournal
                 'sales_return_id' => $salesReturn->id,
                 'error'           => $e->getMessage(),
             ]);
+            $this->failures->record($tenantId, SalesReturnApproved::class, $salesReturn, $e->getMessage());
         }
     }
 }

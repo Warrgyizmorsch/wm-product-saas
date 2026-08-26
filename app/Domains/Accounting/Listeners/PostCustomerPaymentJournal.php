@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Sales\Events\CustomerPaymentReceived;
 use Illuminate\Support\Facades\Log;
 
@@ -13,6 +14,7 @@ class PostCustomerPaymentJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly PostingFailureRecorder $failures,
     ) {
     }
 
@@ -42,10 +44,12 @@ class PostCustomerPaymentJournal
             $creditAccount = $this->accounts->findByCode($creditCode, $payment->tenant_id);
 
             if (!$bank || !$creditAccount) {
-                Log::warning('PostCustomerPaymentJournal: missing chart of accounts, skipping auto-post', [
+                $message = 'Missing chart of accounts (Bank/Accounts Receivable/Customer Advances), skipping auto-post';
+                Log::warning("PostCustomerPaymentJournal: {$message}", [
                     'payment_id' => $payment->id,
                     'tenant_id' => $payment->tenant_id,
                 ]);
+                $this->failures->record($payment->tenant_id, CustomerPaymentReceived::class, $payment, $message);
 
                 return;
             }
@@ -74,6 +78,7 @@ class PostCustomerPaymentJournal
                 'payment_id' => $payment->id,
                 'error' => $e->getMessage(),
             ]);
+            $this->failures->record($payment->tenant_id, CustomerPaymentReceived::class, $payment, $e->getMessage());
         }
     }
 }

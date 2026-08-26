@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Inventory\Events\StockOutflowRecorded;
 use Illuminate\Support\Facades\Log;
 
@@ -13,6 +14,7 @@ class PostCogsJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly PostingFailureRecorder $failures,
     ) {
     }
 
@@ -39,10 +41,12 @@ class PostCogsJournal
             $inventory = $this->accounts->findByCode('1200', $transaction->tenant_id);
 
             if (!$cogs || !$inventory) {
-                Log::warning('PostCogsJournal: missing chart of accounts, skipping auto-post', [
+                $message = 'Missing chart of accounts (COGS/Inventory), skipping auto-post';
+                Log::warning("PostCogsJournal: {$message}", [
                     'stock_transaction_id' => $transaction->id,
                     'tenant_id' => $transaction->tenant_id,
                 ]);
+                $this->failures->record($transaction->tenant_id, StockOutflowRecorded::class, $transaction, $message);
 
                 return;
             }
@@ -71,6 +75,7 @@ class PostCogsJournal
                 'stock_transaction_id' => $transaction->id,
                 'error' => $e->getMessage(),
             ]);
+            $this->failures->record($transaction->tenant_id, StockOutflowRecorded::class, $transaction, $e->getMessage());
         }
     }
 }

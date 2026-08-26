@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\Accounting\Controllers\AccountingPeriodController;
+use App\Domains\Accounting\Controllers\AccountingPostingFailureController;
 use App\Domains\Accounting\Controllers\ApAgingController;
 use App\Domains\Accounting\Controllers\ArAgingController;
 use App\Domains\Accounting\Controllers\BalanceSheetController;
@@ -48,6 +49,10 @@ Route::prefix('accounting')
         Route::get('reports/profit-loss', [ProfitLossController::class, 'index'])->name('reports.profit-loss');
         Route::get('reports/ar-aging', [ArAgingController::class, 'index'])->name('reports.ar-aging');
         Route::get('reports/ap-aging', [ApAgingController::class, 'index'])->name('reports.ap-aging');
+
+        Route::get('posting-failures', [AccountingPostingFailureController::class, 'index'])->name('posting-failures.index');
+        Route::post('posting-failures/{failure}/retry', [AccountingPostingFailureController::class, 'retry'])->name('posting-failures.retry');
+        Route::post('posting-failures/{failure}/dismiss', [AccountingPostingFailureController::class, 'dismiss'])->name('posting-failures.dismiss');
 
         foreach (VoucherType::ALL as $voucherType) {
             Route::prefix("vouchers/{$voucherType}")

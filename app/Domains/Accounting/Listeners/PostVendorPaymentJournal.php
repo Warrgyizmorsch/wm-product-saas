@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Purchase\Events\VendorPaymentRecorded;
 use Illuminate\Support\Facades\Log;
 
@@ -13,6 +14,7 @@ class PostVendorPaymentJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly PostingFailureRecorder $failures,
     ) {
     }
 
@@ -33,10 +35,12 @@ class PostVendorPaymentJournal
             $debitAccount = $this->accounts->findByCode($debitCode, $payment->tenant_id);
 
             if (!$paymentAccount || !$debitAccount) {
-                Log::warning('PostVendorPaymentJournal: missing chart of accounts, skipping auto-post', [
+                $message = 'Missing chart of accounts (Bank/Cash/Accounts Payable/Advance to Suppliers), skipping auto-post';
+                Log::warning("PostVendorPaymentJournal: {$message}", [
                     'payment_id' => $payment->id,
                     'tenant_id' => $payment->tenant_id,
                 ]);
+                $this->failures->record($payment->tenant_id, VendorPaymentRecorded::class, $payment, $message);
                 return;
             }
 
@@ -71,6 +75,7 @@ class PostVendorPaymentJournal
                 'payment_id' => $payment->id,
                 'error' => $e->getMessage(),
             ]);
+            $this->failures->record($payment->tenant_id, VendorPaymentRecorded::class, $payment, $e->getMessage());
         }
     }
 }

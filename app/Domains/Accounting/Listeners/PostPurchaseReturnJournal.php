@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Purchase\Events\PurchaseReturnApproved;
 use Illuminate\Support\Facades\Log;
 
@@ -13,6 +14,7 @@ class PostPurchaseReturnJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly PostingFailureRecorder $failures,
     ) {
     }
 
@@ -41,10 +43,12 @@ class PostPurchaseReturnJournal
             $inventory = $this->accounts->findByCode('1200', $tenantId);
 
             if (!$accountsPayable || !$inventory) {
-                Log::warning('PostPurchaseReturnJournal: missing chart of accounts, skipping auto-post', [
+                $message = 'Missing chart of accounts (Accounts Payable/Inventory), skipping auto-post';
+                Log::warning("PostPurchaseReturnJournal: {$message}", [
                     'purchase_return_id' => $return->id,
                     'tenant_id' => $tenantId,
                 ]);
+                $this->failures->record($tenantId, PurchaseReturnApproved::class, $return, $message);
                 return;
             }
 
@@ -74,6 +78,7 @@ class PostPurchaseReturnJournal
                 'purchase_return_id' => $return->id,
                 'error' => $e->getMessage(),
             ]);
+            $this->failures->record($tenantId, PurchaseReturnApproved::class, $return, $e->getMessage());
         }
     }
 }
