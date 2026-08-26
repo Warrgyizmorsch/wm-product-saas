@@ -41,18 +41,28 @@ class SubcontractProcurementOrchestrator
             $existingPr = PurchaseRequisition::where('tenant_id', $tenantId)
                 ->whereIn('source_type', ['mo', 'ProductionOrder'])
                 ->where('source_id', $order->id)
+                ->where('notes', 'like', "%Op #{$op->sequence}%")
                 ->first();
+
+            if (!$existingPr) {
+                $existingPr = PurchaseRequisition::where('tenant_id', $tenantId)
+                    ->whereIn('source_type', ['mo', 'ProductionOrder'])
+                    ->where('source_id', $order->id)
+                    ->first();
+            }
 
             if ($existingPr) {
                 return $existingPr;
             }
+
+            $serviceNote = "Subcontract Service — Op #{$op->sequence} {$op->name} for Order #{$order->order_number} ({$order->product?->name})";
 
             // Create Requisition via standard PurchaseRequisitionService
             $payload = [
                 'requisition_date' => now()->toDateString(),
                 'source_type' => 'mo',
                 'production_order_id' => $order->id,
-                'notes' => "Subcontract PR for Order #{$order->order_number}, Op #{$op->sequence} ({$op->name})",
+                'notes' => $serviceNote,
                 'items' => [
                     [
                         'product_id' => $productId,
@@ -63,12 +73,6 @@ class SubcontractProcurementOrchestrator
             ];
 
             $pr = $this->prService->storeRequisition($payload, $tenantId);
-
-            // Attach production operation reference to PR item
-            PurchaseRequisitionItem::where('purchase_requisition_id', $pr->id)
-                ->update([
-                    'sales_order_item_id' => $order->sales_order_id ? null : null,
-                ]);
 
             return $pr;
         });

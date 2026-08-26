@@ -165,19 +165,49 @@ class PurchaseRequisitionRepository
                     $product = $item->product;
                     $vendor = null;
 
-                    if ($product->preferred_vendor_id) {
-                        $vendor = $product->vendor;
-                    } else {
-                        $lastPoItem = PurchaseOrderItem::where('tenant_id', $tenantId)
-                            ->where('product_id', $product->id)
-                            ->whereHas('order', function ($q) {
-                                $q->where('status', 'Approved');
-                            })
-                            ->with('order.vendor')
-                            ->orderBy('id', 'desc')
-                            ->first();
+                    // Detect if this PR is for a Subcontract Service Operation
+                    $isSubcontract = false;
+                    $opSeq = null;
+                    $opName = null;
+                    $orderNum = null;
+                    $opId = null;
 
-                        $vendor = $lastPoItem?->order?->vendor;
+                    if (in_array($pr->source_type, ['mo', 'ProductionOrder']) && $pr->source_id) {
+                        $order = \App\Domains\Production\Models\ProductionOrder::find($pr->source_id);
+                        if ($order) {
+                            $orderNum = $order->order_number;
+                            $extOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+                                ->where('production_order_id', $order->id)
+                                ->where('is_external', true)
+                                ->first();
+
+                            if ($extOp && ($item->product_id === $extOp->subcontract_service_product_id || str_contains((string)$pr->notes, "Op #{$extOp->sequence}") || str_contains((string)$pr->notes, 'Subcontract Service'))) {
+                                $isSubcontract = true;
+                                $opSeq = $extOp->sequence;
+                                $opName = $extOp->name;
+                                $opId = $extOp->id;
+                                if ($extOp->vendor_id) {
+                                    $vendor = \App\Domains\Inventory\Models\Vendor::find($extOp->vendor_id);
+                                }
+                            }
+                        }
+                    }
+
+                    if (!$vendor) {
+                        if ($product->preferred_vendor_id) {
+                            $vendor = $product->vendor;
+                        } else {
+                            $lastPoItem = PurchaseOrderItem::where('tenant_id', $tenantId)
+                                ->where('product_id', $product->id)
+                                ->whereHas('order', function ($q) {
+                                    $q->where('status', 'Approved');
+                                })
+                                ->with('order.vendor')
+                                ->orderBy('id', 'desc')
+                                ->first();
+
+                            $vendor = $lastPoItem?->order?->vendor;
+                        }
                     }
 
                     $pendingItems[] = [
@@ -199,6 +229,11 @@ class PurchaseRequisitionRepository
                         'vendor_id' => $vendor?->id ?? null,
                         'vendor_name' => $vendor?->name ?? 'No Supplier Assigned',
                         'vendor_code' => $vendor?->code ?? '',
+                        'is_subcontract' => $isSubcontract,
+                        'operation_sequence' => $opSeq,
+                        'operation_name' => $opName,
+                        'production_order_number' => $orderNum,
+                        'production_order_operation_id' => $opId,
                     ];
                 }
             }

@@ -141,6 +141,13 @@
                                                     <td>
                                                         <strong class="text-dark d-block fs-13">{{ $pi['product_name'] }}</strong>
                                                         <span class="badge bg-light text-muted font-monospace fs-10 px-1.5 py-0.5 border">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</span>
+                                                        @if(!empty($pi['is_subcontract']))
+                                                            <div class="mt-1">
+                                                                <span class="badge bg-soft-info text-info border border-info-subtle fs-11" title="Subcontract Processing Service Job">
+                                                                    <i class="feather-external-link me-1"></i>Subcontract Service · Op #{{ $pi['operation_sequence'] ?? 'XX' }} — {{ $pi['operation_name'] ?? 'Outsourced Process' }} · {{ $pi['production_order_number'] ?? '' }}
+                                                                </span>
+                                                            </div>
+                                                        @endif
                                                     </td>
                                                     <td>
                                                         <strong class="text-primary fs-13">{{ $pi['vendor_name'] }}</strong>
@@ -219,6 +226,13 @@
                                                     <td>
                                                         <strong class="text-dark d-block fs-13">{{ $pi['product_name'] }}</strong>
                                                         <span class="badge bg-light text-muted font-monospace fs-10 px-1.5 py-0.5 border">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</span>
+                                                        @if(!empty($pi['is_subcontract']))
+                                                            <div class="mt-1">
+                                                                <span class="badge bg-soft-info text-info border border-info-subtle fs-11" title="Subcontract Processing Service Job">
+                                                                    <i class="feather-external-link me-1"></i>Subcontract Service · Op #{{ $pi['operation_sequence'] ?? 'XX' }} — {{ $pi['operation_name'] ?? 'Outsourced Process' }} · {{ $pi['production_order_number'] ?? '' }}
+                                                                </span>
+                                                            </div>
+                                                        @endif
                                                     </td>
                                                     <td class="text-muted fst-italic">
                                                         — {{ __('purchase.no_supplier') }} —

@@ -85,7 +85,7 @@
             <h5 class="fw-bold text-dark mb-0">{{ __('production.wip_list') }}</h5>
             
             <!-- View Switcher Toggle -->
-            <div class="btn-group btn-group-sm ms-3 gap-0" role="group">
+            <div class="btn-group btn-group-sm ms-3 gap-2" role="group">
                 <a href="{{ route('production.wip.index', array_merge(request()->query(), ['view' => 'order'])) }}" 
                    class="btn {{ $viewMode === 'order' ? 'btn-primary' : 'btn-outline-secondary' }}" title="Consolidate WIP cards by Production Order">
                     <i class="feather-layers me-1"></i> By Production Order

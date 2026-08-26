@@ -378,17 +378,55 @@ class BatchProductionService
                 ->lockForUpdate()
                 ->get();
 
+            if ($allBatches->isEmpty()) {
+                $plannedForNewBatch = max($quantityProduced, $order->quantity_ordered);
+                $batchProductId = $operation->source_product_id ?? $order->product_id;
+                $newBatch = $this->createBatch(
+                    $tenantId,
+                    $order->id,
+                    $batchProductId,
+                    $plannedForNewBatch,
+                    ProductionBatch::STATUS_IN_PROGRESS,
+                    null,
+                    "Batch created for production at operation #{$operation->sequence}"
+                );
+                $newBatch->current_operation_id = $operation->id;
+                $newBatch->source_operation_id = $operation->id;
+                $newBatch->save();
+
+                return $newBatch;
+            }
+
+            $toOpIds = array_filter(array_unique([
+                $operation->id,
+                $operation->routing_operation_id,
+                $operation->routingOperation?->id,
+            ]));
+
             $eligibleBatches = [];
             foreach ($allBatches as $b) {
-                $transferredIn = \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $tenantId)
+                $txTransferredIn = (float) \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $tenantId)
                     ->where('production_order_id', $order->id)
                     ->where('production_batch_id', $b->id)
-                    ->where('to_operation_id', $operation->routing_operation_id)
+                    ->whereIn('to_operation_id', $toOpIds)
                     ->where('transaction_type', 'transferred')
                     ->sum('quantity');
 
-                $processedAtCurrentOp = \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
-                    ->where('production_batch_id', $b->id)
+                if ($txTransferredIn <= 0) {
+                    $unbatchedTx = (float) \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $tenantId)
+                        ->where('production_order_id', $order->id)
+                        ->whereNull('production_batch_id')
+                        ->whereIn('to_operation_id', $toOpIds)
+                        ->where('transaction_type', 'transferred')
+                        ->sum('quantity');
+
+                    $transferredIn = max((float) $operation->quantity_transferred_in, $unbatchedTx);
+                } else {
+                    $transferredIn = $txTransferredIn;
+                }
+
+                $processedAtCurrentOp = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
+                    ->where(fn($sub) => $sub->whereNull('production_batch_id')->orWhere('production_batch_id', $b->id))
                     ->where('operation_id', $operation->id)
                     ->sum('quantity_produced');
 
@@ -406,16 +444,8 @@ class BatchProductionService
                 throw new \InvalidArgumentException("Multiple batches have transferred WIP available at operation #{$operation->sequence}. Please explicitly select batch_id.");
             }
 
-            // Fallback: If only 1 batch exists for order, continue with it
-            if ($allBatches->count() === 1) {
-                return $allBatches->first();
-            }
-
-            if ($allBatches->isNotEmpty()) {
-                return $allBatches->first();
-            }
-
-            throw new \InvalidArgumentException("No transferred WIP available at operation #{$operation->sequence} for any batch.");
+            // Fallback: Continue with first available batch for the order
+            return $allBatches->first();
         });
     }
 
