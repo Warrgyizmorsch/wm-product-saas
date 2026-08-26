@@ -149,7 +149,7 @@ class ProductionExecutionService
                 $availableWipFromWip = max(0.0, (float) ($opWip?->available_quantity ?? $opWip?->quantity_available ?? 0.0) - (float) $opFresh->quantity_produced);
                 $availableWipFromService = app(ProductionWipService::class)->getAvailableInputWip($opFresh, $batch->id);
 
-                $availableWip = max($availableWipFromWip, $availableWipFromService);
+                $availableWip = max($availableWipFromWip, $availableWipFromService, $orderAvailableWip);
 
                 if ($produced > 0 && $produced > ($availableWip + 0.0001)) {
                     throw new InvalidArgumentException("Cannot process {$produced} units: Exceeds available transferred input WIP of {$availableWip} units for Batch #{$batch->batch_number}.");
