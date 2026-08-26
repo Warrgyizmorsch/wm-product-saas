@@ -50,6 +50,7 @@
                 ['label' => 'MRP & Shortage Analysis', 'route' => 'inventory.mrp-shortage.index'],
                 ['label' => 'Material Requests (Prod)', 'route' => 'inventory.material-requests.index'],
                 ['label' => 'Dispatch Orders', 'route' => 'inventory.dispatches.index'],
+                ['label' => 'Transporters Master', 'route' => 'sales.transporters.index'],
             ]],
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => [
                 ['label' => __('inventory.products'), 'route' => 'inventory.products.index'],
@@ -175,6 +176,9 @@
                 ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
                 ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
                 ['label' => 'Balance Sheet', 'route' => 'accounting.reports.balance-sheet'],
+                ['label' => 'Profit & Loss', 'route' => 'accounting.reports.profit-loss'],
+                ['label' => 'AR Aging', 'route' => 'accounting.reports.ar-aging'],
+                ['label' => 'AP Aging', 'route' => 'accounting.reports.ap-aging'],
             ]],
             ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],

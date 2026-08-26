@@ -16,12 +16,27 @@ class DispatchOrder extends BaseModel
     protected $fillable = [
         'tenant_id',
         'customer_id',
+        'transporter_id',
         'material_requirement_id',
         'sales_order_id',
         'dispatch_number',
         'dispatch_date',
         'carrier',
         'tracking_number',
+        'eway_bill_number',
+        'eway_bill_date',
+        'lr_number',
+        'lr_date',
+        'freight_terms',
+        'freight_amount',
+        'shipping_address',
+        'total_packages',
+        'gross_weight',
+        'net_weight',
+        'volume_cbm',
+        'gate_pass_number',
+        'pod_attachment_path',
+        'delivered_at',
         'vehicle_number',
         'driver_name',
         'driver_phone',
@@ -31,7 +46,19 @@ class DispatchOrder extends BaseModel
 
     protected $casts = [
         'dispatch_date' => 'date',
+        'eway_bill_date' => 'date',
+        'lr_date' => 'date',
+        'delivered_at' => 'datetime',
+        'freight_amount' => 'decimal:2',
+        'gross_weight' => 'decimal:3',
+        'net_weight' => 'decimal:3',
+        'volume_cbm' => 'decimal:3',
     ];
+
+    public function transporter(): BelongsTo
+    {
+        return $this->belongsTo(Transporter::class, 'transporter_id');
+    }
 
     public function materialRequirement(): BelongsTo
     {

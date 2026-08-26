@@ -115,11 +115,57 @@
                             'completed' => 'secondary',
                             default => 'primary',
                         };
+                        $readiness = app(\App\Domains\Production\Services\MesExecutionService::class)->calculateOperationReadiness($op);
                     @endphp
                     <x-ui.badge :variant="$statusVariant"
                         class="fs-13 px-3 py-2 fw-bold">{{ strtoupper($op->status) }}</x-ui.badge>
                 </div>
             </div>
+
+            {{-- F-04: Multi-Level Read-Only Readiness Panel --}}
+            @if($op->predecessorDependencies->isNotEmpty() || $op->is_intermediate)
+                <div class="card border mb-4 bg-light shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold text-dark mb-0"><i class="feather-shield text-primary me-2"></i>Multi-Level Component Execution Readiness</h6>
+                            @if($readiness['is_ready'])
+                                <span class="badge bg-soft-success text-success fw-bold px-2 py-1"><i class="feather-check-circle me-1"></i>Executable</span>
+                            @else
+                                <span class="badge bg-soft-danger text-danger fw-bold px-2 py-1"><i class="feather-alert-triangle me-1"></i>Dependency Waiting</span>
+                            @endif
+                        </div>
+                        <div class="row g-3 text-center border-top pt-2 mt-1">
+                            <div class="col-6 col-md-3">
+                                <span class="fs-11 text-muted text-uppercase d-block">Component Source</span>
+                                <strong class="text-dark fs-13">{{ $op->sourceProduct->name ?? $order->product->name }}</strong>
+                                <span class="badge bg-soft-info text-info fs-10 ms-1">Level {{ $op->bom_level ?? 1 }}</span>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <span class="fs-11 text-muted text-uppercase d-block">Max Executable Qty</span>
+                                <strong class="fs-14 text-dark font-monospace">{{ number_format($readiness['executable_qty'], 2) }}</strong>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <span class="fs-11 text-muted text-uppercase d-block">Already Claimed</span>
+                                <strong class="fs-14 text-secondary font-monospace">{{ number_format($readiness['claimed_qty'], 2) }}</strong>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <span class="fs-11 text-muted text-uppercase d-block">Remaining Executable</span>
+                                <strong class="fs-14 text-primary font-monospace">{{ number_format($readiness['remaining_executable_qty'], 2) }}</strong>
+                            </div>
+                        </div>
+                        @if(!empty($readiness['warnings']))
+                            <div class="alert alert-warning py-1.5 px-3 fs-11 mb-2 mt-3 border border-warning-subtle">
+                                <i class="feather-alert-circle me-1"></i><strong>Material Issue Pending:</strong> {{ implode(' | ', $readiness['warnings']) }}
+                            </div>
+                        @endif
+                        @if(!empty($readiness['blockers']))
+                            <div class="alert alert-danger py-1.5 px-3 fs-11 mb-0 mt-2 border border-danger-subtle">
+                                <i class="feather-alert-triangle me-1"></i><strong>Blockers:</strong> {{ implode(' | ', $readiness['blockers']) }}
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @endif
 
             {{-- Execution Controls --}}
             @if($op->is_external)
@@ -444,6 +490,27 @@
             {{-- Target Quantities --}}
             <div class="col-md-5 ps-md-4">
                 @php
+                    $opTargetQty = 0.0;
+                    if ((float) ($op->target_produced_qty ?? 0) > 0) {
+                        $opTargetQty = (float) $op->target_produced_qty;
+                    } elseif ($op->source_product_id && (int) $op->source_product_id !== (int) $order->product_id) {
+                        $bomItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $op->tenant_id)
+                            ->where('bom_id', $order->bom_id)
+                            ->where('material_id', $op->source_product_id)
+                            ->first();
+                        $ratio = ($bomItem && (float) $bomItem->quantity > 0) ? (float) $bomItem->quantity : 1.0;
+                        $opTargetQty = (float) $order->quantity_ordered * $ratio;
+                    } else {
+                        $opTargetQty = (float) $order->quantity_ordered;
+                    }
+
+                    if (isset($batchQueue['active']) && !empty($batchQueue['active'])) {
+                        $activeBatch = reset($batchQueue['active']);
+                        if ($activeBatch && (float) ($activeBatch['planned_quantity'] ?? 0) > 0) {
+                            $opTargetQty = min($opTargetQty, (float) $activeBatch['planned_quantity']);
+                        }
+                    }
+
                     $totalScrappedAtOp = max(
                         (float) ($op->quantity_scrapped ?? 0),
                         (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $op->tenant_id)
@@ -451,7 +518,7 @@
                             ->where('production_order_operation_id', $op->id)
                             ->sum('quantity')
                     );
-                    $remainingToComplete = max(0.0, (float) $order->quantity_ordered - (($op->quantity_produced ?? 0) + $totalScrappedAtOp + ($op->quantity_rejected ?? 0)));
+                    $remainingToComplete = max(0.0, $opTargetQty - (($op->quantity_produced ?? 0) + $totalScrappedAtOp + ($op->quantity_rejected ?? 0)));
                 @endphp
                 <x-ui.odoo-form-ui type="input" label="Quantity Produced" name="quantity_produced" id="producedInput"
                     inputType="number" step="0.0001" :value="$remainingToComplete" :required="true" />

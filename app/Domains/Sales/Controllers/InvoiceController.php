@@ -34,10 +34,12 @@ class InvoiceController extends Controller
     {
         $this->authorize('create', Invoice::class);
 
-        $customerId = $request->input('customer_id');
-        $mode = $request->input('mode', $customerId ? 'direct' : 'sales_order');
-        $salesOrderId = $request->input('sales_order_id');
-        $dispatchOrderId = $request->input('dispatch_order_id') ?? $request->input('dispatch_id') ?? $request->input('material_requirement_id');
+        $customerId = $request->input('customer_id') ?: $request->query('customer_id');
+        $requestedMode = $request->input('mode') ?: $request->input('amp;mode') ?: $request->query('mode') ?: $request->query('amp;mode');
+        $salesOrderId = $request->input('sales_order_id') ?: $request->input('amp;sales_order_id') ?: $request->query('sales_order_id') ?: $request->query('amp;sales_order_id');
+        $dispatchOrderId = $request->input('dispatch_order_id') ?? $request->input('dispatch_id') ?? $request->input('material_requirement_id') ?? $request->input('amp;dispatch_order_id') ?? $request->query('dispatch_order_id');
+
+        $mode = $requestedMode ?: ($customerId ? 'direct' : 'sales_order');
 
         // Fetch Sales Orders that have unbilled quantities remaining
         $allSalesOrders = SalesOrder::with(['customer', 'items.product', 'items.warehouse', 'invoices' => function($q) {
@@ -52,38 +54,26 @@ class InvoiceController extends Controller
             return ($totalOrdered - $totalInvoiced) > 0.0001;
         });
 
-        // Fetch Dispatch Orders that have unbilled quantities remaining
+        // Fetch Dispatch Orders that have status Confirmed, Shipped, Dispatched, or Delivered and have unbilled quantities remaining
         $allDispatchOrders = \App\Domains\Sales\Models\DispatchOrder::with(['salesOrder.customer', 'items.product', 'items.warehouse', 'materialRequirement'])
+            ->whereIn('status', ['Confirmed', 'Shipped', 'Dispatched', 'Delivered'])
             ->latest()->get();
 
         $dispatchOrders = $allDispatchOrders->filter(function ($do) {
             foreach ($do->items as $doItem) {
                 $doQty = floatval($doItem->quantity_dispatched > 0 ? $doItem->quantity_dispatched : $doItem->quantity_ordered);
                 
-                $cumulativeDispatched = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function($q) use ($do) {
-                    $q->where('sales_order_id', $do->sales_order_id)
-                      ->where('id', '<=', $do->id);
-                })->where(function($q) use ($doItem) {
-                    if ($doItem->material_requirement_item_id) {
-                        $q->where('material_requirement_item_id', $doItem->material_requirement_item_id);
-                    } else {
-                        $q->where('product_id', $doItem->product_id);
-                    }
-                })->sum(DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
+                $alreadyInvoiced = InvoiceItem::whereHas('invoice', function($q) use ($do) {
+                    $q->where('status', '!=', 'Cancelled')
+                      ->where(function($q2) use ($do) {
+                          $q2->where('sales_order_id', $do->sales_order_id)
+                             ->orWhere('material_requirement_id', $do->material_requirement_id);
+                      });
+                })
+                ->where('product_id', $doItem->product_id)
+                ->sum('quantity');
 
-                $mrItemId = $doItem->material_requirement_item_id;
-                $alreadyInvoiced = InvoiceItem::whereHas('invoice', fn($q) => $q->where('status', '!=', 'Cancelled')->where('sales_order_id', $do->sales_order_id))
-                    ->where(function($q) use ($mrItemId, $doItem) {
-                        if ($mrItemId) {
-                            $q->where('material_requirement_item_id', $mrItemId);
-                        } else {
-                            $q->where('product_id', $doItem->product_id);
-                        }
-                    })
-                    ->sum('quantity');
-
-                $unbilledQty = min($doQty, max(0, $cumulativeDispatched - $alreadyInvoiced));
-                if ($unbilledQty > 0.0001) {
+                if (($doQty - $alreadyInvoiced) > 0.0001) {
                     return true;
                 }
             }
@@ -115,12 +105,24 @@ class InvoiceController extends Controller
             }
         }
 
-        if ($request->input('mode') === 'dispatch' || $request->input('mode') === 'dispatch_order') {
+        if ($requestedMode === 'dispatch' || $requestedMode === 'dispatch_order') {
             $mode = 'dispatch_order';
+
+            if ($salesOrderId) {
+                $soDOs = $dispatchOrders->filter(fn($do) => $do->sales_order_id == $salesOrderId)->values();
+                $dispatchOrders = $soDOs;
+
+                if (!$dispatchOrderId && $dispatchOrders->isNotEmpty()) {
+                    $dispatchOrder = $dispatchOrders->first();
+                    if ($dispatchOrder) {
+                        $dispatchOrderId = $dispatchOrder->id;
+                    }
+                }
+            }
         }
 
         $salesOrder = $salesOrderId ? SalesOrder::with('items.product', 'items.warehouse', 'customer')->find($salesOrderId) : null;
-        if ($salesOrder && !$dispatchOrderId) {
+        if ($salesOrder && !$dispatchOrderId && $mode !== 'dispatch_order') {
             $mode = 'sales_order';
             if (!$salesOrders->contains('id', $salesOrder->id)) {
                 $salesOrders->push($salesOrder);
@@ -139,67 +141,69 @@ class InvoiceController extends Controller
         }
 
         $invoiceItems = [];
-        if ($dispatchOrder) {
-            foreach ($dispatchOrder->items as $doItem) {
-                $soItem = $salesOrder?->items->firstWhere('product_id', $doItem->product_id);
-                $dispatchedQty = floatval($doItem->quantity_dispatched > 0 ? $doItem->quantity_dispatched : $doItem->quantity_ordered);
+        if ($mode === 'dispatch_order') {
+            if ($dispatchOrder) {
+                foreach ($dispatchOrder->items as $doItem) {
+                    $soItem = $salesOrder?->items->firstWhere('product_id', $doItem->product_id);
+                    $dispatchedQty = floatval($doItem->quantity_dispatched > 0 ? $doItem->quantity_dispatched : $doItem->quantity_ordered);
 
-                $cumulativeDispatched = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function($q) use ($dispatchOrder) {
-                    $q->where('sales_order_id', $dispatchOrder->sales_order_id)
-                      ->where('id', '<=', $dispatchOrder->id);
-                })->where(function($q) use ($doItem) {
-                    if ($doItem->material_requirement_item_id) {
-                        $q->where('material_requirement_item_id', $doItem->material_requirement_item_id);
-                    } else {
-                        $q->where('product_id', $doItem->product_id);
-                    }
-                })->sum(DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
-
-                $mrItemId = $doItem->material_requirement_item_id;
-                $alreadyInvoiced = InvoiceItem::whereHas('invoice', fn($q) => $q->where('status', '!=', 'Cancelled')->where('sales_order_id', $dispatchOrder->sales_order_id))
-                    ->where(function($q) use ($mrItemId, $doItem) {
-                        if ($mrItemId) {
-                            $q->where('material_requirement_item_id', $mrItemId);
+                    $cumulativeDispatched = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function($q) use ($dispatchOrder) {
+                        $q->where('sales_order_id', $dispatchOrder->sales_order_id)
+                          ->where('id', '<=', $dispatchOrder->id);
+                    })->where(function($q) use ($doItem) {
+                        if ($doItem->material_requirement_item_id) {
+                            $q->where('material_requirement_item_id', $doItem->material_requirement_item_id);
                         } else {
                             $q->where('product_id', $doItem->product_id);
                         }
-                    })
-                    ->sum('quantity');
+                    })->sum(DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
 
-                $unbilledQty = min($dispatchedQty, max(0, $cumulativeDispatched - $alreadyInvoiced));
-                if ($unbilledQty <= 0.0001) {
-                    continue; // Skip items already fully invoiced
+                    $mrItemId = $doItem->material_requirement_item_id;
+                    $alreadyInvoiced = InvoiceItem::whereHas('invoice', fn($q) => $q->where('status', '!=', 'Cancelled')->where('sales_order_id', $dispatchOrder->sales_order_id))
+                        ->where(function($q) use ($mrItemId, $doItem) {
+                            if ($mrItemId) {
+                                $q->where('material_requirement_item_id', $mrItemId);
+                            } else {
+                                $q->where('product_id', $doItem->product_id);
+                            }
+                        })
+                        ->sum('quantity');
+
+                    $unbilledQty = min($dispatchedQty, max(0, $cumulativeDispatched - $alreadyInvoiced));
+                    if ($unbilledQty <= 0.0001) {
+                        continue; // Skip items already fully invoiced
+                    }
+
+                    $unitPrice = $soItem ? floatval($soItem->unit_price) : floatval($doItem->product?->selling_price ?? 0);
+                    $taxRate = $soItem ? floatval($soItem->tax_rate) : 0.0;
+                    $discount = $soItem ? floatval($soItem->discount) : 0.0;
+
+                    $subtotal = $unbilledQty * $unitPrice;
+                    $discountAmt = $discount;
+                    $taxable = max(0, $subtotal - $discountAmt);
+                    $taxAmt = $taxable * ($taxRate / 100);
+
+                    $invoiceItems[] = [
+                        'sales_order_item_id'          => $soItem?->id,
+                        'material_requirement_item_id' => $doItem->material_requirement_item_id,
+                        'product_id'                   => $doItem->product_id,
+                        'product_name'                 => $doItem->product?->name ?? 'Item',
+                        'sku'                          => $doItem->product?->sku ?? null,
+                        'item_name'                    => $doItem->product?->name ?? 'Item',
+                        'description'                  => null,
+                        'quantity'                     => $unbilledQty,
+                        'unit_price'                   => $unitPrice,
+                        'discount'                     => $discount,
+                        'tax_rate'                     => $taxRate,
+                        'tax_amount'                   => $taxAmt,
+                        'subtotal'                     => $subtotal,
+                        'total_amount'                 => $taxable + $taxAmt,
+                        'warehouse_id'                 => $doItem->warehouse_id ?? null,
+                        'warehouse_name'               => $doItem->warehouse?->name ?? null,
+                    ];
                 }
-
-                $unitPrice = $soItem ? floatval($soItem->unit_price) : floatval($doItem->product?->selling_price ?? 0);
-                $taxRate = $soItem ? floatval($soItem->tax_rate) : 0.0;
-                $discount = $soItem ? floatval($soItem->discount) : 0.0;
-
-                $subtotal = $unbilledQty * $unitPrice;
-                $discountAmt = $discount;
-                $taxable = max(0, $subtotal - $discountAmt);
-                $taxAmt = $taxable * ($taxRate / 100);
-
-                $invoiceItems[] = [
-                    'sales_order_item_id'          => $soItem?->id,
-                    'material_requirement_item_id' => $doItem->material_requirement_item_id,
-                    'product_id'                   => $doItem->product_id,
-                    'product_name'                 => $doItem->product?->name ?? 'Item',
-                    'sku'                          => $doItem->product?->sku ?? null,
-                    'item_name'                    => $doItem->product?->name ?? 'Item',
-                    'description'                  => null,
-                    'quantity'                     => $unbilledQty,
-                    'unit_price'                   => $unitPrice,
-                    'discount'                     => $discount,
-                    'tax_rate'                     => $taxRate,
-                    'tax_amount'                   => $taxAmt,
-                    'subtotal'                     => $subtotal,
-                    'total_amount'                 => $taxable + $taxAmt,
-                    'warehouse_id'                 => $doItem->warehouse_id ?? null,
-                    'warehouse_name'               => $doItem->warehouse?->name ?? null,
-                ];
             }
-        } elseif ($salesOrder) {
+        } elseif ($mode === 'sales_order' && $salesOrder) {
             foreach ($salesOrder->items as $soItem) {
                 $orderedQty = floatval($soItem->quantity);
 
@@ -260,6 +264,8 @@ class InvoiceController extends Controller
             'invoice_date'            => ['required', 'date'],
             'due_date'                => ['required', 'date', 'after_or_equal:invoice_date'],
             'gst_type'                => ['nullable', 'string', 'in:cgst_sgst,igst'],
+            'freight_terms'           => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
+            'freight_amount'          => ['nullable', 'numeric', 'min:0'],
             'notes'                   => ['nullable', 'string'],
             'items'                   => ['required', 'array', 'min:1'],
             'items.*.sales_order_item_id'          => ['nullable', 'exists:sales_order_items,id'],
@@ -295,7 +301,10 @@ class InvoiceController extends Controller
         $discountType = $request->input('discount_type', 'without_discount');
         $gstType      = $request->input('gst_type', 'cgst_sgst');
 
-        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $taxType, $discountType, $gstType, $request) {
+        $freightTerms  = $validated['freight_terms'] ?? $salesOrder?->freight_terms ?? 'To Pay';
+        $freightAmount = floatval($validated['freight_amount'] ?? 0);
+
+        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
             $subtotal = 0;
             $taxAmount = 0;
             $discountAmount = 0;
@@ -329,20 +338,24 @@ class InvoiceController extends Controller
                 $taxAmount = 0;
             }
 
+            $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
+            $freightTax = ($effectiveFreight > 0 && $taxType !== 'without_tax') ? round($effectiveFreight * 0.18, 2) : 0;
+            $totalTaxAmount = $taxAmount + $freightTax;
+
             $cgstAmount = 0;
             $sgstAmount = 0;
             $igstAmount = 0;
 
-            if ($taxAmount > 0) {
+            if ($totalTaxAmount > 0) {
                 if ($gstType === 'igst') {
-                    $igstAmount = $taxAmount;
+                    $igstAmount = $totalTaxAmount;
                 } else {
-                    $cgstAmount = round($taxAmount / 2, 2);
-                    $sgstAmount = round($taxAmount - $cgstAmount, 2);
+                    $cgstAmount = round($totalTaxAmount / 2, 2);
+                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 2);
                 }
             }
 
-            $totalAmount = max(0, $subtotal - $discountAmount + $taxAmount);
+            $totalAmount = max(0, $subtotal - $discountAmount + $totalTaxAmount + $effectiveFreight);
 
             $invoice = Invoice::create([
                 'tenant_id'               => $tenantId,
@@ -354,12 +367,14 @@ class InvoiceController extends Controller
                 'due_date'                => $validated['due_date'],
                 'status'                  => 'Draft',
                 'subtotal'                => $subtotal,
-                'tax_amount'              => $taxAmount,
+                'tax_amount'              => $totalTaxAmount,
                 'gst_type'                => $gstType,
                 'cgst_amount'             => $cgstAmount,
                 'sgst_amount'             => $sgstAmount,
                 'igst_amount'             => $igstAmount,
                 'discount_amount'         => $discountAmount,
+                'freight_terms'           => $freightTerms,
+                'freight_amount'          => $freightAmount,
                 'total_amount'            => $totalAmount,
                 'amount_paid'             => 0,
                 'balance_due'             => $totalAmount,
@@ -438,11 +453,6 @@ class InvoiceController extends Controller
                 $remainingBalance -= $applyAmount;
             }
 
-            if ($invoice->amount_paid > 0) {
-                $invoice->status = $invoice->balance_due <= 0 ? 'Paid' : 'Partially Paid';
-                $invoice->save();
-            }
-
             return $invoice;
         });
 
@@ -488,8 +498,8 @@ class InvoiceController extends Controller
         if (!$inv) abort(404);
         $this->authorize('send', $inv);
 
-        if (!in_array($inv->status, ['Draft', 'Sent'])) {
-            return back()->withErrors(['status' => 'Only Draft invoices can be marked as Sent.']);
+        if (!in_array($inv->status, ['Draft', 'Sent', 'Posted'])) {
+            return back()->withErrors(['status' => 'Only Draft or Posted invoices can be marked as Sent.']);
         }
 
         $inv->status = 'Sent';

@@ -37,7 +37,7 @@ class SchedulePreReleaseValidationService
         $operations = ProductionScheduleOperation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('production_schedule_id', $schedule->id)
-            ->with(['workCenter', 'machine', 'orderOperation.routingOperation'])
+            ->with(['workCenter', 'machine', 'orderOperation.routingOperation', 'orderOperation.predecessorDependencies'])
             ->orderBy('sequence')
             ->get();
 
@@ -93,26 +93,83 @@ class SchedulePreReleaseValidationService
         // 2. Dependency Integrity Check
         if ($operations->count() > 1) {
             $orderQty = (float) ($schedule->order->quantity_ordered ?? 1);
-            for ($i = 0; $i < $operations->count() - 1; $i++) {
-                $curr = $operations[$i];
-                $next = $operations[$i + 1];
 
-                $earliestNextStart = $curr->planned_finish;
-                if ($curr->orderOperation) {
-                    $earliestNextStart = $this->schedulingService->calculateTransferReadyAt(
-                        $curr->orderOperation,
-                        $curr->planned_start,
-                        $orderQty
-                    );
+            $opByOrderOpId = [];
+            foreach ($operations as $op) {
+                if ($op->production_order_operation_id) {
+                    $opByOrderOpId[$op->production_order_operation_id] = $op;
+                }
+            }
+
+            foreach ($operations as $op) {
+                $orderOp = $op->orderOperation;
+                if (!$orderOp) {
+                    continue;
                 }
 
-                if ($next->planned_start->lt($earliestNextStart)) {
-                    $errors[] = [
-                        'code'         => 'DEPENDENCY_VIOLATION',
-                        'severity'     => 'error',
-                        'message'      => "Sequence {$next->sequence} starts at {$next->planned_start->toDateTimeString()}, before predecessor transfer-ready time {$earliestNextStart->toDateTimeString()}.",
-                        'operation_id' => $next->id,
-                    ];
+                $predecessorOrderOpIds = [];
+
+                if ($orderOp->previous_operation_id) {
+                    $predecessorOrderOpIds[] = $orderOp->previous_operation_id;
+                }
+
+                if ($orderOp->relationLoaded('predecessorDependencies')) {
+                    foreach ($orderOp->predecessorDependencies as $pred) {
+                        $predecessorOrderOpIds[] = $pred->id;
+                    }
+                } else {
+                    $predIds = \App\Domains\Production\Models\ProductionOrderOperationDependency::where('tenant_id', $tenantId)
+                        ->where('operation_id', $orderOp->id)
+                        ->pluck('predecessor_operation_id')
+                        ->toArray();
+                    $predecessorOrderOpIds = array_merge($predecessorOrderOpIds, $predIds);
+                }
+
+                $predecessorOrderOpIds = array_unique($predecessorOrderOpIds);
+
+                // Fallback for single-routing legacy orders where previous_operation_id is not set
+                if (empty($predecessorOrderOpIds)) {
+                    $sameRoutingPrev = $operations->filter(function ($prevOp) use ($op, $orderOp) {
+                        $prevOrderOp = $prevOp->orderOperation;
+                        if (!$prevOrderOp) return false;
+
+                        $sameSource = ($orderOp->source_routing_id && $prevOrderOp->source_routing_id)
+                            ? ($orderOp->source_routing_id === $prevOrderOp->source_routing_id)
+                            : ($orderOp->production_order_id === $prevOrderOp->production_order_id);
+
+                        return $sameSource && $prevOp->sequence < $op->sequence;
+                    })->sortByDesc('sequence')->first();
+
+                    if ($sameRoutingPrev && $sameRoutingPrev->production_order_operation_id) {
+                        $predecessorOrderOpIds[] = $sameRoutingPrev->production_order_operation_id;
+                    }
+                }
+
+                foreach ($predecessorOrderOpIds as $predOpId) {
+                    if (!isset($opByOrderOpId[$predOpId])) {
+                        continue;
+                    }
+
+                    $predSchedOp = $opByOrderOpId[$predOpId];
+                    $predOrderOp = $predSchedOp->orderOperation;
+
+                    $earliestNextStart = $predSchedOp->planned_finish;
+                    if ($predOrderOp) {
+                        $earliestNextStart = $this->schedulingService->calculateTransferReadyAt(
+                            $predOrderOp,
+                            $predSchedOp->planned_start,
+                            $orderQty
+                        );
+                    }
+
+                    if ($op->planned_start && $op->planned_start->lt($earliestNextStart)) {
+                        $errors[] = [
+                            'code'         => 'DEPENDENCY_VIOLATION',
+                            'severity'     => 'error',
+                            'message'      => "Sequence {$op->sequence} starts at {$op->planned_start->toDateTimeString()}, before predecessor transfer-ready time {$earliestNextStart->toDateTimeString()}.",
+                            'operation_id' => $op->id,
+                        ];
+                    }
                 }
             }
         }
@@ -260,20 +317,26 @@ class SchedulePreReleaseValidationService
                         continue;
                     }
 
-                    $remainingNeed = max(0.0, $required - $issued - $reserved);
                     $available = 0.0;
                     if ($res->warehouse_id) {
-                        $available = StockService::getAvailableStock($res->product_id, $res->warehouse_id);
+                        $available = (float) StockService::getAvailableStock($res->product_id, $res->warehouse_id);
+                    }
+                    if ($available <= 0) {
+                        $available = (float) \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                            ->where('product_id', $res->product_id)
+                            ->sum('quantity');
                     }
 
-                    if ($remainingNeed == 0.0 || ($reserved + $available) >= $required) {
+                    $totalAvailable = $issued + $reserved + $available;
+
+                    if ($totalAvailable >= $required || ($issued + $reserved) >= $required) {
                         $readyCount++;
-                    } elseif (($reserved + $available) > 0) {
+                    } elseif ($totalAvailable > 0) {
                         $shortageCount++;
                         $warnings[] = [
                             'code'         => 'MATERIAL_PARTIALLY_AVAILABLE',
                             'severity'     => 'warning',
-                            'message'      => "Material [{$res->product->name}] is partially available (Available: {$available}, Reserved: {$reserved}, Need: {$required}).",
+                            'message'      => "Material [{$res->product->name}] is partially available (Issued: {$issued}, Warehouse Stock: {$available}, Required: {$required}).",
                             'operation_id' => null,
                         ];
                     } else {
@@ -281,7 +344,7 @@ class SchedulePreReleaseValidationService
                         $warnings[] = [
                             'code'         => 'MATERIAL_SHORTAGE',
                             'severity'     => 'warning',
-                            'message'      => "Material shortage for [{$res->product->name}] (Required: {$required}, Available: {$available}).",
+                            'message'      => "Material shortage for [{$res->product->name}] (Required: {$required}, Issued: {$issued}, Warehouse Stock: {$available}).",
                             'operation_id' => null,
                         ];
                     }

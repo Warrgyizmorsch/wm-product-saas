@@ -18,6 +18,7 @@ use App\Domains\HRMS\Controllers\ShiftOvertimeController;
 use App\Domains\HRMS\Controllers\AttendanceController;
 use App\Domains\HRMS\Controllers\BiometricDeviceController;
 use App\Domains\HRMS\Controllers\ExpenseCategoryController;
+use App\Domains\HRMS\Controllers\ExpensePolicyController;
 use App\Domains\HRMS\Controllers\TravelExpenseController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
@@ -321,7 +322,7 @@ Route::prefix('hrms')
         Route::prefix('holidays')->group(function (): void {
             Route::get('/', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'index'])->name('holidays.index');
             Route::post('/store', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'store'])->name('holidays.store');
-            Route::post('/update/{holiday}', [\App\Domains\HolidayCalendarController::class, 'update'])->name('holidays.update');
+            Route::post('/update/{holiday}', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'update'])->name('holidays.update');
             Route::delete('/delete/{holiday}', [\App\Domains\HRMS\Controllers\HolidayCalendarController::class, 'destroy'])->name('holidays.destroy');
         });
 
@@ -379,7 +380,9 @@ Route::prefix('hrms')
             Route::get('/', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'index'])->name('payroll.index');
             Route::get('/my-salary', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'mySalary'])->name('payroll.mySalary');
             Route::post('/run/store', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'storeRun'])->name('payroll.run.store');
+            Route::post('/run/bulk-adhoc', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'storeBulkAdhoc'])->name('payroll.run.bulk-adhoc');
             Route::post('/run/{run}/lock', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'lockRun'])->name('payroll.run.lock');
+            Route::post('/run/{run}/resolve-pending', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'resolvePending'])->name('payroll.run.resolve-pending');
             Route::post('/run/{run}/release', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'releasePayouts'])->name('payroll.run.release');
             Route::post('/hold/{employee}/{month}', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'toggleHold'])->name('payroll.hold.toggle');
         });

@@ -202,9 +202,19 @@ class PurchaseRequisitionService
 
                     $isSubcontract = false;
                     $moId = null;
-                    if ($firstPrItem->requisition && $firstPrItem->requisition->source_type === 'mo') {
-                        $isSubcontract = true;
+                    $opId = null;
+                    if ($firstPrItem->requisition && in_array($firstPrItem->requisition->source_type, ['mo', 'ProductionOrder'])) {
                         $moId = $firstPrItem->requisition->source_id;
+                        if ($moId) {
+                            $extOp = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $moId)
+                                ->where('is_external', true)
+                                ->first();
+
+                            if ($extOp || str_contains((string)$firstPrItem->requisition->notes, 'Subcontract Service') || str_contains((string)$firstPrItem->requisition->notes, 'Subcontract PR')) {
+                                $isSubcontract = true;
+                                $opId = $extOp?->id;
+                            }
+                        }
                     }
 
                     $po = PurchaseOrder::create([
@@ -230,7 +240,7 @@ class PurchaseRequisitionService
                         'igst_amount' => 0,
                         'tax_amount' => 0,
                         'grand_total' => 0,
-                        'notes' => 'Bulk generated from Pending Requisitions.',
+                        'notes' => $isSubcontract ? 'Subcontract Service PO generated from Pending Requisitions.' : 'Bulk generated from Pending Requisitions.',
                     ]);
 
                     $subtotal = 0.0;
@@ -241,10 +251,18 @@ class PurchaseRequisitionService
                         $amount = $qty * $rate;
                         $subtotal += $amount;
 
+                        $itemOpId = $opId;
+                        if ($moId && !$itemOpId && $isSubcontract) {
+                            $itemOpId = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $moId)
+                                ->where('is_external', true)
+                                ->value('id');
+                        }
+
                         PurchaseOrderItem::create([
                             'purchase_order_id' => $po->id,
                             'product_id' => $item->product_id,
                             'production_order_id' => $moId,
+                            'production_order_operation_id' => $isSubcontract ? $itemOpId : null,
                             'requisition_item_allocations' => [
                                 [
                                     'pr_item_id' => $item->id,

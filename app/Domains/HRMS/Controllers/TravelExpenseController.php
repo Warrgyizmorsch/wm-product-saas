@@ -836,12 +836,59 @@ class TravelExpenseController extends Controller
         DB::transaction(function () use ($expenseReport, $tenantId) {
             $expenseReport->update(['status' => 'paid']);
 
-            // If an advance was associated, mark it as settled
-            if ($expenseReport->cashAdvance) {
-                $expenseReport->cashAdvance->update(['status' => 'settled']);
+            $advance = $expenseReport->cashAdvance;
+            $isAccountingChannel = ($expenseReport->payout_channel ?? 'accounting') === 'accounting';
+
+            // Recover any unspent advance surplus still sitting on the books (accounting
+            // channel only — the payroll channel already recovers surplus via a salary
+            // deduction posted at approval time, see the adhoc component created above).
+            if ($advance && $isAccountingChannel) {
+                $totalAdvance = floatval($advance->approved_amount ?? $advance->amount);
+                $approvedAmount = floatval($expenseReport->approved_amount ?? $expenseReport->total_amount);
+                $surplus = max($totalAdvance - $approvedAmount, 0.00);
+
+                if ($surplus > 0) {
+                    $advancesAccount = $this->getOrCreateAccount($tenantId, '1400', 'Loans & Advances', 'asset', 'debit', 'loans_advances');
+                    $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
+
+                    $lines = [
+                        [
+                            'chart_of_account_id' => $bankAccount->id,
+                            'debit' => $surplus,
+                            'credit' => 0.00,
+                            'description' => "Advance surplus recovered for Claim: " . $expenseReport->title
+                        ],
+                        [
+                            'chart_of_account_id' => $advancesAccount->id,
+                            'debit' => 0.00,
+                            'credit' => $surplus,
+                            'description' => "Advance surplus recovered for Claim: " . $expenseReport->title
+                        ]
+                    ];
+
+                    try {
+                        $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
+                        $journalService->post($lines, [
+                            'tenant_id' => $tenantId,
+                            'journal_date' => now(),
+                            'source' => 'expense',
+                            'reference_type' => 'ExpenseReport',
+                            'reference_id' => $expenseReport->id,
+                            'memo' => "Advance surplus recovered for Claim: " . $expenseReport->title,
+                            'posted_by' => auth()->id(),
+                        ]);
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Advance Surplus Recovery Journal Posting Failed: " . $e->getMessage());
+                    }
+                }
             }
 
-            if (($expenseReport->payout_channel ?? 'accounting') === 'accounting') {
+            // If an advance was associated, mark it as settled
+            if ($advance) {
+                $advance->update(['status' => 'settled']);
+            }
+
+            if ($isAccountingChannel) {
                 $netPayout = floatval($expenseReport->approved_net_reimbursement ?? $expenseReport->net_reimbursement);
                 if ($netPayout > 0) {
                     $payableAccount = $this->getOrCreateAccount($tenantId, '2010', 'Accounts Payable', 'liability', 'credit', 'current_liability');

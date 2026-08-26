@@ -5,6 +5,7 @@ namespace App\Domains\Sales\Controllers;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Sales\Models\DispatchOrder;
+use App\Domains\Sales\Models\Transporter;
 use App\Domains\Sales\Repositories\DispatchOrderRepository;
 use App\Domains\Sales\Services\DispatchOrderService;
 use App\Http\Controllers\Controller;
@@ -36,12 +37,22 @@ class DispatchOrderController extends Controller
         $this->authorize('create', DispatchOrder::class);
 
         $tenantId = require_tenant_id();
-        $warehouses = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get();
-        $pendingDOs = $this->dispatchRepo->getAllPendingMaterialRequirements();
-        $customers  = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->orderBy('name')->get();
-        $products   = Product::where('tenant_id', $tenantId)->with(['uom'])->orderBy('name')->get();
+        $warehouses   = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $transporters = Transporter::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
+        $pendingDOs   = $this->dispatchRepo->getAllPendingMaterialRequirements();
+        $customers    = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $products     = Product::where('tenant_id', $tenantId)->with(['uom'])->orderBy('name')->get();
 
         $mrId = $request->input('material_requirement_id') ?: $request->input('mr_id');
+        $soId = $request->input('sales_order_id') ?: $request->input('so_id');
+
+        $prefillSalesOrder = null;
+        if ($soId) {
+            $prefillSalesOrder = \App\Domains\Sales\Models\SalesOrder::find($soId);
+        } elseif ($mrId) {
+            $mr = \App\Domains\Sales\Models\MaterialRequirement::with('salesOrder')->find($mrId);
+            $prefillSalesOrder = $mr?->salesOrder;
+        }
 
         $formattedWarehouses = $warehouses->map(fn ($w) => ['id' => $w->id, 'name' => $w->name])->values()->all();
         $formattedProducts   = $products->map(fn ($p) => [
@@ -52,7 +63,7 @@ class DispatchOrderController extends Controller
             'track_batch' => (bool) $p->track_batch,
         ])->values()->all();
 
-        return view('modules.sales.dispatches.create', compact('warehouses', 'pendingDOs', 'customers', 'products', 'formattedWarehouses', 'formattedProducts', 'mrId'));
+        return view('modules.sales.dispatches.create', compact('warehouses', 'transporters', 'pendingDOs', 'customers', 'products', 'formattedWarehouses', 'formattedProducts', 'mrId', 'prefillSalesOrder'));
     }
 
     public function pendingMaterialRequirements(Request $request): JsonResponse
@@ -104,7 +115,6 @@ class DispatchOrderController extends Controller
 
         $batches = $query->orderBy('expiry_date', 'asc')->get();
 
-        // If no batches in specific warehouse, fallback to all available batches for product
         if ($batches->isEmpty() && $warehouseId) {
             $batches = \App\Domains\Inventory\Models\Batch::query()
                 ->where('tenant_id', $tenantId)
@@ -139,10 +149,23 @@ class DispatchOrderController extends Controller
         $validated = $request->validate([
             'material_requirement_id' => ['nullable', 'exists:material_requirements,id'],
             'customer_id'             => ['nullable', 'exists:customers,id'],
+            'transporter_id'          => ['nullable', 'exists:transporters,id'],
+            'carrier'                 => ['nullable', 'string', 'max:255'],
+            'tracking_number'         => ['nullable', 'string', 'max:255'],
+            'eway_bill_number'        => ['nullable', 'string', 'max:50'],
+            'eway_bill_date'          => ['nullable', 'date'],
+            'lr_number'               => ['nullable', 'string', 'max:50'],
+            'lr_date'                 => ['nullable', 'date'],
+            'freight_terms'           => ['nullable', 'string', 'max:50'],
+            'freight_amount'          => ['nullable', 'numeric', 'min:0'],
+            'shipping_address'        => ['nullable', 'string'],
+            'total_packages'          => ['nullable', 'integer', 'min:0'],
+            'gross_weight'            => ['nullable', 'numeric', 'min:0'],
+            'net_weight'              => ['nullable', 'numeric', 'min:0'],
+            'volume_cbm'              => ['nullable', 'numeric', 'min:0'],
             'vehicle_number'          => ['nullable', 'string', 'max:100'],
             'driver_name'             => ['nullable', 'string', 'max:100'],
             'driver_phone'            => ['nullable', 'string', 'max:50'],
-            'shipping_agent'          => ['nullable', 'string', 'max:100'],
             'dispatch_date'           => ['required', 'date'],
             'notes'                   => ['nullable', 'string'],
             'items'                   => ['required', 'array', 'min:1'],
@@ -183,9 +206,85 @@ class DispatchOrderController extends Controller
 
         try {
             $dispatch = $this->dispatchService->confirmDispatchOrder($dispatch);
-            return redirect()->route('sales.dispatches.show', $dispatch->id)->with('success', "Dispatch Order {$dispatch->dispatch_number} confirmed and stock deducted successfully.");
+            return redirect()->route('sales.dispatches.show', $dispatch->id)
+                ->with('success', "Dispatch Order {$dispatch->dispatch_number} confirmed and warehouse stock reserved successfully. Invoice creation is now enabled.");
         } catch (Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
+    }
+
+    public function ship(int $id): RedirectResponse
+    {
+        $dispatch = $this->dispatchRepo->find($id);
+        if (!$dispatch) abort(404);
+        $this->authorize('update', $dispatch);
+
+        try {
+            $dispatch = $this->dispatchService->shipDispatchOrder($dispatch);
+            return redirect()->route('sales.dispatches.show', $dispatch->id)
+                ->with('success', "Dispatch Order {$dispatch->dispatch_number} marked as Shipped (Gate Outward) and physical stock deducted from warehouse successfully.");
+        } catch (Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function downloadChallan(int $id)
+    {
+        $dispatch = $this->dispatchRepo->find($id);
+        if (!$dispatch) abort(404);
+        $this->authorize('view', $dispatch);
+
+        return view('modules.sales.dispatches.pdf', compact('dispatch'));
+    }
+
+    public function uploadPod(Request $request, int $id): RedirectResponse
+    {
+        $dispatch = $this->dispatchRepo->find($id);
+        if (!$dispatch) abort(404);
+        $this->authorize('update', $dispatch);
+
+        $request->validate([
+            'pod_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'delivered_at' => 'nullable|date',
+        ]);
+
+        $updateData = [
+            'delivered_at' => $request->input('delivered_at') ?: now(),
+            'status' => 'Delivered',
+        ];
+
+        if ($request->hasFile('pod_file')) {
+            $updateData['pod_attachment_path'] = $request->file('pod_file')->store('pods', 'public');
+        }
+
+        $dispatch->update($updateData);
+
+        return redirect()->route('sales.dispatches.show', $dispatch->id)
+            ->with('success', 'Dispatch Order status updated to Delivered successfully.');
+    }
+
+    public function updateTracking(Request $request, int $id): RedirectResponse
+    {
+        $dispatch = $this->dispatchRepo->find($id);
+        if (!$dispatch) abort(404);
+        $this->authorize('update', $dispatch);
+
+        $validated = $request->validate([
+            'carrier'          => 'nullable|string|max:255',
+            'tracking_number'  => 'nullable|string|max:255',
+            'vehicle_number'   => 'nullable|string|max:100',
+            'driver_name'      => 'nullable|string|max:100',
+            'driver_phone'     => 'nullable|string|max:50',
+            'eway_bill_number' => 'nullable|string|max:50',
+            'lr_number'        => 'nullable|string|max:50',
+            'lr_date'          => 'nullable|date',
+            'freight_terms'    => 'nullable|string|in:To Pay,To Be Billed,Prepaid,Customer Pickup',
+            'freight_amount'   => 'nullable|numeric|min:0',
+        ]);
+
+        $dispatch->update($validated);
+
+        return redirect()->route('sales.dispatches.show', $dispatch->id)
+            ->with('success', 'Tracking & logistics details updated successfully.');
     }
 }

@@ -5,6 +5,8 @@ namespace App\Domains\Production\Services;
 use App\Domains\Production\Models\ProductionBatch;
 use App\Domains\Production\Models\ProductionBatchGenealogy;
 use App\Domains\Production\Models\ProductionLotTrace;
+use App\Domains\Production\Models\ProductionOrder;
+use App\Domains\Production\Models\ProductionOrderOperation;
 use Illuminate\Support\Facades\DB;
 
 class BatchProductionService
@@ -28,9 +30,10 @@ class BatchProductionService
     ): ProductionBatch {
         return DB::transaction(function () use ($tenantId, $orderId, $productId, $plannedQty, $status, $expiryDate, $remarks) {
             $order = \App\Domains\Production\Models\ProductionOrder::find($orderId);
-            if ($order) {
+            if ($order && $productId === $order->product_id) {
                 $sumActivePlanned = ProductionBatch::where('tenant_id', $tenantId)
                     ->where('production_order_id', $orderId)
+                    ->where('product_id', $productId)
                     ->whereNotIn('status', [ProductionBatch::STATUS_CANCELLED])
                     ->sum('planned_quantity');
 
@@ -40,7 +43,7 @@ class BatchProductionService
                 }
             }
 
-            $batchNumber = $this->batchNumberService->generateNextNumber($tenantId, $order ?? $orderId);
+            $batchNumber = $this->batchNumberService->generateNextNumber($tenantId, $order ?? $orderId, $productId);
 
             $batch = ProductionBatch::create([
                 'tenant_id' => $tenantId,
@@ -350,10 +353,11 @@ class BatchProductionService
                     $plannedForNewBatch = $quantityProduced > 0 ? $quantityProduced : $order->quantity_ordered;
                 }
 
+                $batchProductId = $operation->source_product_id ?? $order->product_id;
                 $newBatch = $this->createBatch(
                     $tenantId,
                     $order->id,
-                    $order->product_id,
+                    $batchProductId,
                     $plannedForNewBatch,
                     ProductionBatch::STATUS_IN_PROGRESS,
                     null,
@@ -374,17 +378,55 @@ class BatchProductionService
                 ->lockForUpdate()
                 ->get();
 
+            if ($allBatches->isEmpty()) {
+                $plannedForNewBatch = max($quantityProduced, $order->quantity_ordered);
+                $batchProductId = $operation->source_product_id ?? $order->product_id;
+                $newBatch = $this->createBatch(
+                    $tenantId,
+                    $order->id,
+                    $batchProductId,
+                    $plannedForNewBatch,
+                    ProductionBatch::STATUS_IN_PROGRESS,
+                    null,
+                    "Batch created for production at operation #{$operation->sequence}"
+                );
+                $newBatch->current_operation_id = $operation->id;
+                $newBatch->source_operation_id = $operation->id;
+                $newBatch->save();
+
+                return $newBatch;
+            }
+
+            $toOpIds = array_filter(array_unique([
+                $operation->id,
+                $operation->routing_operation_id,
+                $operation->routingOperation?->id,
+            ]));
+
             $eligibleBatches = [];
             foreach ($allBatches as $b) {
-                $transferredIn = \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $tenantId)
+                $txTransferredIn = (float) \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $tenantId)
                     ->where('production_order_id', $order->id)
                     ->where('production_batch_id', $b->id)
-                    ->where('to_operation_id', $operation->routing_operation_id)
+                    ->whereIn('to_operation_id', $toOpIds)
                     ->where('transaction_type', 'transferred')
                     ->sum('quantity');
 
-                $processedAtCurrentOp = \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
-                    ->where('production_batch_id', $b->id)
+                if ($txTransferredIn <= 0) {
+                    $unbatchedTx = (float) \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $tenantId)
+                        ->where('production_order_id', $order->id)
+                        ->whereNull('production_batch_id')
+                        ->whereIn('to_operation_id', $toOpIds)
+                        ->where('transaction_type', 'transferred')
+                        ->sum('quantity');
+
+                    $transferredIn = max((float) $operation->quantity_transferred_in, $unbatchedTx);
+                } else {
+                    $transferredIn = $txTransferredIn;
+                }
+
+                $processedAtCurrentOp = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
+                    ->where(fn($sub) => $sub->whereNull('production_batch_id')->orWhere('production_batch_id', $b->id))
                     ->where('operation_id', $operation->id)
                     ->sum('quantity_produced');
 
@@ -402,16 +444,8 @@ class BatchProductionService
                 throw new \InvalidArgumentException("Multiple batches have transferred WIP available at operation #{$operation->sequence}. Please explicitly select batch_id.");
             }
 
-            // Fallback: If only 1 batch exists for order, continue with it
-            if ($allBatches->count() === 1) {
-                return $allBatches->first();
-            }
-
-            if ($allBatches->isNotEmpty()) {
-                return $allBatches->first();
-            }
-
-            throw new \InvalidArgumentException("No transferred WIP available at operation #{$operation->sequence} for any batch.");
+            // Fallback: Continue with first available batch for the order
+            return $allBatches->first();
         });
     }
 
@@ -470,27 +504,54 @@ class BatchProductionService
     ): array {
         $tenantId = $operation->tenant_id;
         $orderId = $operation->production_order_id;
+        $opProductId = $operation->source_product_id ?? $operation->order?->product_id;
 
-        // Determine if initial routing operation
+        // Determine if initial routing operation for this product routing
         $isFirstOp = !\App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
+            ->where(function ($q) use ($operation, $opProductId) {
+                if ($operation->routing_id) {
+                    $q->where('routing_id', $operation->routing_id);
+                } else {
+                    $q->where('source_product_id', $opProductId);
+                }
+            })
             ->where('sequence', '<', $operation->sequence)
             ->exists();
 
         $prevOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
+            ->where(function ($q) use ($operation, $opProductId) {
+                if ($operation->routing_id) {
+                    $q->where('routing_id', $operation->routing_id);
+                } else {
+                    $q->where('source_product_id', $opProductId);
+                }
+            })
             ->where('sequence', '<', $operation->sequence)
             ->orderBy('sequence', 'desc')
             ->first();
 
         $nextOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
+            ->where(function ($q) use ($operation, $opProductId) {
+                if ($operation->routing_id) {
+                    $q->where('routing_id', $operation->routing_id);
+                } else {
+                    $q->where('source_product_id', $opProductId);
+                }
+            })
             ->where('sequence', '>', $operation->sequence)
             ->orderBy('sequence', 'asc')
             ->first();
 
         $batches = ProductionBatch::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
+            ->where(function ($q) use ($opProductId) {
+                if ($opProductId) {
+                    $q->where('product_id', $opProductId);
+                }
+            })
             ->whereNotIn('status', [ProductionBatch::STATUS_CANCELLED, ProductionBatch::STATUS_CONSUMED])
             ->get();
 
@@ -553,6 +614,15 @@ class BatchProductionService
             $transferredIn = (float) $batchWip->where('to_operation_id', $operation->routing_operation_id)
                 ->where('transaction_type', 'transferred')
                 ->sum('quantity');
+
+            if ($prevOp && $transferredIn <= 0) {
+                // Good output produced at previous operation in same routing for this batch is available input
+                $reworkCompletedAtPrev = (float) $batchWip->where('from_operation_id', $prevOp->routing_operation_id)
+                    ->where('transaction_type', 'rework_completed')
+                    ->sum('quantity');
+                $goodAtPrevOp = (float) $batchLogs->where('operation_id', $prevOp->id)->sum('quantity_produced') + $reworkCompletedAtPrev;
+                $transferredIn = max($transferredIn, $goodAtPrevOp);
+            }
 
             // Transferred OUT from current operation to successor OR converted to Finished Goods
             $transferredOut = (float) $batchWip->where('from_operation_id', $operation->routing_operation_id)
@@ -701,5 +771,66 @@ class BatchProductionService
         }
 
         return $batch;
+    }
+
+    /**
+     * Record component consumption genealogy between parent and predecessor batch/operation. (F-03)
+     */
+    public function recordComponentConsumptionGenealogy(
+        ProductionOrder $order,
+        ProductionOrderOperation $parentOp,
+        ProductionOrderOperation $predOp,
+        float $quantity,
+        ?int $userId = null,
+        ?int $parentBatchId = null,
+        ?int $childBatchId = null
+    ): void {
+        $parentBatch = $parentBatchId
+            ? ProductionBatch::where('tenant_id', $order->tenant_id)->find($parentBatchId)
+            : ProductionBatch::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->first();
+
+        if (!$parentBatch) {
+            $parentBatch = ProductionBatch::create([
+                'tenant_id' => $order->tenant_id,
+                'production_order_id' => $order->id,
+                'batch_number' => 'BAT-' . $order->order_number . '-01',
+                'product_id' => $order->product_id,
+                'planned_quantity' => $order->quantity_ordered,
+                'status' => 'released',
+            ]);
+        }
+
+        $childBatch = $childBatchId
+            ? ProductionBatch::where('tenant_id', $order->tenant_id)->find($childBatchId)
+            : ProductionBatch::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->where('product_id', $predOp->source_product_id)
+                ->first();
+
+        if ($parentBatch) {
+            $effectiveChildBatchId = $childBatch?->id ?? $parentBatch->id;
+
+            // Prevent duplicate genealogy entries for identical consumption event (F-03)
+            $exists = ProductionBatchGenealogy::where('tenant_id', $order->tenant_id)
+                ->where('parent_batch_id', $parentBatch->id)
+                ->where('child_batch_id', $effectiveChildBatchId)
+                ->where('type', 'component_consumption')
+                ->where('quantity', $quantity)
+                ->exists();
+
+            if (!$exists) {
+                ProductionBatchGenealogy::create([
+                    'tenant_id' => $order->tenant_id,
+                    'parent_batch_id' => $parentBatch->id,
+                    'child_batch_id' => $effectiveChildBatchId,
+                    'component_product_id' => $predOp->source_product_id,
+                    'quantity' => $quantity,
+                    'type' => 'component_consumption',
+                    'recorded_by' => $userId,
+                ]);
+            }
+        }
     }
 }

@@ -108,7 +108,8 @@
                         @php
                             $badgeClass = 'bg-soft-secondary text-secondary';
                             if ($dispatch->status === 'Pending') $badgeClass = 'bg-soft-warning text-warning';
-                            elseif ($dispatch->status === 'Dispatched') $badgeClass = 'bg-soft-info text-info';
+                            elseif ($dispatch->status === 'Confirmed') $badgeClass = 'bg-soft-primary text-primary';
+                            elseif ($dispatch->status === 'Dispatched' || $dispatch->status === 'Shipped') $badgeClass = 'bg-soft-info text-info';
                             elseif ($dispatch->status === 'Delivered') $badgeClass = 'bg-soft-success text-success';
                             elseif ($dispatch->status === 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
 

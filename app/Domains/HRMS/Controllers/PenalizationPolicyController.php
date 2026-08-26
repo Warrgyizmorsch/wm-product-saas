@@ -34,18 +34,36 @@ class PenalizationPolicyController extends Controller
         $attendanceRules = \App\Domains\HRMS\Models\AttendanceRule::with(['company', 'businessUnit', 'branch'])->get();
 
         // Retrieve current tenant settings for overtime
+        $overtimeRule = $rules->get('overtime_rules');
         $tenantSettings = [
             'auto_overtime_threshold_hours' => '',
-            'overtime_rate_multiplier'      => '',
             'min_overtime_request_hours'    => '',
+            'overtime_max_monthly_hours'    => '',
+            'overtime_weekend_multiplier'   => '',
+            'overtime_holiday_multiplier'   => '',
+            'overtime_tiers'                => [],
         ];
-        $user = auth()->user();
-        if ($user && $user->tenant_id) {
-            $tenant = Tenant::find($user->tenant_id);
-            if ($tenant && is_array($tenant->settings)) {
-                $tenantSettings['auto_overtime_threshold_hours'] = isset($tenant->settings['auto_overtime_threshold_hours']) ? $tenant->settings['auto_overtime_threshold_hours'] : '';
-                $tenantSettings['overtime_rate_multiplier']      = isset($tenant->settings['overtime_rate_multiplier']) ? $tenant->settings['overtime_rate_multiplier'] : '';
-                $tenantSettings['min_overtime_request_hours']    = isset($tenant->settings['min_overtime_request_hours']) ? $tenant->settings['min_overtime_request_hours'] : '';
+        if ($overtimeRule) {
+            $settings = is_array($overtimeRule->penalty_tiers) ? $overtimeRule->penalty_tiers : [];
+            $tenantSettings['auto_overtime_threshold_hours'] = $settings['auto_overtime_threshold_hours'] ?? '';
+            $tenantSettings['min_overtime_request_hours']    = $settings['min_overtime_request_hours'] ?? '';
+            $tenantSettings['overtime_max_monthly_hours']    = $settings['overtime_max_monthly_hours'] ?? '';
+            $tenantSettings['overtime_weekend_multiplier']   = $settings['overtime_weekend_multiplier'] ?? '';
+            $tenantSettings['overtime_holiday_multiplier']   = $settings['overtime_holiday_multiplier'] ?? '';
+            $tenantSettings['overtime_tiers']                = $settings['overtime_tiers'] ?? [];
+        } else {
+            // Fallback to legacy global tenant settings
+            $user = auth()->user();
+            if ($user && $user->tenant_id) {
+                $tenant = Tenant::find($user->tenant_id);
+                if ($tenant && is_array($tenant->settings)) {
+                    $tenantSettings['auto_overtime_threshold_hours'] = $tenant->settings['auto_overtime_threshold_hours'] ?? '';
+                    $tenantSettings['min_overtime_request_hours']    = $tenant->settings['min_overtime_request_hours'] ?? '';
+                    $tenantSettings['overtime_max_monthly_hours']    = $tenant->settings['overtime_max_monthly_hours'] ?? '';
+                    $tenantSettings['overtime_weekend_multiplier']   = $tenant->settings['overtime_weekend_multiplier'] ?? '';
+                    $tenantSettings['overtime_holiday_multiplier']   = $tenant->settings['overtime_holiday_multiplier'] ?? '';
+                    $tenantSettings['overtime_tiers']                = $tenant->settings['overtime_tiers'] ?? [];
+                }
             }
         }
 
@@ -58,7 +76,7 @@ class PenalizationPolicyController extends Controller
     public function store(Request $request)
     {
         $rules = [
-            'rule_type' => 'required|in:late_arrival,under_hours,missing_logs',
+            'rule_type' => 'required|in:late_arrival,under_hours,missing_logs,overtime_rules',
             'company_id' => 'nullable|integer',
             'status' => 'required',
         ];
@@ -88,19 +106,30 @@ class PenalizationPolicyController extends Controller
             $rules['penalty_tiers.*.penalty_action'] = 'required|in:no_deduction,salary_deduction,working_hour_deduction,both_deductions';
             $rules['penalty_tiers.*.penalty_value'] = 'required|numeric|min:0';
             $rules['penalty_tiers.*.leave_type_id'] = 'nullable';
+        } elseif ($request->rule_type === 'overtime_rules') {
+            $rules['auto_overtime_threshold_hours'] = 'required_without:min_overtime_request_hours|nullable|numeric|min:0';
+            $rules['min_overtime_request_hours']    = 'required_without:auto_overtime_threshold_hours|nullable|numeric|min:0.5';
+            $rules['overtime_max_monthly_hours']    = 'nullable|numeric|min:0';
+            $rules['overtime_weekend_multiplier']   = 'nullable|numeric|min:1.0';
+            $rules['overtime_holiday_multiplier']   = 'nullable|numeric|min:1.0';
+            $rules['overtime_tiers']                = 'nullable|array';
+            $rules['overtime_tiers.*.min_hours']    = 'required|numeric|min:0';
+            $rules['overtime_tiers.*.max_hours']    = 'nullable|numeric|min:0';
+            $rules['overtime_tiers.*.multiplier']   = 'required|numeric|min:1.0';
         }
 
-        $request->validate($rules);
+        $request->validate($rules, [
+            'auto_overtime_threshold_hours.required_without' => 'Either the Auto Overtime Threshold Hours or the Minimum Overtime Request Hours must be specified.',
+            'min_overtime_request_hours.required_without' => 'Either the Auto Overtime Threshold Hours or the Minimum Overtime Request Hours must be specified.',
+        ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
-        $updateData = [
-            'status' => $status,
-        ];
+        $updateData = [];
 
         if ($request->rule_type === 'late_arrival') {
+            $updateData['status'] = $status;
             $updateData['grace_period_minutes'] = $request->grace_period_minutes ?? 0;
-            // Clean up the penalty tiers to store
             $tiers = [];
             if ($request->has('penalty_tiers') && is_array($request->penalty_tiers)) {
                 foreach ($request->penalty_tiers as $tier) {
@@ -119,9 +148,9 @@ class PenalizationPolicyController extends Controller
             $updateData['leave_type_id'] = null;
             $updateData['penalty_value'] = 0.00;
         } elseif ($request->rule_type === 'missing_logs') {
+            $updateData['status'] = $status;
             $updateData['grace_period_minutes'] = 0;
             $updateData['threshold_count'] = (int) $request->threshold_count;
-            // Clean up the penalty tiers to store (min/max occurrence-based)
             $tiers = [];
             if ($request->has('penalty_tiers') && is_array($request->penalty_tiers)) {
                 foreach ($request->penalty_tiers as $tier) {
@@ -139,9 +168,9 @@ class PenalizationPolicyController extends Controller
             $updateData['leave_type_id'] = null;
             $updateData['penalty_value'] = 0.00;
         } elseif ($request->rule_type === 'under_hours') {
+            $updateData['status'] = $status;
             $updateData['grace_period_minutes'] = (int) (floatval($request->grace_period_hours) * 60);
             $updateData['threshold_count'] = (int) $request->threshold_count;
-            // Clean up percentage-based tiers to store
             $tiers = [];
             if ($request->has('penalty_tiers') && is_array($request->penalty_tiers)) {
                 foreach ($request->penalty_tiers as $tier) {
@@ -157,6 +186,40 @@ class PenalizationPolicyController extends Controller
             $updateData['penalty_action'] = 'salary_deduction';
             $updateData['leave_type_id'] = null;
             $updateData['penalty_value'] = 0.00;
+        } elseif ($request->rule_type === 'overtime_rules') {
+            $tiers = [];
+            if ($request->has('overtime_tiers') && is_array($request->overtime_tiers)) {
+                foreach ($request->overtime_tiers as $tier) {
+                    $min = (isset($tier['min_hours']) && $tier['min_hours'] !== '') ? (float) $tier['min_hours'] : 0.0;
+                    $max = (isset($tier['max_hours']) && $tier['max_hours'] !== '') ? (float) $tier['max_hours'] : null;
+                    $mult = (isset($tier['multiplier']) && $tier['multiplier'] !== '') ? (float) $tier['multiplier'] : 1.0;
+                    $tiers[] = [
+                        'min_hours'  => $min,
+                        'max_hours'  => $max,
+                        'multiplier' => $mult
+                    ];
+                }
+            } else {
+                $tiers = [
+                    ['min_hours' => 0, 'max_hours' => 2, 'multiplier' => 1.5],
+                    ['min_hours' => 2, 'max_hours' => null, 'multiplier' => 2.0]
+                ];
+            }
+
+            $updateData = [
+                'status' => $status,
+                'penalty_tiers' => [
+                    'auto_overtime_threshold_hours' => $request->auto_overtime_threshold_hours !== '' && $request->auto_overtime_threshold_hours !== null ? (float) $request->auto_overtime_threshold_hours : null,
+                    'min_overtime_request_hours'    => $request->min_overtime_request_hours !== '' && $request->min_overtime_request_hours !== null ? (float) $request->min_overtime_request_hours : null,
+                    'overtime_max_monthly_hours'    => $request->overtime_max_monthly_hours !== '' && $request->overtime_max_monthly_hours !== null ? (float) $request->overtime_max_monthly_hours : null,
+                    'overtime_weekend_multiplier'   => $request->overtime_weekend_multiplier !== '' && $request->overtime_weekend_multiplier !== null ? (float) $request->overtime_weekend_multiplier : null,
+                    'overtime_holiday_multiplier'   => $request->overtime_holiday_multiplier !== '' && $request->overtime_holiday_multiplier !== null ? (float) $request->overtime_holiday_multiplier : null,
+                    'overtime_tiers'                => $tiers,
+                ],
+                'penalty_action' => 'earning',
+                'leave_type_id' => null,
+                'penalty_value' => 0.00,
+            ];
         }
 
         // Find or create rule setting for this type and company scoping

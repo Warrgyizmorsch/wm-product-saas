@@ -1,4 +1,4 @@
-@extends('layouts.duralux')
+ @extends('layouts.duralux')
 
 @section('title', 'Create Dispatch Order | SaaS ERP')
 @section('page-title', 'Create Dispatch Order')
@@ -53,26 +53,7 @@
                     </div>
                 </div>
 
-                <!-- Dispatch Mode Switcher Bar -->
-                <div class="mb-4 bg-light p-3 rounded border">
-                    <label class="form-label fw-bold fs-11 text-uppercase text-muted d-block mb-2">Dispatch Creation Mode:</label>
-                    <div class="d-flex gap-4 flex-wrap align-items-center">
-                        <div class="form-check">
-                            <input class="form-check-input mode-radio" type="radio" name="dispatch_mode" id="mode_mr" value="mr" checked autocomplete="off">
-                            <label class="form-check-label fw-bold text-dark fs-13" for="mode_mr">
-                                <i class="feather-truck me-1 text-primary"></i>Against Material Requirement
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input mode-radio" type="radio" name="dispatch_mode" id="mode_direct" value="direct" autocomplete="off">
-                            <label class="form-check-label fw-bold text-dark fs-13" for="mode_direct">
-                                <i class="feather-plus-circle me-1 text-success"></i>Direct Dispatch (Over-The-Counter Outward)
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MR Selection Banner (MR Mode) -->
+                <!-- MR Selection Banner (Against Material Requirement) -->
                 <div id="mrBanner" class="d-flex align-items-center justify-content-between gap-3 mb-4 p-3 bg-light rounded border">
                     <div>
                         <span class="d-block fs-12 text-muted">Material Requirement Reference:</span>
@@ -84,34 +65,39 @@
                     </x-ui.button>
                 </div>
 
-                <!-- Direct Mode Customer Dropdown (Direct Mode) -->
-                <div id="customerSelectCol" class="mb-4 p-3 bg-light rounded border" style="display: none;">
-                    <div class="row align-items-center">
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="select" label="Customer Name (Optional)" name="customer_id" id="customerSelect" class="odoo-select2">
-                                <option value="">— Direct / Walk-in Customer —</option>
-                                @foreach($customers as $c)
-                                    <option value="{{ $c->id }}" @selected(old('customer_id') == $c->id)>
-                                        {{ $c->name }} {{ $c->code ? "({$c->code})" : '' }}
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        </div>
-                        <div class="col-md-6 text-md-end">
-                            <span class="badge bg-soft-success text-success fs-12 p-2">
-                                <i class="feather-check-circle me-1"></i>Direct Outward Mode Active
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Header Details Section -->
                 <div class="row g-4 mb-4 fs-13 text-dark">
                     <div class="col-md-6 border-end pe-md-4">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-calendar me-2"></i>Dispatch & Logistics Details</h6>
                         <x-ui.odoo-form-ui type="input" inputType="date" label="Dispatch Date" name="dispatch_date" :value="old('dispatch_date', now()->toDateString())" :required="true" />
-                        <x-ui.odoo-form-ui type="input" label="Carrier / Courier Partner" name="carrier" :value="old('carrier')" placeholder="e.g. Blue Dart, DHL, Professional Courier" />
-                        <x-ui.odoo-form-ui type="input" label="Tracking / Docket Number" name="tracking_number" :value="old('tracking_number')" placeholder="AWB or tracking reference" />
+                        
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label mb-0 fw-bold fs-12 text-muted">TRANSPORTER MASTER</label>
+                                <button type="button" class="btn btn-xs btn-link text-primary p-0 text-decoration-none fw-semibold" data-bs-toggle="modal" data-bs-target="#quickTransporterModal">
+                                    <i class="feather-plus-circle me-1"></i>Quick Add
+                                </button>
+                            </div>
+                            <select name="transporter_id" id="transporterSelect" class="form-select odoo-select2">
+                                <option value="">— Select Transporter —</option>
+                                @foreach($transporters as $t)
+                                    <option value="{{ $t->id }}" data-id="{{ $t->transporter_id }}" data-gstin="{{ $t->gstin }}" @selected(old('transporter_id') == $t->id)>
+                                        {{ $t->name }} {{ $t->transporter_id ? "({$t->transporter_id})" : ($t->gstin ? "({$t->gstin})" : '') }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <x-ui.odoo-form-ui type="input" label="Carrier / Courier Partner" name="carrier" id="carrierInput" :value="old('carrier')" placeholder="e.g. Blue Dart, DHL, Professional Courier" />
+
+                        <x-ui.odoo-form-ui type="select" label="Freight Terms" name="freight_terms" id="freightTermsSelect">
+                            <option value="To Pay" @selected(old('freight_terms', $prefillSalesOrder?->freight_terms ?? 'To Pay') == 'To Pay')>To Pay (Freight Collect by Driver from Customer)</option>
+                            <option value="To Be Billed" @selected(old('freight_terms', $prefillSalesOrder?->freight_terms ?? '') == 'To Be Billed')>To Be Billed (Prepaid & Added to Invoice)</option>
+                            <option value="Prepaid" @selected(old('freight_terms', $prefillSalesOrder?->freight_terms ?? '') == 'Prepaid')>Prepaid (Freight Included / Seller Paid)</option>
+                            <option value="Customer Pickup" @selected(old('freight_terms', $prefillSalesOrder?->freight_terms ?? '') == 'Customer Pickup')>Customer Pickup (Self Vehicle)</option>
+                        </x-ui.odoo-form-ui>
+
+                        <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', $prefillSalesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
                     </div>
 
                     <div class="col-md-6 ps-md-4">
@@ -120,6 +106,11 @@
                         <x-ui.odoo-form-ui type="input" label="Driver Name" name="driver_name" :value="old('driver_name')" placeholder="Driver's full name" />
                         <x-ui.odoo-form-ui type="input" label="Driver Phone Number" name="driver_phone" :value="old('driver_phone')" placeholder="e.g. +91 98765 43210" />
                     </div>
+                </div>
+
+                <!-- Shipping Address Section -->
+                <div class="mb-4">
+                    <x-ui.odoo-form-ui type="textarea" label="Delivery / Shipping Address (Ship-To Destination)" name="shipping_address" rows="2" placeholder="Enter delivery location / destination address if different from default billing address...">{{ old('shipping_address') }}</x-ui.odoo-form-ui>
                 </div>
 
                 <!-- Line Items Matrix Section -->
@@ -163,12 +154,6 @@
                         </x-ui.odoo-form-ui>
                     </div>
 
-                    <!-- Add a line button outside table (Matching Sales Orders & Quotations UI) -->
-                    <div class="mt-3" id="directAddContainer" style="display: none;">
-                        <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addDirectItemBtn" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
-                            <i class="feather-plus me-1"></i>Add a line
-                        </button>
-                    </div>
                 </div>
 
                 <!-- Internal Notes -->
@@ -203,12 +188,84 @@
             <x-ui.button type="button" variant="light" class="border" data-bs-dismiss="modal">Cancel</x-ui.button>
         </x-slot:footer>
     </x-ui.modal>
+    <!-- Quick Transporter Add Modal Component -->
+    <x-ui.modal id="quickTransporterModal" title="Add Transporter Master" size="md" :centered="true">
+        <form id="quickTransporterForm">
+            @csrf
+            <div class="mb-3">
+                <label class="form-label fw-semibold fs-12 text-dark mb-1">Transporter Name <span class="text-danger">*</span></label>
+                <input type="text" name="name" class="form-control form-control-sm" placeholder="e.g. Blue Dart Express, V-Trans" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold fs-12 text-dark mb-1">15-Digit Transporter ID (E-Way Bill)</label>
+                <input type="text" name="transporter_id" class="form-control form-control-sm font-monospace" placeholder="Optional 15-digit E-Way ID">
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold fs-12 text-dark mb-1">GSTIN Number</label>
+                <input type="text" name="gstin" class="form-control form-control-sm font-monospace text-uppercase" placeholder="Optional 15-digit GSTIN">
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold fs-12 text-dark mb-1">Phone Number</label>
+                <input type="text" name="phone" class="form-control form-control-sm" placeholder="Contact number">
+            </div>
+            <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="saveQuickTransporterBtn">Save Transporter</button>
+            </div>
+        </form>
+    </x-ui.modal>
 @endsection
 
 @push('scripts')
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Quick Transporter AJAX Store
+        $('#quickTransporterForm').on('submit', function(e) {
+            e.preventDefault();
+            const $btn = $('#saveQuickTransporterBtn');
+            $btn.prop('disabled', true).text('Saving...');
+
+            $.ajax({
+                url: "{{ route('sales.transporters.quick-create') }}",
+                type: "POST",
+                data: $(this).serialize(),
+                success: function(response) {
+                    $btn.prop('disabled', false).text('Save Transporter');
+                    if (response.success && response.transporter) {
+                        const t = response.transporter;
+                        const labelText = t.name + (t.transporter_id ? ` (${t.transporter_id})` : (t.gstin ? ` (${t.gstin})` : ''));
+                        const newOpt = new Option(labelText, t.id, true, true);
+                        $('#transporterSelect').append(newOpt).trigger('change');
+                        
+                        // Auto-fill Carrier input if empty
+                        if (!$('#carrierInput').val()) {
+                            $('#carrierInput').val(t.name);
+                        }
+
+                        const modalEl = document.getElementById('quickTransporterModal');
+                        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                        if (modalInstance) modalInstance.hide();
+                        $('#quickTransporterForm')[0].reset();
+                    }
+                },
+                error: function(err) {
+                    $btn.prop('disabled', false).text('Save Transporter');
+                    alert('Error saving transporter: ' + (err.responseJSON?.message || 'Invalid data'));
+                }
+            });
+        });
+
         const warehouses = @json($formattedWarehouses);
         const productsList = @json($formattedProducts);
 
@@ -244,153 +301,9 @@
             if (saveButtonFooter) saveButtonFooter.disabled = disabled;
         }
 
-        // Mode Switching (MR vs Direct)
-        document.querySelectorAll('input[name="dispatch_mode"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                if (this.value === 'direct') {
-                    deliveryOrderId.value = '';
-                    mrBanner.style.display = 'none';
-                    customerSelectCol.style.display = 'block';
-                    directAddContainer.style.display = 'block';
-                    itemsHint.textContent = 'Add product line items manually to issue a Direct Outward Dispatch.';
-                    document.querySelectorAll('.mr-col').forEach(el => el.style.display = 'none');
-                    document.querySelectorAll('.direct-col').forEach(el => el.style.display = '');
-                    itemsBody.innerHTML = '';
-                    addDirectItemRow();
-                } else {
-                    mrBanner.style.display = 'flex';
-                    customerSelectCol.style.display = 'none';
-                    directAddContainer.style.display = 'none';
-                    itemsHint.textContent = 'Select a material requirement to load its items.';
-                    document.querySelectorAll('.mr-col').forEach(el => el.style.display = '');
-                    document.querySelectorAll('.direct-col').forEach(el => el.style.display = 'none');
-                    itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="9" class="text-center py-4 text-muted fs-12"><i class="feather-info me-1"></i>No items selected.</td></tr>';
-                    setSaveButtonsDisabled(true);
-                }
-            });
-        });
 
-        // Add Direct Item Row
-        addDirectItemBtn.addEventListener('click', addDirectItemRow);
 
-        function addDirectItemRow() {
-            const idx = directItemIndex++;
-            const productOptions = productsList.map(p => 
-                `<option value="${p.id}" data-serial="${p.track_serial_number ? '1' : '0'}" data-batch="${p.track_batch ? '1' : '0'}">${escapeHtml(p.name)} ${p.sku ? `(${escapeHtml(p.sku)})` : ''}</option>`
-            ).join('');
 
-            const warehouseOptions = warehouses.map(w => 
-                `<option value="${w.id}">${escapeHtml(w.name)}</option>`
-            ).join('');
-
-            const newRow = `
-                <tr class="item-row" id="direct_row_${idx}">
-                    <td class="ps-3 pe-2 py-2 align-top">
-                        <select name="items[${idx}][product_id]" class="form-select odoo-table-select product-select odoo-select2 fw-semibold" data-idx="${idx}" required>
-                            <option value="">-- Select Product --</option>
-                            ${productOptions}
-                        </select>
-
-                        <!-- Batch Selection Box (FEFO) -->
-                        <div id="batch_block_${idx}" class="mt-2 p-2.5 bg-white border border-warning-subtle rounded shadow-sm" style="display: none;">
-                            <div class="d-flex align-items-center justify-content-between mb-1.5">
-                                <span class="fw-bold fs-11 text-dark d-flex align-items-center">
-                                    <i class="feather-layers text-warning me-1 fs-12"></i>Batch / Lot (FEFO Expiry Order):
-                                </span>
-                                <span class="badge bg-soft-warning text-warning fs-10 fw-bold"><i class="feather-clock me-1"></i>FEFO Active</span>
-                            </div>
-                            <select name="items[${idx}][batch_number]" id="batch_select_${idx}" class="form-select form-select-sm font-monospace fs-11 text-dark odoo-select2">
-                                <option value="">-- Auto-Deduct Nearest Expiry Batch --</option>
-                            </select>
-                            <span class="fs-10 text-muted mt-1 d-block"><i class="feather-info me-1"></i>Sorted by earliest expiry date. Select specific batch or leave auto.</span>
-                        </div>
-
-                        <!-- Serial Numbers Box -->
-                        <div id="serial_block_${idx}" class="mt-2 p-3 bg-white border border-primary-subtle rounded shadow-sm" style="display: none;">
-                            <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="fw-bold fs-11 text-dark d-flex align-items-center">
-                                    <i class="feather-hash text-primary me-1 fs-12"></i>Tracked Serial Numbers:
-                                </span>
-                                <button type="button" class="btn btn-xs btn-outline-primary fw-semibold fetch-serials-btn" data-idx="${idx}">
-                                    <i class="feather-zap me-1"></i>Auto-Fill Available
-                                </button>
-                            </div>
-                            <textarea name="items[${idx}][serial_numbers]" id="serial_input_${idx}" class="form-control form-control-sm font-monospace fs-11 text-dark" rows="3" placeholder="Scan barcode or enter serial numbers (1 per line or comma separated)..."></textarea>
-                            <span class="fs-10 text-muted mt-1 d-block"><i class="feather-info me-1"></i>System will automatically assign these serial numbers upon saving.</span>
-                        </div>
-                    </td>
-                    <td class="px-2 py-2 align-top">
-                        <select name="items[${idx}][warehouse_id]" class="form-select odoo-table-select warehouse-select odoo-select2" data-idx="${idx}" required>
-                            ${warehouseOptions}
-                        </select>
-                    </td>
-                    <td class="text-end px-2 py-2 align-top">
-                        <input type="number" name="items[${idx}][quantity]" class="form-control odoo-table-input text-end dispatch-qty-input fw-bold" value="1" min="0.0001" step="any" required>
-                    </td>
-                    <td class="text-center px-2 py-2 align-top">
-                        <button type="button" class="btn btn-sm btn-link text-danger remove-row-btn p-1 border-0" data-idx="${idx}" title="Remove line item">
-                            <i class="feather-trash-2 fs-14"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-
-            const $tr = $(newRow);
-            $('#dispatchItemsBody').append($tr);
-            initSelect2($tr);
-            setSaveButtonsDisabled(false);
-
-            function updateBlocks() {
-                const selectedOpt = $tr.find('.product-select option:selected');
-                const isSerial = selectedOpt.data('serial') == 1;
-                const isBatch = selectedOpt.data('batch') == 1;
-                const prodId = $tr.find('.product-select').val();
-                const whId = $tr.find('.warehouse-select').val();
-
-                const serialBlock = document.getElementById(`serial_block_${idx}`);
-                if (serialBlock) serialBlock.style.display = isSerial ? 'block' : 'none';
-
-                const batchBlock = document.getElementById(`batch_block_${idx}`);
-                if (batchBlock) {
-                    batchBlock.style.display = isBatch ? 'block' : 'none';
-                    if (isBatch && prodId) {
-                        fetchBatchesForLine(prodId, whId, idx);
-                    }
-                }
-            }
-
-            $tr.find('.product-select, .warehouse-select').on('change', updateBlocks);
-
-            // Remove Row Listener
-            $tr.find('.remove-row-btn').on('click', function() {
-                $tr.remove();
-                if (itemsBody.children.length === 0) {
-                    itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="9" class="text-center py-4 text-muted fs-12"><i class="feather-info me-1"></i>No items selected.</td></tr>';
-                    setSaveButtonsDisabled(true);
-                }
-            });
-
-            // Fetch Available Serials Listener
-            $tr.find('.fetch-serials-btn').on('click', function() {
-                const prodId = $tr.find('.product-select').val();
-                const whId = $tr.find('.warehouse-select').val();
-                if (!prodId) {
-                    alert('Please select a product first.');
-                    return;
-                }
-                fetch(`{{ route('sales.dispatches.available-serials') }}?product_id=${prodId}&warehouse_id=${whId}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.serials && data.serials.length) {
-                            const qty = parseFloat($tr.find('.dispatch-qty-input').val()) || 1;
-                            const serialsToFill = data.serials.slice(0, qty).join("\n");
-                            document.getElementById(`serial_input_${idx}`).value = serialsToFill;
-                        } else {
-                            alert('No available serial numbers found in stock for this product/warehouse.');
-                        }
-                    });
-            });
-        }
 
         function fetchBatchesForLine(productId, warehouseId, lineIdx) {
             const batchSelect = document.getElementById(`batch_select_${lineIdx}`);
@@ -495,6 +408,14 @@
             deliveryOrderId.value = order.id;
             document.getElementById('selectedDeliveryOrder').textContent = order.requirement_number;
             document.getElementById('selectedCustomer').textContent = `${order.sales_order || ''}${order.customer ? ` — ${order.customer}` : ''}`;
+
+            if (order.freight_terms) {
+                $('#freightTermsSelect').val(order.freight_terms).trigger('change');
+            }
+            if (order.freight_amount !== undefined) {
+                $('#freightAmountInput').val(parseFloat(order.freight_amount).toFixed(2));
+            }
+
             renderDispatchItems(order.items);
         }
 
@@ -843,6 +764,53 @@
             handleDispatchBarcodeScan();
         });
 
+        function checkAllDispatchRowsValidation() {
+            let hasError = false;
+            const isDirect = $('input[name="dispatch_mode"]:checked').val() === 'direct';
+
+            $('#dispatchItemsBody tr').each(function() {
+                const $tr = $(this);
+                const $qtyInput = $tr.find('.dispatch-qty-input, input[name$="[quantity]"]');
+                if (!$qtyInput.length) return;
+
+                const $errDiv = $tr.find('.dispatch-qty-error');
+                const prodId = $tr.find('select[name$="[product_id]"]').val() || $tr.find('input[name$="[product_id]"]').val();
+                
+                if (!prodId) return;
+
+                let availQty = 0;
+                if (isDirect) {
+                    availQty = parseFloat($tr.attr('data-available-qty')) || 0;
+                } else {
+                    const availText = $tr.find('.avail-qty-cell').text().trim();
+                    availQty = parseFloat(availText) || 0;
+                }
+
+                const enteredQty = parseFloat($qtyInput.val()) || 0;
+
+                if (enteredQty > availQty) {
+                    hasError = true;
+                    $qtyInput.addClass('is-invalid border-danger');
+                    if ($errDiv.length) {
+                        $errDiv.find('.max-avail-val').text(availQty);
+                        $errDiv.show();
+                    }
+                } else {
+                    $qtyInput.removeClass('is-invalid border-danger');
+                    if ($errDiv.length) {
+                        $errDiv.hide();
+                    }
+                }
+            });
+
+            setSaveButtonsDisabled(hasError);
+        }
+
+        // Live input validation listener for Dispatch Qty
+        $(document).on('input change keyup', '.dispatch-qty-input, input[name$="[quantity]"]', function() {
+            checkAllDispatchRowsValidation();
+        });
+
         // Auto-update Available & Reserved Stock quantity when Warehouse or Product is changed in Dispatch table
         $(document).on('change change.select2', 'select[name$="[warehouse_id]"], select[name$="[product_id]"]', function() {
             const $tr = $(this).closest('tr');
@@ -851,6 +819,8 @@
             let mrItemId = $tr.find('input[name$="[material_requirement_item_id]"]').val();
             const $availCell = $tr.find('.avail-qty-cell');
             const $reservedCell = $tr.find('.reserved-qty-cell');
+            const $availBadgeSpan = $tr.find('.avail-qty-span');
+            const $badgeBox = $tr.find('.stock-info-badge span');
 
             if (!productId || !warehouseId) return;
 
@@ -864,8 +834,10 @@
                 },
                 success: function(response) {
                     if (response && response.success) {
-                        const avail = parseInt(response.available_qty) || 0;
-                        const itemReserved = parseInt(response.item_reserved_qty) || 0;
+                        const avail = parseFloat(response.available_qty) || 0;
+                        const itemReserved = parseFloat(response.item_reserved_qty) || 0;
+
+                        $tr.attr('data-available-qty', avail);
 
                         if ($availCell.length) {
                             $availCell.text(avail);
@@ -875,6 +847,15 @@
 
                         if ($reservedCell.length) {
                             $reservedCell.text(itemReserved);
+                        }
+
+                        if ($availBadgeSpan.length) {
+                            $availBadgeSpan.text(avail);
+                            if (avail <= 0) {
+                                $badgeBox.removeClass('bg-soft-info text-info bg-soft-success text-success').addClass('bg-soft-danger text-danger border-danger');
+                            } else {
+                                $badgeBox.removeClass('bg-soft-info text-info bg-soft-danger text-danger').addClass('bg-soft-success text-success border-success');
+                            }
                         }
 
                         checkAllDispatchRowsValidation();

@@ -1182,8 +1182,20 @@
                                             <td>
                                                 <div class="fw-bold text-dark">{{ $op->operation_number }}</div>
                                                 <small class="text-muted">{{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</small>
+                                                @if($op->sourceProduct && $op->source_product_id !== $order->product_id)
+                                                    <span class="badge bg-soft-info text-info border border-info-subtle ms-1"><i class="feather-box me-1"></i>{{ $op->sourceProduct->name }} (Level {{ $op->bom_level ?? 1 }})</span>
+                                                @elseif($op->bom_level > 1)
+                                                    <span class="badge bg-soft-secondary text-secondary ms-1">Level {{ $op->bom_level }}</span>
+                                                @endif
                                                 @if($op->is_external)
                                                     <span class="badge bg-soft-warning text-dark border border-warning ms-1"><i class="feather-external-link me-1"></i>Subcontract</span>
+                                                    @if(($op->material_supply_type ?? 'company_supplied') === 'company_supplied')
+                                                        <div class="mt-1">
+                                                            <a href="{{ route('inventory.transfers.create', ['production_order_id' => $order->id, 'vendor_id' => $op->vendor_id]) }}" class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 text-decoration-none" title="Generate Subcontract Material Delivery Challan / Gate Pass to Vendor">
+                                                                <i class="feather-truck me-1"></i>Dispatch Material (Delivery Challan)
+                                                            </a>
+                                                        </div>
+                                                    @endif
                                                 @endif
                                             </td>
                                             <td>

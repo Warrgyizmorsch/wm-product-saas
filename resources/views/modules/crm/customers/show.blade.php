@@ -86,7 +86,9 @@
 
                 <div class="text-end">
                     <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">Financial Health Status</span>
-                    @if($outstandingBalance <= 0)
+                    @if(($customerCreditBalance ?? 0) > 0)
+                        <span class="badge bg-soft-info text-info fs-12 px-3 py-1.5 fw-bold border"><i class="feather-arrow-down-left me-1"></i>Advance Credit (-?{{ number_format($customerCreditBalance, 2) }})</span>
+                    @elseif($outstandingBalance <= 0)
                         <span class="badge bg-soft-success text-success fs-12 px-3 py-1.5 fw-bold border"><i class="feather-check-circle me-1"></i>All Clear (Zero Balance)</span>
                     @elseif($overdueAmount > 0)
                         <span class="badge bg-soft-danger text-danger fs-12 px-3 py-1.5 fw-bold border"><i class="feather-alert-triangle me-1"></i>Overdue Balance</span>
@@ -488,6 +490,32 @@
                                 'credit' => 0.00,
                             ]);
                         }
+                        foreach($salesReturns ?? [] as $ret) {
+                            $linkedSO = $ret->salesOrder;
+                            $linkedDeal = $linkedSO?->quotation?->deal;
+                            $soNo = $linkedSO ? ($linkedSO->sales_order_number ?: ($linkedSO->so_number ?: ('SO-' . str_pad($linkedSO->id, 4, '0', STR_PAD_LEFT)))) : null;
+                            $dealNo = $linkedDeal ? ($linkedDeal->deal_number ?: ('DL-' . str_pad($linkedDeal->id, 4, '0', STR_PAD_LEFT))) : null;
+                            $dealTitle = $linkedDeal ? ($linkedDeal->title ?: $linkedDeal->name) : null;
+                            $dealId = $linkedDeal?->id;
+
+                            $retTaxable = (float)$ret->items->sum(fn($i) => floatval($i->quantity) * floatval($i->unit_price));
+                            $taxAmt = round($retTaxable * 0.18, 2);
+                            $retAmount = floatval($ret->total_refund_amount ?: ($ret->total_amount > $retTaxable ? $ret->total_amount : ($retTaxable + $taxAmt)));
+                            if ($retAmount > 0) {
+                                $ledgerRows->push([
+                                    'date' => $ret->return_date ?: $ret->created_at,
+                                    'type' => 'Credit Note',
+                                    'reference' => $ret->return_number ?: ('RET-' . str_pad($ret->id, 4, '0', STR_PAD_LEFT)),
+                                    'description' => 'Sales Return / Credit Note #' . ($ret->return_number ?: ('RET-' . str_pad($ret->id, 4, '0', STR_PAD_LEFT))),
+                                    'deal_no' => $dealNo,
+                                    'deal_title' => $dealTitle,
+                                    'deal_id' => $dealId,
+                                    'so_no' => $soNo,
+                                    'debit' => 0.00,
+                                    'credit' => $retAmount,
+                                ]);
+                            }
+                        }
                         foreach($payments as $pay) {
                             $firstAlloc = $pay->allocations->first();
                             $payInv = $firstAlloc?->invoice;
@@ -511,7 +539,17 @@
                                 'credit' => floatval($pay->amount),
                             ]);
                         }
-                        $sortedLedger = $ledgerRows->sortBy('date');
+                        $sortedLedger = $ledgerRows->sortBy(function ($row) {
+                            $ts = \Carbon\Carbon::parse($row['date'])->timestamp;
+                            $typePriority = match($row['type']) {
+                                'Invoice' => 0,
+                                'Payment Receipt' => 1,
+                                'Credit Note' => 2,
+                                'Payment Refund' => 3,
+                                default => 4,
+                            };
+                            return sprintf('%012d_%d', $ts, $typePriority);
+                        })->values();
                     @endphp
 
                     @if($sortedLedger->isNotEmpty())
@@ -537,7 +575,7 @@
                                         @endphp
                                         <tr>
                                             <td>{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td>
-                                            <td><span class="badge {{ $row['type'] === 'Invoice' ? 'bg-soft-danger text-danger' : 'bg-soft-success text-success' }} fs-11">{{ $row['type'] }}</span></td>
+                                            <td><span class="badge {{ $row['type'] === 'Invoice' ? 'bg-soft-danger text-danger' : ($row['type'] === 'Credit Note' ? 'bg-soft-info text-info' : 'bg-soft-success text-success') }} fs-11">{{ $row['type'] }}</span></td>
                                             <td class="font-monospace text-dark fw-bold">{{ $row['reference'] }}</td>
                                             <td>{{ $row['description'] }}</td>
                                             <td>

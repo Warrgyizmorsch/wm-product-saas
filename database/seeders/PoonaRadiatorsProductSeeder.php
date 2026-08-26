@@ -352,10 +352,11 @@ class PoonaRadiatorsProductSeeder extends Seeder
     }
 
     /**
-     * Seed initial opening stock balances in product_warehouse_stocks and record stock_transactions.
+     * Seed initial opening stock balances in product_warehouse_stocks and record stock_transactions and accounting journal.
      */
     private function seedInitialStock(int $tenantId, array $products, array $warehouses): void
     {
+        $totalOpeningValue = 0;
         foreach ($products as $key => $pInfo) {
             /** @var Product $product */
             $product = $pInfo['model'];
@@ -396,6 +397,71 @@ class PoonaRadiatorsProductSeeder extends Seeder
                     'balance_qty' => $qty,
                 ]
             );
+
+            $totalOpeningValue += $totalValue;
         }
+
+        if ($totalOpeningValue > 0) {
+            $this->postOpeningStockJournal($tenantId, $totalOpeningValue);
+        }
+    }
+
+    /**
+     * Post Accounting Journal Entry for Opening Stock to align Inventory Asset A/c balance in General Ledger.
+     */
+    private function postOpeningStockJournal(int $tenantId, float $totalValue): void
+    {
+        $inventoryAcc = ChartOfAccount::where('tenant_id', $tenantId)
+            ->where(function ($q) {
+                $q->where('code', '1200')->orWhere('name', 'like', '%Inventory%');
+            })->first();
+
+        $equityAcc = ChartOfAccount::where('tenant_id', $tenantId)
+            ->where(function ($q) {
+                $q->where('code', '3010')->orWhere('code', '3020');
+            })->first();
+
+        if (!$inventoryAcc || !$equityAcc) {
+            return;
+   
+        }
+
+        /** @var \App\Domains\Accounting\Services\JournalService $journalService */
+        $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
+
+        $existing = \App\Domains\Accounting\Models\Journal::where('tenant_id', $tenantId)
+            ->where('reference_type', 'OpeningStockSeeder')
+            ->first();
+
+        if ($existing) {
+            $existing->forceDelete();
+        }
+
+        $lines = [
+            [
+                'chart_of_account_id' => $inventoryAcc->id,
+                'debit' => round($totalValue, 2),
+                'credit' => 0,
+                'description' => 'Opening Stock Valuation - Inventory Asset',
+            ],
+            [
+                'chart_of_account_id' => $equityAcc->id,
+                'debit' => 0,
+                'credit' => round($totalValue, 2),
+                'description' => 'Opening Stock Valuation - Owner Equity / Capital',
+            ],
+        ];
+
+        $meta = [
+            'tenant_id' => $tenantId,
+            'journal_date' => now(),
+            'source' => \App\Domains\Accounting\Models\Journal::SOURCE_INVENTORY,
+            'reference_type' => 'OpeningStockSeeder',
+            'reference_id' => 1,
+            'memo' => 'Initial Opening Stock Valuation Accounting Entry',
+            'journal_number_prefix' => 'OP-JNL',
+        ];
+
+        $journalService->post($lines, $meta);
     }
 }

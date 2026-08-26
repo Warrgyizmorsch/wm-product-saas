@@ -147,10 +147,12 @@ class SchedulingService
     public function generateForwardSchedule(ProductionOrder $order, Carbon $startDate): ProductionSchedule
     {
         return DB::transaction(function () use ($order, $startDate) {
-            $operations = $order->operations()->with('workCenter')->orderBy('sequence')->get();
-            if ($operations->isEmpty()) {
+            $rawOperations = $order->operations()->with(['workCenter', 'predecessorDependencies'])->get();
+            if ($rawOperations->isEmpty()) {
                 throw new \LogicException("Cannot generate schedule: Production Order has no operations configured.");
             }
+
+            $operations = $this->sortOperationsTopologically($rawOperations);
 
             foreach ($operations as $op) {
                 if (!$op->is_external) {
@@ -210,7 +212,8 @@ class SchedulingService
                         $op->parallel_group,
                         (bool) $op->is_parallel,
                         $startDate,
-                        (float) $order->quantity_ordered
+                        (float) $order->quantity_ordered,
+                        $op
                     );
 
                     $plannedStart = $earliestStart->copy();
@@ -229,7 +232,8 @@ class SchedulingService
                         $op->parallel_group,
                         (bool) $op->is_parallel,
                         $startDate,
-                        (float) $order->quantity_ordered
+                        (float) $order->quantity_ordered,
+                        $op
                     );
 
                     // Collect parallel-group sibling schedule-op IDs to exclude from bookings
@@ -345,12 +349,14 @@ class SchedulingService
     public function generateBackwardSchedule(ProductionOrder $order, Carbon $dueDate): ProductionSchedule
     {
         return DB::transaction(function () use ($order, $dueDate) {
-            $operations = $order->operations()->with('workCenter')->orderBy('sequence')->get();
-            if ($operations->isEmpty()) {
+            $rawOperations = $order->operations()->with(['workCenter', 'predecessorDependencies', 'successorDependencies'])->get();
+            if ($rawOperations->isEmpty()) {
                 throw new \LogicException("Cannot generate schedule: Production Order has no operations configured.");
             }
 
-            foreach ($operations as $op) {
+            $sortedOps = $this->sortOperationsTopologically($rawOperations);
+
+            foreach ($sortedOps as $op) {
                 if (!$op->is_external) {
                     if (!$op->workCenter) {
                         throw new \LogicException("Cannot generate schedule: Work Center is missing for operation sequence [{$op->sequence}].");
@@ -394,8 +400,8 @@ class SchedulingService
                 'created_by' => auth()->id() ?: 1,
             ]);
 
-            // For backward scheduling, schedule operations in reverse order
-            $reversedOps = $operations->reverse();
+            // For backward scheduling, schedule operations in reverse topological order (successors first)
+            $reversedOps = $sortedOps->reverse();
             $records = [];
             $scheduledData = [];
             // Track created schedule-op IDs per parallel_group for sibling exclusion
@@ -1418,9 +1424,29 @@ class SchedulingService
         float $orderQuantity,
         ?ProductionOrderOperation $currentOp = null
     ): Carbon {
-        $successors = collect($scheduledData)->filter(function ($succ) use ($opSequence, $parallelGroup, $isParallel) {
-            if ($succ['sequence'] <= $opSequence) {
-                return false;
+        $successorOpIds = [];
+        if ($currentOp) {
+            $allOps = ProductionOrderOperation::where('tenant_id', $currentOp->tenant_id)
+                ->where('production_order_id', $currentOp->production_order_id)
+                ->with('predecessorDependencies')
+                ->get();
+            foreach ($allOps as $aOp) {
+                if ($aOp->previous_operation_id === $currentOp->id || $aOp->predecessorDependencies->contains($currentOp->id)) {
+                    $successorOpIds[] = $aOp->id;
+                }
+            }
+        }
+
+        $successors = collect($scheduledData)->filter(function ($succ) use ($opSequence, $parallelGroup, $isParallel, $successorOpIds) {
+            if (!empty($successorOpIds)) {
+                $succOpId = $succ['order_op']?->id ?? $succ['production_order_operation_id'] ?? null;
+                if (!$succOpId || !in_array($succOpId, $successorOpIds)) {
+                    return false;
+                }
+            } else {
+                if ($succ['sequence'] <= $opSequence) {
+                    return false;
+                }
             }
             if ($isParallel && $parallelGroup !== null && ($succ['parallel_group'] ?? null) === $parallelGroup) {
                 return false;
@@ -1489,11 +1515,31 @@ class SchedulingService
         ?string $parallelGroup,
         bool $isParallel,
         Carbon $defaultStart,
-        float $orderQuantity
+        float $orderQuantity,
+        ?ProductionOrderOperation $currentOp = null
     ): Carbon {
-        $predecessors = collect($scheduledData)->filter(function ($prev) use ($opSequence, $parallelGroup, $isParallel) {
-            if ($prev['sequence'] >= $opSequence) {
-                return false;
+        $predecessorOpIds = [];
+        if ($currentOp) {
+            if ($currentOp->previous_operation_id) {
+                $predecessorOpIds[] = $currentOp->previous_operation_id;
+            }
+            if ($currentOp->relationLoaded('predecessorDependencies')) {
+                foreach ($currentOp->predecessorDependencies as $pred) {
+                    $predecessorOpIds[] = $pred->id;
+                }
+            }
+        }
+
+        $predecessors = collect($scheduledData)->filter(function ($prev) use ($opSequence, $parallelGroup, $isParallel, $predecessorOpIds) {
+            if (!empty($predecessorOpIds)) {
+                $prevOpId = $prev['order_op']?->id ?? $prev['production_order_operation_id'] ?? null;
+                if (!$prevOpId || !in_array($prevOpId, $predecessorOpIds)) {
+                    return false;
+                }
+            } else {
+                if ($prev['sequence'] >= $opSequence) {
+                    return false;
+                }
             }
             if ($isParallel && $parallelGroup !== null && ($prev['parallel_group'] ?? null) === $parallelGroup) {
                 return false;
@@ -1539,6 +1585,70 @@ class SchedulingService
         });
 
         return $earliestStartTimestamps->max()->copy();
+    }
+
+    /**
+     * Sort operations topologically (predecessors before successors) considering both
+     * intra-routing previous_operation_id and cross-assembly predecessorDependencies.
+     */
+    public function sortOperationsTopologically(\Illuminate\Support\Collection $operations): \Illuminate\Support\Collection
+    {
+        $opMap = $operations->keyBy('id');
+        $inDegree = [];
+        $graph = [];
+
+        foreach ($operations as $op) {
+            $id = $op->id;
+            if (!isset($inDegree[$id])) {
+                $inDegree[$id] = 0;
+            }
+            if (!isset($graph[$id])) {
+                $graph[$id] = [];
+            }
+
+            // 1. Intra-routing predecessor
+            if ($op->previous_operation_id && $opMap->has($op->previous_operation_id)) {
+                $predId = $op->previous_operation_id;
+                $graph[$predId][] = $id;
+                $inDegree[$id]++;
+            }
+
+            // 2. Cross-assembly predecessors
+            if ($op->relationLoaded('predecessorDependencies')) {
+                foreach ($op->predecessorDependencies as $predOp) {
+                    if ($opMap->has($predOp->id)) {
+                        $graph[$predOp->id][] = $id;
+                        $inDegree[$id]++;
+                    }
+                }
+            }
+        }
+
+        $queue = [];
+        foreach ($inDegree as $id => $deg) {
+            if ($deg === 0) {
+                $queue[] = $id;
+            }
+        }
+
+        $sorted = collect();
+        while (!empty($queue)) {
+            $currId = array_shift($queue);
+            $sorted->push($opMap->get($currId));
+
+            foreach ($graph[$currId] as $succId) {
+                $inDegree[$succId]--;
+                if ($inDegree[$succId] === 0) {
+                    $queue[] = $succId;
+                }
+            }
+        }
+
+        if ($sorted->count() < $operations->count()) {
+            throw new \LogicException("Circular dependency detected in Production Order operations graph.");
+        }
+
+        return $sorted;
     }
 
     private function resolveCalendar(WorkCenter $wc, int $tenantId): ProductionCalendar
