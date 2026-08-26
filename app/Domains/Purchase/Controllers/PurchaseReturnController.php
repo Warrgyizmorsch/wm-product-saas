@@ -221,6 +221,7 @@ class PurchaseReturnController extends Controller
             }
 
             $purchaseReturn->update(['status' => 'Completed']);
+            event(new PurchaseReturnApproved($purchaseReturn));
         });
 
         event(new PurchaseReturnApproved($purchaseReturn));

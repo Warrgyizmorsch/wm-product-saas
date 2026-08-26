@@ -68,11 +68,12 @@ class SalesAccountingService
                 $q->where('code', '2130')->orWhere('name', 'like', '%Output IGST%');
             })->first();
 
-        // 6. Freight & Shipping Income A/c
-        $freightIncome = ChartOfAccount::where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->where('name', 'like', '%Freight%')->orWhere('name', 'like', '%Shipping%');
-            })->first() ?? ChartOfAccount::where('tenant_id', $tenantId)->where('code', '4900')->first();
+        // 6. Freight & Shipping Account (5610 Outward Freight)
+        $freightIncome = ChartOfAccount::where('tenant_id', $tenantId)->where('code', '5610')->first()
+            ?? (ChartOfAccount::where('tenant_id', $tenantId)
+                ->where(function ($q) {
+                    $q->where('name', 'like', '%Freight%')->orWhere('name', 'like', '%Shipping%');
+                })->first() ?? ChartOfAccount::where('tenant_id', $tenantId)->where('code', '4900')->first());
 
         if (!$accountsReceivable || !$salesRevenue) {
             Log::warning("SalesAccountingService: Missing core Chart of Accounts for tenant {$tenantId}");
