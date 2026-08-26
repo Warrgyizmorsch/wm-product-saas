@@ -131,13 +131,23 @@ class CustomerController extends Controller
         $invoices = $customer->invoices()->with(['salesOrder.quotation.deal', 'customer'])->latest()->get();
         $payments = $customer->payments()->with(['allocations.invoice', 'allocations.salesOrder'])->latest()->get();
         $salesOrders = $customer->salesOrders()->with(['quotation.deal', 'items'])->latest()->get();
+        $salesReturns = \App\Domains\Sales\Models\SalesReturn::where('customer_id', $customer->id)
+            ->with(['salesOrder.quotation.deal'])
+            ->latest()
+            ->get();
 
         $totalBilled = $invoices->where('status', '!=', 'cancelled')->sum('total_amount');
         $totalPaid = $invoices->where('status', '!=', 'cancelled')->sum('amount_paid');
         if ($totalPaid == 0 && $payments->isNotEmpty()) {
             $totalPaid = $payments->where('status', 'completed')->sum('amount');
         }
-        $outstandingBalance = max(0, $totalBilled - $totalPaid);
+        $totalReturns = $salesReturns->where('status', '!=', 'cancelled')->sum(function($r) {
+            return floatval($r->total_amount ?: $r->total_refund_amount);
+        });
+
+        $netOutstanding = $totalBilled - $totalPaid - $totalReturns;
+        $outstandingBalance = max(0, $netOutstanding);
+        $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;
         
         $overdueAmount = $invoices->where('status', 'unpaid')
             ->filter(function($inv) {
@@ -152,9 +162,12 @@ class CustomerController extends Controller
             'invoices',
             'payments',
             'salesOrders',
+            'salesReturns',
             'totalBilled',
             'totalPaid',
+            'totalReturns',
             'outstandingBalance',
+            'customerCreditBalance',
             'overdueAmount',
             'creditLimit',
             'availableCredit'

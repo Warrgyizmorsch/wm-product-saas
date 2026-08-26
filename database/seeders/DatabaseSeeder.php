@@ -47,11 +47,11 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             RbacSeeder::class,
+            AccountingChartOfAccountsSeeder::class,
             InventoryMasterDemoSeeder::class,
             PoonaRadiatorsProductSeeder::class,
             PoonaRadiatorsProductionSeeder::class,
             HrmsDemoSeeder::class,
-            AccountingChartOfAccountsSeeder::class,
         ]);
 
         // $this->callWith(ProjectsDemoSeeder::class, ['options' => ['wipe' => true]]);
