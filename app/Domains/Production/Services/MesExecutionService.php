@@ -11,6 +11,8 @@ use App\Domains\Production\Models\ProductionOrderProgressLog;
 use App\Domains\Production\Models\ProductionQualityInspection;
 use App\Domains\Production\Models\ProductionSchedule;
 use App\Domains\Production\Models\ProductionScheduleOperation;
+use App\Domains\Production\Models\ProductionWip;
+use App\Domains\Production\Models\ProductionWipTransaction;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -502,9 +504,18 @@ class MesExecutionService
                     'remarks' => $data['remarks'] ?? null,
                 ]);
 
+                // Determine if required target quantity has been reached
+                $targetQty = (float) ($orderOp->target_produced_qty > 0 ? $orderOp->target_produced_qty : ($schedOp->order->quantity_ordered ?? 0));
+                $newTotalOutput = (float) $orderOp->quantity_produced + (float) $orderOp->quantity_scrapped + (float) $orderOp->quantity_rejected + $produced + $scrapped + $rejected;
+                $isTargetReached = ($targetQty <= 0) || ($newTotalOutput >= $targetQty) || !empty($data['force_complete']);
+
                 // Update order operation
-                $orderOp->status = ProductionOrderOperation::STATUS_COMPLETED;
-                $orderOp->actual_end_time = $now;
+                if ($isTargetReached) {
+                    $orderOp->status = ProductionOrderOperation::STATUS_COMPLETED;
+                    $orderOp->actual_end_time = $now;
+                } else {
+                    $orderOp->status = ProductionOrderOperation::STATUS_RUNNING;
+                }
                 $orderOp->setup_time_actual += $setupMinutes;
                 $orderOp->processing_time_actual += $runMinutes;
                 $orderOp->quantity_produced += $produced;
@@ -512,7 +523,23 @@ class MesExecutionService
                 $orderOp->quantity_scrapped += $scrapped;
                 $orderOp->save();
 
-                // Sync WIP tracking on operation completion
+                // Update schedule operation status
+                if ($isTargetReached) {
+                    $schedOp->update([
+                        'status' => ProductionScheduleOperation::STATUS_COMPLETED,
+                        'actual_finish' => $now,
+                        'accumulated_paused_seconds' => ($schedOp->accumulated_paused_seconds ?? 0) + $pausedSeconds,
+                        'last_paused_at' => null,
+                    ]);
+                } else {
+                    $schedOp->update([
+                        'status' => ProductionScheduleOperation::STATUS_RUNNING,
+                        'accumulated_paused_seconds' => ($schedOp->accumulated_paused_seconds ?? 0) + $pausedSeconds,
+                        'last_paused_at' => null,
+                    ]);
+                }
+
+                // Sync WIP tracking on operation progress
                 $batchId = $data['production_batch_id'] ?? \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $schedOp->order->tenant_id)->where('production_order_id', $schedOp->production_order_id)->value('id');
                 $wip = $batchId ? app(ProductionWipService::class)->getOrCreateWipForBatchOperation(
                     $schedOp->production_order_id,
@@ -538,7 +565,22 @@ class MesExecutionService
                 app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($orderOp->id, $operatorId);
             }
 
-            // Advance next schedule operations to ready (including parallel operations sharing the same next sequence)
+            // Advance successor operations in the same routing only if target quantity is reached
+            if ($orderOp && ($isTargetReached ?? false)) {
+                $successorOps = ProductionOrderOperation::where('production_order_id', $orderOp->production_order_id)
+                    ->where('previous_operation_id', $orderOp->id)
+                    ->where('status', ProductionOrderOperation::STATUS_WAITING)
+                    ->get();
+
+                foreach ($successorOps as $succOp) {
+                    $succOp->update(['status' => ProductionOrderOperation::STATUS_READY]);
+                    ProductionScheduleOperation::where('production_order_operation_id', $succOp->id)
+                        ->where('status', ProductionScheduleOperation::STATUS_WAITING)
+                        ->update(['status' => ProductionScheduleOperation::STATUS_READY]);
+                }
+            }
+
+            // Fallback for schedule operations
             $nextSequence = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                 ->where('sequence', '>', $schedOp->sequence)
                 ->min('sequence');
@@ -550,13 +592,14 @@ class MesExecutionService
 
                 foreach ($nextSchedOps as $nsOp) {
                     if ($nsOp->isWaiting()) {
-                        $nsOp->update(['status' => ProductionScheduleOperation::STATUS_READY]);
-
-                        // Sync next order operation too
-                        $nextOrderOp = ProductionOrderOperation::find($nsOp->production_order_operation_id);
-                        if ($nextOrderOp && $nextOrderOp->status === ProductionOrderOperation::STATUS_WAITING) {
-                            $nextOrderOp->status = ProductionOrderOperation::STATUS_READY;
-                            $nextOrderOp->save();
+                        // Ensure nsOp belongs to same routing/product if orderOp is present
+                        $nsOrderOp = ProductionOrderOperation::find($nsOp->production_order_operation_id);
+                        if (!$orderOp || !$nsOrderOp || $nsOrderOp->source_product_id === $orderOp->source_product_id) {
+                            $nsOp->update(['status' => ProductionScheduleOperation::STATUS_READY]);
+                            if ($nsOrderOp && $nsOrderOp->status === ProductionOrderOperation::STATUS_WAITING) {
+                                $nsOrderOp->status = ProductionOrderOperation::STATUS_READY;
+                                $nsOrderOp->save();
+                            }
                         }
                     }
                 }
@@ -894,5 +937,163 @@ class MesExecutionService
             ->where('status', 'approved')
             ->where('result', 'passed')
             ->exists();
+    }
+
+    /**
+     * Calculate operation readiness and executable parent quantity. (Rule 5 & Rule 11)
+     *
+     * @return array{is_ready: bool, executable_qty: float, remaining_executable_qty: float, claimed_qty: float, blockers: array}
+     */
+    public function calculateOperationReadiness(ProductionOrderOperation $op): array
+    {
+        $op->loadMissing(['previousOperation', 'predecessorDependencies']);
+        $order = $op->order;
+        $tenantId = $op->tenant_id;
+        $blockers = [];
+        $warnings = [];
+
+        // 1. Intra-routing predecessor check
+        $intraAvailableQty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1));
+        if ($op->previousOperation) {
+            $intraAvailableQty = (float) $op->previousOperation->quantity_produced;
+            if ($op->previousOperation->status !== ProductionOrderOperation::STATUS_COMPLETED && $intraAvailableQty <= 0) {
+                $blockers[] = "Intra-routing predecessor operation {$op->previousOperation->operation_number} is not completed.";
+            }
+        }
+
+        // 2. Cross-assembly predecessor check (Executable parent quantity formula - Rule 5 & Rule 11)
+        $crossExecutableLimits = [];
+        $crossPreds = $op->predecessorDependencies()->wherePivot('dependency_type', 'cross_assembly')->get();
+        foreach ($crossPreds as $predOp) {
+            $childProductId = $predOp->source_product_id;
+            if (!$childProductId) {
+                continue;
+            }
+
+            // BOM ratio: how many units of SFG per 1 unit of parent
+            $bomItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $tenantId)
+                ->where('bom_id', $op->source_bom_id ?? $order->bom_id)
+                ->where('material_id', $childProductId)
+                ->first();
+            $bomRatio = ($bomItem && (float) $bomItem->quantity > 0) ? (float) $bomItem->quantity : 1.0;
+
+            // Issued material stock directly for this order
+            $issuedToOrder = (float) \App\Domains\Production\Models\ProductionOrderReservation::where('tenant_id', $tenantId)
+                ->where('production_order_id', $order->id)
+                ->where('product_id', $childProductId)
+                ->sum('quantity_issued');
+
+            // Warehouse Reserved stock & Available stock for order (Rule 2)
+            $reservedWarehouseStock = (float) \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                ->where('product_id', $childProductId)
+                ->sum('reserved_qty');
+            $availableWarehouseStock = (float) \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                ->where('product_id', $childProductId)
+                ->sum('quantity');
+
+            $warehouseStock = max($reservedWarehouseStock, $availableWarehouseStock);
+
+            // Usable Intermediate Manufactured SFG = Produced - (QC Hold + Rework) - Consumed (Rule 11)
+            $predOpFresh = ProductionOrderOperation::find($predOp->id) ?? $predOp;
+            $produced = (float) $predOpFresh->quantity_produced;
+            $qcHold = (float) ($predOpFresh->active_qc_hold ?? 0.0);
+            $rework = (float) ($predOpFresh->active_rework ?? 0.0);
+            $consumed = (float) ($predOpFresh->quantity_consumed ?? 0.0);
+
+            $usableIntermediateSfg = max(0.0, $produced - ($qcHold + $rework) - $consumed);
+            $totalUsableSfg = $issuedToOrder + $warehouseStock + $usableIntermediateSfg;
+
+            if ($issuedToOrder <= 0 && $warehouseStock > 0 && $usableIntermediateSfg <= 0) {
+                $childProduct = \App\Domains\Inventory\Models\Product::find($childProductId);
+                $childName = $childProduct->name ?? "Product #{$childProductId}";
+                $warnings[] = "Stock available in Warehouse ({$warehouseStock} units of {$childName}), but Material Issue to Order from Store is pending (0.00 issued).";
+            }
+
+            $maxExecutableParentQtyForThisComponent = $totalUsableSfg / $bomRatio;
+            $crossExecutableLimits[] = $maxExecutableParentQtyForThisComponent;
+
+            if ($totalUsableSfg <= 0 && $predOp->status !== ProductionOrderOperation::STATUS_COMPLETED) {
+                $blockers[] = "Cross-assembly predecessor operation {$predOp->operation_number} for product ID {$childProductId} has insufficient usable SFG (Available: {$totalUsableSfg}, Required BOM Ratio: {$bomRatio}).";
+            }
+        }
+
+        $minCrossExecutable = !empty($crossExecutableLimits) ? min($crossExecutableLimits) : (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1));
+        $executableQty = min($intraAvailableQty, $minCrossExecutable);
+
+        // Subtract already claimed quantity
+        $claimedQty = (float) ($op->quantity_claimed ?? 0.0);
+        $remainingExecutableQty = max(0.0, $executableQty - $claimedQty);
+
+        $isReady = empty($blockers) && $remainingExecutableQty > 0;
+
+        return [
+            'is_ready' => $isReady,
+            'executable_qty' => $executableQty,
+            'remaining_executable_qty' => $remainingExecutableQty,
+            'claimed_qty' => $claimedQty,
+            'blockers' => $blockers,
+            'warnings' => $warnings,
+        ];
+    }
+
+    /**
+     * Atomically claim a batch quantity to execute on an operation with lockForUpdate and idempotency key check. (F-02)
+     */
+    public function claimBatchToExecute(
+        int $operationId,
+        float $requestedQty,
+        ?string $idempotencyKey = null
+    ): float {
+        return DB::transaction(function () use ($operationId, $requestedQty, $idempotencyKey) {
+            $op = ProductionOrderOperation::lockForUpdate()->findOrFail($operationId);
+
+            // Idempotency check using ProductionWipTransaction batch_claimed audit record (F-02)
+            if (!empty($idempotencyKey)) {
+                $existingClaimTx = ProductionWipTransaction::where('tenant_id', $op->tenant_id)
+                    ->where('production_order_id', $op->production_order_id)
+                    ->where('transaction_type', 'batch_claimed')
+                    ->where('remarks', 'LIKE', "%IDEMPOTENCY_KEY:{$idempotencyKey}%")
+                    ->first();
+                if ($existingClaimTx) {
+                    return (float) $op->quantity_claimed;
+                }
+            }
+
+            $readiness = $this->calculateOperationReadiness($op);
+            if ($requestedQty > $readiness['remaining_executable_qty']) {
+                throw new InvalidArgumentException(
+                    "Cannot claim {$requestedQty} units for operation {$op->operation_number}. Remaining executable quantity is {$readiness['remaining_executable_qty']} (Max Executable: {$readiness['executable_qty']}, Already Claimed: {$readiness['claimed_qty']})."
+                );
+            }
+
+            $op->increment('quantity_claimed', $requestedQty);
+
+            // Record claim audit transaction for idempotency tracking (F-02)
+            $opWip = ProductionWip::where('tenant_id', $op->tenant_id)
+                ->where('production_order_id', $op->production_order_id)
+                ->first();
+            if (!$opWip) {
+                $opWip = app(ProductionWipService::class)->initializeWip($op->production_order_id, null, null);
+            }
+
+            ProductionWipTransaction::create([
+                'tenant_id' => $op->tenant_id,
+                'wip_id' => $opWip->id,
+                'production_order_id' => $op->production_order_id,
+                'from_operation_id' => $op->routing_operation_id,
+                'to_operation_id' => $op->routing_operation_id,
+                'from_work_center_id' => $op->work_center_id,
+                'to_work_center_id' => $op->work_center_id,
+                'transaction_type' => 'batch_claimed',
+                'quantity' => $requestedQty,
+                'cost_before' => 0.0000,
+                'cost_added' => 0.0000,
+                'cost_after' => 0.0000,
+                'remarks' => "Batch claimed: {$requestedQty} units for Op {$op->operation_number}." . (!empty($idempotencyKey) ? " IDEMPOTENCY_KEY:{$idempotencyKey}" : ""),
+                'transaction_at' => now(),
+            ]);
+
+            return (float) $op->fresh()->quantity_claimed;
+        });
     }
 }

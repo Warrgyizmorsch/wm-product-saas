@@ -72,11 +72,25 @@ class MesController extends Controller
             ->where('status', ProductionScheduleOperation::STATUS_READY)
             ->count();
 
+        // Recently completed schedules
+        $recentlyCompletedSchedules = ProductionSchedule::with([
+            'order.product',
+            'operations.workCenter',
+            'operations.machine',
+            'operations.orderOperation'
+        ])
+            ->where('tenant_id', $tenantId)
+            ->where('status', ProductionSchedule::STATUS_COMPLETED)
+            ->orderBy('completed_at', 'desc')
+            ->limit(5)
+            ->get();
+
         // Shifts assigned/active
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->get();
 
         return view('modules.production.mes.dashboard', compact(
             'activeSchedules',
+            'recentlyCompletedSchedules',
             'running',
             'paused',
             'completedToday',

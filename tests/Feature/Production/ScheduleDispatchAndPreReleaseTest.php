@@ -572,4 +572,140 @@ class ScheduleDispatchAndPreReleaseTest extends TestCase
         $this->assertTrue($op->locked);
         $this->assertEquals(2, $op->version);
     }
+
+    /**
+     * Test 15: Pre-release validation passes for multi-level schedules without false dependency violations.
+     */
+    public function test_pre_release_validation_multi_level_routing_passes_without_false_dependency_violations(): void
+    {
+        $order = ProductionOrder::create([
+            'tenant_id'        => $this->tenant->id,
+            'order_number'     => 'ORD-MULTI-VALID-01',
+            'product_id'       => $this->product->id,
+            'quantity_ordered' => 10,
+            'status'           => 'planned',
+            'start_date'       => now(),
+            'end_date'         => now()->addDays(5),
+        ]);
+
+        // SFG Operation 10 (Long running, finishes late)
+        $sfgOp10 = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'sequence'            => 10,
+            'operation_number'    => 'SFG-OP10',
+            'name'                => 'SFG Forging',
+            'work_center_id'      => $this->workCenter1->id,
+            'machine_id'          => $this->primaryMachine1->id,
+            'is_intermediate'     => true,
+            'bom_level'           => 2,
+            'status'              => 'waiting',
+        ]);
+
+        // SFG Operation 20 (Depends on SFG Op 10)
+        $sfgOp20 = ProductionOrderOperation::create([
+            'tenant_id'             => $this->tenant->id,
+            'production_order_id'   => $order->id,
+            'previous_operation_id' => $sfgOp10->id,
+            'sequence'              => 20,
+            'operation_number'      => 'SFG-OP20',
+            'name'                  => 'SFG Machining',
+            'work_center_id'        => $this->workCenter1->id,
+            'machine_id'            => $this->primaryMachine1->id,
+            'is_intermediate'       => true,
+            'bom_level'             => 2,
+            'status'                => 'waiting',
+        ]);
+
+        // FG Operation 10 (Starts early at schedule start, NO dependency on SFG Op 10)
+        $fgOp10 = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'sequence'            => 10,
+            'operation_number'    => 'FG-OP10',
+            'name'                => 'FG Prep',
+            'work_center_id'      => $this->workCenter1->id,
+            'machine_id'          => $this->primaryMachine1->id,
+            'is_intermediate'     => false,
+            'bom_level'           => 1,
+            'status'              => 'waiting',
+        ]);
+
+        // FG Operation 20 (Depends on FG Op 10, starts early)
+        $fgOp20 = ProductionOrderOperation::create([
+            'tenant_id'             => $this->tenant->id,
+            'production_order_id'   => $order->id,
+            'previous_operation_id' => $fgOp10->id,
+            'sequence'              => 20,
+            'operation_number'      => 'FG-OP20',
+            'name'                  => 'FG Assembly',
+            'work_center_id'        => $this->workCenter1->id,
+            'machine_id'            => $this->primaryMachine1->id,
+            'is_intermediate'       => false,
+            'bom_level'             => 1,
+            'status'                => 'waiting',
+        ]);
+
+        $schedule = ProductionSchedule::create([
+            'tenant_id'           => $this->tenant->id,
+            'schedule_number'     => 'SCH-MULTI-VALID-01',
+            'production_order_id' => $order->id,
+            'status'              => 'scheduled',
+            'scheduling_type'     => 'forward',
+            'generated_by'        => 'forward',
+            'scheduled_at'        => now(),
+            'created_by'          => 1,
+        ]);
+
+        $base = Carbon::now()->next(Carbon::MONDAY)->setTime(8, 0, 0);
+
+        // SFG Op 10 starts Mon 8am, finishes Thu 5pm
+        ProductionScheduleOperation::create([
+            'tenant_id'                      => $this->tenant->id,
+            'production_schedule_id'        => $schedule->id,
+            'production_order_id'            => $order->id,
+            'production_order_operation_id' => $sfgOp10->id,
+            'work_center_id'                 => $this->workCenter1->id,
+            'machine_id'                     => $this->primaryMachine1->id,
+            'sequence'                       => 10,
+            'planned_start'                  => $base->copy(),
+            'planned_finish'                 => $base->copy()->addDays(3),
+            'planned_duration_minutes'       => 4320,
+            'status'                         => 'waiting',
+        ]);
+
+        // FG Op 10 starts Mon 8am, finishes Mon 10am
+        ProductionScheduleOperation::create([
+            'tenant_id'                      => $this->tenant->id,
+            'production_schedule_id'        => $schedule->id,
+            'production_order_id'            => $order->id,
+            'production_order_operation_id' => $fgOp10->id,
+            'work_center_id'                 => $this->workCenter1->id,
+            'machine_id'                     => $this->primaryMachine1->id,
+            'sequence'                       => 10,
+            'planned_start'                  => $base->copy(),
+            'planned_finish'                 => $base->copy()->addHours(2),
+            'planned_duration_minutes'       => 120,
+            'status'                         => 'waiting',
+        ]);
+
+        // FG Op 20 starts Mon 10am, finishes Mon 12pm (Valid: after FG Op 10 finish, even though SFG Op 10 is still running!)
+        ProductionScheduleOperation::create([
+            'tenant_id'                      => $this->tenant->id,
+            'production_schedule_id'        => $schedule->id,
+            'production_order_id'            => $order->id,
+            'production_order_operation_id' => $fgOp20->id,
+            'work_center_id'                 => $this->workCenter1->id,
+            'machine_id'                     => $this->primaryMachine1->id,
+            'sequence'                       => 20,
+            'planned_start'                  => $base->copy()->addHours(2),
+            'planned_finish'                 => $base->copy()->addHours(4),
+            'planned_duration_minutes'       => 120,
+            'status'                         => 'waiting',
+        ]);
+
+        $res = $this->validationService->validate($schedule);
+        $depErrors = array_filter($res['errors'], fn($e) => $e['code'] === 'DEPENDENCY_VIOLATION');
+        $this->assertEmpty($depErrors, 'Should have no DEPENDENCY_VIOLATION errors for valid multi-level operations.');
+    }
 }

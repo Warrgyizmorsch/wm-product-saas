@@ -17,12 +17,9 @@
         </a>
 
         @if($schedule->isScheduled())
-            <form method="POST" action="{{ route('production.schedules.release', $schedule->id) }}" class="d-inline">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5">
-                    <i class="feather-play-circle"></i> {{ __('production.release_to_shop_floor') }}
-                </button>
-            </form>
+            <button type="button" onclick="openShowPreReleaseModal({{ $schedule->id }})" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5">
+                <i class="feather-play-circle"></i> {{ __('production.release_to_shop_floor') }}
+            </button>
         @endif
 
         @if(!$schedule->isFrozen())
@@ -50,7 +47,7 @@
     {{-- ── Schedule Workflow Guidance Component (Placed outside panel, matching mockup) ── --}}
     <x-ui.workflow-guide title="What's Next?">
         @if($schedule->isScheduled())
-            Schedule created for Order <a href="{{ route('production.orders.show', $schedule->production_order_id) }}" class="fw-bold text-primary text-decoration-underline">{{ $schedule->order->order_number ?? '' }}</a>. Review the machine allocations below and click <a href="javascript:void(0)" class="fw-bold text-primary text-decoration-underline" onclick="document.querySelector('form[action*=\'schedules/{{ $schedule->id }}/release\'] button')?.click();">Release to Shop Floor</a> to begin execution.
+            Schedule created for Order <a href="{{ route('production.orders.show', $schedule->production_order_id) }}" class="fw-bold text-primary text-decoration-underline">{{ $schedule->order->order_number ?? '' }}</a>. Review the machine allocations below and click <a href="javascript:void(0)" class="fw-bold text-primary text-decoration-underline" onclick="openShowPreReleaseModal({{ $schedule->id }});">Release to Shop Floor</a> to begin execution.
         @elseif($schedule->isReleased() || $schedule->isInProgress())
             Schedule released to Shop Floor. Visit <a href="{{ route('production.mes.dashboard') }}" class="fw-bold text-primary text-decoration-underline me-1">Shop Floor (MES)</a> or <a href="{{ route('production.mes.work-centers.index') }}" class="fw-bold text-primary text-decoration-underline me-1">Work Center Monitor</a> to view live operation execution. Assign operators under <a href="{{ route('production.orders.show', ['order' => $schedule->production_order_id, 'tab' => 'vtab-operations']) }}" class="fw-bold text-primary text-decoration-underline">Production Order Operations</a>.
         @else
@@ -245,21 +242,22 @@
                         <thead>
                             <tr>
                                 <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
-                                <th style="width: 15%">{{ __('production.operations') }}</th>
-                                <th style="width: 12%">{{ __('production.work_centers') }}</th>
-                                <th style="width: 12%">{{ __('production.planned_machine') ?? 'Planned Machine' }}</th>
-                                <th style="width: 12%">{{ __('production.actual_machine') }}</th>
-                                <th style="width: 8%">{{ __('production.status') }}</th>
-                                <th style="width: 10%">{{ __('production.duration') }}</th>
-                                <th style="width: 10%">{{ __('production.planned_start') }}</th>
-                                <th style="width: 10%">{{ __('production.planned_finish') }}</th>
-                                <th style="width: 13%">{{ __('production.gantt_config') }}</th>
-                                <th style="width: 5%" class="text-center">{{ __('production.lock') }}</th>
+                                <th style="width: 14%">{{ __('production.operations') }}</th>
+                                <th style="width: 11%">{{ __('production.work_centers') }}</th>
+                                <th style="width: 11%">{{ __('production.planned_machine') ?? 'Planned Machine' }}</th>
+                                <th style="width: 10%">{{ __('production.actual_machine') }}</th>
+                                <th style="width: 7%">{{ __('production.status') }}</th>
+                                <th style="width: 8%">{{ __('production.duration') }}</th>
+                                <th style="width: 9%">{{ __('production.planned_start') }}</th>
+                                <th style="width: 9%">{{ __('production.planned_finish') }}</th>
+                                <th style="width: 14%">Queue Threshold</th>
+                                <th style="width: 10%">{{ __('production.gantt_config') }}</th>
+                                <th style="width: 4%" class="text-center">{{ __('production.lock') }}</th>
                                 <th style="width: 8%">{{ __('production.warnings') }}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($schedule->operations as $op)
+                            @forelse($schedule->operations->sortBy('planned_start') as $op)
                                 <tr class="{{ $op->locked ? 'bg-light' : '' }}">
                                     <td class="fw-bold text-center align-middle">{{ $op->sequence }}</td>
                                     <td class="align-middle">
@@ -268,17 +266,6 @@
                                         @if($op->orderOperation && $op->orderOperation->is_external)
                                             <br><span class="badge bg-soft-warning text-dark border border-warning font-monospace mt-1"><i class="feather-external-link me-1"></i>SUBCONTRACT — {{ $op->orderOperation->vendor->name ?? 'Vendor' }}</span>
                                             <br><small class="text-warning font-monospace fs-11">Lead: {{ $op->orderOperation->subcontract_lead_time_days ?? 0 }}d | Buffer: {{ $op->orderOperation->dispatch_buffer_days ?? 0 }}d / {{ $op->orderOperation->return_buffer_days ?? 0 }}d</small>
-                                        @endif
-                                        @if($op->orderOperation && ($op->orderOperation->queue_threshold_enabled ?? $op->orderOperation->overlap_enabled))
-                                            @php
-                                                $trTime = app(\App\Domains\Production\Services\SchedulingService::class)->calculateTransferReadyAt(
-                                                    $op->orderOperation,
-                                                    $op->planned_start,
-                                                    (float) ($schedule->order?->quantity_ordered ?? 1)
-                                                );
-                                            @endphp
-                                            <br><span class="badge bg-soft-info text-info font-monospace mt-1">⚡ Queue Threshold Enabled (Batch: {{ (float) $op->orderOperation->transfer_batch_quantity }}, Lag: {{ (int) $op->orderOperation->transfer_lag_minutes }}m)</span>
-                                            <br><small class="text-primary font-monospace fs-11">Transfer-Ready: {{ $trTime->format('d/m/Y H:i') }}</small>
                                         @endif
                                     </td>
                                     <td class="align-middle">{{ $op->workCenter->name ?? '—' }}</td>
@@ -311,6 +298,26 @@
                                     <td class="align-middle fs-11 text-dark fw-semibold">{{ number_format($op->planned_duration_minutes, 1) }} mins</td>
                                     <td class="align-middle fs-11 text-muted">{{ $op->planned_start->format('d/m H:i') }}</td>
                                     <td class="align-middle fs-11 text-muted">{{ $op->planned_finish->format('d/m H:i') }}</td>
+                                    
+                                    {{-- Dedicated Queue Threshold Column --}}
+                                    <td class="align-middle fs-11">
+                                        @if($op->orderOperation && ($op->orderOperation->queue_threshold_enabled ?? $op->orderOperation->overlap_enabled))
+                                            @php
+                                                $trTime = app(\App\Domains\Production\Services\SchedulingService::class)->calculateTransferReadyAt(
+                                                    $op->orderOperation,
+                                                    $op->planned_start,
+                                                    (float) ($schedule->order?->quantity_ordered ?? 1)
+                                                );
+                                            @endphp
+                                            <span class="badge bg-soft-info text-info border font-monospace d-inline-flex align-items-center gap-1 mb-1">
+                                                <i class="feather-zap text-info fs-11"></i> Enabled
+                                            </span>
+                                            <div class="text-dark font-monospace fs-11 fw-semibold">Batch: {{ (float) $op->orderOperation->transfer_batch_quantity }} | Lag: {{ (int) $op->orderOperation->transfer_lag_minutes }}m</div>
+                                            <small class="text-primary font-monospace d-block fs-10">Transfer-Ready: {{ $trTime->format('d/m/Y H:i') }}</small>
+                                        @else
+                                            <span class="badge bg-soft-secondary text-muted font-monospace border fs-10">Disabled</span>
+                                        @endif
+                                    </td>
                                     <td class="align-middle fs-11 text-muted">
                                         <strong>Lane:</strong> {{ $op->lane ?? 'N/A' }}<br>
                                         <strong>Res:</strong> {{ $op->resource_id ?? 'N/A' }}
@@ -547,4 +554,123 @@
             <button type="submit" class="btn btn-warning" onclick="document.getElementById('rescheduleStartFormMain').submit();">Apply & Recalculate</button>
         </x-slot>
     </x-ui.modal>
+
+    {{-- Pre-Release Validation Modal --}}
+    <x-ui.modal id="showPreReleaseModal" title="Schedule Pre-Release Validation" size="lg" centered="true">
+        <div id="showPreReleaseModalBody" class="text-start">
+            <div class="text-center py-4 text-muted">
+                <div class="spinner-border spinner-border-sm me-2 text-info"></div>
+                Running completeness, machine readiness, downtime collision, dependency, and material availability checks...
+            </div>
+        </div>
+        <x-slot name="footer">
+            <div id="showPreReleaseModalFooter" class="d-flex align-items-center justify-content-end gap-2 w-100">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </x-slot>
+    </x-ui.modal>
+
+    <script>
+    function openShowPreReleaseModal(scheduleId) {
+        const modalEl = document.getElementById('showPreReleaseModal');
+        const modalBody = document.getElementById('showPreReleaseModalBody');
+        const modalFooter = document.getElementById('showPreReleaseModalFooter');
+        
+        modalBody.innerHTML = `<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2 text-info"></div> Running completeness, machine readiness, downtime collision, dependency, and material availability checks...</div>`;
+        
+        const bsModal = new bootstrap.Modal(modalEl);
+        bsModal.show();
+
+        fetch(`{{ url('production/schedules') }}/${scheduleId}/pre-release-check`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(r => r.json())
+        .then(res => {
+            let errorsHtml = '';
+            let warningsHtml = '';
+
+            if (res.errors && res.errors.length > 0) {
+                errorsHtml = `
+                    <div class="alert alert-danger border-danger p-3 mb-3">
+                        <h6 class="fw-bold text-danger mb-2"><i class="feather-x-circle me-1"></i> Blocking Errors (${res.errors.length})</h6>
+                        <ul class="mb-0 ps-3">
+                            ${res.errors.map(e => `<li><strong>${e.code}:</strong> ${e.message}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            if (res.warnings && res.warnings.length > 0) {
+                warningsHtml = `
+                    <div class="alert alert-warning border-warning p-3 mb-3">
+                        <h6 class="fw-bold text-warning-dark mb-2"><i class="feather-alert-triangle me-1"></i> Warnings (${res.warnings.length})</h6>
+                        <ul class="mb-0 ps-3">
+                            ${res.warnings.map(w => `<li><strong>${w.code}:</strong> ${w.message}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            if (!errorsHtml && !warningsHtml) {
+                errorsHtml = `<div class="alert alert-success border-success p-3 mb-3"><i class="feather-check-circle me-1"></i> Schedule passed all pre-release validation checks cleanly! Ready for shop-floor release.</div>`;
+            }
+
+            modalBody.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between mb-3 p-3 bg-light rounded border">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0">Schedule Pre-Release Summary</h6>
+                        <span class="text-muted fs-11">${res.summary?.total_operations ?? 0} operations evaluated</span>
+                    </div>
+                    <div>
+                        ${res.can_release ? '<span class="badge bg-success">Can Release</span>' : '<span class="badge bg-danger">Blocked</span>'}
+                        ${res.has_warnings ? '<span class="badge bg-warning text-dark ms-1">Has Warnings</span>' : ''}
+                    </div>
+                </div>
+                ${errorsHtml}
+                ${warningsHtml}
+            `;
+
+            if (res.can_release) {
+                const confirmBtn = res.has_warnings
+                    ? `<button type="button" onclick="executeShowScheduleRelease(${scheduleId}, true)" class="btn btn-warning btn-sm"><i class="feather-play me-1"></i> Release Schedule With Warnings</button>`
+                    : `<button type="button" onclick="executeShowScheduleRelease(${scheduleId}, false)" class="btn btn-primary btn-sm"><i class="feather-play me-1"></i> Release Schedule to Shop Floor</button>`;
+                modalFooter.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button> ${confirmBtn}`;
+            } else {
+                modalFooter.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button><button class="btn btn-danger btn-sm" disabled>Release Disabled (Blocking Errors Exist)</button>`;
+            }
+        })
+        .catch(err => {
+            modalBody.innerHTML = `<div class="alert alert-danger p-3 mb-0">Error running pre-release check: ${err.message}</div>`;
+        });
+    }
+
+    function executeShowScheduleRelease(scheduleId, confirmWarnings) {
+        fetch(`{{ url('production/schedules') }}/${scheduleId}/release`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                confirm_warnings: confirmWarnings ? 1 : 0
+            })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                window.location.href = res.redirect_url || "{{ route('production.mes.dashboard') }}";
+            } else {
+                alert(res.message || 'Failed to release schedule.');
+            }
+        })
+        .catch(err => {
+            alert('Error releasing schedule: ' + err.message);
+        });
+    }
+    </script>
 @endsection

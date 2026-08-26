@@ -1182,6 +1182,11 @@
                                             <td>
                                                 <div class="fw-bold text-dark">{{ $op->operation_number }}</div>
                                                 <small class="text-muted">{{ html_entity_decode($op->name ?? '', ENT_QUOTES, 'UTF-8') }}</small>
+                                                @if($op->sourceProduct && $op->source_product_id !== $order->product_id)
+                                                    <span class="badge bg-soft-info text-info border border-info-subtle ms-1"><i class="feather-box me-1"></i>{{ $op->sourceProduct->name }} (Level {{ $op->bom_level ?? 1 }})</span>
+                                                @elseif($op->bom_level > 1)
+                                                    <span class="badge bg-soft-secondary text-secondary ms-1">Level {{ $op->bom_level }}</span>
+                                                @endif
                                                 @if($op->is_external)
                                                     <span class="badge bg-soft-warning text-dark border border-warning ms-1"><i class="feather-external-link me-1"></i>Subcontract</span>
                                                 @endif

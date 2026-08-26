@@ -343,23 +343,26 @@
         {{-- Create New Batch (Initial Operation Only) --}}
         @if($batchQueue['meta']['is_first_op'])
             @php
+                $targetOpQty = ($op->target_produced_qty > 0) ? (float) $op->target_produced_qty : (float) $order->quantity_ordered;
+                $opProductId = $op->source_product_id ?? $order->product_id;
                 $sumActivePlanned = \App\Domains\Production\Models\ProductionBatch::where('production_order_id', $order->id)
+                    ->where('product_id', $opProductId)
                     ->whereNotIn('status', [\App\Domains\Production\Models\ProductionBatch::STATUS_CANCELLED])
                     ->sum('planned_quantity');
-                $unallocatedOrderQty = max(0.0, (float) $order->quantity_ordered - (float) $sumActivePlanned);
+                $unallocatedOrderQty = max(0.0, $targetOpQty - (float) $sumActivePlanned);
             @endphp
             <x-ui.card :title="__('production.create_new_batch')" class="mb-4 border">
                 <form method="POST" action="{{ route('production.mes.batches.create') }}">
                     @csrf
                     <input type="hidden" name="production_order_id" value="{{ $order->id }}">
-                    <input type="hidden" name="product_id" value="{{ $order->product_id }}">
+                    <input type="hidden" name="product_id" value="{{ $op->source_product_id ?? $order->product_id }}">
 
                     <div class="row g-3">
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="input" :label="__('production.planned_qty')" name="planned_quantity"
                                 inputType="number" step="0.0001" :value="$unallocatedOrderQty" :required="true" />
                             <div class="fs-12 text-muted mt-1">
-                                Unallocated balance: <strong>{{ number_format($unallocatedOrderQty, 2) }}</strong> / {{ number_format($order->quantity_ordered, 2) }}
+                                Unallocated balance: <strong>{{ number_format($unallocatedOrderQty, 2) }}</strong> / {{ number_format($targetOpQty, 2) }}
                             </div>
                         </div>
                         <div class="col-12">

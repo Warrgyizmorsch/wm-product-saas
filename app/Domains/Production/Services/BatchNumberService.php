@@ -14,12 +14,12 @@ class BatchNumberService
      * Generate the next batch number for the tenant in the format: BAT-{ORDER_NUMBER}-01.
      * Collision-safe, order-sequential, and tenant-scoped.
      */
-    public function generateNextNumber(int $tenantId, mixed $order = null): string
+    public function generateNextNumber(int $tenantId, mixed $order = null, ?int $productId = null): string
     {
         if ($order) {
-            $orderNumber = null;
+            $orderModel = null;
             if (is_object($order) && isset($order->order_number)) {
-                $orderNumber = $order->order_number;
+                $orderModel = $order;
             } elseif (is_numeric($order)) {
                 $orderModel = ProductionBatch::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
@@ -27,11 +27,13 @@ class BatchNumberService
                 if (!$orderModel) {
                     $orderModel = \App\Domains\Production\Models\ProductionOrder::withoutGlobalScopes()->find($order);
                 }
-                $orderNumber = $orderModel?->order_number;
             }
 
-            if ($orderNumber) {
-                $prefix = "BAT-{$orderNumber}-";
+            if ($orderModel && $orderModel->order_number) {
+                $orderNumber = $orderModel->order_number;
+                $isSfg = ($productId && (int) $productId !== (int) $orderModel->product_id);
+                $typePrefix = $isSfg ? 'SFG' : 'FG';
+                $prefix = "BAT-{$typePrefix}-{$orderNumber}-";
 
                 $count = ProductionBatch::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
