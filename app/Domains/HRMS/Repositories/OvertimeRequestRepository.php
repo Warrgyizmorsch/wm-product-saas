@@ -50,6 +50,11 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         if (!empty($overtimeStatus)) {
             $query->where('status', $overtimeStatus);
         }
+        $payrollMonth = $inputs['payroll_month'] ?? '';
+        if (!empty($payrollMonth)) {
+            $carbonMonth = Carbon::parse($payrollMonth . '-01');
+            $query->whereBetween('date', [$carbonMonth->copy()->startOfMonth(), $carbonMonth->copy()->endOfMonth()]);
+        }
 
         if (!empty($overtimeSearch)) {
             $query->whereHas('employee', function ($eq) use ($overtimeSearch) {

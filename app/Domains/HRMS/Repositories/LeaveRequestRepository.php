@@ -202,6 +202,12 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         if (!empty($leavesStatus)) {
             $query->where('status', $leavesStatus);
         }
+        $payrollMonth = $inputs['payroll_month'] ?? '';
+        if (!empty($payrollMonth)) {
+            $carbonMonth = \Carbon\Carbon::parse($payrollMonth . '-01');
+            $query->where('start_date', '<=', $carbonMonth->copy()->endOfMonth())
+                  ->where('end_date', '>=', $carbonMonth->copy()->startOfMonth());
+        }
         if (!empty($leavesSearch)) {
             $query->where(function ($q) use ($leavesSearch) {
                 $q->whereHas('employee', function ($eq) use ($leavesSearch) {

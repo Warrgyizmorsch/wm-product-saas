@@ -39,8 +39,20 @@ class AttendanceController extends Controller
         $departments = Department::where('status', true)->orderBy('name')->get();
 
         if ($view === 'corrections') {
-            $corrections = \App\Domains\HRMS\Models\AttendanceCorrection::with(['employee', 'attendance'])
-                ->orderBy('created_at', 'desc')
+            $query = \App\Domains\HRMS\Models\AttendanceCorrection::with(['employee', 'attendance']);
+
+            $correctionsStatus = $request->get('corrections_status');
+            if (!empty($correctionsStatus)) {
+                $query->where('status', $correctionsStatus);
+            }
+
+            $payrollMonth = $request->get('payroll_month');
+            if (!empty($payrollMonth)) {
+                $carbonMonth = \Carbon\Carbon::parse($payrollMonth . '-01');
+                $query->whereBetween('date', [$carbonMonth->copy()->startOfMonth(), $carbonMonth->copy()->endOfMonth()]);
+            }
+
+            $corrections = $query->orderBy('created_at', 'desc')
                 ->paginate(10)
                 ->withQueryString();
 

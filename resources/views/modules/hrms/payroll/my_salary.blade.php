@@ -85,7 +85,7 @@
                     <div class="modal fade" id="payslipModal-{{ $run->id }}" tabindex="-1" aria-labelledby="payslipModalLabel-{{ $run->id }}" aria-hidden="true">
                         <div class="modal-dialog modal-lg modal-dialog-centered">
                             <div class="modal-content shadow-lg border-0 rounded-3">
-                                <div class="modal-header bg-primary text-white py-3">
+                                <div class="modal-header border-0 text-white py-3 px-4" style="background: linear-gradient(135deg, #3b5bdb 0%, #1c3faa 100%);">
                                     <h5 class="modal-title fw-bold text-white fs-15" id="payslipModalLabel-{{ $run->id }}">
                                         <i class="feather-dollar-sign me-2"></i>Payslip Details - {{ $carbonMonth->format('F Y') }}
                                     </h5>
@@ -143,7 +143,7 @@
 
                                                 <div class="d-flex justify-content-between border-top pt-2 mt-auto fs-12 fw-bold text-dark">
                                                     <span>Gross Earnings</span>
-                                                    <span>₹{{ number_format(($calc['gross_earnings'] ?? 0) + ($calc['adhoc_earnings'] ?? 0) + ($calc['retro_lop_reversals'] ?? 0), 2) }}</span>
+                                                    <span>₹{{ number_format($calc['total_earnings'] ?? 0, 2) }}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -185,7 +185,7 @@
 
                                                 <div class="d-flex justify-content-between border-top pt-2 mt-auto fs-12 fw-bold text-dark">
                                                     <span>Total Deductions</span>
-                                                    <span>₹{{ number_format(($calc['gross_deductions'] ?? 0) + ($calc['lop_deduction'] ?? 0) + ($calc['adhoc_deductions'] ?? 0) + ($calc['attendance_penalties'] ?? 0), 2) }}</span>
+                                                    <span>₹{{ number_format($calc['total_deductions'] ?? 0, 2) }}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -201,11 +201,11 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="modal-footer bg-light-50">
+                                <div class="modal-footer" style="background:#f8f9fa; border-top: 1px solid #f0f2f5;">
                                     <span class="fs-11 text-muted me-auto">Released by Finance on {{ $run->updated_at->format('d M Y H:i') }}</span>
-                                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Close</button>
-                                    <button type="button" class="btn btn-sm btn-primary text-white" disabled>
-                                        <i class="feather-download me-1"></i> Download
+                                    <button type="button" class="btn btn-sm fw-semibold px-4" style="border:1px solid #dee2e6; background:#fff; color:#4a3b32; border-radius:6px;" data-bs-dismiss="modal">CLOSE</button>
+                                    <button type="button" class="btn btn-sm fw-semibold px-4 text-white" style="background:#4a3b32; border-radius:6px;" disabled>
+                                        <i class="feather-download me-1"></i> DOWNLOAD
                                     </button>
                                 </div>
                             </div>
