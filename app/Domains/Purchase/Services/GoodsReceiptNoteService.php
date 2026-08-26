@@ -19,7 +19,7 @@ class GoodsReceiptNoteService
 
     public function storeGrn(array $validated, int $tenantId): GoodsReceiptNote
     {
-        return DB::transaction(function () use ($validated, $tenantId) {
+        $grn = DB::transaction(function () use ($validated, $tenantId) {
             $grnNumber = $this->grnRepo->getNextGrnNumber($tenantId);
 
             $po = PurchaseOrder::find($validated['purchase_order_id']);
@@ -92,7 +92,7 @@ class GoodsReceiptNoteService
                     'remarks'                => $item['remarks'] ?? null,
                 ]);
 
-                if ($qtyAccepted > 0) {
+                if ($qtyAccepted > 0 && $this->shouldAffectPhysicalInventory($poItem)) {
                     if (!empty($item['batches']) && is_array($item['batches'])) {
                         $sumBatchQty = 0;
                         foreach ($item['batches'] as $b) {
@@ -168,11 +168,40 @@ class GoodsReceiptNoteService
                 }
             }
 
-            DB::afterCommit(function () use ($grn) {
-                event(new \App\Domains\Purchase\Events\GoodsReceiptNoteApproved($grn));
-            });
-
             return $grn;
         });
+
+        event(new \App\Domains\Purchase\Events\GoodsReceiptNoteApproved($grn));
+
+        return $grn;
+    }
+
+    /**
+     * Centralized decision to determine if a PO item / product receipt affects physical warehouse inventory.
+     */
+    public function shouldAffectPhysicalInventory(PurchaseOrderItem $poItem): bool
+    {
+        $product = $poItem->product;
+        if ($product && (strtolower((string)$product->item_type) === 'service' || strtolower((string)$product->type) === 'service')) {
+            return false;
+        }
+
+        if (!empty($poItem->production_order_operation_id)) {
+            return false;
+        }
+
+        if ($poItem->order && $poItem->order->is_subcontract) {
+            $opId = $poItem->production_order_operation_id;
+            if ($opId) {
+                $op = \App\Domains\Production\Models\ProductionOrderOperation::find($opId);
+                if ($op && $op->is_external) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
