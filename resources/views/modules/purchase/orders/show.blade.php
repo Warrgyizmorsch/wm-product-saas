@@ -277,6 +277,25 @@
                                     <td class="text-muted ps-0">Tax Option:</td>
                                     <td class="fw-semibold text-dark text-capitalize">{{ str_replace('_', ' ', $order->tax_type) }}</td>
                                 </tr>
+                                @if($order->freight_terms)
+                                    <tr>
+                                        <td class="text-muted ps-0">Freight Terms:</td>
+                                        <td class="fw-semibold text-dark text-capitalize">
+                                            @if($order->freight_terms === 'to_pay') To Pay (Freight Collect on Delivery)
+                                            @elseif($order->freight_terms === 'to_be_billed') To Be Billed (Vendor Prepaid & Added)
+                                            @elseif($order->freight_terms === 'prepaid') FOR Site (Freight Included in Price)
+                                            @elseif($order->freight_terms === 'customer_pickup') Self Pickup (Ex-Works)
+                                            @else {{ str_replace('_', ' ', $order->freight_terms) }}
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endif
+                                @if($order->freight_amount > 0)
+                                    <tr>
+                                        <td class="text-muted ps-0">Freight Amount:</td>
+                                        <td class="fw-bold text-primary">?{{ number_format($order->freight_amount, 2) }}</td>
+                                    </tr>
+                                @endif
                             </tbody>
                         </table>
                     </div>

@@ -74,6 +74,8 @@
 
         @php
             $availAdv = max($availableAdvance ?? 0, $bill->goodsReceiptNote?->purchaseOrder?->total_advance_paid ?? 0);
+            $isFreightEligible = ($bill->freight_terms === 'to_pay' || $bill->freight_terms === 'to_be_billed');
+            $isProRata = ($bill->tax_type === 'item_wise_tax' && $isFreightEligible && $bill->freight_tax_method === 'pro_rata' && $bill->freight_amount > 0);
         @endphp
 
         @if($availAdv > 0)
@@ -100,24 +102,50 @@
         @endif
 
         <!-- Metadata Row -->
-        <div class="row g-3 mb-4 fs-13 text-dark">
-            <div class="col-md-3">
+        <div class="row g-3 mb-4 fs-13 text-dark border-bottom pb-3">
+            <div class="col-md-2">
                 <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.vendor_invoice_no') }}</span>
                 <strong class="font-monospace fs-14">{{ $bill->vendor_invoice_number ?: '—' }}</strong>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.bill_date') }}</span>
                 <strong>{{ $bill->bill_date ? $bill->bill_date->format('d-M-Y') : '—' }}</strong>
             </div>
-            <div class="col-md-3">
-                <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.due_date') }}</span>
-                <strong>{{ $bill->due_date ? $bill->due_date->format('d-M-Y') : '—' }}</strong>
+            <div class="col-md-2">
+                <span class="text-muted d-block fs-11 text-uppercase fw-bold">Discount / Tax Options</span>
+                <strong class="text-capitalize d-block">{{ str_replace('_', ' ', $bill->discount_type ?: 'without_discount') }}</strong>
+                <small class="text-muted text-capitalize d-block">{{ str_replace('_', ' ', $bill->tax_type ?: 'order_wise_tax') }}</small>
             </div>
-            <div class="col-md-3 text-md-end">
+            <div class="col-md-2">
+                <span class="text-muted d-block fs-11 text-uppercase fw-bold">GST Type</span>
+                <strong class="text-capitalize">{{ $bill->gst_type === 'igst' ? 'Inter-State (IGST)' : 'Intra-State (CGST+SGST)' }}</strong>
+            </div>
+            <div class="col-md-2">
+                <span class="text-muted d-block fs-11 text-uppercase fw-bold">Freight Terms &amp; Method</span>
+                <strong class="text-capitalize d-block">{{ str_replace('_', ' ', $bill->freight_terms ?: 'To Pay') }}</strong>
+                @if($bill->freight_amount > 0)
+                    <span class="text-primary fw-bold font-monospace d-inline-block">₹{{ number_format($bill->freight_amount, 2) }}</span>
+                    <span class="badge bg-soft-primary text-primary fs-11 ms-1">
+                        {{ $bill->freight_tax_method === 'pro_rata' ? 'Pro-Rata Apportionment' : ($bill->freight_tax_method === 'manual' ? 'Custom Tax Rate' : 'Highest GST Rate') }}
+                    </span>
+                @endif
+            </div>
+            <div class="col-md-2 text-md-end">
                 <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.grand_total') }}</span>
                 <strong class="fs-16 font-monospace text-primary">₹{{ number_format($bill->grand_total, 2) }}</strong>
             </div>
         </div>
+
+        @php
+            // Calculate total gross taxable value for Pro-Rata apportionment
+            $grossTaxableValue = 0;
+            foreach ($bill->items as $bItem) {
+                $grossTaxableValue += ((float)$bItem->quantity * (float)$bItem->unit_rate);
+            }
+            if ($bill->discount_amount > 0 && $bill->discount_type === 'order_wise') {
+                $grossTaxableValue = max(0.01, $grossTaxableValue - (float)$bill->discount_amount);
+            }
+        @endphp
 
         <!-- Billed Items Table -->
         <h6 class="fw-bold text-dark mb-2">{{ __('purchase.billed_items') }}</h6>
@@ -126,14 +154,41 @@
                 <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
                     <tr>
                         <th class="ps-3" style="width: 5%;">#</th>
-                        <th style="width: 45%;">{{ __('purchase.product') }}</th>
-                        <th class="text-center" style="width: 15%;">{{ __('purchase.billed_qty') }}</th>
-                        <th class="text-end" style="width: 15%;">{{ __('purchase.unit_rate') }}</th>
-                        <th class="text-end pe-3" style="width: 20%;">{{ __('purchase.total_amount') }}</th>
+                        <th style="width: 32%;">{{ __('purchase.product') }}</th>
+                        <th class="text-center" style="width: 10%;">{{ __('purchase.billed_qty') }}</th>
+                        <th class="text-end" style="width: 12%;">{{ __('purchase.unit_rate') }}</th>
+                        <th class="text-end" style="width: 12%;">Amount (₹)</th>
+
+                        @if($isProRata)
+                            <th class="text-end text-primary" style="width: 12%;">Freight Share (₹)</th>
+                        @endif
+
+                        <th class="text-center" style="width: 9%;">Tax Rate</th>
+                        <th class="text-end" style="width: 11%;">Tax Amount</th>
+                        <th class="text-end pe-3" style="width: 13%;">{{ __('purchase.total_amount') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($bill->items as $idx => $item)
+                        @php
+                            $qty = (float)$item->quantity;
+                            $rate = (float)$item->unit_rate;
+                            $lineSub = $qty * $rate;
+
+                            $itemFreightShare = 0;
+                            if ($isProRata && $grossTaxableValue > 0) {
+                                $ratio = $lineSub / $grossTaxableValue;
+                                $itemFreightShare = (float)$bill->freight_amount * $ratio;
+                            }
+
+                            $lineTaxableBase = $lineSub + $itemFreightShare;
+                            $taxRate = (float)($item->tax_percentage ?? 0);
+                            $lineTax = $lineTaxableBase * ($taxRate / 100);
+                            $lineTotal = (float)$item->total_amount;
+                            if ($lineTotal <= 0) {
+                                $lineTotal = $lineTaxableBase + $lineTax;
+                            }
+                        @endphp
                         <tr>
                             <td class="ps-3 text-muted fw-semibold">{{ $idx + 1 }}</td>
                             <td>
@@ -142,13 +197,90 @@
                                     <small class="text-muted d-block">{{ __('purchase.sku') }}: {{ $item->product->sku }}</small>
                                 @endif
                             </td>
-                            <td class="text-center font-monospace">{{ (float)$item->quantity }}</td>
-                            <td class="text-end font-monospace">₹{{ number_format($item->unit_rate, 2) }}</td>
-                            <td class="text-end pe-3 font-monospace fw-bold text-success">₹{{ number_format($item->total_amount, 2) }}</td>
+                            <td class="text-center font-monospace">{{ $qty }}</td>
+                            <td class="text-end font-monospace">₹{{ number_format($rate, 2) }}</td>
+                            <td class="text-end font-monospace">₹{{ number_format($lineSub, 2) }}</td>
+
+                            @if($isProRata)
+                                <td class="text-end font-monospace text-primary fw-semibold">+₹{{ number_format($itemFreightShare, 2) }}</td>
+                            @endif
+
+                            <td class="text-center font-monospace">{{ $taxRate }}%</td>
+                            <td class="text-end font-monospace text-muted">₹{{ number_format($lineTax, 2) }}</td>
+                            <td class="text-end pe-3 font-monospace fw-bold text-dark">₹{{ number_format($lineTotal, 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
+        </div>
+
+        <!-- Financial Summary Breakdown Card (Matching Absolute ERP Standards) -->
+        <div class="row mb-4">
+            <div class="col-md-6 offset-md-6">
+                <div class="border rounded p-3 bg-light-50 fs-13 text-dark">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Subtotal (Excl. Tax):</span>
+                        <strong class="font-monospace">₹{{ number_format($bill->subtotal, 2) }}</strong>
+                    </div>
+
+                    @if($bill->discount_amount > 0)
+                        <div class="d-flex justify-content-between mb-2 text-danger">
+                            <span>Less: Discount:</span>
+                            <strong class="font-monospace">-₹{{ number_format($bill->discount_amount, 2) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 border-top pt-1">
+                            <span class="text-muted">Items Taxable Value:</span>
+                            <strong class="font-monospace">₹{{ number_format(max(0, $bill->subtotal - $bill->discount_amount), 2) }}</strong>
+                        </div>
+                    @endif
+
+                    @if($bill->freight_amount > 0 && !$isProRata && $bill->tax_type !== 'order_wise_tax')
+                        <div class="d-flex justify-content-between mb-2 text-primary">
+                            <span>Add: Freight Charges:</span>
+                            <strong class="font-monospace">+₹{{ number_format($bill->freight_amount, 2) }}</strong>
+                        </div>
+                    @elseif($bill->freight_amount > 0 && $isProRata)
+                        <div class="d-flex justify-content-between mb-2 text-primary">
+                            <span>Freight Charges (Apportioned Pro-Rata to Items):</span>
+                            <strong class="font-monospace">+₹{{ number_format($bill->freight_amount, 2) }}</strong>
+                        </div>
+                    @elseif($bill->freight_amount > 0 && $bill->tax_type === 'order_wise_tax')
+                        <div class="d-flex justify-content-between mb-2 text-primary">
+                            <span>Add: Freight Charges:</span>
+                            <strong class="font-monospace">+₹{{ number_format($bill->freight_amount, 2) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 border-top pt-1 fw-bold">
+                            <span>Total Taxable Base (Items + Freight):</span>
+                            <strong class="font-monospace">₹{{ number_format(max(0, $bill->subtotal - $bill->discount_amount) + $bill->freight_amount, 2) }}</strong>
+                        </div>
+                    @endif
+
+                    <hr class="my-2">
+
+                    @if($bill->gst_type === 'igst')
+                        <div class="d-flex justify-content-between mb-2 text-muted">
+                            <span>IGST (Integrated Tax):</span>
+                            <strong class="font-monospace">+₹{{ number_format($bill->igst_amount, 2) }}</strong>
+                        </div>
+                    @else
+                        <div class="d-flex justify-content-between mb-2 text-muted">
+                            <span>CGST (Central Tax):</span>
+                            <strong class="font-monospace">+₹{{ number_format($bill->cgst_amount, 2) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 text-muted">
+                            <span>SGST (State Tax):</span>
+                            <strong class="font-monospace">+₹{{ number_format($bill->sgst_amount, 2) }}</strong>
+                        </div>
+                    @endif
+
+                    <hr class="my-2">
+
+                    <div class="d-flex justify-content-between fw-bold fs-15 text-primary">
+                        <span>Grand Total:</span>
+                        <strong class="font-monospace">₹{{ number_format($bill->grand_total, 2) }}</strong>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Payment Breakdown Cards -->

@@ -34,29 +34,136 @@ class VendorBillService
         return DB::transaction(function () use ($validated, $po, $grn, $vendorId, $tenantId) {
             $billNumber = $this->billRepo->getNextBillNumber($tenantId);
 
+            $discountType = $validated['discount_type'] ?? $po?->discount_type ?? 'without_discount';
+            $taxType = $validated['tax_type'] ?? $po?->tax_type ?? 'order_wise_tax';
+            $gstType = $validated['gst_type'] ?? $po?->gst_type ?? 'cgst_sgst';
+            $freightTerms = $validated['freight_terms'] ?? $po?->freight_terms ?? 'to_pay';
+            $isFreightEligible = in_array($freightTerms, ['to_pay', 'to_be_billed']);
+            $freightAmount = $isFreightEligible ? (float)($validated['freight_amount'] ?? $po?->freight_amount ?? 0) : 0.0;
+            $freightTaxPercent = $isFreightEligible ? (float)($validated['freight_tax_percent'] ?? 18.0) : 0.0;
+            $orderTaxPercent = (float)($validated['order_tax_percent'] ?? $validated['tax_rate'] ?? 0);
+
             $subtotal = 0;
-            $taxAmount = 0;
+            $sumItemDiscounts = 0;
+            $sumItemTaxes = 0;
+
+            $itemsData = [];
 
             foreach ($validated['items'] as $item) {
                 $qty = (float)$item['quantity'];
                 $price = (float)($item['unit_price'] ?? $item['unit_rate'] ?? 0);
+                $discPct = (float)($item['discount_percent'] ?? 0);
                 $taxRate = (float)($item['tax_rate'] ?? $item['tax_percentage'] ?? 0);
 
                 $lineSubtotal = $qty * $price;
-                $lineTax = $lineSubtotal * ($taxRate / 100);
+                $lineDisc = ($discountType === 'item_wise') ? ($lineSubtotal * ($discPct / 100)) : 0;
+                $lineNetSubtotal = max(0, $lineSubtotal - $lineDisc);
+
+                $lineTax = ($taxType === 'item_wise_tax') ? ($lineNetSubtotal * ($taxRate / 100)) : 0;
 
                 $subtotal += $lineSubtotal;
-                $taxAmount += $lineTax;
+                $sumItemDiscounts += $lineDisc;
+                $sumItemTaxes += $lineTax;
+
+                $itemsData[] = [
+                    'item'            => $item,
+                    'qty'             => $qty,
+                    'price'           => $price,
+                    'disc_pct'        => $discPct,
+                    'disc_amt'        => $lineDisc,
+                    'tax_rate'        => $taxRate,
+                    'line_subtotal'   => $lineSubtotal,
+                    'line_tax'        => $lineTax,
+                    'line_total'      => $lineNetSubtotal + $lineTax,
+                ];
             }
 
-            $grandTotal = $subtotal + $taxAmount;
+            if ($discountType === 'order_wise') {
+                $discountAmount = (float)($validated['discount_amount'] ?? 0);
+            } elseif ($discountType === 'item_wise') {
+                $discountAmount = $sumItemDiscounts;
+            } else {
+                $discountAmount = 0;
+            }
 
-            // Bill is always created as Unpaid — advance is applied separately
-            // after the bill is posted (Odoo/Zoho style)
+            $grossBeforeTax = max(0, $subtotal - $discountAmount);
+
+            $freightTaxMethod = $validated['freight_tax_method'] ?? 'highest_rate';
+
+            if ($taxType === 'without_tax' || !$isFreightEligible || $freightAmount <= 0) {
+                $itemsTaxAmount = 0;
+                $freightTaxAmount = 0;
+                if ($taxType === 'order_wise_tax') {
+                    $itemsTaxAmount = $grossBeforeTax * ($orderTaxPercent / 100);
+                } elseif ($taxType === 'item_wise_tax') {
+                    $itemsTaxAmount = $sumItemTaxes;
+                }
+            } else {
+                if ($taxType === 'order_wise_tax') {
+                    $itemsTaxAmount = $grossBeforeTax * ($orderTaxPercent / 100);
+                } else {
+                    $itemsTaxAmount = $sumItemTaxes;
+                }
+
+                if ($freightTaxMethod === 'pro_rata' && $grossBeforeTax > 0) {
+                    $freightTaxAmount = 0.0;
+                    foreach ($itemsData as $itemInfo) {
+                        $itemNetSub = max(0, $itemInfo['line_subtotal'] - $itemInfo['disc_amt']);
+                        $ratio = $itemNetSub / $grossBeforeTax;
+                        $itemFreightShare = $freightAmount * $ratio;
+                        $itemTaxRate = ($taxType === 'item_wise_tax') ? $itemInfo['tax_rate'] : $orderTaxPercent;
+                        $freightTaxAmount += $itemFreightShare * ($itemTaxRate / 100);
+                    }
+                } elseif ($freightTaxMethod === 'manual') {
+                    $freightTaxAmount = $freightAmount * ($freightTaxPercent / 100);
+                } else {
+                    // highest_rate (default)
+                    $maxTaxRate = 0.0;
+                    if ($taxType === 'order_wise_tax') {
+                        $maxTaxRate = $orderTaxPercent;
+                    } else {
+                        foreach ($itemsData as $itemInfo) {
+                            if ($itemInfo['tax_rate'] > $maxTaxRate) {
+                                $maxTaxRate = $itemInfo['tax_rate'];
+                            }
+                        }
+                    }
+                    if ($maxTaxRate <= 0) $maxTaxRate = 18.0;
+                    $freightTaxAmount = $freightAmount * ($maxTaxRate / 100);
+                }
+            }
+
+            $taxAmount = $itemsTaxAmount + $freightTaxAmount;
+
+            $cgstAmount = 0.0;
+            $sgstAmount = 0.0;
+            $igstAmount = 0.0;
+
+            if ($taxAmount > 0) {
+                if ($gstType === 'igst') {
+                    $igstAmount = round($taxAmount, 2);
+                } else {
+                    $cgstAmount = round($taxAmount / 2, 2);
+                    $sgstAmount = round($taxAmount - $cgstAmount, 2);
+                }
+            }
+
+            $grandTotal = max(0, $grossBeforeTax + $freightAmount + $taxAmount);
+
             $bill = $this->billRepo->create([
                 'tenant_id'             => $tenantId,
                 'bill_number'           => $billNumber,
                 'vendor_invoice_number' => $validated['vendor_invoice_number'] ?? $validated['vendor_bill_number'] ?? null,
+                'discount_type'         => $discountType,
+                'tax_type'              => $taxType,
+                'discount_amount'       => $discountAmount,
+                'gst_type'              => $gstType,
+                'freight_terms'         => $freightTerms,
+                'freight_amount'        => $freightAmount,
+                'freight_tax_method'    => $freightTaxMethod,
+                'cgst_amount'           => $cgstAmount,
+                'sgst_amount'           => $sgstAmount,
+                'igst_amount'           => $igstAmount,
                 'goods_receipt_note_id' => $grn?->id,
                 'purchase_order_id'     => $po?->id,
                 'vendor_id'             => $vendorId,
@@ -72,28 +179,37 @@ class VendorBillService
                 'created_by'            => auth()->id() ?: 1,
             ]);
 
-            foreach ($validated['items'] as $item) {
-                $qty = (float)$item['quantity'];
-                $price = (float)($item['unit_price'] ?? $item['unit_rate'] ?? 0);
-                $taxRate = (float)($item['tax_rate'] ?? $item['tax_percentage'] ?? 0);
-
-                $lineSubtotal = $qty * $price;
-                $lineTax = $lineSubtotal * ($taxRate / 100);
-
+            foreach ($itemsData as $row) {
+                $item = $row['item'];
                 $poItem = $po ? $po->items->firstWhere('id', $item['purchase_order_item_id'] ?? null) : null;
                 $productId = $item['product_id'] ?? $poItem?->product_id;
+
+                $itemNetSub = max(0, $row['line_subtotal'] - $row['disc_amt']);
+                $itemTaxRate = ($taxType === 'order_wise_tax') ? $orderTaxPercent : $row['tax_rate'];
+
+                $finalLineTotal = $row['line_total'];
+                if ($freightTaxMethod === 'pro_rata' && $isFreightEligible && $freightAmount > 0 && $grossBeforeTax > 0) {
+                    $ratio = $itemNetSub / $grossBeforeTax;
+                    $itemFreightShare = $freightAmount * $ratio;
+                    $lineTaxWithFreight = ($itemNetSub + $itemFreightShare) * ($itemTaxRate / 100);
+                    $finalLineTotal = round($itemNetSub + $itemFreightShare + $lineTaxWithFreight, 2);
+                }
 
                 VendorBillItem::create([
                     'tenant_id'                  => $tenantId,
                     'vendor_bill_id'             => $bill->id,
                     'product_id'                 => $productId,
                     'goods_receipt_note_item_id' => $item['goods_receipt_note_item_id'] ?? null,
-                    'quantity'                   => $qty,
-                    'unit_rate'                  => $price,
-                    'tax_percentage'             => $taxRate,
-                    'total_amount'               => $lineSubtotal + $lineTax,
+                    'quantity'                   => $row['qty'],
+                    'unit_rate'                  => $row['price'],
+                    'tax_percentage'             => $itemTaxRate,
+                    'total_amount'               => $finalLineTotal,
                 ]);
             }
+
+            // Dispatch BillPosted event to automatically trigger Accounting GL Journal Posting
+            event(new \App\Domains\Purchase\Events\BillPosted($bill));
+            app(\App\Domains\Accounting\Listeners\PostPurchaseBillJournal::class)->handle(new \App\Domains\Purchase\Events\BillPosted($bill));
 
             return $bill;
         });
@@ -101,19 +217,15 @@ class VendorBillService
 
     public function getAvailableVendorAdvance(int $vendorId, int $tenantId): float
     {
-        // Total advance paid to vendor (direct advance payments)
         $directAdvances = VendorPayment::where('tenant_id', $tenantId)
             ->where('vendor_id', $vendorId)
             ->where('payment_type', 'Advance')
             ->sum('amount');
 
-        // Total PO-linked advance payments
         $poAdvances = PurchaseAdvancePayment::where('tenant_id', $tenantId)
             ->where('vendor_id', $vendorId)
             ->sum('amount');
 
-        // Only deduct advance amounts actually allocated to bills
-        // (NOT total paid_amount — that includes direct payments too)
         $usedAsAdvance = VendorPaymentAllocation::where('tenant_id', $tenantId)
             ->whereHas('vendorPayment', function ($q) use ($vendorId) {
                 $q->where('vendor_id', $vendorId)

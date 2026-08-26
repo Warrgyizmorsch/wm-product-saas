@@ -304,10 +304,7 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Listeners\ProcessSubcontractReceiptOnGrnApproved::class
         );
 
-        \Illuminate\Support\Facades\Event::listen(
-            \App\Domains\Purchase\Events\GoodsReceiptNoteApproved::class,
-            \App\Domains\Purchase\Listeners\AutoCreateVendorBillOnGrnApproved::class
-        );
+
 
         \Illuminate\Support\Facades\Event::listen(
             \App\Domains\Inventory\Events\StockOutflowRecorded::class,
