@@ -498,8 +498,8 @@ class InvoiceController extends Controller
         if (!$inv) abort(404);
         $this->authorize('send', $inv);
 
-        if (!in_array($inv->status, ['Draft', 'Sent'])) {
-            return back()->withErrors(['status' => 'Only Draft invoices can be marked as Sent.']);
+        if (!in_array($inv->status, ['Draft', 'Sent', 'Posted'])) {
+            return back()->withErrors(['status' => 'Only Draft or Posted invoices can be marked as Sent.']);
         }
 
         $inv->status = 'Sent';

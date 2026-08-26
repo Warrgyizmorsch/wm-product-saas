@@ -12,10 +12,12 @@ use Illuminate\View\View;
 class ApAgingController extends Controller
 {
     /**
-     * Statuses that still carry an open payable balance. Draft bills aren't
-     * posted yet, Paid/Cancelled have nothing outstanding.
+     * Statuses that still carry an open payable balance. VendorBill never
+     * actually uses 'Posted' (see VendorBillService — bills are created as
+     * 'Unpaid' and move to 'Partially Paid'/'Paid'); Cancelled has nothing
+     * outstanding.
      */
-    private const OPEN_STATUSES = ['Posted', 'Partially Paid'];
+    private const OPEN_STATUSES = ['Unpaid', 'Partially Paid'];
 
     public function __construct(
         private readonly AccessService $access,

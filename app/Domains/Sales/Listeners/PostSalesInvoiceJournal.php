@@ -24,6 +24,14 @@ class PostSalesInvoiceJournal
             $journal = $this->salesAccountingService->postInvoiceJournal($invoice);
             if ($journal) {
                 Log::info("PostSalesInvoiceJournal: Successfully posted accounting journal #{$journal->journal_number} for Invoice #{$invoice->invoice_number}");
+
+                // Keep the invoice's own status in sync with the GL — a Draft invoice
+                // that has already been journaled is invisible to reports (e.g. AR
+                // Aging) that key off status rather than the ledger.
+                if ($invoice->status === 'Draft') {
+                    $invoice->status = 'Posted';
+                    $invoice->save();
+                }
             }
         } catch (\Throwable $e) {
             Log::warning("PostSalesInvoiceJournal Error: " . $e->getMessage(), [

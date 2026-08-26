@@ -13,9 +13,12 @@ class ArAgingController extends Controller
 {
     /**
      * Statuses that still carry an open receivable balance. Draft invoices
-     * aren't posted yet, Paid/Cancelled have nothing outstanding.
+     * aren't posted yet, Paid/Cancelled have nothing outstanding. 'Sent' is
+     * the normal state for an invoice that has gone out to the customer and
+     * still carries a real GL receivable (posting to the ledger happens
+     * automatically at creation, independent of this workflow status).
      */
-    private const OPEN_STATUSES = ['Posted', 'Partially Paid'];
+    private const OPEN_STATUSES = ['Sent', 'Posted', 'Partially Paid'];
 
     public function __construct(
         private readonly AccessService $access,

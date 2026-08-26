@@ -29,6 +29,15 @@ class SalesAccountingService
     {
         $tenantId = $invoice->tenant_id;
 
+        $existing = Journal::where('tenant_id', $tenantId)
+            ->where('reference_type', 'Invoice')
+            ->where('reference_id', $invoice->id)
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
         // 1. Debtors / Accounts Receivable A/c
         $accountsReceivable = ChartOfAccount::where('tenant_id', $tenantId)
             ->where(function ($q) {

@@ -38,8 +38,9 @@ class PostSalesReturnJournal
 
             // Accounts Receivable (1100) - Asset Account
             $accountsReceivable = $this->accounts->findByCode('1100', $tenantId);
-            // Sales Returns / Allowances (4020) or Sales Revenue (4010) - Income Account
-            $salesReturnAccount = $this->accounts->findByCode('4020', $tenantId)
+            // Sales Returns & Allowances (4030), falling back to Sales Revenue (4010)
+            // for tenants provisioned before the dedicated returns ledger existed.
+            $salesReturnAccount = $this->accounts->findByCode('4030', $tenantId)
                 ?? $this->accounts->findByCode('4010', $tenantId);
 
             // Output GST Accounts
