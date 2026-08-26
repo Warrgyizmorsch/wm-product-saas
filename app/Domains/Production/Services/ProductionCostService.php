@@ -186,7 +186,10 @@ class ProductionCostService
                 $committedCost += $opCommitted;
 
                 $vendorBillItem = \Illuminate\Support\Facades\DB::table('vendor_bill_items')
-                    ->where('purchase_order_item_id', $poItem->id)
+                    ->join('vendor_bills', 'vendor_bill_items.vendor_bill_id', '=', 'vendor_bills.id')
+                    ->where('vendor_bills.purchase_order_id', $poItem->purchase_order_id)
+                    ->where('vendor_bill_items.product_id', $poItem->product_id)
+                    ->select('vendor_bill_items.*')
                     ->first();
 
                 if ($vendorBillItem && isset($vendorBillItem->total_amount)) {

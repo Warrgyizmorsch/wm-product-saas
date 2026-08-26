@@ -156,42 +156,90 @@
         </div>
 
         {{-- Subcontracting Execution KPI Row --}}
-        @if(isset($subcontractMetrics))
-            <div class="card border shadow-sm p-3 mb-4 bg-light">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <h6 class="fw-bold text-dark mb-0"><i class="feather-truck text-primary me-2"></i>Multi-Model Subcontracting & Vendor Execution Metrics</h6>
-                    <span class="badge bg-soft-primary text-primary fs-11">Turnkey & Subcontract Linkage</span>
+        @if(!empty($subcontractMetrics))
+            <div class="card border-0 shadow-sm p-3 mb-4 bg-white rounded-3">
+                <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0"><i class="feather-truck text-primary me-2"></i>Multi-Model Subcontracting & Operational Monitoring</h6>
+                        <small class="text-muted">Real-time status of external operations, vendor dispatch, GRN receipts & QC gates</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="{{ route('production.settings.index') }}" class="btn btn-sm btn-outline-secondary"><i class="feather-settings me-1"></i> Subcontract Policy Settings</a>
+                        <span class="badge bg-soft-primary text-primary fs-11 font-monospace">Hybrid Workflow Enabled</span>
+                    </div>
                 </div>
-                <div class="row g-3 text-center">
+                <div class="row g-2 text-center">
                     <div class="col">
-                        <div class="p-2 bg-white rounded border">
-                            <span class="fs-11 text-muted text-uppercase fw-bold">Awaiting PR</span>
-                            <h4 class="text-dark fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['awaiting_subcontract_pr'] ?? 0) }}</h4>
-                        </div>
+                        <a href="{{ route('production.orders.index', ['filter' => 'subcontract_awaiting_pr']) }}" class="text-decoration-none">
+                            <div class="p-2 bg-light rounded border h-100 hover-shadow transition-all">
+                                <span class="fs-10 text-muted text-uppercase fw-bold d-block">Awaiting PR</span>
+                                <h4 class="text-dark fw-bold mb-0 mt-1 font-monospace">{{ number_format($subcontractMetrics['awaiting_subcontract_pr'] ?? 0) }}</h4>
+                            </div>
+                        </a>
                     </div>
                     <div class="col">
-                        <div class="p-2 bg-white rounded border border-warning">
-                            <span class="fs-11 text-warning text-uppercase fw-bold">At Vendor</span>
-                            <h4 class="text-warning fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['at_vendor']) }}</h4>
-                        </div>
+                        <a href="{{ route('purchase.orders.index', ['type' => 'subcontract', 'status' => 'draft']) }}" class="text-decoration-none">
+                            <div class="p-2 bg-soft-warning rounded border border-warning h-100 hover-shadow transition-all">
+                                <span class="fs-10 text-warning text-uppercase fw-bold d-block">PO Awaiting Approval</span>
+                                <h4 class="text-warning-emphasis fw-bold mb-0 mt-1 font-monospace">{{ number_format($subcontractMetrics['po_awaiting_approval'] ?? 0) }}</h4>
+                            </div>
+                        </a>
                     </div>
                     <div class="col">
-                        <div class="p-2 bg-white rounded border border-danger">
-                            <span class="fs-11 text-danger text-uppercase fw-bold">Vendor Delayed</span>
-                            <h4 class="text-danger fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['vendor_delayed']) }}</h4>
-                        </div>
+                        <a href="{{ route('production.orders.index', ['filter' => 'subcontract_ready_dispatch']) }}" class="text-decoration-none">
+                            <div class="p-2 bg-soft-info rounded border border-info h-100 hover-shadow transition-all">
+                                <span class="fs-10 text-info text-uppercase fw-bold d-block">Ready for Dispatch</span>
+                                <h4 class="text-info-emphasis fw-bold mb-0 mt-1 font-monospace">{{ number_format($subcontractMetrics['ready_for_dispatch'] ?? 0) }}</h4>
+                            </div>
+                        </a>
                     </div>
                     <div class="col">
-                        <div class="p-2 bg-white rounded border border-info">
-                            <span class="fs-11 text-info text-uppercase fw-bold">QC Pending</span>
-                            <h4 class="text-info fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['subcontract_qc_pending']) }}</h4>
-                        </div>
+                        <a href="{{ route('production.orders.index', ['filter' => 'subcontract_at_vendor']) }}" class="text-decoration-none">
+                            <div class="p-2 bg-soft-primary rounded border border-primary h-100 hover-shadow transition-all">
+                                <span class="fs-10 text-primary text-uppercase fw-bold d-block">At Vendor</span>
+                                <h4 class="text-primary fw-bold mb-0 mt-1 font-monospace">{{ number_format($subcontractMetrics['at_vendor'] ?? 0) }}</h4>
+                            </div>
+                        </a>
                     </div>
                     <div class="col">
-                        <div class="p-2 bg-white rounded border border-secondary">
-                            <span class="fs-11 text-secondary text-uppercase fw-bold">Vendor Rework</span>
-                            <h4 class="text-secondary fw-bold mb-0 mt-1">{{ number_format($subcontractMetrics['vendor_rework']) }}</h4>
-                        </div>
+                        <a href="{{ route('production.orders.index', ['filter' => 'subcontract_delayed']) }}" class="text-decoration-none">
+                            <div class="p-2 bg-soft-danger rounded border border-danger h-100 hover-shadow transition-all">
+                                <span class="fs-10 text-danger text-uppercase fw-bold d-block">Vendor Delayed</span>
+                                <h4 class="text-danger fw-bold mb-0 mt-1 font-monospace">{{ number_format($subcontractMetrics['vendor_delayed'] ?? 0) }}</h4>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col">
+                        <a href="{{ route('production.orders.index', ['filter' => 'subcontract_partial_receipt']) }}" class="text-decoration-none">
+                            <div class="p-2 bg-light rounded border border-warning h-100 hover-shadow transition-all">
+                                <span class="fs-10 text-dark text-uppercase fw-bold d-block">Partial Receipt</span>
+                                <h4 class="text-dark fw-bold mb-0 mt-1 font-monospace">{{ number_format($subcontractMetrics['partial_receipt'] ?? 0) }}</h4>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col">
+                        <a href="{{ route('production.inspections.index', ['type' => 'subcontract']) }}" class="text-decoration-none">
+                            <div class="p-2 bg-soft-info rounded border border-info h-100 hover-shadow transition-all">
+                                <span class="fs-10 text-info text-uppercase fw-bold d-block">QC Pending</span>
+                                <h4 class="text-info fw-bold mb-0 mt-1 font-monospace">{{ number_format($subcontractMetrics['subcontract_qc_pending'] ?? 0) }}</h4>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col">
+                        <a href="{{ route('production.rework.index') }}" class="text-decoration-none">
+                            <div class="p-2 bg-soft-secondary rounded border border-secondary h-100 hover-shadow transition-all">
+                                <span class="fs-10 text-secondary text-uppercase fw-bold d-block">Vendor Rework</span>
+                                <h4 class="text-secondary fw-bold mb-0 mt-1 font-monospace">{{ number_format($subcontractMetrics['vendor_rework'] ?? 0) }}</h4>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col">
+                        <a href="{{ route('production.orders.index', ['filter' => 'subcontract_material_exception']) }}" class="text-decoration-none">
+                            <div class="p-2 bg-soft-danger rounded border border-danger h-100 hover-shadow transition-all">
+                                <span class="fs-10 text-danger text-uppercase fw-bold d-block">Material Exception</span>
+                                <h4 class="text-danger fw-bold mb-0 mt-1 font-monospace">{{ number_format($subcontractMetrics['material_exceptions'] ?? 0) }}</h4>
+                            </div>
+                        </a>
                     </div>
                 </div>
             </div>

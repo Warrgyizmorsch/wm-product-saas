@@ -232,6 +232,16 @@ class ProductionOrderOperation extends BaseModel
         return $this->hasMany(ProductionOperatorAssignment::class, 'production_order_operation_id');
     }
 
+    public function deliveryChallans(): HasMany
+    {
+        return $this->hasMany(DeliveryChallan::class, 'production_order_operation_id');
+    }
+
+    public function latestDeliveryChallan(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(DeliveryChallan::class, 'production_order_operation_id')->latestOfMany();
+    }
+
     public function isRunning(): bool
     {
         return $this->status === self::STATUS_RUNNING;

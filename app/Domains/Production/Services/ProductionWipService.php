@@ -292,7 +292,7 @@ class ProductionWipService
                 ->where('sequence', '>', $orderOp->sequence)
                 ->exists();
 
-            $isFinalFgOperation = !$nextOpExists && (!$orderOp->is_intermediate && (int) $orderOp->source_product_id === (int) $wip->order->product_id);
+            $isFinalFgOperation = !$nextOpExists && (!$orderOp->is_intermediate && ($orderOp->source_product_id === null || (int) $orderOp->source_product_id === (int) $wip->order->product_id));
 
             // Update quantity states: only final FG operations increment FG completed_quantity
             if ($isFinalFgOperation) {
@@ -594,10 +594,9 @@ class ProductionWipService
     public function evaluateAndExecuteWipTransfers(int $sourceOrderOpId, ?int $userId = null): float
     {
         return DB::transaction(function () use ($sourceOrderOpId, $userId) {
-            $tenantId = require_tenant_id();
-            $sourceOp = ProductionOrderOperation::where('tenant_id', $tenantId)
-                ->lockForUpdate()
+            $sourceOp = ProductionOrderOperation::lockForUpdate()
                 ->findOrFail($sourceOrderOpId);
+            $tenantId = $sourceOp->tenant_id;
 
             $order = $sourceOp->order;
             if (!$order || $order->isClosed() || $order->isCancelled()) {
@@ -725,7 +724,8 @@ class ProductionWipService
 
                 $batchCompletedAtOp = ($expectedInput > 0 && $processedAtCurrentOp >= $expectedInput)
                     || ($goodOutput >= $plannedQty && $plannedQty > 0)
-                    || ($sourceOp->status === ProductionOrderOperation::STATUS_COMPLETED);
+                    || ($sourceOp->status === ProductionOrderOperation::STATUS_COMPLETED)
+                    || ($sourceOp->is_external && $sourceOp->status !== 'subcontract_qc_pending' && $readyToTransfer > 0);
 
                 // Transfer Chunk Determination
                 $transferBatchQty = (float) ($sourceOp->transfer_batch_quantity > 0

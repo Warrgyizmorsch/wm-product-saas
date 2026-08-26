@@ -330,6 +330,47 @@
                             @if($order->plan)
                                 <div class="fs-11 text-muted">Plan: {{ $order->plan->plan_number }}</div>
                             @endif
+
+                            {{-- Subcontract Badges & Exception Pills --}}
+                            @php
+                                $extOps = $order->operations ? $order->operations->filter(fn($o) => $o->is_external) : collect();
+                                $hasExt = $extOps->isNotEmpty();
+                                $hasInt = $order->operations ? $order->operations->contains(fn($o) => !$o->is_external) : false;
+                                $isHybrid = $hasExt && $hasInt;
+                                $isPureSubcontract = $hasExt && !$hasInt;
+                                $hasCompanyMat = $extOps->contains(fn($o) => strtolower($o->material_supply_type ?? '') === 'company_supplied');
+                                $hasVendorMat = $extOps->contains(fn($o) => strtolower($o->material_supply_type ?? '') === 'vendor_supplied');
+
+                                $missingVendor = $extOps->contains(fn($o) => empty($o->vendor_id));
+                                $qcHold = $extOps->contains(fn($o) => $o->status === 'subcontract_qc_pending');
+                                $delayedVendor = $extOps->contains(fn($o) => !in_array($o->status, ['completed', 'cancelled']) && $o->actual_start_time && $o->actual_start_time->lt(now()->subDays(3)));
+                            @endphp
+
+                            @if($hasExt)
+                                <div class="d-flex flex-wrap gap-1 mt-1">
+                                    @if($isHybrid)
+                                        <span class="badge bg-soft-primary text-primary font-monospace fs-10" title="Hybrid Routing (Internal + Subcontract)">Hybrid</span>
+                                    @elseif($isPureSubcontract)
+                                        <span class="badge bg-soft-info text-info font-monospace fs-10" title="Subcontract Routing">Subcontract</span>
+                                    @endif
+
+                                    @if($hasCompanyMat)
+                                        <span class="badge bg-soft-secondary text-secondary font-monospace fs-10" title="Company Supplied Material">Company Material</span>
+                                    @elseif($hasVendorMat)
+                                        <span class="badge bg-soft-secondary text-secondary font-monospace fs-10" title="Vendor Supplied Material">Vendor Material</span>
+                                    @endif
+
+                                    @if($missingVendor)
+                                        <span class="badge bg-danger text-white fs-10" title="Missing Subcontract Vendor Configuration"><i class="feather-alert-triangle me-1"></i>Vendor Missing</span>
+                                    @endif
+                                    @if($qcHold)
+                                        <span class="badge bg-warning text-dark fs-10" title="Subcontract Receipt Pending Quality Inspection"><i class="feather-clock me-1"></i>QC Pending</span>
+                                    @endif
+                                    @if($delayedVendor)
+                                        <span class="badge bg-danger text-white fs-10" title="Vendor Return Overdue"><i class="feather-clock me-1"></i>Overdue</span>
+                                    @endif
+                                </div>
+                            @endif
                         </td>
                         <td>
                             <div class="d-flex flex-column">
