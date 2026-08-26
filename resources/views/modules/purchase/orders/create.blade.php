@@ -135,6 +135,15 @@
                                     <option value="igst" @selected(old('gst_type') === 'igst')>{{ __('purchase.gst_inter_state') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
+
+                            <x-ui.odoo-form-ui type="select" label="Freight Terms" name="freight_terms" id="freightTermsSelect">
+                                <option value="to_pay" @selected(old('freight_terms', 'to_pay') === 'to_pay')>To Pay (Freight Collect on Delivery)</option>
+                                <option value="to_be_billed" @selected(old('freight_terms') === 'to_be_billed')>To Be Billed (Vendor Prepaid & Added to Bill)</option>
+                                <option value="prepaid" @selected(old('freight_terms') === 'prepaid')>FOR Site (Freight Included in Price / Vendor Paid)</option>
+                                <option value="customer_pickup" @selected(old('freight_terms') === 'customer_pickup')>Self Pickup (Ex-Works / Our Vehicle)</option>
+                            </x-ui.odoo-form-ui>
+
+                            <x-ui.odoo-form-ui type="input" label="Freight Amount (?)" name="freight_amount" id="freightAmountInput" inputType="number" step="0.01" min="0" :value="old('freight_amount', '0.00')" />
                         </div>
                     </div>
 

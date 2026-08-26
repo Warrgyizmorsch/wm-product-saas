@@ -182,6 +182,8 @@ class PurchaseOrderController extends Controller
             'discount_type' => 'nullable|string',
             'tax_type' => 'nullable|string',
             'gst_type' => 'nullable|string',
+            'freight_terms' => 'nullable|string',
+            'freight_amount' => 'nullable|numeric|min:0',
             'subtotal' => 'nullable|numeric',
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_amount' => 'nullable|numeric|min:0',

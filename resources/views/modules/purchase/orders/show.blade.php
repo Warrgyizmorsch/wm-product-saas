@@ -122,6 +122,28 @@
 
         <x-ui.odoo-form-ui type="sheet" class="p-0" id="printablePoContent">
             <!-- Header bar -->
+            @if($order->is_subcontract)
+                @php
+                    $firstItemWithMo = $order->items ? $order->items->first(fn($i) => !empty($i->production_order_operation_id)) : null;
+                    $linkedMoOp = $firstItemWithMo?->productionOrderOperation;
+                    $linkedMo = $linkedMoOp?->order;
+                @endphp
+                <div class="bg-soft-primary border-bottom border-primary px-4 py-2 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary text-white font-monospace fs-11">Subcontract Service PO</span>
+                        <span class="fs-12 text-dark">
+                            Auto-generated for Production Subcontracting Execution
+                            @if($linkedMo)
+                                — <strong>MO:</strong> <a href="{{ route('production.orders.show', $linkedMo->id) }}" class="fw-bold text-primary">{{ $linkedMo->order_number }}</a>
+                                @if($linkedMoOp)
+                                    | <strong>Op:</strong> {{ $linkedMoOp->operation_number }} ({{ $linkedMoOp->name }})
+                                @endif
+                            @endif
+                        </span>
+                    </div>
+                    <span class="badge bg-soft-info text-info border font-monospace fs-10">Service Receipt — No Stock Increase</span>
+                </div>
+            @endif
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 px-4 pt-4 pb-3 border-bottom bg-white">
                 <div>
                     <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">
@@ -277,6 +299,25 @@
                                     <td class="text-muted ps-0">Tax Option:</td>
                                     <td class="fw-semibold text-dark text-capitalize">{{ str_replace('_', ' ', $order->tax_type) }}</td>
                                 </tr>
+                                @if($order->freight_terms)
+                                    <tr>
+                                        <td class="text-muted ps-0">Freight Terms:</td>
+                                        <td class="fw-semibold text-dark text-capitalize">
+                                            @if($order->freight_terms === 'to_pay') To Pay (Freight Collect on Delivery)
+                                            @elseif($order->freight_terms === 'to_be_billed') To Be Billed (Vendor Prepaid & Added)
+                                            @elseif($order->freight_terms === 'prepaid') FOR Site (Freight Included in Price)
+                                            @elseif($order->freight_terms === 'customer_pickup') Self Pickup (Ex-Works)
+                                            @else {{ str_replace('_', ' ', $order->freight_terms) }}
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endif
+                                @if($order->freight_amount > 0)
+                                    <tr>
+                                        <td class="text-muted ps-0">Freight Amount:</td>
+                                        <td class="fw-bold text-primary">?{{ number_format($order->freight_amount, 2) }}</td>
+                                    </tr>
+                                @endif
                             </tbody>
                         </table>
                     </div>

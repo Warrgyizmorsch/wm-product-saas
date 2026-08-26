@@ -99,8 +99,9 @@ class VendorBillController extends Controller
 
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
+        $availableAdvance = $selectedGrn ? $this->billService->getAvailableVendorAdvance($selectedGrn->vendor_id, $tenantId) : 0.0;
 
-        return view('modules.purchase.bills.create', compact('selectedGrn', 'vendors', 'warehouses'));
+        return view('modules.purchase.bills.create', compact('selectedGrn', 'vendors', 'warehouses', 'availableAdvance'));
     }
 
     public function store(Request $request)
@@ -115,14 +116,27 @@ class VendorBillController extends Controller
             'vendor_id' => 'required|integer|exists:vendors,id',
             'vendor_bill_number'    => 'nullable|string|max:255',
             'vendor_invoice_number' => 'nullable|string|max:255',
+            'discount_type'         => 'nullable|string',
+            'tax_type'              => 'nullable|string',
+            'gst_type'              => 'nullable|string',
+            'discount_amount'       => 'nullable|numeric|min:0',
+            'order_tax_percent'     => 'nullable|numeric|min:0',
+            'freight_terms'         => 'nullable|string',
+            'freight_amount'        => 'nullable|numeric|min:0',
+            'freight_tax_percent'   => 'nullable|numeric|min:0',
+            'freight_tax_method'    => 'nullable|string',
             'notes'                 => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|integer',
             'items.*.purchase_order_item_id' => 'nullable|integer',
+            'items.*.goods_receipt_note_item_id' => 'nullable|integer',
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.unit_price' => 'nullable|numeric|min:0',
             'items.*.unit_rate' => 'nullable|numeric|min:0',
+            'items.*.discount_percent' => 'nullable|numeric|min:0',
+            'items.*.discount_amount' => 'nullable|numeric|min:0',
             'items.*.tax_rate' => 'nullable|numeric|min:0',
+            'items.*.tax_percentage' => 'nullable|numeric|min:0',
         ]);
 
         if (empty($validated['vendor_bill_number']) && !empty($validated['vendor_invoice_number'])) {

@@ -42,6 +42,8 @@ class PurchaseOrder extends BaseModel
         'discount_type',
         'tax_type',
         'gst_type',
+        'freight_terms',
+        'freight_amount',
         'subtotal',
         'discount_amount',
         'cgst_amount',

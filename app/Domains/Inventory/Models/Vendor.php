@@ -20,4 +20,9 @@ class Vendor extends BaseModel
         'address',
         'status',
     ];
+
+    public function operations()
+    {
+        return $this->hasMany(\App\Domains\Production\Models\ProductionOrderOperation::class, 'vendor_id');
+    }
 }

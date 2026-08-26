@@ -29,14 +29,18 @@ class PostPurchaseBillJournal
         try {
             $tenantId = $bill->tenant_id;
 
+            // Fetch Chart of Accounts by standard codes
             $accountsPayable = $this->accounts->findByCode('2010', $tenantId);
-            $inputGst = $this->accounts->findByCode('1600', $tenantId);
-            $inventory = $this->accounts->findByCode('1200', $tenantId);
+            $inputGst        = $this->accounts->findByCode('1600', $tenantId);
+            $inputCgst       = $this->accounts->findByCode('1601', $tenantId) ?: $inputGst;
+            $inputSgst       = $this->accounts->findByCode('1602', $tenantId) ?: $inputGst;
+            $inputIgst       = $this->accounts->findByCode('1603', $tenantId) ?: $inputGst;
+            $inventory       = $this->accounts->findByCode('1200', $tenantId);
             $purchaseExpense = $this->accounts->findByCode('5900', $tenantId);
+            $freightExpense  = $this->accounts->findByCode('5030', $tenantId) ?: $purchaseExpense;
 
-            if (!$accountsPayable || (!$inventory && !$purchaseExpense) || ((float) $bill->tax_amount > 0 && !$inputGst)) {
-                $message = 'Missing chart of accounts (Accounts Payable/Inventory/Expense/Input GST), skipping auto-post';
-                Log::warning("PostPurchaseBillJournal: {$message}", [
+            if (!$accountsPayable) {
+                Log::warning('PostPurchaseBillJournal: missing Accounts Payable (2010) account, skipping auto-post', [
                     'bill_id' => $bill->id,
                     'tenant_id' => $tenantId,
                 ]);
@@ -58,74 +62,106 @@ class PostPurchaseBillJournal
                 }
             }
 
-            // Fallback: if items/products can't be resolved, treat the whole subtotal as
-            // Inventory — safer default for a Purchase module, where most bills are goods receipts.
+            // Calculate item base value (subtotal minus discount)
+            $netItemsValue = max(0.01, (float)$bill->subtotal - (float)$bill->discount_amount);
             if ($goodsSubtotal <= 0 && $serviceSubtotal <= 0) {
-                $goodsSubtotal = (float) $bill->subtotal;
+                $goodsSubtotal = $netItemsValue;
+            } else if ($bill->discount_amount > 0) {
+                $goodsSubtotal = max(0.01, $goodsSubtotal - (float)$bill->discount_amount);
             }
 
             $lines = [];
 
-            if ($goodsSubtotal > 0) {
-                if (!$inventory) {
-                    $message = 'Missing Inventory (1200) account, skipping auto-post';
-                    Log::warning("PostPurchaseBillJournal: {$message}", [
-                        'bill_id' => $bill->id,
-                        'tenant_id' => $tenantId,
-                    ]);
-                    $this->failures->record($tenantId, BillPosted::class, $bill, $message);
-                    return;
-                }
+            // 1. Inventory / Stock Asset (Debit) - Item Base Amount Only
+            if ($goodsSubtotal > 0 && $inventory) {
                 $lines[] = [
                     'chart_of_account_id' => $inventory->id,
-                    'debit' => $goodsSubtotal,
-                    'description' => "Bill {$bill->bill_number} - Goods",
+                    'debit'               => round($goodsSubtotal, 2),
+                    'credit'              => 0,
+                    'description'         => "Bill {$bill->bill_number} - Stock Purchase (Base Item Value)",
                 ];
             }
 
-            if ($serviceSubtotal > 0) {
-                if (!$purchaseExpense) {
-                    $message = 'Missing Expense (5900) account, skipping auto-post';
-                    Log::warning("PostPurchaseBillJournal: {$message}", [
-                        'bill_id' => $bill->id,
-                        'tenant_id' => $tenantId,
-                    ]);
-                    $this->failures->record($tenantId, BillPosted::class, $bill, $message);
-                    return;
-                }
+            // 2. Service Purchase Expense (Debit)
+            if ($serviceSubtotal > 0 && $purchaseExpense) {
                 $lines[] = [
                     'chart_of_account_id' => $purchaseExpense->id,
-                    'debit' => $serviceSubtotal,
-                    'description' => "Bill {$bill->bill_number} - Services",
+                    'debit'               => round($serviceSubtotal, 2),
+                    'credit'              => 0,
+                    'description'         => "Bill {$bill->bill_number} - Service Charges",
                 ];
             }
 
-            if ((float) $bill->tax_amount > 0) {
+            // 3. Freight Charges Expense (Debit) - Dedicated Separate Freight Account (5400)
+            if ((float)$bill->freight_amount > 0 && $freightExpense) {
+                $lines[] = [
+                    'chart_of_account_id' => $freightExpense->id,
+                    'debit'               => round((float)$bill->freight_amount, 2),
+                    'credit'              => 0,
+                    'description'         => "Bill {$bill->bill_number} - Freight & Transport Charges",
+                ];
+            }
+
+            // 4. Input GST Tax Credits (Debit)
+            if ((float)$bill->igst_amount > 0 && $inputIgst) {
+                $lines[] = [
+                    'chart_of_account_id' => $inputIgst->id,
+                    'debit'               => round((float)$bill->igst_amount, 2),
+                    'credit'              => 0,
+                    'description'         => "Input IGST on Bill {$bill->bill_number}",
+                ];
+            } else {
+                if ((float)$bill->cgst_amount > 0 && $inputCgst) {
+                    $lines[] = [
+                        'chart_of_account_id' => $inputCgst->id,
+                        'debit'               => round((float)$bill->cgst_amount, 2),
+                        'credit'              => 0,
+                        'description'         => "Input CGST on Bill {$bill->bill_number}",
+                    ];
+                }
+                if ((float)$bill->sgst_amount > 0 && $inputSgst) {
+                    $lines[] = [
+                        'chart_of_account_id' => $inputSgst->id,
+                        'debit'               => round((float)$bill->sgst_amount, 2),
+                        'credit'              => 0,
+                        'description'         => "Input SGST on Bill {$bill->bill_number}",
+                    ];
+                }
+            }
+
+            // Fallback for tax amount if specific CGST/SGST accounts not mapped
+            if (empty($lines) || ((float)$bill->tax_amount > 0 && (float)$bill->cgst_amount == 0 && (float)$bill->igst_amount == 0 && $inputGst)) {
                 $lines[] = [
                     'chart_of_account_id' => $inputGst->id,
-                    'debit' => (float) $bill->tax_amount,
-                    'description' => "Input GST on Bill {$bill->bill_number}",
+                    'debit'               => round((float)$bill->tax_amount, 2),
+                    'credit'              => 0,
+                    'description'         => "Input GST Tax Credit on Bill {$bill->bill_number}",
                 ];
             }
 
+            // 5. Accounts Payable / Vendor Account (Credit)
             $lines[] = [
                 'chart_of_account_id' => $accountsPayable->id,
-                'credit' => (float) $bill->grand_total,
-                'description' => "Bill {$bill->bill_number}",
+                'debit'               => 0,
+                'credit'              => round((float)$bill->grand_total, 2),
+                'description'         => "Vendor Payable - Bill {$bill->bill_number}",
             ];
 
+            // Post General Ledger Journal Entry
             $this->journals->post($lines, [
-                'tenant_id' => $tenantId,
-                'journal_date' => $bill->bill_date,
-                'source' => Journal::SOURCE_PURCHASE,
+                'tenant_id'      => $tenantId,
+                'journal_date'   => $bill->bill_date,
+                'source'         => Journal::SOURCE_PURCHASE,
                 'reference_type' => 'vendor_bill',
-                'reference_id' => $bill->id,
-                'memo' => "Vendor Bill {$bill->bill_number}",
+                'reference_id'   => $bill->id,
+                'memo'           => "Vendor Bill {$bill->bill_number} ({$bill->vendor?->name})",
             ]);
+
+            Log::info("PostPurchaseBillJournal: Successfully posted GL entry for Bill {$bill->bill_number}", ['bill_id' => $bill->id]);
         } catch (\Throwable $e) {
-            Log::warning('PostPurchaseBillJournal: failed to auto-post journal', [
+            Log::error('PostPurchaseBillJournal: failed to auto-post journal', [
                 'bill_id' => $bill->id,
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ]);
             $this->failures->record($bill->tenant_id, BillPosted::class, $bill, $e->getMessage());
         }

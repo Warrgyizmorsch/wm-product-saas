@@ -171,7 +171,9 @@ class GoodsReceiptNoteService
             return $grn;
         });
 
-        event(new \App\Domains\Purchase\Events\GoodsReceiptNoteApproved($grn));
+        DB::afterCommit(function () use ($grn) {
+            event(new \App\Domains\Purchase\Events\GoodsReceiptNoteApproved($grn));
+        });
 
         return $grn;
     }

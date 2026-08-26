@@ -310,7 +310,7 @@
                                                 );
                                             @endphp
                                             <span class="badge bg-soft-info text-info border font-monospace d-inline-flex align-items-center gap-1 mb-1">
-                                                <i class="feather-zap text-info fs-11"></i> Enabled
+                                                ⚡ Queue Threshold Enabled
                                             </span>
                                             <div class="text-dark font-monospace fs-11 fw-semibold">Batch: {{ (float) $op->orderOperation->transfer_batch_quantity }} | Lag: {{ (int) $op->orderOperation->transfer_lag_minutes }}m</div>
                                             <small class="text-primary font-monospace d-block fs-10">Transfer-Ready: {{ $trTime->format('d/m/Y H:i') }}</small>

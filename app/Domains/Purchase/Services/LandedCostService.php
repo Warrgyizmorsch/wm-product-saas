@@ -189,6 +189,40 @@ class LandedCostService
             $voucher->posted_at    = now();
             $voucher->save();
 
+            // ── Step 3: Post GL Journal Entry for Landed Cost Revaluation ──
+            try {
+                $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1200')->first();
+                $expenseAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '5030')->first()
+                    ?: (\App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '5900')->first());
+
+                if ($inventoryAcc && $expenseAcc && (float)$voucher->total_expenses > 0) {
+                    $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
+                    $journalService->post([
+                        [
+                            'chart_of_account_id' => $inventoryAcc->id,
+                            'debit'               => round((float)$voucher->total_expenses, 2),
+                            'credit'              => 0,
+                            'description'         => "Landed Cost Revaluation - Voucher {$voucher->voucher_number}",
+                        ],
+                        [
+                            'chart_of_account_id' => $expenseAcc->id,
+                            'debit'               => 0,
+                            'credit'              => round((float)$voucher->total_expenses, 2),
+                            'description'         => "Freight Expense Allocation - Voucher {$voucher->voucher_number}",
+                        ],
+                    ], [
+                        'tenant_id'      => $tenantId,
+                        'journal_date'   => $voucher->voucher_date,
+                        'source'         => \App\Domains\Accounting\Models\Journal::SOURCE_PURCHASE,
+                        'reference_type' => 'landed_cost_voucher',
+                        'reference_id'   => $voucher->id,
+                        'memo'           => "Landed Cost Allocation Voucher {$voucher->voucher_number}",
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("LandedCostService: GL posting failed for voucher {$voucher->voucher_number}: " . $e->getMessage());
+            }
+
             return $voucher;
         });
     }
