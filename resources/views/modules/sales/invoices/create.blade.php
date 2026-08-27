@@ -623,7 +623,11 @@
                 const grandTotal = grossBeforeTax + totalTax + effectiveFreight;
                 const balanceDue = Math.max(0, grandTotal - advanceAllocated);
 
-                $('#summarySubtotalText').val(subtotal.toFixed(2));
+                if (discountType === 'item_wise') {
+                    $('#summarySubtotalText').val(grossBeforeTax.toFixed(2));
+                } else {
+                    $('#summarySubtotalText').val(subtotal.toFixed(2));
+                }
                 $('#summaryGrossText').val(grossBeforeTax.toFixed(2));
                 $('#summaryTaxText').val(totalTax.toFixed(2));
                 $('#summaryCgstText').val(cgstAmt.toFixed(2));

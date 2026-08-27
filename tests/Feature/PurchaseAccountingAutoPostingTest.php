@@ -133,6 +133,9 @@ class PurchaseAccountingAutoPostingTest extends TestCase
             ['code' => '1200', 'name' => 'Inventory', 'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1410', 'name' => 'Advance to Suppliers', 'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '1600', 'name' => 'Duties & Taxes (Input Credit)', 'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
+            ['code' => '1610', 'name' => 'Input CGST', 'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
+            ['code' => '1620', 'name' => 'Input SGST', 'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
+            ['code' => '1630', 'name' => 'Input IGST', 'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '1000'],
             ['code' => '2010', 'name' => 'Accounts Payable', 'type' => ChartOfAccount::TYPE_LIABILITY, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '2000'],
             ['code' => '2100', 'name' => 'Duties & Taxes (Output)', 'type' => ChartOfAccount::TYPE_LIABILITY, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '2000'],
             ['code' => '5900', 'name' => 'Other Expense', 'type' => ChartOfAccount::TYPE_EXPENSE, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
@@ -199,14 +202,20 @@ class PurchaseAccountingAutoPostingTest extends TestCase
         $this->assertEqualsWithDelta((float) $bill->grand_total, (float) $journal->total_credit, 0.01);
 
         $inventory = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '1200')->firstOrFail();
-        $expense = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '5900')->firstOrFail();
-        $inputGst = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '1600')->firstOrFail();
-        $ap = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '2010')->firstOrFail();
+        $expense   = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '5900')->firstOrFail();
+        $inputCgst = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '1610')->first();
+        $inputSgst = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '1620')->first();
+        $inputGst  = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '1600')->first();
+        $ap        = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '2010')->firstOrFail();
 
         $entries = $journal->entries;
         $this->assertEqualsWithDelta(1000.0, (float) $entries->firstWhere('chart_of_account_id', $inventory->id)->debit, 0.01);
         $this->assertEqualsWithDelta(500.0, (float) $entries->firstWhere('chart_of_account_id', $expense->id)->debit, 0.01);
-        $this->assertEqualsWithDelta(180.0, (float) $entries->firstWhere('chart_of_account_id', $inputGst->id)->debit, 0.01);
+        
+        $taxAccountIds = array_filter([$inputCgst?->id, $inputSgst?->id, $inputGst?->id]);
+        $totalTaxDebits = (float) $entries->whereIn('chart_of_account_id', $taxAccountIds)->sum('debit');
+        $this->assertEqualsWithDelta(180.0, $totalTaxDebits, 0.01);
+
         $this->assertEqualsWithDelta(1680.0, (float) $entries->firstWhere('chart_of_account_id', $ap->id)->credit, 0.01);
     }
 

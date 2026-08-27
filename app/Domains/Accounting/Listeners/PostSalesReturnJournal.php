@@ -48,7 +48,7 @@ class PostSalesReturnJournal
             // Output GST Accounts
             $cgstAccount = $this->accounts->findByCode('2110', $tenantId);
             $sgstAccount = $this->accounts->findByCode('2120', $tenantId);
-            $igstAccount = $this->accounts->findByCode('2100', $tenantId);
+            $igstAccount = $this->accounts->findByCode('2130', $tenantId) ?: $this->accounts->findByCode('2100', $tenantId);
 
             if (!$accountsReceivable || !$salesReturnAccount) {
                 $message = 'Missing chart of accounts (Accounts Receivable/Sales Returns/Sales Revenue), skipping auto-post';
@@ -64,12 +64,21 @@ class PostSalesReturnJournal
             $taxRate = 18.0; // Standard GST 18% (9% CGST + 9% SGST)
             $isInterState = false;
 
+            $invoice = null;
             if ($salesReturn->invoice_id) {
                 $invoice = \App\Domains\Sales\Models\Invoice::find($salesReturn->invoice_id);
-                if ($invoice && (float)$invoice->subtotal > 0 && (float)$invoice->tax_total > 0) {
-                    $taxRate = round(((float)$invoice->tax_total / (float)$invoice->subtotal) * 100, 2);
-                    $isInterState = (float)$invoice->igst_amount > 0;
+            } elseif ($salesReturn->sales_order_id) {
+                $invoice = \App\Domains\Sales\Models\Invoice::where('sales_order_id', $salesReturn->sales_order_id)
+                    ->where('status', '!=', 'Cancelled')
+                    ->latest()
+                    ->first();
+            }
+
+            if ($invoice) {
+                if ((float)$invoice->subtotal > 0 && (float)$invoice->tax_amount > 0) {
+                    $taxRate = round(((float)$invoice->tax_amount / (float)$invoice->subtotal) * 100, 2);
                 }
+                $isInterState = ((float)$invoice->igst_amount > 0) || ($invoice->gst_type === 'IGST');
             }
 
             $cgstAmount = 0.0;

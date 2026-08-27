@@ -36,9 +36,15 @@ class PostPurchaseReturnJournal
             $accountsPayable = $this->accounts->findByCode('2010', $tenantId);
             $inventory       = $this->accounts->findByCode('1200', $tenantId);
             $inputGst        = $this->accounts->findByCode('1600', $tenantId);
-            $inputCgst       = $this->accounts->findByCode('1601', $tenantId) ?: $inputGst;
-            $inputSgst       = $this->accounts->findByCode('1602', $tenantId) ?: $inputGst;
-            $inputIgst       = $this->accounts->findByCode('1603', $tenantId) ?: $inputGst;
+            $inputCgst       = $this->accounts->findByCode('1610', $tenantId)
+                ?? $this->accounts->findByCode('1601', $tenantId)
+                ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input CGST%')->first() ?: $inputGst);
+            $inputSgst       = $this->accounts->findByCode('1620', $tenantId)
+                ?? $this->accounts->findByCode('1602', $tenantId)
+                ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input SGST%')->first() ?: $inputGst);
+            $inputIgst       = $this->accounts->findByCode('1630', $tenantId)
+                ?? $this->accounts->findByCode('1603', $tenantId)
+                ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input IGST%')->first() ?: $inputGst);
             $freightExpense  = $this->accounts->findByCode('5030', $tenantId) ?: $this->accounts->findByCode('5900', $tenantId);
 
             if (!$accountsPayable || !$inventory) {
