@@ -2,6 +2,7 @@
 
 namespace App\Domains\Sales\Listeners;
 
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Sales\Events\InvoicePosted;
 use App\Domains\Sales\Services\SalesAccountingService;
 use Illuminate\Support\Facades\Log;
@@ -9,7 +10,8 @@ use Illuminate\Support\Facades\Log;
 class PostSalesInvoiceJournal
 {
     public function __construct(
-        private readonly SalesAccountingService $salesAccountingService
+        private readonly SalesAccountingService $salesAccountingService,
+        private readonly PostingFailureRecorder $failures,
     ) {}
 
     public function handle(InvoicePosted $event): void
@@ -32,11 +34,22 @@ class PostSalesInvoiceJournal
                     $invoice->status = 'Posted';
                     $invoice->save();
                 }
+            } else {
+                // SalesAccountingService already logged the specific reason (missing
+                // chart of accounts, closed accounting period, etc.) — record it as a
+                // resolvable failure so it doesn't only live in the application log.
+                $this->failures->record(
+                    $invoice->tenant_id,
+                    InvoicePosted::class,
+                    $invoice,
+                    "No journal was posted for Invoice #{$invoice->invoice_number} — see application log for the underlying reason."
+                );
             }
         } catch (\Throwable $e) {
             Log::warning("PostSalesInvoiceJournal Error: " . $e->getMessage(), [
                 'invoice_id' => $invoice->id,
             ]);
+            $this->failures->record($invoice->tenant_id, InvoicePosted::class, $invoice, $e->getMessage());
         }
     }
 }

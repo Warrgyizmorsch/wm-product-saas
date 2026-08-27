@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Purchase\Events\BillPosted;
 use Illuminate\Support\Facades\Log;
 
@@ -13,6 +14,7 @@ class PostPurchaseBillJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly PostingFailureRecorder $failures,
     ) {
     }
 
@@ -42,6 +44,7 @@ class PostPurchaseBillJournal
                     'bill_id' => $bill->id,
                     'tenant_id' => $tenantId,
                 ]);
+                $this->failures->record($tenantId, BillPosted::class, $bill, $message);
                 return;
             }
 
@@ -160,6 +163,7 @@ class PostPurchaseBillJournal
                 'bill_id' => $bill->id,
                 'error'   => $e->getMessage(),
             ]);
+            $this->failures->record($bill->tenant_id, BillPosted::class, $bill, $e->getMessage());
         }
     }
 }

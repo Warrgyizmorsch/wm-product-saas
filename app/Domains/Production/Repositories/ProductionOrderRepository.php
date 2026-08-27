@@ -52,14 +52,25 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
 
     public function getSubcontractDashboardMetrics(int $tenantId): array
     {
-        $awaitingPr = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+        $awaitingProcurement = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('is_external', true)
             ->where('status', 'ready')
             ->count();
 
+        $poAwaitingApproval = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+            ->where('is_subcontract', true)
+            ->whereIn('status', ['Draft', 'Pending Approval', 'draft', 'pending_approval'])
+            ->count();
+
+        $readyForDispatch = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('is_external', true)
+            ->where('material_supply_type', 'company_supplied')
+            ->whereIn('status', ['ready', 'running'])
+            ->count();
+
         $atVendor = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('is_external', true)
-            ->whereIn('status', ['in_process', 'sent_to_vendor'])
+            ->whereIn('status', ['in_process', 'sent_to_vendor', 'dispatched'])
             ->count();
 
         $vendorDelayed = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
@@ -67,6 +78,12 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->whereNotNull('actual_start_time')
             ->whereDate('actual_start_time', '<', now()->subDays(3))
+            ->count();
+
+        $partialReceipt = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('is_external', true)
+            ->where('quantity_produced', '>', 0)
+            ->whereRaw('quantity_produced < COALESCE(target_produced_qty, 1)')
             ->count();
 
         $qcPending = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
@@ -81,12 +98,22 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             })
             ->count();
 
+        $materialExceptions = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('is_external', true)
+            ->where('status', 'vendor_dispatched')
+            ->where('quantity_produced', '<', 1)
+            ->count();
+
         return [
-            'awaiting_subcontract_pr' => $awaitingPr,
+            'awaiting_subcontract_pr' => $awaitingProcurement,
+            'po_awaiting_approval' => $poAwaitingApproval,
+            'ready_for_dispatch' => $readyForDispatch,
             'at_vendor' => $atVendor,
             'vendor_delayed' => $vendorDelayed,
+            'partial_receipt' => $partialReceipt,
             'subcontract_qc_pending' => $qcPending,
             'vendor_rework' => $vendorRework,
+            'material_exceptions' => $materialExceptions,
         ];
     }
 

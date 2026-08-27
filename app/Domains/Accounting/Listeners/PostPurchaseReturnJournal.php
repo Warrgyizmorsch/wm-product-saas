@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Listeners;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Purchase\Events\PurchaseReturnApproved;
 use App\Domains\Purchase\Models\LandedCostItem;
 use App\Domains\Purchase\Models\VendorBill;
@@ -16,6 +17,7 @@ class PostPurchaseReturnJournal
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
+        private readonly PostingFailureRecorder $failures,
     ) {
     }
 
@@ -44,6 +46,7 @@ class PostPurchaseReturnJournal
                     'purchase_return_id' => $return->id,
                     'tenant_id' => $tenantId,
                 ]);
+                $this->failures->record($tenantId, PurchaseReturnApproved::class, $return, $message);
                 return;
             }
 
@@ -194,6 +197,7 @@ class PostPurchaseReturnJournal
                 'purchase_return_id' => $return->id,
                 'error'              => $e->getMessage(),
             ]);
+            $this->failures->record($tenantId, PurchaseReturnApproved::class, $return, $e->getMessage());
         }
     }
 }
