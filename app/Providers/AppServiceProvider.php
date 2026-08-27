@@ -89,6 +89,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Repositories\MachineRepository::class
         );
 
+        // ── Production: Plant Maintenance ─────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\MaintenanceRepositoryInterface::class,
+            \App\Domains\Production\Repositories\MaintenanceRepository::class
+        );
+
         // ── Production: Routing ───────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Production\Repositories\RoutingRepositoryInterface::class,

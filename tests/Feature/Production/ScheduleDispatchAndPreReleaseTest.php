@@ -708,4 +708,64 @@ class ScheduleDispatchAndPreReleaseTest extends TestCase
         $depErrors = array_filter($res['errors'], fn($e) => $e['code'] === 'DEPENDENCY_VIOLATION');
         $this->assertEmpty($depErrors, 'Should have no DEPENDENCY_VIOLATION errors for valid multi-level operations.');
     }
+
+    /**
+     * Test pre-release validation allows releasing schedules with subcontracted/external operations without throwing INACTIVE_WORK_CENTER error.
+     */
+    public function test_pre_release_validation_subcontract_external_operation_passes(): void
+    {
+        $order = ProductionOrder::create([
+            'tenant_id'        => $this->tenant->id,
+            'order_number'     => 'ORD-SUB-VAL-01',
+            'product_id'       => $this->product->id,
+            'quantity_ordered' => 10,
+            'status'           => ProductionOrder::STATUS_RELEASED,
+            'start_date'       => now(),
+            'end_date'         => now()->addDays(5),
+        ]);
+
+        $schedule = ProductionSchedule::create([
+            'tenant_id'           => $this->tenant->id,
+            'schedule_number'     => 'SCH-SUB-VAL-01',
+            'production_order_id' => $order->id,
+            'status'              => 'scheduled',
+            'scheduling_type'     => 'forward',
+            'generated_by'        => 'forward',
+            'scheduled_at'        => now(),
+            'created_by'          => 1,
+        ]);
+
+        $subOp = ProductionOrderOperation::create([
+            'tenant_id'                  => $this->tenant->id,
+            'production_order_id'        => $order->id,
+            'work_center_id'             => null,
+            'machine_id'                 => null,
+            'sequence'                   => 20,
+            'operation_number'           => 'OP-20',
+            'name'                       => 'External Plating Subcontract',
+            'is_external'                => true,
+            'subcontract_lead_time_days' => 2,
+        ]);
+
+        ProductionScheduleOperation::create([
+            'tenant_id'                      => $this->tenant->id,
+            'production_schedule_id'        => $schedule->id,
+            'production_order_id'            => $order->id,
+            'production_order_operation_id' => $subOp->id,
+            'work_center_id'                 => null,
+            'machine_id'                     => null,
+            'sequence'                       => 20,
+            'planned_start'                  => now(),
+            'planned_finish'                 => now()->addDays(2),
+            'planned_duration_minutes'       => 2880,
+            'status'                         => 'waiting',
+        ]);
+
+        $res = $this->validationService->validate($schedule);
+
+        $wcErrors = array_filter($res['errors'], fn($e) => $e['code'] === 'INACTIVE_WORK_CENTER');
+        $this->assertEmpty($wcErrors, 'Subcontracted operations should not fail INACTIVE_WORK_CENTER pre-release validation.');
+        $this->assertTrue($res['can_release']);
+    }
 }
+

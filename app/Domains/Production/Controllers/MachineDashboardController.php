@@ -42,6 +42,20 @@ class MachineDashboardController extends Controller
             ->take(10)
             ->get();
 
-        return view('modules.production.mes.machine-detail', array_merge($details, compact('stateHistories', 'downtimes')));
+        $maintenanceWorkOrders = \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::with(['technician'])
+            ->where('machine_id', $machine->id)
+            ->orderByDesc('created_at')
+            ->take(10)
+            ->get();
+
+        $pmSchedules = \App\Domains\Production\Models\ProductionPmSchedule::where('machine_id', $machine->id)
+            ->orderBy('next_due_date')
+            ->get();
+
+        $totalMaintenanceCost = (float) \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::where('machine_id', $machine->id)
+            ->where('status', \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_COMPLETED)
+            ->sum('total_cost');
+
+        return view('modules.production.mes.machine-detail', array_merge($details, compact('stateHistories', 'downtimes', 'maintenanceWorkOrders', 'pmSchedules', 'totalMaintenanceCost')));
     }
 }

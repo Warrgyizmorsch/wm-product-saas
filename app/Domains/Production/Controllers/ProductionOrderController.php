@@ -146,6 +146,11 @@ class ProductionOrderController extends Controller
 
         Gate::authorize('view', $order);
 
+        // Auto-evaluate completion if all operations are completed
+        if (in_array($order->status, ['released', 'in_progress'])) {
+            $this->orderService->evaluateAndAutoCompleteOrder($order, Auth::id());
+        }
+
         if (in_array($order->status, ['released', 'in_progress']) && $order->wips->isEmpty()) {
             try {
                 app(\App\Domains\Production\Services\ProductionWipService::class)->initializeWip($order->id);
