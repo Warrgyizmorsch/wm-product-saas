@@ -119,6 +119,11 @@
                 ['label' => 'Rework Orders',        'route' => 'production.rework.index'],
                 ['label' => 'Scrap Disposals',      'route' => 'production.scrap.index'],
             ]],
+            ['label' => 'Machine Maintenance', 'icon' => 'feather-tool', 'url' => '#', 'children' => [
+                ['label' => 'Maintenance Dashboard', 'route' => 'production.maintenance.dashboard'],
+                ['label' => 'Work Orders',           'route' => 'production.maintenance.work-orders.index'],
+                ['label' => 'PM Schedules',          'route' => 'production.maintenance.schedules.index'],
+            ]],
             ['label' => 'Manufacturing Intelligence', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => [
                 ['label' => 'Executive Dashboard',    'route' => 'production.intelligence.dashboard'],
                 ['label' => 'Live Andon Board',       'route' => 'production.intelligence.andon'],

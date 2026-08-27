@@ -41,13 +41,17 @@ class Machine extends BaseModel
         'status',
         'installation_date',
         'maintenance_status', // A7: future maintenance module integration point
+        'last_maintenance_date',
+        'next_maintenance_due_date',
         'current_state',
         'current_state_reason',
     ];
 
     protected $casts = [
-        'capacity'          => 'float',
-        'installation_date' => 'date',
+        'capacity'                  => 'float',
+        'installation_date'         => 'date',
+        'last_maintenance_date'     => 'date',
+        'next_maintenance_due_date' => 'date',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
@@ -60,6 +64,21 @@ class Machine extends BaseModel
     public function operations(): HasMany
     {
         return $this->hasMany(RoutingOperation::class, 'machine_id');
+    }
+
+    public function pmSchedules(): HasMany
+    {
+        return $this->hasMany(ProductionPmSchedule::class, 'machine_id');
+    }
+
+    public function maintenanceWorkOrders(): HasMany
+    {
+        return $this->hasMany(ProductionMaintenanceWorkOrder::class, 'machine_id');
+    }
+
+    public function downtimes(): HasMany
+    {
+        return $this->hasMany(ProductionMachineDowntime::class, 'machine_id');
     }
 
     // ─── Status Helpers ───────────────────────────────────────────────────────

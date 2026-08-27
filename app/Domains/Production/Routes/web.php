@@ -41,6 +41,9 @@ use App\Domains\Production\Controllers\WorkCenterController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
 use App\Domains\Production\Controllers\ProductionDashboardController;
 use App\Domains\Production\Controllers\ProductionImportExportController;
+use App\Domains\Production\Controllers\MaintenanceDashboardController;
+use App\Domains\Production\Controllers\PmScheduleController;
+use App\Domains\Production\Controllers\MaintenanceWorkOrderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('production')
@@ -103,6 +106,27 @@ Route::prefix('production')
             ->name('machines.by-work-center');
         Route::post('machines/bulk-action', [MachineController::class, 'bulkAction'])->name('machines.bulk-action');
         Route::resource('machines', MachineController::class)->except(['show']);
+
+        // ── Plant Maintenance ──────────────────────────────────────────────────
+        Route::prefix('maintenance')->as('maintenance.')->group(function (): void {
+            Route::get('dashboard', [MaintenanceDashboardController::class, 'index'])->name('dashboard');
+
+            // PM Schedules
+            Route::post('schedules/generate-work-orders', [PmScheduleController::class, 'generateWorkOrders'])->name('schedules.generate-work-orders');
+            Route::resource('schedules', PmScheduleController::class)->except(['show']);
+
+            // Breakdown reporting
+            Route::post('work-orders/breakdown', [MaintenanceWorkOrderController::class, 'reportBreakdown'])->name('work-orders.breakdown');
+
+            // Work Orders
+            Route::post('work-orders/{id}/schedule', [MaintenanceWorkOrderController::class, 'schedule'])->name('work-orders.schedule');
+            Route::post('work-orders/{id}/start', [MaintenanceWorkOrderController::class, 'start'])->name('work-orders.start');
+            Route::post('work-orders/{id}/complete', [MaintenanceWorkOrderController::class, 'complete'])->name('work-orders.complete');
+            Route::post('work-orders/{id}/cancel', [MaintenanceWorkOrderController::class, 'cancel'])->name('work-orders.cancel');
+            Route::post('work-orders/{id}/spares', [MaintenanceWorkOrderController::class, 'addSpare'])->name('work-orders.add-spare');
+            Route::post('work-orders/spares/{spareId}/issue', [MaintenanceWorkOrderController::class, 'issueSpare'])->name('work-orders.issue-spare');
+            Route::resource('work-orders', MaintenanceWorkOrderController::class);
+        });
 
         // ── Routing ───────────────────────────────────────────────────────────
         Route::post('routing/{routing}/submit', [RoutingController::class, 'submitApproval'])->name('routing.submit');

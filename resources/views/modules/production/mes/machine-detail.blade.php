@@ -406,5 +406,55 @@
                 <i class="feather-inbox me-2"></i>No completed operations yet for this machine.
             </div>
         @endif
+
+        {{-- Plant Maintenance Summary & Work Orders --}}
+        <hr class="my-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-dark mb-0">
+                <i class="feather-tool me-2 text-primary"></i>Plant Maintenance & History
+            </h5>
+            <span class="fs-12 text-muted fw-bold">Total Maintenance Expenditure: <strong class="text-primary fs-14">${{ number_format($totalMaintenanceCost ?? 0, 2) }}</strong></span>
+        </div>
+
+        @if(isset($maintenanceWorkOrders) && $maintenanceWorkOrders->count() > 0)
+            <div class="table-responsive mb-4">
+                <x-ui.odoo-form-ui type="table">
+                    <thead>
+                        <tr>
+                            <th>WO Number</th>
+                            <th>Type</th>
+                            <th>Priority</th>
+                            <th>Technician</th>
+                            <th>Status</th>
+                            <th class="text-end">Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($maintenanceWorkOrders as $mwo)
+                            <tr>
+                                <td>
+                                    <a href="{{ route('production.maintenance.work-orders.show', $mwo->id) }}" class="fw-bold text-primary">
+                                        {{ $mwo->work_order_number }}
+                                    </a>
+                                </td>
+                                <td><span class="badge bg-soft-info text-info">{{ ucfirst($mwo->type) }}</span></td>
+                                <td><span class="badge bg-soft-secondary text-dark">{{ ucfirst($mwo->priority) }}</span></td>
+                                <td>{{ $mwo->technician?->name ?? 'Unassigned' }}</td>
+                                <td>
+                                    <span class="badge bg-soft-{{ $mwo->status === 'completed' ? 'success' : ($mwo->status === 'in_progress' ? 'warning' : 'secondary') }} text-dark">
+                                        {{ ucfirst(str_replace('_', ' ', $mwo->status)) }}
+                                    </span>
+                                </td>
+                                <td class="text-end fw-bold">${{ number_format($mwo->total_cost, 2) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </x-ui.odoo-form-ui>
+            </div>
+        @else
+            <div class="text-center py-3 text-muted fs-13 border rounded mb-4">
+                <i class="feather-tool me-2 text-muted"></i>No maintenance work orders recorded for this machine.
+            </div>
+        @endif
     </div>
 @endsection
