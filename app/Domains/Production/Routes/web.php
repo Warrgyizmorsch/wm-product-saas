@@ -65,6 +65,7 @@ Route::prefix('production')
         Route::get('subcontract/delivery-challans/{challan}', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'show'])->name('subcontract.delivery-challans.show');
         Route::get('subcontract/delivery-challans/{challan}/print', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'print'])->name('subcontract.delivery-challans.print');
         Route::post('subcontract/delivery-challans/{challan}/dispatch', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'dispatch'])->name('subcontract.delivery-challans.dispatch');
+        Route::post('subcontract/delivery-challans/{challan}/receive', [\App\Domains\Production\Controllers\SubcontractDeliveryChallanController::class, 'receive'])->name('subcontract.delivery-challans.receive');
 
         // ── Import/Export (Centralized Master Data) ───────────────────────────
         Route::get('import-export/download-template/{type}', [ProductionImportExportController::class, 'downloadTemplate'])

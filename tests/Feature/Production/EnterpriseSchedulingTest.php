@@ -847,4 +847,84 @@ class EnterpriseSchedulingTest extends TestCase
         // Tuesday is not blocked because the holiday belongs to $otherCal, not $cal.
         $this->assertEquals('2026-07-07 09:30:00', $op->planned_finish->toDateTimeString());
     }
+
+    /**
+     * Test scheduling order with subcontract/external operation having null work_center_id.
+     */
+    public function test_scheduling_with_subcontract_external_operation(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id'             => $this->tenant->id,
+            'name'                  => 'Machining Center',
+            'code'                  => 'MC-01',
+            'efficiency_percentage' => 100.0,
+            'status'                => 'active',
+        ]);
+
+        $machine = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name'           => 'CNC Mill',
+            'code'           => 'CNC-MIL-01',
+            'status'         => 'active',
+        ]);
+
+        $order = ProductionOrder::create([
+            'tenant_id'        => $this->tenant->id,
+            'order_number'     => 'ORD-SUB-01',
+            'product_id'       => $this->product->id,
+            'quantity_ordered' => 10,
+            'status'           => 'confirmed',
+            'start_date'       => '2026-07-06 08:00:00',
+            'end_date'         => '2026-07-15 08:00:00',
+        ]);
+
+        ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'work_center_id'      => $wc->id,
+            'machine_id'          => $machine->id,
+            'sequence'            => 10,
+            'operation_number'    => 'OP-10',
+            'name'                => 'Internal Milling',
+            'run_time_minutes'    => 120,
+        ]);
+
+        ProductionOrderOperation::create([
+            'tenant_id'                  => $this->tenant->id,
+            'production_order_id'        => $order->id,
+            'work_center_id'             => null,
+            'machine_id'                 => null,
+            'sequence'                   => 20,
+            'operation_number'           => 'OP-20',
+            'name'                       => 'External Coating',
+            'is_external'                => true,
+            'subcontract_lead_time_days' => 2,
+        ]);
+
+        $start = Carbon::parse('2026-07-06 08:00:00');
+        $sched = $this->schedulingService->generateSchedule($order, $start, 'forward');
+
+        $this->assertNotNull($sched);
+        $this->assertCount(2, $sched->operations);
+
+        $extOp = $sched->operations->where('sequence', 20)->first();
+        $this->assertNotNull($extOp);
+        $this->assertNull($extOp->work_center_id);
+        $this->assertNull($extOp->machine_id);
+
+        $this->schedulingService->validateSchedule($sched);
+        $this->assertGreaterThanOrEqual(0.0, $sched->capacity_utilization);
+
+        $extOrderOp = $order->operations->where('sequence', 20)->first();
+        $trTime = $this->schedulingService->calculateTransferReadyAt($extOrderOp, $start, 10);
+        $this->assertNotNull($trTime);
+
+        $added = $this->schedulingService->addWorkingMinutes(null, $start, 60);
+        $this->assertEquals('2026-07-06 09:00:00', $added->toDateTimeString());
+
+        $subtracted = $this->schedulingService->subtractWorkingMinutes(null, $start, 60);
+        $this->assertEquals('2026-07-06 07:00:00', $subtracted->toDateTimeString());
+    }
 }
+
