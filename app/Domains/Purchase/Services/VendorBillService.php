@@ -35,7 +35,17 @@ class VendorBillService
             $billNumber = $this->billRepo->getNextBillNumber($tenantId);
 
             $discountType = $validated['discount_type'] ?? $po?->discount_type ?? 'without_discount';
-            $taxType = $validated['tax_type'] ?? $po?->tax_type ?? 'order_wise_tax';
+            
+            $hasItemTax = false;
+            if (!empty($validated['items'])) {
+                foreach ($validated['items'] as $it) {
+                    if ((float)($it['tax_rate'] ?? $it['tax_percentage'] ?? 0) > 0) {
+                        $hasItemTax = true;
+                        break;
+                    }
+                }
+            }
+            $taxType = $validated['tax_type'] ?? $po?->tax_type ?? ($hasItemTax ? 'item_wise_tax' : 'order_wise_tax');
             $gstType = $validated['gst_type'] ?? $po?->gst_type ?? 'cgst_sgst';
             $freightTerms = $validated['freight_terms'] ?? $po?->freight_terms ?? 'to_pay';
             $isFreightEligible = in_array($freightTerms, ['to_pay', 'to_be_billed']);

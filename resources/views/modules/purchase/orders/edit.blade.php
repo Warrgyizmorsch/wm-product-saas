@@ -251,28 +251,29 @@
                         
                         <!-- Right side: Calculation Breakdown -->
                         <div class="col-md-5 d-flex flex-column align-items-end fs-13">
-                            <div class="card border-0 shadow-sm w-100" style="max-width: 360px; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1 !important; overflow: hidden;">
+                            <div class="card border-0 shadow-sm w-100" style="max-width: 380px; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1 !important; overflow: hidden;">
                                 <div class="fw-bold py-3 px-3 text-white" style="background-color: #2563eb; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;">
                                     {{ __('purchase.order_summary') }}
                                 </div>
                                 <div class="p-3 bg-white text-dark">
-                                    <!-- Taxable Subtotal -->
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.taxable_subtotal') }}</span>
-                                        <input type="text" id="summarySubtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->subtotal, 2, '.', '') }}">
+                                    <!-- Items Subtotal (Gross) -->
+                                    <div class="d-flex justify-content-between align-items-center mb-3" id="summaryItemsSubtotalRow">
+                                        <span class="text-muted fs-13 fw-semibold">Items Subtotal:</span>
+                                        <input type="text" id="summaryItemsSubtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->subtotal, 2, '.', '') }}">
                                         <input type="hidden" name="subtotal" id="summarySubtotal" value="{{ (float)$order->subtotal }}">
                                     </div>
 
                                     <!-- Total Discount -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryDiscountRow">
-                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.discount_amount') }}</span>
+                                        <span class="text-muted fs-13 fw-semibold" id="summaryDiscountLabel">{{ __('purchase.discount_amount') }}</span>
                                         <input type="number" name="discount_amount" id="summaryDiscount" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" step="0.01" value="{{ number_format($order->discount_amount, 2, '.', '') }}">
                                     </div>
 
-                                    <!-- Gross Total -->
-                                    <div class="d-flex justify-content-between align-items-center mb-3" id="summaryGrossRow">
-                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.gross_total_before_tax') }}</span>
-                                        <input type="text" id="summaryGrossText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->subtotal - $order->discount_amount, 2, '.', '') }}">
+                                    <!-- Taxable Subtotal -->
+                                    <div class="d-flex justify-content-between align-items-center mb-3" id="summaryTaxableSubtotalRow">
+                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.taxable_subtotal') }}</span>
+                                        <input type="text" id="summarySubtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->subtotal - $order->discount_amount, 2, '.', '') }}">
+                                        <input type="text" id="summaryGrossText" class="d-none" readonly value="{{ number_format($order->subtotal - $order->discount_amount, 2, '.', '') }}">
                                     </div>
 
                                     <!-- Tax Rate (Percent) -->
@@ -287,7 +288,7 @@
                                         <input type="number" id="orderTaxPercent" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" step="0.01" value="{{ number_format($initialTaxRate, 2, '.', '') }}">
                                     </div>
 
-                                    <!-- Hidden splits submitted to backend -->
+                                    <!-- Hidden splits -->
                                     <input type="hidden" name="cgst_amount" id="summaryCgst" value="{{ (float)$order->cgst_amount }}">
                                     <input type="hidden" name="sgst_amount" id="summarySgst" value="{{ (float)$order->sgst_amount }}">
                                     <input type="hidden" name="igst_amount" id="summaryIgst" value="{{ (float)$order->igst_amount }}">
@@ -299,7 +300,13 @@
                                         <input type="hidden" name="tax_amount" id="summaryTax" value="{{ (float)$order->tax_amount }}">
                                     </div>
 
-                                    <!-- Grand Total (Mewar Balance Amount style) -->
+                                    <!-- Freight Charges -->
+                                    <div class="d-flex justify-content-between align-items-center mb-3" id="summaryFreightRow">
+                                        <span class="text-muted fs-13 fw-semibold">Freight Charges</span>
+                                        <input type="text" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->freight_amount ?? 0, 2, '.', '') }}">
+                                    </div>
+
+                                    <!-- Grand Total -->
                                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                                         <span class="fw-bold fs-13" style="color: #2563eb;">{{ __('purchase.grand_total') }}</span>
                                         <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-extrabold" style="width: 140px; height: 32px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb;" readonly value="{{ number_format($order->grand_total, 2, '.', '') }}">
@@ -345,15 +352,15 @@
                 // 1. Discount option changes
                 if (discType === 'item_wise') {
                     $('.discount-column').show();
-                    toggleRow($('#summaryDiscountRow'), false);
-                    toggleRow($('#summaryGrossRow'), false);
-                    $('#summaryDiscount').val('0.00');
+                    toggleRow($('#summaryDiscountRow'), true);
+                    $('#summaryDiscountLabel').text('Discount Amount');
+                    $('#summaryDiscount').prop('readonly', true).css('background-color', '#f8fafc');
                 } else if (discType === 'order_wise') {
                     $('.discount-column').hide();
                     $('.disc-percent-input').val('0.00');
                     $('.disc-amount-input').val('0.00');
                     toggleRow($('#summaryDiscountRow'), true);
-                    toggleRow($('#summaryGrossRow'), true);
+                    $('#summaryDiscountLabel').text('Discount Amount');
                     $('#summaryDiscount').prop('readonly', false).css('background-color', '#ffffff');
                 } else {
                     // without_discount
@@ -361,7 +368,6 @@
                     $('.disc-percent-input').val('0.00');
                     $('.disc-amount-input').val('0.00');
                     toggleRow($('#summaryDiscountRow'), false);
-                    toggleRow($('#summaryGrossRow'), false);
                     $('#summaryDiscount').val('0.00');
                 }
 
@@ -370,7 +376,7 @@
                     $('.tax-column').show();
                     toggleRow($('#orderTaxPercentRow'), false);
                     $('#orderTaxPercent').val('0.00');
-                    toggleRow($('#summaryTaxRow'), false);
+                    toggleRow($('#summaryTaxRow'), true);
                     $('#gstTypeContainer').show();
                 } else if (taxType === 'order_wise_tax') {
                     $('.tax-column').hide();
@@ -486,7 +492,7 @@
 
                 // Update subtotal
                 $('#summarySubtotal').val(subtotal.toFixed(2));
-                $('#summarySubtotalText').val(subtotal.toFixed(2));
+                $('#summaryItemsSubtotalText').val(subtotal.toFixed(2));
 
                 // Resolve discount
                 let finalDiscount = 0.00;
@@ -500,18 +506,14 @@
                     $('#summaryDiscount').val('0.00');
                 }
 
-                const grossTotal = subtotal - finalDiscount;
+                const grossTotal = Math.max(0, subtotal - finalDiscount);
                 $('#summaryGrossText').val(grossTotal.toFixed(2));
+                $('#summarySubtotalText').val(grossTotal.toFixed(2));
 
                 // Resolve tax totals
                 let finalTax = 0.00;
                 if (taxType === 'item_wise_tax') {
                     finalTax = totalItemTax;
-                    $('#summaryCgst').val(totalCgst.toFixed(2));
-                    $('#summarySgst').val(totalSgst.toFixed(2));
-                    $('#summaryIgst').val(totalIgst.toFixed(2));
-                    
-                    $('#summaryTaxText').val(finalTax.toFixed(2));
                 } else if (taxType === 'order_wise_tax') {
                     const orderTaxPercent = parseFloat($('#orderTaxPercent').val()) || 0;
 
@@ -529,33 +531,59 @@
                         igstPct = orderTaxPercent;
                     }
 
-                    const cgstAmt = grossTotal * (cgstPct / 100);
-                    const sgstAmt = grossTotal * (sgstPct / 100);
-                    const igstAmt = grossTotal * (igstPct / 100);
+                    totalCgst = grossTotal * (cgstPct / 100);
+                    totalSgst = grossTotal * (sgstPct / 100);
+                    totalIgst = grossTotal * (igstPct / 100);
 
-                    finalTax = cgstAmt + sgstAmt + igstAmt;
-
-                    $('#summaryCgst').val(cgstAmt.toFixed(2));
-                    $('#summarySgst').val(sgstAmt.toFixed(2));
-                    $('#summaryIgst').val(igstAmt.toFixed(2));
-                    
-                    $('#summaryTaxText').val(finalTax.toFixed(2));
+                    finalTax = totalCgst + totalSgst + totalIgst;
                 } else {
-                    $('#summaryCgst').val('0.00');
-                    $('#summarySgst').val('0.00');
-                    $('#summaryIgst').val('0.00');
-                    $('#summaryTaxText').val('0.00');
+                    totalCgst = 0.00;
+                    totalSgst = 0.00;
+                    totalIgst = 0.00;
+                    finalTax = 0.00;
                 }
 
+                $('#summaryCgst').val(totalCgst.toFixed(2));
+                $('#summarySgst').val(totalSgst.toFixed(2));
+                $('#summaryIgst').val(totalIgst.toFixed(2));
+                $('#summaryTaxText').val(finalTax.toFixed(2));
                 $('#summaryTax').val(finalTax.toFixed(2));
 
-                const grandTotal = grossTotal + finalTax;
+                // Update GST breakdown labels and rows
+                if (taxType !== 'without_tax' && finalTax > 0) {
+                    toggleRow($('#summaryGstBreakdownSection'), true);
+                    if (gstType === 'igst') {
+                        toggleRow($('#cgstRow'), false);
+                        toggleRow($('#sgstRow'), false);
+                        toggleRow($('#igstRow'), true);
+                        $('#igstText').val(totalIgst.toFixed(2));
+                    } else {
+                        toggleRow($('#cgstRow'), true);
+                        toggleRow($('#sgstRow'), true);
+                        toggleRow($('#igstRow'), false);
+                        $('#cgstText').val(totalCgst.toFixed(2));
+                        $('#sgstText').val(totalSgst.toFixed(2));
+                    }
+                } else {
+                    toggleRow($('#summaryGstBreakdownSection'), false);
+                }
+
+                // Freight
+                const freightAmount = parseFloat($('#freightAmountInput').val()) || 0.00;
+                $('#summaryFreightText').val(freightAmount.toFixed(2));
+                if (freightAmount > 0) {
+                    toggleRow($('#summaryFreightRow'), true);
+                } else {
+                    toggleRow($('#summaryFreightRow'), false);
+                }
+
+                const grandTotal = grossTotal + finalTax + freightAmount;
                 $('#summaryGrandtotal').val(grandTotal.toFixed(2));
                 $('#summaryGrandtotalText').val(grandTotal.toFixed(2));
             }
 
             // Calculations triggers
-            $(document).on('input', '.qty-input, .rate-input, .disc-percent-input, .tax-percent-input', calculateAll);
+            $(document).on('input change', '.qty-input, .rate-input, .disc-percent-input, .tax-percent-input, #freightAmountInput, #summaryDiscount, #orderTaxPercent', calculateAll);
             $('#summaryDiscount, #orderTaxPercent').on('input', calculateAll);
 
             // Handle Product Selection - prefill rate

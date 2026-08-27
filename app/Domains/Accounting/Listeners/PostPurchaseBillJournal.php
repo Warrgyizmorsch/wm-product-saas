@@ -32,9 +32,15 @@ class PostPurchaseBillJournal
             // Fetch Chart of Accounts by standard codes
             $accountsPayable = $this->accounts->findByCode('2010', $tenantId);
             $inputGst        = $this->accounts->findByCode('1600', $tenantId);
-            $inputCgst       = $this->accounts->findByCode('1601', $tenantId) ?: $inputGst;
-            $inputSgst       = $this->accounts->findByCode('1602', $tenantId) ?: $inputGst;
-            $inputIgst       = $this->accounts->findByCode('1603', $tenantId) ?: $inputGst;
+            $inputCgst       = $this->accounts->findByCode('1610', $tenantId)
+                ?? $this->accounts->findByCode('1601', $tenantId)
+                ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input CGST%')->first() ?: $inputGst);
+            $inputSgst       = $this->accounts->findByCode('1620', $tenantId)
+                ?? $this->accounts->findByCode('1602', $tenantId)
+                ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input SGST%')->first() ?: $inputGst);
+            $inputIgst       = $this->accounts->findByCode('1630', $tenantId)
+                ?? $this->accounts->findByCode('1603', $tenantId)
+                ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input IGST%')->first() ?: $inputGst);
             $inventory       = $this->accounts->findByCode('1200', $tenantId);
             $purchaseExpense = $this->accounts->findByCode('5900', $tenantId);
             $freightExpense  = $this->accounts->findByCode('5030', $tenantId) ?: $purchaseExpense;
@@ -103,6 +109,7 @@ class PostPurchaseBillJournal
             }
 
             // 4. Input GST Tax Credits (Debit)
+            $hasTaxLines = false;
             if ((float)$bill->igst_amount > 0 && $inputIgst) {
                 $lines[] = [
                     'chart_of_account_id' => $inputIgst->id,
@@ -110,6 +117,7 @@ class PostPurchaseBillJournal
                     'credit'              => 0,
                     'description'         => "Input IGST on Bill {$bill->bill_number}",
                 ];
+                $hasTaxLines = true;
             } else {
                 if ((float)$bill->cgst_amount > 0 && $inputCgst) {
                     $lines[] = [
@@ -118,6 +126,7 @@ class PostPurchaseBillJournal
                         'credit'              => 0,
                         'description'         => "Input CGST on Bill {$bill->bill_number}",
                     ];
+                    $hasTaxLines = true;
                 }
                 if ((float)$bill->sgst_amount > 0 && $inputSgst) {
                     $lines[] = [
@@ -126,17 +135,34 @@ class PostPurchaseBillJournal
                         'credit'              => 0,
                         'description'         => "Input SGST on Bill {$bill->bill_number}",
                     ];
+                    $hasTaxLines = true;
                 }
             }
 
-            // Fallback for tax amount if specific CGST/SGST accounts not mapped
-            if (empty($lines) || ((float)$bill->tax_amount > 0 && (float)$bill->cgst_amount == 0 && (float)$bill->igst_amount == 0 && $inputGst)) {
-                $lines[] = [
-                    'chart_of_account_id' => $inputGst->id,
-                    'debit'               => round((float)$bill->tax_amount, 2),
-                    'credit'              => 0,
-                    'description'         => "Input GST Tax Credit on Bill {$bill->bill_number}",
-                ];
+            // Fallback for tax amount if cgst/igst fields were empty on bill model
+            if (!$hasTaxLines && (float)$bill->tax_amount > 0) {
+                if ($inputCgst && $inputSgst && $inputCgst->id !== $inputGst->id) {
+                    $halfTax = round((float)$bill->tax_amount / 2, 2);
+                    $lines[] = [
+                        'chart_of_account_id' => $inputCgst->id,
+                        'debit'               => $halfTax,
+                        'credit'              => 0,
+                        'description'         => "Input CGST on Bill {$bill->bill_number}",
+                    ];
+                    $lines[] = [
+                        'chart_of_account_id' => $inputSgst->id,
+                        'debit'               => round((float)$bill->tax_amount - $halfTax, 2),
+                        'credit'              => 0,
+                        'description'         => "Input SGST on Bill {$bill->bill_number}",
+                    ];
+                } else if ($inputGst) {
+                    $lines[] = [
+                        'chart_of_account_id' => $inputGst->id,
+                        'debit'               => round((float)$bill->tax_amount, 2),
+                        'credit'              => 0,
+                        'description'         => "Input GST Tax Credit on Bill {$bill->bill_number}",
+                    ];
+                }
             }
 
             // 5. Accounts Payable / Vendor Account (Credit)
