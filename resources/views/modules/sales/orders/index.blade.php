@@ -176,10 +176,27 @@
                             {{-- Delivery Challan / Invoicing Column (Absolute ERP Style) --}}
                             <td class="text-center py-2">
                                 @if($order->status !== 'Cancelled')
+                                    @php
+                                        $unbilledDo = $order->dispatches ? $order->dispatches->first(function($d) {
+                                            return !in_array($d->status, ['Invoiced', 'Fully Invoiced', 'Completed', 'Cancelled']);
+                                        }) : null;
+                                        $doInvoiceParams = ['sales_order_id' => $order->id, 'mode' => 'dispatch_order'];
+                                        if ($unbilledDo) {
+                                            $doInvoiceParams['dispatch_order_id'] = $unbilledDo->id;
+                                        }
+                                    @endphp
                                     <div class="d-flex flex-column gap-1 align-items-center justify-content-center">
-                                        <x-ui.button href="{!! route('sales.invoices.create', ['sales_order_id' => $order->id, 'mode' => 'dispatch_order']) !!}" variant="soft-primary" size="xs" icon="feather-file-text" class="fw-bold px-2.5 py-1 fs-11 text-nowrap" title="Create Invoice against Dispatches of this order">
-                                            Add Invoice From DO
-                                        </x-ui.button>
+                                        @if($unbilledDo)
+                                            <x-ui.button href="{!! route('sales.invoices.create', $doInvoiceParams) !!}" variant="soft-primary" size="xs" icon="feather-file-text" class="fw-bold px-2.5 py-1 fs-11 text-nowrap" title="Create Invoice against Dispatches of this order">
+                                                Add Invoice From DO
+                                            </x-ui.button>
+                                        @elseif($doCount > 0)
+                                            <span class="badge bg-soft-success text-success fs-11 fw-semibold">All DOs Invoiced</span>
+                                        @else
+                                            <x-ui.button href="{!! route('sales.invoices.create', $doInvoiceParams) !!}" variant="soft-primary" size="xs" icon="feather-file-text" class="fw-bold px-2.5 py-1 fs-11 text-nowrap" title="Create Invoice against Dispatches of this order">
+                                                Add Invoice From DO
+                                            </x-ui.button>
+                                        @endif
                                         @if($doCount > 0)
                                             <a href="{{ route('sales.orders.show', $order->id) }}#tab-dispatches" class="d-block text-primary fs-11 fw-semibold text-decoration-underline mt-0.5" title="View History of Delivery Challans / Dispatches">
                                                 View History of DO

@@ -60,24 +60,22 @@ class InvoiceController extends Controller
             ->latest()->get();
 
         $dispatchOrders = $allDispatchOrders->filter(function ($do) {
-            foreach ($do->items as $doItem) {
-                $doQty = floatval($doItem->quantity_dispatched > 0 ? $doItem->quantity_dispatched : $doItem->quantity_ordered);
-                
-                $alreadyInvoiced = InvoiceItem::whereHas('invoice', function($q) use ($do) {
-                    $q->where('status', '!=', 'Cancelled')
-                      ->where(function($q2) use ($do) {
-                          $q2->where('sales_order_id', $do->sales_order_id)
-                             ->orWhere('material_requirement_id', $do->material_requirement_id);
-                      });
-                })
-                ->where('product_id', $doItem->product_id)
-                ->sum('quantity');
+            if (in_array($do->status, ['Invoiced', 'Fully Invoiced', 'Completed', 'Cancelled'])) {
+                return false;
+            }
 
-                if (($doQty - $alreadyInvoiced) > 0.0001) {
-                    return true;
+            // Check if an active non-cancelled invoice exists for this dispatch order's material_requirement_id
+            if ($do->material_requirement_id) {
+                $hasInvoice = Invoice::where('status', '!=', 'Cancelled')
+                    ->where('material_requirement_id', $do->material_requirement_id)
+                    ->exists();
+
+                if ($hasInvoice) {
+                    return false;
                 }
             }
-            return false;
+
+            return true;
         });
 
         $customers  = \App\Domains\CRM\Models\Customer::query()->orderBy('name')->get();
@@ -86,8 +84,19 @@ class InvoiceController extends Controller
 
         $dispatchOrder = null;
         $materialRequirement = null;
+
+        if (!$dispatchOrderId && $salesOrderId) {
+            $targetDo = $dispatchOrders->where('sales_order_id', $salesOrderId)->first();
+            if ($targetDo) {
+                $dispatchOrder = $targetDo;
+                $dispatchOrderId = $targetDo->id;
+            }
+        }
+
         if ($dispatchOrderId) {
-            $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])->find($dispatchOrderId);
+            if (!$dispatchOrder) {
+                $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])->find($dispatchOrderId);
+            }
             if (!$dispatchOrder) {
                 $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])
                     ->where('material_requirement_id', $dispatchOrderId)
@@ -110,9 +119,11 @@ class InvoiceController extends Controller
 
             if ($salesOrderId) {
                 $soDOs = $dispatchOrders->filter(fn($do) => $do->sales_order_id == $salesOrderId)->values();
-                $dispatchOrders = $soDOs;
+                if ($soDOs->isNotEmpty()) {
+                    $dispatchOrders = $soDOs;
+                }
 
-                if (!$dispatchOrderId && $dispatchOrders->isNotEmpty()) {
+                if (!$dispatchOrder && $dispatchOrders->isNotEmpty()) {
                     $dispatchOrder = $dispatchOrders->first();
                     if ($dispatchOrder) {
                         $dispatchOrderId = $dispatchOrder->id;
