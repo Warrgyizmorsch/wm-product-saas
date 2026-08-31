@@ -40,6 +40,19 @@ class JournalRepository implements JournalRepositoryInterface
         return $query->orderBy($sort, $direction)->orderByDesc('id')->paginate($perPage);
     }
 
+    public function forDate(\DateTimeInterface $date): Collection
+    {
+        $start = \Illuminate\Support\Carbon::instance($date)->startOfDay();
+        $end = \Illuminate\Support\Carbon::instance($date)->endOfDay();
+
+        return Journal::query()
+            ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+            ->whereBetween('journal_date', [$start, $end])
+            ->with(['entries.account', 'voucherDetail'])
+            ->orderBy('journal_number')
+            ->get();
+    }
+
     public function find(int $id): ?Journal
     {
         return Journal::find($id);
@@ -91,6 +104,7 @@ class JournalRepository implements JournalRepositoryInterface
             $journal->entries()->create([
                 'tenant_id' => $journal->tenant_id,
                 'chart_of_account_id' => $line['chart_of_account_id'],
+                'cost_center_id' => $line['cost_center_id'] ?? null,
                 'debit' => $line['debit'] ?? 0,
                 'credit' => $line['credit'] ?? 0,
                 'description' => $line['description'] ?? null,
@@ -100,12 +114,13 @@ class JournalRepository implements JournalRepositoryInterface
         return $journal->load(['entries.account']);
     }
 
-    public function trialBalance(int $periodId): Collection
+    public function trialBalance(int $periodId, ?int $costCenterId = null): Collection
     {
         return JournalEntry::query()
             ->select('chart_of_account_id')
             ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
             ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('accounting_period_id', $periodId))
+            ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
             ->groupBy('chart_of_account_id')
             ->with('account')
             ->get();

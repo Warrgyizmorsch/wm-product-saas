@@ -88,6 +88,7 @@ class JournalService
 
             $reversalLines = $original->entries->map(fn ($entry) => [
                 'chart_of_account_id' => $entry->chart_of_account_id,
+                'cost_center_id' => $entry->cost_center_id,
                 'debit' => $entry->credit,
                 'credit' => $entry->debit,
                 'description' => $reason ?? "Reversal of {$original->journal_number}",
@@ -131,9 +132,9 @@ class JournalService
         return $this->journals->paginateAll($filters, $perPage);
     }
 
-    public function trialBalance(AccountingPeriod $period): Collection
+    public function trialBalance(AccountingPeriod $period, ?int $costCenterId = null): Collection
     {
-        return $this->journals->trialBalance($period->id);
+        return $this->journals->trialBalance($period->id, $costCenterId);
     }
 
     /**
@@ -144,6 +145,11 @@ class JournalService
     public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection
     {
         return $this->journals->balancesAsOf($tenantId, $asOfDate);
+    }
+
+    public function forDate(\DateTimeInterface $date): Collection
+    {
+        return $this->journals->forDate($date);
     }
 
     /**

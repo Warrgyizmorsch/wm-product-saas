@@ -28,7 +28,7 @@ interface JournalRepositoryInterface
      *
      * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
      */
-    public function trialBalance(int $periodId): Collection;
+    public function trialBalance(int $periodId, ?int $costCenterId = null): Collection;
 
     /**
      * Every posted JournalEntry for one account within one period, for a
@@ -57,4 +57,13 @@ interface JournalRepositoryInterface
      * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
      */
     public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection;
+
+    /**
+     * Every journal (posted or reversed — a Day Book is a chronological
+     * record of what happened, not just what's still in force) dated on one
+     * calendar day, with entries/account eager-loaded, for the Day Book report.
+     *
+     * @return Collection<int, Journal>
+     */
+    public function forDate(\DateTimeInterface $date): Collection;
 }

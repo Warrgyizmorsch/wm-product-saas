@@ -12,6 +12,11 @@
                     $p->id => ($p->fiscalYear?->name) . ' — ' . $p->name . ' (' . $p->status . ')',
                 ])->all()" :selected="$period?->id" />
             </div>
+            <div class="col-md-6">
+                <x-ui.select label="Cost Center" name="cost_center_id" onchange="this.form.submit()" :options="collect(['' => 'All Cost Centers'])->merge($costCenters->mapWithKeys(fn ($c) => [
+                    $c->id => $c->code . ' — ' . $c->name,
+                ]))->all()" :selected="$costCenterId" />
+            </div>
         </form>
     </x-ui.card>
 

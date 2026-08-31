@@ -7,8 +7,13 @@ use App\Domains\Accounting\Controllers\ArAgingController;
 use App\Domains\Accounting\Controllers\BalanceSheetController;
 use App\Domains\Accounting\Controllers\CashFlowController;
 use App\Domains\Accounting\Controllers\ChartOfAccountController;
+use App\Domains\Accounting\Controllers\CostCenterController;
+use App\Domains\Accounting\Controllers\DayBookController;
 use App\Domains\Accounting\Controllers\FiscalYearController;
 use App\Domains\Accounting\Controllers\GeneralLedgerController;
+use App\Domains\Accounting\Controllers\GstSummaryController;
+use App\Domains\Accounting\Controllers\Gstr1Controller;
+use App\Domains\Accounting\Controllers\Gstr3bController;
 use App\Domains\Accounting\Controllers\JournalController;
 use App\Domains\Accounting\Controllers\ProfitLossController;
 use App\Domains\Accounting\Controllers\TaxRateController;
@@ -24,6 +29,11 @@ Route::prefix('accounting')
         Route::post('chart-of-accounts', [ChartOfAccountController::class, 'store'])->name('chart-of-accounts.store');
         Route::put('chart-of-accounts/{account}', [ChartOfAccountController::class, 'update'])->name('chart-of-accounts.update');
         Route::delete('chart-of-accounts/{account}', [ChartOfAccountController::class, 'destroy'])->name('chart-of-accounts.destroy');
+
+        Route::get('cost-centers', [CostCenterController::class, 'index'])->name('cost-centers.index');
+        Route::post('cost-centers', [CostCenterController::class, 'store'])->name('cost-centers.store');
+        Route::put('cost-centers/{costCenter}', [CostCenterController::class, 'update'])->name('cost-centers.update');
+        Route::delete('cost-centers/{costCenter}', [CostCenterController::class, 'destroy'])->name('cost-centers.destroy');
 
         Route::get('fiscal-years', [FiscalYearController::class, 'index'])->name('fiscal-years.index');
         Route::post('fiscal-years', [FiscalYearController::class, 'store'])->name('fiscal-years.store');
@@ -44,6 +54,7 @@ Route::prefix('accounting')
         Route::get('journals/{journal}', [JournalController::class, 'show'])->name('journals.show');
         Route::post('journals/{journal}/reverse', [JournalController::class, 'reverse'])->name('journals.reverse');
 
+        Route::get('reports/day-book', [DayBookController::class, 'index'])->name('reports.day-book');
         Route::get('reports/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.trial-balance');
         Route::get('reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
         Route::get('reports/balance-sheet', [BalanceSheetController::class, 'index'])->name('reports.balance-sheet');
@@ -52,6 +63,9 @@ Route::prefix('accounting')
         Route::get('reports/ar-aging', [ArAgingController::class, 'index'])->name('reports.ar-aging');
         Route::get('reports/ap-aging', [ApAgingController::class, 'index'])->name('reports.ap-aging');
         Route::get('reports/cash-flow', [CashFlowController::class, 'index'])->name('reports.cash-flow');
+        Route::get('reports/gst-summary', [GstSummaryController::class, 'index'])->name('reports.gst-summary');
+        Route::get('reports/gstr1', [Gstr1Controller::class, 'index'])->name('reports.gstr1');
+        Route::get('reports/gstr3b', [Gstr3bController::class, 'index'])->name('reports.gstr3b');
 
         Route::get('posting-failures', [AccountingPostingFailureController::class, 'index'])->name('posting-failures.index');
         Route::post('posting-failures/{failure}/retry', [AccountingPostingFailureController::class, 'retry'])->name('posting-failures.retry');

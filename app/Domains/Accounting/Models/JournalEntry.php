@@ -16,6 +16,7 @@ class JournalEntry extends BaseModel
         'tenant_id',
         'journal_id',
         'chart_of_account_id',
+        'cost_center_id',
         'debit',
         'credit',
         'description',
@@ -34,5 +35,10 @@ class JournalEntry extends BaseModel
     public function account(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id');
+    }
+
+    public function costCenter(): BelongsTo
+    {
+        return $this->belongsTo(CostCenter::class, 'cost_center_id');
     }
 }

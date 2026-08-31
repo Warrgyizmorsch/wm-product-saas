@@ -44,10 +44,11 @@
                         <x-ui.odoo-form-ui type="table" id="itemsTable">
                             <thead>
                                 <tr>
-                                    <th style="width: 35%;">Account</th>
-                                    <th style="width: 25%;">Description</th>
-                                    <th class="text-end" style="width: 17%;">Debit</th>
-                                    <th class="text-end" style="width: 17%;">Credit</th>
+                                    <th style="width: 28%;">Account</th>
+                                    <th style="width: 20%;">Cost Center</th>
+                                    <th style="width: 19%;">Description</th>
+                                    <th class="text-end" style="width: 13%;">Debit</th>
+                                    <th class="text-end" style="width: 13%;">Credit</th>
                                     <th class="text-center" style="width: 6%;"></th>
                                 </tr>
                             </thead>
@@ -93,8 +94,10 @@
 
             @php
                 $mappedAccounts = $accounts->map(fn ($a) => ['id' => $a->id, 'code' => $a->code, 'name' => $a->name]);
+                $mappedCostCenters = $costCenters->map(fn ($c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name]);
             @endphp
             const accountsList = @json($mappedAccounts);
+            const costCentersList = @json($mappedCostCenters);
 
             function escapeHtml(string) {
                 return String(string).replace(/[&<>"']/g, function (s) {
@@ -111,12 +114,26 @@
                 return opts;
             }
 
+            function buildCostCenterOptions(selectedId = '') {
+                let opts = '<option value="">—</option>';
+                costCentersList.forEach(function(c) {
+                    const sel = (c.id == selectedId) ? ' selected' : '';
+                    opts += `<option value="${c.id}"${sel}>${escapeHtml(c.code)} - ${escapeHtml(c.name)}</option>`;
+                });
+                return opts;
+            }
+
             function getRowHtml(index) {
                 return `
                     <tr class="item-row" data-row-id="${index}">
                         <td class="ps-3">
                             <select name="items[${index}][chart_of_account_id]" class="form-select odoo-table-select odoo-select2 account-select" required>
                                 ${buildAccountOptions()}
+                            </select>
+                        </td>
+                        <td>
+                            <select name="items[${index}][cost_center_id]" class="form-select odoo-table-select odoo-select2 cost-center-select">
+                                ${buildCostCenterOptions()}
                             </select>
                         </td>
                         <td>
@@ -171,6 +188,7 @@
 
                 if (typeof $.fn.select2 === 'function') {
                     newRow.find('.account-select').select2({ theme: "bootstrap-5", width: "100%" });
+                    newRow.find('.cost-center-select').select2({ theme: "bootstrap-5", width: "100%" });
                 }
 
                 rowIndex++;

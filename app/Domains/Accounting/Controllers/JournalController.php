@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\Controllers;
 
 use App\Domains\Accounting\Models\ChartOfAccount;
+use App\Domains\Accounting\Models\CostCenter;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Services\ChartOfAccountsService;
 use App\Domains\Accounting\Services\JournalService;
@@ -39,6 +40,7 @@ class JournalController extends Controller
 
         return view('modules.accounting.journals.create', [
             'accounts' => $this->accounts->active(),
+            'costCenters' => CostCenter::active()->orderBy('code')->get(),
         ]);
     }
 
@@ -51,6 +53,7 @@ class JournalController extends Controller
             'memo' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:2'],
             'items.*.chart_of_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
+            'items.*.cost_center_id' => ['nullable', 'integer', 'exists:cost_centers,id'],
             'items.*.debit' => ['nullable', 'numeric', 'min:0'],
             'items.*.credit' => ['nullable', 'numeric', 'min:0'],
             'items.*.description' => ['nullable', 'string', 'max:255'],

@@ -554,6 +554,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\CostCenter::class,
+            \App\Domains\Accounting\Policies\CostCenterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Accounting\Models\FiscalYear::class,
             \App\Domains\Accounting\Policies\FiscalYearPolicy::class
         );
