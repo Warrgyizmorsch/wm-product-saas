@@ -25,6 +25,23 @@ class PayrollCalculationService
         $carbonMonth = Carbon::parse($payrollMonth . '-01');
         $totalDaysInMonth = $carbonMonth->daysInMonth;
 
+        // Try to fetch corresponding active run to get exact user-defined start and end dates
+        $run = \App\Domains\HRMS\Models\PayrollRun::where('payroll_month', $payrollMonth)
+            ->where(function($q) use ($employee) {
+                $q->whereNull('pay_group_id');
+                if ($employee->pay_group_id) {
+                    $q->orWhere('pay_group_id', $employee->pay_group_id);
+                }
+            })
+            ->first();
+
+        $startDate = $run && $run->start_date ? Carbon::parse($run->start_date) : $carbonMonth->copy()->startOfMonth();
+        $endDate = $run && $run->end_date ? Carbon::parse($run->end_date) : $carbonMonth->copy()->endOfMonth();
+        
+        if ($run && $run->start_date && $run->end_date) {
+            $totalDaysInMonth = $startDate->diffInDays($endDate) + 1;
+        }
+
         // 2. Resolve Pay Group Rules
         $payGroup = $employee->payGroup;
         $rules = $payGroup ? ($payGroup->payroll_rules ?? []) : [];
@@ -36,27 +53,24 @@ class PayrollCalculationService
         if ($prorationRule === 'fixed_30_days') {
             $divisor = 30;
         } elseif ($prorationRule === 'working_days') {
-            // Count days in month excluding Sundays (0)
+            // Count days in cycle excluding Sundays (0)
             $workingDays = 0;
-            for ($d = 1; $d <= $totalDaysInMonth; $d++) {
-                $tempDate = Carbon::parse($payrollMonth . '-' . $d);
-                if ($tempDate->dayOfWeek !== Carbon::SUNDAY) {
+            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+                if ($date->dayOfWeek !== Carbon::SUNDAY) {
                     $workingDays++;
                 }
             }
             $divisor = max(1, $workingDays);
         }
 
-        // 4. Calculate LOP Days (Absences + Penalty Days combined)
+        // 4. Calculate LOP Days (Absences + Penalty Days combined in the run dates range)
         $absenceDays = Attendance::where('employee_id', $employee->id)
-            ->whereMonth('date', $carbonMonth->month)
-            ->whereYear('date', $carbonMonth->year)
+            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->where('status', 'absent')
             ->count();
 
         $penaltyDaysCount = EmployeePenalty::where('employee_id', $employee->id)
-            ->whereMonth('date', $carbonMonth->month)
-            ->whereYear('date', $carbonMonth->year)
+            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->where('status', '!=', 'excused')
             ->sum('penalty_amount');
 
@@ -120,9 +134,10 @@ class PayrollCalculationService
 
             // Calculate Balancing Component (e.g. Special Allowance)
             $balancingItem = $baseStructure->items->filter(fn($i) => $i->calculation_type === 'balancing')->first();
+            $monthlyCTC = $employee->current_salary / 12;
+
             if ($balancingItem) {
                 $compCode = $balancingItem->component->code;
-                $monthlyCTC = $employee->current_salary / 12;
                 $sumOthers = 0.00;
                 foreach ($computedSalaryItems as $code => $data) {
                     if ($code !== $compCode && $data['type'] === 'earning') {
@@ -134,17 +149,63 @@ class PayrollCalculationService
                     $computedSalaryItems[$compCode]['base_monthly'] = round($balancingMonthly, 2);
                     $computedSalaryItems[$compCode]['calculated_value'] = round($balancingMonthly, 2);
                 }
+            } else {
+                // If there is no manual balancing component, check if the total monthly base earnings equal monthly CTC
+                $sumEarnings = 0.00;
+                foreach ($computedSalaryItems as $code => $data) {
+                    if ($data['type'] === 'earning') {
+                        $sumEarnings += $data['base_monthly'];
+                    }
+                }
+
+                if ($sumEarnings < $monthlyCTC) {
+                    $remainder = $monthlyCTC - $sumEarnings;
+                    
+                    // If Special Allowance (SPL) is already in the structure, add the remainder to it
+                    if (isset($computedSalaryItems['SPL'])) {
+                        $computedSalaryItems['SPL']['base_monthly'] = round($computedSalaryItems['SPL']['base_monthly'] + $remainder, 2);
+                        $computedSalaryItems['SPL']['calculated_value'] = round($computedSalaryItems['SPL']['calculated_value'] + $remainder, 2);
+                    } else {
+                        // Otherwise, fetch the SPL component and dynamically inject it to absorb the remainder
+                        $splComponent = \App\Domains\HRMS\Models\SalaryComponent::where('code', 'SPL')->first();
+                        if ($splComponent) {
+                            $computedSalaryItems['SPL'] = [
+                                'name'             => $splComponent->name,
+                                'type'             => $splComponent->type,
+                                'base_monthly'     => round($remainder, 2),
+                                'calculated_value' => round($remainder, 2),
+                                'deduction'        => 0.00,
+                                'reversal'         => 0.00,
+                            ];
+                        }
+                    }
+                }
             }
         }
 
         // 6. Apply LOP deductions
+        $totalLopDeduction = 0.00;
         $lopFactor = $divisor > 0 ? ($lopDays / $divisor) : 0;
         foreach ($computedSalaryItems as $code => &$item) {
-            if ($item['type'] === 'earning' && $lopFactor > 0) {
-                if ($splicingRule === 'proportionate_gross' || in_array($code, ['BASIC', 'HRA'])) {
-                    $item['deduction'] = round($item['base_monthly'] * $lopFactor, 2);
-                    $item['calculated_value'] = max(0.00, $item['calculated_value'] - $item['deduction']);
+            $itemPaidDays = $divisor;
+            if ($item['type'] === 'earning') {
+                if ($lopFactor > 0 && ($splicingRule === 'proportionate_gross' || in_array($code, ['BASIC', 'HRA']))) {
+                    $itemLopDeduction = round($item['base_monthly'] * $lopFactor, 2);
+                    $item['deduction'] = $itemLopDeduction;
+                    $item['calculated_value'] = max(0.00, $item['calculated_value'] - $itemLopDeduction);
+                    $itemPaidDays = max(0.0, $divisor - $lopDays);
+                    $totalLopDeduction += $itemLopDeduction;
                 }
+            }
+            $item['paid_days'] = $itemPaidDays;
+        }
+        unset($item);
+
+        // Append proration days details to component names ONLY if there was Loss of Pay
+        foreach ($computedSalaryItems as $code => &$item) {
+            if ($item['type'] === 'earning' && $lopDays > 0) {
+                $itemPaidDays = $item['paid_days'] ?? $divisor;
+                $item['name'] = $item['name'] . ' (Paid for ' . $itemPaidDays . '/' . $divisor . ' Days)';
             }
         }
         unset($item);
@@ -169,8 +230,7 @@ class PayrollCalculationService
 
         // 8. Inject Unexcused Attendance Penalties (stored as number of days, e.g. 0.25 days, 0.5 days)
         $penaltyDays = EmployeePenalty::where('employee_id', $employee->id)
-            ->whereMonth('date', $carbonMonth->month)
-            ->whereYear('date', $carbonMonth->year)
+            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->where('status', '!=', 'excused')
             ->sum('penalty_amount');
 
@@ -198,7 +258,7 @@ class PayrollCalculationService
 
         // 9.5. Process Overtime Payouts
         $overtimeRequests = \App\Domains\HRMS\Models\OvertimeRequest::where('employee_id', $employee->id)
-            ->whereBetween('date', [$carbonMonth->copy()->startOfMonth(), $carbonMonth->copy()->endOfMonth()])
+            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->whereIn('status', ['approved', 'processed'])
             ->whereIn('compensation_type', ['payout', 'pay'])
             ->get();
@@ -343,6 +403,95 @@ class PayrollCalculationService
             $processedEncashIds[] = $encash->id;
         }
 
+        // 9.9. Dynamic Statutory Calculations (PF & ESI)
+        $enablePf = !isset($rules['enable_pf']) || (bool)$rules['enable_pf'];
+        $restrictPfCeiling = !isset($rules['restrict_pf_ceiling']) || (bool)$rules['restrict_pf_ceiling'];
+        $enableEsi = !isset($rules['enable_esi']) || (bool)$rules['enable_esi'];
+        $restrictEsiThreshold = !isset($rules['restrict_esi_threshold']) || (bool)$rules['restrict_esi_threshold'];
+
+        // Inject PF component if enabled but not in the structure items
+        if ($enablePf && !isset($computedSalaryItems['PF'])) {
+            $pfComponent = \App\Domains\HRMS\Models\SalaryComponent::where('code', 'PF')->first();
+            if ($pfComponent) {
+                $computedSalaryItems['PF'] = [
+                    'name'             => $pfComponent->name,
+                    'type'             => $pfComponent->type,
+                    'base_monthly'     => 0.00,
+                    'calculated_value' => 0.00,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            }
+        }
+
+        // Inject ESI component if enabled but not in the structure items
+        if ($enableEsi && !isset($computedSalaryItems['ESI'])) {
+            $esiComponent = \App\Domains\HRMS\Models\SalaryComponent::where('code', 'ESI')->first();
+            if ($esiComponent) {
+                $computedSalaryItems['ESI'] = [
+                    'name'             => $esiComponent->name,
+                    'type'             => $esiComponent->type,
+                    'base_monthly'     => 0.00,
+                    'calculated_value' => 0.00,
+                    'deduction'        => 0.00,
+                    'reversal'         => 0.00,
+                ];
+            }
+        }
+
+        // 9.9.1. Dynamic PF Calculation
+        if (isset($computedSalaryItems['PF'])) {
+            if ($enablePf) {
+                // PF Wage Basis is standardly Basic + Dearness Allowance (DA)
+                $earnedBasic = ($computedSalaryItems['BASIC']['calculated_value'] ?? 0.00) + ($computedSalaryItems['DA']['calculated_value'] ?? 0.00);
+                $pfBasis = $restrictPfCeiling ? min($earnedBasic, 15000.00) : $earnedBasic;
+                $pfDeduction = round($pfBasis * 0.12, 2);
+                $computedSalaryItems['PF']['calculated_value'] = $pfDeduction;
+                
+                $baseBasic = ($computedSalaryItems['BASIC']['base_monthly'] ?? 0) + ($computedSalaryItems['DA']['base_monthly'] ?? 0);
+                $computedSalaryItems['PF']['base_monthly'] = $restrictPfCeiling ? min($baseBasic, 15000.00) * 0.12 : $baseBasic * 0.12;
+            } else {
+                $computedSalaryItems['PF']['calculated_value'] = 0.00;
+                $computedSalaryItems['PF']['base_monthly'] = 0.00;
+            }
+        }
+
+        // 9.9.2. Dynamic ESI Calculation
+        if (isset($computedSalaryItems['ESI'])) {
+            if ($enableEsi) {
+                // Under ESI regulations, eligibility is evaluated on Gross Salary EXCLUDING Overtime, Leave Encashment, and Retrospective Adjustments.
+                $esiEligibleGross = 0.00;
+                foreach ($computedSalaryItems as $code => $item) {
+                    if ($item['type'] === 'earning' && !in_array($code, ['OVERTIME', 'LEAVE_ENCASHMENT']) && !str_starts_with($code, 'RETRO_REFUND')) {
+                        $esiEligibleGross += $item['calculated_value'];
+                    }
+                }
+                $esiEligibleGross += $adhocEarnings;
+
+                // Once eligible, the ESI contribution is calculated on total gross INCLUDING Overtime.
+                $esiContributionGross = $esiEligibleGross + $totalOtPayout;
+
+                if (!$restrictEsiThreshold || ($esiEligibleGross <= 21000.00 && $esiEligibleGross > 0)) {
+                    // ESI employee deduction must be rounded up to the next higher rupee (statutory ceil)
+                    $esiDeduction = ceil($esiContributionGross * 0.0075);
+                } else {
+                    $esiDeduction = 0.00;
+                }
+                $computedSalaryItems['ESI']['calculated_value'] = $esiDeduction;
+
+                $baseGross = 0.00;
+                foreach ($computedSalaryItems as $code => $item) {
+                    if ($item['type'] === 'earning' && !in_array($code, ['OVERTIME', 'LEAVE_ENCASHMENT']) && !str_starts_with($code, 'RETRO_REFUND')) {
+                        $baseGross += $item['base_monthly'];
+                    }
+                }
+                $computedSalaryItems['ESI']['base_monthly'] = (!$restrictEsiThreshold || $baseGross <= 21000.00) ? ceil($baseGross * 0.0075) : 0.00;
+            } else {
+                $computedSalaryItems['ESI']['calculated_value'] = 0.00;
+                $computedSalaryItems['ESI']['base_monthly'] = 0.00;
+            }
+        }
+
         // 10. Compute final sums
         $grossEarnings = 0.00;
         $grossDeductions = 0.00;
@@ -419,6 +568,8 @@ class PayrollCalculationService
                 'payroll_month'        => $payrollMonth,
                 'total_days'           => $totalDaysInMonth,
                 'lop_days'             => $lopDays,
+                'lop_deduction'        => round($totalLopDeduction, 2),
+                'paid_days'            => max(0.0, $divisor - $lopDays),
                 'proration_rule'       => $prorationRule,
                 'base_gross_earnings'  => round($grossEarnings, 2),
                 'adhoc_earnings'       => round($adhocEarnings, 2),

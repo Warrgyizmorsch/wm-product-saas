@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Api\MapApiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -22,3 +23,14 @@ Route::prefix('auth')->name('auth.')->group(function () {
         ->middleware('auth:sanctum')
         ->name('logout');
 });
+
+// Map & Location Utility routes
+Route::get('/config', [MapApiController::class, 'config'])->name('api.config');
+
+Route::prefix('maps')
+    ->middleware(['auth:sanctum'])
+    ->name('api.maps.')
+    ->group(function () {
+        Route::get('/geocode', [MapApiController::class, 'geocode'])->name('geocode');
+        Route::get('/autocomplete', [MapApiController::class, 'autocomplete'])->name('autocomplete');
+    });

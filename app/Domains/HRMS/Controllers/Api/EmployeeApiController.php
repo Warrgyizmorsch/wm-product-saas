@@ -264,10 +264,12 @@ class EmployeeApiController extends Controller
             if ($request->filled('user_id')) {
                 $targetUser = \App\Models\User::find($request->user_id);
                 if ($targetUser) {
-                    $request->merge([
-                        'full_name' => $targetUser->name,
-                        'personal_email' => $targetUser->email,
-                    ]);
+                    if (!$request->filled('full_name')) {
+                        $request->merge(['full_name' => $targetUser->name]);
+                    }
+                    if (!$request->filled('personal_email')) {
+                        $request->merge(['personal_email' => $targetUser->email]);
+                    }
                 }
             }
 

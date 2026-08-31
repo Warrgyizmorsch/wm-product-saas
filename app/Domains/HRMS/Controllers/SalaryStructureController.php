@@ -216,11 +216,23 @@ class SalaryStructureController extends Controller
 
     public function updatePayGroupRules(Request $request, PayGroup $payGroup)
     {
+        // Checkboxes return nothing if unchecked, so we merge explicit booleans
+        $request->merge([
+            'enable_pf'              => $request->has('enable_pf'),
+            'restrict_pf_ceiling'    => $request->has('restrict_pf_ceiling'),
+            'enable_esi'             => $request->has('enable_esi'),
+            'restrict_esi_threshold' => $request->has('restrict_esi_threshold'),
+        ]);
+
         $validated = $request->validate([
-            'proration_rule'      => 'required|in:calendar_days,fixed_30_days,working_days',
-            'lop_splicing_rule'   => 'required|in:proportionate_gross,basic_hra_only',
-            'attendance_lock_day' => 'required|integer|min:1|max:31',
-            'variable_lock_day'   => 'required|integer|min:1|max:31',
+            'proration_rule'         => 'required|in:calendar_days,fixed_30_days,working_days',
+            'lop_splicing_rule'      => 'required|in:proportionate_gross,basic_hra_only',
+            'attendance_lock_day'    => 'required|integer|min:1|max:31',
+            'variable_lock_day'      => 'required|integer|min:1|max:31',
+            'enable_pf'              => 'required|boolean',
+            'restrict_pf_ceiling'    => 'required|boolean',
+            'enable_esi'             => 'required|boolean',
+            'restrict_esi_threshold' => 'required|boolean',
         ]);
 
         $payGroup->update([

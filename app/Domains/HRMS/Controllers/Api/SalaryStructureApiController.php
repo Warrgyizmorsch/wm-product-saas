@@ -191,11 +191,23 @@ class SalaryStructureApiController extends Controller
             return $authError;
         }
 
+        $rules = $payGroup->payroll_rules ?? [];
+        $request->merge([
+            'enable_pf'              => $request->exists('enable_pf') ? filter_var($request->input('enable_pf'), FILTER_VALIDATE_BOOLEAN) : ($rules['enable_pf'] ?? true),
+            'restrict_pf_ceiling'    => $request->exists('restrict_pf_ceiling') ? filter_var($request->input('restrict_pf_ceiling'), FILTER_VALIDATE_BOOLEAN) : ($rules['restrict_pf_ceiling'] ?? true),
+            'enable_esi'             => $request->exists('enable_esi') ? filter_var($request->input('enable_esi'), FILTER_VALIDATE_BOOLEAN) : ($rules['enable_esi'] ?? true),
+            'restrict_esi_threshold' => $request->exists('restrict_esi_threshold') ? filter_var($request->input('restrict_esi_threshold'), FILTER_VALIDATE_BOOLEAN) : ($rules['restrict_esi_threshold'] ?? true),
+        ]);
+
         $validated = $request->validate([
-            'proration_rule'      => 'required|in:calendar_days,fixed_30_days,working_days',
-            'lop_splicing_rule'   => 'required|in:proportionate_gross,basic_hra_only',
-            'attendance_lock_day' => 'required|integer|min:1|max:31',
-            'variable_lock_day'   => 'required|integer|min:1|max:31',
+            'proration_rule'         => 'required|in:calendar_days,fixed_30_days,working_days',
+            'lop_splicing_rule'      => 'required|in:proportionate_gross,basic_hra_only',
+            'attendance_lock_day'    => 'required|integer|min:1|max:31',
+            'variable_lock_day'      => 'required|integer|min:1|max:31',
+            'enable_pf'              => 'required|boolean',
+            'restrict_pf_ceiling'    => 'required|boolean',
+            'enable_esi'             => 'required|boolean',
+            'restrict_esi_threshold' => 'required|boolean',
         ]);
 
         $payGroup->update([

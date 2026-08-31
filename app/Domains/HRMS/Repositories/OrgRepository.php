@@ -196,21 +196,89 @@ class OrgRepository implements OrgRepositoryInterface
 
     public function storeCompany(array $validated): Company { return Company::create($validated); }
     public function updateCompany(Company $company, array $validated): bool { return $company->update($validated); }
-    public function destroyCompany(Company $company): bool { return $company->delete(); }
+    public function destroyCompany(Company $company): bool {
+        \App\Domains\HRMS\Models\Employee::withTrashed()->where('company_id', $company->id)->update(['company_id' => null]);
+        
+        $branchIds = \App\Domains\HRMS\Models\Branch::where('company_id', $company->id)->pluck('id');
+        \App\Domains\HRMS\Models\Employee::withTrashed()->whereIn('branch_id', $branchIds)->update(['branch_id' => null]);
+
+        $buIds = \App\Domains\HRMS\Models\BusinessUnit::where('company_id', $company->id)->pluck('id');
+        \App\Domains\HRMS\Models\Employee::withTrashed()->whereIn('business_unit_id', $buIds)->update(['business_unit_id' => null]);
+
+        $departmentIds = \App\Domains\HRMS\Models\Department::where('company_id', $company->id)->pluck('id');
+        \App\Domains\HRMS\Models\Employee::withTrashed()->whereIn('department_id', $departmentIds)->update([
+            'department_id' => null,
+            'designation_id' => null
+        ]);
+
+        \App\Domains\HRMS\Models\Designation::whereIn('department_id', $departmentIds)->delete();
+        \App\Domains\HRMS\Models\Department::where('company_id', $company->id)->delete();
+        \App\Domains\HRMS\Models\Branch::where('company_id', $company->id)->delete();
+        \App\Domains\HRMS\Models\BusinessUnit::where('company_id', $company->id)->delete();
+
+        // Clean up document master and category constraints
+        $catIds = \Illuminate\Support\Facades\DB::table('document_categories')->where('company_id', $company->id)->pluck('id');
+        \Illuminate\Support\Facades\DB::table('document_masters')->whereIn('document_category_id', $catIds)->delete();
+        \Illuminate\Support\Facades\DB::table('document_categories')->where('company_id', $company->id)->delete();
+
+        return $company->delete();
+    }
 
     public function storeBusinessUnit(array $validated): BusinessUnit { return BusinessUnit::create($validated); }
     public function updateBusinessUnit(BusinessUnit $businessUnit, array $validated): bool { return $businessUnit->update($validated); }
-    public function destroyBusinessUnit(BusinessUnit $businessUnit): bool { return $businessUnit->delete(); }
+    public function destroyBusinessUnit(BusinessUnit $businessUnit): bool {
+        \App\Domains\HRMS\Models\Employee::withTrashed()->where('business_unit_id', $businessUnit->id)->update(['business_unit_id' => null]);
+        
+        $branchIds = \App\Domains\HRMS\Models\Branch::where('business_unit_id', $businessUnit->id)->pluck('id');
+        \App\Domains\HRMS\Models\Employee::withTrashed()->whereIn('branch_id', $branchIds)->update(['branch_id' => null]);
+
+        $departmentIds = \App\Domains\HRMS\Models\Department::where('business_unit_id', $businessUnit->id)->pluck('id');
+        \App\Domains\HRMS\Models\Employee::withTrashed()->whereIn('department_id', $departmentIds)->update([
+            'department_id' => null,
+            'designation_id' => null
+        ]);
+
+        \App\Domains\HRMS\Models\Designation::whereIn('department_id', $departmentIds)->delete();
+        \App\Domains\HRMS\Models\Department::where('business_unit_id', $businessUnit->id)->delete();
+        \App\Domains\HRMS\Models\Branch::where('business_unit_id', $businessUnit->id)->delete();
+
+        return $businessUnit->delete();
+    }
 
     public function storeBranch(array $validated): Branch { return Branch::create($validated); }
     public function updateBranch(Branch $branch, array $validated): bool { return $branch->update($validated); }
-    public function destroyBranch(Branch $branch): bool { return $branch->delete(); }
+    public function destroyBranch(Branch $branch): bool {
+        \App\Domains\HRMS\Models\Employee::withTrashed()->where('branch_id', $branch->id)->update(['branch_id' => null]);
+        $departmentIds = \App\Domains\HRMS\Models\Department::where('branch_id', $branch->id)->pluck('id');
+        
+        \App\Domains\HRMS\Models\Employee::withTrashed()->whereIn('department_id', $departmentIds)->update([
+            'department_id' => null,
+            'designation_id' => null
+        ]);
+
+        \App\Domains\HRMS\Models\Designation::whereIn('department_id', $departmentIds)->delete();
+        \App\Domains\HRMS\Models\Department::where('branch_id', $branch->id)->delete();
+
+        return $branch->delete();
+    }
 
     public function storeDepartment(array $validated): Department { return Department::create($validated); }
     public function updateDepartment(Department $department, array $validated): bool { return $department->update($validated); }
-    public function destroyDepartment(Department $department): bool { return $department->delete(); }
+    public function destroyDepartment(Department $department): bool {
+        \App\Domains\HRMS\Models\Employee::withTrashed()->where('department_id', $department->id)->update([
+            'department_id' => null,
+            'designation_id' => null,
+        ]);
+        \App\Domains\HRMS\Models\Designation::where('department_id', $department->id)->delete();
+        return $department->delete();
+    }
 
     public function storeDesignation(array $validated): Designation { return Designation::create($validated); }
     public function updateDesignation(Designation $designation, array $validated): bool { return $designation->update($validated); }
-    public function destroyDesignation(Designation $designation): bool { return $designation->delete(); }
+    public function destroyDesignation(Designation $designation): bool {
+        \App\Domains\HRMS\Models\Employee::withTrashed()->where('designation_id', $designation->id)->update([
+            'designation_id' => null,
+        ]);
+        return $designation->delete();
+    }
 }

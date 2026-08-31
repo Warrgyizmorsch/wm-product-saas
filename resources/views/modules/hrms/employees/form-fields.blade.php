@@ -5,8 +5,9 @@
         return old($field, $default);
     };
 @endphp
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+@once
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
+@endonce
 
 <div class="row g-4">
     <div class="col-xl-3 employee-photo-col">
@@ -119,16 +120,25 @@
         <div class="employee-modal-section-title">{{ __('hrms.employees.basic_details') }}</div>
         <div class="row g-3">
             <div class="col-md-6">
-                @if(!$isEdit)
-                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_full_name') }}" name="user_id" id="{{ $prefix }}_user_id" :required="true" select2-selector="default">
-                        <option value="">{{ __('hrms.employees.frm_select_user') }}</option>
-                        @foreach($unmappedUsers as $u)
-                            <option value="{{ $u->id }}" @selected((string) $fieldValue('user_id') === (string) $u->id)>{{ $u->name }} ({{ $u->email }})</option>
-                        @endforeach
-                    </x-ui.odoo-form-ui>
-                @else
-                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_full_name') }}" name="full_name" id="{{ $prefix }}_full_name" :required="true" :value="$fieldValue('full_name')" readonly="readonly" class="bg-light" />
-                @endif
+                @php
+                    $usersList = $unmappedUsers ?? collect();
+                    if ($isEdit && isset($employee) && $employee->user) {
+                        if (!$usersList->contains('id', $employee->user_id)) {
+                            $usersList = collect([$employee->user])->concat($usersList);
+                        }
+                    }
+                @endphp
+                <x-ui.odoo-form-ui type="select" label="User Account (Link to login)" name="user_id" id="{{ $prefix }}_user_id" :required="true" select2-selector="default" :errorText="$errors->first('user_id')">
+                    <option value="">Select User Account</option>
+                    @foreach($usersList as $u)
+                        <option value="{{ $u->id }}" data-user-name="{{ $u->name }}" data-user-email="{{ $u->email }}" data-user-role-id="{{ $u->role_id ?? $u->roles->first()?->id ?? '' }}" @selected((string) $fieldValue('user_id', $isEdit ? ($employee->user_id ?? '') : '') === (string) $u->id)>
+                            {{ $u->name }} ({{ $u->email }})
+                        </option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_full_name') }}" name="full_name" id="{{ $prefix }}_full_name" :required="true" :value="$fieldValue('full_name', $isEdit ? ($employee->full_name ?? '') : '')" placeholder="Enter Full Name" />
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="select" label="System Role" name="role_id" id="{{ $prefix }}_role_id" :required="true" select2-selector="default" :errorText="$errors->first('role_id')">
@@ -249,11 +259,7 @@
                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_mobile') }}" name="personal_mobile_number" id="{{ $prefix }}_personal_mobile_number" :value="$fieldValue('personal_mobile_number')" placeholder="{{ __('hrms.employees.frm_mobile_placeholder') }}" :errorText="$errors->first('personal_mobile_number')" />
             </div>
             <div class="col-md-6">
-                @if(!$isEdit)
-                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email')" placeholder="{{ __('hrms.employees.frm_email_autofill_placeholder') }}" readonly="readonly" class="bg-light" />
-                @else
-                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email')" placeholder="{{ __('hrms.employees.frm_email_placeholder') }}" :errorText="$errors->first('personal_email')" />
-                @endif
+                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email', $isEdit ? ($employee->personal_email ?? '') : '')" placeholder="Linked user email address" readonly="readonly" class="bg-light" :errorText="$errors->first('personal_email')" />
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_office_email') }}" name="office_email" id="{{ $prefix }}_office_email" inputType="email" :value="$fieldValue('office_email')" placeholder="{{ __('hrms.employees.frm_office_email_placeholder') }}" :errorText="$errors->first('office_email')" />
@@ -338,8 +344,13 @@
                 <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.frm_skill_set') }}" name="skill_set" id="{{ $prefix }}_skill_set" rows="3" placeholder="{{ __('hrms.employees.frm_skill_set_placeholder') }}" :errorText="$errors->first('skill_set')">{{ $fieldValue('skill_set') }}</x-ui.odoo-form-ui>
             </div>
         </div>
-    </div>
 </div>
+
+<style>
+    .pac-container {
+        z-index: 9999 !important;
+    }
+</style>
 
 <script>
 const runEmployeeFormSetup = () => {
@@ -351,6 +362,22 @@ const runEmployeeFormSetup = () => {
         }
 
         const prefix = "{{ $prefix }}";
+
+        // Auto-fill Full Name, Personal Email, and System Role from linked User Account selection
+        $('#' + prefix + '_user_id').on('change', function() {
+            const selectedOpt = $(this).find('option:selected');
+            const userName = selectedOpt.attr('data-user-name') || selectedOpt.data('user-name') || '';
+            const userEmail = selectedOpt.attr('data-user-email') || selectedOpt.data('user-email') || '';
+            const userRoleId = selectedOpt.attr('data-user-role-id') || selectedOpt.data('user-role-id') || '';
+            if (userName) {
+                $('#' + prefix + '_full_name').val(userName);
+            }
+            $('#' + prefix + '_personal_email').val(userEmail);
+            if (userRoleId) {
+                $('#' + prefix + '_role_id').val(userRoleId).trigger('change');
+            }
+        });
+
         const officeSelect = $('#' + prefix + '_office');
         const coordSection = $('#' + prefix + '_wfh_coordinates_section');
         
@@ -385,7 +412,7 @@ const runEmployeeFormSetup = () => {
         let wfhMarker = null;
 
         const initWfhMapPicker = () => {
-            if (typeof L === 'undefined') {
+            if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
                 setTimeout(initWfhMapPicker, 100);
                 return;
             }
@@ -398,34 +425,40 @@ const runEmployeeFormSetup = () => {
 
             let initialLat = parseFloat(latInput.val()) || 28.6139; // Default to New Delhi or a sensible center
             let initialLng = parseFloat(lngInput.val()) || 77.2090;
+            const initialPos = { lat: initialLat, lng: initialLng };
             
             if (wfhMap) {
-                setTimeout(() => {
-                    wfhMap.invalidateSize();
-                }, 200);
+                google.maps.event.trigger(wfhMap, 'resize');
+                wfhMap.setCenter(initialPos);
                 return;
             }
 
-            wfhMap = L.map(mapContainerId).setView([initialLat, initialLng], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
-            }).addTo(wfhMap);
+            wfhMap = new google.maps.Map(document.getElementById(mapContainerId), {
+                center: initialPos,
+                zoom: 13,
+                mapTypeControl: false,
+                fullscreenControl: false,
+                streetViewControl: false
+            });
 
-            wfhMarker = L.marker([initialLat, initialLng], { draggable: true }).addTo(wfhMap);
+            wfhMarker = new google.maps.Marker({
+                position: initialPos,
+                map: wfhMap,
+                draggable: true
+            });
 
             // Update inputs on marker drag
-            wfhMarker.on('dragend', function(e) {
-                const position = wfhMarker.getLatLng();
-                latInput.val(position.lat.toFixed(8));
-                lngInput.val(position.lng.toFixed(8));
+            wfhMarker.addListener('dragend', function() {
+                const position = wfhMarker.getPosition();
+                latInput.val(position.lat().toFixed(8));
+                lngInput.val(position.lng().toFixed(8));
             });
 
             // Update marker and inputs on map click
-            wfhMap.on('click', function(e) {
-                wfhMarker.setLatLng(e.latlng);
-                latInput.val(e.latlng.lat.toFixed(8));
-                lngInput.val(e.latlng.lng.toFixed(8));
+            wfhMap.addListener('click', function(e) {
+                wfhMarker.setPosition(e.latLng);
+                latInput.val(e.latLng.lat().toFixed(8));
+                lngInput.val(e.latLng.lng().toFixed(8));
             });
 
             // Update map when inputs change manually
@@ -433,83 +466,42 @@ const runEmployeeFormSetup = () => {
                 const lat = parseFloat(latInput.val());
                 const lng = parseFloat(lngInput.val());
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    const latlng = [lat, lng];
-                    wfhMarker.setLatLng(latlng);
-                    wfhMap.setView(latlng, wfhMap.getZoom());
+                    const latlng = { lat: lat, lng: lng };
+                    wfhMarker.setPosition(latlng);
+                    wfhMap.setCenter(latlng);
                 }
             };
 
             latInput.on('input', updateMapFromInputs);
             lngInput.on('input', updateMapFromInputs);
 
-            // Address Search Geocoding logic
-            const searchInput = $('#' + prefix + '_wfh_map_search');
+            // Bind Google Places Autocomplete search input
+            const searchInputEl = document.getElementById(prefix + '_wfh_map_search');
+            if (searchInputEl) {
+                const autocomplete = new google.maps.places.Autocomplete(searchInputEl);
+                autocomplete.bindTo('bounds', wfhMap);
 
-            const performSearch = () => {
-                const query = searchInput.val();
-                if (!query) return;
+                autocomplete.addListener('place_changed', function() {
+                    const place = autocomplete.getPlace();
+                    if (!place.geometry || !place.geometry.location) {
+                        return;
+                    }
 
-                searchInput.prop('disabled', true).attr('placeholder', 'Searching...');
-                
-                // Use ArcGIS World Geocoding Service (Free public lookup) for high accuracy address/subarea search
-                fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query)}&maxLocations=1`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data && data.candidates && data.candidates.length > 0) {
-                            const lat = parseFloat(data.candidates[0].location.y);
-                            const lng = parseFloat(data.candidates[0].location.x);
-                            
-                            latInput.val(lat.toFixed(8));
-                            lngInput.val(lng.toFixed(8));
+                    wfhMap.setCenter(place.geometry.location);
+                    wfhMap.setZoom(15);
+                    wfhMarker.setPosition(place.geometry.location);
 
-                            if (wfhMap && wfhMarker) {
-                                wfhMarker.setLatLng([lat, lng]);
-                                wfhMap.setView([lat, lng], 15);
-                            }
-                            searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
-                        } else {
-                            // Fallback to OSM Nominatim
-                            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
-                                .then(res2 => res2.json())
-                                .then(data2 => {
-                                    if (data2 && data2.length > 0) {
-                                        const lat = parseFloat(data2[0].lat);
-                                        const lng = parseFloat(data2[0].lon);
-                                        
-                                        latInput.val(lat.toFixed(8));
-                                        lngInput.val(lng.toFixed(8));
+                    latInput.val(place.geometry.location.lat().toFixed(8));
+                    lngInput.val(place.geometry.location.lng().toFixed(8));
+                });
 
-                                        if (wfhMap && wfhMarker) {
-                                            wfhMarker.setLatLng([lat, lng]);
-                                            wfhMap.setView([lat, lng], 15);
-                                        }
-                                    } else {
-                                        alert("Location not found. Please try a different query.");
-                                    }
-                                    searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
-                                })
-                                .catch(err => {
-                                    alert("Location not found. Please try a different query.");
-                                    searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
-                                });
-                        }
-                    })
-                    .catch(err => {
-                        console.error("Geocoding error:", err);
-                        searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
-                    });
-            };
-
-            searchInput.on('keypress', function(e) {
-                if (e.which === 13) {
-                    e.preventDefault();
-                    performSearch();
-                }
-            });
-
-            setTimeout(() => {
-                wfhMap.invalidateSize();
-            }, 300);
+                // Prevent form submission when pressing enter on search box
+                $(searchInputEl).on('keypress', function(e) {
+                    if (e.which === 13) {
+                        e.preventDefault();
+                    }
+                });
+            }
         };
 
         // Map toggle function (called inline from the Map button)
@@ -557,9 +549,11 @@ const runEmployeeFormSetup = () => {
                     $('#' + prefix + '_wfh_latitude').val(lat.toFixed(8));
                     $('#' + prefix + '_wfh_longitude').val(lng.toFixed(8));
                     
+                    const latlng = { lat: lat, lng: lng };
                     if (wfhMap && wfhMarker) {
-                        wfhMarker.setLatLng([lat, lng]);
-                        wfhMap.setView([lat, lng], 15);
+                        wfhMarker.setPosition(latlng);
+                        wfhMap.setCenter(latlng);
+                        wfhMap.setZoom(15);
                     } else {
                         // If map isn't open yet, auto-open it so user sees the detected location
                         const mapWrap = document.getElementById(prefix + '_wfh_map_wrap');
@@ -567,8 +561,9 @@ const runEmployeeFormSetup = () => {
                             window['toggleWfhMapPicker_' + prefix]();
                             setTimeout(() => {
                                 if (wfhMap && wfhMarker) {
-                                    wfhMarker.setLatLng([lat, lng]);
-                                    wfhMap.setView([lat, lng], 15);
+                                    wfhMarker.setPosition(latlng);
+                                    wfhMap.setCenter(latlng);
+                                    wfhMap.setZoom(15);
                                 }
                             }, 600);
                         }

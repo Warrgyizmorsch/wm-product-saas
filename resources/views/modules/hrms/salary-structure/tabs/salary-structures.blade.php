@@ -1,8 +1,61 @@
 @php
     $selectedPayGroup = $selectedPayGroup ?? null;
+
+    // Self-Healing: Ensure PF, ESI, and SPL components exist in the database
+    $requiredComponents = [
+        'SPL' => ['name' => 'Special Allowance', 'type' => 'earning', 'calculation_type' => 'balancing', 'default_value' => '0', 'description' => 'System-calculated balancing component', 'is_adhoc' => false],
+        'PF'  => ['name' => 'Provident Fund', 'type' => 'deduction', 'calculation_type' => 'fixed', 'default_value' => '1800', 'description' => 'Employee PF contribution', 'is_adhoc' => false],
+        'ESI' => ['name' => 'Employee State Insurance', 'type' => 'deduction', 'calculation_type' => 'fixed', 'default_value' => '0', 'description' => 'Employee ESI contribution', 'is_adhoc' => false]
+    ];
+
+    $statutoryCodes = ['SPL', 'PF', 'ESI'];
+    $statutoryComponents = \App\Domains\HRMS\Models\SalaryComponent::whereIn('code', $statutoryCodes)->get()->keyBy('code');
+
+    foreach ($statutoryCodes as $code) {
+        if (!isset($statutoryComponents[$code])) {
+            $company = \App\Domains\HRMS\Models\Company::first();
+            $payGroup = $selectedPayGroup ?: \App\Domains\HRMS\Models\PayGroup::first();
+            $data = $requiredComponents[$code];
+            
+            $newComp = \App\Domains\HRMS\Models\SalaryComponent::create([
+                'tenant_id' => auth()->user()->tenant_id ?? 1,
+                'company_id' => $company ? $company->id : null,
+                'pay_group_id' => $payGroup ? $payGroup->id : null,
+                'name' => $data['name'],
+                'code' => $code,
+                'type' => $data['type'],
+                'calculation_type' => $data['calculation_type'],
+                'default_value' => $data['default_value'],
+                'description' => $data['description'],
+                'is_adhoc' => $data['is_adhoc'],
+                'status' => true
+            ]);
+            $statutoryComponents[$code] = $newComp;
+        }
+    }
+
+    // Load other active recurring components for the current pay group (excluding the statutory ones)
+    $otherComponents = \App\Domains\HRMS\Models\SalaryComponent::where('status', true)
+        ->whereNotIn('code', $statutoryCodes)
+        ->where(function($q) use ($selectedPayGroup) {
+            $q->whereNull('pay_group_id');
+            if ($selectedPayGroup) {
+                $q->orWhere('pay_group_id', $selectedPayGroup->id);
+            }
+        })
+        ->get();
+
+    // Always force prepend SPL, PF, and ESI to the recurring components list
+    $recurringComponentsForStructure = collect([
+        $statutoryComponents['SPL'],
+        $statutoryComponents['PF'],
+        $statutoryComponents['ESI']
+    ])->concat($otherComponents->filter(fn($component) => !($component->is_adhoc ?? false)));
+
     $salaryStructures = $salaryStructures ?? collect();
-    $salaryComponents = $salaryComponents ?? collect();
-    $recurringComponentsForStructure = $salaryComponents->filter(fn ($component) => !($component->is_adhoc ?? false));
+    $rules = $selectedPayGroup->payroll_rules ?? [];
+    $isPfEnabled = !isset($rules['enable_pf']) || (bool)$rules['enable_pf'];
+    $isEsiEnabled = !isset($rules['enable_esi']) || (bool)$rules['enable_esi'];
 @endphp
 
 <div class="row g-4">
@@ -285,18 +338,34 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <x-ui.odoo-form-ui type="select"
-                                                        name="components[{{ $comp->id }}][calculation_type]"
-                                                        class="add-calc-type-select"
-                                                        data-comp-id="{{ $comp->id }}"
-                                                        id="add-calc-type-{{ $comp->id }}"
-                                                        onchange="handleCalcTypeChange('add', {{ $comp->id }})">
-                                                    <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
-                                                    <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
-                                                    <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
-                                                    <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
-                                                    <option value="balancing">{{ __('hrms.salary.balancing') }}</option>
-                                                </x-ui.odoo-form-ui>
+                                                @if($comp->code === 'PF' && $isPfEnabled)
+                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
+                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (PF rule active)
+                                                    </div>
+                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="not_included">
+                                                @elseif($comp->code === 'ESI' && $isEsiEnabled)
+                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
+                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (ESI rule active)
+                                                    </div>
+                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="not_included">
+                                                @elseif($comp->code === 'SPL')
+                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
+                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (Balancing component)
+                                                    </div>
+                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="balancing">
+                                                @else
+                                                    <x-ui.odoo-form-ui type="select"
+                                                            name="components[{{ $comp->id }}][calculation_type]"
+                                                            class="add-calc-type-select"
+                                                            data-comp-id="{{ $comp->id }}"
+                                                            id="add-calc-type-{{ $comp->id }}"
+                                                            onchange="handleCalcTypeChange('add', {{ $comp->id }})">
+                                                        <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
+                                                        <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
+                                                        <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
+                                                        <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
+                                                    </x-ui.odoo-form-ui>
+                                                @endif
                                             </td>
                                             <td>
                                                 <x-ui.odoo-form-ui type="input"
@@ -389,18 +458,34 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <x-ui.odoo-form-ui type="select"
-                                                        name="components[{{ $comp->id }}][calculation_type]"
-                                                        class="edit-calc-type-select"
-                                                        data-comp-id="{{ $comp->id }}"
-                                                        id="edit-calc-type-{{ $comp->id }}"
-                                                        onchange="handleCalcTypeChange('edit', {{ $comp->id }})">
-                                                    <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
-                                                    <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
-                                                    <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
-                                                    <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
-                                                    <option value="balancing">{{ __('hrms.salary.balancing') }}</option>
-                                                </x-ui.odoo-form-ui>
+                                                @if($comp->code === 'PF' && $isPfEnabled)
+                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
+                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (PF rule active)
+                                                    </div>
+                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="not_included">
+                                                @elseif($comp->code === 'ESI' && $isEsiEnabled)
+                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
+                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (ESI rule active)
+                                                    </div>
+                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="not_included">
+                                                @elseif($comp->code === 'SPL')
+                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
+                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (Balancing component)
+                                                    </div>
+                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="balancing">
+                                                @else
+                                                    <x-ui.odoo-form-ui type="select"
+                                                            name="components[{{ $comp->id }}][calculation_type]"
+                                                            class="edit-calc-type-select"
+                                                            data-comp-id="{{ $comp->id }}"
+                                                            id="edit-calc-type-{{ $comp->id }}"
+                                                            onchange="handleCalcTypeChange('edit', {{ $comp->id }})">
+                                                        <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
+                                                        <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
+                                                        <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
+                                                        <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
+                                                    </x-ui.odoo-form-ui>
+                                                @endif
                                             </td>
                                             <td>
                                                 <x-ui.odoo-form-ui type="input"
