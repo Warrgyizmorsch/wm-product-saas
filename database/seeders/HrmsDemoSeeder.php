@@ -287,7 +287,7 @@ class HrmsDemoSeeder extends Seeder
             'pay_group_id' => $payGroup1->id,
             'name' => 'Regular Employee Salary Package',
             'min_ctc' => 0,
-            'max_ctc' => 50000,
+            'max_ctc' => 600000,
             'status' => true
         ]);
 
@@ -356,7 +356,7 @@ class HrmsDemoSeeder extends Seeder
             'pay_group_id' => $payGroup2->id,
             'name' => 'Executive Employee Salary Package',
             'min_ctc' => 0,
-            'max_ctc' => 100000,
+            'max_ctc' => 1200000,
             'status' => true
         ]);
 
@@ -722,7 +722,7 @@ class HrmsDemoSeeder extends Seeder
                 'pay_group_id' => $item['structure'] == $structure1->id ? $payGroup1->id : $payGroup2->id,
                 'salary_structure_id' => $item['structure'],
                 'leave_plan_id' => $planId,
-                'current_salary' => $item['structure'] == $structure1->id ? 40000 : 80000,
+                'current_salary' => $item['structure'] == $structure1->id ? 480000 : 960000,
                 'date_of_joining' => '2026-08-01',
                 'weekly_pattern' => [0 => 'off', 1 => $shiftDay->id, 2 => $shiftDay->id, 3 => $shiftDay->id, 4 => $shiftDay->id, 5 => $shiftDay->id, 6 => 'off'], // Sat & Sun off
                 'gender' => $item['gender'],
@@ -867,7 +867,12 @@ class HrmsDemoSeeder extends Seeder
             'tenant_id' => $tenant->id,
             'employee_id' => $employeesList[2]->id,
             'title' => 'Branch Audit Travel Expenses',
-            'status' => 'approved'
+            'status' => 'approved',
+            'total_amount' => 4200.00,
+            'advance_adjusted' => 0.00,
+            'net_reimbursement' => 4200.00,
+            'approved_amount' => 4200.00,
+            'approved_net_reimbursement' => 4200.00,
         ]);
 
         \App\Domains\HRMS\Models\ExpenseClaim::create([

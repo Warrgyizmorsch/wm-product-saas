@@ -115,7 +115,6 @@ Route::prefix('hrms')
             Route::get('/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
             Route::delete('/delete/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
             
-            Route::post('/{employee}/documents/request', [EmployeeController::class, 'requestDocument'])->name('employees.documents.request');
             Route::post('/{employee}/documents/upload', [EmployeeController::class, 'uploadDocument'])->name('employees.documents.upload');
             Route::patch('/documents/{document}/approve', [EmployeeController::class, 'approveDocument'])->name('employees.documents.approve');
             Route::patch('/documents/{document}/reject', [EmployeeController::class, 'rejectDocument'])->name('employees.documents.reject');

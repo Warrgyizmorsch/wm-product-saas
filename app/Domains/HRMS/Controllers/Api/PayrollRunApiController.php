@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Domains\HRMS\Controllers;
+namespace App\Domains\HRMS\Controllers\Api;
 
 use App\Domains\HRMS\Models\PayrollRun;
 use App\Domains\HRMS\Models\PayrollHold;
@@ -8,39 +8,86 @@ use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Services\PayrollCalculationService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\OvertimeRequest;
-use App\Exports\PayrollBankExport;
-use Maatwebsite\Excel\Facades\Excel;
 
-class PayrollRunController extends Controller
+class PayrollRunApiController extends Controller
 {
     public function __construct(
         private readonly PayrollCalculationService $payrollCalculationService
     ) {}
 
-    public function index(Request $request)
+    /**
+     * Helper for standardized success JSON response.
+     */
+    private function sendSuccess(mixed $data = null, string $message = 'Operation successful', int $statusCode = 200): JsonResponse
     {
-        // Automatically run migrations to ensure schema is up-to-date
-        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'data'    => $data,
+        ], $statusCode);
+    }
+
+    /**
+     * Helper for standardized error JSON response.
+     */
+    private function sendError(string $message = 'An error occurred', int $statusCode = 400, mixed $errors = null): JsonResponse
+    {
+        $response = [
+            'success' => false,
+            'message' => $message,
+        ];
+        if ($errors !== null) {
+            $response['errors'] = $errors;
+        }
+        return response()->json($response, $statusCode);
+    }
+
+    /**
+     * Null-safe authorization check.
+     */
+    private function authorizeUser(): ?JsonResponse
+    {
+        if (!auth()->check()) {
+            $authUser = request()->getUser();
+            $authPass = request()->getPassword();
+            if ($authUser && $authPass) {
+                if (!auth()->attempt(['email' => $authUser, 'password' => $authPass])) {
+                    return $this->sendError('Invalid HTTP Basic Auth credentials.', 401);
+                }
+            } else {
+                return $this->sendError('Unauthenticated access.', 401);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * GET /api/hrms/payroll
+     */
+    public function index(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
 
         $runs = PayrollRun::orderBy('payroll_month', 'desc')->get();
         
         $selectedRunId = $request->get('run_id');
         $selectedRun = $selectedRunId ? PayrollRun::find($selectedRunId) : $runs->first();
 
-        // Get all active pay groups for the initiation form dropdown
         $payGroups = \App\Domains\HRMS\Models\PayGroup::where('status', true)->get();
 
         $registerData = [];
         $pendingPriorHolds = [];
         
-        if ($selectedRun) {
             $excludeEmployeeIds = [];
             if (empty($selectedRun->employee_ids)) {
-                // Exclude employees already processed in other runs for the same month
                 $otherRuns = PayrollRun::where('payroll_month', $selectedRun->payroll_month)
                     ->where('id', '!=', $selectedRun->id)
                     ->get();
@@ -59,7 +106,6 @@ class PayrollRunController extends Controller
                 $excludeEmployeeIds = array_unique($excludeEmployeeIds);
             }
 
-            // Get active employees mapped to pay groups & structures
             if ($selectedRun->employee_ids && count($selectedRun->employee_ids) > 0) {
                 $employees = Employee::whereIn('id', $selectedRun->employee_ids)
                     ->whereNotIn('id', $excludeEmployeeIds)
@@ -72,11 +118,9 @@ class PayrollRunController extends Controller
                     ->whereNotNull('salary_structure_id')
                     ->whereNotIn('id', $excludeEmployeeIds);
 
-                // 1. If the current run is a specific pay group, filter by it
                 if ($selectedRun->pay_group_id) {
                     $employeesQuery->where('pay_group_id', $selectedRun->pay_group_id);
                 } else {
-                    // 2. If current run is "All Pay Groups", exclude any pay group that already has its own run
                     $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $selectedRun->payroll_month)
                         ->where('id', '!=', $selectedRun->id)
                         ->whereNotNull('pay_group_id')
@@ -118,7 +162,6 @@ class PayrollRunController extends Controller
                 ];
             }
 
-            // Fetch any unreleased holds from prior months to display warning alerts
             $priorHolds = PayrollHold::where('status', 'on_hold')
                 ->where('payroll_month', '<', $selectedRun->payroll_month)
                 ->get();
@@ -142,7 +185,6 @@ class PayrollRunController extends Controller
         $allEmployees = Employee::where('status', true)->orderBy('full_name')->get();
         $departments = \App\Domains\HRMS\Models\Department::orderBy('name')->get();
 
-        // Apply search, sort, and status/department filters to registerData
         $registerCollection = collect($registerData);
         
         $search = $request->get('search');
@@ -199,18 +241,34 @@ class PayrollRunController extends Controller
 
         $registerData = $registerCollection->values()->all();
 
-        $filters = [
-            'search'        => $request->get('search'),
-            'sort'          => $request->get('sort', 'name_asc'),
-            'status'        => $request->get('status'),
-            'department_id' => $request->get('department_id'),
-        ];
-
-        return view('modules.hrms.payroll.index', compact('runs', 'selectedRun', 'registerData', 'payGroups', 'pendingPriorHolds', 'pendingIssues', 'salaryComponents', 'allEmployees', 'departments', 'filters'));
+        return $this->sendSuccess([
+            'runs'               => $runs,
+            'selected_run'       => $selectedRun,
+            'register_data'      => $registerData,
+            'pay_groups'         => $payGroups,
+            'pending_prior_holds'=> $pendingPriorHolds,
+            'pending_issues'     => $pendingIssues,
+            'salary_components'  => $salaryComponents,
+            'all_employees'      => $allEmployees,
+            'departments'        => $departments,
+            'filters'            => [
+                'search'        => $request->get('search'),
+                'sort'          => $request->get('sort', 'name_asc'),
+                'status'        => $request->get('status'),
+                'department_id' => $request->get('department_id'),
+            ],
+        ], 'Payroll overview and registers loaded successfully');
     }
 
-    public function storeRun(Request $request)
+    /**
+     * POST /api/hrms/payroll/store
+     */
+    public function storeRun(Request $request): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $validated = $request->validate([
             'payroll_month' => 'required|string|regex:/^\d{4}-\d{2}$/',
             'pay_group_id'  => 'nullable|exists:pay_groups,id',
@@ -220,7 +278,6 @@ class PayrollRunController extends Controller
             'end_date'      => 'required|date|after_or_equal:start_date',
         ]);
 
-        // 1. If trying to create a specific run, check if a general run already exists for this month
         if (!empty($validated['pay_group_id'])) {
             $generalExists = PayrollRun::where('payroll_month', $validated['payroll_month'])
                 ->whereNull('pay_group_id')
@@ -229,11 +286,10 @@ class PayrollRunController extends Controller
                 })
                 ->exists();
             if ($generalExists) {
-                return redirect()->back()->with('error', "A general payroll run for all pay groups already exists for {$validated['payroll_month']}.");
+                return $this->sendError("A general payroll run for all pay groups already exists for {$validated['payroll_month']}.", 400);
             }
         }
 
-        // 2. Check if a payroll run for this month and specific pay group already exists
         if (empty($validated['employee_ids'])) {
             $existsQuery = PayrollRun::where('payroll_month', $validated['payroll_month']);
             if (!empty($validated['pay_group_id'])) {
@@ -246,7 +302,7 @@ class PayrollRunController extends Controller
 
             if ($existsQuery->exists()) {
                 $label = !empty($validated['pay_group_id']) ? 'this pay group' : 'all pay groups';
-                return redirect()->back()->with('error', "A payroll run already exists for {$validated['payroll_month']} and {$label}.");
+                return $this->sendError("A payroll run already exists for {$validated['payroll_month']} and {$label}.", 400);
             }
         } else {
             // Check if any of the selected employees are already processed in another run for this month
@@ -267,11 +323,11 @@ class PayrollRunController extends Controller
             $overlap = array_intersect($validated['employee_ids'], $alreadyProcessed);
             if (!empty($overlap)) {
                 $names = Employee::whereIn('id', $overlap)->pluck('full_name')->toArray();
-                return redirect()->back()->with('error', "Cannot initiate payroll: The following employees have already been processed in another run for this month: " . implode(', ', $names));
+                return $this->sendError("Cannot initiate payroll: The following employees have already been processed in another run for this month: " . implode(', ', $names), 400);
             }
         }
 
-        PayrollRun::create([
+        $run = PayrollRun::create([
             'company_id'    => auth()->user()->company_id ?? 1,
             'pay_group_id'  => $validated['pay_group_id'] ?? null,
             'employee_ids'  => $validated['employee_ids'] ?? null,
@@ -282,23 +338,40 @@ class PayrollRunController extends Controller
             'processed_by'  => auth()->id(),
         ]);
 
-        return redirect()->route('hrms.payroll.index')->with('success', 'Payroll run initiated successfully.');
+        return $this->sendSuccess($run, 'Payroll run initiated successfully.');
     }
 
-    public function lockRun(PayrollRun $run)
+    /**
+     * POST /api/hrms/payroll/{run}/lock
+     */
+    public function lockRun(PayrollRun $run): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $pending = $this->getPendingIssues($run);
         if ($pending['total'] > 0) {
-            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
-                ->with('error', "Cannot lock payroll: There are {$pending['total']} pending requests (Leaves: {$pending['leaves']}, Corrections: {$pending['corrections']}, Overtime: {$pending['overtime']}). Please resolve them first.");
+            return $this->sendError(
+                "Cannot lock payroll: There are {$pending['total']} pending requests (Leaves: {$pending['leaves']}, Corrections: {$pending['corrections']}, Overtime: {$pending['overtime']}). Please resolve them first.",
+                400,
+                $pending
+            );
         }
 
         $run->update(['status' => 'locked']);
-        return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll run locked successfully.');
+        return $this->sendSuccess($run, 'Payroll run locked successfully.');
     }
 
-    public function resolvePending(Request $request, PayrollRun $run)
+    /**
+     * POST /api/hrms/payroll/{run}/resolve
+     */
+    public function resolvePending(Request $request, PayrollRun $run): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $validated = $request->validate([
             'resolution_action' => 'required|string|in:approve_all,reject_all',
         ]);
@@ -326,7 +399,6 @@ class PayrollRunController extends Controller
         DB::beginTransaction();
         try {
             if ($resolution === 'approve_all') {
-                // 1. Approve Leave Requests
                 $leaves = $leavesQuery->get();
                 
                 $leaveRepo = app(\App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface::class);
@@ -334,7 +406,6 @@ class PayrollRunController extends Controller
                     $leaveRepo->updateStatus($leave, ['action' => 'approved'], $request);
                 }
 
-                // 2. Approve Attendance Corrections
                 $corrections = $correctionsQuery->get();
 
                 $correctionController = app(\App\Domains\HRMS\Controllers\AttendanceCorrectionController::class);
@@ -342,7 +413,6 @@ class PayrollRunController extends Controller
                     $correctionController->approve($request, $correction);
                 }
 
-                // 3. Approve Overtime Requests
                 $overtimes = $overtimesQuery->get();
 
                 $otRepo = app(\App\Domains\HRMS\Repositories\OvertimeRequestRepositoryInterface::class);
@@ -355,8 +425,6 @@ class PayrollRunController extends Controller
 
                 $message = "All pending requests approved and payroll calculations updated.";
             } else {
-                // reject_all
-                // 1. Reject Leave Requests
                 $leaves = $leavesQuery->get();
                 
                 $leaveRepo = app(\App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface::class);
@@ -367,7 +435,6 @@ class PayrollRunController extends Controller
                     ], $request);
                 }
 
-                // 2. Reject Attendance Corrections
                 $corrections = $correctionsQuery->get();
 
                 $correctionController = app(\App\Domains\HRMS\Controllers\AttendanceCorrectionController::class);
@@ -377,7 +444,6 @@ class PayrollRunController extends Controller
                     $correctionController->reject($fakeRequest, $correction);
                 }
 
-                // 3. Reject Overtime Requests
                 $overtimes = $overtimesQuery->get();
 
                 $otRepo = app(\App\Domains\HRMS\Repositories\OvertimeRequestRepositoryInterface::class);
@@ -392,7 +458,7 @@ class PayrollRunController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', $message);
+            return $this->sendSuccess($run->fresh(), $message);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -400,61 +466,26 @@ class PayrollRunController extends Controller
                 'run_id' => $run->id,
                 'error' => $e->getMessage()
             ]);
-            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
-                ->with('error', "Failed to resolve pending requests: " . $e->getMessage());
+            return $this->sendError("Failed to resolve pending requests: " . $e->getMessage(), 500);
         }
     }
 
-    private function getPendingIssues(PayrollRun $run): array
+    /**
+     * POST /api/hrms/payroll/{run}/release
+     */
+    public function releasePayouts(PayrollRun $run): JsonResponse
     {
-        $startDate = $run->start_date;
-        $endDate = $run->end_date;
-
-        $leavesQuery = LeaveRequest::with(['employee', 'leaveType'])
-            ->where('status', 'pending')
-            ->where('start_date', '<=', $endDate)
-            ->where('end_date', '>=', $startDate);
-
-        $correctionsQuery = AttendanceCorrection::with('employee')
-            ->where('status', 'pending')
-            ->whereBetween('date', [$startDate, $endDate]);
-
-        $overtimeQuery = OvertimeRequest::with('employee')
-            ->where('status', 'pending')
-            ->whereBetween('date', [$startDate, $endDate]);
-
-        if ($run->employee_ids && count($run->employee_ids) > 0) {
-            $leavesQuery->whereIn('employee_id', $run->employee_ids);
-            $correctionsQuery->whereIn('employee_id', $run->employee_ids);
-            $overtimeQuery->whereIn('employee_id', $run->employee_ids);
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
         }
 
-        $pendingLeaves = $leavesQuery->get();
-        $pendingCorrections = $correctionsQuery->get();
-        $pendingOvertime = $overtimeQuery->get();
-
-        return [
-            'leaves'            => $pendingLeaves->count(),
-            'corrections'       => $pendingCorrections->count(),
-            'overtime'          => $pendingOvertime->count(),
-            'total'             => $pendingLeaves->count() + $pendingCorrections->count() + $pendingOvertime->count(),
-            'leaves_list'       => $pendingLeaves,
-            'corrections_list'  => $pendingCorrections,
-            'overtime_list'     => $pendingOvertime,
-        ];
-    }
-
-    public function releasePayouts(PayrollRun $run)
-    {
         $run->update(['status' => 'paid']);
         
-        // Also update any pending retro adjustments inside this month to 'processed'
         DB::table('payroll_retroactive_adjustments')
             ->where('target_payroll_month', $run->payroll_month)
             ->where('status', 'pending')
             ->update(['status' => 'processed']);
 
-        // Also update any pending ad-hoc components inside this month to 'processed'
         DB::table('employee_adhoc_components')
             ->where('payroll_month', $run->payroll_month)
             ->where('status', 'pending')
@@ -462,7 +493,6 @@ class PayrollRunController extends Controller
 
         $excludeEmployeeIds = [];
         if (empty($run->employee_ids)) {
-            // Exclude employees already processed in other runs for the same month
             $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
                 ->where('id', '!=', $run->id)
                 ->get();
@@ -481,7 +511,6 @@ class PayrollRunController extends Controller
             $excludeEmployeeIds = array_unique($excludeEmployeeIds);
         }
 
-        // Collect and update all approved overtime request records paid in this run
         if ($run->employee_ids && count($run->employee_ids) > 0) {
             $employees = Employee::whereIn('id', $run->employee_ids)
                 ->whereNotIn('id', $excludeEmployeeIds)
@@ -596,15 +625,31 @@ class PayrollRunController extends Controller
                     'posted_by' => auth()->id(),
                 ]);
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error("Payroll Payout Journal Posting Failed: " . $e->getMessage());
+                Log::error("Payroll Payout Journal Posting Failed: " . $e->getMessage());
             }
         }
 
-        return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll payouts released successfully.');
+        return $this->sendSuccess($run->fresh(), 'Payroll payouts released successfully.');
     }
 
-    public function toggleHold(Request $request, Employee $employee, string $month)
+    /**
+     * POST /api/hrms/payroll/hold/toggle
+     */
+    public function toggleHold(Request $request): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'employee_id'   => 'required|exists:employees,id',
+            'payroll_month' => 'required|string|regex:/^\d{4}-\d{2}$/',
+            'target_month'  => 'nullable|string|regex:/^\d{4}-\d{2}$/',
+        ]);
+
+        $employee = Employee::find($validated['employee_id']);
+        $month = $validated['payroll_month'];
+
         $hold = PayrollHold::where('employee_id', $employee->id)
             ->where('payroll_month', $month)
             ->first();
@@ -614,18 +659,14 @@ class PayrollRunController extends Controller
                 $hold->update(['status' => 'released']);
                 $msg = 'Payout released for ' . $employee->full_name;
 
-                // If the payroll run is already locked or paid, we cannot pay them directly in the current run.
-                // Instead, we automatically convert this released payout to Arrears/Retroactive Adjustment for a target month (default: NEXT month).
                 $run = PayrollRun::where('payroll_month', $month)->first();
                 if ($run && in_array($run->status, ['locked', 'paid'])) {
                     $calc = $this->payrollCalculationService->calculateSalary($employee, $month);
                     $netPayout = $calc['summary']['net_payout'] ?? 0.00;
 
                     if ($netPayout > 0) {
-                        // Use request's target_month if specified (e.g. from active cycle dashboard release), otherwise fallback to next month
-                        $targetMonthStr = $request->get('target_month') ?: \Carbon\Carbon::parse($month . '-01')->addMonth()->format('Y-m');
+                        $targetMonthStr = $validated['target_month'] ?: \Carbon\Carbon::parse($month . '-01')->addMonth()->format('Y-m');
                         
-                        // Prevent duplicate adjustment entries
                         $adjustmentExists = \App\Domains\HRMS\Models\PayrollRetroactiveAdjustment::where('employee_id', $employee->id)
                             ->where('target_payroll_month', $targetMonthStr)
                             ->where('amount_reversal', $netPayout)
@@ -648,7 +689,6 @@ class PayrollRunController extends Controller
                 $hold->update(['status' => 'on_hold']);
                 $msg = 'Payout put on hold for ' . $employee->full_name;
 
-                // Clean up any pending retroactive adjustments that were created when this was released
                 $calc = $this->payrollCalculationService->calculateSalary($employee, $month);
                 $netPayout = $calc['summary']['net_payout'] ?? 0.00;
 
@@ -658,7 +698,7 @@ class PayrollRunController extends Controller
                     ->delete();
             }
         } else {
-            PayrollHold::create([
+            $hold = PayrollHold::create([
                 'employee_id'   => $employee->id,
                 'payroll_month' => $month,
                 'status'        => 'on_hold',
@@ -666,31 +706,30 @@ class PayrollRunController extends Controller
             $msg = 'Payout put on hold for ' . $employee->full_name;
         }
 
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => $msg
-            ]);
-        }
-
-        return redirect()->back()->with('success', $msg);
+        return $this->sendSuccess($hold, $msg);
     }
 
-    public function mySalary()
+    /**
+     * GET /api/hrms/payroll/my-salary
+     */
+    public function mySalary(): JsonResponse
     {
-        $employee = auth()->user()->employee;
-        if (!$employee) {
-            return redirect()->back()->with('error', 'No employee profile linked to your user account.');
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
         }
 
-        // Get all paid runs (released payslips)
+        $user = auth()->user();
+        $employee = Employee::where('user_id', $user->id)->first();
+        if (!$employee) {
+            return $this->sendError('No employee profile linked to your user account.', 404);
+        }
+
         $paidRuns = PayrollRun::where('status', 'paid')
             ->orderBy('payroll_month', 'desc')
             ->get();
 
         $salaryHistory = [];
         foreach ($paidRuns as $run) {
-            // If the employee's payout is currently on hold, do not show the payslip in their employee portal
             $isHeld = PayrollHold::where('employee_id', $employee->id)
                 ->where('payroll_month', $run->payroll_month)
                 ->where('status', 'on_hold')
@@ -702,20 +741,33 @@ class PayrollRunController extends Controller
 
             $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
             $salaryHistory[] = [
-                'run' => $run,
-                'calc' => $calc['summary'] ?? null,
-                'details' => $calc['items'] ?? [],
+                'payroll_run_id'=> $run->id,
+                'payroll_month' => $run->payroll_month,
+                'start_date'    => $run->start_date,
+                'end_date'      => $run->end_date,
+                'calc'          => $calc['summary'] ?? null,
+                'details'       => $calc['items'] ?? [],
             ];
         }
 
-        return view('modules.hrms.payroll.my_salary', compact('employee', 'salaryHistory'));
+        return $this->sendSuccess([
+            'employee'       => $employee->load(['department', 'designation']),
+            'salary_history' => $salaryHistory,
+        ], 'Salary history loaded successfully.');
     }
 
-    public function storeBulkAdhoc(Request $request)
+    /**
+     * POST /api/hrms/payroll/bulk-adhoc
+     */
+    public function storeBulkAdhoc(Request $request): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $validated = $request->validate([
             'salary_component_id' => 'required|exists:salary_components,id',
-            'payroll_month'       => 'required|string',
+            'payroll_month'       => 'required|string|regex:/^\d{4}-\d{2}$/',
             'employee_ids'        => 'required|array',
             'employee_ids.*'      => 'exists:employees,id',
             'amount'              => 'required|numeric|min:0',
@@ -723,9 +775,8 @@ class PayrollRunController extends Controller
         ]);
 
         $employees = Employee::whereIn('id', $validated['employee_ids'])->get();
-
         if ($employees->isEmpty()) {
-            return redirect()->back()->with('error', 'No selected employees found.');
+            return $this->sendError('No selected employees found.', 404);
         }
 
         DB::beginTransaction();
@@ -746,93 +797,55 @@ class PayrollRunController extends Controller
             }
 
             DB::table('employee_adhoc_components')->insert($insertData);
-
             DB::commit();
-            return redirect()->back()->with('success', 'Bulk ad-hoc adjustments created successfully for ' . $employees->count() . ' employees.');
+
+            return $this->sendSuccess(null, 'Bulk ad-hoc adjustments created successfully for ' . $employees->count() . ' employees.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Failed to create bulk adjustments: ' . $e->getMessage());
+            return $this->sendError('Failed to create bulk adjustments: ' . $e->getMessage(), 500);
         }
     }
 
-    public function exportBankFile(PayrollRun $run)
+    /**
+     * Helper for resolving pending issues.
+     */
+    private function getPendingIssues(PayrollRun $run): array
     {
-        $fileName = 'bank_transfer_' . $run->payroll_month . '.xlsx';
-        return Excel::download(new PayrollBankExport($run), $fileName);
-    }
+        $startDate = $run->start_date;
+        $endDate = $run->end_date;
 
-    public function downloadPayslip(PayrollRun $run, Employee $employee)
-    {
-        // Security check: If the logged-in user is an employee, they can only access their own payslip
-        $user = auth()->user();
-        if ($user->employee && $user->employee->id !== $employee->id) {
-            abort(403, 'Unauthorized access to this payslip.');
+        $leavesQuery = LeaveRequest::with(['employee', 'leaveType'])
+            ->where('status', 'pending')
+            ->where('start_date', '<=', $endDate)
+            ->where('end_date', '>=', $startDate);
+
+        $correctionsQuery = AttendanceCorrection::with('employee')
+            ->where('status', 'pending')
+            ->whereBetween('date', [$startDate, $endDate]);
+
+        $overtimeQuery = OvertimeRequest::with('employee')
+            ->where('status', 'pending')
+            ->whereBetween('date', [$startDate, $endDate]);
+
+        if ($run->employee_ids && count($run->employee_ids) > 0) {
+            $leavesQuery->whereIn('employee_id', $run->employee_ids);
+            $correctionsQuery->whereIn('employee_id', $run->employee_ids);
+            $overtimeQuery->whereIn('employee_id', $run->employee_ids);
         }
 
-        $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
-        $company = $employee->company ?? \App\Domains\HRMS\Models\Company::first();
+        $pendingLeaves = $leavesQuery->get();
+        $pendingCorrections = $correctionsQuery->get();
+        $pendingOvertime = $overtimeQuery->get();
 
-        // Convert Net Payout to Words (Rupees)
-        $netPayout = $calc['summary']['net_payout'] ?? 0;
-        $netPayoutInWords = $this->convertNumberToWords($netPayout) . ' Only';
-
-        $data = [
-            'run' => $run,
-            'employee' => $employee,
-            'company' => $company,
-            'calc' => $calc['summary'] ?? null,
-            'details' => $calc['items'] ?? [],
-            'netPayoutInWords' => $netPayoutInWords,
-            'payroll_month_formatted' => \Carbon\Carbon::parse($run->payroll_month . '-01')->format('F Y'),
+        return [
+            'leaves'            => $pendingLeaves->count(),
+            'corrections'       => $pendingCorrections->count(),
+            'overtime'          => $pendingOvertime->count(),
+            'total'             => $pendingLeaves->count() + $pendingCorrections->count() + $pendingOvertime->count(),
+            'leaves_list'       => $pendingLeaves,
+            'corrections_list'  => $pendingCorrections,
+            'overtime_list'     => $pendingOvertime,
         ];
-
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.hrms.payroll.pdf_payslip', $data);
-        $fileName = 'payslip_' . $employee->employee_id . '_' . $run->payroll_month . '.pdf';
-        
-        return $pdf->download($fileName);
-    }
-
-    private function convertNumberToWords($number)
-    {
-        $no = (int)floor($number);
-        $point = (int)round(($number - $no) * 100);
-        $hundred = null;
-        $digits_1 = strlen($no);
-        $i = 0;
-        $str = [];
-        $words = [
-            0 => '', 1 => 'One', 2 => 'Two',
-            3 => 'Three', 4 => 'Four', 5 => 'Five',
-            6 => 'Six', 7 => 'Seven', 8 => 'Eight',
-            9 => 'Nine', 10 => 'Ten', 11 => 'Eleven',
-            12 => 'Twelve', 13 => 'Thirteen', 14 => 'Fourteen',
-            15 => 'Fifteen', 16 => 'Sixteen', 17 => 'Seventeen',
-            18 => 'Eighteen', 19 => 'Nineteen', 20 => 'Twenty',
-            30 => 'Thirty', 40 => 'Forty', 50 => 'Fifty',
-            60 => 'Sixty', 70 => 'Seventy', 80 => 'Eighty',
-            90 => 'Ninety'
-        ];
-        $digits = ['', 'Hundred', 'Thousand', 'Lakh', 'Crore'];
-        while ($i < $digits_1) {
-            $divider = ($i == 2) ? 10 : 100;
-            $number = floor($no % $divider);
-            $no = floor($no / $divider);
-            $i += ($divider == 10) ? 1 : 2;
-            if ($number) {
-                $plural = (($counter = count($str)) && $number > 9) ? 's' : null;
-                $hundred = ($counter == 1 && $str[0]) ? ' and ' : null;
-                $str[] = ($number < 21) ? $words[$number] . ' ' . $digits[$counter] . $plural . ' ' . $hundred
-                    : $words[floor($number / 10) * 10] . ' ' . $words[$number % 10] . ' ' . $digits[$counter] . $plural . ' ' . $hundred;
-            } else {
-                $str[] = null;
-            }
-        }
-        $Rupees = implode('', array_reverse($str));
-        $paise = '';
-        if ($point > 0) {
-            $paise = ' and ' . ($point < 21 ? $words[$point] : $words[floor($point / 10) * 10] . ' ' . $words[$point % 10]) . ' Paise';
-        }
-        return ($Rupees ? $Rupees . 'Rupees' : '') . $paise;
     }
 
     private function getOrCreateAccount(int $tenantId, string $code, string $name, string $type, string $normalBalance, ?string $subtype = null)
