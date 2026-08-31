@@ -3,9 +3,11 @@
 namespace App\Domains\Accounting\Listeners;
 
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\VoucherDetail;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
+use App\Domains\Accounting\Support\VoucherType;
 use App\Domains\Sales\Events\SalesReturnApproved;
 use Illuminate\Support\Facades\Log;
 
@@ -136,13 +138,25 @@ class PostSalesReturnJournal
                 'description'         => "Credit Note Total Refund {$salesReturn->return_number}",
             ];
 
-            $this->journals->post($lines, [
-                'tenant_id'      => $tenantId,
-                'journal_date'   => $salesReturn->return_date ?: now(),
-                'source'         => Journal::SOURCE_SALES,
-                'reference_type' => 'sales_return',
-                'reference_id'   => $salesReturn->id,
-                'memo'           => "Sales Return / Credit Note {$salesReturn->return_number}",
+            $creditNoteJournal = $this->journals->post($lines, [
+                'tenant_id'              => $tenantId,
+                'journal_date'           => $salesReturn->return_date ?: now(),
+                'source'                 => Journal::SOURCE_SALES,
+                'reference_type'         => 'sales_return',
+                'reference_id'           => $salesReturn->id,
+                'memo'                   => "Sales Return / Credit Note {$salesReturn->return_number}",
+                'voucher_type'           => VoucherType::CREDIT_NOTE,
+                'journal_number_prefix'  => VoucherType::prefix(VoucherType::CREDIT_NOTE),
+            ]);
+
+            VoucherDetail::create([
+                'tenant_id'    => $tenantId,
+                'journal_id'   => $creditNoteJournal->id,
+                'voucher_type' => VoucherType::CREDIT_NOTE,
+                'party_type'   => 'customer',
+                'party_id'     => $salesReturn->customer_id,
+                'party_name'   => $salesReturn->customer?->name,
+                'reference_no' => $salesReturn->return_number,
             ]);
 
             // 2. COGS & Inventory Asset Restocking Journal

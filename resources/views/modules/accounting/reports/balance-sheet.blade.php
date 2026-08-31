@@ -23,177 +23,144 @@
             </div>
         </x-ui.card>
     @else
+        @php
+            // Liabilities column groups, in Busy/Tally order: Profit for the
+            // Period (no drill-down — a single computed figure, not a list of
+            // accounts), Capital Account, Non-Current Liabilities (only when
+            // non-empty), Current Liabilities.
+            $liabilityGroups = [
+                [
+                    'label' => 'Capital Account',
+                    'total' => $totals['equity'],
+                    'rows' => $sections['equity']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+                ],
+            ];
+            if ($sections['liability']['non_current']->isNotEmpty()) {
+                $liabilityGroups[] = [
+                    'label' => 'Non-Current Liabilities',
+                    'total' => $totals['liability_non_current'],
+                    'rows' => $sections['liability']['non_current']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+                ];
+            }
+            $liabilityGroups[] = [
+                'label' => 'Current Liabilities',
+                'total' => $totals['liability_current'],
+                'rows' => $sections['liability']['current']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+            ];
+
+            $assetGroups = [
+                [
+                    'label' => 'Fixed Assets',
+                    'total' => $totals['asset_non_current'],
+                    'rows' => $sections['asset']['non_current']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+                ],
+                [
+                    'label' => 'Current Assets',
+                    'total' => $totals['asset_current'],
+                    'rows' => $sections['asset']['current']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+                ],
+            ];
+        @endphp
+
         <x-ui.card class="mb-3">
             <div class="d-flex justify-content-between align-items-center fs-13">
                 <span class="text-muted">As of {{ \Illuminate\Support\Carbon::parse($period->end_date)->format('d M Y') }} (end of {{ $period->name }})</span>
-                @if ($isBalanced)
-                    <x-ui.badge variant="success" soft>Balanced</x-ui.badge>
-                @else
-                    <x-ui.badge variant="danger" soft>Out of Balance</x-ui.badge>
-                @endif
+                <div class="d-flex align-items-center gap-2">
+                    @if ($isBalanced)
+                        <x-ui.badge variant="success" soft>Balanced</x-ui.badge>
+                    @else
+                        <x-ui.badge variant="danger" soft>Out of Balance</x-ui.badge>
+                    @endif
+                    <a href="{{ route('accounting.reports.balance-sheet.pdf', ['period_id' => $period->id]) }}" class="btn btn-sm btn-outline-primary">
+                        <i class="feather-download me-1"></i>Download PDF
+                    </a>
+                </div>
             </div>
         </x-ui.card>
 
-        <div class="row g-4">
-            <div class="col-lg-6">
-                <x-ui.card title="Assets" bodyClass="p-0" class="accounting-dense">
-                    <x-ui.table hoverable>
+        <x-ui.card bodyClass="p-0" class="accounting-dense">
+            <div class="text-center py-3 border-bottom">
+                <h5 class="mb-1 fw-bold">Balance Sheet of {{ tenant()?->name }}</h5>
+                <div class="text-muted fs-13">as at {{ \Illuminate\Support\Carbon::parse($period->end_date)->format('d M Y') }}</div>
+            </div>
+            <div class="row g-0 bs-groups">
+                <div class="col-lg-6 border-end">
+                    <table class="table mb-0 bs-group-table">
                         <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                             <tr>
-                                <th class="ps-4">Code</th>
-                                <th>Account</th>
-                                <th class="text-end pe-4">Balance</th>
+                                <th class="ps-4">Liabilities</th>
+                                <th class="text-end pe-4">Amount</th>
                             </tr>
                         </thead>
                         <tbody class="fs-13 text-dark">
-                            <tr class="table-light">
-                                <td class="ps-4 fw-bold text-uppercase fs-11 text-muted" colspan="3">Current Assets</td>
+                            <tr>
+                                <td class="ps-4 fw-semibold">Profit for the Period</td>
+                                <td class="text-end pe-4 fw-semibold">{{ number_format($netIncome, 2) }}</td>
                             </tr>
-                            @forelse ($sections['asset']['current'] as $row)
-                                <tr>
-                                    <td class="ps-4 fw-bold font-monospace">{{ $row['account']->code }}</td>
-                                    <td>{{ $row['account']->name }}</td>
-                                    <td class="text-end pe-4">{{ number_format($row['balance'], 2) }}</td>
+                            @foreach ($liabilityGroups as $gi => $group)
+                                <tr class="bs-group-row" role="button" data-target="liab-{{ $gi }}">
+                                    <td class="ps-4 fw-semibold">
+                                        <i class="feather-chevron-right bs-chevron me-1"></i>{{ $group['label'] }}
+                                    </td>
+                                    <td class="text-end pe-4 fw-semibold">{{ number_format($group['total'], 2) }}</td>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="3" class="text-center py-3 text-muted">No current asset balances.</td>
-                                </tr>
-                            @endforelse
-                            <tr class="fw-semibold">
-                                <td class="ps-4" colspan="2">Total Current Assets</td>
-                                <td class="text-end pe-4">{{ number_format($totals['asset_current'], 2) }}</td>
-                            </tr>
-
-                            <tr class="table-light">
-                                <td class="ps-4 fw-bold text-uppercase fs-11 text-muted" colspan="3">Non-Current Assets</td>
-                            </tr>
-                            @forelse ($sections['asset']['non_current'] as $row)
-                                <tr>
-                                    <td class="ps-4 fw-bold font-monospace">{{ $row['account']->code }}</td>
-                                    <td>{{ $row['account']->name }}</td>
-                                    <td class="text-end pe-4">{{ number_format($row['balance'], 2) }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="3" class="text-center py-3 text-muted">No non-current asset balances.</td>
-                                </tr>
-                            @endforelse
-                            <tr class="fw-semibold">
-                                <td class="ps-4" colspan="2">Total Non-Current Assets</td>
-                                <td class="text-end pe-4">{{ number_format($totals['asset_non_current'], 2) }}</td>
-                            </tr>
+                                @forelse ($group['rows'] as $row)
+                                    <tr class="bs-detail-row d-none" data-group="liab-{{ $gi }}">
+                                        <td class="ps-5 font-monospace text-muted">{{ $row['code'] }} <span class="text-dark font-monospace-off">{{ $row['name'] }}</span></td>
+                                        <td class="text-end pe-4">{{ number_format($row['amount'], 2) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr class="bs-detail-row d-none" data-group="liab-{{ $gi }}">
+                                        <td class="ps-5 text-muted" colspan="2">No accounts.</td>
+                                    </tr>
+                                @endforelse
+                            @endforeach
                         </tbody>
                         <tfoot>
                             <tr class="fw-bold fs-13 bg-light">
-                                <td class="ps-4" colspan="2">Total Assets</td>
+                                <td class="ps-4">Total</td>
+                                <td class="text-end pe-4">{{ number_format($totals['liability'] + $totals['equity'], 2) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="col-lg-6">
+                    <table class="table mb-0 bs-group-table">
+                        <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                            <tr>
+                                <th class="ps-4">Assets</th>
+                                <th class="text-end pe-4">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody class="fs-13 text-dark">
+                            @foreach ($assetGroups as $gi => $group)
+                                <tr class="bs-group-row" role="button" data-target="asset-{{ $gi }}">
+                                    <td class="ps-4 fw-semibold">
+                                        <i class="feather-chevron-right bs-chevron me-1"></i>{{ $group['label'] }}
+                                    </td>
+                                    <td class="text-end pe-4 fw-semibold">{{ number_format($group['total'], 2) }}</td>
+                                </tr>
+                                @forelse ($group['rows'] as $row)
+                                    <tr class="bs-detail-row d-none" data-group="asset-{{ $gi }}">
+                                        <td class="ps-5 font-monospace text-muted">{{ $row['code'] }} <span class="text-dark font-monospace-off">{{ $row['name'] }}</span></td>
+                                        <td class="text-end pe-4">{{ number_format($row['amount'], 2) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr class="bs-detail-row d-none" data-group="asset-{{ $gi }}">
+                                        <td class="ps-5 text-muted" colspan="2">No accounts.</td>
+                                    </tr>
+                                @endforelse
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold fs-13 bg-light">
+                                <td class="ps-4">Total</td>
                                 <td class="text-end pe-4">{{ number_format($totals['asset'], 2) }}</td>
                             </tr>
                         </tfoot>
-                    </x-ui.table>
-                </x-ui.card>
-            </div>
-
-            <div class="col-lg-6">
-                <x-ui.card title="Liabilities" bodyClass="p-0" class="accounting-dense mb-4">
-                    <x-ui.table hoverable>
-                        <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
-                            <tr>
-                                <th class="ps-4">Code</th>
-                                <th>Account</th>
-                                <th class="text-end pe-4">Balance</th>
-                            </tr>
-                        </thead>
-                        <tbody class="fs-13 text-dark">
-                            <tr class="table-light">
-                                <td class="ps-4 fw-bold text-uppercase fs-11 text-muted" colspan="3">Current Liabilities</td>
-                            </tr>
-                            @forelse ($sections['liability']['current'] as $row)
-                                <tr>
-                                    <td class="ps-4 fw-bold font-monospace">{{ $row['account']->code }}</td>
-                                    <td>{{ $row['account']->name }}</td>
-                                    <td class="text-end pe-4">{{ number_format($row['balance'], 2) }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="3" class="text-center py-3 text-muted">No current liability balances.</td>
-                                </tr>
-                            @endforelse
-                            <tr class="fw-semibold">
-                                <td class="ps-4" colspan="2">Total Current Liabilities</td>
-                                <td class="text-end pe-4">{{ number_format($totals['liability_current'], 2) }}</td>
-                            </tr>
-
-                            <tr class="table-light">
-                                <td class="ps-4 fw-bold text-uppercase fs-11 text-muted" colspan="3">Non-Current Liabilities</td>
-                            </tr>
-                            @forelse ($sections['liability']['non_current'] as $row)
-                                <tr>
-                                    <td class="ps-4 fw-bold font-monospace">{{ $row['account']->code }}</td>
-                                    <td>{{ $row['account']->name }}</td>
-                                    <td class="text-end pe-4">{{ number_format($row['balance'], 2) }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="3" class="text-center py-3 text-muted">No non-current liability balances.</td>
-                                </tr>
-                            @endforelse
-                            <tr class="fw-semibold">
-                                <td class="ps-4" colspan="2">Total Non-Current Liabilities</td>
-                                <td class="text-end pe-4">{{ number_format($totals['liability_non_current'], 2) }}</td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="fw-bold fs-13 bg-light">
-                                <td class="ps-4" colspan="2">Total Liabilities</td>
-                                <td class="text-end pe-4">{{ number_format($totals['liability'], 2) }}</td>
-                            </tr>
-                        </tfoot>
-                    </x-ui.table>
-                </x-ui.card>
-
-                <x-ui.card title="Equity" bodyClass="p-0" class="accounting-dense">
-                    <x-ui.table hoverable>
-                        <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
-                            <tr>
-                                <th class="ps-4">Code</th>
-                                <th>Account</th>
-                                <th class="text-end pe-4">Balance</th>
-                            </tr>
-                        </thead>
-                        <tbody class="fs-13 text-dark">
-                            @forelse ($sections['equity'] as $row)
-                                <tr>
-                                    <td class="ps-4 fw-bold font-monospace">{{ $row['account']->code }}</td>
-                                    <td>{{ $row['account']->name }}</td>
-                                    <td class="text-end pe-4">{{ number_format($row['balance'], 2) }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="3" class="text-center py-4 text-muted">No equity balances.</td>
-                                </tr>
-                            @endforelse
-                            <tr>
-                                <td class="ps-4 text-muted">—</td>
-                                <td class="text-muted">Current Year Earnings (Income − Expenses)</td>
-                                <td class="text-end pe-4">{{ number_format($netIncome, 2) }}</td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr class="fw-bold fs-13 bg-light">
-                                <td class="ps-4" colspan="2">Total Equity</td>
-                                <td class="text-end pe-4">{{ number_format($totals['equity'], 2) }}</td>
-                            </tr>
-                        </tfoot>
-                    </x-ui.table>
-                </x-ui.card>
-            </div>
-        </div>
-
-        <x-ui.card class="mt-4">
-            <div class="d-flex justify-content-between fs-14 fw-bold">
-                <span>Total Assets: {{ number_format($totals['asset'], 2) }}</span>
-                <span>Total Liabilities + Equity: {{ number_format($totals['liability'] + $totals['equity'], 2) }}</span>
+                    </table>
+                </div>
             </div>
         </x-ui.card>
     @endif
@@ -206,5 +173,33 @@
             padding: 6px 10px !important;
             font-size: 12px !important;
         }
+        .bs-group-row {
+            cursor: pointer;
+        }
+        .bs-group-row:hover {
+            background-color: var(--bs-light, #f8f9fa);
+        }
+        .bs-chevron {
+            font-size: 11px;
+            transition: transform 0.15s ease;
+            display: inline-block;
+        }
+        .bs-group-row.is-open .bs-chevron {
+            transform: rotate(90deg);
+        }
     </style>
+@endpush
+
+@push('scripts')
+    <script>
+        document.querySelectorAll('.bs-group-row').forEach(function (header) {
+            header.addEventListener('click', function () {
+                var target = header.getAttribute('data-target');
+                var isOpen = header.classList.toggle('is-open');
+                document.querySelectorAll('.bs-detail-row[data-group="' + target + '"]').forEach(function (row) {
+                    row.classList.toggle('d-none', !isOpen);
+                });
+            });
+        });
+    </script>
 @endpush

@@ -5,6 +5,7 @@ use App\Domains\Accounting\Controllers\AccountingPostingFailureController;
 use App\Domains\Accounting\Controllers\ApAgingController;
 use App\Domains\Accounting\Controllers\ArAgingController;
 use App\Domains\Accounting\Controllers\BalanceSheetController;
+use App\Domains\Accounting\Controllers\CashFlowController;
 use App\Domains\Accounting\Controllers\ChartOfAccountController;
 use App\Domains\Accounting\Controllers\FiscalYearController;
 use App\Domains\Accounting\Controllers\GeneralLedgerController;
@@ -46,9 +47,11 @@ Route::prefix('accounting')
         Route::get('reports/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.trial-balance');
         Route::get('reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
         Route::get('reports/balance-sheet', [BalanceSheetController::class, 'index'])->name('reports.balance-sheet');
+        Route::get('reports/balance-sheet/pdf', [BalanceSheetController::class, 'downloadPdf'])->name('reports.balance-sheet.pdf');
         Route::get('reports/profit-loss', [ProfitLossController::class, 'index'])->name('reports.profit-loss');
         Route::get('reports/ar-aging', [ArAgingController::class, 'index'])->name('reports.ar-aging');
         Route::get('reports/ap-aging', [ApAgingController::class, 'index'])->name('reports.ap-aging');
+        Route::get('reports/cash-flow', [CashFlowController::class, 'index'])->name('reports.cash-flow');
 
         Route::get('posting-failures', [AccountingPostingFailureController::class, 'index'])->name('posting-failures.index');
         Route::post('posting-failures/{failure}/retry', [AccountingPostingFailureController::class, 'retry'])->name('posting-failures.retry');

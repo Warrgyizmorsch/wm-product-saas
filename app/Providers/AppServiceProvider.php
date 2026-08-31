@@ -337,6 +337,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Listeners\PostPurchaseReturnJournal::class
         );
 
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Purchase\Events\GrnAssetLineReceived::class,
+            \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
+        );
+
         // ── Production Policies ───────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionKpiTarget::class,

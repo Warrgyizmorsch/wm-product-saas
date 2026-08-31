@@ -18,6 +18,9 @@ class GoodsReceiptNoteItem extends BaseModel
         'goods_receipt_note_id',
         'purchase_order_item_id',
         'product_id',
+        'line_type',
+        'chart_of_account_id',
+        'asset_category_id',
         'production_order_id',
         'production_order_operation_id',
         'production_batch_id',
@@ -33,6 +36,8 @@ class GoodsReceiptNoteItem extends BaseModel
     ];
 
     protected $casts = [
+        'chart_of_account_id' => 'integer',
+        'asset_category_id' => 'integer',
         'ordered_qty' => 'float',
         'previous_received_qty' => 'float',
         'received_qty' => 'float',
@@ -59,6 +64,16 @@ class GoodsReceiptNoteItem extends BaseModel
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    public function assetCategory(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\HRMS\Models\AssetCategory::class, 'asset_category_id');
+    }
+
+    public function chartOfAccount(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\ChartOfAccount::class, 'chart_of_account_id');
     }
 
     public function productionOrder(): BelongsTo

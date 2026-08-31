@@ -2,11 +2,13 @@
 
 namespace App\Domains\Accounting\Listeners;
 
+use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Purchase\Events\BillPosted;
+use App\Domains\Purchase\Models\PurchaseOrderItem;
 use Illuminate\Support\Facades\Log;
 
 class PostPurchaseBillJournal
@@ -50,27 +52,54 @@ class PostPurchaseBillJournal
                     'bill_id' => $bill->id,
                     'tenant_id' => $tenantId,
                 ]);
-                $this->failures->record($tenantId, BillPosted::class, $bill, $message);
+                $this->failures->record($tenantId, BillPosted::class, $bill, 'Missing Accounts Payable (2010) account.');
                 return;
             }
 
             $goodsSubtotal = 0.0;
-            $serviceSubtotal = 0.0;
+            $assetBuckets = []; // chart_of_account_id => subtotal
+            $expenseBuckets = []; // chart_of_account_id => subtotal
 
             foreach ($bill->items as $item) {
                 $lineSubtotal = (float) $item->quantity * (float) $item->unit_rate;
-                $isService = $item->product && $item->product->item_type === 'Service';
+                $grnItem = $item->grnItem;
+                $lineType = $grnItem?->line_type;
 
-                if ($isService) {
-                    $serviceSubtotal += $lineSubtotal;
-                } else {
+                if ($lineType === PurchaseOrderItem::LINE_TYPE_ASSET) {
+                    $account = $grnItem->chartOfAccount
+                        ?? $grnItem->assetCategory?->chartOfAccount
+                        ?? $this->accounts->findByCode('1500', $tenantId);
+                    $accountId = $account?->id;
+                    if ($accountId) {
+                        $assetBuckets[$accountId] = ($assetBuckets[$accountId] ?? 0) + $lineSubtotal;
+                    }
+                } elseif ($lineType === PurchaseOrderItem::LINE_TYPE_EXPENSE) {
+                    $account = $grnItem->chartOfAccount ?? $purchaseExpense;
+                    $accountId = $account?->id;
+                    if ($accountId) {
+                        $expenseBuckets[$accountId] = ($expenseBuckets[$accountId] ?? 0) + $lineSubtotal;
+                    }
+                } elseif ($lineType === PurchaseOrderItem::LINE_TYPE_STOCK) {
                     $goodsSubtotal += $lineSubtotal;
+                } else {
+                    // Legacy fallback: no linked GRN line / no line_type recorded — preserve
+                    // the original goods-vs-service split so pre-existing bills post unchanged.
+                    $isService = $item->product && $item->product->item_type === 'Service';
+                    if ($isService) {
+                        $accountId = $purchaseExpense?->id;
+                        if ($accountId) {
+                            $expenseBuckets[$accountId] = ($expenseBuckets[$accountId] ?? 0) + $lineSubtotal;
+                        }
+                    } else {
+                        $goodsSubtotal += $lineSubtotal;
+                    }
                 }
             }
 
             // Calculate item base value (subtotal minus discount)
             $netItemsValue = max(0.01, (float)$bill->subtotal - (float)$bill->discount_amount);
-            if ($goodsSubtotal <= 0 && $serviceSubtotal <= 0) {
+            $totalLinesSubtotal = $goodsSubtotal + array_sum($assetBuckets) + array_sum($expenseBuckets);
+            if ($totalLinesSubtotal <= 0) {
                 $goodsSubtotal = $netItemsValue;
             } else if ($bill->discount_amount > 0) {
                 $goodsSubtotal = max(0.01, $goodsSubtotal - (float)$bill->discount_amount);
@@ -88,17 +117,31 @@ class PostPurchaseBillJournal
                 ];
             }
 
-            // 2. Service Purchase Expense (Debit)
-            if ($serviceSubtotal > 0 && $purchaseExpense) {
-                $lines[] = [
-                    'chart_of_account_id' => $purchaseExpense->id,
-                    'debit'               => round($serviceSubtotal, 2),
-                    'credit'              => 0,
-                    'description'         => "Bill {$bill->bill_number} - Service Charges",
-                ];
+            // 2. Fixed Asset purchases (Debit), one line per resolved account
+            foreach ($assetBuckets as $accountId => $amount) {
+                if ($amount > 0) {
+                    $lines[] = [
+                        'chart_of_account_id' => $accountId,
+                        'debit'               => round($amount, 2),
+                        'credit'              => 0,
+                        'description'         => "Bill {$bill->bill_number} - Fixed Asset Purchase",
+                    ];
+                }
             }
 
-            // 3. Freight Charges Expense (Debit) - Dedicated Separate Freight Account (5400)
+            // 3. Service / Expense Purchase (Debit), one line per resolved account
+            foreach ($expenseBuckets as $accountId => $amount) {
+                if ($amount > 0) {
+                    $lines[] = [
+                        'chart_of_account_id' => $accountId,
+                        'debit'               => round($amount, 2),
+                        'credit'              => 0,
+                        'description'         => "Bill {$bill->bill_number} - Service/Expense Charges",
+                    ];
+                }
+            }
+
+            // 4. Freight Charges Expense (Debit) - Dedicated Separate Freight Account (5400)
             if ((float)$bill->freight_amount > 0 && $freightExpense) {
                 $lines[] = [
                     'chart_of_account_id' => $freightExpense->id,
@@ -108,7 +151,7 @@ class PostPurchaseBillJournal
                 ];
             }
 
-            // 4. Input GST Tax Credits (Debit)
+            // 5. Input GST Tax Credits (Debit)
             $hasTaxLines = false;
             if ((float)$bill->igst_amount > 0 && $inputIgst) {
                 $lines[] = [
@@ -165,7 +208,7 @@ class PostPurchaseBillJournal
                 }
             }
 
-            // 5. Accounts Payable / Vendor Account (Credit)
+            // 6. Accounts Payable / Vendor Account (Credit)
             $lines[] = [
                 'chart_of_account_id' => $accountsPayable->id,
                 'debit'               => 0,

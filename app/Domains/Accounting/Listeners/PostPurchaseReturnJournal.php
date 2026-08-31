@@ -2,10 +2,13 @@
 
 namespace App\Domains\Accounting\Listeners;
 
+use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\VoucherDetail;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
+use App\Domains\Accounting\Support\VoucherType;
 use App\Domains\Purchase\Events\PurchaseReturnApproved;
 use App\Domains\Purchase\Models\LandedCostItem;
 use App\Domains\Purchase\Models\VendorBill;
@@ -52,7 +55,7 @@ class PostPurchaseReturnJournal
                     'purchase_return_id' => $return->id,
                     'tenant_id' => $tenantId,
                 ]);
-                $this->failures->record($tenantId, PurchaseReturnApproved::class, $return, $message);
+                $this->failures->record($tenantId, PurchaseReturnApproved::class, $return, 'Missing Chart of Accounts (2010/1200).');
                 return;
             }
 
@@ -183,13 +186,25 @@ class PostPurchaseReturnJournal
             }
 
             // Post General Ledger Journal Entry
-            $this->journals->post($lines, [
-                'tenant_id'      => $tenantId,
-                'journal_date'   => $return->return_date ?: now(),
-                'source'         => Journal::SOURCE_PURCHASE,
-                'reference_type' => 'purchase_return',
-                'reference_id'   => $return->id,
-                'memo'           => "Purchase Return / Debit Note {$return->return_number} ({$return->vendor?->name})",
+            $debitNoteJournal = $this->journals->post($lines, [
+                'tenant_id'             => $tenantId,
+                'journal_date'          => $return->return_date ?: now(),
+                'source'                => Journal::SOURCE_PURCHASE,
+                'reference_type'        => 'purchase_return',
+                'reference_id'          => $return->id,
+                'memo'                  => "Purchase Return / Debit Note {$return->return_number} ({$return->vendor?->name})",
+                'voucher_type'          => VoucherType::DEBIT_NOTE,
+                'journal_number_prefix' => VoucherType::prefix(VoucherType::DEBIT_NOTE),
+            ]);
+
+            VoucherDetail::create([
+                'tenant_id'    => $tenantId,
+                'journal_id'   => $debitNoteJournal->id,
+                'voucher_type' => VoucherType::DEBIT_NOTE,
+                'party_type'   => 'vendor',
+                'party_id'     => $return->vendor_id,
+                'party_name'   => $return->vendor?->name,
+                'reference_no' => $return->return_number,
             ]);
 
             Log::info("PostPurchaseReturnJournal: Successfully posted GL entry for Purchase Return {$return->return_number}", [

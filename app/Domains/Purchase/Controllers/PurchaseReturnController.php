@@ -220,6 +220,16 @@ class PurchaseReturnController extends Controller
                 );
             }
 
+            if ($purchaseReturn->vendor_bill_id) {
+                $bill = \App\Domains\Purchase\Models\VendorBill::find($purchaseReturn->vendor_bill_id);
+                if ($bill) {
+                    $apply = min((float) $purchaseReturn->total_refund_amount, (float) $bill->due_amount);
+                    $bill->due_amount = max(0, (float) $bill->due_amount - $apply);
+                    $bill->status = $bill->due_amount <= 0.001 ? 'Paid' : 'Partially Paid';
+                    $bill->save();
+                }
+            }
+
             $purchaseReturn->update(['status' => 'Completed']);
             event(new PurchaseReturnApproved($purchaseReturn));
         });

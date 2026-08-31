@@ -14,6 +14,7 @@ class Asset extends BaseModel
         'asset_category_id',
         'asset_item_id',
         'asset_request_id',
+        'goods_receipt_note_item_id',
         'asset_code',
         'name',
         'brand',

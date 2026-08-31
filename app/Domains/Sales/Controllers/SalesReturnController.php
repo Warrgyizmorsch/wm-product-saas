@@ -274,6 +274,16 @@ class SalesReturnController extends Controller
                 );
             }
 
+            if ($returnOrder->invoice_id) {
+                $invoice = \App\Domains\Sales\Models\Invoice::find($returnOrder->invoice_id);
+                if ($invoice) {
+                    $apply = min((float) $returnOrder->total_refund_amount, (float) $invoice->balance_due);
+                    $invoice->balance_due = max(0, (float) $invoice->balance_due - $apply);
+                    $invoice->status = $invoice->balance_due <= 0 ? 'Paid' : 'Partially Paid';
+                    $invoice->save();
+                }
+            }
+
             $returnOrder->update(['status' => 'Completed']);
         });
 

@@ -192,4 +192,23 @@ class ChartOfAccount extends BaseModel
     {
         return in_array($this->subtype, self::NON_CURRENT_SUBTYPES, true);
     }
+
+    /**
+     * Movement in this account's *type's* canonical direction (debit-positive for
+     * asset/expense, credit-positive for liability/equity/income) rather than the
+     * account's own normal_balance. Contra accounts (e.g. Sales Returns — income
+     * type but debit-normal) deliberately have a normal_balance opposite their
+     * type, so summing signedMovement() across a type/subtype bucket would add a
+     * contra account's balance instead of subtracting it. Use this instead of
+     * signedMovement() whenever movements from multiple accounts of the same
+     * type are being totaled together (Balance Sheet, P&L, Cash Flow); keep
+     * signedMovement() for single-account views (General Ledger, Trial Balance)
+     * where the account's own balance direction is what should be displayed.
+     */
+    public function canonicalMovement(float $debit, float $credit): float
+    {
+        $net = $debit - $credit;
+
+        return in_array($this->type, [self::TYPE_ASSET, self::TYPE_EXPENSE], true) ? $net : -$net;
+    }
 }

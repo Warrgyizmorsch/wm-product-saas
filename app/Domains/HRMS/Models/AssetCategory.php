@@ -14,7 +14,13 @@ class AssetCategory extends BaseModel
         'company_id',
         'name',
         'description',
+        'fixed_asset_account_id',
     ];
+
+    public function chartOfAccount(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\ChartOfAccount::class, 'fixed_asset_account_id');
+    }
 
     /**
      * Get the company that owns the category.

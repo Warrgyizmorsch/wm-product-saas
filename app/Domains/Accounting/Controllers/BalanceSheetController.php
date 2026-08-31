@@ -8,6 +8,7 @@ use App\Domains\Accounting\Services\FiscalPeriodService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -21,6 +22,29 @@ class BalanceSheetController extends Controller
     }
 
     public function index(Request $request): View
+    {
+        $data = $this->buildReport($request);
+
+        return view('modules.accounting.reports.balance-sheet', $data);
+    }
+
+    public function downloadPdf(Request $request)
+    {
+        $data = $this->buildReport($request);
+
+        if (!$data['period']) {
+            return redirect()->route('accounting.reports.balance-sheet')->with('error', 'Select an accounting period first.');
+        }
+
+        $pdf = Pdf::loadView('modules.accounting.reports.balance-sheet-pdf', $data);
+
+        return $pdf->download("BalanceSheet_{$data['period']->name}.pdf");
+    }
+
+    /**
+     * @return array{allPeriods: \Illuminate\Support\Collection, period: ?AccountingPeriod, sections: array, totals: array, netIncome: float, isBalanced: bool}
+     */
+    private function buildReport(Request $request): array
     {
         abort_unless($this->access->allows(auth()->user(), 'accounting.reports.view', [
             'tenant_id' => auth()->user()->tenant_id,
@@ -46,7 +70,10 @@ class BalanceSheetController extends Controller
         $isBalanced = true;
 
         if ($period) {
-            $asOfDate = $period->end_date;
+            // journal_date carries a real timestamp, so an in-progress period's end
+            // date must cover the full day or same-day postings get excluded by the
+            // <= comparison in balancesAsOf().
+            $asOfDate = \Illuminate\Support\Carbon::parse($period->end_date)->endOfDay();
             $balances = $this->journals->balancesAsOf(auth()->user()->tenant_id, $asOfDate);
 
             $incomeTotal = 0.0;
@@ -59,7 +86,7 @@ class BalanceSheetController extends Controller
                     continue;
                 }
 
-                $balance = $account->signedMovement((float) $row->debit, (float) $row->credit);
+                $balance = $account->canonicalMovement((float) $row->debit, (float) $row->credit);
 
                 if ($account->type === ChartOfAccount::TYPE_ASSET) {
                     $bucket = $account->isNonCurrent() ? 'non_current' : 'current';
@@ -94,13 +121,13 @@ class BalanceSheetController extends Controller
             $isBalanced = abs($totals['asset'] - ($totals['liability'] + $totals['equity'])) < 0.01;
         }
 
-        return view('modules.accounting.reports.balance-sheet', [
+        return [
             'allPeriods' => $allPeriods,
             'period' => $period,
             'sections' => $sections,
             'totals' => $totals,
             'netIncome' => $netIncome,
             'isBalanced' => $isBalanced,
-        ]);
+        ];
     }
 }
