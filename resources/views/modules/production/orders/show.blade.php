@@ -2529,9 +2529,28 @@
             </x-slot>
         </x-ui.modal>
 
+        @php
+            $opsWithTarget = $order->operations->map(function ($op) use ($order) {
+                $arr = $op->toArray();
+                if (!empty($op->target_produced_qty) && (float) $op->target_produced_qty > 0) {
+                    $arr['computed_target_qty'] = (float) $op->target_produced_qty;
+                } elseif (!empty($op->source_product_id) && $op->source_product_id !== $order->product_id) {
+                    $bomItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $op->tenant_id)
+                        ->where('bom_id', $order->bom_id)
+                        ->where('material_id', $op->source_product_id)
+                        ->first();
+                    $ratio = ($bomItem && (float) $bomItem->quantity > 0) ? (float) $bomItem->quantity : 1.0;
+                    $arr['computed_target_qty'] = (float) $order->quantity_ordered * $ratio;
+                } else {
+                    $arr['computed_target_qty'] = (float) ($order->quantity_ordered ?? 0.0);
+                }
+                return $arr;
+            });
+        @endphp
+
         <script>
             document.addEventListener('DOMContentLoaded', function () {
-                const operationsData = @json($order->operations);
+                const operationsData = @json($opsWithTarget);
                 const plannedQty = {{ (float) $order->quantity_ordered }};
 
                 const opSelect = document.getElementById('op_select_id');
@@ -2567,8 +2586,11 @@
                         .filter(o => o.sequence < op.sequence)
                         .reduce((acc, o) => acc + parseFloat(o.quantity_scrapped || 0), 0);
 
-                    // Operation target equals order planned quantity minus preceding scrapped units
-                    const opTarget = Math.max(0, plannedQty - precedingScrap);
+                    // Operation target: use operation-level computed target (for SFGs/subassemblies) if available, minus preceding scrap
+                    const baseTarget = (op.computed_target_qty !== undefined && op.computed_target_qty !== null)
+                        ? parseFloat(op.computed_target_qty)
+                        : plannedQty;
+                    const opTarget = Math.max(0, baseTarget - precedingScrap);
 
                     const produced = parseFloat(op.quantity_produced || 0);
                     const rejected = parseFloat(op.quantity_rejected || 0);

@@ -509,7 +509,7 @@ class MesExecutionService
                 $newTotalOutput = (float) $orderOp->quantity_produced + (float) $orderOp->quantity_scrapped + (float) $orderOp->quantity_rejected + $produced + $scrapped + $rejected;
                 $isTargetReached = ($targetQty <= 0) || ($newTotalOutput >= $targetQty) || !empty($data['force_complete']);
 
-                // Update order operation
+                // Update order operation & parent production order metrics
                 if ($isTargetReached) {
                     $orderOp->status = ProductionOrderOperation::STATUS_COMPLETED;
                     $orderOp->actual_end_time = $now;
@@ -522,6 +522,84 @@ class MesExecutionService
                 $orderOp->quantity_rejected += $rejected;
                 $orderOp->quantity_scrapped += $scrapped;
                 $orderOp->save();
+
+                $order = $schedOp->order ?? $schedOp->schedule->order ?? null;
+                if ($order) {
+                    $order->quantity_produced += $produced;
+                    $order->quantity_rejected += $rejected;
+                    $order->quantity_scrapped += $scrapped;
+                    $order->save();
+                }
+
+                // Handle automatic Rework Order & NCR creation when rejected quantity is logged from shopfloor
+                if ($rejected > 0 && $order) {
+                    app(ProductionExecutionService::class)->logRework(
+                        $schedOp->production_order_id,
+                        $orderOp->id,
+                        $rejected,
+                        $data['remarks'] ?? 'Automatic log rework from MES shopfloor operation execution.',
+                        $operatorId,
+                        $batchId
+                    );
+
+                    $ncr = \App\Domains\Production\Models\ProductionNcr::create([
+                        'tenant_id' => $order->tenant_id,
+                        'ncr_number' => 'NCR-AUTO-' . strtoupper(uniqid()),
+                        'category' => 'process',
+                        'status' => 'open',
+                        'disposition_type' => 'rework',
+                        'production_order_id' => $schedOp->production_order_id,
+                        'production_order_operation_id' => $orderOp->id,
+                        'batch_id' => $batchId,
+                        'machine_id' => $schedOp->machine_id,
+                        'operator_id' => $operatorId,
+                        'description' => "Automatic NCR generated due to rejected quantity logged during MES shopfloor operation execution.",
+                    ]);
+
+                    app(\App\Domains\Production\Services\ReworkService::class)->createReworkOrder($order->tenant_id, $ncr->id, [
+                        'original_production_order_id' => $order->id,
+                        'work_center_id' => $orderOp->work_center_id,
+                        'cost_estimate' => 50.00,
+                    ]);
+                }
+
+                // Handle automatic Scrap Disposal & NCR creation when scrapped quantity is logged from shopfloor
+                if ($scrapped > 0 && $order) {
+                    \App\Domains\Production\Models\ProductionOrderScrap::create([
+                        'tenant_id' => $order->tenant_id,
+                        'production_order_id' => $schedOp->production_order_id,
+                        'production_order_operation_id' => $orderOp->id,
+                        'production_batch_id' => $batchId,
+                        'product_id' => $order->product_id,
+                        'quantity' => $scrapped,
+                        'reason' => $data['remarks'] ?? 'Automatic log scrap from MES shopfloor operation execution.',
+                        'recorded_by' => $operatorId,
+                        'recorded_at' => $now,
+                        'stock_transaction_id' => null,
+                    ]);
+
+                    $ncr = \App\Domains\Production\Models\ProductionNcr::create([
+                        'tenant_id' => $order->tenant_id,
+                        'ncr_number' => 'NCR-AUTO-' . strtoupper(uniqid()),
+                        'category' => 'process',
+                        'status' => 'open',
+                        'disposition_type' => 'scrap',
+                        'production_order_id' => $schedOp->production_order_id,
+                        'production_order_operation_id' => $orderOp->id,
+                        'batch_id' => $batchId,
+                        'machine_id' => $schedOp->machine_id,
+                        'operator_id' => $operatorId,
+                        'description' => "Automatic NCR generated due to scrapped quantity logged during MES shopfloor operation execution.",
+                    ]);
+
+                    app(ScrapService::class)->createScrapDisposal($order->tenant_id, [
+                        'ncr_id' => $ncr->id,
+                        'category' => 'finished_good',
+                        'reason_code' => 'defect',
+                        'quantity' => $scrapped,
+                        'cost' => $scrapped * ($order->product->unit_cost ?? 1.00),
+                    ]);
+                }
 
                 // Update schedule operation status
                 if ($isTargetReached) {

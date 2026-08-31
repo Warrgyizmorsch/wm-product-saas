@@ -27,6 +27,7 @@ class MaintenanceWorkOrderController extends Controller
     public function index(Request $request): View
     {
         $tenantId   = require_tenant_id();
+        \Illuminate\Support\Facades\Gate::authorize('viewAny', \App\Domains\Production\Models\Machine::class);
         $filters    = $request->only(['machine_id', 'status', 'type', 'search']);
         $workOrders = $this->repository->paginateWorkOrders($tenantId, $filters, 15)->withQueryString();
         $machines   = $this->machineRepository->getAll();
@@ -36,14 +37,17 @@ class MaintenanceWorkOrderController extends Controller
 
     public function create(): View
     {
+        \Illuminate\Support\Facades\Gate::authorize('create', \App\Domains\Production\Models\Machine::class);
+        $tenantId    = require_tenant_id();
         $machines    = $this->machineRepository->getAll();
-        $technicians = User::all();
+        $technicians = User::where('tenant_id', $tenantId)->get();
 
         return view('modules.production.maintenance.work-orders.create', compact('machines', 'technicians'));
     }
 
     public function store(Request $request): RedirectResponse
     {
+        \Illuminate\Support\Facades\Gate::authorize('create', \App\Domains\Production\Models\Machine::class);
         $tenantId  = require_tenant_id();
         $validated = $request->validate([
             'machine_id'             => ['required', 'integer'],
@@ -68,11 +72,12 @@ class MaintenanceWorkOrderController extends Controller
 
     public function show(int $id): View
     {
+        \Illuminate\Support\Facades\Gate::authorize('viewAny', \App\Domains\Production\Models\Machine::class);
         $tenantId = require_tenant_id();
         $workOrder = $this->repository->findWorkOrder($id, $tenantId);
         abort_if(!$workOrder, 404, 'Work Order not found.');
 
-        $technicians = User::all();
+        $technicians = User::where('tenant_id', $tenantId)->get();
         $products    = Product::where('tenant_id', $tenantId)->get();
         $warehouses  = Warehouse::where('tenant_id', $tenantId)->get();
 

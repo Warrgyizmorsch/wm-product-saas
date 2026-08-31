@@ -101,6 +101,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Repositories\RoutingRepository::class
         );
 
+        // ── Production: Subcontract Delivery Challan ─────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\DeliveryChallanRepositoryInterface::class,
+            \App\Domains\Production\Repositories\DeliveryChallanRepository::class
+        );
+
         // ── HRMS: Repositories ───────────────────────────────────────────
         $this->app->bind(
             \App\Domains\HRMS\Repositories\AssetRepositoryInterface::class,
@@ -421,6 +427,16 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionDeviation::class,
             \App\Domains\Production\Policies\QualityManagementPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\DeliveryChallan::class,
+            \App\Domains\Production\Policies\DeliveryChallanPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionCostAdjustment::class,
+            \App\Domains\Production\Policies\ProductionCostAdjustmentPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(

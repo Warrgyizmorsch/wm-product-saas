@@ -3,54 +3,39 @@
 namespace App\Domains\Production\Controllers;
 
 use App\Domains\Inventory\Models\Product;
-use App\Domains\Inventory\Models\StockTransaction;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Production\Models\DeliveryChallan;
-use App\Domains\Production\Models\DeliveryChallanItem;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
-use App\Domains\Production\Models\ProductionOrderProgressLog;
+use App\Domains\Production\Repositories\DeliveryChallanRepositoryInterface;
+use App\Domains\Production\Services\SubcontractMaterialBalanceService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class SubcontractDeliveryChallanController extends Controller
 {
+    public function __construct(
+        private readonly DeliveryChallanRepositoryInterface $repository,
+        private readonly SubcontractMaterialBalanceService $materialBalanceService
+    ) {}
+
     public function index(Request $request)
     {
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $this->authorize('viewAny', DeliveryChallan::class);
+        $tenantId = require_tenant_id();
 
-        $query = DeliveryChallan::where('tenant_id', $tenantId)
-            ->with(['productionOrder', 'operation', 'vendor', 'warehouse', 'creator', 'items.warehouse', 'items.product']);
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('challan_number', 'like', "%{$search}%")
-                  ->orWhere('vehicle_number', 'like', "%{$search}%")
-                  ->orWhere('lr_number', 'like', "%{$search}%");
-            });
-        }
-
-        $challans = $query->latest()->paginate(15);
-        $statusCounts = [
-            'total' => DeliveryChallan::where('tenant_id', $tenantId)->count(),
-            'draft' => DeliveryChallan::where('tenant_id', $tenantId)->where('status', 'draft')->count(),
-            'dispatched' => DeliveryChallan::where('tenant_id', $tenantId)->where('status', 'dispatched')->count(),
-            'completed' => DeliveryChallan::where('tenant_id', $tenantId)->where('status', 'completed')->count(),
-        ];
+        $filters = $request->only(['status', 'search']);
+        $challans = $this->repository->paginate($tenantId, $filters, 15);
+        $statusCounts = $this->repository->getStatusCounts($tenantId);
 
         return view('modules.production.subcontract.challans.index', compact('challans', 'statusCounts'));
     }
 
     public function create(Request $request)
     {
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $this->authorize('create', DeliveryChallan::class);
+        $tenantId = require_tenant_id();
 
         $order = null;
         $operation = null;
@@ -73,7 +58,6 @@ class SubcontractDeliveryChallanController extends Controller
                     $vendor = $operation->vendor;
                 }
 
-                // Prevent opening duplicate draft gate passes if one already exists
                 $existingDraft = DeliveryChallan::where('tenant_id', $tenantId)
                     ->where('production_order_operation_id', $operation->id)
                     ->where('status', 'draft')
@@ -94,7 +78,6 @@ class SubcontractDeliveryChallanController extends Controller
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $defaultWarehouseId = $warehouses->firstWhere('is_default', true)?->id ?? $warehouses->first()?->id;
 
-        // Pre-fill raw material items for this operation from BOM
         if ($order && $order->bom && $order->bom->items) {
             $targetQty = (float) $order->quantity_ordered;
             $bomBase = (float) ($order->bom->base_quantity > 0 ? $order->bom->base_quantity : 1.0);
@@ -114,7 +97,6 @@ class SubcontractDeliveryChallanController extends Controller
             }
         }
 
-        // Fallback: If no BOM items, add finished product or dummy line
         if ($prefilledItems->isEmpty() && $order && $order->product) {
             $prefilledItems->push([
                 'product_id' => $order->product_id,
@@ -126,7 +108,7 @@ class SubcontractDeliveryChallanController extends Controller
             ]);
         }
 
-        $nextNumber = $this->getNextChallanNumber($tenantId);
+        $nextNumber = $this->repository->getNextChallanNumber($tenantId);
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $products = Product::where('tenant_id', $tenantId)->get();
 
@@ -145,7 +127,7 @@ class SubcontractDeliveryChallanController extends Controller
 
     public function checkStock(Request $request)
     {
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $warehouseId = $request->query('warehouse_id');
         $productId = $request->query('product_id');
@@ -181,7 +163,8 @@ class SubcontractDeliveryChallanController extends Controller
 
     public function store(Request $request)
     {
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $this->authorize('create', DeliveryChallan::class);
+        $tenantId = require_tenant_id();
 
         $validated = $request->validate([
             'production_order_id' => 'nullable|exists:production_orders,id',
@@ -205,9 +188,8 @@ class SubcontractDeliveryChallanController extends Controller
             'items.*.serial_number' => 'nullable|string',
         ]);
 
-        // Stock availability verification when dispatching
         if ($validated['status'] === 'dispatched') {
-            $stockErrors = $this->validateStockAvailability($tenantId, $validated['items']);
+            $stockErrors = $this->materialBalanceService->validateStockAvailability($tenantId, $validated['items']);
             if (!empty($stockErrors)) {
                 return redirect()->back()
                     ->withInput()
@@ -215,48 +197,11 @@ class SubcontractDeliveryChallanController extends Controller
             }
         }
 
-        $challan = DB::transaction(function () use ($validated, $tenantId) {
-            $challanNumber = $this->getNextChallanNumber($tenantId);
-            $firstWarehouseId = $validated['warehouse_id'] ?? ($validated['items'][0]['warehouse_id'] ?? null);
+        $challan = $this->repository->create($tenantId, $validated, $validated['items']);
 
-            $challan = DeliveryChallan::create([
-                'tenant_id' => $tenantId,
-                'challan_number' => $challanNumber,
-                'type' => 'subcontract_dispatch',
-                'production_order_id' => $validated['production_order_id'] ?? null,
-                'production_order_operation_id' => $validated['production_order_operation_id'] ?? null,
-                'vendor_id' => $validated['vendor_id'],
-                'warehouse_id' => $firstWarehouseId,
-                'challan_date' => $validated['challan_date'],
-                'expected_return_date' => $validated['expected_return_date'] ?? null,
-                'status' => $validated['status'],
-                'vehicle_number' => $validated['vehicle_number'] ?? null,
-                'transporter_name' => $validated['transporter_name'] ?? null,
-                'lr_number' => $validated['lr_number'] ?? null,
-                'driver_name' => $validated['driver_name'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'created_by' => auth()->id() ?: 1,
-            ]);
-
-            foreach ($validated['items'] as $item) {
-                DeliveryChallanItem::create([
-                    'tenant_id' => $tenantId,
-                    'delivery_challan_id' => $challan->id,
-                    'product_id' => $item['product_id'],
-                    'warehouse_id' => $item['warehouse_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_of_measure' => $item['unit_of_measure'] ?? 'PCS',
-                    'batch_number' => $item['batch_number'] ?? null,
-                    'serial_number' => $item['serial_number'] ?? null,
-                ]);
-            }
-
-            if ($validated['status'] === 'dispatched') {
-                $this->processDispatchActions($challan, $tenantId);
-            }
-
-            return $challan;
-        });
+        if ($validated['status'] === 'dispatched') {
+            $this->materialBalanceService->processDispatchActions($challan, $tenantId);
+        }
 
         return redirect()->route('production.subcontract.delivery-challans.show', $challan->id)
             ->with('success', "Delivery Challan {$challan->challan_number} created successfully.");
@@ -264,33 +209,31 @@ class SubcontractDeliveryChallanController extends Controller
 
     public function show($id)
     {
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
+        $challan = $this->repository->findOrFail((int) $id, $tenantId);
 
-        $challan = DeliveryChallan::where('tenant_id', $tenantId)
-            ->with(['productionOrder.product', 'operation', 'vendor', 'warehouse', 'items.product', 'items.warehouse', 'creator'])
-            ->findOrFail($id);
-
-        $warehouses = \App\Domains\Inventory\Models\Warehouse::where('tenant_id', $tenantId)->get();
+        $this->authorize('view', $challan);
+        $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
 
         return view('modules.production.subcontract.challans.show', compact('challan', 'warehouses'));
     }
 
     public function print($id)
     {
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
+        $challan = $this->repository->findOrFail((int) $id, $tenantId);
 
-        $challan = DeliveryChallan::where('tenant_id', $tenantId)
-            ->with(['productionOrder.product', 'operation', 'vendor', 'warehouse', 'items.product', 'items.warehouse', 'creator'])
-            ->findOrFail($id);
+        $this->authorize('view', $challan);
 
         return view('modules.production.subcontract.challans.print', compact('challan'));
     }
 
     public function dispatch($id)
     {
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
+        $challan = $this->repository->findOrFail((int) $id, $tenantId);
 
-        $challan = DeliveryChallan::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+        $this->authorize('dispatch', $challan);
 
         if ($challan->status === 'dispatched') {
             return redirect()->back()->with('warning', 'Challan is already dispatched.');
@@ -302,35 +245,30 @@ class SubcontractDeliveryChallanController extends Controller
             'quantity' => $i->quantity
         ])->toArray();
 
-        $stockErrors = $this->validateStockAvailability($tenantId, $itemsArray);
+        $stockErrors = $this->materialBalanceService->validateStockAvailability($tenantId, $itemsArray);
 
         if (!empty($stockErrors)) {
             return redirect()->back()->with('error', implode(' ', $stockErrors));
         }
 
-        DB::transaction(function () use ($challan, $tenantId) {
-            $challan->status = 'dispatched';
-            $challan->save();
-
-            $this->processDispatchActions($challan, $tenantId);
-        });
+        $this->repository->updateStatus($challan, 'dispatched');
+        $this->materialBalanceService->processDispatchActions($challan, $tenantId);
 
         return redirect()->back()->with('success', "Delivery Challan {$challan->challan_number} has been dispatched to vendor.");
     }
 
     public function receive(Request $request, $id)
     {
-        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
+        $challan = $this->repository->findOrFail((int) $id, $tenantId);
 
-        $challan = DeliveryChallan::where('tenant_id', $tenantId)
-            ->with(['productionOrder.product', 'operation', 'vendor'])
-            ->findOrFail($id);
+        $this->authorize('receive', $challan);
 
         if ($challan->status === 'completed') {
             return redirect()->back()->with('warning', 'This delivery challan is already completed.');
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'received_qty' => 'required|numeric|min:0.01',
             'accepted_qty' => 'nullable|numeric|min:0',
             'rejected_qty' => 'nullable|numeric|min:0',
@@ -338,180 +276,23 @@ class SubcontractDeliveryChallanController extends Controller
             'remarks'      => 'nullable|string',
         ]);
 
-        $receivedQty = (float) $request->input('received_qty');
-        $acceptedQty = (float) ($request->input('accepted_qty') ?? $receivedQty);
-        $rejectedQty = (float) ($request->input('rejected_qty') ?? 0);
-        $warehouseId = (int) $request->input('warehouse_id');
-        $remarks     = $request->input('remarks');
+        $receivedQty = (float) $validated['received_qty'];
+        $acceptedQty = (float) ($validated['accepted_qty'] ?? $receivedQty);
+        $rejectedQty = (float) ($validated['rejected_qty'] ?? 0);
+        $warehouseId = (int) $validated['warehouse_id'];
+        $remarks     = $validated['remarks'] ?? null;
 
-        DB::transaction(function () use ($challan, $tenantId, $receivedQty, $acceptedQty, $rejectedQty, $warehouseId, $remarks) {
-            $op = $challan->operation;
-            $order = $challan->productionOrder;
-
-            // 1. Add processed product stock back into warehouse (IN)
-            $targetProductId = $order?->product_id;
-            if ($targetProductId && $acceptedQty > 0) {
-                \App\Domains\Inventory\Services\StockService::recordInflow(
-                    tenantId: $tenantId,
-                    productId: $targetProductId,
-                    warehouseId: $warehouseId,
-                    quantity: $acceptedQty,
-                    unitCost: 0,
-                    referenceType: 'SubcontractReceipt',
-                    referenceId: $challan->id
-                );
-            }
-
-            // 2. Backflush company material components used for this subcontract batch
-            if ($op) {
-                app(\App\Domains\Production\Services\SubcontractMaterialBalanceService::class)
-                    ->backflushCompanyMaterial($tenantId, $op, $acceptedQty);
-
-                // 3. Update operation progress & status
-                $op->quantity_produced = (float) $op->quantity_produced + $acceptedQty;
-                if ($rejectedQty > 0) {
-                    $op->quantity_rejected = (float) $op->quantity_rejected + $rejectedQty;
-                }
-
-                $targetQty = (float) ($op->target_produced_qty ?: ($order?->quantity_ordered ?: 0.0));
-                if ($targetQty > 0 && $op->quantity_produced < ($targetQty - 0.0001)) {
-                    $op->status = 'running';
-                } else {
-                    $op->status = 'completed';
-                    $op->actual_end_time = now();
-                }
-                $op->save();
-
-                // 4. Log progress
-                ProductionOrderProgressLog::create([
-                    'tenant_id'           => $tenantId,
-                    'production_order_id' => $op->production_order_id,
-                    'operation_id'        => $op->id,
-                    'quantity_completed'  => $acceptedQty,
-                    'recorded_at'          => now(),
-                    'status'              => $op->status,
-                    'log_type'            => 'subcontract_receipt',
-                    'logged_by'           => auth()->id() ?: 1,
-                    'remarks'             => "Received {$acceptedQty} processed items from vendor [{$challan->vendor?->name}] via Challan #{$challan->challan_number}. " . ($remarks ?? ''),
-                ]);
-
-                // 5. Unlock next operation on Shopfloor
-                app(\App\Domains\Production\Services\ProductionWipService::class)->evaluateAndExecuteWipTransfers($op->id);
-            }
-
-            // Mark Challan as Completed
-            $challan->status = 'completed';
-            $challan->save();
-
-            // Auto-approve Subcontract PO if draft
-            if ($challan->production_order_operation_id) {
-                $poItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('production_order_operation_id', $challan->production_order_operation_id)->first();
-                if ($poItem && $poItem->order && $poItem->order->status === 'Draft') {
-                    $poItem->order->status = 'Approved';
-                    $poItem->order->save();
-                }
-            }
-
-            // Auto-complete Production Order if all operations completed
-            if ($challan->production_order_id) {
-                app(\App\Domains\Production\Services\ProductionOrderService::class)->evaluateAndAutoCompleteOrder($challan->production_order_id);
-            }
-        });
+        $this->materialBalanceService->processReceiveActions(
+            $challan,
+            $tenantId,
+            $receivedQty,
+            $acceptedQty,
+            $rejectedQty,
+            $warehouseId,
+            $remarks
+        );
 
         return redirect()->route('production.subcontract.delivery-challans.show', $challan->id)
             ->with('success', "Received {$acceptedQty} items from vendor. Stock updated and next operation unlocked on shopfloor.");
-    }
-
-    protected function validateStockAvailability(int $tenantId, array $items): array
-    {
-        $errors = [];
-
-        foreach ($items as $item) {
-            $whId = $item['warehouse_id'] ?? null;
-            $productId = $item['product_id'];
-            $reqQty = (float) $item['quantity'];
-
-            if (!$whId) continue;
-
-            $wh = Warehouse::find($whId);
-            $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                ->where('warehouse_id', $whId)
-                ->where('product_id', $productId)
-                ->first();
-
-            $available = $stock ? (float) ($stock->available_qty ?? $stock->quantity) : 0.0;
-
-            if ($available < $reqQty) {
-                $product = Product::find($productId);
-                $errors[] = "Insufficient stock for [{$product?->name}] in warehouse [{$wh?->name}]. Required: " . number_format($reqQty, 2) . ", Available: " . number_format($available, 2) . ".";
-            }
-        }
-
-        return $errors;
-    }
-
-    protected function processDispatchActions(DeliveryChallan $challan, int $tenantId): void
-    {
-        // 1. Physical Stock Deduction & Stock Ledger Transaction per item warehouse
-        foreach ($challan->items as $item) {
-            $whId = $item->warehouse_id ?: $challan->warehouse_id;
-
-            if ($whId) {
-                StockTransaction::create([
-                    'tenant_id' => $tenantId,
-                    'product_id' => $item->product_id,
-                    'warehouse_id' => $whId,
-                    'type' => 'OUT',
-                    'reference_type' => 'DeliveryChallan',
-                    'reference_id' => $challan->production_order_id ?: $challan->id,
-                    'quantity' => (float) $item->quantity,
-                    'unit_cost' => 0,
-                    'total_value' => 0,
-                    'balance_qty' => 0,
-                ]);
-
-                $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                    ->where('warehouse_id', $whId)
-                    ->where('product_id', $item->product_id)
-                    ->first();
-
-                if ($stock) {
-                    $stock->quantity = max(0.0, (float) $stock->quantity - (float) $item->quantity);
-                    $stock->available_qty = max(0.0, (float) $stock->available_qty - (float) $item->quantity);
-                    $stock->save();
-                }
-            }
-        }
-
-        // 2. Production Operation & Progress Log Update
-        if ($challan->production_order_operation_id) {
-            $op = ProductionOrderOperation::where('tenant_id', $tenantId)->find($challan->production_order_operation_id);
-
-            if ($op) {
-                $op->status = 'vendor_dispatched';
-                $op->actual_start_time = $op->actual_start_time ?: now();
-                $op->save();
-
-                ProductionOrderProgressLog::create([
-                    'tenant_id' => $tenantId,
-                    'production_order_id' => $op->production_order_id,
-                    'operation_id' => $op->id,
-                    'quantity_completed' => 0,
-                    'recorded_at' => now(),
-                    'status' => 'vendor_dispatched',
-                    'log_type' => 'subcontract_dispatch',
-                    'logged_by' => auth()->id() ?: 1,
-                    'remarks' => "Company material dispatched to vendor via Delivery Challan #{$challan->challan_number} (Vehicle: {$challan->vehicle_number}). Stock deducted from respective item warehouses.",
-                ]);
-            }
-        }
-    }
-
-    protected function getNextChallanNumber(int $tenantId): string
-    {
-        $lastChallan = DeliveryChallan::where('tenant_id', $tenantId)->latest('id')->first();
-        $nextNum = $lastChallan ? ((int) preg_replace('/[^0-9]/', '', $lastChallan->challan_number)) + 1 : 1;
-
-        return 'DC-' . date('Y') . '-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
     }
 }
