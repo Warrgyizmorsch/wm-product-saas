@@ -55,6 +55,13 @@
                         </div>
                         <div class="fs-11 text-muted">
                             {{ $run->start_date->format('d M') }} - {{ $run->end_date->format('d M Y') }}
+                            @if($run->employee_ids && count($run->employee_ids) > 0)
+                                <span class="d-block text-primary mt-1 fw-bold"><i class="feather-user me-1"></i>Individual ({{ count($run->employee_ids) }})</span>
+                            @elseif($run->payGroup)
+                                <span class="d-block text-info mt-1"><i class="feather-users me-1"></i>{{ $run->payGroup->name }}</span>
+                            @else
+                                <span class="d-block text-secondary mt-1"><i class="feather-users me-1"></i>All Pay Groups</span>
+                            @endif
                         </div>
                     </a>
                 @empty
@@ -75,7 +82,9 @@
                         <div>
                             <h5 class="fw-bold text-dark mb-1">
                                 Payroll Register &mdash; {{ Carbon\Carbon::parse($selectedRun->payroll_month . '-01')->format('F Y') }}
-                                @if($selectedRun->payGroup)
+                                @if($selectedRun->employee_ids && count($selectedRun->employee_ids) > 0)
+                                    <span class="badge bg-soft-primary text-primary fs-12 ms-2 fw-semibold"><i class="feather-user me-1"></i>Individual Run ({{ count($selectedRun->employee_ids) }} Employees)</span>
+                                @elseif($selectedRun->payGroup)
                                     <span class="badge bg-soft-info text-info fs-12 ms-2 fw-semibold">{{ $selectedRun->payGroup->name }}</span>
                                 @else
                                     <span class="badge bg-soft-secondary text-secondary fs-12 ms-2 fw-semibold">All Pay Groups</span>
@@ -395,12 +404,27 @@
                             <x-ui.odoo-form-ui type="input" inputType="month" label="Payroll Month (YYYY-MM)" name="payroll_month" id="initiate_payroll_month" :required="true" placeholder="e.g. 2026-08" />
                         </div>
                         <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Selection Mode" name="selection_mode" id="initiate_selection_mode" :required="true">
+                                <option value="pay_group">By Pay Group</option>
+                                <option value="individual">By Selected Employees</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12" id="pay_group_selection_div">
                             <x-ui.odoo-form-ui type="select" label="Pay Group" name="pay_group_id" id="initiate_pay_group_id" helperText="Select a specific pay group to process or leave as all pay groups.">
                                 <option value="">All Pay Groups (Process All Employees)</option>
                                 @foreach($payGroups as $pg)
                                     <option value="{{ $pg->id }}">{{ $pg->name }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12 d-none" id="employee_selection_div">
+                            <label class="form-label fw-bold fs-12 mb-1">Select Employees <span class="text-danger">*</span></label>
+                            <select name="employee_ids[]" id="initiate_employee_ids" class="form-control odoo-select2" multiple style="width: 100%;">
+                                @foreach($allEmployees as $emp)
+                                    <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text fs-10 mt-1">Select one or more employees to run payroll for.</div>
                         </div>
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" id="initiate_start_date" :required="true" />
@@ -1049,6 +1073,29 @@
             }
         }
 
+        // Selection Mode Toggle inside Initiate Run Modal
+        const selectionMode = document.getElementById('initiate_selection_mode');
+        const payGroupDiv = document.getElementById('pay_group_selection_div');
+        const employeeDiv = document.getElementById('employee_selection_div');
+
+        if (selectionMode) {
+            $(selectionMode).on('change', function() {
+                if (this.value === 'individual') {
+                    if (payGroupDiv) payGroupDiv.classList.add('d-none');
+                    if (employeeDiv) {
+                        employeeDiv.classList.remove('d-none');
+                        // Trigger select2 initialization inside modal if not yet done
+                        if (typeof initOdooComponents === 'function') {
+                            initOdooComponents();
+                        }
+                    }
+                } else {
+                    if (payGroupDiv) payGroupDiv.classList.remove('d-none');
+                    if (employeeDiv) employeeDiv.classList.add('d-none');
+                }
+            });
+        }
+
         const payrollMonthInput = document.getElementById('initiate_payroll_month');
         if (payrollMonthInput) {
             const updateDates = function() {
@@ -1147,17 +1194,7 @@
                 }
             });
 
-            if (summary.lop_deduction && parseFloat(summary.lop_deduction) > 0) {
-                const lopRowHtml = `<div class="d-flex justify-content-between align-items-center mb-2" style="font-size:13px;">
-                    <span class="text-secondary">Loss of Pay (${summary.lop_days} days)</span>
-                    <span class="badge bg-soft-secondary text-secondary fs-10 fw-semibold px-2 py-0.5" title="Amount is already spliced/deducted directly from proration-based earnings.">Spliced (-${fmt(summary.lop_deduction)})</span>
-                </div>`;
-                if (!deductionsHtml || deductionsHtml.includes('No deductions defined')) {
-                    deductionsHtml = lopRowHtml;
-                } else {
-                    deductionsHtml += lopRowHtml;
-                }
-            }
+
 
             if (!earningsHtml) {
                 earningsHtml = '<div class="text-center text-muted py-3" style="font-size:12px;">No earnings defined.</div>';

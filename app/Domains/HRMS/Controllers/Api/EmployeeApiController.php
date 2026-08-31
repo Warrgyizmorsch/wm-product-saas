@@ -470,34 +470,6 @@ class EmployeeApiController extends Controller
     // 4b. EMPLOYEE DOCUMENTS APIs
     // ==========================================
 
-    public function requestDocument(Request $request, Employee $employee): JsonResponse
-    {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
-
-        $request->validate([
-            'name'        => 'required|string|max:255',
-            'description' => 'nullable|string|max:500',
-            'has_expiry'  => 'nullable|boolean',
-        ]);
-
-        $tenantId = auth()->user()->tenant_id;
-
-        $document = Document::create([
-            'tenant_id'         => $tenantId,
-            'documentable_id'   => $employee->id,
-            'documentable_type' => Employee::class,
-            'name'              => $request->string('name')->value(),
-            'description'       => $request->input('description'),
-            'status'            => 'requested',
-            'has_expiry'        => $request->boolean('has_expiry'),
-            'requested_by_id'   => auth()->id(),
-        ]);
-
-        return $this->sendSuccess($document, 'Document request created successfully', 201);
-    }
-
     public function uploadDocument(Request $request, Employee $employee): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {

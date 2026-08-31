@@ -63,18 +63,138 @@ class PayrollCalculationService
             $divisor = max(1, $workingDays);
         }
 
-        // 4. Calculate LOP Days (Absences + Penalty Days combined in the run dates range)
-        $absenceDays = Attendance::where('employee_id', $employee->id)
+        // 4. Calculate LOP Days (Absences + Unpaid Leaves + Penalty Days combined in the run dates range)
+        $attendances = Attendance::where('employee_id', $employee->id)
             ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-            ->where('status', 'absent')
-            ->count();
+            ->get()
+            ->keyBy(fn($a) => $a->date instanceof Carbon ? $a->date->format('Y-m-d') : Carbon::parse($a->date)->format('Y-m-d'));
+
+        $holidays = \App\Domains\HRMS\Models\HolidayCalendar::where('tenant_id', $employee->tenant_id)
+            ->whereBetween('holiday_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->get();
+
+        $leaves = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->where(function($query) use ($startDate, $endDate) {
+                $query->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->orWhere(function($sub) use ($startDate, $endDate) {
+                        $sub->where('start_date', '<=', $startDate->format('Y-m-d'))
+                            ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                    });
+            })
+            ->get();
+
+        $unpaidStatusLeaves = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+            ->where('status', 'unpaid')
+            ->where(function($query) use ($startDate, $endDate) {
+                $query->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->orWhere(function($sub) use ($startDate, $endDate) {
+                        $sub->where('start_date', '<=', $startDate->format('Y-m-d'))
+                            ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                    });
+            })
+            ->get();
+
+        $absenceDays = 0.0;
+        $unpaidLeaveDays = 0.0;
+        $today = Carbon::today();
+
+        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+            $dateStr = $date->format('Y-m-d');
+            
+            // Skip future dates to avoid counting upcoming days as absent
+            if ($date->greaterThan($today)) {
+                continue;
+            }
+
+            // 1. Check if there is an approved unpaid status leave on this date
+            $activeUnpaidStatusLeave = $unpaidStatusLeaves->first(function($l) use ($dateStr) {
+                $start = $l->start_date instanceof Carbon ? $l->start_date->format('Y-m-d') : Carbon::parse($l->start_date)->format('Y-m-d');
+                $end = $l->end_date instanceof Carbon ? $l->end_date->format('Y-m-d') : Carbon::parse($l->end_date)->format('Y-m-d');
+                return $dateStr >= $start && $dateStr <= $end;
+            });
+
+            if ($activeUnpaidStatusLeave) {
+                $unpaidLeaveDays += 1.0;
+                continue;
+            }
+
+            // 2. Check if there is an approved paid or unpaid leave request
+            $activeLeave = $leaves->first(function($l) use ($dateStr) {
+                $start = $l->start_date instanceof Carbon ? $l->start_date->format('Y-m-d') : Carbon::parse($l->start_date)->format('Y-m-d');
+                $end = $l->end_date instanceof Carbon ? $l->end_date->format('Y-m-d') : Carbon::parse($l->end_date)->format('Y-m-d');
+                return $dateStr >= $start && $dateStr <= $end;
+            });
+
+            if ($activeLeave) {
+                if ($activeLeave->leaveType && $activeLeave->leaveType->type === 'unpaid') {
+                    $unpaidLeaveDays += 1.0;
+                }
+                continue;
+            }
+
+            // 3. Check if it is a holiday
+            $holiday = $holidays->first(function($h) use ($employee, $dateStr) {
+                $hDate = $h->holiday_date instanceof Carbon ? $h->holiday_date->format('Y-m-d') : Carbon::parse($h->holiday_date)->format('Y-m-d');
+                if ($hDate !== $dateStr) {
+                    return false;
+                }
+                if (is_null($h->company_id) && is_null($h->business_unit_id) && is_null($h->branch_id)) {
+                    return true;
+                }
+                if ($h->company_id == $employee->company_id) {
+                    if (is_null($h->business_unit_id) && is_null($h->branch_id)) {
+                        return true;
+                    }
+                    if ($h->business_unit_id == $employee->business_unit_id) {
+                        if (is_null($h->branch_id) || $h->branch_id == $employee->branch_id) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            });
+
+            if ($holiday) {
+                continue;
+            }
+
+            // 4. Check if it is a week off
+            $dayOfWeek = $date->dayOfWeek;
+            $isWeekOff = false;
+            if (isset($employee->weekly_pattern) && is_array($employee->weekly_pattern)) {
+                if (isset($employee->weekly_pattern[$dayOfWeek]) && $employee->weekly_pattern[$dayOfWeek] === 'off') {
+                    $isWeekOff = true;
+                } elseif ($dayOfWeek === 0 && (!isset($employee->weekly_pattern[$dayOfWeek]) || $employee->weekly_pattern[$dayOfWeek] === 'off')) {
+                    $isWeekOff = true;
+                }
+            } else {
+                if ($dayOfWeek === 0) {
+                    $isWeekOff = true;
+                }
+            }
+
+            if ($isWeekOff) {
+                continue;
+            }
+
+            // 5. It's a working day. Check attendance status
+            $att = $attendances->get($dateStr);
+            if (!$att || $att->status === 'absent') {
+                $absenceDays += 1.0;
+            } elseif ($att->status === 'half_day') {
+                $absenceDays += 0.5;
+            }
+        }
 
         $penaltyDaysCount = EmployeePenalty::where('employee_id', $employee->id)
             ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->where('status', '!=', 'excused')
             ->sum('penalty_amount');
 
-        $lopDays = $absenceDays + $penaltyDaysCount;
+        $lopDays = $absenceDays + $unpaidLeaveDays + $penaltyDaysCount;
 
         // 5. Check for mid-month CTC split/revision
         $revisions = SalaryRevision::where('employee_id', $employee->id)
@@ -192,7 +312,7 @@ class PayrollCalculationService
                 if ($lopFactor > 0 && ($splicingRule === 'proportionate_gross' || in_array($code, ['BASIC', 'HRA']))) {
                     $itemLopDeduction = round($item['base_monthly'] * $lopFactor, 2);
                     $item['deduction'] = $itemLopDeduction;
-                    $item['calculated_value'] = max(0.00, $item['calculated_value'] - $itemLopDeduction);
+                    // LOP is added as a standard deduction under Deductions table instead of being spliced from earnings directly.
                     $itemPaidDays = max(0.0, $divisor - $lopDays);
                     $totalLopDeduction += $itemLopDeduction;
                 }
@@ -201,14 +321,16 @@ class PayrollCalculationService
         }
         unset($item);
 
-        // Append proration days details to component names ONLY if there was Loss of Pay
-        foreach ($computedSalaryItems as $code => &$item) {
-            if ($item['type'] === 'earning' && $lopDays > 0) {
-                $itemPaidDays = $item['paid_days'] ?? $divisor;
-                $item['name'] = $item['name'] . ' (Paid for ' . $itemPaidDays . '/' . $divisor . ' Days)';
-            }
+        if ($totalLopDeduction > 0) {
+            $computedSalaryItems['LOP'] = [
+                'name'             => 'Loss of Pay (' . $lopDays . ' days)',
+                'type'             => 'deduction',
+                'base_monthly'     => $totalLopDeduction,
+                'calculated_value' => $totalLopDeduction,
+                'deduction'        => 0.00,
+                'reversal'         => 0.00,
+            ];
         }
-        unset($item);
 
         // 7. Inject Ad-hoc Variable Components
         $adhocs = EmployeeAdhocComponent::with(['component'])

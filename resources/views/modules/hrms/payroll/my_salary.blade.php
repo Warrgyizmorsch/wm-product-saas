@@ -167,12 +167,7 @@
                                                     @endif
                                                 @endforeach
 
-                                                @if(($calc['lop_deduction'] ?? 0) > 0)
-                                                    <div class="d-flex justify-content-between fs-12 mb-2 align-items-center">
-                                                        <span class="text-muted">Loss of Pay ({{ $calc['lop_days'] }} days)</span>
-                                                        <span class="badge bg-soft-secondary text-secondary fs-10 fw-semibold px-2 py-0.5" title="Amount is already spliced/deducted directly from the basic salary and other proration-based earnings.">Spliced (-₹{{ number_format($calc['lop_deduction'], 2) }})</span>
-                                                    </div>
-                                                @endif
+
 
                                                 @if(($calc['adhoc_deductions'] ?? 0) > 0)
                                                     <div class="d-flex justify-content-between fs-12 mb-2">

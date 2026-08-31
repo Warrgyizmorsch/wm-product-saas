@@ -18,6 +18,8 @@ use App\Domains\HRMS\Controllers\Api\DocumentApiController;
 use App\Domains\HRMS\Controllers\Api\DocumentMasterApiController;
 use App\Domains\HRMS\Controllers\Api\AttendanceApiController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
+use App\Domains\HRMS\Controllers\Api\TravelExpenseApiController;
+use App\Domains\HRMS\Controllers\Api\PayrollRunApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -276,8 +278,6 @@ Route::prefix('api/hrms/employees')
         Route::post('/{employee}/employment-histories', [EmployeeApiController::class, 'storeEmploymentHistory'])->name('employment-histories.store');
         Route::delete('/{employee}/employment-histories/{history}', [EmployeeApiController::class, 'destroyEmploymentHistory'])->name('employment-histories.destroy');
 
-        // Employee Documents APIs
-        Route::post('/{employee}/documents/request', [EmployeeApiController::class, 'requestDocument'])->name('documents.request');
         Route::post('/{employee}/documents/upload', [EmployeeApiController::class, 'uploadDocument'])->name('documents.upload');
         Route::patch('/documents/{document}/approve', [EmployeeApiController::class, 'approveDocument'])->name('documents.approve');
         Route::patch('/documents/{document}/reject', [EmployeeApiController::class, 'rejectDocument'])->name('documents.reject');
@@ -468,4 +468,50 @@ Route::prefix('api/hrms/documents-master')
         Route::delete('/documents/{document}', [DocumentMasterApiController::class, 'destroyDocument'])->name('documents.destroy');
         Route::patch('/documents/{document}/toggle', [DocumentMasterApiController::class, 'toggleStatus'])->name('documents.toggle');
     });
+
+// ==========================================
+// 14. TRAVEL & EXPENSE API ROUTES
+// ==========================================
+Route::prefix('api/hrms/travel-expense')
+    ->middleware(['auth:sanctum', 'throttle:100,1'])
+    ->name('api.hrms.travel-expense.')
+    ->group(function () {
+        Route::get('/', [TravelExpenseApiController::class, 'index'])->name('index');
+        Route::post('/travel/store', [TravelExpenseApiController::class, 'storeTravelRequest'])->name('travel.store');
+        Route::post('/travel/{travelRequest}/approve', [TravelExpenseApiController::class, 'approveTravelRequest'])->name('travel.approve');
+        Route::post('/travel/{travelRequest}/reject', [TravelExpenseApiController::class, 'rejectTravelRequest'])->name('travel.reject');
+        
+        Route::post('/advance/store', [TravelExpenseApiController::class, 'storeCashAdvance'])->name('advance.store');
+        Route::post('/advance/{cashAdvance}/approve', [TravelExpenseApiController::class, 'approveCashAdvance'])->name('advance.approve');
+        Route::post('/advance/{cashAdvance}/disburse', [TravelExpenseApiController::class, 'disburseCashAdvance'])->name('advance.disburse');
+        Route::post('/advance/{cashAdvance}/reject', [TravelExpenseApiController::class, 'rejectCashAdvance'])->name('advance.reject');
+        
+        Route::post('/report/store', [TravelExpenseApiController::class, 'storeExpenseReport'])->name('report.store');
+        Route::post('/report/{expenseReport}/update', [TravelExpenseApiController::class, 'updateExpenseReport'])->name('report.update');
+        Route::post('/report/{expenseReport}/submit', [TravelExpenseApiController::class, 'submitExpenseReport'])->name('report.submit');
+        Route::post('/report/{expenseReport}/approve', [TravelExpenseApiController::class, 'approveExpenseReport'])->name('report.approve');
+        Route::post('/report/{expenseReport}/reject', [TravelExpenseApiController::class, 'rejectExpenseReport'])->name('report.reject');
+        Route::post('/report/{expenseReport}/pay', [TravelExpenseApiController::class, 'payExpenseReport'])->name('report.pay');
+        
+        Route::get('/employee-policy/{employee}', [TravelExpenseApiController::class, 'getEmployeePolicy'])->name('employee-policy');
+    });
+
+// ==========================================
+// 15. PAYROLL API ROUTES
+// ==========================================
+Route::prefix('api/hrms/payroll')
+    ->middleware(['auth:sanctum', 'throttle:100,1'])
+    ->name('api.hrms.payroll.')
+    ->group(function () {
+        Route::get('/', [PayrollRunApiController::class, 'index'])->name('index');
+        Route::post('/store', [PayrollRunApiController::class, 'storeRun'])->name('store');
+        Route::post('/{run}/lock', [PayrollRunApiController::class, 'lockRun'])->name('lock');
+        Route::post('/{run}/resolve', [PayrollRunApiController::class, 'resolvePending'])->name('resolve');
+        Route::post('/{run}/release', [PayrollRunApiController::class, 'releasePayouts'])->name('release');
+        Route::post('/hold/toggle', [PayrollRunApiController::class, 'toggleHold'])->name('hold.toggle');
+        Route::get('/my-salary', [PayrollRunApiController::class, 'mySalary'])->name('my-salary');
+        Route::post('/bulk-adhoc', [PayrollRunApiController::class, 'storeBulkAdhoc'])->name('bulk-adhoc');
+    });
+
+
 

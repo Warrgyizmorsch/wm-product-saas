@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Domains\HRMS\Controllers;
+namespace App\Domains\HRMS\Controllers\Api;
 
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\Designation;
@@ -12,48 +12,68 @@ use App\Domains\HRMS\Models\ExpenseReport;
 use App\Domains\HRMS\Models\ExpenseClaim;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
-class TravelExpenseController extends Controller
+class TravelExpenseApiController extends Controller
 {
-    public function index(Request $request): View
+    /**
+     * Helper for standardized success JSON response.
+     */
+    private function sendSuccess(mixed $data = null, string $message = 'Operation successful', int $statusCode = 200): JsonResponse
     {
-        // Auto-run schema check for approved_budget column if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('travel_requests', 'approved_budget')) {
-            \Illuminate\Support\Facades\Schema::table('travel_requests', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->decimal('approved_budget', 10, 2)->nullable()->after('estimated_budget');
-            });
-        }
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'data'    => $data,
+        ], $statusCode);
+    }
 
-        // Auto-run schema check for approved_amount column if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('cash_advances', 'approved_amount')) {
-            \Illuminate\Support\Facades\Schema::table('cash_advances', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->decimal('approved_amount', 10, 2)->nullable()->after('amount');
-            });
+    /**
+     * Helper for standardized error JSON response.
+     */
+    private function sendError(string $message = 'An error occurred', int $statusCode = 400, mixed $errors = null): JsonResponse
+    {
+        $response = [
+            'success' => false,
+            'message' => $message,
+        ];
+        if ($errors !== null) {
+            $response['errors'] = $errors;
         }
+        return response()->json($response, $statusCode);
+    }
 
-        // Auto-run schema check for approved_amount on expense_reports if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('expense_reports', 'approved_amount')) {
-            \Illuminate\Support\Facades\Schema::table('expense_reports', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->decimal('approved_amount', 10, 2)->nullable()->after('total_amount');
-            });
+    /**
+     * Null-safe authorization check.
+     */
+    private function authorizeUser(): ?JsonResponse
+    {
+        if (!auth()->check()) {
+            $authUser = request()->getUser();
+            $authPass = request()->getPassword();
+            if ($authUser && $authPass) {
+                if (!auth()->attempt(['email' => $authUser, 'password' => $authPass])) {
+                    return $this->sendError('Invalid HTTP Basic Auth credentials.', 401);
+                }
+            } else {
+                return $this->sendError('Unauthenticated access.', 401);
+            }
         }
+        return null;
+    }
 
-        // Auto-run schema check for approved_net_reimbursement on expense_reports if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('expense_reports', 'approved_net_reimbursement')) {
-            \Illuminate\Support\Facades\Schema::table('expense_reports', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->decimal('approved_net_reimbursement', 10, 2)->nullable()->after('net_reimbursement');
-            });
-        }
-
-        // Auto-run schema check for payout_channel on expense_reports if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('expense_reports', 'payout_channel')) {
-            \Illuminate\Support\Facades\Schema::table('expense_reports', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->string('payout_channel')->default('accounting')->after('status');
-            });
+    /**
+     * GET /api/hrms/travel-expense
+     * Dashboard listings of travel requests, cash advances, and reports.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
@@ -67,83 +87,54 @@ class TravelExpenseController extends Controller
                 ->first();
         }
 
+        $isAdmin = ($user->role ?? '') === 'admin';
+
+        // 2. Query lists
+        $travelQuery = TravelRequest::where('tenant_id', $tenantId)->with('employee');
+        $advanceQuery = CashAdvance::where('tenant_id', $tenantId)->with(['employee', 'travelRequest']);
+        $reportQuery = ExpenseReport::where('tenant_id', $tenantId)->with(['employee', 'claims.category']);
+
+        if (!$isAdmin && $employee) {
+            $travelQuery->where('employee_id', $employee->id);
+            $advanceQuery->where('employee_id', $employee->id);
+            $reportQuery->where('employee_id', $employee->id);
+        }
+
+        // Apply travel search & status
+        if ($travelSearch = $request->input('travel_search')) {
+            $travelQuery->where(function($q) use ($travelSearch) {
+                $q->where('purpose', 'like', "%{$travelSearch}%")
+                  ->orWhere('destination', 'like', "%{$travelSearch}%");
+            });
+        }
+        if ($travelStatus = $request->input('travel_status')) {
+            $travelQuery->where('status', $travelStatus);
+        }
+
+        // Apply advance search & status
+        if ($advanceSearch = $request->input('advance_search')) {
+            $advanceQuery->where(function($q) use ($advanceSearch) {
+                $q->where('purpose', 'like', "%{$advanceSearch}%");
+            });
+        }
+        if ($advanceStatus = $request->input('advance_status')) {
+            $advanceQuery->where('status', $advanceStatus);
+        }
+
+        // Apply report search & status
+        if ($reportSearch = $request->input('report_search')) {
+            $reportQuery->where(function($q) use ($reportSearch) {
+                $q->where('title', 'like', "%{$reportSearch}%");
+            });
+        }
+        if ($reportStatus = $request->input('report_status')) {
+            $reportQuery->where('status', $reportStatus);
+        }
+
         // Resolve company currency symbol
         $company = \App\Domains\HRMS\Models\Company::first();
         $currencyCode = $company?->currency ?? 'USD';
         $currencySymbol = self::currencySymbol($currencyCode);
-
-        // 2. Fetch lists for dropdowns
-        $employees = Employee::where('status', true)->orderBy('full_name')->get();
-        $categories = ExpenseCategory::where('tenant_id', $tenantId)->where('status', true)->orderBy('name')->get();
-        $designations = Designation::where('status', true)->orderBy('name')->get();
-
-        // 3. Fetch operational lists (Travel Requests, Advances, Reports)
-        // If user is Admin, show all records; otherwise, show only employee's records
-        $isAdmin = ($user->role ?? '') === 'admin';
-
-        // 3. Query lists with sorting, searching, filtering, and tab-safe pagination
-        $activeTab = $request->input('tab', 'travel');
-        $travelPageName = ($activeTab === 'travel') ? 'page' : 'travel_page';
-        $advancePageName = ($activeTab === 'advance') ? 'page' : 'advance_page';
-        $reportPageName = ($activeTab === 'report') ? 'page' : 'report_page';
-
-        $travelSearch = $request->input('travel_search');
-        $travelStatus = $request->input('travel_status');
-        $travelSort = $request->input('travel_sort', 'newest');
-
-        $travelQuery = TravelRequest::where('tenant_id', $tenantId)->with('employee');
-        if ($travelSearch) {
-            $travelQuery->where(function($q) use ($travelSearch) {
-                $q->where('purpose', 'like', "%{$travelSearch}%")
-                  ->orWhere('destination', 'like', "%{$travelSearch}%")
-                  ->orWhereHas('employee', function($eq) use ($travelSearch) {
-                      $eq->where('full_name', 'like', "%{$travelSearch}%");
-                  });
-            });
-        }
-        if ($travelStatus) {
-            $travelQuery->where('status', $travelStatus);
-        }
-        $travelQuery->orderBy('created_at', $travelSort === 'oldest' ? 'asc' : 'desc');
-        $travelRequests = $travelQuery->paginate(10, ['*'], $travelPageName)->withQueryString();
-
-        $advanceSearch = $request->input('advance_search');
-        $advanceStatus = $request->input('advance_status');
-        $advanceSort = $request->input('advance_sort', 'newest');
-
-        $advanceQuery = CashAdvance::where('tenant_id', $tenantId)->with(['employee', 'travelRequest']);
-        if ($advanceSearch) {
-            $advanceQuery->where(function($q) use ($advanceSearch) {
-                $q->where('purpose', 'like', "%{$advanceSearch}%")
-                  ->orWhereHas('employee', function($eq) use ($advanceSearch) {
-                      $eq->where('full_name', 'like', "%{$advanceSearch}%");
-                  });
-            });
-        }
-        if ($advanceStatus) {
-            $advanceQuery->where('status', $advanceStatus);
-        }
-        $advanceQuery->orderBy('created_at', $advanceSort === 'oldest' ? 'asc' : 'desc');
-        $cashAdvances = $advanceQuery->paginate(10, ['*'], $advancePageName)->withQueryString();
-
-        $reportSearch = $request->input('report_search');
-        $reportStatus = $request->input('report_status');
-        $reportSort = $request->input('report_sort', 'newest');
-
-        $reportQuery = ExpenseReport::where('tenant_id', $tenantId)->with(['employee', 'claims.category']);
-        if ($reportSearch) {
-            $reportQuery->where(function($q) use ($reportSearch) {
-                $q->where('title', 'like', "%{$reportSearch}%")
-                  ->orWhereHas('employee', function($eq) use ($reportSearch) {
-                      $eq->where('full_name', 'like', "%{$reportSearch}%");
-                  });
-            });
-        }
-        if ($reportStatus) {
-            $reportQuery->where('status', $reportStatus);
-        }
-        $reportQuery->orderBy('created_at', $reportSort === 'oldest' ? 'asc' : 'desc');
-        $expenseReports = $reportQuery->paginate(10, ['*'], $reportPageName)->withQueryString();
 
         // Load all approved travel requests and open cash advances to show all options
         $myApprovedTravelRequests = TravelRequest::where('status', 'approved')
@@ -155,36 +146,31 @@ class TravelExpenseController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('modules.hrms.travel-expense.index', compact(
-            'employee',
-            'employees',
-            'categories',
-            'designations',
-            'travelRequests',
-            'cashAdvances',
-            'expenseReports',
-            'myApprovedTravelRequests',
-            'myOpenCashAdvances',
-            'isAdmin',
-            'travelSearch',
-            'travelStatus',
-            'travelSort',
-            'advanceSearch',
-            'advanceStatus',
-            'advanceSort',
-            'reportSearch',
-            'reportStatus',
-            'reportSort',
-            'currencySymbol',
-            'currencyCode'
-        ));
-    }
+        // Metadata dropdowns
+        $categories = ExpenseCategory::where('tenant_id', $tenantId)->where('status', true)->orderBy('name')->get();
+        $designations = Designation::where('status', true)->orderBy('name')->get();
+        $employees = Employee::where('status', true)->orderBy('full_name')->get();
 
-    // ── CURRENCY HELPER ───────────────────────────────────────────────────────
+        return $this->sendSuccess([
+            'employee'                  => $employee,
+            'is_admin'                  => $isAdmin,
+            'currency_code'             => $currencyCode,
+            'currency_symbol'           => $currencySymbol,
+            'my_approved_travel_requests'=> $myApprovedTravelRequests,
+            'my_open_cash_advances'     => $myOpenCashAdvances,
+            'dropdowns'                 => [
+                'employees'          => $employees,
+                'expense_categories' => $categories,
+                'designations'       => $designations,
+            ],
+            'travel_requests'           => $travelQuery->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10), ['*'], 'travel_page'),
+            'cash_advances'             => $advanceQuery->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10), ['*'], 'advance_page'),
+            'expense_reports'           => $reportQuery->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10), ['*'], 'report_page'),
+        ], 'Travel & Expense dashboard data loaded successfully');
+    }
 
     /**
      * Returns the display symbol for a given ISO 4217 currency code.
-     * Falls back to the code itself if not in the map.
      */
     public static function currencySymbol(string $code): string
     {
@@ -203,10 +189,15 @@ class TravelExpenseController extends Controller
         return $map[strtoupper($code)] ?? strtoupper($code);
     }
 
-    // ── TRAVEL REQUESTS ───────────────────────────────────────────────────────
-
-    public function storeTravelRequest(Request $request): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/travel/store
+     */
+    public function storeTravelRequest(Request $request): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -223,8 +214,8 @@ class TravelExpenseController extends Controller
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
 
-        DB::transaction(function () use ($validated, $request) {
-            $travelRequest = TravelRequest::create([
+        $travelRequest = DB::transaction(function () use ($validated, $request) {
+            $tr = TravelRequest::create([
                 'tenant_id'        => $validated['tenant_id'],
                 'employee_id'      => $validated['employee_id'],
                 'purpose'          => $validated['purpose'],
@@ -239,25 +230,28 @@ class TravelExpenseController extends Controller
                 CashAdvance::create([
                     'tenant_id'         => $validated['tenant_id'],
                     'employee_id'       => $validated['employee_id'],
-                    'travel_request_id' => $travelRequest->id,
+                    'travel_request_id' => $tr->id,
                     'amount'            => $validated['advance_amount'],
                     'purpose'           => $validated['purpose'],
                     'status'            => 'pending',
                 ]);
             }
+
+            return $tr;
         });
 
-        $message = 'Travel request submitted successfully.';
-        if ($request->boolean('request_advance')) {
-            $message .= ' Linked cash advance request submitted.';
-        }
-
-        return redirect()->route('hrms.travel-expense.index', ['tab' => 'travel'])
-            ->with('success', $message);
+        return $this->sendSuccess($travelRequest->load('cashAdvances'), 'Travel request submitted successfully.');
     }
 
-    public function approveTravelRequest(Request $request, TravelRequest $travelRequest): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/travel/{travelRequest}/approve
+     */
+    public function approveTravelRequest(Request $request, TravelRequest $travelRequest): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $approvedBudget = $request->input('approved_budget', $travelRequest->estimated_budget);
         
         $travelRequest->update([
@@ -265,19 +259,31 @@ class TravelExpenseController extends Controller
             'approved_budget' => $approvedBudget
         ]);
 
-        return redirect()->back()->with('success', 'Travel request approved with budget: $' . number_format($approvedBudget, 2));
+        return $this->sendSuccess($travelRequest, 'Travel request approved successfully.');
     }
 
-    public function rejectTravelRequest(TravelRequest $travelRequest): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/travel/{travelRequest}/reject
+     */
+    public function rejectTravelRequest(TravelRequest $travelRequest): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $travelRequest->update(['status' => 'rejected']);
-        return redirect()->back()->with('success', 'Travel request rejected.');
+        return $this->sendSuccess($travelRequest, 'Travel request rejected successfully.');
     }
 
-    // ── CASH ADVANCES ─────────────────────────────────────────────────────────
-
-    public function storeCashAdvance(Request $request): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/advance/store
+     */
+    public function storeCashAdvance(Request $request): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -290,14 +296,20 @@ class TravelExpenseController extends Controller
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
 
-        CashAdvance::create($validated);
+        $cashAdvance = CashAdvance::create($validated);
 
-        return redirect()->route('hrms.travel-expense.index', ['tab' => 'advance'])
-            ->with('success', 'Cash advance request submitted.');
+        return $this->sendSuccess($cashAdvance, 'Cash advance request submitted successfully.');
     }
 
-    public function approveCashAdvance(Request $request, CashAdvance $cashAdvance): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/advance/{cashAdvance}/approve
+     */
+    public function approveCashAdvance(Request $request, CashAdvance $cashAdvance): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $approvedAmount = $request->input('approved_amount', $cashAdvance->amount);
         
         $cashAdvance->update([
@@ -305,11 +317,18 @@ class TravelExpenseController extends Controller
             'approved_amount' => $approvedAmount
         ]);
 
-        return redirect()->back()->with('success', 'Cash advance request approved with amount: $' . number_format($approvedAmount, 2));
+        return $this->sendSuccess($cashAdvance, 'Cash advance request approved successfully.');
     }
 
-    public function disburseCashAdvance(CashAdvance $cashAdvance): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/advance/{cashAdvance}/disburse
+     */
+    public function disburseCashAdvance(CashAdvance $cashAdvance): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $cashAdvance->update(['status' => 'disbursed']);
 
@@ -345,23 +364,35 @@ class TravelExpenseController extends Controller
                     'posted_by' => auth()->id(),
                 ]);
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error("Disbursement Journal Posting Failed: " . $e->getMessage());
+                Log::error("Disbursement Journal Posting Failed: " . $e->getMessage());
             }
         }
 
-        return redirect()->back()->with('success', 'Cash advance disbursed successfully.');
+        return $this->sendSuccess($cashAdvance, 'Cash advance disbursed successfully.');
     }
 
-    public function rejectCashAdvance(CashAdvance $cashAdvance): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/advance/{cashAdvance}/reject
+     */
+    public function rejectCashAdvance(CashAdvance $cashAdvance): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $cashAdvance->update(['status' => 'rejected']);
-        return redirect()->back()->with('success', 'Cash advance request rejected.');
+        return $this->sendSuccess($cashAdvance, 'Cash advance request rejected successfully.');
     }
 
-    // ── EXPENSE REPORTS ───────────────────────────────────────────────────────
-
-    public function storeExpenseReport(Request $request): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/report/store
+     */
+    public function storeExpenseReport(Request $request): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -379,7 +410,6 @@ class TravelExpenseController extends Controller
             'claims.*.receipt'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
-        // Resolve active policy for the employee and enforce limits/receipt requirements
         $employee = Employee::find($validated['employee_id']);
         if ($employee) {
             $policy = ExpensePolicy::where('tenant_id', $tenantId)
@@ -407,12 +437,10 @@ class TravelExpenseController extends Controller
                 foreach ($validated['claims'] as $index => $c) {
                     $rule = $policy->rules()->where('expense_category_id', $c['category_id'])->first();
                     if ($rule) {
-                        // 1. Max Limit per Claim Check
                         if ($rule->max_limit_per_claim && floatval($c['amount']) > floatval($rule->max_limit_per_claim)) {
                             $errorMessages["claims.{$index}.amount"] = "This claim amount exceeds the policy limit of ₹" . number_format($rule->max_limit_per_claim, 2) . " for category " . $rule->category->name . ".";
                         }
                         
-                        // 2. Receipt Requirement Check
                         $needsReceipt = false;
                         if ($rule->receipt_required) {
                             $needsReceipt = true;
@@ -428,19 +456,17 @@ class TravelExpenseController extends Controller
                 }
                 
                 if (!empty($errorMessages)) {
-                    return redirect()->back()->withInput()->withErrors($errorMessages);
+                    return $this->sendError('Expense policy validation failed.', 422, $errorMessages);
                 }
             }
         }
 
-        DB::transaction(function () use ($validated, $request, $tenantId) {
-            // 1. Calculate totals
+        $report = DB::transaction(function () use ($validated, $request, $tenantId) {
             $totalAmount = 0.00;
             foreach ($validated['claims'] as $c) {
                 $totalAmount += floatval($c['amount']);
             }
 
-            // Calculate advance adjustment
             $advanceAdjusted = 0.00;
             $advance = null;
             if (!empty($validated['cash_advance_id'])) {
@@ -453,8 +479,7 @@ class TravelExpenseController extends Controller
 
             $netReimbursement = max($totalAmount - $advanceAdjusted, 0.00);
 
-            // 2. Create report record
-            $report = ExpenseReport::create([
+            $rep = ExpenseReport::create([
                 'tenant_id'         => $tenantId,
                 'employee_id'       => $validated['employee_id'],
                 'travel_request_id' => $validated['travel_request_id'] ?: null,
@@ -465,12 +490,10 @@ class TravelExpenseController extends Controller
                 'status'            => 'draft',
             ]);
 
-            // 3. Link cash advance to this report if applicable
             if ($advance) {
-                $advance->update(['expense_report_id' => $report->id]);
+                $advance->update(['expense_report_id' => $rep->id]);
             }
 
-            // 4. Create individual claim lines
             foreach ($validated['claims'] as $index => $c) {
                 $receiptPath = null;
                 $fileKey = "claims.{$index}.receipt";
@@ -479,7 +502,7 @@ class TravelExpenseController extends Controller
                 }
 
                 ExpenseClaim::create([
-                    'expense_report_id'   => $report->id,
+                    'expense_report_id'   => $rep->id,
                     'expense_category_id' => $c['category_id'],
                     'expense_date'        => $c['date'],
                     'amount'              => $c['amount'],
@@ -489,19 +512,26 @@ class TravelExpenseController extends Controller
                     'receipt_path'        => $receiptPath,
                 ]);
             }
+
+            return $rep;
         });
 
-        return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
-            ->with('success', 'Expense report saved to drafts.');
+        return $this->sendSuccess($report->load('claims'), 'Expense report saved to drafts.');
     }
 
-    public function updateExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/report/{expenseReport}/update
+     */
+    public function updateExpenseReport(Request $request, ExpenseReport $expenseReport): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
-        // Enforce update only in draft state
         if ($expenseReport->status !== 'draft') {
-            return redirect()->back()->with('error', 'Only draft expense reports can be edited.');
+            return $this->sendError('Only draft expense reports can be edited.', 400);
         }
 
         $validated = $request->validate([
@@ -520,7 +550,6 @@ class TravelExpenseController extends Controller
             'claims.*.existing_receipt' => 'nullable|string',
         ]);
 
-        // Enforce policies
         $employee = Employee::find($validated['employee_id']);
         if ($employee) {
             $policy = ExpensePolicy::where('tenant_id', $tenantId)
@@ -560,7 +589,6 @@ class TravelExpenseController extends Controller
                         }
                         
                         $fileKey = "claims.{$index}.receipt";
-                        // If needs receipt and neither new file uploaded nor existing receipt path present
                         if ($needsReceipt && !$request->hasFile($fileKey) && empty($c['existing_receipt'])) {
                             $errorMessages[$fileKey] = "A receipt attachment is required for " . $rule->category->name . " claims.";
                         }
@@ -568,19 +596,17 @@ class TravelExpenseController extends Controller
                 }
                 
                 if (!empty($errorMessages)) {
-                    return redirect()->back()->withInput()->withErrors($errorMessages);
+                    return $this->sendError('Expense policy validation failed.', 422, $errorMessages);
                 }
             }
         }
 
         DB::transaction(function () use ($validated, $request, $tenantId, $expenseReport) {
-            // 1. Calculate totals
             $totalAmount = 0.00;
             foreach ($validated['claims'] as $c) {
                 $totalAmount += floatval($c['amount']);
             }
 
-            // Calculate advance adjustment
             $advanceAdjusted = 0.00;
             $advance = null;
             if (!empty($validated['cash_advance_id'])) {
@@ -593,7 +619,6 @@ class TravelExpenseController extends Controller
 
             $netReimbursement = max($totalAmount - $advanceAdjusted, 0.00);
 
-            // Update main report
             $expenseReport->update([
                 'travel_request_id' => $validated['travel_request_id'] ?: null,
                 'title'             => $validated['title'],
@@ -602,18 +627,14 @@ class TravelExpenseController extends Controller
                 'net_reimbursement' => $netReimbursement,
             ]);
 
-            // Unlink any previously linked Cash Advance
             CashAdvance::where('expense_report_id', $expenseReport->id)->update(['expense_report_id' => null]);
 
-            // Link new Cash Advance if applicable
             if ($advance) {
                 $advance->update(['expense_report_id' => $expenseReport->id]);
             }
 
-            // Delete old claim lines
             $expenseReport->claims()->delete();
 
-            // Create new claim lines
             foreach ($validated['claims'] as $index => $c) {
                 $receiptPath = $c['existing_receipt'] ?? null;
                 $fileKey = "claims.{$index}.receipt";
@@ -634,119 +655,88 @@ class TravelExpenseController extends Controller
             }
         });
 
-        return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
-            ->with('success', 'Expense report updated successfully.');
+        return $this->sendSuccess($expenseReport->fresh()->load('claims'), 'Expense report updated successfully.');
     }
 
-    public function submitExpenseReport(ExpenseReport $expenseReport): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/report/{expenseReport}/submit
+     */
+    public function submitExpenseReport(ExpenseReport $expenseReport): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $expenseReport->update(['status' => 'submitted']);
-        return redirect()->back()->with('success', 'Expense report submitted for approval.');
+        return $this->sendSuccess($expenseReport, 'Expense report submitted for approval.');
     }
 
-    public function approveExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/report/{expenseReport}/approve
+     */
+    public function approveExpenseReport(Request $request, ExpenseReport $expenseReport): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $approvedAmount = $request->input('approved_amount', $expenseReport->total_amount);
-        $approvedAmount = floatval($approvedAmount);
+        $approvedAmount = floatval($request->input('approved_amount', $expenseReport->total_amount));
 
         $advance = $expenseReport->cashAdvance;
         $totalAdvance = $advance ? floatval($advance->approved_amount ?? $advance->amount) : 0.00;
 
-        // Capped offset value inside accounting
         $adjusted = min($totalAdvance, $approvedAmount);
-        // Net reimbursement payout due to employee (if expense exceeds advance)
         $approvedNet = max($approvedAmount - $totalAdvance, 0.00);
 
         $payoutChannel = $request->input('payout_channel', 'accounting');
 
-        $expenseReport->update([
-            'status' => 'approved',
-            'approved_amount' => $approvedAmount,
-            'approved_net_reimbursement' => $approvedNet,
-            'advance_adjusted' => $adjusted,
-            'payout_channel' => $payoutChannel,
-        ]);
+        DB::transaction(function () use ($expenseReport, $tenantId, $approvedAmount, $approvedNet, $adjusted, $payoutChannel, $advance) {
+            $expenseReport->update([
+                'status' => 'approved',
+                'approved_amount' => $approvedAmount,
+                'approved_net_reimbursement' => $approvedNet,
+                'advance_adjusted' => $adjusted,
+                'payout_channel' => $payoutChannel,
+            ]);
 
-        if ($payoutChannel === 'accounting') {
-            // Do not post to accounting on approval. Accounting entry is posted only on actual payout.
-        } else {
-            // Payout channel is Payroll:
-            // 1. Post the spent offset to Accounting (DR Expense 5900, CR Advances 1400)
-            $lines = [];
-            $spentAmount = min($adjusted, $approvedAmount);
-            if ($spentAmount > 0) {
-                $expenseAccount = $this->getOrCreateAccount($tenantId, '5900', 'Other Expense', 'expense', 'debit', 'operating_expense');
-                $advancesAccount = $this->getOrCreateAccount($tenantId, '1400', 'Loans & Advances', 'asset', 'debit', 'loans_advances');
-                $lines[] = [
-                    'chart_of_account_id' => $expenseAccount->id,
-                    'debit' => $spentAmount,
-                    'credit' => 0.00,
-                    'description' => "Expense Claim (Payroll offset): " . $expenseReport->title
-                ];
-                $lines[] = [
-                    'chart_of_account_id' => $advancesAccount->id,
-                    'debit' => 0.00,
-                    'credit' => $spentAmount,
-                    'description' => "Advance offset for Claim: " . $expenseReport->title
-                ];
+            if ($payoutChannel === 'accounting') {
+                // Do not post to accounting on approval. Accounting entry is posted only on actual payout.
+            } else {
+                $employee = $expenseReport->employee;
+                if ($employee) {
+                    $currentMonth = Carbon::now()->format('Y-m');
 
-                try {
-                    $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                    $journalService->post($lines, [
-                        'tenant_id' => $tenantId,
-                        'journal_date' => now(),
-                        'source' => 'expense',
-                        'reference_type' => 'ExpenseReport',
-                        'reference_id' => $expenseReport->id,
-                        'memo' => "Approved Expense Claim (Payroll offset): " . $expenseReport->title,
-                        'posted_by' => auth()->id(),
-                    ]);
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error("Payroll Claim Journal Posting Failed: " . $e->getMessage());
-                }
-            }
+                    if ($adjusted < $totalAdvance) {
+                        $surplus = $totalAdvance - $adjusted;
+                        if ($surplus > 0) {
+                            $comp = $this->getOrCreateRecoveryComponent($employee->company_id, $employee->pay_group_id);
+                            if ($comp && $employee->salary_structure_id) {
+                                \App\Domains\HRMS\Models\SalaryStructureItem::firstOrCreate([
+                                    'salary_structure_id' => $employee->salary_structure_id,
+                                    'salary_component_id' => $comp->id,
+                                ], [
+                                    'calculation_type' => 'flat',
+                                    'value' => 0.00,
+                                    'sort_order' => 99,
+                                ]);
+                            }
 
-            // 2. Insert adhoc component entry into payroll
-            $employee = $expenseReport->employee;
-            if ($employee) {
-                $companyId = $employee->company_id ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
-                $payGroupId = $employee->pay_group_id;
-                $currentMonth = now()->format('Y-m');
-
-                if ($approvedAmount < $totalAdvance) {
-                    // Surplus refund deduction
-                    $surplus = $totalAdvance - $approvedAmount;
-                    $comp = $this->getOrCreateRecoveryComponent($companyId, $payGroupId);
-                    if ($comp) {
-                        // Automatically link component to the employee's salary structure if not present
-                        if ($employee->salary_structure_id) {
-                            \App\Domains\HRMS\Models\SalaryStructureItem::firstOrCreate([
-                                'salary_structure_id' => $employee->salary_structure_id,
+                            \App\Domains\HRMS\Models\EmployeeAdhocComponent::create([
+                                'employee_id' => $employee->id,
                                 'salary_component_id' => $comp->id,
-                            ], [
-                                'calculation_type' => 'flat',
-                                'value' => 0.00,
-                                'sort_order' => 99,
+                                'amount' => $surplus,
+                                'payroll_month' => $currentMonth,
+                                'status' => 'pending',
+                                'remarks' => "Surplus Recovery for Travel Advance: " . $expenseReport->title
                             ]);
                         }
-
-                        \App\Domains\HRMS\Models\EmployeeAdhocComponent::create([
-                            'employee_id' => $employee->id,
-                            'salary_component_id' => $comp->id,
-                            'amount' => $surplus,
-                            'payroll_month' => $currentMonth,
-                            'status' => 'pending',
-                            'remarks' => "Deduction for T&E Advance Surplus - Claim: " . $expenseReport->title
-                        ]);
                     }
-                } elseif ($approvedAmount > $totalAdvance) {
-                    // Net reimbursement earning
-                    $reimbursement = $approvedAmount - $totalAdvance;
-                    $comp = $this->getOrCreateReimbursementComponent($companyId, $payGroupId);
-                    if ($comp) {
-                        // Automatically link component to the employee's salary structure if not present
-                        if ($employee->salary_structure_id) {
+
+                    $reimbursement = $approvedNet;
+                    if ($reimbursement > 0) {
+                        $comp = $this->getOrCreateReimbursementComponent($employee->company_id, $employee->pay_group_id);
+                        if ($comp && $employee->salary_structure_id) {
                             \App\Domains\HRMS\Models\SalaryStructureItem::firstOrCreate([
                                 'salary_structure_id' => $employee->salary_structure_id,
                                 'salary_component_id' => $comp->id,
@@ -768,19 +758,33 @@ class TravelExpenseController extends Controller
                     }
                 }
             }
+        });
+
+        return $this->sendSuccess($expenseReport->fresh(), 'Expense report approved successfully.');
+    }
+
+    /**
+     * POST /api/hrms/travel-expense/report/{expenseReport}/reject
+     */
+    public function rejectExpenseReport(ExpenseReport $expenseReport): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
         }
 
-        return redirect()->back()->with('success', 'Expense report approved with approved budget: $' . number_format($approvedAmount, 2));
-    }
-
-    public function rejectExpenseReport(ExpenseReport $expenseReport): RedirectResponse
-    {
         $expenseReport->update(['status' => 'rejected']);
-        return redirect()->back()->with('success', 'Expense report rejected.');
+        return $this->sendSuccess($expenseReport, 'Expense report rejected successfully.');
     }
 
-    public function payExpenseReport(ExpenseReport $expenseReport): RedirectResponse
+    /**
+     * POST /api/hrms/travel-expense/report/{expenseReport}/pay
+     */
+    public function payExpenseReport(ExpenseReport $expenseReport): JsonResponse
     {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         DB::transaction(function () use ($expenseReport, $tenantId) {
@@ -854,7 +858,7 @@ class TravelExpenseController extends Controller
                             'posted_by' => auth()->id(),
                         ]);
                     } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error("Payout Journal Posting Failed: " . $e->getMessage());
+                        Log::error("Payout Journal Posting Failed: " . $e->getMessage());
                     }
                 }
             }
@@ -865,56 +869,18 @@ class TravelExpenseController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', 'Expense report marked as paid and advance settled.');
+        return $this->sendSuccess($expenseReport->fresh(), 'Expense report marked as paid and advance settled successfully.');
     }
 
-    // ── EXPENSE POLICIES (MANAGED INSIDE PENALIZATION POLICY) ──────────────────
-
-    public function saveExpensePolicy(Request $request): RedirectResponse
+    /**
+     * GET /api/hrms/travel-expense/employee-policy/{employee}
+     */
+    public function getEmployeePolicy(Employee $employee): JsonResponse
     {
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
 
-        $validated = $request->validate([
-            'expense_category_id'        => 'required|exists:expense_categories,id',
-            'name'                       => 'required|string|max:255',
-            'company_id'                 => 'nullable|exists:companies,id',
-            'business_unit_id'           => 'nullable|exists:business_units,id',
-            'branch_id'                  => 'nullable|exists:branches,id',
-            'designation_id'             => 'nullable|exists:designations,id',
-            'max_limit_per_claim'        => 'nullable|numeric|min:0',
-            'max_monthly_limit'          => 'nullable|numeric|min:0',
-            'receipt_required_threshold' => 'nullable|numeric|min:0',
-            'status'                     => 'nullable|boolean',
-        ]);
-
-        $validated['tenant_id'] = $tenantId;
-        $validated['status']    = true; // Active by default; status comes from the top Status dropdown
-
-        ExpensePolicy::updateOrCreate(
-            [
-                'tenant_id'           => $tenantId,
-                'expense_category_id' => $validated['expense_category_id'],
-                'designation_id'      => $validated['designation_id'] ?: null,
-                'company_id'          => $validated['company_id'] ?: null,
-                'business_unit_id'    => $validated['business_unit_id'] ?: null,
-                'branch_id'           => $validated['branch_id'] ?: null,
-            ],
-            $validated
-        );
-
-        return redirect()->route('hrms.penalization-policy.index', ['policy_type' => 'expense_rules'])
-            ->with('success', 'Expense policy configuration saved successfully.');
-    }
-
-    public function deleteExpensePolicy(ExpensePolicy $expensePolicy): RedirectResponse
-    {
-        $expensePolicy->delete();
-        return redirect()->route('hrms.penalization-policy.index', ['tab' => 'expense_rules'])
-            ->with('success', 'Expense policy deleted successfully.');
-    }
-
-    public function getEmployeePolicy(Employee $employee): \Illuminate\Http\JsonResponse
-    {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         
         $policy = ExpensePolicy::where('tenant_id', $tenantId)
@@ -949,20 +915,17 @@ class TravelExpenseController extends Controller
             }
         }
 
-        return response()->json([
-            'success' => true,
+        return $this->sendSuccess([
             'policy_name' => $policy ? $policy->name : null,
-            'rules' => $rules
-        ]);
+            'rules'       => $rules
+        ], 'Employee active expense policy retrieved.');
     }
 
     /**
      * Get or create a chart of account record for integration.
-     * Prevents system crashes if seeded defaults are missing.
      */
     private function getOrCreateAccount(int $tenantId, string $code, string $name, string $type, string $normalBalance, ?string $subtype = null)
     {
-        // Try to fetch by exact code and tenant first (pure query, NO inserts)
         $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('code', $code)
@@ -978,7 +941,6 @@ class TravelExpenseController extends Controller
             ->unique()
             ->toArray();
 
-        // If not found, try to find any account of the same type for this tenant (excluding headers)
         $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('type', $type)
@@ -989,7 +951,6 @@ class TravelExpenseController extends Controller
             return $account;
         }
 
-        // Ultimate fallback: return the first account available (excluding headers)
         return \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
             ->whereNotIn('id', $groupAccountIds)
             ->first();

@@ -308,12 +308,7 @@
                                 </tr>
                             @endif
 
-                            @if(($calc['lop_deduction'] ?? 0) > 0)
-                                <tr>
-                                    <td>Loss of Pay Deduction</td>
-                                    <td class="amount-col" style="color: #64748b; font-style: italic;">Spliced</td>
-                                </tr>
-                            @endif
+
 
                             <!-- Fill empty rows to align heights -->
                             @for ($k = 0; $k < max(0, 5 - count($details)); $k++)

@@ -11,6 +11,7 @@ class PayrollRun extends BaseModel
         'tenant_id',
         'company_id',
         'pay_group_id',
+        'employee_ids',
         'payroll_month',
         'start_date',
         'end_date',
@@ -21,6 +22,7 @@ class PayrollRun extends BaseModel
     protected $casts = [
         'start_date' => 'date',
         'end_date'   => 'date',
+        'employee_ids' => 'array',
     ];
 
     public function company()

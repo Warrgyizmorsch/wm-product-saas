@@ -219,11 +219,33 @@ class AttendanceCorrectionController extends Controller
 
             if ($lockedRunExists) {
                 // Fetch employee's monthly basic salary to compute daily wage LOP reversal
-                $salary = $correction->employee->current_salary; // Annual CTC
-                $monthlyBasic = ($salary * 0.50) / 12; // Standard assumption: Basic is 50% of CTC
+                $employee = $correction->employee;
+                $salary = $employee->current_salary; // Annual CTC
+                
+                // Get active structure mapping
+                $baseStructure = \App\Domains\HRMS\Models\SalaryStructure::where('pay_group_id', $employee->pay_group_id)
+                    ->where('min_ctc', '<=', $salary)
+                    ->where('max_ctc', '>=', $salary)
+                    ->where('status', true)
+                    ->first();
+                if (!$baseStructure) {
+                    $baseStructure = $employee->salaryStructure;
+                }
+
+                $monthlyBasic = ($salary * 0.50) / 12; // Fallback
+                if ($baseStructure && $baseStructure->items) {
+                    $basicItem = $baseStructure->items->filter(fn($i) => $i->component->code === 'BASIC')->first();
+                    if ($basicItem) {
+                        if ($basicItem->calculation_type === 'percentage_of_ctc') {
+                            $monthlyBasic = (($salary * $basicItem->value) / 100) / 12;
+                        } elseif ($basicItem->calculation_type === 'fixed') {
+                            $monthlyBasic = $basicItem->value;
+                        }
+                    }
+                }
                 
                 // Read proration rules
-                $rules = $correction->employee->payGroup ? ($correction->employee->payGroup->payroll_rules ?? []) : [];
+                $rules = $employee->payGroup ? ($employee->payGroup->payroll_rules ?? []) : [];
                 $prorationRule = $rules['proration_rule'] ?? 'calendar_days';
                 
                 $divisor = $correction->date->daysInMonth;
@@ -235,6 +257,7 @@ class AttendanceCorrectionController extends Controller
 
                 // Create the retro adjustment record
                 \App\Domains\HRMS\Models\PayrollRetroactiveAdjustment::create([
+                    'tenant_id'            => $employee->tenant_id,
                     'employee_id'          => $correction->employee_id,
                     'target_payroll_month' => $payrollMonth,
                     'reversal_days'        => 1,
