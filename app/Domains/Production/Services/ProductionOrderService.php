@@ -392,7 +392,7 @@ class ProductionOrderService
                 'triggered_by' => $userId,
             ]);
         } catch (\Throwable $e) {
-            dd("RELEASE_EXCEPTION", $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
+            \Illuminate\Support\Facades\Log::error('Production order release event failed: ' . $e->getMessage());
         }
     }
 

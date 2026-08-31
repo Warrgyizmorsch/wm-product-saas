@@ -167,8 +167,8 @@ class TrendAnalysisService
                 ->where('tenant_id', $tenantId)
                 ->whereBetween('start_time', [$dayStart, $dayEnd])
                 ->when(!empty($filters['machine_id']), fn($q) => $q->where('machine_id', $filters['machine_id']))
-                ->when(!empty($filters['work_center_id']), function($q) use ($filters) {
-                    $q->whereIn('machine_id', \Illuminate\Support\Facades\DB::table('production_machines')->where('work_center_id', $filters['work_center_id'])->pluck('id'));
+                ->when(!empty($filters['work_center_id']), function($q) use ($filters, $tenantId) {
+                    $q->whereIn('machine_id', \Illuminate\Support\Facades\DB::table('production_machines')->where('tenant_id', $tenantId)->where('work_center_id', $filters['work_center_id'])->pluck('id'));
                 })
                 ->sum('duration_minutes');
 
