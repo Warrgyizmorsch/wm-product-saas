@@ -20,6 +20,9 @@ class Invoice extends BaseModel
         'status',
         'subtotal',
         'tax_amount',
+        'tax_type',
+        'discount_type',
+        'order_tax_rate',
         'gst_type',
         'cgst_amount',
         'sgst_amount',
@@ -31,6 +34,8 @@ class Invoice extends BaseModel
         'notes',
         'freight_terms',
         'freight_amount',
+        'freight_tax_rate',
+        'adjustment',
     ];
 
     protected $casts = [
@@ -38,8 +43,10 @@ class Invoice extends BaseModel
         'due_date'       => 'date',
         'subtotal'       => 'decimal:2',
         'tax_amount'     => 'decimal:2',
+        'order_tax_rate' => 'decimal:2',
         'discount_amount'=> 'decimal:2',
         'freight_amount' => 'decimal:2',
+        'adjustment'     => 'decimal:2',
         'total_amount'   => 'decimal:2',
         'amount_paid'    => 'decimal:2',
         'balance_due'    => 'decimal:2',

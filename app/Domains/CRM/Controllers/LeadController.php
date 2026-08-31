@@ -42,6 +42,24 @@ class LeadController extends Controller
 
         $leads = $this->leadRepo->getPaginatedLeads($filters, 10);
         $this->duplicateService->annotateDuplicates($leads->items(), $tenantId);
+
+        if ($request->input('duplicates_only') === '1') {
+            $filtered = array_values(array_filter($leads->items(), function ($lead) {
+                return !empty($lead->is_duplicate) || !empty($lead->is_original);
+            }));
+
+            usort($filtered, function ($a, $b) {
+                $groupA = $a->is_duplicate ? $a->duplicate_of_id : $a->id;
+                $groupB = $b->is_duplicate ? $b->duplicate_of_id : $b->id;
+                if ($groupA === $groupB) {
+                    return $a->id <=> $b->id;
+                }
+                return $groupA <=> $groupB;
+            });
+
+            $leads->setCollection(collect($filtered));
+        }
+
         $quotations = $this->quotationService->latest();
         $users = \App\Models\User::orderBy('name')->get();
 
@@ -59,10 +77,10 @@ class LeadController extends Controller
         $allTenantLeads = Lead::query()
             ->where('tenant_id', $tenantId)
             ->whereNull('deleted_at')
-            ->select(['id', 'email', 'phone'])
+            ->select(['id', 'lead_number', 'gstin', 'email', 'company_email', 'phone', 'company_phone'])
             ->get();
         $this->duplicateService->annotateDuplicates($allTenantLeads, $tenantId);
-        $duplicatesCount = $allTenantLeads->where('is_duplicate', true)->count();
+        $duplicatesCount = $allTenantLeads->filter(fn($l) => $l->is_duplicate || $l->is_original)->count();
 
         return view('modules.crm.leads.index', compact('leads', 'quotations', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users', 'leadStatuses'));
     }
