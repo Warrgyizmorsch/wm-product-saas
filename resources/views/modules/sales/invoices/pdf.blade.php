@@ -504,40 +504,73 @@
             <td style="width:3%; vertical-align:top;"></td>
             <!-- Right: Subtotal Calculations -->
             <td style="width:45%; vertical-align:top;">
+                @php
+                    $grossSubtotal = 0;
+                    $totalItemDiscount = 0;
+                    foreach($invoice->items as $it) {
+                        $grossSubtotal += ($it->quantity * $it->unit_price);
+                        $totalItemDiscount += $it->discount;
+                    }
+                    $effectiveDiscount = ($invoice->discount_type === 'order_wise') ? (float)$invoice->discount_amount : $totalItemDiscount;
+                    $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
+                    $gstTaxAmount = (float)$invoice->tax_amount;
+                    $itemsTotalInclGst = $taxableBase + $gstTaxAmount;
+                    $freightAmount = ($invoice->freight_terms === 'To Be Billed') ? (float)($invoice->freight_amount ?: 0) : 0;
+                    $adjustment = (float)($invoice->adjustment ?? 0);
+                    $grandTotal = (float)$invoice->total_amount;
+                    $gstType = $invoice->gst_type ?? 'cgst_sgst';
+                @endphp
                 <table class="summary-table" cellpadding="0" cellspacing="0">
                     <tr>
-                        <td>Sub Total:</td>
-                        <td class="amount">&#8377;{{ number_format($invoice->subtotal, 2) }}</td>
+                        <td>Subtotal (Excl. Tax):</td>
+                        <td class="amount">&#8377;{{ number_format($grossSubtotal, 2) }}</td>
                     </tr>
-                    @if($invoice->discount_amount > 0)
+                    @if($invoice->discount_type !== 'without_discount' && $effectiveDiscount > 0)
                         <tr>
-                            <td>Discount:</td>
-                            <td class="amount" style="color:#dc2626;">-&#8377;{{ number_format($invoice->discount_amount, 2) }}</td>
+                            <td style="color:#dc2626;">Less: Item Discounts:</td>
+                            <td class="amount" style="color:#dc2626;">-&#8377;{{ number_format($effectiveDiscount, 2) }}</td>
                         </tr>
                     @endif
-                    @if($invoice->gst_type === 'igst' || $invoice->igst_amount > 0)
+                    <tr>
+                        <td>Items Taxable Value:</td>
+                        <td class="amount">&#8377;{{ number_format($taxableBase, 2) }}</td>
+                    </tr>
+                    @if($invoice->tax_type !== 'without_tax' && $gstTaxAmount > 0)
+                        @if($gstType === 'cgst_sgst')
+                            <tr>
+                                <td style="color:#64748b; font-size:10px;">Add: CGST (Central Tax):</td>
+                                <td class="amount" style="color:#64748b; font-size:10px;">+&#8377;{{ number_format($gstTaxAmount / 2, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td style="color:#64748b; font-size:10px;">Add: SGST (State Tax):</td>
+                                <td class="amount" style="color:#64748b; font-size:10px;">+&#8377;{{ number_format($gstTaxAmount / 2, 2) }}</td>
+                            </tr>
+                        @else
+                            <tr>
+                                <td style="color:#64748b; font-size:10px;">Add: IGST (Integrated Tax):</td>
+                                <td class="amount" style="color:#64748b; font-size:10px;">+&#8377;{{ number_format($gstTaxAmount, 2) }}</td>
+                            </tr>
+                        @endif
+                    @endif
+                    <tr style="background-color:#f1f5f9; font-weight:bold;">
+                        <td>Billed Items Total (Incl. GST):</td>
+                        <td class="amount">&#8377;{{ number_format($itemsTotalInclGst, 2) }}</td>
+                    </tr>
+                    @if($freightAmount > 0)
                         <tr>
-                            <td>IGST Amount:</td>
-                            <td class="amount">&#8377;{{ number_format($invoice->igst_amount > 0 ? $invoice->igst_amount : $invoice->tax_amount, 2) }}</td>
+                            <td>Freight Charges:</td>
+                            <td class="amount" style="color:#1e40af;">&#8377;{{ number_format($freightAmount, 2) }}</td>
                         </tr>
-                    @elseif($invoice->gst_type === 'cgst_sgst' || ($invoice->cgst_amount > 0 || $invoice->sgst_amount > 0))
+                    @endif
+                    @if($adjustment != 0)
                         <tr>
-                            <td>CGST Amount:</td>
-                            <td class="amount">&#8377;{{ number_format($invoice->cgst_amount > 0 ? $invoice->cgst_amount : round($invoice->tax_amount / 2, 2), 2) }}</td>
-                        </tr>
-                        <tr>
-                            <td>SGST Amount:</td>
-                            <td class="amount">&#8377;{{ number_format($invoice->sgst_amount > 0 ? $invoice->sgst_amount : round($invoice->tax_amount / 2, 2), 2) }}</td>
-                        </tr>
-                    @else
-                        <tr>
-                            <td>Tax Amount:</td>
-                            <td class="amount">&#8377;{{ number_format($invoice->tax_amount, 2) }}</td>
+                            <td>Adjustment:</td>
+                            <td class="amount">&#8377;{{ number_format($adjustment, 2) }}</td>
                         </tr>
                     @endif
                     <tr class="grand-total">
-                        <td>Total Amount:</td>
-                        <td class="amount" style="color:#1e40af; font-size:13px;">&#8377;{{ number_format($invoice->total_amount, 2) }}</td>
+                        <td style="font-weight:bold; color:#1e40af;">Grand Total:</td>
+                        <td class="amount" style="color:#1e40af; font-size:13px; font-weight:bold;">&#8377;{{ number_format($grandTotal, 2) }}</td>
                     </tr>
                     @if($adjustedAmount > 0 || $invoice->amount_paid > 0)
                         <tr>

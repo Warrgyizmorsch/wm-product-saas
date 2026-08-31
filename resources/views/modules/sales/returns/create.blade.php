@@ -154,16 +154,29 @@
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     @php
         $salesOrdersData = $salesOrders->map(function($so) {
+            $soSubtotal = (float)($so->subtotal ?: 1);
+            $soDiscountType = $so->discount_type ?? 'item_wise';
+            $soOrderDiscount = ($soDiscountType === 'order_wise') ? (float)($so->discount ?: 0) : 0;
             return [
                 'id' => $so->id,
                 'sales_order_number' => $so->sales_order_number,
                 'customer_name' => $so->customer?->name,
-                'items' => $so->items->map(function($item) {
+                'items' => $so->items->map(function($item) use ($soSubtotal, $soOrderDiscount, $soDiscountType) {
+                    $qty = (float)$item->quantity;
+                    $grossPrice = (float)$item->unit_price;
+                    $lineGrossTotal = $qty * $grossPrice;
+                    $totalItemDisc = 0;
+                    if ($soDiscountType === 'order_wise') {
+                        $totalItemDisc = ($soSubtotal > 0 && $soOrderDiscount > 0) ? ($lineGrossTotal / $soSubtotal) * $soOrderDiscount : 0;
+                    } else {
+                        $totalItemDisc = (float)($item->discount ?? 0);
+                    }
+                    $netPrice = ($qty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $qty, 2) : $grossPrice;
                     return [
                         'product_id' => $item->product_id,
                         'item_name' => $item->item_name ?? $item->product?->name ?? 'Product Item',
-                        'quantity' => $item->quantity,
-                        'unit_price' => $item->unit_price,
+                        'quantity' => $qty,
+                        'unit_price' => $netPrice,
                         'warehouse_id' => $item->warehouse_id,
                         'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
                         'track_serial_number' => (bool)($item->product?->track_serial_number),
@@ -173,6 +186,9 @@
         })->values()->toArray();
 
         $invoicesData = $invoices->map(function($inv) {
+            $invSubtotal = (float)($inv->subtotal ?: 1);
+            $invDiscountType = $inv->discount_type ?? 'item_wise';
+            $invOrderDiscount = ($invDiscountType === 'order_wise') ? (float)($inv->discount_amount ?: 0) : 0;
             return [
                 'id' => $inv->id,
                 'invoice_number' => $inv->invoice_number,
@@ -180,12 +196,22 @@
                 'invoice_date' => $inv->invoice_date ? $inv->invoice_date->format('d/m/Y') : '',
                 'total_amount' => (float)$inv->total_amount,
                 'gst_type' => $inv->gst_type ?? ((float)$inv->igst_amount > 0 ? 'IGST' : 'CGST + SGST'),
-                'items' => $inv->items->map(function($item) {
+                'items' => $inv->items->map(function($item) use ($invSubtotal, $invOrderDiscount, $invDiscountType) {
+                    $qty = (float)$item->quantity;
+                    $grossPrice = (float)$item->unit_price;
+                    $lineGrossTotal = $qty * $grossPrice;
+                    $totalItemDisc = 0;
+                    if ($invDiscountType === 'order_wise') {
+                        $totalItemDisc = ($invSubtotal > 0 && $invOrderDiscount > 0) ? ($lineGrossTotal / $invSubtotal) * $invOrderDiscount : 0;
+                    } else {
+                        $totalItemDisc = (float)($item->discount ?? 0);
+                    }
+                    $netPrice = ($qty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $qty, 2) : $grossPrice;
                     return [
                         'product_id' => $item->product_id,
                         'item_name' => $item->item_name ?? $item->product?->name ?? 'Product Item',
-                        'quantity' => $item->quantity,
-                        'unit_price' => $item->unit_price,
+                        'quantity' => $qty,
+                        'unit_price' => $netPrice,
                         'warehouse_id' => $item->warehouse_id,
                         'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
                         'track_serial_number' => (bool)($item->product?->track_serial_number),

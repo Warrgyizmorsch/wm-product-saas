@@ -204,6 +204,54 @@ class QuotationService
 
     public function handleQuotationStatusChange(Quotation $quotation, string $status, ?int $leadId = null): void
     {
+        // 1. Automatic Deal Stage Transition when Quotation is Sent
+        if (in_array($status, ['Quotation Sent', 'Sent'])) {
+            $deal = $quotation->crm_deal_id ? CrmDeal::find($quotation->crm_deal_id) : null;
+            $leadObj = null;
+            if ($leadId) {
+                $leadObj = Lead::find($leadId);
+            }
+            if (!$leadObj && $quotation->lead_id) {
+                $leadObj = Lead::find($quotation->lead_id);
+            }
+            if (!$deal && $leadObj && $leadObj->crm_deal_id) {
+                $deal = CrmDeal::find($leadObj->crm_deal_id);
+            }
+
+            if ($deal && !in_array($deal->stage, ['Won', 'Closed Won', 'Closed Lost'])) {
+                // Determine if this is a first-time quotation or a revised quotation
+                $isRevision = ($quotation->revision_number > 0)
+                    || !empty($quotation->parent_id)
+                    || Quotation::query()
+                        ->where(function($q) use ($deal, $quotation) {
+                            $q->where('crm_deal_id', $deal->id);
+                            if ($quotation->lead_id) {
+                                $q->orWhere('lead_id', $quotation->lead_id);
+                            }
+                        })
+                        ->where('id', '!=', $quotation->id)
+                        ->where('id', '<', $quotation->id)
+                        ->exists();
+
+                $newStage = $isRevision ? 'Negotiation' : 'Proposal';
+                $newProbability = $isRevision ? 80 : 60;
+                $oldStage = $deal->stage;
+
+                $deal->update([
+                    'stage'       => $newStage,
+                    'probability' => $newProbability,
+                ]);
+
+                if ($leadObj && $oldStage !== $newStage) {
+                    LeadHistory::logEvent(
+                        $leadObj, 'deal_stage_updated', $oldStage, $newStage,
+                        "Deal '{$deal->title}' stage updated to '{$newStage}' because Quotation {$quotation->quotation_number} status changed to '{$status}'"
+                    );
+                }
+            }
+        }
+
+        // 2. Customer Acceptance & Account/Customer/Order Sync when Quotation is Accepted
         if ($status === 'Accepted') {
             $tenantId = $quotation->tenant_id ?? (tenant_id() ?? 1);
             $deal = $quotation->crm_deal_id ? CrmDeal::find($quotation->crm_deal_id) : null;

@@ -140,22 +140,22 @@
 
                         <!-- PO Style Discount Option -->
                         <x-ui.odoo-form-ui type="select" label="Discount Option" name="discount_type" id="discountTypeSelect" :required="true">
-                            <option value="without_discount" @selected(old('discount_type', 'without_discount') === 'without_discount')>Without Discount</option>
-                            <option value="item_wise" @selected(old('discount_type') === 'item_wise')>Item Level Discount</option>
-                            <option value="order_wise" @selected(old('discount_type') === 'order_wise')>Order Level Discount</option>
+                            <option value="without_discount" @selected(old('discount_type', $salesOrder?->discount_type ?? 'item_wise') === 'without_discount')>Without Discount</option>
+                            <option value="item_wise" @selected(old('discount_type', $salesOrder?->discount_type ?? 'item_wise') === 'item_wise')>Item Level Discount</option>
+                            <option value="order_wise" @selected(old('discount_type', $salesOrder?->discount_type) === 'order_wise')>Order Level Discount</option>
                         </x-ui.odoo-form-ui>
 
                         <!-- PO Style Tax Option -->
                         <x-ui.odoo-form-ui type="select" label="Tax Option" name="tax_type" id="taxTypeSelect" :required="true">
-                            <option value="without_tax" @selected(old('tax_type') === 'without_tax')>Without Tax</option>
-                            <option value="item_wise_tax" @selected(old('tax_type', 'item_wise_tax') === 'item_wise_tax')>Item Wise Tax</option>
-                            <option value="order_wise_tax" @selected(old('tax_type') === 'order_wise_tax')>Order Wise Tax</option>
+                            <option value="without_tax" @selected(old('tax_type', $salesOrder?->tax_type) === 'without_tax')>Without Tax</option>
+                            <option value="item_wise_tax" @selected(old('tax_type', $salesOrder?->tax_type ?? 'item_wise_tax') === 'item_wise_tax')>Item Wise Tax</option>
+                            <option value="order_wise_tax" @selected(old('tax_type', $salesOrder?->tax_type) === 'order_wise_tax')>Order Wise Tax</option>
                         </x-ui.odoo-form-ui>
 
                         <!-- GST Option (CGST/SGST vs IGST) -->
                         <x-ui.odoo-form-ui type="select" label="GST Option" name="gst_type" id="gstTypeSelect" :required="true">
-                            <option value="cgst_sgst" @selected(old('gst_type', 'cgst_sgst') === 'cgst_sgst')>CGST + SGST (Intra-State)</option>
-                            <option value="igst" @selected(old('gst_type') === 'igst')>IGST (Inter-State)</option>
+                            <option value="cgst_sgst" @selected(old('gst_type', $salesOrder?->gst_type ?? 'cgst_sgst') === 'cgst_sgst')>CGST + SGST (Intra-State)</option>
+                            <option value="igst" @selected(old('gst_type', $salesOrder?->gst_type) === 'igst')>IGST (Inter-State)</option>
                         </x-ui.odoo-form-ui>
 
                         <x-ui.odoo-form-ui type="select" label="Freight Terms" name="freight_terms" id="invFreightTermsSelect">
@@ -165,7 +165,21 @@
                             <option value="Customer Pickup" @selected(old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? '') == 'Customer Pickup')>Customer Pickup (Self Vehicle)</option>
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="invFreightAmountInput" :value="old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="invFreightAmountInput" :value="old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.odoo-form-ui type="select" label="Freight GST Tax Rate" name="freight_tax_rate" id="invFreightTaxRateSelect">
+                                    <option value="highest" @selected(old('freight_tax_rate', $salesOrder?->freight_tax_rate ?? 'highest') === 'highest')>Highest Item Rate (Auto)</option>
+                                    <option value="18" @selected(old('freight_tax_rate', $salesOrder?->freight_tax_rate) === '18')>18% GST</option>
+                                    <option value="12" @selected(old('freight_tax_rate', $salesOrder?->freight_tax_rate) === '12')>12% GST</option>
+                                    <option value="5" @selected(old('freight_tax_rate', $salesOrder?->freight_tax_rate) === '5')>5% GST</option>
+                                    <option value="28" @selected(old('freight_tax_rate', $salesOrder?->freight_tax_rate) === '28')>28% GST</option>
+                                    <option value="0" @selected(old('freight_tax_rate', $salesOrder?->freight_tax_rate) === '0')>0% (Exempt / Nil)</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -296,63 +310,99 @@
 
                     <!-- Right Side: Order Summary Card -->
                     <div class="col-md-5 d-flex flex-column align-items-end fs-13">
-                        <div class="card border-0 shadow-sm w-100" style="max-width: 380px; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1 !important; overflow: hidden;">
-                            <div class="fw-bold py-3 px-3 text-white" style="background-color: #2563eb; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;">
-                                <i class="feather-shopping-bag me-1"></i>Order Summary
+                        <div class="card shadow-sm border-0 rounded-3 overflow-hidden w-100" style="border: 1px solid #cbd5e1 !important;">
+                            <div class="fw-bold py-2.5 px-3 text-white" style="background-color: #2563eb; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;">
+                                FINANCIAL SUMMARY
                             </div>
                             <div class="p-3 bg-white text-dark">
-                                <!-- Taxable Subtotal -->
+                                
+                                <!-- 1. Subtotal (Excl. Tax) -->
+                                <div class="d-flex justify-content-between align-items-center mb-3" id="summarySubtotalRow">
+                                    <span class="text-muted fs-13 fw-semibold">Subtotal (Excl. Tax):</span>
+                                    <input type="text" id="calcSubtotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="₹0.00">
+                                </div>
+
+                                <!-- 2. Less: Item Discounts -->
+                                <div class="d-flex justify-content-between align-items-center mb-3 d-none" id="summaryDiscountRow">
+                                    <span class="text-muted fs-13 fw-semibold" id="summaryDiscountLabel">Less: Item Discounts:</span>
+                                    <input type="text" id="calcDiscountDisplay" class="form-control form-control-sm text-end fw-bold text-danger" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="-₹0.00">
+                                    <input type="number" name="discount_amount" id="summaryDiscount" class="form-control form-control-sm text-end fw-bold text-danger d-none" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('discount_amount', $salesOrder?->discount ?: 0) }}" step="0.01">
+                                </div>
+
+                                <!-- 3. Items Taxable Value -->
+                                <div class="d-flex justify-content-between align-items-center mb-3" id="calcTaxableRow">
+                                    <span class="text-muted fs-13 fw-semibold">Items Taxable Value:</span>
+                                    <input type="text" id="calcTaxableAmount" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="₹0.00">
+                                </div>
+
+                                <!-- 4. Order Tax Rate (%) -->
+                                <div class="d-flex justify-content-between align-items-center mb-3 d-none" id="summaryOrderTaxRow">
+                                    <span class="text-muted fs-13 fw-semibold">Order Tax Rate (%):</span>
+                                    <input type="number" name="order_tax_rate" id="orderTaxPercent" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('order_tax_rate', $salesOrder?->order_tax_rate ?: 18) }}" min="0" max="100" step="0.01">
+                                </div>
+
+                                <!-- 5. Add: Items GST Tax -->
+                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryItemsTaxRow">
+                                    <span class="text-muted fs-13 fw-semibold">Add: Items GST Tax:</span>
+                                    <input type="text" id="summaryItemsTaxText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
+                                </div>
+
+                                <!-- 6. Billed Items Total (Incl. GST) -->
+                                <div class="d-flex justify-content-between align-items-center mb-3 fw-bold text-dark" id="calcItemsTotalRow">
+                                    <span class="fs-13">Billed Items Total (Incl. GST):</span>
+                                    <input type="text" id="calcItemsTotalInclGst" class="form-control form-control-sm text-end fw-bold text-dark" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f1f5f9;" readonly value="₹0.00">
+                                </div>
+
+                                <!-- FREIGHT BREAKDOWN SECTION -->
+                                <div id="summaryFreightSectionContainer">
+                                    <hr class="my-2 border-slate">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span class="text-muted fs-13 fw-semibold">Freight Charges:</span>
+                                        <input type="number" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" min="0" step="0.01" value="{{ old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0) }}">
+                                        <input type="hidden" name="freight_amount" id="invFreightAmountInput" value="{{ old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0) }}">
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center mb-3" id="summaryFreightTaxRow">
+                                        <span class="text-muted fs-13 fw-semibold" id="summaryFreightTaxLabel">Add: Freight GST Tax:</span>
+                                        <input type="text" id="summaryFreightTaxText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center mb-3 fw-bold text-dark" id="summaryFreightTotalRow">
+                                        <span class="fs-13">Total Freight (Incl. GST):</span>
+                                        <input type="text" id="summaryFreightTotalText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #eff6ff;" readonly value="₹0.00">
+                                    </div>
+                                </div>
+
+                                <!-- OVERALL TAX BREAKDOWN -->
+                                <hr class="my-2 border-slate">
+                                <div id="cgstSgstRows">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span class="text-muted fs-13 fw-semibold">CGST (Central Tax):</span>
+                                        <input type="text" id="summaryCgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span class="text-muted fs-13 fw-semibold">SGST (State Tax):</span>
+                                        <input type="text" id="summarySgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
+                                    </div>
+                                </div>
+
+                                <div id="igstRow" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span class="text-muted fs-13 fw-semibold">IGST (Integrated Tax):</span>
+                                        <input type="text" id="summaryIgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
+                                    </div>
+                                </div>
+
+                                <!-- 9. Adjustment -->
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-13 fw-semibold">Taxable Subtotal</span>
-                                    <input type="text" id="summarySubtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
+                                    <span class="text-muted fs-13 fw-semibold">Adjustment:</span>
+                                    <input type="number" name="adjustment" id="adjustmentInput" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('adjustment', $salesOrder?->adjustment ?: 0) }}" step="0.01">
                                 </div>
 
-                                <!-- Total Discount -->
-                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryDiscountRow">
-                                    <span class="text-muted fs-13 fw-semibold">Discount Amount</span>
-                                    <input type="number" name="discount_amount" id="summaryDiscount" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #dc2626;" step="0.01" value="0.00">
-                                </div>
-
-                                <!-- Gross Total Before Tax -->
-                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryGrossRow">
-                                    <span class="text-muted fs-13 fw-semibold">Gross Total Before Tax</span>
-                                    <input type="text" id="summaryGrossText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
-                                </div>
-
-                                <!-- Tax Rate (Percent for Order Wise Tax) -->
-                                <div class="d-flex justify-content-between align-items-center mb-3" id="orderTaxPercentRow">
-                                    <span class="text-muted fs-13 fw-semibold">Tax Rate (%)</span>
-                                    <input type="number" name="order_tax_percent" id="orderTaxPercent" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" max="100" step="0.01" value="18.00">
-                                </div>
-
-                                <!-- Tax Amount -->
-                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryTaxRow">
-                                    <span class="text-muted fs-13 fw-semibold">Total Tax Amount</span>
-                                    <input type="text" id="summaryTaxText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
-                                </div>
-
-                                <!-- CGST Row -->
-                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryCgstRow">
-                                    <span class="text-muted fs-13 fw-semibold">CGST Amount</span>
-                                    <input type="text" id="summaryCgstText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
-                                </div>
-
-                                <!-- SGST Row -->
-                                <div class="d-flex justify-content-between align-items-center mb-3" id="summarySgstRow">
-                                    <span class="text-muted fs-13 fw-semibold">SGST Amount</span>
-                                    <input type="text" id="summarySgstText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
-                                </div>
-
-                                <!-- Freight Charges Row -->
-                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryFreightRow">
-                                    <span class="text-muted fs-13 fw-semibold">Freight Charges (₹)</span>
-                                    <input type="number" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" step="0.01" value="{{ old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0) }}">
-                                </div>
-
-                                <!-- Grand Total -->
-                                <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                                    <span class="fw-bold fs-13" style="color: #2563eb;">Grand Total</span>
-                                    <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-extrabold" style="width: 140px; height: 32px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb;" readonly value="0.00">
+                                <!-- 10. Grand Total -->
+                                <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-3">
+                                    <span class="fw-bold text-primary fs-13">Grand Total:</span>
+                                    <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 36px; border: 1.5px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb; font-size: 14px; font-weight: 800;" readonly value="₹0.00">
                                 </div>
 
                                 @if ($advanceAllocations > 0)
@@ -362,9 +412,10 @@
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mt-1 pt-1 text-success">
                                         <span class="fw-bold fs-13">Balance Due</span>
-                                        <span class="fw-extrabold fs-14" id="summaryBalanceDueText">0.00</span>
+                                        <span class="fw-extrabold fs-14" id="summaryBalanceDueText">₹0.00</span>
                                     </div>
                                 @endif
+
                             </div>
                         </div>
                     </div>
@@ -402,51 +453,44 @@
 
             // Toggle Columns & Summary Visibility (PO Logic)
             function toggleTaxAndDiscountDisplay() {
-                const discountType = $('#discountTypeSelect').val();
-                const taxType      = $('#taxTypeSelect').val();
+                const discountType = $('#discountTypeSelect').val() || 'item_wise';
+                const taxType      = $('#taxTypeSelect').val() || 'item_wise_tax';
 
                 if (discountType === 'item_wise') {
-                    $('.discount-column').show();
-                    $('#summaryDiscountRow').addClass('d-none').removeClass('d-flex');
+                    $('.discount-column').removeClass('d-none').show();
+                    $('#summaryDiscountRow').removeClass('d-none').show();
+                    $('#calcDiscountDisplay').removeClass('d-none').show();
+                    $('#summaryDiscount').addClass('d-none').hide();
                 } else if (discountType === 'order_wise') {
-                    $('.discount-column').hide();
-                    $('#summaryDiscountRow').removeClass('d-none').addClass('d-flex');
-                } else {
-                    $('.discount-column').hide();
-                    $('#summaryDiscountRow').addClass('d-none').removeClass('d-flex');
+                    $('.discount-column').addClass('d-none').hide();
+                    $('#summaryDiscountRow').removeClass('d-none').show();
+                    $('#calcDiscountDisplay').addClass('d-none').hide();
+                    $('#summaryDiscount').removeClass('d-none').show();
+                } else { // without_discount
+                    $('.discount-column').addClass('d-none').hide();
+                    $('#summaryDiscountRow').addClass('d-none').hide();
+                    $('#summaryDiscount').val('0.00');
+                    $('#calcDiscountDisplay').val('-₹0.00');
                 }
 
                 if (taxType === 'item_wise_tax') {
-                    $('.tax-column').show();
-                    $('#orderTaxPercentRow').addClass('d-none').removeClass('d-flex');
-                    $('#summaryTaxRow').removeClass('d-none').addClass('d-flex');
+                    $('.tax-column').removeClass('d-none').show();
+                    $('#summaryOrderTaxRow').addClass('d-none').hide();
+                    $('#calcTaxableRow').removeClass('d-none').show();
                 } else if (taxType === 'order_wise_tax') {
-                    $('.tax-column').hide();
-                    $('#orderTaxPercentRow').removeClass('d-none').addClass('d-flex');
-                    $('#summaryTaxRow').removeClass('d-none').addClass('d-flex');
-                } else {
-                    $('.tax-column').hide();
-                    $('#orderTaxPercentRow').addClass('d-none').removeClass('d-flex');
-                    $('#summaryTaxRow').addClass('d-none').removeClass('d-flex');
-                }
-
-                const gstType = $('#gstTypeSelect').val() || 'cgst_sgst';
-                if (taxType !== 'without_tax') {
-                    if (gstType === 'igst') {
-                        $('#summaryIgstRow').removeClass('d-none').addClass('d-flex');
-                        $('#summaryCgstRow, #summarySgstRow').addClass('d-none').removeClass('d-flex');
-                    } else {
-                        $('#summaryCgstRow, #summarySgstRow').removeClass('d-none').addClass('d-flex');
-                        $('#summaryIgstRow').addClass('d-none').removeClass('d-flex');
-                    }
-                } else {
-                    $('#summaryCgstRow, #summarySgstRow, #summaryIgstRow').addClass('d-none').removeClass('d-flex');
+                    $('.tax-column').addClass('d-none').hide();
+                    $('#summaryOrderTaxRow').removeClass('d-none').show();
+                    $('#calcTaxableRow').removeClass('d-none').show();
+                } else { // without_tax
+                    $('.tax-column').addClass('d-none').hide();
+                    $('#summaryOrderTaxRow').addClass('d-none').hide();
+                    $('#calcTaxableRow').addClass('d-none').hide();
                 }
 
                 recalculateInvoiceTotals();
             }
 
-            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect').on('change', function() {
+            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #orderTaxPercent').on('change input', function() {
                 toggleTaxAndDiscountDisplay();
             });
 
@@ -526,21 +570,7 @@
             });
 
             // Event listeners for recalculating
-            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect', function() {
-                recalculateInvoiceTotals();
-            });
-
-            $(document).on('input change', '#summaryFreightText', function() {
-                const val = parseFloat($(this).val()) || 0;
-                $('#invFreightAmountInput').val(val);
-                recalculateInvoiceTotals();
-            });
-
-            $(document).on('input change', '#invFreightAmountInput', function() {
-                const val = parseFloat($(this).val()) || 0;
-                if (!$('#summaryFreightText').is(':focus')) {
-                    $('#summaryFreightText').val(val);
-                }
+            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect, #invFreightTaxRateSelect, #summaryFreightText, #adjustmentInput', function() {
                 recalculateInvoiceTotals();
             });
 
@@ -550,19 +580,24 @@
             });
 
             function recalculateInvoiceTotals() {
-                const discountType = $('#discountTypeSelect').val();
-                const taxType      = $('#taxTypeSelect').val();
+                const discountType = $('#discountTypeSelect').val() || 'item_wise';
+                const taxType      = $('#taxTypeSelect').val() || 'item_wise_tax';
                 const gstType      = $('#gstTypeSelect').val() || 'cgst_sgst';
 
                 let subtotal = 0;
                 let itemTaxTotal = 0;
                 let itemDiscTotal = 0;
+                let maxItemTaxRate = 0;
 
                 $('#invoiceItemsTable tbody tr.item-row').each(function() {
                     const q = parseFloat($(this).find('.qty-input').val()) || 0;
                     const p = parseFloat($(this).find('.rate-input').val()) || 0;
                     const d = (discountType === 'item_wise') ? (parseFloat($(this).find('.disc-input').val()) || 0) : 0;
                     const t = (taxType === 'item_wise_tax') ? (parseFloat($(this).find('.tax-input').val()) || 0) : 0;
+
+                    if (t > maxItemTaxRate) {
+                        maxItemTaxRate = t;
+                    }
 
                     const lineAmount = q * p;
                     const lineTaxable = Math.max(0, lineAmount - d);
@@ -580,8 +615,11 @@
                 let totalDiscount = 0;
                 if (discountType === 'item_wise') {
                     totalDiscount = itemDiscTotal;
+                    $('#summaryDiscount').val(totalDiscount.toFixed(2));
+                    $('#calcDiscountDisplay').val('-₹' + totalDiscount.toFixed(2));
                 } else if (discountType === 'order_wise') {
                     totalDiscount = parseFloat($('#summaryDiscount').val()) || 0;
+                    $('#calcDiscountDisplay').val('-₹' + totalDiscount.toFixed(2));
                 }
 
                 const grossBeforeTax = Math.max(0, subtotal - totalDiscount);
@@ -594,47 +632,60 @@
                     totalTax = grossBeforeTax * (taxPercent / 100);
                 }
 
+                const itemsTaxTotal = totalTax;
+
                 const freightTerms = $('#invFreightTermsSelect').val() || 'To Pay';
                 const summaryFreight = parseFloat($('#summaryFreightText').val()) || 0;
-                const hiddenFreight = parseFloat($('#invFreightAmountInput').val()) || 0;
-                const freightAmount = $('#summaryFreightText').is(':focus') ? summaryFreight : (summaryFreight > 0 ? summaryFreight : hiddenFreight);
+                const effectiveFreight = (freightTerms === 'To Be Billed') ? summaryFreight : 0;
+                $('#invFreightAmountInput').val(effectiveFreight);
 
-                $('#invFreightAmountInput').val(freightAmount);
-
-                const effectiveFreight = (freightTerms === 'To Be Billed') ? freightAmount : 0;
-                const freightTax = (effectiveFreight > 0 && taxType !== 'without_tax') ? Math.round(effectiveFreight * 0.18 * 100) / 100 : 0;
-
-                totalTax = totalTax + freightTax;
-
-                let cgstAmt = 0, sgstAmt = 0, igstAmt = 0;
-                if (taxType !== 'without_tax' && totalTax > 0) {
-                    if (gstType === 'igst') {
-                        igstAmt = totalTax;
+                const freightTaxRateOption = $('#invFreightTaxRateSelect').val() || 'highest';
+                let freightTaxRate = 18;
+                if (freightTaxRateOption === 'highest') {
+                    if (taxType === 'order_wise_tax') {
+                        freightTaxRate = parseFloat($('#orderTaxPercent').val()) || 18;
                     } else {
-                        cgstAmt = Math.round((totalTax / 2) * 100) / 100;
-                        sgstAmt = Math.round((totalTax - cgstAmt) * 100) / 100;
+                        freightTaxRate = (maxItemTaxRate > 0) ? maxItemTaxRate : 18;
                     }
+                } else {
+                    freightTaxRate = parseFloat(freightTaxRateOption) || 0;
                 }
 
-                if (!$('#summaryFreightText').is(':focus')) {
-                    $('#summaryFreightText').val(effectiveFreight.toFixed(2));
+                const freightTax = (effectiveFreight > 0 && taxType !== 'without_tax') ? Math.round(effectiveFreight * (freightTaxRate / 100) * 100) / 100 : 0;
+                const totalFreightInclGst = effectiveFreight + freightTax;
+                const grandTotalTax = itemsTaxTotal + freightTax;
+
+                $('#summaryItemsTaxText').val('+₹' + itemsTaxTotal.toFixed(2));
+                $('#summaryFreightTaxText').val('+₹' + freightTax.toFixed(2));
+                $('#summaryFreightTotalText').val('₹' + totalFreightInclGst.toFixed(2));
+
+                if (taxType !== 'without_tax' && grandTotalTax > 0) {
+                    if (gstType === 'igst') {
+                        $('#cgstSgstRows').addClass('d-none').hide();
+                        $('#igstRow').removeClass('d-none').show();
+                        $('#summaryIgstText').val('+₹' + grandTotalTax.toFixed(2));
+                    } else {
+                        $('#cgstSgstRows').removeClass('d-none').show();
+                        $('#igstRow').addClass('d-none').hide();
+                        const halfTax = grandTotalTax / 2;
+                        $('#summaryCgstText').val('+₹' + halfTax.toFixed(2));
+                        $('#summarySgstText').val('+₹' + halfTax.toFixed(2));
+                    }
+                } else {
+                    $('#cgstSgstRows').addClass('d-none').hide();
+                    $('#igstRow').addClass('d-none').hide();
                 }
 
-                const grandTotal = grossBeforeTax + totalTax + effectiveFreight;
+                const itemsTotalInclGst = grossBeforeTax + itemsTaxTotal;
+                const adjustment = parseFloat($('#adjustmentInput').val()) || 0;
+                const grandTotal = itemsTotalInclGst + totalFreightInclGst + adjustment;
                 const balanceDue = Math.max(0, grandTotal - advanceAllocated);
 
-                if (discountType === 'item_wise') {
-                    $('#summarySubtotalText').val(grossBeforeTax.toFixed(2));
-                } else {
-                    $('#summarySubtotalText').val(subtotal.toFixed(2));
-                }
-                $('#summaryGrossText').val(grossBeforeTax.toFixed(2));
-                $('#summaryTaxText').val(totalTax.toFixed(2));
-                $('#summaryCgstText').val(cgstAmt.toFixed(2));
-                $('#summarySgstText').val(sgstAmt.toFixed(2));
-                $('#summaryIgstText').val(igstAmt.toFixed(2));
-                $('#summaryGrandtotalText').val(grandTotal.toFixed(2));
-                $('#summaryBalanceDueText').text(balanceDue.toFixed(2));
+                $('#calcSubtotal').val('₹' + subtotal.toFixed(2));
+                $('#calcTaxableAmount').val('₹' + grossBeforeTax.toFixed(2));
+                $('#calcItemsTotalInclGst').val('₹' + itemsTotalInclGst.toFixed(2));
+                $('#summaryGrandtotalText').val('₹' + grandTotal.toFixed(2));
+                $('#summaryBalanceDueText').text('₹' + balanceDue.toFixed(2));
 
                 // Build Tally-Style Tax Rate Breakdown Analysis Table
                 const taxGroups = {};
@@ -656,6 +707,15 @@
                         taxGroups[key].taxable += lineTaxable;
                         taxGroups[key].tax += lineTax;
                     });
+
+                    if (effectiveFreight > 0 && freightTax > 0) {
+                        const fKey = freightTaxRate.toFixed(2);
+                        if (!taxGroups[fKey]) {
+                            taxGroups[fKey] = { rate: freightTaxRate, taxable: 0, tax: 0 };
+                        }
+                        taxGroups[fKey].taxable += effectiveFreight;
+                        taxGroups[fKey].tax += freightTax;
+                    }
                 }
 
                 const taxRates = Object.keys(taxGroups).sort((a, b) => parseFloat(a) - parseFloat(b));
