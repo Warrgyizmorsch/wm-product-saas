@@ -300,17 +300,27 @@
                             <thead class="table-light fs-10 text-uppercase fw-bold text-muted" style="border-bottom: 2px solid #cbd5e1;">
                                 <tr>
                                     <th class="ps-3 py-2 text-center" style="width: 4%;">#</th>
-                                    <th class="py-2 ps-3" style="width: 38%;">Product Details</th>
-                                    <th class="py-2 text-center" style="width: 15%;">Warehouse</th>
+                                    <th class="py-2 ps-3" style="width: 36%;">Product Details</th>
+                                    <th class="py-2 text-center" style="width: 14%;">Warehouse</th>
                                     <th class="text-center py-2" style="width: 7%;">Qty</th>
                                     <th class="text-end py-2 pe-3" style="width: 11%;">Unit Price</th>
-                                    <th class="text-end py-2 pe-3" style="width: 9%;">Tax Rate</th>
-                                    <th class="text-end py-2 pe-3" style="width: 8%;">Discount</th>
-                                    <th class="text-end pe-4 py-2" style="width: 13%;">Amount</th>
+                                    <th class="text-end py-2 pe-3" style="width: 10%;">Discount (₹)</th>
+                                    <th class="text-end py-2 pe-3" style="width: 9%;">Taxes (%)</th>
+                                    <th class="text-end pe-4 py-2" style="width: 14%;">Amount (₹)</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-12 text-dark">
                                 @foreach ($order->items as $index => $item)
+                                    @php
+                                        $qty = (float) $item->quantity;
+                                        $price = (float) $item->unit_price;
+                                        $untaxed = $qty * $price;
+                                        $discount = (float) $item->discount;
+                                        $taxable = max(0, $untaxed - $discount);
+                                        $taxRate = (float) $item->tax_rate;
+                                        $lineTax = ($order->tax_type === 'order_wise_tax') ? 0 : ($taxable * ($taxRate / 100));
+                                        $lineTotalInclTax = $taxable + $lineTax;
+                                    @endphp
                                     <tr>
                                         <td class="ps-3 text-muted text-center py-1.5">{{ $index + 1 }}</td>
                                         <td class="py-1.5 ps-3">
@@ -353,15 +363,21 @@
                                         </td>
                                         <td class="text-center fw-semibold py-1.5">{{ $item->quantity }}</td>
                                         <td class="text-end text-muted py-1.5 pe-3">₹{{ number_format($item->unit_price, 2) }}</td>
-                                        <td class="text-end text-muted py-1.5 pe-3">{{ number_format($item->tax_rate, 2) }}%</td>
-                                        <td class="text-end text-muted py-1.5 pe-3">
+                                        <td class="text-end text-danger py-1.5 pe-3">
                                             @if($item->discount > 0)
-                                                ₹{{ number_format($item->discount, 2) }}
+                                                -₹{{ number_format($item->discount, 2) }}
                                             @else
                                                 —
                                             @endif
                                         </td>
-                                        <td class="text-end pe-4 fw-bold text-dark py-1.5">₹{{ number_format($item->amount, 2) }}</td>
+                                        <td class="text-end text-muted py-1.5 pe-3">
+                                            @if($order->tax_type !== 'without_tax')
+                                                {{ number_format($item->tax_rate, 2) }}%
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
+                                        <td class="text-end pe-4 fw-bold text-dark py-1.5">₹{{ number_format($lineTotalInclTax, 2) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -385,47 +401,103 @@
                                 </div>
                             @endif
                         </div>
-                        <div class="col-sm-5">
-                            <div class="border p-3 rounded bg-light">
-                                <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                    <span class="text-muted">Subtotal:</span>
-                                    <span class="fw-semibold text-dark">₹{{ number_format($order->subtotal, 2) }}</span>
+                        <div class="col-sm-5 ms-auto">
+                            <div class="p-3 rounded-3 border bg-light text-dark" style="border-color: #cbd5e1 !important; background-color: #f8fafc !important;">
+                                @php
+                                    $grossSubtotal = 0;
+                                    $totalItemDiscount = 0;
+                                    $itemsTaxAmount = 0;
+                                    $maxItemTaxRate = 0;
+                                    foreach($order->items as $it) {
+                                        $grossSubtotal += ($it->quantity * $it->unit_price);
+                                        $totalItemDiscount += $it->discount;
+                                        if ($order->tax_type === 'item_wise_tax') {
+                                            $lineTaxable = max(0, ($it->quantity * $it->unit_price) - $it->discount);
+                                            $itemsTaxAmount += ($lineTaxable * ($it->tax_rate / 100));
+                                            if ($it->tax_rate > $maxItemTaxRate) $maxItemTaxRate = $it->tax_rate;
+                                        }
+                                    }
+                                    $effectiveDiscount = ($order->discount_type === 'order_wise') ? (float)$order->discount : $totalItemDiscount;
+                                    $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
+
+                                    if ($order->tax_type === 'order_wise_tax') {
+                                        $itemsTaxAmount = $taxableBase * (($order->order_tax_rate ?: 18) / 100);
+                                    } elseif ($order->tax_type === 'without_tax') {
+                                        $itemsTaxAmount = 0;
+                                    }
+
+                                    $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
+                                    $freightAmount = ($order->freight_terms === 'To Be Billed') ? (float)($order->freight_amount ?: $order->shipping_charges ?: 0) : 0;
+                                    $adjustment = (float)$order->adjustment;
+                                    $grandTotal = $itemsTotalInclGst + $freightAmount + $adjustment;
+                                    $gstType = $order->gst_type ?? 'cgst_sgst';
+                                @endphp
+
+                                <!-- 1. Subtotal (Excl. Tax) -->
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                    <span class="text-muted fw-semibold">Subtotal (Excl. Tax):</span>
+                                    <span class="fw-bold text-dark">₹{{ number_format($grossSubtotal, 2) }}</span>
                                 </div>
-                                <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                    <span class="text-muted">Tax total (GST):</span>
-                                    <span class="fw-semibold text-dark">₹{{ number_format($order->tax, 2) }}</span>
-                                </div>
-                                @if($order->discount > 0)
-                                    <div class="d-flex justify-content-between mb-1.5 fs-12 text-danger">
-                                        <span>Discount:</span>
-                                        <span>-₹{{ number_format($order->discount, 2) }}</span>
+
+                                <!-- 2. Less: Item Discounts -->
+                                @if($order->discount_type !== 'without_discount' && $effectiveDiscount > 0)
+                                    <div class="d-flex justify-content-between align-items-center mb-2 fs-12 text-danger">
+                                        <span class="fw-semibold">Less: Item Discounts:</span>
+                                        <span class="fw-bold">-₹{{ number_format($effectiveDiscount, 2) }}</span>
                                     </div>
                                 @endif
-                                <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                    <span class="text-muted">Freight Terms:</span>
-                                    <span class="badge bg-soft-primary text-primary fw-semibold">{{ $order->freight_terms ?: 'To Pay' }}</span>
+
+                                <!-- 3. Items Taxable Value -->
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                    <span class="text-muted fw-semibold">Items Taxable Value:</span>
+                                    <span class="fw-bold text-dark">₹{{ number_format($taxableBase, 2) }}</span>
                                 </div>
-                                @if(($order->freight_amount > 0 || $order->shipping_charges > 0) && $order->freight_terms === 'To Be Billed')
-                                    <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                        <span class="text-muted">Freight Amount (Billed):</span>
-                                        <span class="fw-semibold text-dark">₹{{ number_format($order->freight_amount ?: $order->shipping_charges, 2) }}</span>
-                                    </div>
-                                @elseif($order->freight_amount > 0 || $order->shipping_charges > 0)
-                                    <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                        <span class="text-muted">Freight Amount:</span>
-                                        <span class="fw-semibold text-muted">₹{{ number_format($order->freight_amount ?: $order->shipping_charges, 2) }}</span>
+
+                                <!-- 4. Add: CGST / SGST or IGST Breakdown -->
+                                @if($order->tax_type !== 'without_tax' && $itemsTaxAmount > 0)
+                                    @if($gstType === 'cgst_sgst')
+                                        <div class="d-flex justify-content-between align-items-center mb-1.5 fs-12">
+                                            <span class="text-muted fw-medium">Add: CGST (Central Tax):</span>
+                                            <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount / 2, 2) }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                            <span class="text-muted fw-medium">Add: SGST (State Tax):</span>
+                                            <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount / 2, 2) }}</span>
+                                        </div>
+                                    @else
+                                        <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                            <span class="text-muted fw-medium">Add: IGST (Integrated Tax):</span>
+                                            <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount, 2) }}</span>
+                                        </div>
+                                    @endif
+                                @endif
+
+                                <!-- 5. Billed Items Total (Incl. GST) -->
+                                <div class="d-flex justify-content-between align-items-center my-2 py-1.5 px-2.5 rounded bg-white border fs-12 fw-bold text-dark" style="border-color: #e2e8f0 !important;">
+                                    <span>Billed Items Total (Incl. GST):</span>
+                                    <span>₹{{ number_format($itemsTotalInclGst, 2) }}</span>
+                                </div>
+
+                                <!-- 6. Freight Charges -->
+                                @if($freightAmount > 0)
+                                    <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                        <span class="text-muted fw-semibold">Freight Charges:</span>
+                                        <span class="fw-bold text-primary">₹{{ number_format($freightAmount, 2) }}</span>
                                     </div>
                                 @endif
-                                @if($order->adjustment != 0)
-                                    <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                        <span class="text-muted">Adjustment:</span>
-                                        <span class="fw-semibold text-dark">₹{{ number_format($order->adjustment, 2) }}</span>
+
+                                <!-- 7. Adjustment -->
+                                @if($adjustment != 0)
+                                    <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                        <span class="text-muted fw-semibold">Adjustment:</span>
+                                        <span class="fw-bold text-dark">₹{{ number_format($adjustment, 2) }}</span>
                                     </div>
                                 @endif
-                                <hr class="my-2">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="fs-13 fw-bold text-dark">Total Amount:</span>
-                                    <span class="fs-13 fw-bold text-primary">₹{{ number_format($order->total_amount, 2) }}</span>
+
+                                <!-- 8. Grand Total -->
+                                <div class="d-flex justify-content-between align-items-center pt-2.5 border-top mt-2" style="border-color: #cbd5e1 !important;">
+                                    <span class="fw-bold text-dark fs-13 text-uppercase" style="letter-spacing: 0.5px;">Grand Total:</span>
+                                    <span class="fw-bold text-primary fs-16">₹{{ number_format($grandTotal, 2) }}</span>
                                 </div>
                             </div>
                         </div>

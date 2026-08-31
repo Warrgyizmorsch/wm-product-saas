@@ -111,6 +111,11 @@
                 ['label' => 'Machine Monitor',        'route' => 'production.mes.machines.index'],
                 ['label' => 'Barcode Scanner',        'route' => 'production.mes.scanner.index'],
             ]],
+            ['label' => 'Subcontracting', 'icon' => 'feather-truck', 'url' => '#', 'children' => [
+                ['label' => 'Delivery Challans / Gate Passes', 'route' => 'production.subcontract.delivery-challans.index'],
+                ['label' => 'Vendor SLA & Analytics',          'route' => 'production.subcontract.analytics'],
+                ['label' => 'Subcontract Settings',            'route' => 'production.settings.index'],
+            ]],
             ['label' => 'Quality Management', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quality Dashboard',    'route' => 'production.quality.dashboard'],
                 ['label' => 'Quality Inspections',  'route' => 'production.inspections.index'],

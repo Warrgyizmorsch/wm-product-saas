@@ -575,12 +575,20 @@
                                                                     <i class="feather-briefcase me-1"></i>{{ $vendorName }}
                                                                 </span>
                                                             @else
-                                                                <span
-                                                                    class="badge bg-soft-secondary text-dark border fs-10 text-wrap d-inline-block"
-                                                                    data-bs-toggle="tooltip" data-bs-placement="top"
-                                                                    title="Assigned Operator: {{ $assignedName }}">
-                                                                    <i class="feather-user me-1"></i>{{ $assignedName }}
-                                                                </span>
+                                                                <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                                    <span class="badge bg-soft-secondary text-dark border fs-10 text-wrap d-inline-block"
+                                                                        data-bs-toggle="tooltip" data-bs-placement="top"
+                                                                        title="Assigned Operator: {{ $assignedName }}">
+                                                                        <i class="feather-user me-1"></i>{{ $assignedName }}
+                                                                    </span>
+                                                                    @if(!$isCompleted)
+                                                                        <button type="button" class="btn btn-xs btn-outline-primary p-0.5 px-1 fs-10 border shadow-none"
+                                                                            title="{{ $assignedName !== 'Unassigned' ? 'Reassign Operator' : 'Assign Operator' }}"
+                                                                            data-bs-toggle="modal" data-bs-target="#assignOperatorModal{{ $op->id }}">
+                                                                            <i class="feather-user-plus me-1"></i>{{ $assignedName !== 'Unassigned' ? 'Edit' : 'Assign' }}
+                                                                        </button>
+                                                                    @endif
+                                                                </div>
                                                             @endif
                                                         </td>
                                                     </tr>
@@ -782,6 +790,35 @@
                                             </button>
                                         </x-slot>
                                     </x-ui.modal>
+
+                                    {{-- Assign Operator Modal (Shopfloor Assignment) --}}
+                                    @if(!$isActiveOutsourced && $activeOp->status !== 'completed')
+                                        <x-ui.modal id="assignOperatorModal{{ $activeOp->id }}" title="Assign Operator — Op #{{ $activeOp->sequence }} ({{ $activeOrderOp->name ?? '' }})" class="text-start" :showFooter="true">
+                                            <form method="POST" action="{{ route('production.mes.assignments.assign') }}" id="assignOperatorForm{{ $activeOp->id }}">
+                                                @csrf
+                                                <input type="hidden" name="production_order_operation_id" value="{{ $activeOrderOp->id }}">
+
+                                                <x-ui.odoo-form-ui type="select" label="Select Operator" name="user_id" :required="true">
+                                                    <option value="">-- Choose Operator --</option>
+                                                    @foreach($operators as $operator)
+                                                        <option value="{{ $operator->id }}" {{ ($activeOp->assignedOperator->id ?? null) == $operator->id ? 'selected' : '' }}>
+                                                            {{ $operator->name }} ({{ ucfirst($operator->role) }})
+                                                        </option>
+                                                    @endforeach
+                                                </x-ui.odoo-form-ui>
+
+                                                <x-ui.odoo-form-ui type="textarea" label="Remarks / Instructions" name="remarks"
+                                                    placeholder="Provide shift remarks or operation requirements..." rows="3" />
+                                            </form>
+                                            <x-slot name="footer">
+                                                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="button" class="btn btn-primary px-4"
+                                                    onclick="document.getElementById('assignOperatorForm{{ $activeOp->id }}').submit();">
+                                                    <i class="feather-user-check me-1"></i>Assign Operator
+                                                </button>
+                                            </x-slot>
+                                        </x-ui.modal>
+                                    @endif
                                 @endif
                             @endforeach
                 @empty

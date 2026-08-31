@@ -241,17 +241,39 @@
                                     <div class="d-flex align-items-center flex-wrap gap-1">
                                         <span class="fw-bold text-dark">{{ $lead->company_name }}</span>
                                         <span class="badge bg-light text-primary border font-monospace px-1.5 py-0.5 fs-11">{{ $lead->lead_number ?: ('LD-' . str_pad($lead->id, 4, '0', STR_PAD_LEFT)) }}</span>
-                                        @if(!empty($lead->is_duplicate) && (request('duplicates_only') === '1' || request('sort_by') === 'duplicates'))
-                                            <span class="duplicate-indicator ms-1" 
-                                                  data-bs-toggle="tooltip" 
-                                                  data-bs-placement="top" 
-                                                  data-bs-html="true" 
-                                                  data-bs-custom-class="custom-white-tooltip" 
-                                                  title="<div class='text-start'><div class='fw-bold text-dark fs-12 mb-1'><i class='feather-copy text-warning me-1'></i>Duplicate Lead</div><div class='text-muted fs-11 mb-1'>Duplicate of Lead <strong class='text-dark'>#{{ $lead->duplicate_of_id }}</strong></div><div class='text-muted fs-11'>Reason: <strong class='text-dark'>{{ $lead->duplicate_reason }}</strong></div></div>">
-                                                <a href="{{ route('crm.leads.show', $lead->duplicate_of_id) }}" class="text-warning text-decoration-none d-inline-flex align-items-center p-1 rounded hover-bg-warning-soft" onclick="event.stopPropagation();">
-                                                    <i class="feather-copy fs-13"></i>
-                                                </a>
-                                            </span>
+                                        @if(request('duplicates_only') === '1' || request('sort_by') === 'duplicates')
+                                            @if(!empty($lead->is_duplicate))
+                                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle font-monospace px-2 py-0.5 fs-11 ms-1 d-inline-flex align-items-center" 
+                                                      data-bs-toggle="tooltip" 
+                                                      data-bs-placement="top" 
+                                                      data-bs-html="true" 
+                                                      data-bs-custom-class="custom-white-tooltip" 
+                                                      title="<div class='text-start'><div class='fw-bold text-dark fs-12 mb-1'><i class='feather-copy text-warning me-1'></i>Duplicate Lead</div><div class='text-muted fs-11 mb-1'>Duplicate of Lead <strong class='text-dark'>#{{ $lead->duplicate_of_number ?: ('LD-' . str_pad($lead->duplicate_of_id, 4, '0', STR_PAD_LEFT)) }}</strong></div><div class='text-muted fs-11'>Reason: <strong class='text-dark'>{{ $lead->duplicate_reason }}</strong></div></div>">
+                                                    <a href="{{ route('crm.leads.show', $lead->duplicate_of_id) }}" class="text-warning text-decoration-none d-inline-flex align-items-center" onclick="event.stopPropagation();">
+                                                        <i class="feather-copy me-1 fs-11"></i>Duplicate of #{{ $lead->duplicate_of_number ?: ('LD-' . str_pad($lead->duplicate_of_id, 4, '0', STR_PAD_LEFT)) }}
+                                                    </a>
+                                                </span>
+                                            @elseif(!empty($lead->is_original))
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace px-2 py-0.5 fs-11 ms-1 d-inline-flex align-items-center" 
+                                                      data-bs-toggle="tooltip" 
+                                                      data-bs-placement="top" 
+                                                      title="Original Lead record. Subsequent matching leads are marked as duplicates of this lead.">
+                                                    <i class="feather-check-circle me-1 fs-11"></i>ORIGINAL LEAD
+                                                </span>
+                                            @endif
+                                        @else
+                                            @if(!empty($lead->is_duplicate))
+                                                <span class="duplicate-indicator ms-1" 
+                                                      data-bs-toggle="tooltip" 
+                                                      data-bs-placement="top" 
+                                                      data-bs-html="true" 
+                                                      data-bs-custom-class="custom-white-tooltip" 
+                                                      title="<div class='text-start'><div class='fw-bold text-dark fs-12 mb-1'><i class='feather-copy text-warning me-1'></i>Duplicate Lead</div><div class='text-muted fs-11 mb-1'>Duplicate of Lead <strong class='text-dark'>#{{ $lead->duplicate_of_number ?: ('LD-' . str_pad($lead->duplicate_of_id, 4, '0', STR_PAD_LEFT)) }}</strong></div><div class='text-muted fs-11'>Reason: <strong class='text-dark'>{{ $lead->duplicate_reason }}</strong></div></div>">
+                                                    <a href="{{ route('crm.leads.show', $lead->duplicate_of_id) }}" class="text-warning text-decoration-none d-inline-flex align-items-center p-1 rounded hover-bg-warning-soft" onclick="event.stopPropagation();">
+                                                        <i class="feather-copy fs-13"></i>
+                                                    </a>
+                                                </span>
+                                            @endif
                                         @endif
                                     </div>
                                     <span class="text-muted fs-11"><i class="feather-user me-1 fs-10 text-primary"></i>{{ $lead->contact_person ?: 'N/A' }}</span>

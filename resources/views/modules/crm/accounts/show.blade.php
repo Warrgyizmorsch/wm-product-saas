@@ -10,8 +10,12 @@
         font-weight: 600;
         font-size: 13px;
         color: #64748b;
-        border-bottom: 2px solid transparent !important;
+        border-bottom: 2.5px solid transparent !important;
         padding: 10px 18px !important;
+        transition: all 0.2s ease;
+    }
+    .zoho-tab-link:hover {
+        color: #1e40af !important;
     }
     .zoho-tab-link.active {
         color: #1e40af !important;
@@ -19,9 +23,10 @@
         background: transparent !important;
     }
     .zoho-field-label {
-        font-size: 11px;
+        font-size: 10.5px;
         font-weight: 700;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
         color: #64748b;
         margin-bottom: 2px;
     }
@@ -29,25 +34,31 @@
         font-size: 13px;
         color: #0f172a;
     }
+    .account-info-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 14px 18px;
+    }
 </style>
 @endpush
 
 @section('page-actions')
-    <div class="d-flex gap-2">
-        <a href="{{ route('crm.accounts.index') }}" class="btn btn-light border">
-            <i class="feather-arrow-left me-1"></i>Back to Accounts
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <a href="{{ route('crm.accounts.index') }}" class="btn btn-light border p-2 d-inline-flex align-items-center justify-content-center" title="Back to Accounts">
+            <i class="feather-arrow-left fs-16"></i>
         </a>
-        <a href="{{ route('crm.deals.create', ['account_id' => $account->id]) }}" class="btn btn-soft-warning fw-bold">
+        <a href="{{ route('crm.deals.create', ['account_id' => $account->id]) }}" class="btn btn-soft-warning fw-bold px-3">
             <i class="feather-plus me-1"></i>Create New Deal
         </a>
-        <a href="{{ route('crm.accounts.edit', $account) }}" class="btn btn-primary" style="background-color: #1e40af; border-color: #1e40af;">
+        <a href="{{ route('crm.accounts.edit', $account) }}" class="btn btn-primary px-3" style="background-color: #1e40af; border-color: #1e40af;">
             <i class="feather-edit me-1"></i>Edit Account
         </a>
     </div>
 @endsection
 
 @section('content')
-    <div class="erp-single-panel">
+    <div class="erp-single-panel bg-white p-4 rounded-3 border shadow-sm">
         {{-- Flash Messages --}}
         @if(session('success'))
             <div class="alert alert-success alert-dismissible fade show fs-13 py-2.5 mb-3" role="alert">
@@ -56,183 +67,224 @@
             </div>
         @endif
 
-        <!-- Company Summary Hero Banner -->
-        <div class="card border-0 shadow-sm p-4 bg-white mb-4 rounded-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-0">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="avatar-text avatar-xl bg-soft-primary text-primary fs-3 fw-bold shadow-sm rounded-circle d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
-                        <i class="feather-briefcase"></i>
-                    </div>
-                    <div>
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <h3 class="fw-bold text-dark mb-0 fs-20">{{ $account->name }}</h3>
-                            <span class="badge bg-light text-primary border font-monospace px-2.5 py-1 fs-12">{{ $account->account_number }}</span>
-                            @if($account->status === 'active')
-                                <span class="badge bg-soft-success text-success border border-success-subtle rounded-pill px-2.5 py-1 fs-11 fw-bold">Active Account</span>
-                            @else
-                                <span class="badge bg-soft-danger text-danger border border-danger-subtle rounded-pill px-2.5 py-1 fs-11 fw-bold">Inactive Account</span>
-                            @endif
-                        </div>
-                        <div class="d-flex gap-3 align-items-center mt-2 text-muted fs-13 flex-wrap">
-                            @if($account->gstin)
-                                <span><i class="feather-file-text me-1 text-primary"></i>GSTIN: <strong class="text-dark font-monospace">{{ $account->gstin }}</strong></span>
-                                <span>•</span>
-                            @endif
-                            <span><i class="feather-phone me-1 text-primary"></i>Phone: <strong class="text-dark">{{ $account->phone ?: 'N/A' }}</strong></span>
-                            <span>•</span>
-                            <span><i class="feather-mail me-1 text-primary"></i>Email: <strong class="text-dark">{{ $account->email ?: 'N/A' }}</strong></span>
-                            @if($account->city || $account->state)
-                                <span>•</span>
-                                <span><i class="feather-map-pin me-1 text-primary"></i>Location: <strong class="text-dark">{{ implode(', ', array_filter([$account->city, $account->state])) }}</strong></span>
-                            @endif
-                        </div>
-                    </div>
+        {{-- 1. Single Page Header: Account Profile Info --}}
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 pb-3 border-bottom mb-4">
+            <div class="d-flex align-items-start gap-3">
+                <div class="avatar-text avatar-xl bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold fs-22 shadow-sm flex-shrink-0" style="width: 56px; height: 56px;">
+                    <i class="feather-briefcase"></i>
                 </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                        <h4 class="fw-bold text-dark mb-0 fs-20 me-1">{{ $account->name }}</h4>
+                        <span class="badge bg-light text-primary border font-monospace px-2.5 py-1 fs-12">{{ $account->account_number }}</span>
+                        @if($account->status === 'active')
+                            <span class="badge bg-soft-success text-success border border-success-subtle rounded-pill px-2.5 py-1 fs-11 fw-bold">
+                                <i class="feather-check-circle me-1"></i>Active Account
+                            </span>
+                        @else
+                            <span class="badge bg-soft-danger text-danger border border-danger-subtle rounded-pill px-2.5 py-1 fs-11 fw-bold">
+                                <i class="feather-x-circle me-1"></i>Inactive Account
+                            </span>
+                        @endif
+                    </div>
 
-                <!-- Right Quick Metric Cards -->
-                <div class="d-flex gap-3 text-end mt-3 mt-md-0 flex-wrap">
-                    <div class="bg-light p-3 rounded-3 border text-center px-4">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-trending-up me-1 text-primary"></i>Pipeline Value</span>
-                        <h4 class="fw-bold text-primary mb-0">₹{{ number_format($pipelineValue, 2) }}</h4>
+                    {{-- Clean 2-Row Contact & Location Meta --}}
+                    <div class="d-flex align-items-center gap-4 text-muted fs-12 flex-wrap">
+                        @if($account->gstin)
+                            <span><i class="feather-file-text me-1 text-primary"></i><strong>GSTIN:</strong> <span class="font-monospace text-primary fw-bold">{{ $account->gstin }}</span></span>
+                        @endif
+                        <span><i class="feather-phone me-1 text-primary"></i><strong>Phone:</strong> <strong class="text-dark">{{ $account->phone ?: 'N/A' }}</strong></span>
+                        <span><i class="feather-mail me-1 text-primary"></i><strong>Email:</strong> @if($account->email)<a href="mailto:{{ $account->email }}" class="text-primary fw-semibold">{{ $account->email }}</a>@else<strong class="text-dark">N/A</strong>@endif</span>
                     </div>
-                    <div class="bg-light p-3 rounded-3 border text-center px-4">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-layers me-1 text-info"></i>Open Deals</span>
-                        <h4 class="fw-bold text-info mb-0">{{ $openDealsCount }}</h4>
-                    </div>
-                    <div class="bg-light p-3 rounded-3 border text-center px-4">
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-check-circle me-1 text-success"></i>Won Deals</span>
-                        <h4 class="fw-bold text-success mb-0">{{ $wonDealsCount }}</h4>
+
+                    <div class="d-flex align-items-center gap-4 text-muted fs-12 mt-1.5 flex-wrap">
+                        @if($account->city || $account->state)
+                            <span><i class="feather-map-pin me-1 text-primary"></i><strong>Location:</strong> <strong class="text-dark">{{ implode(', ', array_filter([$account->city, $account->state])) }}</strong></span>
+                        @endif
+                        @if($account->owner)
+                            <span><i class="feather-user me-1 text-primary"></i><strong>Account Manager:</strong> <span class="badge bg-soft-primary text-primary fs-11 fw-bold">{{ $account->owner->name }}</span></span>
+                        @endif
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Tabs Container Card -->
-        <div class="card border-0 shadow-sm bg-white rounded-3">
-            <div class="card-header bg-white border-bottom p-0">
-                <ul class="nav nav-tabs border-0 px-3" id="accountTabs" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link zoho-tab-link active" id="overview-tab" data-bs-toggle="tab" href="#overview-pane" role="tab">
-                            <i class="feather-info me-1.5"></i>Overview
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link zoho-tab-link" id="deals-tab" data-bs-toggle="tab" href="#deals-pane" role="tab">
-                            <i class="feather-git-branch me-1.5"></i>Deals & Projects ({{ $account->deals->count() }})
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link zoho-tab-link" id="contacts-tab" data-bs-toggle="tab" href="#contacts-pane" role="tab">
-                            <i class="feather-users me-1.5"></i>Personnel Contacts ({{ $account->contacts->count() }})
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link zoho-tab-link" id="quotations-tab" data-bs-toggle="tab" href="#quotations-pane" role="tab">
-                            <i class="feather-file-text me-1.5"></i>Quotations ({{ $account->quotations->count() }})
-                        </a>
-                    </li>
-                </ul>
+        {{-- 2. Single Page Integrated Financial & Performance Metrics Strip --}}
+        <div class="bg-light p-3 rounded-3 border mb-4">
+            <div class="row g-3 text-center text-md-start">
+                <div class="col-md-3 border-end">
+                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-trending-up me-1 text-primary"></i>Total Pipeline Value</span>
+                    <h4 class="fw-bold text-primary mb-0 fs-18">₹{{ number_format($pipelineValue, 2) }}</h4>
+                    <span class="fs-11 text-muted">{{ $account->deals->count() }} Total Opportunities</span>
+                </div>
+                <div class="col-md-3 border-end">
+                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-layers me-1 text-info"></i>Active Deals Count</span>
+                    <h4 class="fw-bold text-info mb-0 fs-18">{{ $openDealsCount }} Deals</h4>
+                    <span class="fs-11 text-muted">In Progress / Qualified</span>
+                </div>
+                <div class="col-md-3 border-end">
+                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-check-circle me-1 text-success"></i>Won Deals Count</span>
+                    <h4 class="fw-bold text-success mb-0 fs-18">{{ $wonDealsCount }} Deals</h4>
+                    <span class="fs-11 text-muted">Successfully Closed</span>
+                </div>
+                <div class="col-md-3">
+                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-credit-card me-1 text-warning"></i>Credit Limit / Available</span>
+                    <h4 class="fw-bold text-dark mb-0 fs-18">₹{{ number_format($account->credit_limit ?: 0, 2) }}</h4>
+                    <span class="fs-11 text-muted">Quotations: {{ $account->quotations->count() }} Quotes</span>
+                </div>
             </div>
+        </div>
 
-            <div class="card-body p-4">
-                <div class="tab-content" id="accountTabsContent">
-                    <!-- Tab 0: Overview -->
-                    <div class="tab-pane fade show active" id="overview-pane" role="tabpanel">
-                        <div class="row g-4">
-                            <div class="col-lg-6 border-end">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-briefcase me-1.5"></i>Company Account Details</h6>
-                                <div class="row g-3 fs-13">
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">Account Name</div>
-                                        <div class="zoho-field-value fw-bold text-dark">{{ $account->name }}</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">Account Number</div>
-                                        <div class="zoho-field-value font-monospace text-primary fw-bold">{{ $account->account_number }}</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">GSTIN / Tax ID</div>
-                                        <div class="zoho-field-value font-monospace fw-bold text-dark">{{ $account->gstin ?: 'Not Available' }}</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">Industry Type</div>
-                                        <div class="zoho-field-value text-dark">{{ $account->industry_type ?: 'General Business' }}</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">Website</div>
-                                        <div class="zoho-field-value text-primary">
-                                            @if($account->website)
-                                                <a href="{{ Str::startsWith($account->website, 'http') ? $account->website : 'https://' . $account->website }}" target="_blank" class="text-primary text-decoration-none fw-semibold">
-                                                    <i class="feather-external-link me-1"></i>{{ $account->website }}
-                                                </a>
-                                            @else
-                                                —
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">Credit Limit</div>
-                                        <div class="zoho-field-value text-dark fw-bold">₹{{ number_format($account->credit_limit ?: 0, 2) }}</div>
+        {{-- 3. Integrated Navigation Tabs Strip --}}
+        <div class="border-bottom mb-3">
+            <ul class="nav nav-tabs border-0 gap-1" id="accountTabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link zoho-tab-link active fw-bold px-3 py-2" id="overview-tab" data-bs-toggle="tab" href="#overview-pane" role="tab">
+                        <i class="feather-info me-1.5 text-primary"></i>Overview
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="deals-tab" data-bs-toggle="tab" href="#deals-pane" role="tab">
+                        <i class="feather-git-branch me-1.5 text-info"></i>Deals & Projects
+                        <span class="badge bg-soft-info text-info ms-1 px-1.5 rounded-pill">{{ $account->deals->count() }}</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="contacts-tab" data-bs-toggle="tab" href="#contacts-pane" role="tab">
+                        <i class="feather-users me-1.5 text-success"></i>Personnel Contacts
+                        <span class="badge bg-soft-success text-success ms-1 px-1.5 rounded-pill">{{ $account->contacts->count() }}</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link zoho-tab-link fw-bold px-3 py-2" id="quotations-tab" data-bs-toggle="tab" href="#quotations-pane" role="tab">
+                        <i class="feather-file-text me-1.5 text-warning"></i>Quotations
+                        <span class="badge bg-soft-warning text-warning ms-1 px-1.5 rounded-pill">{{ $account->quotations->count() }}</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        {{-- 4. Tab Content Panes --}}
+        <div class="tab-content pt-2" id="accountTabsContent">
+            <!-- Tab 0: Overview -->
+            <div class="tab-pane fade show active" id="overview-pane" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="account-info-box mb-3">
+                            <h6 class="fw-bold text-primary mb-3 fs-13"><i class="feather-briefcase me-1.5"></i>Company Account Details</h6>
+                            <div class="row g-3 fs-12">
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Account Name</div>
+                                    <div class="zoho-field-value fw-bold text-dark">{{ $account->name }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Account Number</div>
+                                    <div class="zoho-field-value font-monospace text-primary fw-bold">{{ $account->account_number }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">GSTIN / Tax ID</div>
+                                    <div class="zoho-field-value font-monospace fw-bold text-dark">{{ $account->gstin ?: 'Not Available' }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Industry Type</div>
+                                    <div class="zoho-field-value text-dark">{{ $account->industry_type ?: 'General Business' }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Website</div>
+                                    <div class="zoho-field-value text-primary">
+                                        @if($account->website)
+                                            <a href="{{ Str::startsWith($account->website, 'http') ? $account->website : 'https://' . $account->website }}" target="_blank" class="text-primary text-decoration-none fw-semibold">
+                                                <i class="feather-external-link me-1"></i>{{ $account->website }}
+                                            </a>
+                                        @else
+                                            —
+                                        @endif
                                     </div>
                                 </div>
-
-                                <div class="mt-4 pt-3 border-top">
-                                    <h6 class="fw-bold text-primary mb-2"><i class="feather-map-pin me-1.5"></i>Billing & Corporate Address</h6>
-                                    <div class="p-3 bg-light rounded-3 text-dark fs-13">
-                                        <div><strong>Street:</strong> {{ $account->street ?: '—' }}</div>
-                                        <div><strong>City/State:</strong> {{ implode(', ', array_filter([$account->city, $account->state])) ?: '—' }}</div>
-                                        <div><strong>Country / Zip:</strong> {{ implode(' - ', array_filter([$account->country, $account->zip_code])) ?: '—' }}</div>
-                                    </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Credit Limit</div>
+                                    <div class="zoho-field-value text-dark fw-bold">₹{{ number_format($account->credit_limit ?: 0, 2) }}</div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="col-lg-6 ps-lg-4">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-bar-chart-2 me-1.5"></i>Deals & Opportunity Stats</h6>
-                                <div class="row g-3 fs-13">
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">Pipeline Value</div>
-                                        <div class="zoho-field-value fw-bold text-primary fs-16">₹{{ number_format($pipelineValue, 2) }}</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">Active Deals Count</div>
-                                        <div class="zoho-field-value fw-bold text-info fs-16">{{ $openDealsCount }} Deals</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">Won Deals Count</div>
-                                        <div class="zoho-field-value text-success fw-bold">{{ $wonDealsCount }} Deals</div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="zoho-field-label">Total Quotations</div>
-                                        <div class="zoho-field-value text-dark fw-bold">{{ $account->quotations->count() }} Quotes</div>
-                                    </div>
+                        <div class="account-info-box">
+                            <h6 class="fw-bold text-primary mb-3 fs-13"><i class="feather-map-pin me-1.5"></i>Billing & Corporate Address</h6>
+                            <div class="row g-3 fs-12 text-dark">
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Street</div>
+                                    <div class="zoho-field-value">{{ $account->street ?: '—' }}</div>
                                 </div>
-
-                                <div class="mt-4 pt-3 border-top">
-                                    <h6 class="fw-bold text-primary mb-2"><i class="feather-user me-1.5"></i>Primary Contact & Ownership</h6>
-                                    <div class="p-3 bg-light rounded-3 border fs-13">
-                                        @php
-                                            $primaryContact = $account->contacts->where('is_primary', true)->first() ?: $account->contacts->first();
-                                        @endphp
-                                        @if($primaryContact)
-                                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                                <span class="fw-bold text-dark fs-14"><i class="feather-user-check me-1 text-success"></i>{{ $primaryContact->name }}</span>
-                                                <span class="badge bg-soft-primary text-primary">Primary Contact</span>
-                                            </div>
-                                            <div><strong>Role:</strong> {{ $primaryContact->role ?: 'Decision Maker' }}</div>
-                                            <div><strong>Email:</strong> {{ $primaryContact->email ?: 'N/A' }}</div>
-                                            <div><strong>Phone:</strong> {{ $primaryContact->mobile ?: ($primaryContact->phone ?: 'N/A') }}</div>
-                                        @else
-                                            <div class="text-muted mb-2">No primary contact added yet. Click on <strong>Personnel Contacts</strong> tab to add.</div>
-                                        @endif
-                                        <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between">
-                                            <span class="text-muted fw-semibold">Account Manager / Owner:</span>
-                                            <span class="badge bg-soft-primary text-primary fs-12 fw-bold"><i class="feather-user me-1"></i>{{ $account->owner?->name ?: 'Unassigned' }}</span>
-                                        </div>
-                                    </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">City / State</div>
+                                    <div class="zoho-field-value">{{ implode(', ', array_filter([$account->city, $account->state])) ?: '—' }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Country / Zip</div>
+                                    <div class="zoho-field-value">{{ implode(' - ', array_filter([$account->country, $account->zip_code])) ?: '—' }}</div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <div class="col-lg-6">
+                        <div class="account-info-box mb-3">
+                            <h6 class="fw-bold text-primary mb-3 fs-13"><i class="feather-bar-chart-2 me-1.5"></i>Deals & Opportunity Stats</h6>
+                            <div class="row g-3 fs-12">
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Pipeline Value</div>
+                                    <div class="zoho-field-value fw-bold text-primary fs-15">₹{{ number_format($pipelineValue, 2) }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Active Deals Count</div>
+                                    <div class="zoho-field-value fw-bold text-info fs-15">{{ $openDealsCount }} Deals</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Won Deals Count</div>
+                                    <div class="zoho-field-value text-success fw-bold">{{ $wonDealsCount }} Deals</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">Total Quotations</div>
+                                    <div class="zoho-field-value text-dark fw-bold">{{ $account->quotations->count() }} Quotes</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="account-info-box">
+                            <h6 class="fw-bold text-primary mb-3 fs-13"><i class="feather-user me-1.5"></i>Primary Contact & Ownership</h6>
+                            @php
+                                $primaryContact = $account->contacts->where('is_primary', true)->first() ?: $account->contacts->first();
+                            @endphp
+                            @if($primaryContact)
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-dark fs-13"><i class="feather-user-check me-1 text-success"></i>{{ $primaryContact->name }}</span>
+                                    <span class="badge bg-soft-primary text-primary fs-11">Primary Contact</span>
+                                </div>
+                                <div class="row g-2 fs-12 mb-2">
+                                    <div class="col-6">
+                                        <div class="zoho-field-label">Role</div>
+                                        <div class="zoho-field-value">{{ $primaryContact->role ?: 'Decision Maker' }}</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="zoho-field-label">Phone</div>
+                                        <div class="zoho-field-value">{{ $primaryContact->mobile ?: ($primaryContact->phone ?: 'N/A') }}</div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="zoho-field-label">Email</div>
+                                        <div class="zoho-field-value text-primary">{{ $primaryContact->email ?: 'N/A' }}</div>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="text-muted fs-12 mb-2">No primary contact added yet. Add via Personnel Contacts tab.</div>
+                            @endif
+                            <div class="pt-2 border-top d-flex align-items-center justify-content-between fs-12">
+                                <span class="text-muted fw-semibold">Account Manager / Owner:</span>
+                                <span class="badge bg-soft-primary text-primary fs-11 fw-bold"><i class="feather-user me-1"></i>{{ $account->owner?->name ?: 'Unassigned' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
                     <!-- Tab 1: Deals & Projects -->
                     <div class="tab-pane fade" id="deals-pane" role="tabpanel">

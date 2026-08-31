@@ -100,6 +100,9 @@ class MesController extends Controller
         // Shifts assigned/active
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->get();
 
+        // Operators list for shopfloor operator assignment
+        $operators = \App\Models\User::where('tenant_id', $tenantId)->get();
+
         return view('modules.production.mes.dashboard', compact(
             'activeSchedules',
             'recentlyCompletedSchedules',
@@ -107,7 +110,8 @@ class MesController extends Controller
             'paused',
             'completedToday',
             'readyCount',
-            'shifts'
+            'shifts',
+            'operators'
         ));
     }
 

@@ -77,10 +77,20 @@ class PostSalesReturnJournal
             }
 
             if ($invoice) {
-                if ((float)$invoice->subtotal > 0 && (float)$invoice->tax_amount > 0) {
-                    $taxRate = round(((float)$invoice->tax_amount / (float)$invoice->subtotal) * 100, 2);
+                if ($invoice->tax_type === 'without_tax') {
+                    $taxRate = 0.0;
+                } elseif ($invoice->tax_type === 'order_wise_tax') {
+                    $taxRate = (float)($invoice->order_tax_rate ?: 18.0);
+                } else {
+                    $invItemsSubtotal = (float)$invoice->items->sum(fn($i) => max(0, ((float)$i->quantity * (float)$i->unit_price) - (float)$i->discount));
+                    $invItemsTax = (float)$invoice->items->sum(fn($i) => (float)$i->tax_amount);
+                    if ($invItemsSubtotal > 0 && $invItemsTax > 0) {
+                        $taxRate = round(($invItemsTax / $invItemsSubtotal) * 100, 2);
+                    } else {
+                        $taxRate = 18.0;
+                    }
                 }
-                $isInterState = ((float)$invoice->igst_amount > 0) || ($invoice->gst_type === 'IGST');
+                $isInterState = ((float)$invoice->igst_amount > 0) || (strtolower((string)($invoice->gst_type ?? '')) === 'igst');
             }
 
             $cgstAmount = 0.0;

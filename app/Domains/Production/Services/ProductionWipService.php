@@ -52,7 +52,19 @@ class ProductionWipService
 
             $batch = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $order->tenant_id)->find($batchId);
             $validBatchId = $batch ? $batch->id : null;
+
+            $targetOp = ProductionOrderOperation::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->where(function ($q) use ($routingOpId) {
+                    $q->where('routing_operation_id', $routingOpId)
+                      ->orWhere('id', $routingOpId);
+                })
+                ->first();
+
             $plannedQty = $batch ? (float) $batch->planned_quantity : (float) $order->quantity_ordered;
+            if ($targetOp && (float) $targetOp->target_produced_qty > 0) {
+                $plannedQty = $batch ? min((float) $batch->planned_quantity, (float) $targetOp->target_produced_qty) : (float) $targetOp->target_produced_qty;
+            }
 
             $wip = ProductionWip::create([
                 'tenant_id' => $order->tenant_id,
@@ -116,7 +128,15 @@ class ProductionWipService
      */
     public function initializeWip(int $orderId, ?int $batchId = null, ?int $userId = null): ProductionWip
     {
-        return DB::transaction(function () use ($orderId, $batchId, $userId) {
+        return $this->initializeWipForOrder($orderId, $userId, $batchId);
+    }
+
+    /**
+     * Initialize WIP tracking card for a Production Order (starts at initial routing operation).
+     */
+    public function initializeWipForOrder(int $orderId, ?int $userId = null, ?int $batchId = null): ProductionWip
+    {
+        return DB::transaction(function () use ($orderId, $userId, $batchId) {
             $order = ProductionOrder::findOrFail($orderId);
 
             // Fetch the first operation in sequence
@@ -140,6 +160,17 @@ class ProductionWipService
                 return $existing;
             }
 
+            $firstOpTarget = (float) ($firstOp->target_produced_qty > 0 ? $firstOp->target_produced_qty : $order->quantity_ordered);
+            if (!empty($firstOp->source_product_id) && $firstOp->source_product_id !== $order->product_id) {
+                $bomItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $order->tenant_id)
+                    ->where('bom_id', $order->bom_id)
+                    ->where('material_id', $firstOp->source_product_id)
+                    ->first();
+                if ($bomItem && (float) $bomItem->quantity > 0) {
+                    $firstOpTarget = (float) $order->quantity_ordered * (float) $bomItem->quantity;
+                }
+            }
+
             $wip = ProductionWip::create([
                 'tenant_id' => $order->tenant_id,
                 'production_order_id' => $order->id,
@@ -149,8 +180,8 @@ class ProductionWipService
                 'current_schedule_operation_id' => null,
                 'current_work_center_id' => $firstOp->work_center_id,
                 'current_machine_id' => $firstOp->machine_id,
-                'quantity' => $order->quantity_ordered,
-                'available_quantity' => $order->quantity_ordered,
+                'quantity' => $firstOpTarget,
+                'available_quantity' => $firstOpTarget,
                 'completed_quantity' => 0.0000,
                 'rejected_quantity' => 0.0000,
                 'scrap_quantity' => 0.0000,
@@ -178,7 +209,7 @@ class ProductionWipService
                 'machine_id' => $firstOp->machine_id,
                 'operator_id' => $userId,
                 'transaction_type' => 'created',
-                'quantity' => $order->quantity_ordered,
+                'quantity' => $firstOpTarget,
                 'good_quantity' => 0.0000,
                 'rejected_quantity' => 0.0000,
                 'scrap_quantity' => 0.0000,
@@ -219,6 +250,14 @@ class ProductionWipService
                 'status' => 'active',
             ]);
 
+            $startQty = $wip->available_quantity;
+            if ($orderOp) {
+                $availableInput = $this->getAvailableInputWip($orderOp, $wip->production_batch_id);
+                if ($availableInput > 0) {
+                    $startQty = min($startQty > 0 ? $startQty : $availableInput, $availableInput);
+                }
+            }
+
             ProductionWipTransaction::create([
                 'tenant_id' => $wip->tenant_id,
                 'wip_id' => $wip->id,
@@ -231,7 +270,7 @@ class ProductionWipService
                 'machine_id' => $schedOp->machine_id,
                 'operator_id' => $userId,
                 'transaction_type' => 'operation_started',
-                'quantity' => $wip->available_quantity,
+                'quantity' => $startQty,
                 'transaction_at' => now(),
                 'created_by' => $userId,
             ]);
