@@ -156,7 +156,7 @@ class GoodsReceiptNoteController extends Controller
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.purchase_order_item_id' => 'required|exists:purchase_order_items,id',
-            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_id' => 'nullable|exists:products,id',
             'items.*.received_qty' => 'required|numeric|min:0',
             'items.*.rejected_qty' => 'nullable|numeric|min:0',
             'items.*.remarks' => 'nullable|string',

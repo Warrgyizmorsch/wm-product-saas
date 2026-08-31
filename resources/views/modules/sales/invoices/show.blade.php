@@ -551,66 +551,157 @@
                     </div>
 
                     <!-- Right: Subtotal Calculations -->
-                    <div class="col-5 summary-table-box">
-                        <table class="table table-sm border-0 summary-table w-100 mb-0">
-                            <tbody>
-                                <tr>
-                                    <td class="text-muted fw-semibold">Sub Total:</td>
-                                    <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->subtotal, 2) }}</td>
-                                </tr>
-                                @if ($invoice->discount_amount > 0)
-                                    <tr>
-                                        <td class="text-muted fw-semibold">Discount:</td>
-                                        <td class="text-end fw-bold text-danger">-₹{{ number_format($invoice->discount_amount, 2) }}</td>
-                                    </tr>
-                                @endif
-                                @if ($invoice->gst_type === 'igst' || $invoice->igst_amount > 0)
-                                    <tr>
-                                        <td class="text-muted fw-semibold">IGST Amount:</td>
-                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->igst_amount > 0 ? $invoice->igst_amount : $invoice->tax_amount, 2) }}</td>
-                                    </tr>
-                                @elseif ($invoice->gst_type === 'cgst_sgst' || ($invoice->cgst_amount > 0 || $invoice->sgst_amount > 0))
-                                    <tr>
-                                        <td class="text-muted fw-semibold">CGST Amount:</td>
-                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->cgst_amount > 0 ? $invoice->cgst_amount : round($invoice->tax_amount / 2, 2), 2) }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="text-muted fw-semibold">SGST Amount:</td>
-                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->sgst_amount > 0 ? $invoice->sgst_amount : round($invoice->tax_amount / 2, 2), 2) }}</td>
-                                    </tr>
-                                @else
-                                    <tr>
-                                        <td class="text-muted fw-semibold">Tax Amount:</td>
-                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->tax_amount, 2) }}</td>
-                                    </tr>
-                                @endif
+                    <div class="col-5 summary-table-box ms-auto">
+                        <div class="p-3 rounded-3 border bg-light text-dark" style="border-color: #cbd5e1 !important; background-color: #f8fafc !important;">
+                            @php
+                                $grossSubtotal = 0;
+                                $totalItemDiscount = 0;
+                                $itemsTaxAmount = 0;
+                                $maxItemTaxRate = 0;
+                                foreach($invoice->items as $it) {
+                                    $grossSubtotal += ($it->quantity * $it->unit_price);
+                                    $totalItemDiscount += $it->discount;
+                                    if ($invoice->tax_type === 'item_wise_tax') {
+                                        $lineTaxable = max(0, ($it->quantity * $it->unit_price) - $it->discount);
+                                        $itemsTaxAmount += ($lineTaxable * ($it->tax_rate / 100));
+                                        if ($it->tax_rate > $maxItemTaxRate) $maxItemTaxRate = $it->tax_rate;
+                                    }
+                                }
+                                $effectiveDiscount = ($invoice->discount_type === 'order_wise') ? (float)$invoice->discount_amount : $totalItemDiscount;
+                                $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
 
-                                <tr>
-                                    <td class="text-muted fw-semibold">Freight Terms:</td>
-                                    <td class="text-end font-monospace fw-semibold fs-11">{{ $invoice->freight_terms ?: 'To Pay' }}</td>
-                                </tr>
-                                @if ($invoice->freight_terms === 'To Be Billed' && $invoice->freight_amount > 0)
-                                    <tr>
-                                        <td class="text-muted fw-semibold">Freight Charges:</td>
-                                        <td class="text-end fw-bold text-dark">₹{{ number_format($invoice->freight_amount, 2) }}</td>
-                                    </tr>
+                                if ($invoice->tax_type === 'order_wise_tax') {
+                                    $itemsTaxAmount = $taxableBase * (($invoice->order_tax_rate ?: 18) / 100);
+                                } elseif ($invoice->tax_type === 'without_tax') {
+                                    $itemsTaxAmount = 0;
+                                }
+
+                                $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
+                                $freightAmount = ($invoice->freight_terms === 'To Be Billed') ? (float)($invoice->freight_amount ?: 0) : 0;
+
+                                $freightTaxRateOpt = $invoice->freight_tax_rate ?? 'highest';
+                                $freightTaxRatePercent = 18;
+                                if ($freightTaxRateOpt === 'highest') {
+                                    if ($invoice->tax_type === 'order_wise_tax') {
+                                        $freightTaxRatePercent = $invoice->order_tax_rate > 0 ? $invoice->order_tax_rate : 18;
+                                    } else {
+                                        $freightTaxRatePercent = ($maxItemTaxRate > 0) ? $maxItemTaxRate : 18;
+                                    }
+                                } else {
+                                    $freightTaxRatePercent = floatval($freightTaxRateOpt);
+                                }
+
+                                $freightTax = ($freightAmount > 0 && $invoice->tax_type !== 'without_tax') ? round($freightAmount * ($freightTaxRatePercent / 100), 2) : 0;
+                                $totalFreightInclGst = $freightAmount + $freightTax;
+                                $totalInvoiceTaxAmount = $itemsTaxAmount + $freightTax;
+                                $adjustment = (float)($invoice->adjustment ?? 0);
+                                $grandTotal = $itemsTotalInclGst + $totalFreightInclGst + $adjustment;
+                                $gstType = $invoice->gst_type ?? 'cgst_sgst';
+                            @endphp
+
+                            <!-- 1. Subtotal (Excl. Tax) -->
+                            <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                <span class="text-muted fw-semibold">Subtotal (Excl. Tax):</span>
+                                <span class="fw-bold text-dark">₹{{ number_format($grossSubtotal, 2) }}</span>
+                            </div>
+
+                            <!-- 2. Less: Item Discounts -->
+                            @if($invoice->discount_type !== 'without_discount' && $effectiveDiscount > 0)
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12 text-danger">
+                                    <span class="fw-semibold">Less: Item Discounts:</span>
+                                    <span class="fw-bold">-₹{{ number_format($effectiveDiscount, 2) }}</span>
+                                </div>
+                            @endif
+
+                            <!-- 3. Items Taxable Value -->
+                            <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                <span class="text-muted fw-semibold">Items Taxable Value:</span>
+                                <span class="fw-bold text-dark">₹{{ number_format($taxableBase, 2) }}</span>
+                            </div>
+
+                            <!-- 4. Add: Items GST Tax -->
+                            @if($invoice->tax_type !== 'without_tax' && $itemsTaxAmount > 0)
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                    <span class="text-muted fw-medium">Add: Items GST Tax:</span>
+                                    <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount, 2) }}</span>
+                                </div>
+                            @endif
+
+                            <!-- 5. Billed Items Total (Incl. GST) -->
+                            <div class="d-flex justify-content-between align-items-center my-2 py-1.5 px-2.5 rounded bg-white border fs-12 fw-bold text-dark" style="border-color: #e2e8f0 !important;">
+                                <span>Billed Items Total (Incl. GST):</span>
+                                <span>₹{{ number_format($itemsTotalInclGst, 2) }}</span>
+                            </div>
+
+                            <!-- 6. Freight Charges -->
+                            @if($freightAmount > 0)
+                                <hr class="my-2 border-slate">
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                    <span class="text-muted fw-semibold">Freight Charges:</span>
+                                    <span class="fw-bold text-primary">₹{{ number_format($freightAmount, 2) }}</span>
+                                </div>
+                                @if($freightTax > 0)
+                                    <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                        <span class="text-muted fw-semibold">Add: Freight GST Tax:</span>
+                                        <span class="text-muted font-monospace">+₹{{ number_format($freightTax, 2) }}</span>
+                                    </div>
                                 @endif
-                                <tr class="border-top border-bottom" style="background-color: #f8fafc;">
-                                    <td class="fw-bold fs-14" style="color: #1e40af;">Total Amount:</td>
-                                    <td class="text-end fw-black fs-15" style="color: #1e40af;">₹{{ number_format($invoice->total_amount, 2) }}</td>
-                                </tr>
-                                @if ($adjustedAmount > 0 || $invoice->amount_paid > 0)
-                                    <tr class="text-success">
-                                        <td class="fw-semibold fs-12">Payments Received:</td>
-                                        <td class="text-end fw-bold">-₹{{ number_format(max($invoice->amount_paid, $adjustedAmount), 2) }}</td>
-                                    </tr>
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12 fw-bold text-primary">
+                                    <span>Total Freight (Incl. GST):</span>
+                                    <span>₹{{ number_format($totalFreightInclGst, 2) }}</span>
+                                </div>
+                            @endif
+
+                            <!-- OVERALL TAX BREAKDOWN -->
+                            @if($invoice->tax_type !== 'without_tax' && $totalInvoiceTaxAmount > 0)
+                                <hr class="my-2 border-slate">
+                                @if($gstType === 'cgst_sgst')
+                                    <div class="d-flex justify-content-between align-items-center mb-1.5 fs-12">
+                                        <span class="text-muted fw-medium">CGST (Central Tax):</span>
+                                        <span class="text-muted font-monospace">+₹{{ number_format($totalInvoiceTaxAmount / 2, 2) }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                        <span class="text-muted fw-medium">SGST (State Tax):</span>
+                                        <span class="text-muted font-monospace">+₹{{ number_format($totalInvoiceTaxAmount / 2, 2) }}</span>
+                                    </div>
+                                @else
+                                    <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                        <span class="text-muted fw-medium">IGST (Integrated Tax):</span>
+                                        <span class="text-muted font-monospace">+₹{{ number_format($totalInvoiceTaxAmount, 2) }}</span>
+                                    </div>
                                 @endif
-                                <tr>
-                                    <td class="fw-bold fs-13 text-dark">Balance Due:</td>
-                                    <td class="text-end fw-extrabold fs-14 {{ $balanceDue > 0 ? 'text-danger' : 'text-success' }}">₹{{ number_format($balanceDue, 2) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                            @endif
+
+                            <!-- 7. Adjustment -->
+                            @if($adjustment != 0)
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
+                                    <span class="text-muted fw-semibold">Adjustment:</span>
+                                    <span class="fw-bold text-dark">₹{{ number_format($adjustment, 2) }}</span>
+                                </div>
+                            @endif
+
+                            <!-- 8. Grand Total -->
+                            <div class="d-flex justify-content-between align-items-center pt-2.5 border-top mt-2" style="border-color: #cbd5e1 !important;">
+                                <span class="fw-bold text-dark fs-13 text-uppercase" style="letter-spacing: 0.5px;">Grand Total:</span>
+                                <span class="fw-bold text-primary fs-16">₹{{ number_format($grandTotal, 2) }}</span>
+                            </div>
+
+                            <!-- 9. Balance Due (if applicable) -->
+                            @php
+                                $totalPaid = $invoice->amount_paid ?: 0;
+                                $balDue = max(0, $grandTotal - $totalPaid);
+                            @endphp
+                            @if($totalPaid > 0)
+                                <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top text-success fs-12">
+                                    <span class="fw-semibold">Amount Paid:</span>
+                                    <span class="fw-bold">-₹{{ number_format($totalPaid, 2) }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-1 pt-1 text-danger fs-13">
+                                    <span class="fw-bold">Balance Due:</span>
+                                    <span class="fw-bold">₹{{ number_format($balDue, 2) }}</span>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 </div>
 

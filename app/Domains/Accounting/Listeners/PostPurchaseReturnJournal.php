@@ -2,10 +2,13 @@
 
 namespace App\Domains\Accounting\Listeners;
 
+use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\VoucherDetail;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
+use App\Domains\Accounting\Support\VoucherType;
 use App\Domains\Purchase\Events\PurchaseReturnApproved;
 use App\Domains\Purchase\Models\LandedCostItem;
 use App\Domains\Purchase\Models\VendorBill;
@@ -36,9 +39,15 @@ class PostPurchaseReturnJournal
             $accountsPayable = $this->accounts->findByCode('2010', $tenantId);
             $inventory       = $this->accounts->findByCode('1200', $tenantId);
             $inputGst        = $this->accounts->findByCode('1600', $tenantId);
-            $inputCgst       = $this->accounts->findByCode('1601', $tenantId) ?: $inputGst;
-            $inputSgst       = $this->accounts->findByCode('1602', $tenantId) ?: $inputGst;
-            $inputIgst       = $this->accounts->findByCode('1603', $tenantId) ?: $inputGst;
+            $inputCgst       = $this->accounts->findByCode('1610', $tenantId)
+                ?? $this->accounts->findByCode('1601', $tenantId)
+                ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input CGST%')->first() ?: $inputGst);
+            $inputSgst       = $this->accounts->findByCode('1620', $tenantId)
+                ?? $this->accounts->findByCode('1602', $tenantId)
+                ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input SGST%')->first() ?: $inputGst);
+            $inputIgst       = $this->accounts->findByCode('1630', $tenantId)
+                ?? $this->accounts->findByCode('1603', $tenantId)
+                ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input IGST%')->first() ?: $inputGst);
             $freightExpense  = $this->accounts->findByCode('5030', $tenantId) ?: $this->accounts->findByCode('5900', $tenantId);
 
             if (!$accountsPayable || !$inventory) {
@@ -46,7 +55,7 @@ class PostPurchaseReturnJournal
                     'purchase_return_id' => $return->id,
                     'tenant_id' => $tenantId,
                 ]);
-                $this->failures->record($tenantId, PurchaseReturnApproved::class, $return, $message);
+                $this->failures->record($tenantId, PurchaseReturnApproved::class, $return, 'Missing Chart of Accounts (2010/1200).');
                 return;
             }
 
@@ -177,13 +186,25 @@ class PostPurchaseReturnJournal
             }
 
             // Post General Ledger Journal Entry
-            $this->journals->post($lines, [
-                'tenant_id'      => $tenantId,
-                'journal_date'   => $return->return_date ?: now(),
-                'source'         => Journal::SOURCE_PURCHASE,
-                'reference_type' => 'purchase_return',
-                'reference_id'   => $return->id,
-                'memo'           => "Purchase Return / Debit Note {$return->return_number} ({$return->vendor?->name})",
+            $debitNoteJournal = $this->journals->post($lines, [
+                'tenant_id'             => $tenantId,
+                'journal_date'          => $return->return_date ?: now(),
+                'source'                => Journal::SOURCE_PURCHASE,
+                'reference_type'        => 'purchase_return',
+                'reference_id'          => $return->id,
+                'memo'                  => "Purchase Return / Debit Note {$return->return_number} ({$return->vendor?->name})",
+                'voucher_type'          => VoucherType::DEBIT_NOTE,
+                'journal_number_prefix' => VoucherType::prefix(VoucherType::DEBIT_NOTE),
+            ]);
+
+            VoucherDetail::create([
+                'tenant_id'    => $tenantId,
+                'journal_id'   => $debitNoteJournal->id,
+                'voucher_type' => VoucherType::DEBIT_NOTE,
+                'party_type'   => 'vendor',
+                'party_id'     => $return->vendor_id,
+                'party_name'   => $return->vendor?->name,
+                'reference_no' => $return->return_number,
             ]);
 
             Log::info("PostPurchaseReturnJournal: Successfully posted GL entry for Purchase Return {$return->return_number}", [

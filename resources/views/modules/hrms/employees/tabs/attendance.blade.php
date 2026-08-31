@@ -1,5 +1,11 @@
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+@once
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
+<style>
+    .pac-container {
+        z-index: 9999 !important;
+    }
+</style>
+@endonce
 <div class="tab-pane fade {{ $activeTabName === 'attendance' ? 'show active' : '' }}" id="attendance-pane" role="tabpanel" aria-labelledby="attendance-tab">
     
     <div class="row g-4">
@@ -929,7 +935,12 @@
 
     // Map instance for detail drawer
     let detailDrawerMapObj = null;
-    let detailDrawerMarkersGroup = null;
+    let detailDrawerOverlays = [];
+
+    function clearDetailDrawerOverlays() {
+        detailDrawerOverlays.forEach(overlay => overlay.setMap(null));
+        detailDrawerOverlays = [];
+    }
 
     @php
         $officeLat = $rule ? $rule->office_latitude  : null;
@@ -1041,110 +1052,79 @@
         const bootstrapDrawer = bootstrap.Offcanvas.getOrCreateInstance(drawerEl);
         bootstrapDrawer.show();
 
-        // Render Leaflet map
+        // Render Google map
         setTimeout(() => {
             if (hasCheckinCoords || hasCheckoutCoords || hasLocationLogs || hasGeofenceCoords) {
+                if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+                    return;
+                }
+
                 // Initialize map if not yet initialized
                 if (!detailDrawerMapObj) {
                     @if($officeLat && $officeLng)
-                    detailDrawerMapObj = L.map('detail-drawer-map').setView([{{ (float)$officeLat }}, {{ (float)$officeLng }}], 13);
+                    const initCenter = { lat: {{ (float)$officeLat }}, lng: {{ (float)$officeLng }} };
                     @elseif($wfhLat && $wfhLng)
-                    detailDrawerMapObj = L.map('detail-drawer-map').setView([{{ (float)$wfhLat }}, {{ (float)$wfhLng }}], 13);
+                    const initCenter = { lat: {{ (float)$wfhLat }}, lng: {{ (float)$wfhLng }} };
                     @else
-                    detailDrawerMapObj = L.map('detail-drawer-map').setView([20.5937, 78.9629], 5);
+                    const initCenter = { lat: 20.5937, lng: 78.9629 };
                     @endif
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 19,
-                        attribution: '© OpenStreetMap'
-                    }).addTo(detailDrawerMapObj);
-                    detailDrawerMarkersGroup = L.featureGroup().addTo(detailDrawerMapObj);
 
-                    // Geocoding search logic for details drawer map
+                    detailDrawerMapObj = new google.maps.Map(document.getElementById('detail-drawer-map'), {
+                        center: initCenter,
+                        zoom: 13,
+                        mapTypeControl: false,
+                        fullscreenControl: false,
+                        streetViewControl: false
+                    });
+
+                    // Google Places Autocomplete search logic for details drawer map
                     const searchInput = document.getElementById('detail_drawer_map_search');
                     if (searchInput) {
-                        const performDetailSearch = () => {
-                            const query = searchInput.value;
-                            if (!query) return;
+                        const autocomplete = new google.maps.places.Autocomplete(searchInput);
+                        autocomplete.bindTo('bounds', detailDrawerMapObj);
 
-                            searchInput.disabled = true;
-                            searchInput.placeholder = 'Searching...';
-
-                            // ArcGIS World Geocoding (primary — high accuracy for streets, subareas, landmarks)
-                            fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query)}&maxLocations=1`)
-                                .then(res => res.json())
-                                .then(data => {
-                                    if (data && data.candidates && data.candidates.length > 0) {
-                                        const lat = parseFloat(data.candidates[0].location.y);
-                                        const lng = parseFloat(data.candidates[0].location.x);
-                                        if (detailDrawerMapObj) {
-                                            detailDrawerMapObj.setView([lat, lng], 15);
-                                        }
-                                        searchInput.disabled = false;
-                                        searchInput.placeholder = 'Search address or subarea (Press Enter)...';
-                                    } else {
-                                        // Fallback to OSM Nominatim
-                                        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
-                                            .then(res2 => res2.json())
-                                            .then(data2 => {
-                                                if (data2 && data2.length > 0) {
-                                                    const lat = parseFloat(data2[0].lat);
-                                                    const lng = parseFloat(data2[0].lon);
-                                                    if (detailDrawerMapObj) {
-                                                        detailDrawerMapObj.setView([lat, lng], 15);
-                                                    }
-                                                } else {
-                                                    alert("Location not found. Please try a different query.");
-                                                }
-                                                searchInput.disabled = false;
-                                                searchInput.placeholder = 'Search address or subarea (Press Enter)...';
-                                            })
-                                            .catch(() => {
-                                                alert("Location not found. Please try a different query.");
-                                                searchInput.disabled = false;
-                                                searchInput.placeholder = 'Search address or subarea (Press Enter)...';
-                                            });
-                                    }
-                                })
-                                .catch(err => {
-                                    console.error("Geocoding error:", err);
-                                    searchInput.disabled = false;
-                                    searchInput.placeholder = 'Search address or subarea (Press Enter)...';
-                                });
-                        };
+                        autocomplete.addListener('place_changed', function() {
+                            const place = autocomplete.getPlace();
+                            if (!place.geometry || !place.geometry.location) {
+                                return;
+                            }
+                            detailDrawerMapObj.setCenter(place.geometry.location);
+                            detailDrawerMapObj.setZoom(15);
+                        });
 
                         searchInput.addEventListener('keypress', function(e) {
                             if (e.key === 'Enter') {
                                 e.preventDefault();
-                                performDetailSearch();
                             }
                         });
                     }
                 } else {
-                    // Clear existing markers
-                    detailDrawerMarkersGroup.clearLayers();
+                    clearDetailDrawerOverlays();
                 }
 
                 const pathLatLngs = [];
+                const bounds = new google.maps.LatLngBounds();
 
-                // Add Check-In Marker (Green icon style)
+                // Add Check-In Marker (Green icon)
                 if (hasCheckinCoords) {
                     const checkinLatVal = parseFloat(checkinLat);
                     const checkinLngVal = parseFloat(checkinLng);
-                    const checkinLatLng = [checkinLatVal, checkinLngVal];
+                    const checkinLatLng = { lat: checkinLatVal, lng: checkinLngVal };
                     pathLatLngs.push(checkinLatLng);
+                    bounds.extend(checkinLatLng);
                     
-                    const checkinIcon = L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
+                    const marker = new google.maps.Marker({
+                        position: checkinLatLng,
+                        map: detailDrawerMapObj,
+                        title: 'Check In Point',
+                        icon: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
                     });
+                    detailDrawerOverlays.push(marker);
 
-                    L.marker(checkinLatLng, { icon: checkinIcon })
-                        .addTo(detailDrawerMarkersGroup)
-                        .bindPopup(`<b>Check In Point</b><br>Time: ${checkinTime}<br>Lat: ${checkinLatVal.toFixed(6)}<br>Lng: ${checkinLngVal.toFixed(6)}`);
+                    const infowindow = new google.maps.InfoWindow({
+                        content: `<b>Check In Point</b><br>Time: ${checkinTime}<br>Lat: ${checkinLatVal.toFixed(6)}<br>Lng: ${checkinLngVal.toFixed(6)}`
+                    });
+                    marker.addListener('click', () => infowindow.open(detailDrawerMapObj, marker));
                 }
 
                 // Add intermediate 15-minute tracking location logs as circle markers
@@ -1153,52 +1133,68 @@
                         if (log.lat && log.lng) {
                             const latVal = parseFloat(log.lat);
                             const lngVal = parseFloat(log.lng);
-                            const logLatLng = [latVal, lngVal];
+                            const logLatLng = { lat: latVal, lng: lngVal };
                             pathLatLngs.push(logLatLng);
+                            bounds.extend(logLatLng);
 
-                            L.circleMarker(logLatLng, {
-                                radius: 6,
-                                fillColor: '#3b82f6',
-                                color: '#ffffff',
-                                weight: 2,
-                                opacity: 1,
-                                fillOpacity: 0.8
-                            }).addTo(detailDrawerMarkersGroup)
-                              .bindPopup(`<b>Location Log (15m Tracking)</b><br>Time: ${log.time}<br>Lat: ${latVal.toFixed(6)}<br>Lng: ${lngVal.toFixed(6)}`);
+                            const circleMarker = new google.maps.Marker({
+                                position: logLatLng,
+                                map: detailDrawerMapObj,
+                                icon: {
+                                    path: google.maps.SymbolPath.CIRCLE,
+                                    fillColor: '#3b82f6',
+                                    fillOpacity: 0.8,
+                                    strokeColor: '#FFFFFF',
+                                    strokeWeight: 2,
+                                    scale: 6 // 6-pixel radius dot
+                                }
+                            });
+                            detailDrawerOverlays.push(circleMarker);
+
+                            const infowindow = new google.maps.InfoWindow({
+                                content: `<b>Location Log (15m Tracking)</b><br>Time: ${log.time}<br>Lat: ${latVal.toFixed(6)}<br>Lng: ${lngVal.toFixed(6)}`
+                            });
+                            circleMarker.addListener('click', () => {
+                                infowindow.setPosition(logLatLng);
+                                infowindow.open(detailDrawerMapObj);
+                            });
                         }
                     });
                 }
 
-                // Add Check-Out Marker (Red icon style)
+                // Add Check-Out Marker (Red icon)
                 if (hasCheckoutCoords) {
                     const checkoutLatVal = parseFloat(checkoutLat);
                     const checkoutLngVal = parseFloat(checkoutLng);
-                    const checkoutLatLng = [checkoutLatVal, checkoutLngVal];
+                    const checkoutLatLng = { lat: checkoutLatVal, lng: checkoutLngVal };
                     pathLatLngs.push(checkoutLatLng);
+                    bounds.extend(checkoutLatLng);
 
-                    const checkoutIcon = L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
+                    const marker = new google.maps.Marker({
+                        position: checkoutLatLng,
+                        map: detailDrawerMapObj,
+                        title: 'Check Out Point',
+                        icon: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
                     });
+                    detailDrawerOverlays.push(marker);
 
-                    L.marker(checkoutLatLng, { icon: checkoutIcon })
-                        .addTo(detailDrawerMarkersGroup)
-                        .bindPopup(`<b>Check Out Point</b><br>Time: ${checkoutTime}<br>Lat: ${checkoutLatVal.toFixed(6)}<br>Lng: ${checkoutLngVal.toFixed(6)}`);
+                    const infowindow = new google.maps.InfoWindow({
+                        content: `<b>Check Out Point</b><br>Time: ${checkoutTime}<br>Lat: ${checkoutLatVal.toFixed(6)}<br>Lng: ${checkoutLngVal.toFixed(6)}`
+                    });
+                    marker.addListener('click', () => infowindow.open(detailDrawerMapObj, marker));
                 }
 
                 // Add Polyline connecting all path points if we have 2 or more coordinates
                 if (pathLatLngs.length >= 2) {
-                    L.polyline(pathLatLngs, {
-                        color: '#4f46e5', // Premium Indigo path color
-                        weight: 4,
-                        opacity: 0.8,
-                        dashArray: '8, 8', // Dashed line to show direction/flow
-                        lineJoin: 'round'
-                    }).addTo(detailDrawerMarkersGroup);
+                    const polyline = new google.maps.Polyline({
+                        path: pathLatLngs,
+                        geodesic: true,
+                        strokeColor: '#4f46e5',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 4
+                    });
+                    polyline.setMap(detailDrawerMapObj);
+                    detailDrawerOverlays.push(polyline);
                 }
 
                 // Draw geofence threshold radius circles
@@ -1206,54 +1202,59 @@
                 const officeGeofenceLat = {{ (float)$officeLat }};
                 const officeGeofenceLng = {{ (float)$officeLng }};
                 const officeGeofenceRadius = {{ $officeRad }};
-                L.circle([officeGeofenceLat, officeGeofenceLng], {
-                    radius: officeGeofenceRadius,
-                    color: '#4f46e5',
-                    weight: 2,
+                const officePos = { lat: officeGeofenceLat, lng: officeGeofenceLng };
+                bounds.extend(officePos);
+
+                const officeCircle = new google.maps.Circle({
+                    strokeColor: '#4f46e5',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
                     fillColor: '#4f46e5',
                     fillOpacity: 0.08,
-                    dashArray: '6, 4'
-                }).addTo(detailDrawerMarkersGroup)
-                  .bindPopup(`<b>Office Geofence</b><br>Lat: ${officeGeofenceLat.toFixed(6)}<br>Lng: ${officeGeofenceLng.toFixed(6)}<br>Radius: ${officeGeofenceRadius}m`);
+                    map: detailDrawerMapObj,
+                    center: officePos,
+                    radius: officeGeofenceRadius
+                });
+                detailDrawerOverlays.push(officeCircle);
                 @endif
 
                 @if($wfhLat && $wfhLng)
                 const wfhGeofenceLat = {{ (float)$wfhLat }};
                 const wfhGeofenceLng = {{ (float)$wfhLng }};
                 const wfhGeofenceRadius = {{ $wfhRad }};
-                L.circle([wfhGeofenceLat, wfhGeofenceLng], {
-                    radius: wfhGeofenceRadius,
-                    color: '#10b981',
-                    weight: 2,
+                const wfhPos = { lat: wfhGeofenceLat, lng: wfhGeofenceLng };
+                bounds.extend(wfhPos);
+
+                const wfhCircle = new google.maps.Circle({
+                    strokeColor: '#10b981',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
                     fillColor: '#10b981',
                     fillOpacity: 0.08,
-                    dashArray: '6, 4'
-                }).addTo(detailDrawerMarkersGroup)
-                  .bindPopup(`<b>WFH Geofence</b><br>Lat: ${wfhGeofenceLat.toFixed(6)}<br>Lng: ${wfhGeofenceLng.toFixed(6)}<br>Radius: ${wfhGeofenceRadius}m`);
+                    map: detailDrawerMapObj,
+                    center: wfhPos,
+                    radius: wfhGeofenceRadius
+                });
+                detailDrawerOverlays.push(wfhCircle);
                 @endif
 
                 // Set View/Bounds
                 if (pathLatLngs.length > 0) {
-                    const bounds = detailDrawerMarkersGroup.getBounds();
-                    if (pathLatLngs.length >= 2) {
-                        detailDrawerMapObj.fitBounds(bounds, { padding: [30, 30] });
-                    } else {
-                        detailDrawerMapObj.setView(pathLatLngs[0], 15);
+                    detailDrawerMapObj.fitBounds(bounds);
+                    if (pathLatLngs.length === 1) {
+                        detailDrawerMapObj.setZoom(15);
                     }
-                } else if (detailDrawerMarkersGroup.getLayers().length > 0) {
-                    // Only geofence circles — center map on available geofence bounds
-                    try {
-                        detailDrawerMapObj.fitBounds(detailDrawerMarkersGroup.getBounds(), { padding: [20, 20] });
-                    } catch(e) {
-                        @if($officeLat && $officeLng)
-                        detailDrawerMapObj.setView([{{ (float)$officeLat }}, {{ (float)$officeLng }}], 15);
-                        @elseif($wfhLat && $wfhLng)
-                        detailDrawerMapObj.setView([{{ (float)$wfhLat }}, {{ (float)$wfhLng }}], 15);
-                        @endif
-                    }
+                } else {
+                    @if($officeLat && $officeLng)
+                    detailDrawerMapObj.setCenter({ lat: {{ (float)$officeLat }}, lng: {{ (float)$officeLng }} });
+                    detailDrawerMapObj.setZoom(15);
+                    @elseif($wfhLat && $wfhLng)
+                    detailDrawerMapObj.setCenter({ lat: {{ (float)$wfhLat }}, lng: {{ (float)$wfhLng }} });
+                    detailDrawerMapObj.setZoom(15);
+                    @endif
                 }
-                
-                detailDrawerMapObj.invalidateSize();
+
+                google.maps.event.trigger(detailDrawerMapObj, 'resize');
             }
         }, 300);
     }
@@ -1265,7 +1266,7 @@
             document.body.appendChild(drawerEl);
             drawerEl.addEventListener('shown.bs.offcanvas', function() {
                 if (detailDrawerMapObj) {
-                    detailDrawerMapObj.invalidateSize();
+                    google.maps.event.trigger(detailDrawerMapObj, 'resize');
                 }
             });
         }

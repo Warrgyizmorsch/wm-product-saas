@@ -138,6 +138,7 @@ class AssetController extends Controller
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
+            'fixed_asset_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
         ]);
 
         $this->assetRepository->storeCategory($validated);
@@ -151,6 +152,7 @@ class AssetController extends Controller
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
+            'fixed_asset_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
         ]);
 
         $this->assetRepository->updateCategory($assetCategory, $validated);

@@ -18,6 +18,9 @@ class PurchaseOrderItem extends Model
     protected $fillable = [
         'purchase_order_id',
         'product_id',
+        'line_type',
+        'chart_of_account_id',
+        'asset_category_id',
         'production_order_id',
         'production_order_operation_id',
         'production_batch_id',
@@ -39,9 +42,21 @@ class PurchaseOrderItem extends Model
         'total_amount',
     ];
 
+    public const LINE_TYPE_STOCK = 'stock';
+    public const LINE_TYPE_ASSET = 'asset';
+    public const LINE_TYPE_EXPENSE = 'expense';
+
+    public const LINE_TYPES = [
+        self::LINE_TYPE_STOCK,
+        self::LINE_TYPE_ASSET,
+        self::LINE_TYPE_EXPENSE,
+    ];
+
     protected $casts = [
         'purchase_order_id' => 'integer',
         'product_id' => 'integer',
+        'chart_of_account_id' => 'integer',
+        'asset_category_id' => 'integer',
         'production_order_id' => 'integer',
         'production_order_operation_id' => 'integer',
         'production_batch_id' => 'integer',
@@ -76,6 +91,16 @@ class PurchaseOrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    public function assetCategory(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\HRMS\Models\AssetCategory::class, 'asset_category_id');
+    }
+
+    public function chartOfAccount(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\ChartOfAccount::class, 'chart_of_account_id');
     }
 
     public function productionOrder(): BelongsTo

@@ -5,6 +5,7 @@ namespace App\Domains\Sales\Controllers;
 use App\Domains\Sales\Models\SalesReturn;
 use App\Domains\Sales\Models\SalesReturnItem;
 use App\Domains\Sales\Models\SalesOrder;
+use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Repositories\SalesReturnRepository;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\Inventory\Models\Warehouse;
@@ -40,7 +41,16 @@ class SalesReturnController extends Controller
 
         $tenantId = require_tenant_id();
         $customers = Customer::query()->orderBy('name')->get();
-        $salesOrders = SalesOrder::whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped'])->latest()->get();
+        $salesOrders = SalesOrder::with(['invoices' => function($q) {
+            $q->where('status', '!=', 'Cancelled')->with('items.product', 'items.warehouse');
+        }, 'customer', 'items.product', 'items.warehouse'])
+        ->whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped', 'Invoiced'])
+        ->latest()->get();
+
+        $invoices = Invoice::with(['customer', 'items.product', 'items.warehouse', 'salesOrder'])
+            ->where('status', '!=', 'Cancelled')
+            ->latest()->get();
+
         $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();
         $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->orderBy('name')->get();
 
@@ -50,6 +60,7 @@ class SalesReturnController extends Controller
 
         $prefillSalesOrderId = $salesOrderId;
         $prefillCustomerId   = $salesOrder?->customer_id;
+        $prefillInvoiceId    = $request->input('invoice_id');
 
         $formattedWarehouses = $warehouses->map(fn ($w) => ['id' => $w->id, 'name' => $w->name])->values()->all();
         $formattedProducts   = $products->map(fn ($p) => [
@@ -61,14 +72,27 @@ class SalesReturnController extends Controller
         ])->values()->all();
 
         return view('modules.sales.returns.create', compact(
-            'customers', 'salesOrders', 'salesOrder', 'warehouses', 'nextReturnNumber',
-            'prefillSalesOrderId', 'prefillCustomerId', 'products', 'formattedProducts', 'formattedWarehouses'
+            'customers', 'salesOrders', 'salesOrder', 'invoices', 'warehouses', 'nextReturnNumber',
+            'prefillSalesOrderId', 'prefillCustomerId', 'prefillInvoiceId', 'products', 'formattedProducts', 'formattedWarehouses'
         ));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', SalesReturn::class);
+
+        // Auto-fill sales_order_id and customer_id from Invoice if provided
+        if ($request->filled('invoice_id')) {
+            $inv = Invoice::find($request->input('invoice_id'));
+            if ($inv) {
+                if (!$request->filled('customer_id')) {
+                    $request->merge(['customer_id' => $inv->customer_id]);
+                }
+                if (!$request->filled('sales_order_id') && $inv->sales_order_id) {
+                    $request->merge(['sales_order_id' => $inv->sales_order_id]);
+                }
+            }
+        }
 
         // Auto-fill customer_id from SalesOrder if missing in request
         if (!$request->filled('customer_id') && $request->filled('sales_order_id')) {
@@ -102,6 +126,7 @@ class SalesReturnController extends Controller
         $validated = $request->validate([
             'customer_id'    => ['required', 'exists:customers,id'],
             'sales_order_id' => ['nullable', 'exists:sales_orders,id'],
+            'invoice_id'     => ['nullable', 'exists:invoices,id'],
             'return_number'  => ['required', 'string', 'max:255', 'unique:sales_returns,return_number'],
             'return_date'    => ['required', 'date'],
             'reason'         => ['nullable', 'string'],
@@ -123,6 +148,7 @@ class SalesReturnController extends Controller
                 'tenant_id'           => tenant_id() ?? 1,
                 'customer_id'         => $validated['customer_id'],
                 'sales_order_id'      => $validated['sales_order_id'] ?? null,
+                'invoice_id'          => $validated['invoice_id'] ?? null,
                 'return_number'       => $validated['return_number'],
                 'return_date'         => $validated['return_date'],
                 'status'              => 'Pending',
@@ -246,6 +272,16 @@ class SalesReturnController extends Controller
                     null,
                     $serials
                 );
+            }
+
+            if ($returnOrder->invoice_id) {
+                $invoice = \App\Domains\Sales\Models\Invoice::find($returnOrder->invoice_id);
+                if ($invoice) {
+                    $apply = min((float) $returnOrder->total_refund_amount, (float) $invoice->balance_due);
+                    $invoice->balance_due = max(0, (float) $invoice->balance_due - $apply);
+                    $invoice->status = $invoice->balance_due <= 0 ? 'Paid' : 'Partially Paid';
+                    $invoice->save();
+                }
             }
 
             $returnOrder->update(['status' => 'Completed']);

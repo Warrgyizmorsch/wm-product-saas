@@ -28,8 +28,11 @@ class SchedulingService
     ) {
     }
 
-    private function getCachedWorkCenter(int $wcId): ?WorkCenter
+    private function getCachedWorkCenter(?int $wcId): ?WorkCenter
     {
+        if (!$wcId) {
+            return null;
+        }
         if (!isset($this->workCentersCache[$wcId])) {
             $this->workCentersCache[$wcId] = WorkCenter::withoutGlobalScopes()->find($wcId);
         }
@@ -678,13 +681,21 @@ class SchedulingService
      * @return array{start: Carbon, finish: Carbon, warnings: array}
      */
     public function calculateAvailableSlot(
-        int $workCenterId,
+        ?int $workCenterId,
         ?int $machineId,
         Carbon $from,
         float $durationMinutes,
         bool $forward = true,
         array $excludeScheduleOpIds = []
     ): array {
+        if (!$workCenterId) {
+            return [
+                'start' => $forward ? $from->copy() : $from->copy()->subMinutes((int) $durationMinutes),
+                'finish' => $forward ? $from->copy()->addMinutes((int) $durationMinutes) : $from->copy(),
+                'warnings' => [],
+            ];
+        }
+
         $wc = $this->getCachedWorkCenter($workCenterId);
         if (!$wc) {
             return ['start' => $from->copy(), 'finish' => $from->copy()->addMinutes((int) $durationMinutes), 'warnings' => []];
@@ -1072,8 +1083,12 @@ class SchedulingService
     /**
      * Resolve working hours of Work Center in minutes.
      */
-    public function calculateCapacity(int $workCenterId, Carbon $date): float
+    public function calculateCapacity(?int $workCenterId, Carbon $date): float
     {
+        if (!$workCenterId) {
+            return 0.0;
+        }
+
         $wc = $this->getCachedWorkCenter($workCenterId);
         if (!$wc || !$wc->isActive()) {
             return 0.0;
@@ -1243,10 +1258,14 @@ class SchedulingService
     /**
      * Add working minutes to a timestamp respecting work center shifts, working days, and holidays.
      */
-    public function addWorkingMinutes(int $workCenterId, Carbon $from, float $minutes): Carbon
+    public function addWorkingMinutes(?int $workCenterId, Carbon $from, float $minutes): Carbon
     {
         if ($minutes <= 0) {
             return $from->copy();
+        }
+
+        if (!$workCenterId) {
+            return $from->copy()->addMinutes((int) ceil($minutes));
         }
 
         $wc = $this->getCachedWorkCenter($workCenterId);
@@ -1313,10 +1332,14 @@ class SchedulingService
     /**
      * Subtract working minutes from a timestamp respecting work center shifts, working days, and holidays.
      */
-    public function subtractWorkingMinutes(int $workCenterId, Carbon $from, float $minutes): Carbon
+    public function subtractWorkingMinutes(?int $workCenterId, Carbon $from, float $minutes): Carbon
     {
         if ($minutes <= 0) {
             return $from->copy();
+        }
+
+        if (!$workCenterId) {
+            return $from->copy()->subMinutes((int) ceil($minutes));
         }
 
         $wc = $this->getCachedWorkCenter($workCenterId);
@@ -1784,7 +1807,7 @@ class SchedulingService
         $totalScheduled = $ops->sum('planned_duration_minutes');
 
         // Sum total daily capacities for the scheduled dates
-        $workCenterIds = $ops->pluck('work_center_id')->unique();
+        $workCenterIds = $ops->pluck('work_center_id')->filter()->unique();
         $minDate = $ops->min('planned_start');
         $maxDate = $ops->max('planned_finish');
 
@@ -1796,7 +1819,9 @@ class SchedulingService
 
         while ($date->lte($maxDate)) {
             foreach ($workCenterIds as $wcId) {
-                $totalCapacity += $this->calculateCapacity($wcId, $date);
+                if ($wcId) {
+                    $totalCapacity += $this->calculateCapacity((int) $wcId, $date);
+                }
             }
             $date->addDay();
         }
@@ -1817,6 +1842,10 @@ class SchedulingService
         $tenantId = $schedule->order->tenant_id;
 
         foreach ($schedule->operations()->with(['workCenter', 'machine'])->get() as $op) {
+            if (!$op->work_center_id) {
+                continue;
+            }
+
             if (!$op->workCenter || !$op->workCenter->isActive()) {
                 throw new \LogicException(
                     "Work Center for operation [{$op->sequence}] is inactive or missing."
@@ -1864,6 +1893,9 @@ class SchedulingService
         $groupedOps = $ops->groupBy('work_center_id');
 
         foreach ($groupedOps as $wcId => $wcOps) {
+            if (!$wcId) {
+                continue;
+            }
             $wc = WorkCenter::withoutGlobalScopes()->find($wcId);
             if (!$wc)
                 continue;

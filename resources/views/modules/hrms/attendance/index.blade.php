@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Attendance Management | SaaS ERP')
-@section('page-title', 'Attendance Management')
-@section('breadcrumb', 'HRMS / Attendance')
+@section('title', 'Employees Attendance | SaaS ERP')
+@section('page-title', 'Employees Attendance')
+@section('breadcrumb', 'HRMS / Employees Attendance')
 
 @section('page-actions')
     <div class="d-flex gap-2 align-items-center">
@@ -41,8 +41,9 @@
 @endsection
 
 @section('content')
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+@once
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
+@endonce
 
 <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
 
@@ -77,7 +78,7 @@
         <div class="mb-4 pb-3 border-bottom">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 w-100">
                 <div>
-                    <h5 class="fw-bold text-dark mb-0 fs-16">Daily Attendance Overview</h5>
+                    <h5 class="fw-bold text-dark mb-0 fs-16">Employees Attendance Overview</h5>
                     @if(($view ?? 'date') === 'date')
                         <p class="text-muted fs-12 mb-0">Monitor and manage employee logs grouped by date</p>
                     @else
@@ -131,6 +132,21 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date" value="{{ request('date') }}" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Month</label>
+                            <x-ui.odoo-form-ui type="select" name="month" select2-selector="default">
+                                <option value="">All Months</option>
+                                @for($i = 0; $i > -12; $i--)
+                                    @php
+                                        $m = now()->addMonths($i);
+                                        $val = $m->format('Y-m');
+                                        $label = $m->format('F Y');
+                                    @endphp
+                                    <option value="{{ $val }}" @selected(request('month', $filters['month'] ?? '') === $val)>{{ $label }}</option>
+                                @endfor
+                            </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
@@ -269,15 +285,15 @@
                             @forelse($dates as $dateItem)
                                 @php
                                     $dStr = $dateItem->date->format('Y-m-d');
-                                    $dayStats = $statsByDate->get($dStr, collect());
-                                    $presentCount = $dayStats->where('status', 'present')->sum('count');
-                                    $lateCount = $dayStats->where('status', 'late')->sum('count');
-                                    $wfhCount = $dayStats->filter(function($item) {
-                                        return $item->status === 'wfh' || strtolower($item->location_type) === 'wfh';
-                                    })->sum('count');
-                                    $halfDayCount = $dayStats->where('status', 'half_day')->sum('count');
-                                    $absentCount = $dayStats->where('status', 'absent')->sum('count');
-                                    $leaveCount = $dayStats->where('status', 'on_leave')->sum('count');
+                                    $dayStats = $statsByDate->get($dStr, []);
+                                    $presentCount = $dayStats['present'] ?? 0;
+                                    $lateCount = $dayStats['late'] ?? 0;
+                                    $wfhCount = $dayStats['wfh'] ?? 0;
+                                    $halfDayCount = $dayStats['half_day'] ?? 0;
+                                    $absentCount = $dayStats['absent'] ?? 0;
+                                    $leaveCount = $dayStats['on_leave'] ?? 0;
+                                    $weekOffCount = $dayStats['week_off'] ?? 0;
+                                    $holidayCount = $dayStats['holiday'] ?? 0;
                                     $overtimeCount = \App\Domains\HRMS\Models\Attendance::where('date', $dStr)
                                         ->whereIn('employee_id', function($q) use ($dStr) {
                                             $q->select('employee_id')
@@ -306,6 +322,12 @@
                                             </span>
                                             <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer; background-color: rgba(108, 117, 125, 0.1); color: #6c757d !important;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'on_leave')">
                                                 Leave: {{ $leaveCount }}
+                                            </span>
+                                            <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'week_off')">
+                                                Week Off: {{ $weekOffCount }}
+                                            </span>
+                                            <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer; background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'holiday')">
+                                                Holiday: {{ $holidayCount }}
                                             </span>
                                             <span class="badge bg-soft-primary text-primary px-3 py-1.5 fs-11 rounded-pill fw-bold" style="cursor: pointer;" onclick="openDailyLogs('{{ $dStr }}', '{{ $dateItem->date->format('M d, Y') }}', 'overtime')">
                                                 Overtime: {{ $overtimeCount }}
@@ -364,17 +386,15 @@
                                     $log = $employee->attendances->first();
                                     $dStr = $filters['date'] ?? today()->format('Y-m-d');
                                     
-                                    // Query counts for this employee across all dates
-                                    $allAttendances = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->get();
-                                    $presentCount = $allAttendances->where('status', 'present')->count();
-                                    $lateCount = $allAttendances->where('status', 'late')->count();
-                                    $wfhCount = $allAttendances->where(function($item) {
-                                        return $item->status === 'wfh' || strtolower($item->location_type) === 'wfh';
-                                    })->count();
-                                    $halfDayCount = $allAttendances->where('status', 'half_day')->count();
-                                    $absentCount = $allAttendances->where('status', 'absent')->count();
-                                    $leaveCount = $allAttendances->where('status', 'on_leave')->count();
+                                    // Fetch dynamically computed counts for the current month
+                                    $presentCount = $employee->computed_present ?? 0;
+                                    $lateCount = $employee->computed_late ?? 0;
+                                    $wfhCount = $employee->computed_wfh ?? 0;
+                                    $halfDayCount = $employee->computed_half_day ?? 0;
+                                    $absentCount = $employee->computed_absent ?? 0;
+                                    $leaveCount = $employee->computed_on_leave ?? 0;
                                     $overtimeCount = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)
+                                        ->whereBetween('date', [now()->startOfMonth()->format('Y-m-d'), now()->today()->format('Y-m-d')])
                                         ->whereIn('date', function($q) use ($employee) {
                                             $q->select('date')
                                               ->from('overtime_requests')
@@ -582,7 +602,8 @@
         bsOffcanvas.show();
         
         // Fetch logs from controller
-        fetch(`/hrms/attendance/employee/${employeeId}`)
+        const monthVal = document.querySelector('input[name="month"]')?.value || '';
+        fetch(`/hrms/attendance/employee/${employeeId}?month=${monthVal}`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -637,6 +658,15 @@
                             badgeClass = 'bg-soft-warning text-warning';
                         }
 
+                        let actionButton = '';
+                        if (log.id && !String(log.id).startsWith('virtual_')) {
+                            actionButton = `
+                                <button type="button" class="btn erp-icon-btn erp-icon-btn--primary btn-sm toggle-details-btn" onclick="toggleAttendanceRowDetails(this, '${log.id}')">
+                                    <i class="feather-chevron-down fs-14"></i>
+                                </button>
+                            `;
+                        }
+
                         tr.innerHTML = `
                             <td class="text-nowrap">
                                 <span class="fw-semibold text-dark d-block mb-1">${log.date}</span>
@@ -648,9 +678,7 @@
                             <td class="fw-semibold text-dark text-nowrap">${log.work_hours}</td>
                             <td>${log.status}</td>
                             <td class="text-end pe-3">
-                                <button type="button" class="btn erp-icon-btn erp-icon-btn--primary btn-sm toggle-details-btn" onclick="toggleAttendanceRowDetails(this, '${log.id}')">
-                                    <i class="feather-chevron-down fs-14"></i>
-                                </button>
+                                ${actionButton}
                             </td>
                         `;
                         
@@ -756,7 +784,9 @@
                 'absent': 'Absent',
                 'on_leave': 'Leave',
                 'overtime': 'Overtime',
-                'half_day': 'Half Day'
+                'half_day': 'Half Day',
+                'week_off': 'Week Off',
+                'holiday': 'Holiday'
             };
             const statusLabel = formatMap[filterStatus] || filterStatus;
             filterTitleSuffix = ` (${statusLabel})`;
@@ -818,6 +848,12 @@
                         if (filterStatus === 'on_leave') {
                             return log.status_raw === 'on_leave';
                         }
+                        if (filterStatus === 'week_off') {
+                            return log.status_raw === 'week_off';
+                        }
+                        if (filterStatus === 'holiday') {
+                            return log.status_raw === 'holiday';
+                        }
                         if (filterStatus === 'half_day') {
                             return log.status_raw === 'half_day';
                         }
@@ -844,6 +880,15 @@
                             locationBadge = `<span class="badge bg-soft-dark text-slate border-0" style="font-size: 9px; padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block;">${log.location_type}</span>`;
                         }
 
+                        let actionButton = '';
+                        if (log.id && !String(log.id).startsWith('virtual_')) {
+                            actionButton = `
+                                <button type="button" class="btn erp-icon-btn erp-icon-btn--primary btn-sm toggle-details-btn" onclick="toggleAttendanceRowDetails(this, '${log.id}')">
+                                    <i class="feather-chevron-down fs-14"></i>
+                                </button>
+                            `;
+                        }
+
                         tr.innerHTML = `
                             <td>
                                 <span class="fw-bold text-dark d-block fs-13 mb-0">${log.employee_name}</span>
@@ -857,9 +902,7 @@
                                 <div>${log.status}</div>
                             </td>
                             <td class="text-end pe-3">
-                                <button type="button" class="btn erp-icon-btn erp-icon-btn--primary btn-sm toggle-details-btn" onclick="toggleAttendanceRowDetails(this, '${log.id}')">
-                                    <i class="feather-chevron-down fs-14"></i>
-                                </button>
+                                ${actionButton}
                             </td>
                         `;
                         
@@ -968,7 +1011,6 @@
         
         // Destroy existing map
         if (window.activeRowMap) {
-            window.activeRowMap.remove();
             window.activeRowMap = null;
         }
         
@@ -987,8 +1029,12 @@
         }
     }
 
-    // Initialize Leaflet Map for a specific details row
+    // Initialize Google Map for a specific details row
     function initializeRowMap(logId, log) {
+        if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+            return;
+        }
+
         const checkinLat = parseFloat(log.check_in_latitude);
         const checkinLng = parseFloat(log.check_in_longitude);
         const checkoutLat = parseFloat(log.check_out_latitude);
@@ -1009,90 +1055,113 @@
             setTimeout(() => {
                 const mapEl = document.getElementById(`map-${logId}`);
                 if (!mapEl) return;
+
+                // Clear previous map content to avoid duplicate initializations
+                mapEl.innerHTML = '';
                 
                 // Base map set to center on check-in or India by default
-                const defaultCenter = hasCheckin ? [checkinLat, checkinLng] : [20.5937, 78.9629];
-                const map = L.map(`map-${logId}`).setView(defaultCenter, 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap'
-                }).addTo(map);
+                const defaultCenter = hasCheckin ? { lat: checkinLat, lng: checkinLng } : { lat: 20.5937, lng: 78.9629 };
                 
-                const markersGroup = L.featureGroup().addTo(map);
+                const map = new google.maps.Map(mapEl, {
+                    center: defaultCenter,
+                    zoom: 13,
+                    mapTypeControl: false,
+                    fullscreenControl: false,
+                    streetViewControl: false
+                });
+                
                 const pathLatLngs = [];
+                const bounds = new google.maps.LatLngBounds();
                 
                 // 1. Add Check-In Marker (Green)
                 if (hasCheckin) {
-                    const checkinLatLng = [checkinLat, checkinLng];
+                    const checkinLatLng = { lat: checkinLat, lng: checkinLng };
                     pathLatLngs.push(checkinLatLng);
-                    const checkinIcon = L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
+                    bounds.extend(checkinLatLng);
+
+                    const marker = new google.maps.Marker({
+                        position: checkinLatLng,
+                        map: map,
+                        title: 'Check In Point',
+                        icon: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
                     });
-                    L.marker(checkinLatLng, { icon: checkinIcon })
-                        .addTo(markersGroup)
-                        .bindPopup(`<b>Check In Point</b><br>Lat: ${checkinLat.toFixed(6)}<br>Lng: ${checkinLng.toFixed(6)}`);
+
+                    const infowindow = new google.maps.InfoWindow({
+                        content: `<b>Check In Point</b><br>Lat: ${checkinLat.toFixed(6)}<br>Lng: ${checkinLng.toFixed(6)}`
+                    });
+                    marker.addListener('click', () => infowindow.open(map, marker));
                 }
                 
                 // 2. Add intermediate tracking location logs (Blue circles)
                 if (hasLogs) {
                     locationLogs.forEach(locLog => {
                         if (locLog.lat && locLog.lng) {
-                            const logLatLng = [parseFloat(locLog.lat), parseFloat(locLog.lng)];
+                            const logLatLng = { lat: parseFloat(locLog.lat), lng: parseFloat(locLog.lng) };
                             pathLatLngs.push(logLatLng);
-                            L.circleMarker(logLatLng, {
-                                radius: 5,
-                                fillColor: '#3b82f6',
-                                color: '#ffffff',
-                                weight: 1.5,
-                                opacity: 1,
-                                fillOpacity: 0.8
-                            }).addTo(markersGroup)
-                              .bindPopup(`<b>Tracking Log</b><br>Time: ${locLog.time}<br>Lat: ${logLatLng[0].toFixed(6)}<br>Lng: ${logLatLng[1].toFixed(6)}`);
+                            bounds.extend(logLatLng);
+
+                            const circleMarker = new google.maps.Marker({
+                                position: logLatLng,
+                                map: map,
+                                icon: {
+                                    path: google.maps.SymbolPath.CIRCLE,
+                                    fillColor: '#3b82f6',
+                                    fillOpacity: 0.8,
+                                    strokeColor: '#FFFFFF',
+                                    strokeWeight: 1.5,
+                                    scale: 6 // 6-pixel radius dot
+                                }
+                            });
+
+                            const infowindow = new google.maps.InfoWindow({
+                                content: `<b>Tracking Log</b><br>Time: ${locLog.time}<br>Lat: ${logLatLng.lat.toFixed(6)}<br>Lng: ${logLatLng.lng.toFixed(6)}`
+                            });
+                            circleMarker.addListener('click', () => {
+                                infowindow.setPosition(logLatLng);
+                                infowindow.open(map);
+                            });
                         }
                     });
                 }
                 
                 // 3. Add Check-Out Marker (Red)
                 if (hasCheckout) {
-                    const checkoutLatLng = [checkoutLat, checkoutLng];
+                    const checkoutLatLng = { lat: checkoutLat, lng: checkoutLng };
                     pathLatLngs.push(checkoutLatLng);
-                    const checkoutIcon = L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
+                    bounds.extend(checkoutLatLng);
+
+                    const marker = new google.maps.Marker({
+                        position: checkoutLatLng,
+                        map: map,
+                        title: 'Check Out Point',
+                        icon: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
                     });
-                    L.marker(checkoutLatLng, { icon: checkoutIcon })
-                        .addTo(markersGroup)
-                        .bindPopup(`<b>Check Out Point</b><br>Lat: ${checkoutLat.toFixed(6)}<br>Lng: ${checkoutLng.toFixed(6)}`);
+
+                    const infowindow = new google.maps.InfoWindow({
+                        content: `<b>Check Out Point</b><br>Lat: ${checkoutLat.toFixed(6)}<br>Lng: ${checkoutLng.toFixed(6)}`
+                    });
+                    marker.addListener('click', () => infowindow.open(map, marker));
                 }
                 
                 // 4. Indigo Path Connecting Line
                 if (pathLatLngs.length >= 2) {
-                    L.polyline(pathLatLngs, {
-                        color: '#4f46e5',
-                        weight: 3,
-                        opacity: 0.8,
-                        dashArray: '6, 6',
-                        lineJoin: 'round'
-                    }).addTo(markersGroup);
+                    const polyline = new google.maps.Polyline({
+                        path: pathLatLngs,
+                        geodesic: true,
+                        strokeColor: '#4f46e5',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 3
+                    });
+                    polyline.setMap(map);
                 }
                 
                 window.activeRowMap = map;
                 
-                map.invalidateSize();
+                google.maps.event.trigger(map, 'resize');
                 if (pathLatLngs.length > 0) {
-                    if (pathLatLngs.length >= 2) {
-                        map.fitBounds(markersGroup.getBounds(), { padding: [20, 20] });
-                    } else {
-                        map.setView(pathLatLngs[0], 14);
+                    map.fitBounds(bounds);
+                    if (pathLatLngs.length === 1) {
+                        map.setZoom(14);
                     }
                 }
             }, 150);

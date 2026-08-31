@@ -10,6 +10,8 @@ use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Production\Models\DeliveryChallan;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionSchedule;
+use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -241,4 +243,140 @@ class SubcontractDeliveryChallanTest extends TestCase
 
         $response->assertRedirect(route('production.subcontract.delivery-challans.show', $challan->id));
     }
+
+    public function test_mes_dashboard_renders_manage_challan_for_outsourced_operations(): void
+    {
+        $vendor = \App\Domains\Inventory\Models\Vendor::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Precision Coating Pvt Ltd',
+            'code' => 'VEND-COAT-01',
+            'status' => 'active',
+        ]);
+
+        $order = ProductionOrder::create([
+            'tenant_id' => $this->tenant->id,
+            'order_number' => 'MO-MES-SUB-001',
+            'product_id' => $this->product->id,
+            'quantity_ordered' => 20,
+            'status' => ProductionOrder::STATUS_RELEASED,
+            'start_date' => now(),
+            'end_date' => now()->addDays(5),
+        ]);
+
+        $orderOp = ProductionOrderOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'sequence' => 20,
+            'operation_number' => 'OP-20',
+            'name' => 'Subcontracted Powder Coating',
+            'is_external' => true,
+            'vendor_id' => $vendor->id,
+        ]);
+
+        $schedule = ProductionSchedule::create([
+            'tenant_id' => $this->tenant->id,
+            'schedule_number' => 'SCH-MES-SUB-001',
+            'production_order_id' => $order->id,
+            'status' => ProductionSchedule::STATUS_RELEASED,
+            'scheduling_type' => 'forward',
+            'generated_by' => 'forward',
+            'scheduled_at' => now(),
+            'created_by' => 1,
+        ]);
+
+        ProductionScheduleOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'production_schedule_id' => $schedule->id,
+            'production_order_id' => $order->id,
+            'production_order_operation_id' => $orderOp->id,
+            'work_center_id' => null,
+            'machine_id' => null,
+            'sequence' => 20,
+            'planned_start' => now(),
+            'planned_finish' => now()->addDays(2),
+            'planned_duration_minutes' => 2880,
+            'status' => 'waiting',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->get(route('production.mes.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Manage Challan');
+        $response->assertSee('Precision Coating Pvt Ltd');
+        $response->assertSee('MANAGE CHALLAN');
+    }
+
+    public function test_can_receive_subcontract_delivery_challan_and_update_stock_and_operation(): void
+    {
+        $vendor = Vendor::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Matrix Logistics',
+            'code' => 'VEND-MATRIX',
+            'status' => 'active',
+        ]);
+
+        $order = ProductionOrder::create([
+            'tenant_id' => $this->tenant->id,
+            'order_number' => 'MO-REC-001',
+            'product_id' => $this->product->id,
+            'quantity_ordered' => 30,
+            'status' => ProductionOrder::STATUS_RELEASED,
+            'start_date' => now(),
+            'end_date' => now()->addDays(5),
+        ]);
+
+        $orderOp = ProductionOrderOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'sequence' => 20,
+            'operation_number' => 'OP-20',
+            'name' => 'TIG Nozzle Welding',
+            'is_external' => true,
+            'vendor_id' => $vendor->id,
+            'status' => 'vendor_dispatched',
+        ]);
+
+        $challan = DeliveryChallan::create([
+            'tenant_id' => $this->tenant->id,
+            'challan_number' => 'DC-REC-001',
+            'production_order_id' => $order->id,
+            'production_order_operation_id' => $orderOp->id,
+            'vendor_id' => $vendor->id,
+            'warehouse_id' => $this->warehouse->id,
+            'challan_date' => now()->toDateString(),
+            'status' => 'dispatched',
+            'created_by' => $this->user->id,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->post(route('production.subcontract.delivery-challans.receive', $challan->id), [
+                'received_qty' => 30.00,
+                'accepted_qty' => 30.00,
+                'rejected_qty' => 0.00,
+                'warehouse_id' => $this->warehouse->id,
+                'remarks' => 'Received 30 pcs clean after welding',
+            ]);
+
+        $response->assertRedirect(route('production.subcontract.delivery-challans.show', $challan->id));
+
+        $challan->refresh();
+        $this->assertEquals('completed', $challan->status);
+
+        $orderOp->refresh();
+        $this->assertEquals('completed', $orderOp->status);
+        $this->assertEquals(30.00, $orderOp->quantity_produced);
+
+        $stock = ProductWarehouseStock::where('tenant_id', $this->tenant->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->where('product_id', $this->product->id)
+            ->first();
+
+        $this->assertNotNull($stock);
+        $this->assertEquals(30.00, $stock->quantity);
+    }
 }
+
+

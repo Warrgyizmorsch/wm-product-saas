@@ -36,13 +36,23 @@ class MesController extends Controller
             'order.product',
             'operations.workCenter',
             'operations.machine',
-            'operations.orderOperation'
+            'operations.orderOperation.vendor',
+            'operations.orderOperation.latestDeliveryChallan',
+            'operations.orderOperation.deliveryChallans',
         ])
             ->where('tenant_id', $tenantId)
             ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS])
             ->orderBy('scheduled_at', 'asc')
             ->orderBy('id', 'asc')
             ->get();
+
+        // Auto-evaluate completion for active schedules so finished orders auto-complete
+        $poService = app(\App\Domains\Production\Services\ProductionOrderService::class);
+        foreach ($activeSchedules as $sched) {
+            if ($sched->production_order_id) {
+                $poService->evaluateAndAutoCompleteOrder($sched->production_order_id, $userId);
+            }
+        }
 
         // Running operations (for stopwatch timer block countdowns)
         $running = ProductionScheduleOperation::where('tenant_id', $tenantId)
@@ -77,7 +87,9 @@ class MesController extends Controller
             'order.product',
             'operations.workCenter',
             'operations.machine',
-            'operations.orderOperation'
+            'operations.orderOperation.vendor',
+            'operations.orderOperation.latestDeliveryChallan',
+            'operations.orderOperation.deliveryChallans',
         ])
             ->where('tenant_id', $tenantId)
             ->where('status', ProductionSchedule::STATUS_COMPLETED)
@@ -88,6 +100,9 @@ class MesController extends Controller
         // Shifts assigned/active
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->get();
 
+        // Operators list for shopfloor operator assignment
+        $operators = \App\Models\User::where('tenant_id', $tenantId)->get();
+
         return view('modules.production.mes.dashboard', compact(
             'activeSchedules',
             'recentlyCompletedSchedules',
@@ -95,7 +110,8 @@ class MesController extends Controller
             'paused',
             'completedToday',
             'readyCount',
-            'shifts'
+            'shifts',
+            'operators'
         ));
     }
 

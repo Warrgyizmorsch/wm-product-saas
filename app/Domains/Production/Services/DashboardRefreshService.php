@@ -84,8 +84,8 @@ class DashboardRefreshService
         $totalDowntimeMins = (float) DB::table('production_machine_downtimes')
             ->where('tenant_id', $tenantId)
             ->whereBetween('start_time', [$start, $end])
-            ->when(!empty($filters['work_center_id']), function($q) use ($filters) {
-                $q->whereIn('machine_id', DB::table('production_machines')->where('work_center_id', $filters['work_center_id'])->pluck('id'));
+            ->when(!empty($filters['work_center_id']), function($q) use ($filters, $tenantId) {
+                $q->whereIn('machine_id', DB::table('production_machines')->where('tenant_id', $tenantId)->where('work_center_id', $filters['work_center_id'])->pluck('id'));
             })
             ->sum('duration_minutes');
 

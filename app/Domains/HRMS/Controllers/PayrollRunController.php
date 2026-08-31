@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\DB;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\OvertimeRequest;
-use Illuminate\Support\Facades\Log;
+use App\Exports\PayrollBankExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PayrollRunController extends Controller
 {
@@ -22,6 +23,9 @@ class PayrollRunController extends Controller
 
     public function index(Request $request)
     {
+        // Automatically run migrations to ensure schema is up-to-date
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+
         $runs = PayrollRun::orderBy('payroll_month', 'desc')->get();
         
         $selectedRunId = $request->get('run_id');
@@ -34,28 +38,58 @@ class PayrollRunController extends Controller
         $pendingPriorHolds = [];
         
         if ($selectedRun) {
-            // Get active employees mapped to pay groups & structures
-            $employeesQuery = Employee::where('status', true)
-                ->whereNotNull('pay_group_id')
-                ->whereNotNull('salary_structure_id');
-
-            // 1. If the current run is a specific pay group, filter by it
-            if ($selectedRun->pay_group_id) {
-                $employeesQuery->where('pay_group_id', $selectedRun->pay_group_id);
-            } else {
-                // 2. If current run is "All Pay Groups", exclude any pay group that already has its own run
-                $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $selectedRun->payroll_month)
+            $excludeEmployeeIds = [];
+            if (empty($selectedRun->employee_ids)) {
+                // Exclude employees already processed in other runs for the same month
+                $otherRuns = PayrollRun::where('payroll_month', $selectedRun->payroll_month)
                     ->where('id', '!=', $selectedRun->id)
-                    ->whereNotNull('pay_group_id')
-                    ->pluck('pay_group_id')
-                    ->toArray();
+                    ->get();
 
-                if (!empty($otherProcessedPayGroupIds)) {
-                    $employeesQuery->whereNotIn('pay_group_id', $otherProcessedPayGroupIds);
+                foreach ($otherRuns as $or) {
+                    if ($or->employee_ids && count($or->employee_ids) > 0) {
+                        $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
+                    } elseif ($or->pay_group_id) {
+                        $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
+                        $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
+                    } else {
+                        $allEmpIds = Employee::pluck('id')->toArray();
+                        $excludeEmployeeIds = array_merge($excludeEmployeeIds, $allEmpIds);
+                    }
                 }
+                $excludeEmployeeIds = array_unique($excludeEmployeeIds);
             }
 
-            $employees = $employeesQuery->get();
+            // Get active employees mapped to pay groups & structures
+            if ($selectedRun->employee_ids && count($selectedRun->employee_ids) > 0) {
+                $employees = Employee::whereIn('id', $selectedRun->employee_ids)
+                    ->whereNotIn('id', $excludeEmployeeIds)
+                    ->where('status', true)
+                    ->whereNotNull('salary_structure_id')
+                    ->get();
+            } else {
+                $employeesQuery = Employee::where('status', true)
+                    ->whereNotNull('pay_group_id')
+                    ->whereNotNull('salary_structure_id')
+                    ->whereNotIn('id', $excludeEmployeeIds);
+
+                // 1. If the current run is a specific pay group, filter by it
+                if ($selectedRun->pay_group_id) {
+                    $employeesQuery->where('pay_group_id', $selectedRun->pay_group_id);
+                } else {
+                    // 2. If current run is "All Pay Groups", exclude any pay group that already has its own run
+                    $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $selectedRun->payroll_month)
+                        ->where('id', '!=', $selectedRun->id)
+                        ->whereNotNull('pay_group_id')
+                        ->pluck('pay_group_id')
+                        ->toArray();
+
+                    if (!empty($otherProcessedPayGroupIds)) {
+                        $employeesQuery->whereNotIn('pay_group_id', $otherProcessedPayGroupIds);
+                    }
+                }
+
+                $employees = $employeesQuery->get();
+            }
 
             foreach ($employees as $employee) {
                 $calc = $this->payrollCalculationService->calculateSalary($employee, $selectedRun->payroll_month);
@@ -180,6 +214,8 @@ class PayrollRunController extends Controller
         $validated = $request->validate([
             'payroll_month' => 'required|string|regex:/^\d{4}-\d{2}$/',
             'pay_group_id'  => 'nullable|exists:pay_groups,id',
+            'employee_ids'  => 'nullable|array',
+            'employee_ids.*'=> 'exists:employees,id',
             'start_date'    => 'required|date',
             'end_date'      => 'required|date|after_or_equal:start_date',
         ]);
@@ -188,6 +224,9 @@ class PayrollRunController extends Controller
         if (!empty($validated['pay_group_id'])) {
             $generalExists = PayrollRun::where('payroll_month', $validated['payroll_month'])
                 ->whereNull('pay_group_id')
+                ->where(function($q) {
+                    $q->whereNull('employee_ids')->orWhere('employee_ids', '[]');
+                })
                 ->exists();
             if ($generalExists) {
                 return redirect()->back()->with('error', "A general payroll run for all pay groups already exists for {$validated['payroll_month']}.");
@@ -195,21 +234,47 @@ class PayrollRunController extends Controller
         }
 
         // 2. Check if a payroll run for this month and specific pay group already exists
-        $existsQuery = PayrollRun::where('payroll_month', $validated['payroll_month']);
-        if (!empty($validated['pay_group_id'])) {
-            $existsQuery->where('pay_group_id', $validated['pay_group_id']);
-        } else {
-            $existsQuery->whereNull('pay_group_id');
-        }
+        if (empty($validated['employee_ids'])) {
+            $existsQuery = PayrollRun::where('payroll_month', $validated['payroll_month']);
+            if (!empty($validated['pay_group_id'])) {
+                $existsQuery->where('pay_group_id', $validated['pay_group_id']);
+            } else {
+                $existsQuery->whereNull('pay_group_id')->where(function($q) {
+                    $q->whereNull('employee_ids')->orWhere('employee_ids', '[]');
+                });
+            }
 
-        if ($existsQuery->exists()) {
-            $label = !empty($validated['pay_group_id']) ? 'this pay group' : 'all pay groups';
-            return redirect()->back()->with('error', "A payroll run already exists for {$validated['payroll_month']} and {$label}.");
+            if ($existsQuery->exists()) {
+                $label = !empty($validated['pay_group_id']) ? 'this pay group' : 'all pay groups';
+                return redirect()->back()->with('error', "A payroll run already exists for {$validated['payroll_month']} and {$label}.");
+            }
+        } else {
+            // Check if any of the selected employees are already processed in another run for this month
+            $otherRuns = PayrollRun::where('payroll_month', $validated['payroll_month'])->get();
+            $alreadyProcessed = [];
+            foreach ($otherRuns as $or) {
+                if ($or->employee_ids && count($or->employee_ids) > 0) {
+                    $alreadyProcessed = array_merge($alreadyProcessed, $or->employee_ids);
+                } elseif ($or->pay_group_id) {
+                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
+                    $alreadyProcessed = array_merge($alreadyProcessed, $pgEmpIds);
+                } else {
+                    $allEmpIds = Employee::pluck('id')->toArray();
+                    $alreadyProcessed = array_merge($alreadyProcessed, $allEmpIds);
+                }
+            }
+            $alreadyProcessed = array_unique($alreadyProcessed);
+            $overlap = array_intersect($validated['employee_ids'], $alreadyProcessed);
+            if (!empty($overlap)) {
+                $names = Employee::whereIn('id', $overlap)->pluck('full_name')->toArray();
+                return redirect()->back()->with('error', "Cannot initiate payroll: The following employees have already been processed in another run for this month: " . implode(', ', $names));
+            }
         }
 
         PayrollRun::create([
             'company_id'    => auth()->user()->company_id ?? 1,
             'pay_group_id'  => $validated['pay_group_id'] ?? null,
+            'employee_ids'  => $validated['employee_ids'] ?? null,
             'payroll_month' => $validated['payroll_month'],
             'start_date'    => $validated['start_date'],
             'end_date'      => $validated['end_date'],
@@ -242,14 +307,27 @@ class PayrollRunController extends Controller
         $startDate = $run->start_date;
         $endDate = $run->end_date;
 
+        $leavesQuery = LeaveRequest::where('status', 'pending')
+            ->where('start_date', '<=', $endDate)
+            ->where('end_date', '>=', $startDate);
+
+        $correctionsQuery = AttendanceCorrection::where('status', 'pending')
+            ->whereBetween('date', [$startDate, $endDate]);
+
+        $overtimesQuery = OvertimeRequest::where('status', 'pending')
+            ->whereBetween('date', [$startDate, $endDate]);
+
+        if ($run->employee_ids && count($run->employee_ids) > 0) {
+            $leavesQuery->whereIn('employee_id', $run->employee_ids);
+            $correctionsQuery->whereIn('employee_id', $run->employee_ids);
+            $overtimesQuery->whereIn('employee_id', $run->employee_ids);
+        }
+
         DB::beginTransaction();
         try {
             if ($resolution === 'approve_all') {
                 // 1. Approve Leave Requests
-                $leaves = LeaveRequest::where('status', 'pending')
-                    ->where('start_date', '<=', $endDate)
-                    ->where('end_date', '>=', $startDate)
-                    ->get();
+                $leaves = $leavesQuery->get();
                 
                 $leaveRepo = app(\App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface::class);
                 foreach ($leaves as $leave) {
@@ -257,9 +335,7 @@ class PayrollRunController extends Controller
                 }
 
                 // 2. Approve Attendance Corrections
-                $corrections = AttendanceCorrection::where('status', 'pending')
-                    ->whereBetween('date', [$startDate, $endDate])
-                    ->get();
+                $corrections = $correctionsQuery->get();
 
                 $correctionController = app(\App\Domains\HRMS\Controllers\AttendanceCorrectionController::class);
                 foreach ($corrections as $correction) {
@@ -267,9 +343,7 @@ class PayrollRunController extends Controller
                 }
 
                 // 3. Approve Overtime Requests
-                $overtimes = OvertimeRequest::where('status', 'pending')
-                    ->whereBetween('date', [$startDate, $endDate])
-                    ->get();
+                $overtimes = $overtimesQuery->get();
 
                 $otRepo = app(\App\Domains\HRMS\Repositories\OvertimeRequestRepositoryInterface::class);
                 foreach ($overtimes as $ot) {
@@ -283,10 +357,7 @@ class PayrollRunController extends Controller
             } else {
                 // reject_all
                 // 1. Reject Leave Requests
-                $leaves = LeaveRequest::where('status', 'pending')
-                    ->where('start_date', '<=', $endDate)
-                    ->where('end_date', '>=', $startDate)
-                    ->get();
+                $leaves = $leavesQuery->get();
                 
                 $leaveRepo = app(\App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface::class);
                 foreach ($leaves as $leave) {
@@ -297,9 +368,7 @@ class PayrollRunController extends Controller
                 }
 
                 // 2. Reject Attendance Corrections
-                $corrections = AttendanceCorrection::where('status', 'pending')
-                    ->whereBetween('date', [$startDate, $endDate])
-                    ->get();
+                $corrections = $correctionsQuery->get();
 
                 $correctionController = app(\App\Domains\HRMS\Controllers\AttendanceCorrectionController::class);
                 foreach ($corrections as $correction) {
@@ -309,9 +378,7 @@ class PayrollRunController extends Controller
                 }
 
                 // 3. Reject Overtime Requests
-                $overtimes = OvertimeRequest::where('status', 'pending')
-                    ->whereBetween('date', [$startDate, $endDate])
-                    ->get();
+                $overtimes = $overtimesQuery->get();
 
                 $otRepo = app(\App\Domains\HRMS\Repositories\OvertimeRequestRepositoryInterface::class);
                 foreach ($overtimes as $ot) {
@@ -343,21 +410,28 @@ class PayrollRunController extends Controller
         $startDate = $run->start_date;
         $endDate = $run->end_date;
 
-        $pendingLeaves = LeaveRequest::with(['employee', 'leaveType'])
+        $leavesQuery = LeaveRequest::with(['employee', 'leaveType'])
             ->where('status', 'pending')
             ->where('start_date', '<=', $endDate)
-            ->where('end_date', '>=', $startDate)
-            ->get();
+            ->where('end_date', '>=', $startDate);
 
-        $pendingCorrections = AttendanceCorrection::with('employee')
+        $correctionsQuery = AttendanceCorrection::with('employee')
             ->where('status', 'pending')
-            ->whereBetween('date', [$startDate, $endDate])
-            ->get();
+            ->whereBetween('date', [$startDate, $endDate]);
 
-        $pendingOvertime = OvertimeRequest::with('employee')
+        $overtimeQuery = OvertimeRequest::with('employee')
             ->where('status', 'pending')
-            ->whereBetween('date', [$startDate, $endDate])
-            ->get();
+            ->whereBetween('date', [$startDate, $endDate]);
+
+        if ($run->employee_ids && count($run->employee_ids) > 0) {
+            $leavesQuery->whereIn('employee_id', $run->employee_ids);
+            $correctionsQuery->whereIn('employee_id', $run->employee_ids);
+            $overtimeQuery->whereIn('employee_id', $run->employee_ids);
+        }
+
+        $pendingLeaves = $leavesQuery->get();
+        $pendingCorrections = $correctionsQuery->get();
+        $pendingOvertime = $overtimeQuery->get();
 
         return [
             'leaves'            => $pendingLeaves->count(),
@@ -386,24 +460,54 @@ class PayrollRunController extends Controller
             ->where('status', 'pending')
             ->update(['status' => 'processed']);
 
-        // Collect and update all approved overtime request records paid in this run
-        $employeesQuery = Employee::where('status', true)
-            ->whereNotNull('pay_group_id')
-            ->whereNotNull('salary_structure_id');
-
-        if ($run->pay_group_id) {
-            $employeesQuery->where('pay_group_id', $run->pay_group_id);
-        } else {
-            $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
+        $excludeEmployeeIds = [];
+        if (empty($run->employee_ids)) {
+            // Exclude employees already processed in other runs for the same month
+            $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
                 ->where('id', '!=', $run->id)
-                ->whereNotNull('pay_group_id')
-                ->pluck('pay_group_id')
-                ->toArray();
-            if (!empty($otherProcessedPayGroupIds)) {
-                $employeesQuery->whereNotIn('pay_group_id', $otherProcessedPayGroupIds);
+                ->get();
+
+            foreach ($otherRuns as $or) {
+                if ($or->employee_ids && count($or->employee_ids) > 0) {
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
+                } elseif ($or->pay_group_id) {
+                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
+                } else {
+                    $allEmpIds = Employee::pluck('id')->toArray();
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $allEmpIds);
+                }
             }
+            $excludeEmployeeIds = array_unique($excludeEmployeeIds);
         }
-        $employees = $employeesQuery->get();
+
+        // Collect and update all approved overtime request records paid in this run
+        if ($run->employee_ids && count($run->employee_ids) > 0) {
+            $employees = Employee::whereIn('id', $run->employee_ids)
+                ->whereNotIn('id', $excludeEmployeeIds)
+                ->where('status', true)
+                ->whereNotNull('salary_structure_id')
+                ->get();
+        } else {
+            $employeesQuery = Employee::where('status', true)
+                ->whereNotNull('pay_group_id')
+                ->whereNotNull('salary_structure_id')
+                ->whereNotIn('id', $excludeEmployeeIds);
+
+            if ($run->pay_group_id) {
+                $employeesQuery->where('pay_group_id', $run->pay_group_id);
+            } else {
+                $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
+                    ->where('id', '!=', $run->id)
+                    ->whereNotNull('pay_group_id')
+                    ->pluck('pay_group_id')
+                    ->toArray();
+                if (!empty($otherProcessedPayGroupIds)) {
+                    $employeesQuery->whereNotIn('pay_group_id', $otherProcessedPayGroupIds);
+                }
+            }
+            $employees = $employeesQuery->get();
+        }
 
         $allOtIds = [];
         $allEncashIds = [];
@@ -427,6 +531,73 @@ class PayrollRunController extends Controller
             DB::table('leave_encashments')
                 ->whereIn('id', $allEncashIds)
                 ->update(['status' => 'processed']);
+        }
+
+        // Integrate with Accounting (Consolidated Single Journal Entry)
+        $tenantId = $run->tenant_id ?? (tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id());
+        $totalEarnings = 0.00;
+        $totalDeductions = 0.00;
+        $totalNetPayout = 0.00;
+
+        foreach ($employees as $employee) {
+            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
+            $summary = $calc['summary'] ?? [];
+            $totalEarnings += floatval($summary['total_earnings'] ?? 0.00);
+            $totalDeductions += floatval($summary['total_deductions'] ?? 0.00);
+            $totalNetPayout += floatval($summary['net_payout'] ?? 0.00);
+        }
+
+        if ($totalNetPayout > 0 || $totalEarnings > 0) {
+            $expenseAccount = $this->getOrCreateAccount($tenantId, '5100', 'Salary & Wages - Staff', 'expense', 'debit', 'indirect_expense');
+            $statutoryAccount = $this->getOrCreateAccount($tenantId, '2080', 'Statutory Dues Payable', 'liability', 'credit', 'current_liability');
+            $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
+
+            $lines = [];
+
+            // 1. DR Salary Expense
+            if ($totalEarnings > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $expenseAccount->id,
+                    'debit' => $totalEarnings,
+                    'credit' => 0.00,
+                    'description' => "Salary Expense for payroll run: " . $run->payroll_month
+                ];
+            }
+
+            // 2. CR Statutory Payables
+            if ($totalDeductions > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $statutoryAccount->id,
+                    'debit' => 0.00,
+                    'credit' => $totalDeductions,
+                    'description' => "Employee deductions for payroll run: " . $run->payroll_month
+                ];
+            }
+
+            // 3. CR Bank Account (Cash Out)
+            if ($totalNetPayout > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $bankAccount->id,
+                    'debit' => 0.00,
+                    'credit' => $totalNetPayout,
+                    'description' => "Bank Transfer payment for payroll run: " . $run->payroll_month
+                ];
+            }
+
+            try {
+                $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
+                $journalService->post($lines, [
+                    'tenant_id' => $tenantId,
+                    'journal_date' => now(),
+                    'source' => 'payroll',
+                    'reference_type' => 'PayrollRun',
+                    'reference_id' => $run->id,
+                    'memo' => "Payroll Payout for month: " . $run->payroll_month,
+                    'posted_by' => auth()->id(),
+                ]);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Payroll Payout Journal Posting Failed: " . $e->getMessage());
+            }
         }
 
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll payouts released successfully.');
@@ -582,5 +753,117 @@ class PayrollRunController extends Controller
             DB::rollBack();
             return redirect()->back()->with('error', 'Failed to create bulk adjustments: ' . $e->getMessage());
         }
+    }
+
+    public function exportBankFile(PayrollRun $run)
+    {
+        $fileName = 'bank_transfer_' . $run->payroll_month . '.xlsx';
+        return Excel::download(new PayrollBankExport($run), $fileName);
+    }
+
+    public function downloadPayslip(PayrollRun $run, Employee $employee)
+    {
+        // Security check: If the logged-in user is an employee, they can only access their own payslip
+        $user = auth()->user();
+        if ($user->employee && $user->employee->id !== $employee->id) {
+            abort(403, 'Unauthorized access to this payslip.');
+        }
+
+        $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
+        $company = $employee->company ?? \App\Domains\HRMS\Models\Company::first();
+
+        // Convert Net Payout to Words (Rupees)
+        $netPayout = $calc['summary']['net_payout'] ?? 0;
+        $netPayoutInWords = $this->convertNumberToWords($netPayout) . ' Only';
+
+        $data = [
+            'run' => $run,
+            'employee' => $employee,
+            'company' => $company,
+            'calc' => $calc['summary'] ?? null,
+            'details' => $calc['items'] ?? [],
+            'netPayoutInWords' => $netPayoutInWords,
+            'payroll_month_formatted' => \Carbon\Carbon::parse($run->payroll_month . '-01')->format('F Y'),
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.hrms.payroll.pdf_payslip', $data);
+        $fileName = 'payslip_' . $employee->employee_id . '_' . $run->payroll_month . '.pdf';
+        
+        return $pdf->download($fileName);
+    }
+
+    private function convertNumberToWords($number)
+    {
+        $no = (int)floor($number);
+        $point = (int)round(($number - $no) * 100);
+        $hundred = null;
+        $digits_1 = strlen($no);
+        $i = 0;
+        $str = [];
+        $words = [
+            0 => '', 1 => 'One', 2 => 'Two',
+            3 => 'Three', 4 => 'Four', 5 => 'Five',
+            6 => 'Six', 7 => 'Seven', 8 => 'Eight',
+            9 => 'Nine', 10 => 'Ten', 11 => 'Eleven',
+            12 => 'Twelve', 13 => 'Thirteen', 14 => 'Fourteen',
+            15 => 'Fifteen', 16 => 'Sixteen', 17 => 'Seventeen',
+            18 => 'Eighteen', 19 => 'Nineteen', 20 => 'Twenty',
+            30 => 'Thirty', 40 => 'Forty', 50 => 'Fifty',
+            60 => 'Sixty', 70 => 'Seventy', 80 => 'Eighty',
+            90 => 'Ninety'
+        ];
+        $digits = ['', 'Hundred', 'Thousand', 'Lakh', 'Crore'];
+        while ($i < $digits_1) {
+            $divider = ($i == 2) ? 10 : 100;
+            $number = floor($no % $divider);
+            $no = floor($no / $divider);
+            $i += ($divider == 10) ? 1 : 2;
+            if ($number) {
+                $plural = (($counter = count($str)) && $number > 9) ? 's' : null;
+                $hundred = ($counter == 1 && $str[0]) ? ' and ' : null;
+                $str[] = ($number < 21) ? $words[$number] . ' ' . $digits[$counter] . $plural . ' ' . $hundred
+                    : $words[floor($number / 10) * 10] . ' ' . $words[$number % 10] . ' ' . $digits[$counter] . $plural . ' ' . $hundred;
+            } else {
+                $str[] = null;
+            }
+        }
+        $Rupees = implode('', array_reverse($str));
+        $paise = '';
+        if ($point > 0) {
+            $paise = ' and ' . ($point < 21 ? $words[$point] : $words[floor($point / 10) * 10] . ' ' . $words[$point % 10]) . ' Paise';
+        }
+        return ($Rupees ? $Rupees . 'Rupees' : '') . $paise;
+    }
+
+    private function getOrCreateAccount(int $tenantId, string $code, string $name, string $type, string $normalBalance, ?string $subtype = null)
+    {
+        $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('code', $code)
+            ->first();
+
+        if ($account) {
+            return $account;
+        }
+
+        $groupAccountIds = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->whereNotNull('parent_id')
+            ->pluck('parent_id')
+            ->unique()
+            ->toArray();
+
+        $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('type', $type)
+            ->whereNotIn('id', $groupAccountIds)
+            ->first();
+
+        if ($account) {
+            return $account;
+        }
+
+        return \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->whereNotIn('id', $groupAccountIds)
+            ->first();
     }
 }

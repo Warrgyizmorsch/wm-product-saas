@@ -51,11 +51,32 @@ class MachineStateService
                 'remarks'          => $remarks,
             ]);
 
-            // 3. Update Machine model current state
-            $machine->update([
+            // 3. Update Machine model current state & sync status
+            $updateData = [
                 'current_state'        => $newState,
                 'current_state_reason' => $reason,
-            ]);
+            ];
+
+            if (in_array($newState, ['Idle', 'Running', 'Setup']) && $machine->status === Machine::STATUS_UNDER_MAINTENANCE) {
+                $hasActiveMwo = \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::where('tenant_id', $tenantId)
+                    ->where('machine_id', $machineId)
+                    ->whereIn('status', [
+                        \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_DRAFT,
+                        \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_SCHEDULED,
+                        \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_IN_PROGRESS,
+                    ])
+                    ->exists();
+
+                if (!$hasActiveMwo) {
+                    $updateData['status'] = Machine::STATUS_ACTIVE;
+                    $updateData['maintenance_status'] = 'none';
+                }
+            } elseif (in_array($newState, ['Breakdown', 'Maintenance'])) {
+                $updateData['status'] = Machine::STATUS_UNDER_MAINTENANCE;
+                $updateData['maintenance_status'] = $newState === 'Breakdown' ? 'breakdown' : 'in_progress';
+            }
+
+            $machine->update($updateData);
         });
     }
 }

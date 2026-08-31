@@ -63,9 +63,9 @@
                                             <button type="button" class="btn btn-icon btn-sm btn-soft-primary rounded-circle" data-bs-toggle="modal" data-bs-target="#payslipModal-{{ $run->id }}" title="View Details">
                                                 <i class="feather-eye"></i>
                                             </button>
-                                            <button type="button" class="btn btn-icon btn-sm btn-soft-secondary rounded-circle" disabled title="Download Receipt coming soon">
+                                            <a href="{{ route('hrms.payroll.payslip.download', [$run->id, $employee->id]) }}" class="btn btn-icon btn-sm btn-soft-secondary rounded-circle" title="Download Payslip">
                                                 <i class="feather-download"></i>
-                                            </button>
+                                            </a>
                                         </div>
                                     </td>
                                 </tr>
@@ -107,8 +107,13 @@
                                             <span class="fw-bold text-dark fs-13">{{ $employee->bank_name ?? 'N/A' }} ({{ $employee->account_number ? substr($employee->account_number, -4) : 'N/A' }})</span>
                                         </div>
                                         <div class="col-md-3">
-                                            <span class="text-muted d-block">Proration Days</span>
-                                            <span class="fw-bold text-dark fs-13">{{ $calc['total_days'] ?? 30 }} Days (Basis)</span>
+                                            <span class="text-muted d-block">Salary Days (Paid / Total)</span>
+                                            <span class="fw-bold text-dark fs-13">
+                                                {{ ($calc['total_days'] ?? 30) - ($calc['lop_days'] ?? 0) }} / {{ $calc['total_days'] ?? 30 }} Days
+                                                @if(($calc['lop_days'] ?? 0) > 0)
+                                                    <span class="text-danger" style="font-weight: 600;">(-{{ $calc['lop_days'] }} LOP)</span>
+                                                @endif
+                                            </span>
                                         </div>
                                     </div>
 
@@ -162,12 +167,7 @@
                                                     @endif
                                                 @endforeach
 
-                                                @if(($calc['lop_deduction'] ?? 0) > 0)
-                                                    <div class="d-flex justify-content-between fs-12 mb-2">
-                                                        <span class="text-muted">Loss of Pay ({{ $calc['lop_days'] }} days)</span>
-                                                        <span class="fw-medium text-danger">-₹{{ number_format($calc['lop_deduction'], 2) }}</span>
-                                                    </div>
-                                                @endif
+
 
                                                 @if(($calc['adhoc_deductions'] ?? 0) > 0)
                                                     <div class="d-flex justify-content-between fs-12 mb-2">
@@ -194,7 +194,7 @@
                                     <!-- Summary Banner -->
                                     <div class="alert alert-success d-flex align-items-center justify-content-between mt-4 mb-0 py-2.5">
                                         <div class="fs-12 fw-semibold text-success-800">
-                                            <i class="feather-check-circle me-1"></i> Net Salary Payout (Released)
+                                            <i class="feather-check-circle me-1"></i> Net Salary Payout (Paid for {{ ($calc['total_days'] ?? 30) - ($calc['lop_days'] ?? 0) }} Days)
                                         </div>
                                         <div class="fs-16 fw-bold text-success-900">
                                             ₹{{ number_format($calc['net_payout'] ?? 0, 2) }}
@@ -204,9 +204,9 @@
                                 <div class="modal-footer" style="background:#f8f9fa; border-top: 1px solid #f0f2f5;">
                                     <span class="fs-11 text-muted me-auto">Released by Finance on {{ $run->updated_at->format('d M Y H:i') }}</span>
                                     <button type="button" class="btn btn-sm fw-semibold px-4" style="border:1px solid #dee2e6; background:#fff; color:#4a3b32; border-radius:6px;" data-bs-dismiss="modal">CLOSE</button>
-                                    <button type="button" class="btn btn-sm fw-semibold px-4 text-white" style="background:#4a3b32; border-radius:6px;" disabled>
-                                        <i class="feather-download me-1"></i> DOWNLOAD
-                                    </button>
+                                     <a href="{{ route('hrms.payroll.payslip.download', [$run->id, $employee->id]) }}" class="btn btn-sm fw-semibold px-4 text-white d-flex align-items-center gap-1" style="background:#4a3b32; border-radius:6px;">
+                                         <i class="feather-download" style="font-size:12px;"></i> DOWNLOAD
+                                     </a>
                                 </div>
                             </div>
                         </div>

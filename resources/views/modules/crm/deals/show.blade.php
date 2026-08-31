@@ -1441,9 +1441,11 @@
                                     <i class="feather-file-text fs-36 text-muted mb-2 d-block opacity-50"></i>
                                     <h5 class="fw-bold text-dark fs-14">No Quotation Created Yet</h5>
                                     <p class="text-muted fs-12 mb-3">Create a quotation for this deal to generate quotation sheets and track revisions.</p>
-                                    <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-sm btn-success fw-bold px-3">
-                                        <i class="feather-plus me-1"></i>Create Quotation Now
-                                    </a>
+                                    <div class="d-flex justify-content-center">
+                                        <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-sm btn-success fw-bold px-4 py-2 d-inline-flex align-items-center justify-content-center shadow-xs" style="width: auto !important; max-width: fit-content !important;">
+                                            <i class="feather-plus me-1.5 fs-13"></i>Create Quotation Now
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         @endif

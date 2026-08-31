@@ -392,7 +392,7 @@ class ProductionOrderService
                 'triggered_by' => $userId,
             ]);
         } catch (\Throwable $e) {
-            dd("RELEASE_EXCEPTION", $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
+            \Illuminate\Support\Facades\Log::error('Production order release event failed: ' . $e->getMessage());
         }
     }
 
@@ -434,6 +434,71 @@ class ProductionOrderService
             'event_source' => 'ProductionOrderService',
             'triggered_by' => $userId,
         ]);
+    }
+
+    /**
+     * Automatically evaluate if all operations of an order are completed, and if so, auto-complete the order & schedules.
+     */
+    public function evaluateAndAutoCompleteOrder(ProductionOrder|int $orderOrId, ?int $userId = null): bool
+    {
+        $order = is_numeric($orderOrId) ? $this->orderRepository->find((int) $orderOrId) : $orderOrId;
+        if (!$order || in_array($order->status, [ProductionOrder::STATUS_COMPLETED, ProductionOrder::STATUS_CLOSED])) {
+            return false;
+        }
+
+        $ops = $order->operations;
+        if ($ops->isEmpty()) {
+            return false;
+        }
+
+        $allDone = true;
+        foreach ($ops as $op) {
+            $targetQty = (float) ($op->target_produced_qty ?: ($order->quantity_ordered ?: 0.0));
+            $doneQty = (float) ($op->quantity_produced ?: 0.0);
+            $isOpDone = ($op->status === ProductionOrderOperation::STATUS_COMPLETED)
+                || ($op->status === ProductionOrderOperation::STATUS_SKIPPED)
+                || ($op->status === ProductionOrderOperation::STATUS_CANCELLED)
+                || ($targetQty > 0 && $doneQty >= ($targetQty - 0.0001));
+
+            if (!$isOpDone) {
+                $allDone = false;
+                break;
+            }
+        }
+
+        if ($allDone) {
+            foreach ($ops as $op) {
+                if ($op->status !== ProductionOrderOperation::STATUS_COMPLETED) {
+                    $op->status = ProductionOrderOperation::STATUS_COMPLETED;
+                    $op->save();
+                }
+            }
+
+            ProductionSchedule::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->where('status', '!=', ProductionSchedule::STATUS_COMPLETED)
+                ->update([
+                    'status' => ProductionSchedule::STATUS_COMPLETED,
+                    'completed_at' => now(),
+                ]);
+
+            ProductionScheduleOperation::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->where('status', '!=', ProductionScheduleOperation::STATUS_COMPLETED)
+                ->update([
+                    'status' => ProductionScheduleOperation::STATUS_COMPLETED,
+                ]);
+
+            $order->status = ProductionOrder::STATUS_COMPLETED;
+            $order->completed_by = $userId ?: (auth()->id() ?: 1);
+            $order->completed_at = now();
+            $order->actual_end_date = $order->actual_end_date ?: now();
+            $order->save();
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

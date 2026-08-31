@@ -70,6 +70,12 @@
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
+
+                            <div id="invoiceSelectWrapper" class="mt-3">
+                                <x-ui.odoo-form-ui type="select" label="Sales Invoice Reference (Exact Tax & Line Mapping)" name="invoice_id" id="invoiceSelect" class="odoo-select2">
+                                    <option value="">-- Select Sales Invoice --</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
                         </div>
 
                         <!-- Customer Selector (Direct Mode) -->
@@ -101,7 +107,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
                             <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-rotate-ccw me-2 text-danger"></i>Items to Return</h6>
-                            <span id="itemsHint" class="fs-12 text-muted">Select a Sales Order to populate return items or add lines directly below.</span>
+                            <span id="itemsHint" class="fs-12 text-muted">Select a Sales Order / Invoice to populate return items.</span>
                         </div>
                     </div>
 
@@ -109,17 +115,17 @@
                         <x-ui.odoo-form-ui type="table" id="returnItemsTable">
                             <thead class="table-light fs-12">
                                 <tr>
-                                    <th style="width: 45%;" class="ps-3">Product Details & Serials</th>
+                                    <th style="width: 40%;" class="ps-3">Product Details & Serials</th>
                                     <th style="width: 25%;">Restock Warehouse</th>
                                     <th class="text-end" style="width: 13%;">Return Qty</th>
                                     <th class="text-end pe-3" style="width: 17%;">Refund Unit Price</th>
-                                    <th class="text-center direct-col" style="width: 5%; display: none;"></th>
+                                    <th class="text-center pe-3" style="width: 5%;"></th>
                                 </tr>
                             </thead>
                             <tbody id="returnItemsBody" class="fs-13 text-dark">
                                 <tr id="emptyItemsRow">
                                     <td colspan="5" class="text-center text-muted py-4 fs-12">
-                                        <i class="feather-info me-1"></i>Please select a Sales Order to populate items.
+                                        <i class="feather-info me-1"></i>Please select a Sales Order / Invoice to populate items.
                                     </td>
                                 </tr>
                             </tbody>
@@ -148,14 +154,64 @@
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     @php
         $salesOrdersData = $salesOrders->map(function($so) {
+            $soSubtotal = (float)($so->subtotal ?: 1);
+            $soDiscountType = $so->discount_type ?? 'item_wise';
+            $soOrderDiscount = ($soDiscountType === 'order_wise') ? (float)($so->discount ?: 0) : 0;
             return [
                 'id' => $so->id,
-                'items' => $so->items->map(function($item) {
+                'sales_order_number' => $so->sales_order_number,
+                'customer_name' => $so->customer?->name,
+                'items' => $so->items->map(function($item) use ($soSubtotal, $soOrderDiscount, $soDiscountType) {
+                    $qty = (float)$item->quantity;
+                    $grossPrice = (float)$item->unit_price;
+                    $lineGrossTotal = $qty * $grossPrice;
+                    $totalItemDisc = 0;
+                    if ($soDiscountType === 'order_wise') {
+                        $totalItemDisc = ($soSubtotal > 0 && $soOrderDiscount > 0) ? ($lineGrossTotal / $soSubtotal) * $soOrderDiscount : 0;
+                    } else {
+                        $totalItemDisc = (float)($item->discount ?? 0);
+                    }
+                    $netPrice = ($qty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $qty, 2) : $grossPrice;
                     return [
                         'product_id' => $item->product_id,
                         'item_name' => $item->item_name ?? $item->product?->name ?? 'Product Item',
-                        'quantity' => $item->quantity,
-                        'unit_price' => $item->unit_price,
+                        'quantity' => $qty,
+                        'unit_price' => $netPrice,
+                        'warehouse_id' => $item->warehouse_id,
+                        'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
+                        'track_serial_number' => (bool)($item->product?->track_serial_number),
+                    ];
+                })->values()->toArray()
+            ];
+        })->values()->toArray();
+
+        $invoicesData = $invoices->map(function($inv) {
+            $invSubtotal = (float)($inv->subtotal ?: 1);
+            $invDiscountType = $inv->discount_type ?? 'item_wise';
+            $invOrderDiscount = ($invDiscountType === 'order_wise') ? (float)($inv->discount_amount ?: 0) : 0;
+            return [
+                'id' => $inv->id,
+                'invoice_number' => $inv->invoice_number,
+                'sales_order_id' => $inv->sales_order_id,
+                'invoice_date' => $inv->invoice_date ? $inv->invoice_date->format('d/m/Y') : '',
+                'total_amount' => (float)$inv->total_amount,
+                'gst_type' => $inv->gst_type ?? ((float)$inv->igst_amount > 0 ? 'IGST' : 'CGST + SGST'),
+                'items' => $inv->items->map(function($item) use ($invSubtotal, $invOrderDiscount, $invDiscountType) {
+                    $qty = (float)$item->quantity;
+                    $grossPrice = (float)$item->unit_price;
+                    $lineGrossTotal = $qty * $grossPrice;
+                    $totalItemDisc = 0;
+                    if ($invDiscountType === 'order_wise') {
+                        $totalItemDisc = ($invSubtotal > 0 && $invOrderDiscount > 0) ? ($lineGrossTotal / $invSubtotal) * $invOrderDiscount : 0;
+                    } else {
+                        $totalItemDisc = (float)($item->discount ?? 0);
+                    }
+                    $netPrice = ($qty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $qty, 2) : $grossPrice;
+                    return [
+                        'product_id' => $item->product_id,
+                        'item_name' => $item->item_name ?? $item->product?->name ?? 'Product Item',
+                        'quantity' => $qty,
+                        'unit_price' => $netPrice,
                         'warehouse_id' => $item->warehouse_id,
                         'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
                         'track_serial_number' => (bool)($item->product?->track_serial_number),
@@ -168,6 +224,7 @@
         const warehouses = @json($formattedWarehouses);
         const productsList = @json($formattedProducts);
         const salesOrdersList = @json($salesOrdersData);
+        const invoicesList = @json($invoicesData);
         const itemsBody = document.getElementById('returnItemsBody');
         const itemsHint = document.getElementById('itemsHint');
         const directAddContainer = document.getElementById('directAddContainer');
@@ -186,13 +243,90 @@
         $(document).ready(function() {
             initSelect2(document);
 
+            function renderItemsList(items) {
+                itemsBody.innerHTML = '';
+                if (!items || items.length === 0) {
+                    itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>No products found.</td></tr>';
+                    return;
+                }
+
+                items.forEach((item, index) => {
+                    if (!item.product_id) return;
+                    
+                    const isSerial = item.track_serial_number;
+                    const serialBlock = isSerial ? `
+                        <div id="serial_block_${index}" class="mt-2 p-3 bg-white border border-primary-subtle rounded shadow-sm">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-bold fs-11 text-dark d-flex align-items-center">
+                                    <i class="feather-hash text-primary me-1 fs-12"></i>Tracked Serial Numbers (Returning):
+                                </span>
+                                <button type="button" class="btn btn-xs btn-outline-primary fw-semibold fetch-sold-serials-btn" data-product-id="${item.product_id}" data-warehouse-id="${item.warehouse_id}" data-idx="${index}">
+                                    <i class="feather-zap me-1"></i>Auto-Fill Sold
+                                </button>
+                            </div>
+                            <textarea name="items[${index}][serial_numbers]" id="serial_input_${index}" class="form-control form-control-sm font-monospace fs-11 text-dark" rows="2" placeholder="Scan barcode or enter returning serial numbers (1 per line or comma)..."></textarea>
+                            <span class="fs-10 text-muted mt-1 d-block"><i class="feather-info me-1"></i>Restores serial numbers back to Available status in inventory upon approval.</span>
+                        </div>
+                    ` : '';
+
+                    const row = `
+                        <tr class="item-row align-top">
+                            <td class="ps-3 pe-2 py-2">
+                                <strong class="text-dark fs-13 d-block">${escapeHtml(item.item_name)}</strong>
+                                <input type="hidden" name="items[${index}][product_id]" value="${item.product_id}">
+                                ${serialBlock}
+                            </td>
+                            <td class="px-2 py-2">
+                                <span class="text-dark fw-semibold fs-12">${escapeHtml(item.warehouse_name)}</span>
+                                <input type="hidden" name="items[${index}][warehouse_id]" value="${item.warehouse_id}">
+                            </td>
+                            <td class="text-end px-2 py-2">
+                                <input type="number" 
+                                       name="items[${index}][quantity]" 
+                                       class="form-control odoo-table-input text-end fw-bold text-primary return-qty-input" 
+                                       value="${item.quantity}" 
+                                       min="0.0001" 
+                                       max="${item.quantity}" 
+                                       required 
+                                       style="width: 100px; margin-left: auto;">
+                            </td>
+                            <td class="text-end pe-3 py-2">
+                                <input type="number" 
+                                       name="items[${index}][unit_price]" 
+                                       class="form-control odoo-table-input text-end text-muted fw-bold" 
+                                       value="${item.unit_price}" 
+                                       min="0" 
+                                       step="0.01" 
+                                       required 
+                                       style="width: 120px; margin-left: auto;">
+                            </td>
+                            <td class="text-center pe-3 py-2 align-middle">
+                                <button type="button" class="btn btn-sm btn-link text-danger remove-row-btn p-1 border-0" title="Remove item from return">
+                                    <i class="feather-trash-2 fs-15"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    const $tr = $(row);
+                    $(itemsBody).append($tr);
+
+                    $tr.find('.remove-row-btn').on('click', function() {
+                        $tr.remove();
+                        if (itemsBody.children.length === 0) {
+                            itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>No products found.</td></tr>';
+                        }
+                    });
+
+                    attachSoldSerialsHandler($tr);
+                });
+            }
+
             function updateModeValidation(mode) {
                 if (mode === 'direct') {
                     soSelectBlock.style.display = 'none';
                     customerSelectBlock.style.display = 'block';
                     directAddContainer.style.display = 'block';
                     itemsHint.textContent = 'Add product line items manually to issue a Direct Sales Return.';
-                    document.querySelectorAll('.direct-col').forEach(el => el.style.display = '');
 
                     $('#salesOrderSelect').prop('required', false).val('').trigger('change.select2');
                     $('#customerSelect').prop('required', true);
@@ -205,8 +339,7 @@
                     soSelectBlock.style.display = 'block';
                     customerSelectBlock.style.display = 'none';
                     directAddContainer.style.display = 'none';
-                    itemsHint.textContent = 'Select a Sales Order to populate return items.';
-                    document.querySelectorAll('.direct-col').forEach(el => el.style.display = 'none');
+                    itemsHint.textContent = 'Select a Sales Order / Invoice to populate return items.';
 
                     $('#salesOrderSelect').prop('required', true);
                     $('#customerSelect').prop('required', false).val('').trigger('change.select2');
@@ -234,74 +367,49 @@
                 if (document.querySelector('input[name="return_mode"]:checked').value === 'direct') return;
 
                 const soId = $(this).val();
-                itemsBody.innerHTML = '';
+                const $invoiceSel = $('#invoiceSelect');
+                $invoiceSel.empty().append('<option value="">-- All Invoices / Select Specific Invoice --</option>');
 
                 if (!soId) {
+                    $invoiceSel.trigger('change.select2');
                     itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>Please select a Sales Order to populate items.</td></tr>';
                     return;
                 }
 
-                const selectedSo = salesOrdersList.find(so => so.id == soId);
-                if (selectedSo && selectedSo.items.length > 0) {
-                    selectedSo.items.forEach((item, index) => {
-                        if (!item.product_id) return;
-                        
-                        const isSerial = item.track_serial_number;
-                        const serialBlock = isSerial ? `
-                            <div id="serial_block_${index}" class="mt-2 p-3 bg-white border border-primary-subtle rounded shadow-sm">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <span class="fw-bold fs-11 text-dark d-flex align-items-center">
-                                        <i class="feather-hash text-primary me-1 fs-12"></i>Tracked Serial Numbers (Returning):
-                                    </span>
-                                    <button type="button" class="btn btn-xs btn-outline-primary fw-semibold fetch-sold-serials-btn" data-product-id="${item.product_id}" data-warehouse-id="${item.warehouse_id}" data-idx="${index}">
-                                        <i class="feather-zap me-1"></i>Auto-Fill Sold
-                                    </button>
-                                </div>
-                                <textarea name="items[${index}][serial_numbers]" id="serial_input_${index}" class="form-control form-control-sm font-monospace fs-11 text-dark" rows="2" placeholder="Scan barcode or enter returning serial numbers (1 per line or comma)..."></textarea>
-                                <span class="fs-10 text-muted mt-1 d-block"><i class="feather-info me-1"></i>Restores serial numbers back to Available status in inventory upon approval.</span>
-                            </div>
-                        ` : '';
+                // Populate Invoices belonging to this Sales Order
+                const matchingInvoices = invoicesList.filter(inv => inv.sales_order_id == soId);
+                matchingInvoices.forEach(inv => {
+                    $invoiceSel.append(`<option value="${inv.id}">${inv.invoice_number} (Date: ${inv.invoice_date} - Total: ₹${inv.total_amount.toFixed(2)} - Tax: ${inv.gst_type})</option>`);
+                });
 
-                        const row = `
-                            <tr class="item-row align-top">
-                                <td class="ps-3 pe-2 py-2">
-                                    <strong class="text-dark fs-13 d-block">${escapeHtml(item.item_name)}</strong>
-                                    <input type="hidden" name="items[${index}][product_id]" value="${item.product_id}">
-                                    ${serialBlock}
-                                </td>
-                                <td class="px-2 py-2">
-                                    <span class="text-dark fw-semibold fs-12">${escapeHtml(item.warehouse_name)}</span>
-                                    <input type="hidden" name="items[${index}][warehouse_id]" value="${item.warehouse_id}">
-                                </td>
-                                <td class="text-end px-2 py-2">
-                                    <input type="number" 
-                                           name="items[${index}][quantity]" 
-                                           class="form-control odoo-table-input text-end fw-bold text-primary return-qty-input" 
-                                           value="${item.quantity}" 
-                                           min="0.0001" 
-                                           max="${item.quantity}" 
-                                           required 
-                                           style="width: 100px; margin-left: auto;">
-                                </td>
-                                <td class="text-end pe-3 py-2">
-                                    <input type="number" 
-                                           name="items[${index}][unit_price]" 
-                                           class="form-control odoo-table-input text-end text-muted fw-bold" 
-                                           value="${item.unit_price}" 
-                                           min="0" 
-                                           step="0.01" 
-                                           required 
-                                           style="width: 120px; margin-left: auto;">
-                                </td>
-                            </tr>
-                        `;
-                        const $tr = $(row);
-                        $(itemsBody).append($tr);
-
-                        attachSoldSerialsHandler($tr);
-                    });
+                if (matchingInvoices.length > 0) {
+                    $invoiceSel.val(matchingInvoices[0].id).trigger('change.select2');
+                    renderItemsList(matchingInvoices[0].items);
                 } else {
-                    itemsBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>No products found on this Sales Order.</td></tr>';
+                    $invoiceSel.trigger('change.select2');
+                    const selectedSo = salesOrdersList.find(so => so.id == soId);
+                    if (selectedSo) {
+                        renderItemsList(selectedSo.items);
+                    }
+                }
+            });
+
+            // Invoice Selection Handler
+            $('#invoiceSelect').on('change', function() {
+                const invId = $(this).val();
+                if (invId) {
+                    const selectedInv = invoicesList.find(inv => inv.id == invId);
+                    if (selectedInv) {
+                        renderItemsList(selectedInv.items);
+                    }
+                } else {
+                    const soId = $('#salesOrderSelect').val();
+                    if (soId) {
+                        const selectedSo = salesOrdersList.find(so => so.id == soId);
+                        if (selectedSo) {
+                            renderItemsList(selectedSo.items);
+                        }
+                    }
                 }
             });
 

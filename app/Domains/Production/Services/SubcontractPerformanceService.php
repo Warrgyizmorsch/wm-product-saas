@@ -277,6 +277,7 @@ class SubcontractPerformanceService
                 // Vendor Bill actual cost
                 $vendorBillItem = DB::table('vendor_bill_items')
                     ->join('vendor_bills', 'vendor_bill_items.vendor_bill_id', '=', 'vendor_bills.id')
+                    ->where('vendor_bills.tenant_id', $tenantId)
                     ->where('vendor_bills.purchase_order_id', $poItem->purchase_order_id)
                     ->where('vendor_bill_items.product_id', $poItem->product_id)
                     ->select('vendor_bill_items.*')

@@ -111,6 +111,11 @@
                 ['label' => 'Machine Monitor',        'route' => 'production.mes.machines.index'],
                 ['label' => 'Barcode Scanner',        'route' => 'production.mes.scanner.index'],
             ]],
+            ['label' => 'Subcontracting', 'icon' => 'feather-truck', 'url' => '#', 'children' => [
+                ['label' => 'Delivery Challans / Gate Passes', 'route' => 'production.subcontract.delivery-challans.index'],
+                ['label' => 'Vendor SLA & Analytics',          'route' => 'production.subcontract.analytics'],
+                ['label' => 'Subcontract Settings',            'route' => 'production.settings.index'],
+            ]],
             ['label' => 'Quality Management', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quality Dashboard',    'route' => 'production.quality.dashboard'],
                 ['label' => 'Quality Inspections',  'route' => 'production.inspections.index'],
@@ -118,6 +123,11 @@
                 ['label' => 'CAPA',                 'route' => 'production.capas.index'],
                 ['label' => 'Rework Orders',        'route' => 'production.rework.index'],
                 ['label' => 'Scrap Disposals',      'route' => 'production.scrap.index'],
+            ]],
+            ['label' => 'Machine Maintenance', 'icon' => 'feather-tool', 'url' => '#', 'children' => [
+                ['label' => 'Maintenance Dashboard', 'route' => 'production.maintenance.dashboard'],
+                ['label' => 'Work Orders',           'route' => 'production.maintenance.work-orders.index'],
+                ['label' => 'PM Schedules',          'route' => 'production.maintenance.schedules.index'],
             ]],
             ['label' => 'Manufacturing Intelligence', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => [
                 ['label' => 'Executive Dashboard',    'route' => 'production.intelligence.dashboard'],
@@ -149,10 +159,10 @@
                 ['label' => 'Employees Assets', 'route' => 'hrms.assets-module.index'],
                 ['label' => 'My Assets', 'route' => 'hrms.assets-module.my-assets'],
             ]],
-            ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#', 'children' => [
-                ['label' => 'Admin Attendance', 'route' => 'hrms.attendance.index'],
-                ['label' => 'My Attendance', 'route' => 'hrms.attendance.myAttendance'],
-            ]],
+             ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#', 'children' => [
+                 ['label' => 'Employees Attendance', 'route' => 'hrms.attendance.index'],
+                 ['label' => 'My Attendance', 'route' => 'hrms.attendance.myAttendance'],
+             ]],
             ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
@@ -165,6 +175,7 @@
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
                 ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
+                ['label' => 'Cost Centers', 'route' => 'accounting.cost-centers.index'],
                 ['label' => 'Journals', 'route' => 'accounting.journals.index'],
                 ['label' => 'Payment Vouchers', 'route' => 'accounting.vouchers.payment.index'],
                 ['label' => 'Receipt Vouchers', 'route' => 'accounting.vouchers.receipt.index'],
@@ -173,12 +184,17 @@
                 ['label' => 'Debit Notes', 'route' => 'accounting.vouchers.debit_note.index'],
                 ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index'],
                 ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index'],
+                ['label' => 'Day Book', 'route' => 'accounting.reports.day-book'],
                 ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
                 ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
                 ['label' => 'Balance Sheet', 'route' => 'accounting.reports.balance-sheet'],
                 ['label' => 'Profit & Loss', 'route' => 'accounting.reports.profit-loss'],
                 ['label' => 'AR Aging', 'route' => 'accounting.reports.ar-aging'],
                 ['label' => 'AP Aging', 'route' => 'accounting.reports.ap-aging'],
+                ['label' => 'Cash Flow', 'route' => 'accounting.reports.cash-flow'],
+                ['label' => 'GST Summary', 'route' => 'accounting.reports.gst-summary'],
+                ['label' => 'GSTR-1', 'route' => 'accounting.reports.gstr1'],
+                ['label' => 'GSTR-3B', 'route' => 'accounting.reports.gstr3b'],
             ]],
             ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],

@@ -3,9 +3,11 @@
 namespace App\Domains\Accounting\Listeners;
 
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\VoucherDetail;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
+use App\Domains\Accounting\Support\VoucherType;
 use App\Domains\Sales\Events\SalesReturnApproved;
 use Illuminate\Support\Facades\Log;
 
@@ -48,7 +50,7 @@ class PostSalesReturnJournal
             // Output GST Accounts
             $cgstAccount = $this->accounts->findByCode('2110', $tenantId);
             $sgstAccount = $this->accounts->findByCode('2120', $tenantId);
-            $igstAccount = $this->accounts->findByCode('2100', $tenantId);
+            $igstAccount = $this->accounts->findByCode('2130', $tenantId) ?: $this->accounts->findByCode('2100', $tenantId);
 
             if (!$accountsReceivable || !$salesReturnAccount) {
                 $message = 'Missing chart of accounts (Accounts Receivable/Sales Returns/Sales Revenue), skipping auto-post';
@@ -64,12 +66,31 @@ class PostSalesReturnJournal
             $taxRate = 18.0; // Standard GST 18% (9% CGST + 9% SGST)
             $isInterState = false;
 
+            $invoice = null;
             if ($salesReturn->invoice_id) {
                 $invoice = \App\Domains\Sales\Models\Invoice::find($salesReturn->invoice_id);
-                if ($invoice && (float)$invoice->subtotal > 0 && (float)$invoice->tax_total > 0) {
-                    $taxRate = round(((float)$invoice->tax_total / (float)$invoice->subtotal) * 100, 2);
-                    $isInterState = (float)$invoice->igst_amount > 0;
+            } elseif ($salesReturn->sales_order_id) {
+                $invoice = \App\Domains\Sales\Models\Invoice::where('sales_order_id', $salesReturn->sales_order_id)
+                    ->where('status', '!=', 'Cancelled')
+                    ->latest()
+                    ->first();
+            }
+
+            if ($invoice) {
+                if ($invoice->tax_type === 'without_tax') {
+                    $taxRate = 0.0;
+                } elseif ($invoice->tax_type === 'order_wise_tax') {
+                    $taxRate = (float)($invoice->order_tax_rate ?: 18.0);
+                } else {
+                    $invItemsSubtotal = (float)$invoice->items->sum(fn($i) => max(0, ((float)$i->quantity * (float)$i->unit_price) - (float)$i->discount));
+                    $invItemsTax = (float)$invoice->items->sum(fn($i) => (float)$i->tax_amount);
+                    if ($invItemsSubtotal > 0 && $invItemsTax > 0) {
+                        $taxRate = round(($invItemsTax / $invItemsSubtotal) * 100, 2);
+                    } else {
+                        $taxRate = 18.0;
+                    }
                 }
+                $isInterState = ((float)$invoice->igst_amount > 0) || (strtolower((string)($invoice->gst_type ?? '')) === 'igst');
             }
 
             $cgstAmount = 0.0;
@@ -127,13 +148,25 @@ class PostSalesReturnJournal
                 'description'         => "Credit Note Total Refund {$salesReturn->return_number}",
             ];
 
-            $this->journals->post($lines, [
-                'tenant_id'      => $tenantId,
-                'journal_date'   => $salesReturn->return_date ?: now(),
-                'source'         => Journal::SOURCE_SALES,
-                'reference_type' => 'sales_return',
-                'reference_id'   => $salesReturn->id,
-                'memo'           => "Sales Return / Credit Note {$salesReturn->return_number}",
+            $creditNoteJournal = $this->journals->post($lines, [
+                'tenant_id'              => $tenantId,
+                'journal_date'           => $salesReturn->return_date ?: now(),
+                'source'                 => Journal::SOURCE_SALES,
+                'reference_type'         => 'sales_return',
+                'reference_id'           => $salesReturn->id,
+                'memo'                   => "Sales Return / Credit Note {$salesReturn->return_number}",
+                'voucher_type'           => VoucherType::CREDIT_NOTE,
+                'journal_number_prefix'  => VoucherType::prefix(VoucherType::CREDIT_NOTE),
+            ]);
+
+            VoucherDetail::create([
+                'tenant_id'    => $tenantId,
+                'journal_id'   => $creditNoteJournal->id,
+                'voucher_type' => VoucherType::CREDIT_NOTE,
+                'party_type'   => 'customer',
+                'party_id'     => $salesReturn->customer_id,
+                'party_name'   => $salesReturn->customer?->name,
+                'reference_no' => $salesReturn->return_number,
             ]);
 
             // 2. COGS & Inventory Asset Restocking Journal

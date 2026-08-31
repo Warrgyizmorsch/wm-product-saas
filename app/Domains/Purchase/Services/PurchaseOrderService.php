@@ -114,7 +114,10 @@ class PurchaseOrderService
 
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $po->id,
-                    'product_id' => $item['product_id'],
+                    'product_id' => $item['product_id'] ?? null,
+                    'line_type' => $item['line_type'] ?? PurchaseOrderItem::LINE_TYPE_STOCK,
+                    'chart_of_account_id' => $item['chart_of_account_id'] ?? null,
+                    'asset_category_id' => $item['asset_category_id'] ?? null,
                     'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $qty,
                     'rate' => $price,

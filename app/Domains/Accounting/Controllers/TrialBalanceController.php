@@ -4,6 +4,7 @@ namespace App\Domains\Accounting\Controllers;
 
 use App\Domains\Accounting\Models\AccountingPeriod;
 use App\Domains\Accounting\Models\ChartOfAccount;
+use App\Domains\Accounting\Models\CostCenter;
 use App\Domains\Accounting\Services\FiscalPeriodService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Http\Controllers\Controller;
@@ -32,11 +33,13 @@ class TrialBalanceController extends Controller
             ? AccountingPeriod::find($request->integer('period_id'))
             : $this->periods->periodForDate(now());
 
+        $costCenterId = $request->filled('cost_center_id') ? $request->integer('cost_center_id') : null;
+
         $rows = collect();
         $totals = ['debit' => 0.0, 'credit' => 0.0];
 
         if ($period) {
-            $rows = $this->journals->trialBalance($period)->map(function ($row) {
+            $rows = $this->journals->trialBalance($period, $costCenterId)->map(function ($row) {
                 $account = $row->account;
 
                 return [
@@ -56,6 +59,8 @@ class TrialBalanceController extends Controller
             'period' => $period,
             'rows' => $rows,
             'totals' => $totals,
+            'costCenters' => CostCenter::active()->orderBy('code')->get(),
+            'costCenterId' => $costCenterId,
         ]);
     }
 }

@@ -60,24 +60,22 @@ class InvoiceController extends Controller
             ->latest()->get();
 
         $dispatchOrders = $allDispatchOrders->filter(function ($do) {
-            foreach ($do->items as $doItem) {
-                $doQty = floatval($doItem->quantity_dispatched > 0 ? $doItem->quantity_dispatched : $doItem->quantity_ordered);
-                
-                $alreadyInvoiced = InvoiceItem::whereHas('invoice', function($q) use ($do) {
-                    $q->where('status', '!=', 'Cancelled')
-                      ->where(function($q2) use ($do) {
-                          $q2->where('sales_order_id', $do->sales_order_id)
-                             ->orWhere('material_requirement_id', $do->material_requirement_id);
-                      });
-                })
-                ->where('product_id', $doItem->product_id)
-                ->sum('quantity');
+            if (in_array($do->status, ['Invoiced', 'Fully Invoiced', 'Completed', 'Cancelled'])) {
+                return false;
+            }
 
-                if (($doQty - $alreadyInvoiced) > 0.0001) {
-                    return true;
+            // Check if an active non-cancelled invoice exists for this dispatch order's material_requirement_id
+            if ($do->material_requirement_id) {
+                $hasInvoice = Invoice::where('status', '!=', 'Cancelled')
+                    ->where('material_requirement_id', $do->material_requirement_id)
+                    ->exists();
+
+                if ($hasInvoice) {
+                    return false;
                 }
             }
-            return false;
+
+            return true;
         });
 
         $customers  = \App\Domains\CRM\Models\Customer::query()->orderBy('name')->get();
@@ -86,8 +84,19 @@ class InvoiceController extends Controller
 
         $dispatchOrder = null;
         $materialRequirement = null;
+
+        if (!$dispatchOrderId && $salesOrderId) {
+            $targetDo = $dispatchOrders->where('sales_order_id', $salesOrderId)->first();
+            if ($targetDo) {
+                $dispatchOrder = $targetDo;
+                $dispatchOrderId = $targetDo->id;
+            }
+        }
+
         if ($dispatchOrderId) {
-            $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])->find($dispatchOrderId);
+            if (!$dispatchOrder) {
+                $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])->find($dispatchOrderId);
+            }
             if (!$dispatchOrder) {
                 $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])
                     ->where('material_requirement_id', $dispatchOrderId)
@@ -110,9 +119,11 @@ class InvoiceController extends Controller
 
             if ($salesOrderId) {
                 $soDOs = $dispatchOrders->filter(fn($do) => $do->sales_order_id == $salesOrderId)->values();
-                $dispatchOrders = $soDOs;
+                if ($soDOs->isNotEmpty()) {
+                    $dispatchOrders = $soDOs;
+                }
 
-                if (!$dispatchOrderId && $dispatchOrders->isNotEmpty()) {
+                if (!$dispatchOrder && $dispatchOrders->isNotEmpty()) {
                     $dispatchOrder = $dispatchOrders->first();
                     if ($dispatchOrder) {
                         $dispatchOrderId = $dispatchOrder->id;
@@ -266,6 +277,7 @@ class InvoiceController extends Controller
             'gst_type'                => ['nullable', 'string', 'in:cgst_sgst,igst'],
             'freight_terms'           => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
             'freight_amount'          => ['nullable', 'numeric', 'min:0'],
+            'freight_tax_rate'        => ['nullable', 'string'],
             'notes'                   => ['nullable', 'string'],
             'items'                   => ['required', 'array', 'min:1'],
             'items.*.sales_order_item_id'          => ['nullable', 'exists:sales_order_items,id'],
@@ -338,8 +350,25 @@ class InvoiceController extends Controller
                 $taxAmount = 0;
             }
 
+            $freightTaxRateOpt = $request->input('freight_tax_rate', 'highest');
+            $freightTaxRatePercent = 18;
+            if ($freightTaxRateOpt === 'highest') {
+                if ($taxType === 'order_wise_tax') {
+                    $freightTaxRatePercent = floatval($request->input('order_tax_percent', 18));
+                } else {
+                    $maxTax = 0;
+                    foreach ($validated['items'] as $it) {
+                        $tr = floatval($it['tax_rate'] ?? 0);
+                        if ($tr > $maxTax) $maxTax = $tr;
+                    }
+                    $freightTaxRatePercent = ($maxTax > 0) ? $maxTax : 18;
+                }
+            } else {
+                $freightTaxRatePercent = floatval($freightTaxRateOpt);
+            }
+
             $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
-            $freightTax = ($effectiveFreight > 0 && $taxType !== 'without_tax') ? round($effectiveFreight * 0.18, 2) : 0;
+            $freightTax = ($effectiveFreight > 0 && $taxType !== 'without_tax') ? round($effectiveFreight * ($freightTaxRatePercent / 100), 2) : 0;
             $totalTaxAmount = $taxAmount + $freightTax;
 
             $cgstAmount = 0;
@@ -355,7 +384,8 @@ class InvoiceController extends Controller
                 }
             }
 
-            $totalAmount = max(0, $subtotal - $discountAmount + $totalTaxAmount + $effectiveFreight);
+            $adjustment = floatval($request->input('adjustment', 0));
+            $totalAmount = max(0, $subtotal - $discountAmount + $totalTaxAmount + $effectiveFreight + $adjustment);
 
             $invoice = Invoice::create([
                 'tenant_id'               => $tenantId,
@@ -366,6 +396,10 @@ class InvoiceController extends Controller
                 'invoice_date'            => $validated['invoice_date'],
                 'due_date'                => $validated['due_date'],
                 'status'                  => 'Draft',
+                'discount_type'           => $discountType,
+                'tax_type'                => $taxType,
+                'order_tax_rate'          => floatval($request->input('order_tax_percent', $request->input('order_tax_rate', 0))),
+                'adjustment'              => $adjustment,
                 'subtotal'                => $subtotal,
                 'tax_amount'              => $totalTaxAmount,
                 'gst_type'                => $gstType,
@@ -375,6 +409,7 @@ class InvoiceController extends Controller
                 'discount_amount'         => $discountAmount,
                 'freight_terms'           => $freightTerms,
                 'freight_amount'          => $freightAmount,
+                'freight_tax_rate'        => $freightTaxRateOpt,
                 'total_amount'            => $totalAmount,
                 'amount_paid'             => 0,
                 'balance_due'             => $totalAmount,

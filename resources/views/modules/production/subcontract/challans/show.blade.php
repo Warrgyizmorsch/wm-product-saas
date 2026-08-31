@@ -18,24 +18,29 @@
         <!-- Action Control Bar -->
         <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom flex-wrap gap-2">
             <div class="d-flex align-items-center gap-3">
-                <a href="{{ route('production.subcontract.delivery-challans.index') }}" class="btn btn-sm btn-outline-secondary">
-                    <i class="feather-arrow-left me-1"></i> Back to Challans
-                </a>
+                <x-ui.button href="{{ route('production.subcontract.delivery-challans.index') }}" variant="outline-secondary" size="sm" icon="feather-arrow-left">
+                    Back to Challans
+                </x-ui.button>
                 <span class="badge bg-primary text-white font-monospace fs-13 px-3 py-1.5">{{ $challan->challan_number }}</span>
                 <x-ui.status-badge :status="$challan->status" />
             </div>
 
             <div class="d-flex align-items-center gap-2">
-                <a href="{{ route('production.subcontract.delivery-challans.print', $challan->id) }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                    <i class="feather-printer me-1"></i> Print Gate Pass (PDF)
-                </a>
+                <x-ui.button href="{{ route('production.subcontract.delivery-challans.print', $challan->id) }}" target="_blank" variant="outline-primary" size="sm" icon="feather-printer">
+                    Print Gate Pass (PDF)
+                </x-ui.button>
+
                 @if($challan->status === 'draft')
                     <form action="{{ route('production.subcontract.delivery-challans.dispatch', $challan->id) }}" method="POST" class="d-inline">
                         @csrf
-                        <button type="submit" class="btn btn-sm btn-success text-white fw-bold shadow-sm">
-                            <i class="feather-send me-1"></i> Dispatch & Deduct Stock
-                        </button>
+                        <x-ui.button type="submit" variant="success" size="sm" icon="feather-send">
+                            Dispatch & Deduct Stock
+                        </x-ui.button>
                     </form>
+                @elseif(in_array($challan->status, ['dispatched', 'vendor_dispatched', 'in_transit']))
+                    <x-ui.button type="button" variant="primary" size="sm" icon="feather-check-circle" data-bs-toggle="modal" data-bs-target="#receiveItemsModal">
+                        Receive Processed Items
+                    </x-ui.button>
                 @endif
             </div>
         </div>
@@ -126,5 +131,77 @@
             </div>
         @endif
     </x-ui.odoo-form-ui>
+
+    <!-- Receive Processed Subcontract Items Modal using Common UI Components -->
+    @if(in_array($challan->status, ['dispatched', 'vendor_dispatched', 'in_transit']))
+        @php
+            $whOptions = [];
+            foreach ($warehouses ?? [] as $wh) {
+                $whOptions[$wh->id] = $wh->name . ' (' . $wh->code . ')';
+            }
+        @endphp
+
+        <x-ui.modal
+            id="receiveItemsModal"
+            title="<i class='feather-check-circle me-2 text-primary'></i>Receive Processed Subcontract Items"
+            :centered="true"
+            formAction="{{ route('production.subcontract.delivery-challans.receive', $challan->id) }}"
+            formMethod="POST"
+            submitText="Confirm Inward Receipt & Complete"
+            closeText="Cancel"
+        >
+            <div class="alert alert-info fs-12 mb-3">
+                <strong class="d-block mb-1"><i class="feather-info me-1"></i>Inward Material Receipt & Backflushing:</strong>
+                Receiving items will add finished/processed stock into your store, backflush consumed company raw materials, update operation progress, and unlock the next shopfloor step.
+            </div>
+
+            <x-ui.input
+                label="Target Product"
+                name="target_product_display"
+                value="{{ $challan->productionOrder?->product?->name ?? 'Processed Material' }}"
+                :disabled="true"
+            />
+
+            <div class="row">
+                <div class="col-md-6">
+                    <x-ui.input
+                        label="Quantity Received"
+                        name="received_qty"
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value="{{ $challan->operation?->target_produced_qty ?: ($challan->productionOrder?->quantity_ordered ?: 30.00) }}"
+                        :required="true"
+                    />
+                </div>
+                <div class="col-md-6">
+                    <x-ui.input
+                        label="Quantity Accepted"
+                        name="accepted_qty"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value="{{ $challan->operation?->target_produced_qty ?: ($challan->productionOrder?->quantity_ordered ?: 30.00) }}"
+                        :required="true"
+                    />
+                </div>
+            </div>
+
+            <x-ui.select
+                label="Receiving Store"
+                name="warehouse_id"
+                :options="$whOptions"
+                :selected="$challan->warehouse_id"
+                :required="true"
+            />
+
+            <x-ui.textarea
+                label="Inspection Remarks"
+                name="remarks"
+                rows="2"
+                placeholder="e.g. Received 30 pcs after TIG welding inspection PASS"
+            />
+        </x-ui.modal>
+    @endif
 </div>
 @endsection

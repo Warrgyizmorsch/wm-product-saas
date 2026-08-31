@@ -45,6 +45,44 @@
                 <x-ui.odoo-form-ui type="input" subtype="number" min="1" max="31" label="Ad-hoc / Variable Inputs Lock Day" name="variable_lock_day" :required="true" value="{{ $variableLockDay }}" />
                 <small class="text-muted d-block mt-1 fs-11">The cut-off day for adding ad-hoc bonuses, cash advance deductions, or claims.</small>
             </div>
+
+            <!-- 5. Statutory Configuration (PF & ESI) -->
+            <div class="col-12 mt-4 border-top pt-4">
+                <h6 class="fw-bold text-dark mb-3"><i class="feather-umbrella text-primary me-2"></i>Statutory Contributions (PF & ESI)</h6>
+                <div class="row g-4">
+                    <!-- PF Enabled -->
+                    <div class="col-md-6 col-12">
+                        <div class="pt-2">
+                            <x-ui.checkbox id="enable_pf" name="enable_pf" value="1" :checked="($rules['enable_pf'] ?? true)" label="Enable Provident Fund (PF) Deductions" />
+                        </div>
+                        <small class="text-muted d-block fs-11 mt-1">When enabled, employee and employer PF contributions (12% standard) will be computed.</small>
+                    </div>
+
+                    <!-- PF Ceiling -->
+                    <div class="col-md-6 col-12">
+                        <div class="pt-2">
+                            <x-ui.checkbox id="restrict_pf_ceiling" name="restrict_pf_ceiling" value="1" :checked="($rules['restrict_pf_ceiling'] ?? true)" label="Restrict PF Contribution to Wage Ceiling (₹15,000)" />
+                        </div>
+                        <small class="text-muted d-block fs-11 mt-1">If enabled, the PF calculation basis is capped at a maximum basic salary of ₹15,000 per month (max deduction ₹1,800).</small>
+                    </div>
+
+                    <!-- ESI Enabled -->
+                    <div class="col-md-6 col-12">
+                        <div class="pt-2">
+                            <x-ui.checkbox id="enable_esi" name="enable_esi" value="1" :checked="($rules['enable_esi'] ?? true)" label="Enable Employee State Insurance (ESI) Deductions" />
+                        </div>
+                        <small class="text-muted d-block fs-11 mt-1">When enabled, ESI contribution (0.75% standard) will be calculated on Gross Salary.</small>
+                    </div>
+
+                    <!-- ESI Threshold -->
+                    <div class="col-md-6 col-12">
+                        <div class="pt-2">
+                            <x-ui.checkbox id="restrict_esi_threshold" name="restrict_esi_threshold" value="1" :checked="($rules['restrict_esi_threshold'] ?? true)" label="Apply ESI Gross Salary Threshold (₹21,000)" />
+                        </div>
+                        <small class="text-muted d-block fs-11 mt-1">If enabled, ESI will only be deducted if the employee's monthly gross salary is ₹21,000 or below.</small>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="d-flex justify-content-end mt-4 pt-3 border-top">

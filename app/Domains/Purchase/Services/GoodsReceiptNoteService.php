@@ -19,7 +19,9 @@ class GoodsReceiptNoteService
 
     public function storeGrn(array $validated, int $tenantId): GoodsReceiptNote
     {
-        $grn = DB::transaction(function () use ($validated, $tenantId) {
+        $assetLineIds = [];
+
+        $grn = DB::transaction(function () use ($validated, $tenantId, &$assetLineIds) {
             $grnNumber = $this->grnRepo->getNextGrnNumber($tenantId);
 
             $po = PurchaseOrder::find($validated['purchase_order_id']);
@@ -78,6 +80,9 @@ class GoodsReceiptNoteService
                     'goods_receipt_note_id'  => $grn->id,
                     'purchase_order_item_id' => $poItem->id,
                     'product_id'             => $poItem->product_id,
+                    'line_type'              => $poItem->line_type ?? PurchaseOrderItem::LINE_TYPE_STOCK,
+                    'chart_of_account_id'    => $poItem->chart_of_account_id,
+                    'asset_category_id'      => $poItem->asset_category_id,
                     'production_order_id'           => $poItem->production_order_id ?? $po?->production_order_id,
                     'production_order_operation_id' => $poItem->production_order_operation_id,
                     'production_batch_id'           => $poItem->production_batch_id,
@@ -91,6 +96,10 @@ class GoodsReceiptNoteService
                     'total_amount'           => $totalAmount,
                     'remarks'                => $item['remarks'] ?? null,
                 ]);
+
+                if ($qtyAccepted > 0 && $grnItem->line_type === PurchaseOrderItem::LINE_TYPE_ASSET) {
+                    $assetLineIds[] = $grnItem->id;
+                }
 
                 if ($qtyAccepted > 0 && $this->shouldAffectPhysicalInventory($poItem)) {
                     if (!empty($item['batches']) && is_array($item['batches'])) {
@@ -171,8 +180,12 @@ class GoodsReceiptNoteService
             return $grn;
         });
 
-        DB::afterCommit(function () use ($grn) {
+        DB::afterCommit(function () use ($grn, $assetLineIds) {
             event(new \App\Domains\Purchase\Events\GoodsReceiptNoteApproved($grn));
+
+            foreach (GoodsReceiptNoteItem::whereIn('id', $assetLineIds)->get() as $assetLine) {
+                event(new \App\Domains\Purchase\Events\GrnAssetLineReceived($assetLine));
+            }
         });
 
         return $grn;
@@ -183,6 +196,10 @@ class GoodsReceiptNoteService
      */
     public function shouldAffectPhysicalInventory(PurchaseOrderItem $poItem): bool
     {
+        if ($poItem->line_type && $poItem->line_type !== PurchaseOrderItem::LINE_TYPE_STOCK) {
+            return false;
+        }
+
         $product = $poItem->product;
         if ($product && (strtolower((string)$product->item_type) === 'service' || strtolower((string)$product->type) === 'service')) {
             return false;

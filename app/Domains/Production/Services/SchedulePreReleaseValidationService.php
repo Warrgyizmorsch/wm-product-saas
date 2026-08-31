@@ -51,7 +51,7 @@ class SchedulePreReleaseValidationService
         }
 
         foreach ($operations as $op) {
-            $isExternal = (bool) ($op->orderOperation?->is_external ?? $op->orderOperation?->routingOperation?->is_external ?? false);
+            $isExternal = (bool) ($op->orderOperation?->is_external ?? $op->orderOperation?->routingOperation?->is_external ?? ($op->work_center_id === null));
 
             if (!$op->planned_start || !$op->planned_finish) {
                 $errors[] = [
@@ -62,7 +62,7 @@ class SchedulePreReleaseValidationService
                 ];
             }
 
-            if (!$op->workCenter || !$op->workCenter->isActive()) {
+            if (!$isExternal && (!$op->workCenter || !$op->workCenter->isActive())) {
                 $errors[] = [
                     'code'         => 'INACTIVE_WORK_CENTER',
                     'severity'     => 'error',
@@ -72,7 +72,7 @@ class SchedulePreReleaseValidationService
             }
 
             // Check if Machine assignment is required for this WorkCenter (only for internal operations)
-            if (!$isExternal && !$op->machine_id) {
+            if (!$isExternal && $op->work_center_id && !$op->machine_id) {
                 $machinesCount = Machine::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
                     ->where('work_center_id', $op->work_center_id)
@@ -83,7 +83,7 @@ class SchedulePreReleaseValidationService
                     $errors[] = [
                         'code'         => 'UNASSIGNED_MACHINE',
                         'severity'     => 'error',
-                        'message'      => "Operation sequence {$op->sequence} requires a machine assignment at Work Center [{$op->workCenter->name}].",
+                        'message'      => "Operation sequence {$op->sequence} requires a machine assignment at Work Center [" . ($op->workCenter?->name ?? 'N/A') . "].",
                         'operation_id' => $op->id,
                     ];
                 }

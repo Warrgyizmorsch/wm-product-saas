@@ -55,6 +55,13 @@
                         </div>
                         <div class="fs-11 text-muted">
                             {{ $run->start_date->format('d M') }} - {{ $run->end_date->format('d M Y') }}
+                            @if($run->employee_ids && count($run->employee_ids) > 0)
+                                <span class="d-block text-primary mt-1 fw-bold"><i class="feather-user me-1"></i>Individual ({{ count($run->employee_ids) }})</span>
+                            @elseif($run->payGroup)
+                                <span class="d-block text-info mt-1"><i class="feather-users me-1"></i>{{ $run->payGroup->name }}</span>
+                            @else
+                                <span class="d-block text-secondary mt-1"><i class="feather-users me-1"></i>All Pay Groups</span>
+                            @endif
                         </div>
                     </a>
                 @empty
@@ -75,7 +82,9 @@
                         <div>
                             <h5 class="fw-bold text-dark mb-1">
                                 Payroll Register &mdash; {{ Carbon\Carbon::parse($selectedRun->payroll_month . '-01')->format('F Y') }}
-                                @if($selectedRun->payGroup)
+                                @if($selectedRun->employee_ids && count($selectedRun->employee_ids) > 0)
+                                    <span class="badge bg-soft-primary text-primary fs-12 ms-2 fw-semibold"><i class="feather-user me-1"></i>Individual Run ({{ count($selectedRun->employee_ids) }} Employees)</span>
+                                @elseif($selectedRun->payGroup)
                                     <span class="badge bg-soft-info text-info fs-12 ms-2 fw-semibold">{{ $selectedRun->payGroup->name }}</span>
                                 @else
                                     <span class="badge bg-soft-secondary text-secondary fs-12 ms-2 fw-semibold">All Pay Groups</span>
@@ -85,24 +94,27 @@
                                 Cycle dates: {{ $selectedRun->start_date->format('F d, Y') }} to {{ $selectedRun->end_date->format('F d, Y') }}
                             </div>
                         </div>
-                        <div>
+                        <div class="d-inline-flex gap-2 align-items-center">
+                            @if($selectedRun->status !== 'draft')
+                                <x-ui.button variant="outline-primary" icon="feather-download-cloud" href="{{ route('hrms.payroll.run.export-bank-file', $selectedRun->id) }}" class="fw-bold">
+                                    Export Bank File
+                                </x-ui.button>
+                            @endif
                             @if($selectedRun->status === 'draft')
-                                <div class="d-inline-flex gap-2 align-items-center">
-                                    <button type="button" class="btn btn-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#bulkAdhocModal">
-                                        <i class="feather-plus-circle me-1.5"></i>Bulk Ad-hoc
-                                    </button>
-                                    <form action="{{ route('hrms.payroll.run.lock', $selectedRun->id) }}" method="POST" class="d-inline m-0">
-                                        @csrf
-                                        <button type="submit" class="btn btn-warning text-white fw-bold"><i class="feather-lock me-2"></i>Lock Payroll Register</button>
-                                    </form>
-                                </div>
+                                <button type="button" class="btn btn-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#bulkAdhocModal">
+                                    <i class="feather-plus-circle me-1.5"></i>Bulk Ad-hoc
+                                </button>
+                                <form action="{{ route('hrms.payroll.run.lock', $selectedRun->id) }}" method="POST" class="d-inline m-0">
+                                    @csrf
+                                    <button type="submit" class="btn btn-warning text-white fw-bold"><i class="feather-lock me-2"></i>Lock Payroll Register</button>
+                                </form>
                             @elseif($selectedRun->status === 'locked')
-                                <form action="{{ route('hrms.payroll.run.release', $selectedRun->id) }}" method="POST" class="d-inline">
+                                <form action="{{ route('hrms.payroll.run.release', $selectedRun->id) }}" method="POST" class="d-inline m-0">
                                     @csrf
                                     <button type="submit" class="btn btn-success fw-bold"><i class="feather-check-circle me-2"></i>Release Payouts</button>
                                 </form>
                             @else
-                                <button class="btn btn-outline-success fw-bold border-2" disabled><i class="feather-check me-2"></i>Payout Completed</button>
+                                <button class="btn btn-outline-success fw-bold border-2 m-0" disabled><i class="feather-check me-2"></i>Payout Completed</button>
                             @endif
                         </div>
                     </div>
@@ -324,10 +336,12 @@
                                                 <button type="button" class="btn btn-icon btn-sm btn-soft-primary rounded-circle show-salary-details" 
                                                         data-employee-name="{{ $row['employee']->full_name }}" 
                                                         data-employee-id="{{ $row['employee']->employee_id }}"
+                                                        data-employee-db-id="{{ $row['employee']->id }}"
+                                                        data-run-id="{{ $selectedRun->id }}"
                                                         data-job-title="{{ $row['employee']->job_title }}"
                                                         data-bank="{{ $row['employee']->bank_name ?? '—' }}"
                                                         data-bank-account="{{ $row['employee']->account_number ?? '—' }}"
-                                                        data-proration-days="{{ $summary['total_days'] ?? '—' }} Days ({{ ucfirst(str_replace('_', ' ', $summary['proration_rule'] ?? 'Basis')) }})"
+                                                        data-proration-days="{{ ($summary['total_days'] ?? 30) - ($summary['lop_days'] ?? 0) }} / {{ $summary['total_days'] ?? 30 }} Days @if(($summary['lop_days'] ?? 0) > 0) (-{{ $summary['lop_days'] }} LOP) @endif"
                                                         data-run-status="{{ $selectedRun->status }}"
                                                         data-released-by="{{ $selectedRun->processedBy?->name ?? 'Finance' }}"
                                                         data-released-at="{{ $selectedRun->updated_at ? $selectedRun->updated_at->format('d M Y H:i') : '' }}"
@@ -390,12 +404,27 @@
                             <x-ui.odoo-form-ui type="input" inputType="month" label="Payroll Month (YYYY-MM)" name="payroll_month" id="initiate_payroll_month" :required="true" placeholder="e.g. 2026-08" />
                         </div>
                         <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Selection Mode" name="selection_mode" id="initiate_selection_mode" :required="true">
+                                <option value="pay_group">By Pay Group</option>
+                                <option value="individual">By Selected Employees</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12" id="pay_group_selection_div">
                             <x-ui.odoo-form-ui type="select" label="Pay Group" name="pay_group_id" id="initiate_pay_group_id" helperText="Select a specific pay group to process or leave as all pay groups.">
                                 <option value="">All Pay Groups (Process All Employees)</option>
                                 @foreach($payGroups as $pg)
                                     <option value="{{ $pg->id }}">{{ $pg->name }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12 d-none" id="employee_selection_div">
+                            <label class="form-label fw-bold fs-12 mb-1">Select Employees <span class="text-danger">*</span></label>
+                            <select name="employee_ids[]" id="initiate_employee_ids" class="form-control odoo-select2" multiple style="width: 100%;">
+                                @foreach($allEmployees as $emp)
+                                    <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text fs-10 mt-1">Select one or more employees to run payroll for.</div>
                         </div>
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" id="initiate_start_date" :required="true" />
@@ -425,7 +454,7 @@
                     <div class="d-flex align-items-center justify-content-center rounded-circle" style="width:34px;height:34px;background:rgba(255,255,255,0.2);">
                         <i class="feather-dollar-sign" style="font-size:16px;"></i>
                     </div>
-                    <h5 class="modal-title fw-bold mb-0" id="salaryDetailsModalLabel" style="font-size:15px;">
+                    <h5 class="modal-title fw-bold mb-0 text-white" id="salaryDetailsModalLabel" style="font-size:15px; color: #ffffff !important;">
                         Payslip Details — <span id="modalPayrollMonth"></span>
                     </h5>
                 </div>
@@ -500,6 +529,7 @@
             <div class="modal-footer bg-white border-top px-4 py-3 d-flex align-items-center justify-content-between" style="border-color:#f0f2f5 !important;">
                 <div class="text-muted" style="font-size:11px;" id="modalReleasedBy"></div>
                 <div class="d-flex gap-2">
+                    <a href="#" id="modalDownloadPayslipBtn" class="btn btn-primary fw-semibold px-4 d-flex align-items-center gap-1" style="font-size:12px;border-radius:6px;"><i class="feather-download" style="font-size:13px;"></i>DOWNLOAD PAYSLIP</a>
                     <button type="button" class="btn btn-light border fw-semibold px-4" style="font-size:12px;border-radius:6px;" data-bs-dismiss="modal">CLOSE</button>
                 </div>
             </div>
@@ -1043,6 +1073,29 @@
             }
         }
 
+        // Selection Mode Toggle inside Initiate Run Modal
+        const selectionMode = document.getElementById('initiate_selection_mode');
+        const payGroupDiv = document.getElementById('pay_group_selection_div');
+        const employeeDiv = document.getElementById('employee_selection_div');
+
+        if (selectionMode) {
+            $(selectionMode).on('change', function() {
+                if (this.value === 'individual') {
+                    if (payGroupDiv) payGroupDiv.classList.add('d-none');
+                    if (employeeDiv) {
+                        employeeDiv.classList.remove('d-none');
+                        // Trigger select2 initialization inside modal if not yet done
+                        if (typeof initOdooComponents === 'function') {
+                            initOdooComponents();
+                        }
+                    }
+                } else {
+                    if (payGroupDiv) payGroupDiv.classList.remove('d-none');
+                    if (employeeDiv) employeeDiv.classList.add('d-none');
+                }
+            });
+        }
+
         const payrollMonthInput = document.getElementById('initiate_payroll_month');
         if (payrollMonthInput) {
             const updateDates = function() {
@@ -1072,6 +1125,8 @@
             const btn      = this;
             const name     = btn.getAttribute('data-employee-name') || '';
             const empId    = btn.getAttribute('data-employee-id') || '';
+            const empDbId  = btn.getAttribute('data-employee-db-id') || '';
+            const runId    = btn.getAttribute('data-run-id') || '';
             const jobTitle = btn.getAttribute('data-job-title') || '';
             const bank     = btn.getAttribute('data-bank') || '—';
             const bankAcc  = btn.getAttribute('data-bank-account') || '—';
@@ -1083,6 +1138,11 @@
             const items    = JSON.parse(btn.getAttribute('data-items') || '{}');
             const summary  = JSON.parse(btn.getAttribute('data-summary') || '{}');
 
+            const downloadBtn = document.getElementById('modalDownloadPayslipBtn');
+            if (downloadBtn) {
+                downloadBtn.setAttribute('href', `/hrms/payroll/payslip/${runId}/${empDbId}/download`);
+            }
+
             // Populate header info
             document.getElementById('modalPayrollMonth').textContent  = month;
             document.getElementById('modalEmployeeName').textContent   = name;
@@ -1092,12 +1152,13 @@
 
             // Released / status label
             const netLabel = document.getElementById('modalNetLabel');
+            const paidDaysVal = (summary.total_days || 30) - (summary.lop_days || 0);
             if (runStatus === 'paid') {
-                netLabel.innerHTML = '<span style="color:#16a34a;">Net Salary Payout</span> <span class="badge ms-2" style="background:#dcfce7;color:#15803d;font-size:10px;border-radius:20px;padding:2px 8px;">Released</span>';
+                netLabel.innerHTML = `<span style="color:#16a34a;">Net Salary Payout (Paid for ${paidDaysVal} Days)</span> <span class="badge ms-2" style="background:#dcfce7;color:#15803d;font-size:10px;border-radius:20px;padding:2px 8px;">Released</span>`;
             } else if (runStatus === 'locked') {
-                netLabel.innerHTML = '<span style="color:#b45309;">Net Salary Payout</span> <span class="badge ms-2" style="background:#fef9c3;color:#854d0e;font-size:10px;border-radius:20px;padding:2px 8px;">Locked</span>';
+                netLabel.innerHTML = `<span style="color:#b45309;">Net Salary Payout (Paid for ${paidDaysVal} Days)</span> <span class="badge ms-2" style="background:#fef9c3;color:#854d0e;font-size:10px;border-radius:20px;padding:2px 8px;">Locked</span>`;
             } else {
-                netLabel.innerHTML = '<span style="color:#166534;">Net Salary Payout</span> <span class="badge ms-2" style="background:#dbeafe;color:#1e40af;font-size:10px;border-radius:20px;padding:2px 8px;">Draft</span>';
+                netLabel.innerHTML = `<span style="color:#166534;">Net Salary Payout (Paid for ${paidDaysVal} Days)</span> <span class="badge ms-2" style="background:#dbeafe;color:#1e40af;font-size:10px;border-radius:20px;padding:2px 8px;">Draft</span>`;
             }
 
             const fmt = v => '₹' + parseFloat(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1132,6 +1193,8 @@
                     </div>`;
                 }
             });
+
+
 
             if (!earningsHtml) {
                 earningsHtml = '<div class="text-center text-muted py-3" style="font-size:12px;">No earnings defined.</div>';

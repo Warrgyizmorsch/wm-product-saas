@@ -17,7 +17,8 @@ class QualityInspectionController extends Controller
     public function __construct(
         private readonly QualityInspectionService $inspectionService,
         private readonly ProductionQualityRepositoryInterface $qualityRepository
-    ) {}
+    ) {
+    }
 
     public function index(Request $request)
     {

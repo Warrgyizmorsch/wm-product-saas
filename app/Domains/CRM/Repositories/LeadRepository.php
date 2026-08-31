@@ -42,7 +42,9 @@ class LeadRepository
                 ->whereNull('deleted_at')
                 ->where(function ($q) {
                     $q->whereNotNull('email')->where('email', '!=', '')
-                      ->orWhereNotNull('phone')->where('phone', '!=', '');
+                      ->orWhereNotNull('company_email')->where('company_email', '!=', '')
+                      ->orWhereNotNull('phone')->where('phone', '!=', '')
+                      ->orWhereNotNull('company_phone')->where('company_phone', '!=', '');
                 });
             $query->orderByRaw("LOWER(email) ASC, phone ASC, id ASC");
         } else {

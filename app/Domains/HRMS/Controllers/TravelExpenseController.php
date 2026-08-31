@@ -669,57 +669,7 @@ class TravelExpenseController extends Controller
         ]);
 
         if ($payoutChannel === 'accounting') {
-            $lines = [];
-
-            // Debit Expense (Code 5900)
-            if ($approvedAmount > 0) {
-                $expenseAccount = $this->getOrCreateAccount($tenantId, '5900', 'Other Expense', 'expense', 'debit', 'operating_expense');
-                $lines[] = [
-                    'chart_of_account_id' => $expenseAccount->id,
-                    'debit' => $approvedAmount,
-                    'credit' => 0.00,
-                    'description' => "Expense Claim: " . $expenseReport->title
-                ];
-            }
-
-            // Credit Advances (Code 1400)
-            if ($adjusted > 0) {
-                $advancesAccount = $this->getOrCreateAccount($tenantId, '1400', 'Loans & Advances', 'asset', 'debit', 'loans_advances');
-                $lines[] = [
-                    'chart_of_account_id' => $advancesAccount->id,
-                    'debit' => 0.00,
-                    'credit' => min($adjusted, $approvedAmount),
-                    'description' => "Advance offset for Claim: " . $expenseReport->title
-                ];
-            }
-
-            // Credit Payable (Code 2010)
-            if ($approvedNet > 0) {
-                $payableAccount = $this->getOrCreateAccount($tenantId, '2010', 'Accounts Payable', 'liability', 'credit', 'current_liability');
-                $lines[] = [
-                    'chart_of_account_id' => $payableAccount->id,
-                    'debit' => 0.00,
-                    'credit' => $approvedNet,
-                    'description' => "Reimbursement payable for Claim: " . $expenseReport->title
-                ];
-            }
-
-            if (count($lines) > 0) {
-                try {
-                    $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                    $journalService->post($lines, [
-                        'tenant_id' => $tenantId,
-                        'journal_date' => now(),
-                        'source' => 'expense',
-                        'reference_type' => 'ExpenseReport',
-                        'reference_id' => $expenseReport->id,
-                        'memo' => "Approved Expense Claim: " . $expenseReport->title,
-                        'posted_by' => auth()->id(),
-                    ]);
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error("Journal Posting Failed: " . $e->getMessage());
-                }
-            }
+            // Do not post to accounting on approval. Accounting entry is posted only on actual payout.
         } else {
             // Payout channel is Payroll:
             // 1. Post the spent offset to Accounting (DR Expense 5900, CR Advances 1400)
@@ -839,76 +789,59 @@ class TravelExpenseController extends Controller
             $advance = $expenseReport->cashAdvance;
             $isAccountingChannel = ($expenseReport->payout_channel ?? 'accounting') === 'accounting';
 
-            // Recover any unspent advance surplus still sitting on the books (accounting
-            // channel only — the payroll channel already recovers surplus via a salary
-            // deduction posted at approval time, see the adhoc component created above).
-            if ($advance && $isAccountingChannel) {
-                $totalAdvance = floatval($advance->approved_amount ?? $advance->amount);
+            if ($isAccountingChannel) {
+                $totalAdvance = $advance ? floatval($advance->approved_amount ?? $advance->amount) : 0.00;
                 $approvedAmount = floatval($expenseReport->approved_amount ?? $expenseReport->total_amount);
                 $surplus = max($totalAdvance - $approvedAmount, 0.00);
+                $approvedNet = max($approvedAmount - $totalAdvance, 0.00);
 
-                if ($surplus > 0) {
+                $lines = [];
+
+                // 1. Debit Other Expense (Code 5900)
+                if ($approvedAmount > 0) {
+                    $expenseAccount = $this->getOrCreateAccount($tenantId, '5900', 'Other Expense', 'expense', 'debit', 'operating_expense');
+                    $lines[] = [
+                        'chart_of_account_id' => $expenseAccount->id,
+                        'debit' => $approvedAmount,
+                        'credit' => 0.00,
+                        'description' => "Expense Claim: " . $expenseReport->title
+                    ];
+                }
+
+                // 2. Credit Advances (Code 1400)
+                if ($totalAdvance > 0) {
                     $advancesAccount = $this->getOrCreateAccount($tenantId, '1400', 'Loans & Advances', 'asset', 'debit', 'loans_advances');
-                    $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
+                    $lines[] = [
+                        'chart_of_account_id' => $advancesAccount->id,
+                        'debit' => 0.00,
+                        'credit' => $totalAdvance,
+                        'description' => "Clear Advance for Claim: " . $expenseReport->title
+                    ];
+                }
 
-                    $lines = [
-                        [
+                // 3. Bank Account transaction (Code 1020)
+                if ($surplus > 0 || $approvedNet > 0) {
+                    $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
+                    if ($surplus > 0) {
+                        // Recovery (Debit Bank)
+                        $lines[] = [
                             'chart_of_account_id' => $bankAccount->id,
                             'debit' => $surplus,
                             'credit' => 0.00,
                             'description' => "Advance surplus recovered for Claim: " . $expenseReport->title
-                        ],
-                        [
-                            'chart_of_account_id' => $advancesAccount->id,
-                            'debit' => 0.00,
-                            'credit' => $surplus,
-                            'description' => "Advance surplus recovered for Claim: " . $expenseReport->title
-                        ]
-                    ];
-
-                    try {
-                        $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                        $journalService->post($lines, [
-                            'tenant_id' => $tenantId,
-                            'journal_date' => now(),
-                            'source' => 'expense',
-                            'reference_type' => 'ExpenseReport',
-                            'reference_id' => $expenseReport->id,
-                            'memo' => "Advance surplus recovered for Claim: " . $expenseReport->title,
-                            'posted_by' => auth()->id(),
-                        ]);
-                    } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error("Advance Surplus Recovery Journal Posting Failed: " . $e->getMessage());
-                    }
-                }
-            }
-
-            // If an advance was associated, mark it as settled
-            if ($advance) {
-                $advance->update(['status' => 'settled']);
-            }
-
-            if ($isAccountingChannel) {
-                $netPayout = floatval($expenseReport->approved_net_reimbursement ?? $expenseReport->net_reimbursement);
-                if ($netPayout > 0) {
-                    $payableAccount = $this->getOrCreateAccount($tenantId, '2010', 'Accounts Payable', 'liability', 'credit', 'current_liability');
-                    $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
-
-                    $lines = [
-                        [
-                            'chart_of_account_id' => $payableAccount->id,
-                            'debit' => $netPayout,
-                            'credit' => 0.00,
-                            'description' => "Payout for Claim: " . $expenseReport->title
-                        ],
-                        [
+                        ];
+                    } elseif ($approvedNet > 0) {
+                        // Payout (Credit Bank)
+                        $lines[] = [
                             'chart_of_account_id' => $bankAccount->id,
                             'debit' => 0.00,
-                            'credit' => $netPayout,
+                            'credit' => $approvedNet,
                             'description' => "Payout for Claim: " . $expenseReport->title
-                        ]
-                    ];
+                        ];
+                    }
+                }
 
+                if (count($lines) > 0) {
                     try {
                         $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
                         $journalService->post($lines, [
@@ -924,6 +857,11 @@ class TravelExpenseController extends Controller
                         \Illuminate\Support\Facades\Log::error("Payout Journal Posting Failed: " . $e->getMessage());
                     }
                 }
+            }
+
+            // If an advance was associated, mark it as settled
+            if ($advance) {
+                $advance->update(['status' => 'settled']);
             }
         });
 
@@ -1034,18 +972,27 @@ class TravelExpenseController extends Controller
             return $account;
         }
 
-        // If not found, try to find any account of the same type for this tenant
+        $groupAccountIds = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->whereNotNull('parent_id')
+            ->pluck('parent_id')
+            ->unique()
+            ->toArray();
+
+        // If not found, try to find any account of the same type for this tenant (excluding headers)
         $account = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('type', $type)
+            ->whereNotIn('id', $groupAccountIds)
             ->first();
 
         if ($account) {
             return $account;
         }
 
-        // Ultimate fallback: return the first account available to prevent system crash
-        return \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()->first();
+        // Ultimate fallback: return the first account available (excluding headers)
+        return \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScopes()
+            ->whereNotIn('id', $groupAccountIds)
+            ->first();
     }
 
     /**

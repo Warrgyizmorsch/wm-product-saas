@@ -55,7 +55,7 @@ class ProfitLossController extends Controller
                     continue;
                 }
 
-                $movement = $account->signedMovement((float) $row->debit, (float) $row->credit);
+                $movement = $account->canonicalMovement((float) $row->debit, (float) $row->credit);
                 $subtype = $account->subtype;
 
                 if (!isset($sections[$subtype])) {

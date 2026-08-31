@@ -11,6 +11,7 @@ class ProductionSettingsController extends Controller
 {
     public function index(): View
     {
+        \Illuminate\Support\Facades\Gate::authorize('create', \App\Domains\Production\Models\WorkCenter::class);
         $tenant = tenant();
         $settings = is_array($tenant?->settings) ? $tenant->settings : [];
 
@@ -24,6 +25,7 @@ class ProductionSettingsController extends Controller
 
     public function updateSubcontract(Request $request): RedirectResponse
     {
+        \Illuminate\Support\Facades\Gate::authorize('create', \App\Domains\Production\Models\WorkCenter::class);
         $validated = $request->validate([
             'subcontract_procurement_workflow' => 'required|in:manual_pr_po,auto_draft_po,auto_approved_po',
             'subcontract_auto_approval_limit' => 'nullable|numeric|min:0',

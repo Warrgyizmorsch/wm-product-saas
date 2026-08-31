@@ -111,10 +111,10 @@ Route::prefix('hrms')
             Route::post('/store', [EmployeeController::class, 'store'])->name('employees.store');
             Route::post('/update/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
             Route::post('/{employee}/update-status', [EmployeeController::class, 'updateStatus'])->name('employees.update-status');
+            Route::post('/{employee}/update-stage', [EmployeeController::class, 'updateStage'])->name('employees.update-stage');
             Route::get('/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
             Route::delete('/delete/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
             
-            Route::post('/{employee}/documents/request', [EmployeeController::class, 'requestDocument'])->name('employees.documents.request');
             Route::post('/{employee}/documents/upload', [EmployeeController::class, 'uploadDocument'])->name('employees.documents.upload');
             Route::patch('/documents/{document}/approve', [EmployeeController::class, 'approveDocument'])->name('employees.documents.approve');
             Route::patch('/documents/{document}/reject', [EmployeeController::class, 'rejectDocument'])->name('employees.documents.reject');
@@ -372,6 +372,7 @@ Route::prefix('hrms')
             Route::post('/report/{expenseReport}/submit', [TravelExpenseController::class, 'submitExpenseReport'])->name('travel-expense.report.submit');
             Route::post('/report/{expenseReport}/approve', [TravelExpenseController::class, 'approveExpenseReport'])->name('travel-expense.report.approve');
             Route::post('/report/{expenseReport}/reject', [TravelExpenseController::class, 'rejectExpenseReport'])->name('travel-expense.report.reject');
+            Route::post('/report/{expenseReport}/pay', [TravelExpenseController::class, 'payExpenseReport'])->name('travel-expense.report.pay');
             Route::get('/employee-policy/{employee}', [TravelExpenseController::class, 'getEmployeePolicy'])->name('travel-expense.employee-policy');
         });
 
@@ -385,5 +386,7 @@ Route::prefix('hrms')
             Route::post('/run/{run}/resolve-pending', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'resolvePending'])->name('payroll.run.resolve-pending');
             Route::post('/run/{run}/release', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'releasePayouts'])->name('payroll.run.release');
             Route::post('/hold/{employee}/{month}', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'toggleHold'])->name('payroll.hold.toggle');
+            Route::get('/run/{run}/export-bank-file', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'exportBankFile'])->name('payroll.run.export-bank-file');
+            Route::get('/payslip/{run}/{employee}/download', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'downloadPayslip'])->name('payroll.payslip.download');
         });
     });

@@ -89,10 +89,22 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Repositories\MachineRepository::class
         );
 
+        // ── Production: Plant Maintenance ─────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\MaintenanceRepositoryInterface::class,
+            \App\Domains\Production\Repositories\MaintenanceRepository::class
+        );
+
         // ── Production: Routing ───────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Production\Repositories\RoutingRepositoryInterface::class,
             \App\Domains\Production\Repositories\RoutingRepository::class
+        );
+
+        // ── Production: Subcontract Delivery Challan ─────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\DeliveryChallanRepositoryInterface::class,
+            \App\Domains\Production\Repositories\DeliveryChallanRepository::class
         );
 
         // ── HRMS: Repositories ───────────────────────────────────────────
@@ -331,6 +343,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Listeners\PostPurchaseReturnJournal::class
         );
 
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Purchase\Events\GrnAssetLineReceived::class,
+            \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
+        );
+
         // ── Production Policies ───────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionKpiTarget::class,
@@ -415,6 +432,16 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionDeviation::class,
             \App\Domains\Production\Policies\QualityManagementPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\DeliveryChallan::class,
+            \App\Domains\Production\Policies\DeliveryChallanPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionCostAdjustment::class,
+            \App\Domains\Production\Policies\ProductionCostAdjustmentPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(
@@ -524,6 +551,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Accounting\Models\ChartOfAccount::class,
             \App\Domains\Accounting\Policies\ChartOfAccountPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\CostCenter::class,
+            \App\Domains\Accounting\Policies\CostCenterPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(
