@@ -16,9 +16,12 @@ class AttendanceController extends Controller
 
     public function index(Request $request)
     {
-        $filters = $request->only(['date', 'department_id', 'search', 'status']);
+        $filters = $request->only(['date', 'department_id', 'search', 'status', 'month']);
         
-        $date = $filters['date'] ?? \Carbon\Carbon::today()->format('Y-m-d');
+        $date = $request->input('date');
+        if (!$date && !$request->has('month')) {
+            $date = \Carbon\Carbon::today()->format('Y-m-d');
+        }
         $departmentId = $filters['department_id'] ?? null;
         $search = $filters['search'] ?? null;
         $statusFilter = $filters['status'] ?? null;
@@ -74,58 +77,145 @@ class AttendanceController extends Controller
         }
 
         if ($view === 'date') {
-            $dateQuery = Attendance::select('date')
-                ->groupBy('date')
-                ->orderBy('date', 'desc');
-
-            if ($search) {
-                $dateQuery->whereIn('date', function($q) use ($search) {
-                    $q->select('date')
-                      ->from('attendances')
-                      ->whereIn('employee_id', function($sq) use ($search) {
-                          $sq->select('id')
-                            ->from('employees')
-                            ->where('full_name', 'like', "%{$search}%")
-                            ->orWhere('employee_id', 'like', "%{$search}%");
-                      });
-                });
+            $monthFilter = $filters['month'] ?? null;
+            if (!$monthFilter && !isset($filters['date'])) {
+                $monthFilter = now()->format('Y-m');
             }
 
-            if ($departmentId) {
-                $dateQuery->whereIn('date', function($q) use ($departmentId) {
-                    $q->select('date')
-                      ->from('attendances')
-                      ->whereIn('employee_id', function($sq) use ($departmentId) {
-                          $sq->select('id')
-                            ->from('employees')
-                            ->where('department_id', $departmentId);
-                      });
-                });
+            $year = now()->year;
+            $month = now()->month;
+            if ($monthFilter) {
+                $parts = explode('-', $monthFilter);
+                if (count($parts) === 2) {
+                    $year = (int)$parts[0];
+                    $month = (int)$parts[1];
+                }
             }
 
-            if ($statusFilter) {
-                $dateQuery->whereIn('date', function($q) use ($statusFilter) {
-                    $q->select('date')
-                      ->from('attendances')
-                      ->where('status', $statusFilter);
-                });
+            $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+            $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
+            $today = now()->startOfDay();
+            if ($endDate->gt($today)) {
+                $endDate = $today->copy();
             }
 
             if (isset($filters['date']) && $filters['date']) {
-                $dateQuery->where('date', $filters['date']);
+                $startDate = \Carbon\Carbon::parse($filters['date'])->startOfDay();
+                $endDate = $startDate->copy()->endOfDay();
             }
 
-            $dates = $dateQuery->paginate(10)->withQueryString();
-            
+            $calendarDates = [];
+            $currentDate = $startDate->copy();
+            while ($currentDate->lte($endDate)) {
+                $dayObj = new \stdClass();
+                $dayObj->date = $currentDate->copy();
+                $calendarDates[] = $dayObj;
+                $currentDate->addDay();
+            }
+
+            // Apply filters
+            if ($search || $departmentId || $statusFilter) {
+                $filteredDates = [];
+                foreach ($calendarDates as $day) {
+                    $dStr = $day->date->format('Y-m-d');
+                    $query = Attendance::where('date', $dStr);
+                    
+                    if ($search) {
+                        $query->whereIn('employee_id', function($sq) use ($search) {
+                            $sq->select('id')
+                              ->from('employees')
+                              ->where('full_name', 'like', "%{$search}%")
+                              ->orWhere('employee_id', 'like', "%{$search}%");
+                        });
+                    }
+                    
+                    if ($departmentId) {
+                        $query->whereIn('employee_id', function($sq) use ($departmentId) {
+                            $sq->select('id')
+                              ->from('employees')
+                              ->where('department_id', $departmentId);
+                        });
+                    }
+                    
+                    if ($statusFilter) {
+                        $query->where('status', $statusFilter);
+                    }
+                    
+                    if ($query->exists()) {
+                        $filteredDates[] = $day;
+                    }
+                }
+                $calendarDates = $filteredDates;
+            }
+
+            // Sort descending
+            usort($calendarDates, function($a, $b) {
+                return $b->date->timestamp <=> $a->date->timestamp;
+            });
+
+            $dates = collect($calendarDates);
+
             $statsByDate = collect();
             if ($dates->isNotEmpty()) {
-                $statsByDate = Attendance::whereIn('date', $dates->pluck('date'))
-                    ->selectRaw('date, status, location_type, COUNT(*) as count')
-                    ->groupBy('date', 'status', 'location_type')
+                $dateStrings = $dates->pluck('date')->map(fn($d) => $d->format('Y-m-d'))->toArray();
+                
+                // Fetch active employees
+                $allEmployees = \App\Domains\HRMS\Models\Employee::where('status', true)->get();
+                
+                // Fetch attendances for these dates
+                $allAttendances = Attendance::whereIn('date', $dateStrings)
                     ->get()
-                    ->groupBy(function($item) {
-                        return $item->date->format('Y-m-d');
-                    });
+                    ->groupBy(fn($a) => $a->date->format('Y-m-d'));
+                
+                // Fetch holidays overlapping these dates
+                $minDate = min($dateStrings);
+                $maxDate = max($dateStrings);
+                $allHolidays = \App\Domains\HRMS\Models\HolidayCalendar::where('status', true)
+                    ->whereBetween('holiday_date', [$minDate, $maxDate])
+                    ->get();
+                
+                // Fetch approved leaves overlapping these dates
+                $allLeaves = \App\Domains\HRMS\Models\LeaveRequest::where('status', 'approved')
+                    ->where(function($q) use ($minDate, $maxDate) {
+                        $q->whereBetween('start_date', [$minDate, $maxDate])
+                          ->orWhereBetween('end_date', [$minDate, $maxDate])
+                          ->orWhere(function($sub) use ($minDate, $maxDate) {
+                              $sub->where('start_date', '<=', $minDate)
+                                  ->where('end_date', '>=', $maxDate);
+                          });
+                    })
+                    ->get();
+
+                // Compute stats for each date
+                $computedStats = [];
+                foreach ($dateStrings as $dStr) {
+                    $carbonDate = \Carbon\Carbon::parse($dStr);
+                    $dateAttendances = $allAttendances->get($dStr, collect())->keyBy('employee_id');
+                    
+                    $present = 0;
+                    $late = 0;
+                    $half_day = 0;
+                    $wfh = 0;
+                    $absent = 0;
+                    $counts = [
+                        'present' => 0, 'wfh' => 0, 'late' => 0, 'half_day' => 0,
+                        'absent' => 0, 'on_leave' => 0, 'week_off' => 0, 'holiday' => 0
+                    ];
+
+                    foreach ($allEmployees as $emp) {
+                        $att = $dateAttendances->get($emp->id);
+                        $res = $this->resolveStatusForDate($emp, $carbonDate, $att, $allHolidays, $allLeaves);
+                        
+                        $status = $res['status'];
+                        if (isset($counts[$status])) {
+                            $counts[$status]++;
+                        }
+                    }
+
+                    $computedStats[$dStr] = $counts;
+                }
+                
+                $statsByDate = collect($computedStats);
             }
 
             $employees = collect();
@@ -143,9 +233,10 @@ class AttendanceController extends Controller
         }
 
         // view === 'employee'
+        $queryDate = $date ?? \Carbon\Carbon::today()->format('Y-m-d');
         $query = \App\Domains\HRMS\Models\Employee::where('status', true)
-            ->with(['department', 'designation', 'attendances' => function($q) use ($date) {
-                $q->where('date', $date)->with('breaks');
+            ->with(['department', 'designation', 'attendances' => function($q) use ($queryDate) {
+                $q->where('date', $queryDate)->with('breaks');
             }]);
 
         if ($departmentId) {
@@ -160,8 +251,8 @@ class AttendanceController extends Controller
         }
 
         if ($statusFilter) {
-            $query->whereHas('attendances', function($q) use ($date, $statusFilter) {
-                $q->where('date', $date)->where('status', $statusFilter);
+            $query->whereHas('attendances', function($q) use ($queryDate, $statusFilter) {
+                $q->where('date', $queryDate)->where('status', $statusFilter);
             });
         }
 
@@ -171,16 +262,121 @@ class AttendanceController extends Controller
         } elseif ($sort === 'checkin_asc' || $sort === 'checkin_desc') {
             $order = ($sort === 'checkin_desc') ? 'desc' : 'asc';
             $query->select('employees.*')
-                ->leftJoin('attendances', function($join) use ($date) {
+                ->leftJoin('attendances', function($join) use ($queryDate) {
                     $join->on('employees.id', '=', 'attendances.employee_id')
-                         ->where('attendances.date', '=', $date);
+                         ->where('attendances.date', '=', $queryDate);
                 })
                 ->orderByRaw("CASE WHEN attendances.check_in IS NULL THEN 1 ELSE 0 END, attendances.check_in {$order}");
         } else {
             $query->orderBy('full_name', 'asc');
         }
 
-        $employees = $query->paginate(10)->withQueryString();
+        $employees = $query->get();
+        
+        $monthFilter = $filters['month'] ?? null;
+        if (!$monthFilter && !isset($filters['date'])) {
+            $monthFilter = now()->format('Y-m');
+        }
+
+        $year = now()->year;
+        $month = now()->month;
+        if ($monthFilter) {
+            $parts = explode('-', $monthFilter);
+            if (count($parts) === 2) {
+                $year = (int)$parts[0];
+                $month = (int)$parts[1];
+            }
+        }
+
+        $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
+        $today = now()->startOfDay();
+        if ($endDate->gt($today)) {
+            $endDate = $today->copy();
+        }
+
+        if ($employees->isNotEmpty()) {
+            $employeeIds = $employees->pluck('id')->toArray();
+
+            // Fetch attendances for these employees for this month
+            $monthAttendances = Attendance::whereIn('employee_id', $employeeIds)
+                ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->get()
+                ->groupBy('employee_id');
+
+            // Fetch holidays for this month
+            $monthHolidays = \App\Domains\HRMS\Models\HolidayCalendar::where('status', true)
+                ->whereBetween('holiday_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->get();
+
+            // Fetch approved leaves for these employees for this month
+            $monthLeaves = \App\Domains\HRMS\Models\LeaveRequest::whereIn('employee_id', $employeeIds)
+                ->where('status', 'approved')
+                ->where(function($q) use ($startDate, $endDate) {
+                    $q->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                      ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                      ->orWhere(function($sub) use ($startDate, $endDate) {
+                          $sub->where('start_date', '<=', $startDate->format('Y-m-d'))
+                              ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                      });
+                })
+                ->get()
+                ->groupBy('employee_id');
+
+            foreach ($employees as $employee) {
+                $empAttendances = $monthAttendances->get($employee->id, collect())->keyBy(function($att) {
+                    return $att->date->format('Y-m-d');
+                });
+                $empLeaves = $monthLeaves->get($employee->id, collect());
+
+                $counts = [
+                    'present' => 0, 'wfh' => 0, 'late' => 0, 'half_day' => 0,
+                    'absent' => 0, 'on_leave' => 0, 'week_off' => 0, 'holiday' => 0
+                ];
+
+                $joiningDate = $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->startOfDay() : null;
+                $empStartDate = $startDate->copy();
+                if ($joiningDate && $joiningDate->gt($empStartDate)) {
+                    $empStartDate = $joiningDate->copy();
+                }
+                
+                $empEndDate = $endDate->copy();
+                if ($empStartDate->gt($empEndDate)) {
+                    $employee->computed_present = 0;
+                    $employee->computed_late = 0;
+                    $employee->computed_wfh = 0;
+                    $employee->computed_half_day = 0;
+                    $employee->computed_absent = 0;
+                    $employee->computed_on_leave = 0;
+                    $employee->computed_week_off = 0;
+                    $employee->computed_holiday = 0;
+                    continue;
+                }
+
+                $currentDate = $empStartDate->copy();
+                while ($currentDate->lte($empEndDate)) {
+                    $dateStr = $currentDate->format('Y-m-d');
+                    $att = $empAttendances->get($dateStr);
+                    $res = $this->resolveStatusForDate($employee, $currentDate, $att, $monthHolidays, $empLeaves);
+
+                    $status = $res['status'];
+                    if (isset($counts[$status])) {
+                        $counts[$status]++;
+                    }
+                    $currentDate->addDay();
+                }
+
+                $employee->computed_present = $counts['present'];
+                $employee->computed_late = $counts['late'];
+                $employee->computed_wfh = $counts['wfh'];
+                $employee->computed_half_day = $counts['half_day'];
+                $employee->computed_absent = $counts['absent'];
+                $employee->computed_on_leave = $counts['on_leave'];
+                $employee->computed_week_off = $counts['week_off'];
+                $employee->computed_holiday = $counts['holiday'];
+            }
+        }
+
         $dates = collect();
         $statsByDate = collect();
 
@@ -214,107 +410,144 @@ class AttendanceController extends Controller
             $monthFilter = now()->format('Y-m');
         }
 
-        $query = Attendance::where('employee_id', $employee->id)
-            ->with('breaks');
-
-        // Search filter
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('location_type', 'like', "%{$search}%")
-                  ->orWhere('status', 'like', "%{$search}%")
-                  ->orWhere('date', 'like', "%{$search}%");
-
-                // Parse month prefixes, names, and year/day integers for advanced date searching
-                $cleanSearch = str_replace([',', '.'], '', strtolower(trim($search)));
-                $tokens = array_filter(explode(' ', $cleanSearch));
-                
-                $monthsNames = [
-                    1 => 'january', 2 => 'february', 3 => 'march', 4 => 'april',
-                    5 => 'may', 6 => 'june', 7 => 'july', 8 => 'august',
-                    9 => 'september', 10 => 'october', 11 => 'november', 12 => 'december'
-                ];
-
-                $matchedMonths = [];
-                $yearNum = null;
-                $dayNum = null;
-
-                foreach ($tokens as $token) {
-                    if (is_numeric($token)) {
-                        $val = (int)$token;
-                        if ($val > 1000 && $val < 3000) {
-                            $yearNum = $val;
-                        } elseif ($val >= 1 && $val <= 31) {
-                            $dayNum = $val;
-                        }
-                    } else {
-                        // Check if token matches prefix of any month (either full month name or 3-letter abbreviation)
-                        foreach ($monthsNames as $num => $name) {
-                            if (str_starts_with($name, $token) || str_starts_with(substr($name, 0, 3), $token)) {
-                                $matchedMonths[] = $num;
-                            }
-                        }
-                    }
-                }
-
-                $matchedMonths = array_unique($matchedMonths);
-
-                if (!empty($matchedMonths)) {
-                    $q->orWhere(function($sub) use ($matchedMonths, $yearNum, $dayNum) {
-                        $sub->where(function($monthSub) use ($matchedMonths) {
-                            foreach ($matchedMonths as $mNum) {
-                                $monthSub->orWhereMonth('date', $mNum);
-                            }
-                        });
-                        if ($yearNum) {
-                            $sub->whereYear('date', $yearNum);
-                        }
-                        if ($dayNum) {
-                            $sub->whereDay('date', $dayNum);
-                        }
-                    });
-                }
-            });
-        }
-
-        // Date filter
-        if ($date) {
-            $query->whereDate('date', $date);
-        }
-
-        // Month filter
+        $year = now()->year;
+        $month = now()->month;
         if ($monthFilter) {
             $parts = explode('-', $monthFilter);
             if (count($parts) === 2) {
-                $query->whereYear('date', $parts[0])
-                      ->whereMonth('date', $parts[1]);
+                $year = (int)$parts[0];
+                $month = (int)$parts[1];
+            }
+        }
+        
+        $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $joiningDate = $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->startOfDay() : null;
+        if ($joiningDate && $joiningDate->gt($startDate)) {
+            $startDate = $joiningDate->copy();
+        }
+
+        $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
+        $today = now()->startOfDay();
+        if ($endDate->gt($today)) {
+            $endDate = $today->copy();
+        }
+
+        if ($date) {
+            $parsedDate = \Carbon\Carbon::parse($date)->startOfDay();
+            if ($joiningDate && $joiningDate->gt($parsedDate)) {
+                $startDate = $joiningDate->copy();
+                $endDate = $parsedDate->copy()->endOfDay();
+            } else {
+                $startDate = $parsedDate;
+                $endDate = $parsedDate->copy()->endOfDay();
             }
         }
 
-        // Status filter
+        $attendances = Attendance::where('employee_id', $employee->id)
+            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->with(['breaks', 'locationLogs'])
+            ->get();
+
+        $holidays = \App\Domains\HRMS\Models\HolidayCalendar::where('status', true)
+            ->whereBetween('holiday_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->get();
+
+        $leaves = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->where(function($q) use ($startDate, $endDate) {
+                $q->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhere(function($sub) use ($startDate, $endDate) {
+                      $sub->where('start_date', '<=', $startDate->format('Y-m-d'))
+                          ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                  });
+            })
+            ->with('leaveType')
+            ->get();
+
+        $attendancesByDate = $attendances->keyBy(function($att) {
+            return $att->date->format('Y-m-d');
+        });
+
+        $calendarDays = [];
+        $currentDate = $startDate->copy();
+        
+        while ($currentDate->lte($endDate)) {
+            $dateStr = $currentDate->format('Y-m-d');
+            $attRecord = $attendancesByDate->get($dateStr);
+            
+            $resolved = $this->resolveStatusForDate(
+                $employee,
+                $currentDate,
+                $attRecord,
+                $holidays,
+                $leaves
+            );
+            
+            $dayObj = new \stdClass();
+            $dayObj->id = $attRecord ? $attRecord->id : null;
+            $dayObj->date = $currentDate->copy();
+            $dayObj->location_type = $attRecord ? $attRecord->location_type : '';
+            $dayObj->formatted_location_type = $attRecord ? $attRecord->formatted_location_type : '—';
+            $dayObj->check_in = $attRecord ? $attRecord->check_in : null;
+            $dayObj->check_in_latitude = $attRecord ? $attRecord->check_in_latitude : null;
+            $dayObj->check_out = $attRecord ? $attRecord->check_out : null;
+            $dayObj->check_out_latitude = $attRecord ? $attRecord->check_out_latitude : null;
+            $dayObj->breaks = $attRecord ? $attRecord->breaks : collect();
+            $dayObj->total_break_hours = $attRecord ? $attRecord->total_break_hours : 0;
+            $dayObj->formatted_break_hours = $attRecord ? $attRecord->formatted_break_hours : '—';
+            $dayObj->formatted_work_hours = $attRecord ? $attRecord->formatted_work_hours : '—';
+            
+            $dayObj->status = $resolved['status'];
+            $dayObj->status_label = $resolved['label'];
+            $dayObj->holiday_name = $resolved['holiday_name'];
+            $dayObj->leave_type_name = $resolved['leave_type_name'];
+            
+            $dayObj->check_in_selfie_path = $attRecord ? $attRecord->check_in_selfie_path : null;
+            $dayObj->check_out_selfie_path = $attRecord ? $attRecord->check_out_selfie_path : null;
+            $dayObj->check_in_longitude = $attRecord ? $attRecord->check_in_longitude : null;
+            $dayObj->check_out_longitude = $attRecord ? $attRecord->check_out_longitude : null;
+            $dayObj->locationLogs = $attRecord ? $attRecord->locationLogs : collect();
+
+            $calendarDays[] = $dayObj;
+            
+            $currentDate->addDay();
+        }
+
+        $calendarDays = collect($calendarDays);
+
         if ($status) {
-            $query->where('status', $status);
+            $calendarDays = $calendarDays->filter(function($day) use ($status) {
+                return $day->status === $status;
+            });
         }
 
-        // Sorting
-        switch ($sort) {
-            case 'date_asc':
-                $query->orderBy('date', 'asc');
-                break;
-
-            case 'checkin_asc':
-                $query->orderBy('check_in', 'asc');
-                break;
-
-            case 'checkin_desc':
-                $query->orderBy('check_in', 'desc');
-                break;
-
-            default:
-                $query->orderBy('date', 'desc');
-                break;
+        if ($search) {
+            $searchLower = strtolower($search);
+            $calendarDays = $calendarDays->filter(function($day) use ($searchLower) {
+                return str_contains(strtolower($day->date->format('M d, Y')), $searchLower) ||
+                       str_contains(strtolower($day->status_label), $searchLower) ||
+                       str_contains(strtolower($day->location_type), $searchLower) ||
+                       ($day->holiday_name && str_contains(strtolower($day->holiday_name), $searchLower)) ||
+                       ($day->leave_type_name && str_contains(strtolower($day->leave_type_name), $searchLower));
+            });
         }
 
-        $attendances = $query->get();
+        if ($sort === 'date_asc') {
+            $calendarDays = $calendarDays->sortBy(fn($d) => $d->date->timestamp);
+        } elseif ($sort === 'checkin_asc') {
+            $calendarDays = $calendarDays->sortBy(function($d) {
+                return $d->check_in ? $d->check_in->timestamp : PHP_INT_MAX;
+            });
+        } elseif ($sort === 'checkin_desc') {
+            $calendarDays = $calendarDays->sortByDesc(function($d) {
+                return $d->check_in ? $d->check_in->timestamp : 0;
+            });
+        } else {
+            $calendarDays = $calendarDays->sortByDesc(fn($d) => $d->date->timestamp);
+        }
+
+        $attendances = $calendarDays;
 
         $correctionRequests = \App\Domains\HRMS\Models\AttendanceCorrection::where('employee_id', $employee->id)
             ->get()
@@ -434,9 +667,48 @@ class AttendanceController extends Controller
 
     public function getEmployeeLogs(\App\Domains\HRMS\Models\Employee $employee)
     {
+        $monthFilter = request('month', now()->format('Y-m'));
+        $year = now()->year;
+        $month = now()->month;
+        if ($monthFilter) {
+            $parts = explode('-', $monthFilter);
+            if (count($parts) === 2) {
+                $year = (int)$parts[0];
+                $month = (int)$parts[1];
+            }
+        }
+        $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $joiningDate = $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->startOfDay() : null;
+        if ($joiningDate && $joiningDate->gt($startDate)) {
+            $startDate = $joiningDate->copy();
+        }
+
+        $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
+        $today = now()->startOfDay();
+        if ($endDate->gt($today)) {
+            $endDate = $today->copy();
+        }
+
         $logs = Attendance::where('employee_id', $employee->id)
+            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->with(['breaks', 'locationLogs'])
-            ->orderBy('date', 'desc')
+            ->get();
+
+        $holidays = \App\Domains\HRMS\Models\HolidayCalendar::where('status', true)
+            ->whereBetween('holiday_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->get();
+
+        $leaves = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->where(function($q) use ($startDate, $endDate) {
+                $q->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhere(function($sub) use ($startDate, $endDate) {
+                      $sub->where('start_date', '<=', $startDate->format('Y-m-d'))
+                          ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                  });
+            })
+            ->with('leaveType')
             ->get();
 
         $approvedOvertimeDates = \App\Domains\HRMS\Models\OvertimeRequest::where('employee_id', $employee->id)
@@ -447,12 +719,67 @@ class AttendanceController extends Controller
             })
             ->toArray();
 
+        $attendancesByDate = $logs->keyBy(function($att) {
+            return $att->date->format('Y-m-d');
+        });
+
+        $calendarDays = [];
+        $currentDate = $startDate->copy();
+        
+        while ($currentDate->lte($endDate)) {
+            $dateStr = $currentDate->format('Y-m-d');
+            $attRecord = $attendancesByDate->get($dateStr);
+            
+            $resolved = $this->resolveStatusForDate(
+                $employee,
+                $currentDate,
+                $attRecord,
+                $holidays,
+                $leaves
+            );
+            
+            $log = new \stdClass();
+            $log->id = $attRecord ? $attRecord->id : 'virtual_' . $currentDate->timestamp;
+            $log->date = $currentDate->format('M d, Y');
+            $log->formatted_location_type = $attRecord ? $attRecord->formatted_location_type : '—';
+            $log->location_type = $attRecord ? $attRecord->location_type : '';
+            $log->check_in = $attRecord ? $attRecord->check_in : null;
+            $log->check_out = $attRecord ? $attRecord->check_out : null;
+            $log->breaks = $attRecord ? $attRecord->breaks : collect();
+            $log->total_break_hours = $attRecord ? $attRecord->total_break_hours : 0;
+            $log->formatted_break_hours = $attRecord ? $attRecord->formatted_break_hours : '—';
+            $log->formatted_work_hours = $attRecord ? $attRecord->formatted_work_hours : '—';
+            
+            $log->status = $resolved['status'];
+            $log->status_label = $resolved['label'];
+            $log->holiday_name = $resolved['holiday_name'];
+            $log->leave_type_name = $resolved['leave_type_name'];
+            $log->check_in_latitude = $attRecord ? $attRecord->check_in_latitude : null;
+            $log->check_in_longitude = $attRecord ? $attRecord->check_in_longitude : null;
+            $log->check_out_latitude = $attRecord ? $attRecord->check_out_latitude : null;
+            $log->check_out_longitude = $attRecord ? $attRecord->check_out_longitude : null;
+            $log->check_in_selfie_path = $attRecord ? $attRecord->check_in_selfie_path : null;
+            $log->check_out_selfie_path = $attRecord ? $attRecord->check_out_selfie_path : null;
+            $log->locationLogs = $attRecord ? $attRecord->locationLogs : collect();
+
+            $calendarDays[] = $log;
+            
+            $currentDate->addDay();
+        }
+
+        // Sort descending
+        usort($calendarDays, function($a, $b) {
+            return strcmp(\Carbon\Carbon::parse($b->date)->format('Y-m-d'), \Carbon\Carbon::parse($a->date)->format('Y-m-d'));
+        });
+
+        $calendarDays = collect($calendarDays);
+
         return response()->json([
             'employee' => [
                 'name' => $employee->display_name,
                 'code' => $employee->employee_id,
             ],
-            'logs' => $logs->map(function ($log) use ($approvedOvertimeDates) {
+            'logs' => $calendarDays->map(function ($log) use ($approvedOvertimeDates) {
                 $breaksHtml = '';
                 if ($log->breaks->isNotEmpty()) {
                     foreach ($log->breaks as $index => $brk) {
@@ -468,8 +795,8 @@ class AttendanceController extends Controller
                     $breaksHtml = '-';
                 }
 
-                $status = $log->status ?: 'present';
-                $isAbsentOrLeave = in_array($status, ['absent', 'on_leave']);
+                $status = $log->status;
+                $isAbsentOrLeave = in_array($status, ['absent', 'on_leave', 'week_off', 'holiday']);
 
                 if ($status === 'present') {
                     $statusBadge = '<span class="badge bg-soft-success text-success">Present</span>';
@@ -480,88 +807,13 @@ class AttendanceController extends Controller
                 } elseif ($status === 'half_day') {
                     $statusBadge = '<span class="badge bg-soft-danger text-danger">Half Day</span>';
                 } elseif ($status === 'on_leave') {
-                    $statusBadge = '<span class="badge bg-soft-primary text-primary">On Leave</span>';
+                    $statusBadge = '<span class="badge bg-soft-primary text-primary">On Leave: ' . ($log->leave_type_name ?? 'Leave') . '</span>';
                 } elseif ($status === 'absent') {
                     $statusBadge = '<span class="badge bg-soft-danger text-danger">Absent</span>';
-                } elseif ($status === 'under_hours') {
-                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Under Hours</span>';
-                } else {
-                    $statusBadge = '<span class="badge bg-soft-dark text-dark">' . ucfirst(str_replace('_', ' ', $status)) . '</span>';
-                }
-
-                return [
-                    'id' => $log->id,
-                    'date' => $log->date->format('M d, Y'),
-                    'location_type' => $log->formatted_location_type,
-                    'check_in' => ($log->check_in && !$isAbsentOrLeave) ? \Carbon\Carbon::parse($log->check_in)->format('h:i A') : '-',
-                    'check_out' => ($log->check_out && !$isAbsentOrLeave) ? \Carbon\Carbon::parse($log->check_out)->format('h:i A') : '-',
-                    'breaks' => $breaksHtml,
-                    'work_hours' => ($log->check_out && !$isAbsentOrLeave) ? $log->formatted_work_hours : '-',
-                    'status' => $statusBadge,
-                    'status_raw' => $status,
-                    'has_overtime' => in_array($log->date->format('Y-m-d'), $approvedOvertimeDates),
-                    'check_in_latitude' => $log->check_in_latitude,
-                    'check_in_longitude' => $log->check_in_longitude,
-                    'check_out_latitude' => $log->check_out_latitude,
-                    'check_out_longitude' => $log->check_out_longitude,
-                    'check_in_selfie_url' => $log->check_in_selfie_path ? asset('storage/' . $log->check_in_selfie_path) : null,
-                    'check_out_selfie_url' => $log->check_out_selfie_path ? asset('storage/' . $log->check_out_selfie_path) : null,
-                    'location_logs' => $log->locationLogs->map(fn($l) => [
-                        'lat' => (float)$l->latitude,
-                        'lng' => (float)$l->longitude,
-                        'time' => $l->created_at ? $l->created_at->format('h:i A') : ''
-                    ])->toArray(),
-                ];
-            }),
-        ]);
-    }
-
-    public function getDateLogs($date)
-    {
-        $logs = Attendance::where('date', $date)
-            ->with(['employee.department', 'breaks', 'locationLogs'])
-            ->get();
-
-        $approvedOvertimeEmployeeIds = \App\Domains\HRMS\Models\OvertimeRequest::where('date', $date)
-            ->where('status', 'approved')
-            ->pluck('employee_id')
-            ->toArray();
-
-        return response()->json([
-            'date' => \Carbon\Carbon::parse($date)->format('M d, Y'),
-            'logs' => $logs->map(function ($log) use ($approvedOvertimeEmployeeIds) {
-                $breaksHtml = '';
-                if ($log->breaks->isNotEmpty()) {
-                    foreach ($log->breaks as $index => $brk) {
-                        $brkIn = \Carbon\Carbon::parse($brk->break_in)->format('h:i A');
-                        $brkOut = $brk->break_out ? \Carbon\Carbon::parse($brk->break_out)->format('h:i A') : 'Active';
-                        $brkDur = $brk->duration_minutes !== null ? $brk->duration_minutes . 'm' : 'Active';
-                        $breaksHtml .= "<div class='fs-10 text-muted' style='line-height: 1.3;'>{$brkIn} - {$brkOut} ({$brkDur})</div>";
-                    }
-                    if ($log->total_break_hours > 0) {
-                        $breaksHtml .= "<div class='fw-bold mt-1 text-dark' style='font-size: 10px;'>Total: {$log->formatted_break_hours}</div>";
-                    }
-                } else {
-                    $breaksHtml = '-';
-                }
-
-                $status = $log->status ?: 'present';
-                $isAbsentOrLeave = in_array($status, ['absent', 'on_leave']);
-
-                if ($status === 'present') {
-                    $statusBadge = '<span class="badge bg-soft-success text-success">Present</span>';
-                } elseif ($status === 'wfh') {
-                    $statusBadge = '<span class="badge bg-soft-info text-info">WFH</span>';
-                } elseif ($status === 'late') {
-                    $statusBadge = '<span class="badge bg-soft-warning text-warning">Late</span>';
-                } elseif ($status === 'half_day') {
-                    $statusBadge = '<span class="badge bg-soft-danger text-danger">Half Day</span>';
-                } elseif ($status === 'on_leave') {
-                    $statusBadge = '<span class="badge bg-soft-primary text-primary">On Leave</span>';
-                } elseif ($status === 'absent') {
-                    $statusBadge = '<span class="badge bg-soft-danger text-danger">Absent</span>';
-                } elseif ($status === 'under_hours') {
-                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Under Hours</span>';
+                } elseif ($status === 'week_off') {
+                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Week Off</span>';
+                } elseif ($status === 'holiday') {
+                    $statusBadge = '<span class="badge bg-soft-indigo text-indigo" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">Holiday: ' . ($log->holiday_name ?? '') . '</span>';
                 } else {
                     $statusBadge = '<span class="badge bg-soft-dark text-dark">' . ucfirst(str_replace('_', ' ', $status)) . '</span>';
                 }
@@ -594,9 +846,7 @@ class AttendanceController extends Controller
 
                 return [
                     'id' => $log->id,
-                    'employee_name' => $log->employee?->display_name ?? 'Unknown',
-                    'employee_code' => $log->employee?->employee_id ?? 'Unknown',
-                    'department' => $log->employee?->department?->name ?? 'No Department',
+                    'date' => $log->date,
                     'location_type' => $log->formatted_location_type,
                     'check_in' => $checkInDisplay,
                     'check_out' => $checkOutDisplay,
@@ -604,7 +854,164 @@ class AttendanceController extends Controller
                     'work_hours' => $workHoursDisplay,
                     'status' => $statusBadge,
                     'status_raw' => $status,
-                    'has_overtime' => in_array($log->employee_id, $approvedOvertimeEmployeeIds),
+                    'has_overtime' => in_array(\Carbon\Carbon::parse($log->date)->format('Y-m-d'), $approvedOvertimeDates),
+                    'check_in_latitude' => $log->check_in_latitude,
+                    'check_in_longitude' => $log->check_in_longitude,
+                    'check_out_latitude' => $log->check_out_latitude,
+                    'check_out_longitude' => $log->check_out_longitude,
+                    'check_in_selfie_url' => $log->check_in_selfie_path ? asset('storage/' . $log->check_in_selfie_path) : null,
+                    'check_out_selfie_url' => $log->check_out_selfie_path ? asset('storage/' . $log->check_out_selfie_path) : null,
+                    'location_logs' => $log->locationLogs->map(fn($l) => [
+                        'lat' => (float)$l->latitude,
+                        'lng' => (float)$l->longitude,
+                        'time' => $l->created_at ? $l->created_at->format('h:i A') : ''
+                    ])->toArray(),
+                ];
+            }),
+        ]);
+    }
+
+    public function getDateLogs($date)
+    {
+        $carbonDate = \Carbon\Carbon::parse($date);
+        $dateStr = $carbonDate->format('Y-m-d');
+
+        $employees = \App\Domains\HRMS\Models\Employee::where('status', true)
+            ->with(['department'])
+            ->get();
+
+        $holidays = \App\Domains\HRMS\Models\HolidayCalendar::where('status', true)
+            ->where('holiday_date', $dateStr)
+            ->get();
+
+        $leaves = \App\Domains\HRMS\Models\LeaveRequest::where('status', 'approved')
+            ->where('start_date', '<=', $dateStr)
+            ->where('end_date', '>=', $dateStr)
+            ->with('leaveType')
+            ->get();
+
+        $attendances = Attendance::where('date', $dateStr)
+            ->with(['breaks', 'locationLogs'])
+            ->get()
+            ->keyBy('employee_id');
+
+        $approvedOvertimeEmployeeIds = \App\Domains\HRMS\Models\OvertimeRequest::where('date', $dateStr)
+            ->where('status', 'approved')
+            ->pluck('employee_id')
+            ->toArray();
+
+        $logs = $employees->map(function ($employee) use ($carbonDate, $attendances, $holidays, $leaves) {
+            $attRecord = $attendances->get($employee->id);
+            $resolved = $this->resolveStatusForDate($employee, $carbonDate, $attRecord, $holidays, $leaves);
+
+            $log = new \stdClass();
+            $log->id = $attRecord ? $attRecord->id : 'virtual_' . $employee->id;
+            $log->employee = $employee;
+            $log->employee_name = $employee->display_name;
+            $log->employee_code = $employee->employee_id;
+            $log->department = $employee->department?->name ?? 'No Department';
+            $log->formatted_location_type = $attRecord ? $attRecord->formatted_location_type : '—';
+            $log->location_type = $attRecord ? $attRecord->location_type : '';
+            $log->check_in = $attRecord ? $attRecord->check_in : null;
+            $log->check_out = $attRecord ? $attRecord->check_out : null;
+            $log->breaks = $attRecord ? $attRecord->breaks : collect();
+            $log->total_break_hours = $attRecord ? $attRecord->total_break_hours : 0;
+            $log->formatted_break_hours = $attRecord ? $attRecord->formatted_break_hours : '—';
+            $log->formatted_work_hours = $attRecord ? $attRecord->formatted_work_hours : '—';
+            $log->status = $resolved['status'];
+            $log->holiday_name = $resolved['holiday_name'];
+            $log->leave_type_name = $resolved['leave_type_name'];
+            $log->check_in_latitude = $attRecord ? $attRecord->check_in_latitude : null;
+            $log->check_in_longitude = $attRecord ? $attRecord->check_in_longitude : null;
+            $log->check_out_latitude = $attRecord ? $attRecord->check_out_latitude : null;
+            $log->check_out_longitude = $attRecord ? $attRecord->check_out_longitude : null;
+            $log->check_in_selfie_path = $attRecord ? $attRecord->check_in_selfie_path : null;
+            $log->check_out_selfie_path = $attRecord ? $attRecord->check_out_selfie_path : null;
+            $log->locationLogs = $attRecord ? $attRecord->locationLogs : collect();
+
+            return $log;
+        });
+
+        return response()->json([
+            'date' => $carbonDate->format('M d, Y'),
+            'logs' => $logs->map(function ($log) use ($approvedOvertimeEmployeeIds) {
+                $breaksHtml = '';
+                if ($log->breaks->isNotEmpty()) {
+                    foreach ($log->breaks as $index => $brk) {
+                        $brkIn = \Carbon\Carbon::parse($brk->break_in)->format('h:i A');
+                        $brkOut = $brk->break_out ? \Carbon\Carbon::parse($brk->break_out)->format('h:i A') : 'Active';
+                        $brkDur = $brk->duration_minutes !== null ? $brk->duration_minutes . 'm' : 'Active';
+                        $breaksHtml .= "<div class='fs-10 text-muted' style='line-height: 1.3;'>{$brkIn} - {$brkOut} ({$brkDur})</div>";
+                    }
+                    if ($log->total_break_hours > 0) {
+                        $breaksHtml .= "<div class='fw-bold mt-1 text-dark' style='font-size: 10px;'>Total: {$log->formatted_break_hours}</div>";
+                    }
+                } else {
+                    $breaksHtml = '-';
+                }
+
+                $status = $log->status;
+                $isAbsentOrLeave = in_array($status, ['absent', 'on_leave', 'week_off', 'holiday']);
+
+                if ($status === 'present') {
+                    $statusBadge = '<span class="badge bg-soft-success text-success">Present</span>';
+                } elseif ($status === 'wfh') {
+                    $statusBadge = '<span class="badge bg-soft-info text-info">WFH</span>';
+                } elseif ($status === 'late') {
+                    $statusBadge = '<span class="badge bg-soft-warning text-warning">Late</span>';
+                } elseif ($status === 'half_day') {
+                    $statusBadge = '<span class="badge bg-soft-danger text-danger">Half Day</span>';
+                } elseif ($status === 'on_leave') {
+                    $statusBadge = '<span class="badge bg-soft-primary text-primary">On Leave: ' . ($log->leave_type_name ?? 'Leave') . '</span>';
+                } elseif ($status === 'absent') {
+                    $statusBadge = '<span class="badge bg-soft-danger text-danger">Absent</span>';
+                } elseif ($status === 'week_off') {
+                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Week Off</span>';
+                } elseif ($status === 'holiday') {
+                    $statusBadge = '<span class="badge bg-soft-indigo text-indigo" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">Holiday: ' . ($log->holiday_name ?? '') . '</span>';
+                } else {
+                    $statusBadge = '<span class="badge bg-soft-dark text-dark">' . ucfirst(str_replace('_', ' ', $status)) . '</span>';
+                }
+
+                $checkInDisplay = '-';
+                $checkOutDisplay = '-';
+                $workHoursDisplay = '-';
+
+                if ($log->check_in) {
+                    $checkInCarbon = \Carbon\Carbon::parse($log->check_in);
+                    if ($isAbsentOrLeave || $checkInCarbon->format('H:i:s') === '00:00:00') {
+                        $checkInDisplay = '-';
+                    } else {
+                        $checkInDisplay = $checkInCarbon->format('h:i A');
+                    }
+                }
+
+                if ($log->check_out) {
+                    $checkOutCarbon = \Carbon\Carbon::parse($log->check_out);
+                    if ($isAbsentOrLeave || $checkOutCarbon->format('H:i:s') === '00:00:00') {
+                        $checkOutDisplay = '-';
+                    } else {
+                        $checkOutDisplay = $checkOutCarbon->format('h:i A');
+                    }
+                }
+
+                if (!$isAbsentOrLeave) {
+                    $workHoursDisplay = $log->formatted_work_hours;
+                }
+
+                return [
+                    'id' => $log->id,
+                    'employee_name' => $log->employee_name,
+                    'employee_code' => $log->employee_code,
+                    'department' => $log->department,
+                    'location_type' => $log->formatted_location_type,
+                    'check_in' => $checkInDisplay,
+                    'check_out' => $checkOutDisplay,
+                    'breaks' => $breaksHtml,
+                    'work_hours' => $workHoursDisplay,
+                    'status' => $statusBadge,
+                    'status_raw' => $status,
+                    'has_overtime' => in_array($log->employee->id, $approvedOvertimeEmployeeIds),
                     'check_in_latitude' => $log->check_in_latitude,
                     'check_in_longitude' => $log->check_in_longitude,
                     'check_out_latitude' => $log->check_out_latitude,
@@ -1342,5 +1749,134 @@ class AttendanceController extends Controller
         );
 
         return response()->json($result);
+    }
+
+    /**
+     * Resolves the attendance status for a given employee on a specific date.
+     */
+    private function resolveStatusForDate(
+        $employee,
+        \Carbon\Carbon $date,
+        $attendanceRecord,
+        $holidays,
+        $leaves
+    ) {
+        // 1. If a real punch record exists, use its status
+        if ($attendanceRecord) {
+            $status = $attendanceRecord->status ?: 'present';
+            // WFH can be determined by location_type too
+            if (strtolower($attendanceRecord->location_type) === 'wfh' && $status === 'present') {
+                $status = 'wfh';
+            }
+            return [
+                'status' => $status,
+                'label' => ucfirst(str_replace('_', ' ', $status)),
+                'record' => $attendanceRecord,
+                'holiday_name' => null,
+                'leave_type_name' => null
+            ];
+        }
+
+        $dateStr = $date->format('Y-m-d');
+
+        // 2. Check if it is a holiday
+        $holiday = $holidays->first(function($h) use ($employee, $dateStr) {
+            $hDate = $h->holiday_date instanceof \Carbon\Carbon ? $h->holiday_date->format('Y-m-d') : \Carbon\Carbon::parse($h->holiday_date)->format('Y-m-d');
+            if ($hDate !== $dateStr) {
+                return false;
+            }
+            // Check scope
+            if (is_null($h->company_id) && is_null($h->business_unit_id) && is_null($h->branch_id)) {
+                return true;
+            }
+            if ($h->company_id == $employee->company_id) {
+                if (is_null($h->business_unit_id) && is_null($h->branch_id)) {
+                    return true;
+                }
+                if ($h->business_unit_id == $employee->business_unit_id) {
+                    if (is_null($h->branch_id) || $h->branch_id == $employee->branch_id) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+
+        if ($holiday) {
+            return [
+                'status' => 'holiday',
+                'label' => 'Holiday: ' . $holiday->name,
+                'record' => null,
+                'holiday_name' => $holiday->name,
+                'leave_type_name' => null
+            ];
+        }
+
+        // 3. Check if it is a week off
+        $dayOfWeek = $date->dayOfWeek; // 0 = Sunday, 1 = Monday, etc.
+        $isWeekOff = false;
+        if (isset($employee->weekly_pattern) && is_array($employee->weekly_pattern)) {
+            if (isset($employee->weekly_pattern[$dayOfWeek]) && $employee->weekly_pattern[$dayOfWeek] === 'off') {
+                $isWeekOff = true;
+            } elseif ($dayOfWeek === 0 && (!isset($employee->weekly_pattern[$dayOfWeek]) || $employee->weekly_pattern[$dayOfWeek] === 'off')) {
+                // Sunday is off by default unless overridden to a shift in weekly pattern
+                $isWeekOff = true;
+            }
+        } else {
+            // No weekly pattern, Sunday is default week off
+            if ($dayOfWeek === 0) {
+                $isWeekOff = true;
+            }
+        }
+
+        if ($isWeekOff) {
+            return [
+                'status' => 'week_off',
+                'label' => 'Week Off',
+                'record' => null,
+                'holiday_name' => null,
+                'leave_type_name' => null
+            ];
+        }
+
+        // 4. Check if it is an approved leave
+        $leave = $leaves->first(function($l) use ($employee, $dateStr) {
+            if ($l->employee_id != $employee->id) {
+                return false;
+            }
+            $start = $l->start_date instanceof \Carbon\Carbon ? $l->start_date->format('Y-m-d') : \Carbon\Carbon::parse($l->start_date)->format('Y-m-d');
+            $end = $l->end_date instanceof \Carbon\Carbon ? $l->end_date->format('Y-m-d') : \Carbon\Carbon::parse($l->end_date)->format('Y-m-d');
+            return $dateStr >= $start && $dateStr <= $end;
+        });
+
+        if ($leave) {
+            $typeName = $leave->leaveType ? $leave->leaveType->name : 'Leave';
+            return [
+                'status' => 'on_leave',
+                'label' => 'Leave',
+                'record' => null,
+                'holiday_name' => null,
+                'leave_type_name' => $typeName
+            ];
+        }
+
+        // 5. Past days are Absent, future days are Scheduled/Upcoming
+        if ($date->isFuture() && !$date->isToday()) {
+            return [
+                'status' => 'scheduled',
+                'label' => 'Scheduled',
+                'record' => null,
+                'holiday_name' => null,
+                'leave_type_name' => null
+            ];
+        }
+
+        return [
+            'status' => 'absent',
+            'label' => 'Absent',
+            'record' => null,
+            'holiday_name' => null,
+            'leave_type_name' => null
+        ];
     }
 }

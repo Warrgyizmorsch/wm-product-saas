@@ -555,6 +555,7 @@
                                 <th>{{ __('hrms.employees.tbl_department') }}</th>
                                 <th>{{ __('hrms.employees.tbl_designation') }}</th>
                                 <th>{{ __('hrms.employees.tbl_company') }}</th>
+                                <th>{{ __('hrms.employees.frm_stage') }}</th>
                                 <th>{{ __('hrms.employees.tbl_status') }}</th>
                                 <th width="150" class="text-end">{{ __('hrms.employees.tbl_actions') }}</th>
                             </tr>
@@ -582,6 +583,42 @@
                                     <td>{{ $employee->department?->name ?? 'Not assigned' }}</td>
                                     <td>{{ $employee->designation?->name ?? 'Not assigned' }}</td>
                                     <td>{{ $employee->company?->company_name ?? 'Not assigned' }}</td>
+                                    <td>
+                                        @php
+                                            $stageBadge = match($employee->employee_stage) {
+                                                'Probation'     => ['color' => '#f59e0b', 'bg' => '#fef3c7'],
+                                                'Confirmed'     => ['color' => '#10b981', 'bg' => '#d1fae5'],
+                                                'Notice Period' => ['color' => '#f97316', 'bg' => '#ffedd5'],
+                                                'Exited'        => ['color' => '#ef4444', 'bg' => '#fee2e2'],
+                                                default         => ['color' => '#64748b', 'bg' => '#f1f5f9'],
+                                            };
+                                            $stageLabel = $employee->employee_stage ?: 'Not Set';
+                                        @endphp
+                                        <div class="dropdown d-inline-block">
+                                            <span class="dropdown-toggle fw-bold employee-stage-toggle"
+                                                  id="stageDropdown_{{ $employee->id }}"
+                                                  data-bs-toggle="dropdown"
+                                                  aria-expanded="false"
+                                                  style="cursor: pointer; border-bottom: 1px solid #ced4da; padding-bottom: 2px; font-size: 13px; color: {{ $stageBadge['color'] }};">
+                                                {{ $stageLabel }}
+                                            </span>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm stage-dropdown-menu" aria-labelledby="stageDropdown_{{ $employee->id }}" style="min-width: auto !important; width: 130px !important; z-index: 1050;">
+                                                @foreach(['Probation' => '#f59e0b', 'Confirmed' => '#10b981', 'Notice Period' => '#f97316', 'Exited' => '#ef4444'] as $stageOpt => $stageColor)
+                                                <li>
+                                                    <button type="button" class="dropdown-item change-stage-btn fw-bold d-flex align-items-center justify-content-between gap-2"
+                                                            data-employee-id="{{ $employee->id }}"
+                                                            data-stage="{{ $stageOpt }}"
+                                                            style="background: transparent !important; color: {{ $stageColor }} !important; box-shadow: none !important; border: 0; width: 100%;">
+                                                        {{ $stageOpt }}
+                                                        @if($employee->employee_stage === $stageOpt)
+                                                            <i class="feather feather-check ms-2"></i>
+                                                        @endif
+                                                    </button>
+                                                </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    </td>
                                     <td>
                                         <div class="dropdown d-inline-block">
                                             <span class="dropdown-toggle fw-bold employee-status-toggle" 
@@ -697,7 +734,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-5">
+                                    <td colspan="8" class="text-center py-5">
                                         <i class="feather-users fs-32 d-block mb-3 text-secondary"></i>
                                         <div class="fw-semibold text-dark mb-1">No employees found.</div>
                                         <div>Create your first employee record or broaden the filters.</div>
@@ -1572,6 +1609,68 @@
                 } else {
                     $('#edit_leave_transition_options').addClass('d-none');
                 }
+            });
+
+            // Handle Employee Stage Dropdown Change
+            function sendUpdateStageRequest(employeeId, stage, toggleBtn, dropdownContainer) {
+                if (toggleBtn.hasClass('is-loading')) return;
+                toggleBtn.addClass('is-loading');
+
+                var url = `/hrms/employees/${employeeId}/update-stage`;
+
+                var stageColors = {
+                    'Probation':    '#f59e0b',
+                    'Confirmed':    '#10b981',
+                    'Notice Period': '#f97316',
+                    'Exited':       '#ef4444'
+                };
+
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        employee_stage: stage
+                    },
+                    success: function(response) {
+                        toggleBtn.removeClass('is-loading');
+                        if (response.success) {
+                            var color = stageColors[stage] || '#64748b';
+                            toggleBtn.text(stage).css('color', color);
+
+                            // Update active checks in dropdown items
+                            dropdownContainer.find('.change-stage-btn').each(function() {
+                                var item = $(this);
+                                item.find('.feather-check').remove();
+                                if (item.data('stage') === stage) {
+                                    item.append('<i class="feather feather-check ms-2"></i>');
+                                }
+                            });
+
+                            showToast(response.message || 'Employee stage updated successfully.', 'success');
+                        } else {
+                            showToast(response.message || 'Failed to update employee stage.', 'error');
+                        }
+                    },
+                    error: function(xhr) {
+                        toggleBtn.removeClass('is-loading');
+                        var errMsg = 'Failed to update employee stage.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errMsg = xhr.responseJSON.message;
+                        }
+                        showToast(errMsg, 'error');
+                    }
+                });
+            }
+
+            $(document).on('click', '.change-stage-btn', function(e) {
+                e.preventDefault();
+                var btn = $(this);
+                var employeeId = btn.data('employee-id');
+                var stage = btn.data('stage');
+                var dropdownContainer = btn.closest('.dropdown');
+                var toggleBtn = dropdownContainer.find('.employee-stage-toggle');
+                sendUpdateStageRequest(employeeId, stage, toggleBtn, dropdownContainer);
             });
 
             // Handle Employee Status Dropdown Change

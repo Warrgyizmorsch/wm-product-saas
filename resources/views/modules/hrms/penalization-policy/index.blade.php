@@ -7,8 +7,14 @@
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    @once
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
+    @endonce
+    <style>
+        .pac-container {
+            z-index: 9999 !important;
+        }
+    </style>
 @endpush
 
 @push('scripts')
@@ -1660,9 +1666,38 @@
 
         let officeMapObj = null;
         let officeMarkerObj = null;
+        let officeCircleObj = null;
+
+        const updateGeofenceCircle = () => {
+            if (!officeMapObj) return;
+            const latInput = document.getElementById('office_latitude');
+            const lngInput = document.getElementById('office_longitude');
+            const lat = parseFloat(latInput.value);
+            const lng = parseFloat(lngInput.value);
+            const radius = parseFloat(document.getElementById('office_radius').value) || 100;
+            
+            if (isNaN(lat) || isNaN(lng)) return;
+            const center = { lat: lat, lng: lng };
+            
+            if (officeCircleObj) {
+                officeCircleObj.setCenter(center);
+                officeCircleObj.setRadius(radius);
+            } else {
+                officeCircleObj = new google.maps.Circle({
+                    strokeColor: '#10b981',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    fillColor: '#d1fae5',
+                    fillOpacity: 0.35,
+                    map: officeMapObj,
+                    center: center,
+                    radius: radius
+                });
+            }
+        };
 
         const initOfficeMapPicker = () => {
-            if (typeof L === 'undefined') {
+            if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
                 setTimeout(initOfficeMapPicker, 100);
                 return;
             }
@@ -1675,34 +1710,45 @@
 
             let initialLat = parseFloat(latInput.value) || 28.6139; // Default center
             let initialLng = parseFloat(lngInput.value) || 77.2090;
+            const initialPos = { lat: initialLat, lng: initialLng };
 
             if (officeMapObj) {
-                setTimeout(() => {
-                    officeMapObj.invalidateSize();
-                }, 200);
+                google.maps.event.trigger(officeMapObj, 'resize');
+                officeMapObj.setCenter(initialPos);
+                updateGeofenceCircle();
                 return;
             }
 
-            officeMapObj = L.map(mapContainerId).setView([initialLat, initialLng], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
-            }).addTo(officeMapObj);
+            officeMapObj = new google.maps.Map(document.getElementById(mapContainerId), {
+                center: initialPos,
+                zoom: 15,
+                mapTypeControl: false,
+                fullscreenControl: false,
+                streetViewControl: false
+            });
 
-            officeMarkerObj = L.marker([initialLat, initialLng], { draggable: true }).addTo(officeMapObj);
+            officeMarkerObj = new google.maps.Marker({
+                position: initialPos,
+                map: officeMapObj,
+                draggable: true
+            });
+
+            updateGeofenceCircle();
 
             // Update inputs on marker drag
-            officeMarkerObj.on('dragend', function(e) {
-                const position = officeMarkerObj.getLatLng();
-                latInput.value = position.lat.toFixed(6);
-                lngInput.value = position.lng.toFixed(6);
+            officeMarkerObj.addListener('dragend', function() {
+                const position = officeMarkerObj.getPosition();
+                latInput.value = position.lat().toFixed(6);
+                lngInput.value = position.lng().toFixed(6);
+                updateGeofenceCircle();
             });
 
             // Update marker and inputs on map click
-            officeMapObj.on('click', function(e) {
-                officeMarkerObj.setLatLng(e.latlng);
-                latInput.value = e.latlng.lat.toFixed(6);
-                lngInput.value = e.latlng.lng.toFixed(6);
+            officeMapObj.addListener('click', function(e) {
+                officeMarkerObj.setPosition(e.latLng);
+                latInput.value = e.latLng.lat().toFixed(6);
+                lngInput.value = e.latLng.lng().toFixed(6);
+                updateGeofenceCircle();
             });
 
             // Update map when inputs change manually
@@ -1710,87 +1756,52 @@
                 const lat = parseFloat(latInput.value);
                 const lng = parseFloat(lngInput.value);
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    const latlng = [lat, lng];
-                    officeMarkerObj.setLatLng(latlng);
-                    officeMapObj.setView(latlng, officeMapObj.getZoom());
+                    const latlng = { lat: lat, lng: lng };
+                    officeMarkerObj.setPosition(latlng);
+                    officeMapObj.setCenter(latlng);
+                    updateGeofenceCircle();
                 }
             };
 
             latInput.addEventListener('input', updateMapFromInputs);
             lngInput.addEventListener('input', updateMapFromInputs);
 
-            // Address Search Geocoding logic
+            // Bind office_radius input to dynamically update geofence circle
+            const radiusInput = document.getElementById('office_radius');
+            if (radiusInput) {
+                radiusInput.addEventListener('input', updateGeofenceCircle);
+            }
+
+            // Google Places Autocomplete search logic
             const searchInput = document.getElementById('office_map_search');
+            if (searchInput) {
+                const autocomplete = new google.maps.places.Autocomplete(searchInput);
+                autocomplete.bindTo('bounds', officeMapObj);
 
-            const performSearch = () => {
-                const query = searchInput.value;
-                if (!query) return;
+                autocomplete.addListener('place_changed', function() {
+                    const place = autocomplete.getPlace();
+                    if (!place.geometry || !place.geometry.location) {
+                        return;
+                    }
 
-                searchInput.disabled = true;
-                searchInput.placeholder = 'Searching...';
+                    officeMapObj.setCenter(place.geometry.location);
+                    officeMapObj.setZoom(15);
+                    officeMarkerObj.setPosition(place.geometry.location);
 
-                // ArcGIS World Geocoding (primary — high accuracy for streets, subareas, landmarks)
-                fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query)}&maxLocations=1`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data && data.candidates && data.candidates.length > 0) {
-                            const lat = parseFloat(data.candidates[0].location.y);
-                            const lng = parseFloat(data.candidates[0].location.x);
+                    latInput.value = place.geometry.location.lat().toFixed(6);
+                    lngInput.value = place.geometry.location.lng().toFixed(6);
+                    updateGeofenceCircle();
+                });
 
-                            latInput.value = lat.toFixed(6);
-                            lngInput.value = lng.toFixed(6);
-
-                            if (officeMapObj && officeMarkerObj) {
-                                officeMarkerObj.setLatLng([lat, lng]);
-                                officeMapObj.setView([lat, lng], 15);
-                            }
-                            searchInput.disabled = false;
-                            searchInput.placeholder = 'Search address or subarea (Press Enter)...';
-                        } else {
-                            // Fallback to OSM Nominatim
-                            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
-                                .then(res2 => res2.json())
-                                .then(data2 => {
-                                    if (data2 && data2.length > 0) {
-                                        const lat = parseFloat(data2[0].lat);
-                                        const lng = parseFloat(data2[0].lon);
-
-                                        latInput.value = lat.toFixed(6);
-                                        lngInput.value = lng.toFixed(6);
-
-                                        if (officeMapObj && officeMarkerObj) {
-                                            officeMarkerObj.setLatLng([lat, lng]);
-                                            officeMapObj.setView([lat, lng], 15);
-                                        }
-                                    } else {
-                                        alert("Location not found. Please try a different query.");
-                                    }
-                                    searchInput.disabled = false;
-                                    searchInput.placeholder = 'Search address or subarea (Press Enter)...';
-                                })
-                                .catch(() => {
-                                    alert("Location not found. Please try a different query.");
-                                    searchInput.disabled = false;
-                                    searchInput.placeholder = 'Search address or subarea (Press Enter)...';
-                                });
-                        }
-                    })
-                    .catch(err => {
-                        console.error("Geocoding error:", err);
-                        searchInput.disabled = false;
-                        searchInput.placeholder = 'Search address or subarea (Press Enter)...';
-                    });
-            };
-
-            searchInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    performSearch();
-                }
-            });
-
+                // Prevent form submission when pressing enter on search box
+                searchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                    }
+                });
+            }
             setTimeout(() => {
-                if (officeMapObj) officeMapObj.invalidateSize();
+                if (officeMapObj) google.maps.event.trigger(officeMapObj, 'resize');
             }, 300);
         };
 
@@ -1871,9 +1882,12 @@
                     $('#office_latitude').val(lat.toFixed(6));
                     $('#office_longitude').val(lng.toFixed(6));
                     
+                    const latlng = { lat: lat, lng: lng };
                     if (officeMapObj && officeMarkerObj) {
-                        officeMarkerObj.setLatLng([lat, lng]);
-                        officeMapObj.setView([lat, lng], 15);
+                        officeMarkerObj.setPosition(latlng);
+                        officeMapObj.setCenter(latlng);
+                        officeMapObj.setZoom(15);
+                        updateGeofenceCircle();
                     }
                     
                     $btn.prop('disabled', false).html(originalText);

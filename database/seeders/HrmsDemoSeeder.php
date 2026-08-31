@@ -12,31 +12,26 @@ use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Models\PayGroup;
 use App\Domains\HRMS\Models\LeavePlan;
 use App\Domains\HRMS\Models\LeaveType;
-use App\Domains\HRMS\Models\AttendancePenalty;
 use App\Domains\HRMS\Models\SalaryComponent;
 use App\Domains\HRMS\Models\SalaryStructure;
 use App\Domains\HRMS\Models\SalaryStructureItem;
 use App\Domains\HRMS\Models\Employee;
-use App\Domains\HRMS\Models\EmployeeEmploymentHistory;
-use App\Domains\HRMS\Models\EmployeePenalty;
-use App\Domains\HRMS\Models\EmployeeAdhocComponent;
-use App\Domains\HRMS\Models\ShiftRoster;
-use App\Domains\HRMS\Models\AssetCategory;
-use App\Domains\HRMS\Models\AssetItem;
-use App\Domains\HRMS\Models\Asset;
-use App\Domains\HRMS\Models\AssetAllocation;
-use App\Domains\HRMS\Models\AssetRequest;
-use App\Domains\HRMS\Models\Document;
 use App\Domains\HRMS\Models\LeaveBalance;
 use App\Domains\HRMS\Models\LeaveRequest;
-use App\Domains\HRMS\Models\LeaveEncashment;
 use App\Domains\HRMS\Models\AttendanceRule;
 use App\Domains\HRMS\Models\Attendance;
 use App\Domains\HRMS\Models\AttendanceBreak;
-use App\Domains\HRMS\Models\AttendanceLocationLog;
 use App\Domains\HRMS\Models\WfhRequest;
-use App\Domains\HRMS\Models\ShiftChangeRequest;
 use App\Domains\HRMS\Models\OvertimeRequest;
+use App\Domains\HRMS\Models\ShiftRoster;
+use App\Domains\HRMS\Models\AssetCategory;
+use App\Domains\HRMS\Models\Asset;
+use App\Domains\HRMS\Models\AssetItem;
+use App\Domains\HRMS\Models\AssetAllocation;
+use App\Domains\HRMS\Models\AssetRequest;
+use App\Domains\HRMS\Models\DocumentCategory;
+use App\Domains\HRMS\Models\DocumentMaster;
+use App\Domains\HRMS\Models\Document;
 use App\Domains\Production\Models\ProductionShift;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +46,7 @@ class HrmsDemoSeeder extends Seeder
     {
         Schema::disableForeignKeyConstraints();
 
+        // Truncate all related tables
         DB::table('wfh_requests')->truncate();
         DB::table('shift_change_requests')->truncate();
         DB::table('overtime_requests')->truncate();
@@ -67,6 +63,8 @@ class HrmsDemoSeeder extends Seeder
         DB::table('asset_items')->truncate();
         DB::table('asset_categories')->truncate();
         DB::table('documents')->truncate();
+        DB::table('document_masters')->truncate();
+        DB::table('document_categories')->truncate();
         DB::table('employees')->truncate();
         DB::table('designations')->truncate();
         DB::table('departments')->truncate();
@@ -85,1778 +83,904 @@ class HrmsDemoSeeder extends Seeder
         DB::table('attendances')->truncate();
         DB::table('attendance_rules')->truncate();
         DB::table('production_shifts')->truncate();
+        DB::table('holiday_calendars')->truncate();
+        DB::table('expense_claims')->truncate();
+        DB::table('expense_reports')->truncate();
+        DB::table('expense_policy_rules')->truncate();
+        DB::table('expense_policies')->truncate();
+        DB::table('expense_categories')->truncate();
+        DB::table('travel_requests')->truncate();
+        DB::table('payroll_runs')->truncate();
+        DB::table('salary_revisions')->truncate();
 
         Schema::enableForeignKeyConstraints();
 
         // 1. Fetch Tenant and Admin User
-        $tenant = Tenant::where('slug', config('tenancy.local_fallback_slug', 'demo'))->first()
-            ?? Tenant::where('slug', 'demo')->first()
-            ?? Tenant::first();
+        $tenant = Tenant::first() ?? Tenant::create([
+            'name' => 'Demo Tenant',
+            'slug' => 'demo',
+            'status' => 'active'
+        ]);
 
-        if (!$tenant) {
-            $tenant = Tenant::create([
-                'name' => 'Demo Tenant',
-                'slug' => config('tenancy.local_fallback_slug', 'demo'),
-                'status' => Tenant::STATUS_ACTIVE,
-                'plan' => Tenant::PLAN_ENTERPRISE,
-                'subscription_status' => Tenant::SUBSCRIPTION_ACTIVE,
-                'max_users' => 100,
-                'max_storage_mb' => 10240,
-                'plan_started_at' => now(),
-                'timezone' => 'Asia/Kolkata',
-                'locale' => 'en',
-                'settings' => [],
-            ]);
-        }
+        $user = User::where('email', 'admin@demo.com')->first() ?? User::create([
+            'name' => 'Admin User',
+            'email' => 'admin@demo.com',
+            'password' => bcrypt('password'),
+            'tenant_id' => $tenant->id
+        ]);
 
-        $adminUser = User::where('email', 'admin@example.com')->first();
-        if (!$adminUser) {
-            $adminUser = User::create([
-                'tenant_id' => $tenant->id,
-                'name' => 'Demo Admin',
-                'email' => 'admin@example.com',
-                'password' => bcrypt('password'),
-            ]);
-        }
-
-        // 2. Company
+        // 2. Org Structure: Company warrgyizmorsch
         $company = Company::create([
             'tenant_id' => $tenant->id,
-            'company_name' => 'Acme India Pvt Ltd',
-            'legal_name' => 'Acme India Private Limited',
-            'gst_number' => '29AAAAA1111A1Z1',
-            'pan_number' => 'AAAAA1111A',
-            'cin_number' => 'U11111KA2026PTC111111',
-            'registration_number' => '111111',
-            'email' => 'india@acme.com',
-            'phone' => '+919876543210',
-            'website' => 'https://india.acme.com',
-            'address' => '123 Acme Tech Park, Outer Ring Road',
-            'city' => 'Bangalore',
-            'state' => 'Karnataka',
-            'country' => 'India',
-            'postal_code' => '560103',
-            'currency' => 'INR',
-            'timezone' => 'Asia/Kolkata',
-            'status' => true,
+            'company_name' => 'Warrgyizmorsch',
+            'legal_name' => 'Warrgyizmorsch Pvt Ltd',
+            'status' => true
         ]);
 
-        // 3. Pay Groups
-        $payGroupStandard = PayGroup::create([
+        $bu = BusinessUnit::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'name' => 'Standard Employees Pay Group',
-            'description' => 'Default monthly payroll group for general staff.',
-            'status' => true,
+            'name' => 'Technology Business Unit',
+            'code' => 'TBU',
+            'status' => true
         ]);
 
-        $payGroupExecutive = PayGroup::create([
+        $branch = Branch::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'name' => 'Executive Pay Group',
-            'description' => 'Payroll group for management and executives.',
-            'status' => true,
+            'business_unit_id' => $bu->id,
+            'name' => 'Headquarters',
+            'code' => 'HQ',
+            'status' => true
         ]);
 
-        // 4. Salary Components (12 Components)
-        $salaryComponentsData = [
-            ['name' => 'Basic Salary', 'code' => 'BASIC', 'type' => 'earning', 'calculation_type' => 'percentage', 'default_value' => '50', 'description' => 'Base salary component', 'is_adhoc' => false],
-            ['name' => 'House Rent Allowance', 'code' => 'HRA', 'type' => 'earning', 'calculation_type' => 'percentage', 'default_value' => '40', 'description' => 'HRA allowance', 'is_adhoc' => false],
-            ['name' => 'Special Allowance', 'code' => 'SPL', 'type' => 'earning', 'calculation_type' => 'fixed', 'default_value' => '5000', 'description' => 'Special monthly allowance', 'is_adhoc' => false],
-            ['name' => 'Conveyance Allowance', 'code' => 'CONV', 'type' => 'earning', 'calculation_type' => 'fixed', 'default_value' => '1600', 'description' => 'Transport conveyance allowance', 'is_adhoc' => false],
-            ['name' => 'Medical Allowance', 'code' => 'MED', 'type' => 'earning', 'calculation_type' => 'fixed', 'default_value' => '1250', 'description' => 'Medical reimbursement allowance', 'is_adhoc' => false],
-            ['name' => 'Provident Fund', 'code' => 'PF', 'type' => 'deduction', 'calculation_type' => 'fixed', 'default_value' => '1800', 'description' => 'Employee PF contribution', 'is_adhoc' => false],
-            ['name' => 'Professional Tax', 'code' => 'PT', 'type' => 'deduction', 'calculation_type' => 'fixed', 'default_value' => '200', 'description' => 'State professional tax', 'is_adhoc' => false],
-            ['name' => 'Tax Deducted at Source', 'code' => 'TDS', 'type' => 'deduction', 'calculation_type' => 'fixed', 'default_value' => '1500', 'description' => 'Income tax deduction', 'is_adhoc' => false],
-            ['name' => 'Performance Bonus', 'code' => 'BONUS', 'type' => 'earning', 'calculation_type' => 'fixed', 'default_value' => '0', 'description' => 'Ad-hoc performance bonus', 'is_adhoc' => true],
-            ['name' => 'Overtime Allowance', 'code' => 'OT', 'type' => 'earning', 'calculation_type' => 'fixed', 'default_value' => '0', 'description' => 'Ad-hoc overtime payment', 'is_adhoc' => true],
-            ['name' => 'Shift Differential Allowance', 'code' => 'SHIFT', 'type' => 'earning', 'calculation_type' => 'fixed', 'default_value' => '0', 'description' => 'Night shift bonus', 'is_adhoc' => true],
-            ['name' => 'Salary Advance Deduction', 'code' => 'ADV', 'type' => 'deduction', 'calculation_type' => 'fixed', 'default_value' => '0', 'description' => 'Recovery of salary advance', 'is_adhoc' => true],
-        ];
-
-        $basicComp = null; $hraComp = null; $pfComp = null; $bonusComp = null;
-        foreach ($salaryComponentsData as $sc) {
-            $scObj = SalaryComponent::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'pay_group_id' => $payGroupStandard->id,
-                'name' => $sc['name'],
-                'code' => $sc['code'],
-                'type' => $sc['type'],
-                'calculation_type' => $sc['calculation_type'],
-                'default_value' => $sc['default_value'],
-                'description' => $sc['description'],
-                'is_adhoc' => $sc['is_adhoc'],
-                'status' => true,
-            ]);
-            if ($sc['code'] === 'BASIC') $basicComp = $scObj;
-            if ($sc['code'] === 'HRA') $hraComp = $scObj;
-            if ($sc['code'] === 'PF') $pfComp = $scObj;
-            if ($sc['code'] === 'BONUS') $bonusComp = $scObj;
-        }
-
-        // 5. Salary Structures & Items (12 Structures)
-        $salaryStructuresData = [
-            ['name' => 'Standard Developer Structure', 'min_ctc' => 300000.00, 'max_ctc' => 1500000.00],
-            ['name' => 'Senior Engineering Lead Structure', 'min_ctc' => 1200000.00, 'max_ctc' => 2500000.00],
-            ['name' => 'Executive HR Structure', 'min_ctc' => 600000.00, 'max_ctc' => 1800000.00],
-            ['name' => 'Plant Supervisor Structure', 'min_ctc' => 400000.00, 'max_ctc' => 1000000.00],
-            ['name' => 'Machine Operator Grade 1 Structure', 'min_ctc' => 250000.00, 'max_ctc' => 500000.00],
-            ['name' => 'QA Inspector Structure', 'min_ctc' => 350000.00, 'max_ctc' => 800000.00],
-            ['name' => 'Enterprise Sales Commission Structure', 'min_ctc' => 500000.00, 'max_ctc' => 2000000.00],
-            ['name' => 'Financial Analyst Structure', 'min_ctc' => 450000.00, 'max_ctc' => 1100000.00],
-            ['name' => 'IT Admin & Infrastructure Structure', 'min_ctc' => 400000.00, 'max_ctc' => 900000.00],
-            ['name' => 'Supply Chain Manager Structure', 'min_ctc' => 600000.00, 'max_ctc' => 1400000.00],
-            ['name' => 'Customer Success Specialist Structure', 'min_ctc' => 300000.00, 'max_ctc' => 700000.00],
-            ['name' => 'Legal & Compliance Officer Structure', 'min_ctc' => 800000.00, 'max_ctc' => 2200000.00],
-        ];
-
-        $salaryStructureStandard = null;
-        foreach ($salaryStructuresData as $idx => $ss) {
-            $ssObj = SalaryStructure::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'pay_group_id' => ($idx % 2 === 0) ? $payGroupStandard->id : $payGroupExecutive->id,
-                'name' => $ss['name'],
-                'min_ctc' => $ss['min_ctc'],
-                'max_ctc' => $ss['max_ctc'],
-                'status' => true,
-            ]);
-            if ($idx === 0) $salaryStructureStandard = $ssObj;
-
-            SalaryStructureItem::create([
-                'tenant_id' => $tenant->id,
-                'salary_structure_id' => $ssObj->id,
-                'salary_component_id' => $basicComp->id,
-                'calculation_type' => 'percentage_of_ctc',
-                'value' => 50.00,
-                'sort_order' => 1,
-            ]);
-            SalaryStructureItem::create([
-                'tenant_id' => $tenant->id,
-                'salary_structure_id' => $ssObj->id,
-                'salary_component_id' => $hraComp->id,
-                'calculation_type' => 'percentage_of_basic',
-                'value' => 40.00,
-                'sort_order' => 2,
-            ]);
-            SalaryStructureItem::create([
-                'tenant_id' => $tenant->id,
-                'salary_structure_id' => $ssObj->id,
-                'salary_component_id' => $pfComp->id,
-                'calculation_type' => 'fixed',
-                'value' => 1800.00,
-                'sort_order' => 3,
-            ]);
-        }
-
-        // 6. Leave Plans & Leave Types (12 Leave Types)
-        $leavePlan = LeavePlan::create([
+        // 2 Departments
+        $deptEng = Department::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'name' => 'Standard India Leave Plan 2026',
-            'effective_from' => '2026-01-01',
-            'description' => 'Default annual leave policy for Indian employees.',
-            'status' => true,
+            'business_unit_id' => $bu->id,
+            'branch_id' => $branch->id,
+            'name' => 'Engineering',
+            'code' => 'ENG',
+            'status' => true
         ]);
 
-        $leaveTypesData = [
-            ['name' => 'Sick Leave', 'code' => 'SL', 'description' => 'For medical recovery and emergencies.', 'type' => 'paid', 'color' => '#ef4444', 'quota' => 10.0],
-            ['name' => 'Casual Leave', 'code' => 'CL', 'description' => 'For personal and unplanned events.', 'type' => 'paid', 'color' => '#f59e0b', 'quota' => 8.0],
-            ['name' => 'Earned / Privilege Leave', 'code' => 'EL', 'description' => 'Annual accrued paid leave.', 'type' => 'paid', 'color' => '#3b82f6', 'quota' => 15.0],
-            ['name' => 'Maternity Leave', 'code' => 'ML', 'description' => 'Paid maternity leave for female employees.', 'type' => 'paid', 'color' => '#ec4899', 'quota' => 26.0],
-            ['name' => 'Paternity Leave', 'code' => 'PL', 'description' => 'Paid leave for new fathers.', 'type' => 'paid', 'color' => '#8b5cf6', 'quota' => 5.0],
-            ['name' => 'Marriage Leave', 'code' => 'MAR', 'description' => 'Special leave for employee wedding.', 'type' => 'paid', 'color' => '#10b981', 'quota' => 5.0],
-            ['name' => 'Bereavement Leave', 'code' => 'BL', 'description' => 'Leave during family bereavement.', 'type' => 'paid', 'color' => '#64748b', 'quota' => 5.0],
-            ['name' => 'Compensatory Off', 'code' => 'CO', 'description' => 'Compensatory leave for weekend work.', 'type' => 'paid', 'color' => '#06b6d4', 'quota' => 6.0],
-            ['name' => 'Study / Exam Leave', 'code' => 'ST', 'description' => 'Leave for higher education exams.', 'type' => 'paid', 'color' => '#84cc16', 'quota' => 7.0],
-            ['name' => 'Sabbatical Leave', 'code' => 'SAB', 'description' => 'Extended unpaid career break.', 'type' => 'unpaid', 'color' => '#475569', 'quota' => 30.0],
-            ['name' => 'Quarantine Emergency Leave', 'code' => 'QAR', 'description' => 'Special health isolation leave.', 'type' => 'paid', 'color' => '#14b8a6', 'quota' => 14.0],
-            ['name' => 'Loss of Pay', 'code' => 'LOP', 'description' => 'Unpaid leave when quota is exhausted.', 'type' => 'unpaid', 'color' => '#94a3b8', 'quota' => 0.0],
-        ];
-
-        $leaveSick = null; $leaveCasual = null;
-        foreach ($leaveTypesData as $lt) {
-            $ltObj = LeaveType::create([
-                'tenant_id' => $tenant->id,
-                'leave_plan_id' => $leavePlan->id,
-                'name' => $lt['name'],
-                'code' => $lt['code'],
-                'description' => $lt['description'],
-                'type' => $lt['type'],
-                'color' => $lt['color'],
-                'quota' => $lt['quota'],
-                'rules' => null,
-                'status' => true,
-            ]);
-            if ($lt['code'] === 'SL') $leaveSick = $ltObj;
-            if ($lt['code'] === 'CL') $leaveCasual = $ltObj;
-        }
-
-        // 7. Attendance Penalties
-        $attendancePenalty = AttendancePenalty::create([
+        $deptHr = Department::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'rule_type' => 'late_arrival',
-            'grace_period_minutes' => 15,
-            'threshold_count' => 3,
-            'penalty_action' => 'salary_deduction',
-            'leave_type_id' => null,
-            'penalty_value' => 0.50,
-            'penalty_tiers' => [
-                ['late_minutes_min' => 16, 'late_minutes_max' => 60, 'penalty' => 0.25],
-                ['late_minutes_min' => 61, 'late_minutes_max' => 180, 'penalty' => 0.50],
+            'business_unit_id' => $bu->id,
+            'branch_id' => $branch->id,
+            'name' => 'Human Resources',
+            'code' => 'HR',
+            'status' => true
+        ]);
+
+        // 4 Designations (2 in ENG, 2 in HR)
+        $desigSe = Designation::create([
+            'tenant_id' => $tenant->id,
+            'department_id' => $deptEng->id,
+            'name' => 'Software Engineer',
+            'level' => 'L1',
+            'status' => true
+        ]);
+
+        $desigTl = Designation::create([
+            'tenant_id' => $tenant->id,
+            'department_id' => $deptEng->id,
+            'name' => 'Tech Lead',
+            'level' => 'L3',
+            'status' => true
+        ]);
+
+        $desigHra = Designation::create([
+            'tenant_id' => $tenant->id,
+            'department_id' => $deptHr->id,
+            'name' => 'HR Associate',
+            'level' => 'L1',
+            'status' => true
+        ]);
+
+        $desigHrm = Designation::create([
+            'tenant_id' => $tenant->id,
+            'department_id' => $deptHr->id,
+            'name' => 'HR Manager',
+            'level' => 'L3',
+            'status' => true
+        ]);
+
+        // 3. Salary Structure: 2 Pay Groups & Packages
+        $payGroup1 = PayGroup::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Regular Pay Group (Deductions)',
+            'payroll_rules' => [
+                'proration_rule' => 'calendar_days',
+                'lop_splicing_rule' => 'proportionate_gross',
+                'attendance_lock_day' => 25,
+                'variable_lock_day' => 25,
+                'enable_pf' => true,
+                'restrict_pf_ceiling' => true,
+                'enable_esi' => true,
+                'restrict_esi_threshold' => true
             ],
-            'status' => true,
+            'status' => true
         ]);
 
-        // 8. Organizational Structure (Business Units, Branches, 12 Departments, 12 Designations)
-        $buManufacturing = BusinessUnit::create([
+        $payGroup2 = PayGroup::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'name' => 'Manufacturing Business Unit',
-            'code' => 'BU-MFG',
-            'description' => 'Core production and supply chain division.',
-            'head_employee_id' => null,
-            'status' => true,
+            'name' => 'Executive Pay Group (No Deductions)',
+            'payroll_rules' => [
+                'proration_rule' => 'calendar_days',
+                'lop_splicing_rule' => 'proportionate_gross',
+                'attendance_lock_day' => 25,
+                'variable_lock_day' => 25,
+                'enable_pf' => false,
+                'restrict_pf_ceiling' => false,
+                'enable_esi' => false,
+                'restrict_esi_threshold' => false
+            ],
+            'status' => true
         ]);
 
-        $buServices = BusinessUnit::create([
+        // Salary components for Pay Group 1
+        $compBasic = SalaryComponent::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'name' => 'Professional Services',
-            'code' => 'BU-SRV',
-            'description' => 'Consulting and client engineering group.',
-            'head_employee_id' => null,
-            'status' => true,
+            'pay_group_id' => $payGroup1->id,
+            'name' => 'Basic Salary',
+            'code' => 'BASIC',
+            'type' => 'earning',
+            'calculation_type' => 'fixed',
+            'default_value' => '30000',
+            'description' => 'Base salary',
+            'is_adhoc' => false,
+            'status' => true
         ]);
 
-        $branchHQ = Branch::create([
-            'tenant_id' => $tenant->id,
-            'business_unit_id' => $buServices->id,
-            'company_id' => $company->id,
-            'name' => 'Corporate HQ Bangalore',
-            'code' => 'BR-BLR-HQ',
-            'manager_employee_id' => null,
-            'phone' => '+91801234567',
-            'email' => 'hq-blr@acme.com',
-            'address' => 'Level 5, Acme Tower, Tech Park',
-            'city' => 'Bangalore',
-            'state' => 'Karnataka',
-            'country' => 'India',
-            'postal_code' => '560103',
-            'status' => true,
-        ]);
-
-        $branchFactory = Branch::create([
-            'tenant_id' => $tenant->id,
-            'business_unit_id' => $buManufacturing->id,
-            'company_id' => $company->id,
-            'name' => 'Mumbai Factory & Depot',
-            'code' => 'BR-BOM-FAC',
-            'manager_employee_id' => null,
-            'phone' => '+91227654321',
-            'email' => 'factory-bom@acme.com',
-            'address' => 'Plot 45, MIDC Industrial Area',
-            'city' => 'Mumbai',
-            'state' => 'Maharashtra',
-            'country' => 'India',
-            'postal_code' => '400059',
-            'status' => true,
-        ]);
-
-        // 12 Departments
-        $deptHR = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchHQ->id, 'company_id' => $company->id, 'business_unit_id' => $buServices->id, 'name' => 'Human Resources', 'code' => 'DEPT-HR', 'head_employee_id' => null, 'description' => 'Talent acquisition, payroll, and employee success.', 'status' => true]);
-        $deptProd = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchFactory->id, 'company_id' => $company->id, 'business_unit_id' => $buManufacturing->id, 'name' => 'Production & Assembly', 'code' => 'DEPT-PROD', 'head_employee_id' => null, 'description' => 'Assembly line workers and shop floor management.', 'status' => true]);
-        $deptEng = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchHQ->id, 'company_id' => $company->id, 'business_unit_id' => $buServices->id, 'name' => 'Engineering & R&D', 'code' => 'DEPT-ENG', 'head_employee_id' => null, 'description' => 'Product development, architecture, and software engineering.', 'status' => true]);
-        $deptQA = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchFactory->id, 'company_id' => $company->id, 'business_unit_id' => $buManufacturing->id, 'name' => 'Quality Assurance & Audit', 'code' => 'DEPT-QA', 'head_employee_id' => null, 'description' => 'Quality control, inspections, and compliance audits.', 'status' => true]);
-        $deptSales = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchHQ->id, 'company_id' => $company->id, 'business_unit_id' => $buServices->id, 'name' => 'Sales & Marketing', 'code' => 'DEPT-MKT', 'head_employee_id' => null, 'description' => 'Client acquisition, enterprise sales, and branding.', 'status' => true]);
-        $deptFinance = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchHQ->id, 'company_id' => $company->id, 'business_unit_id' => $buServices->id, 'name' => 'Finance & Accounts', 'code' => 'DEPT-FIN', 'head_employee_id' => null, 'description' => 'Financial reporting, tax management, and treasury.', 'status' => true]);
-        $deptIT = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchHQ->id, 'company_id' => $company->id, 'business_unit_id' => $buServices->id, 'name' => 'Information Technology', 'code' => 'DEPT-IT', 'head_employee_id' => null, 'description' => 'IT support, server infrastructure, and network security.', 'status' => true]);
-        $deptSCM = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchFactory->id, 'company_id' => $company->id, 'business_unit_id' => $buManufacturing->id, 'name' => 'Supply Chain & Logistics', 'code' => 'DEPT-SCM', 'head_employee_id' => null, 'description' => 'Vendor management, warehouse inventory, and shipping.', 'status' => true]);
-        $deptSupport = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchHQ->id, 'company_id' => $company->id, 'business_unit_id' => $buServices->id, 'name' => 'Customer Support & Success', 'code' => 'DEPT-CS', 'head_employee_id' => null, 'description' => 'Customer service, technical support desk, and SLAs.', 'status' => true]);
-        $deptLegal = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchHQ->id, 'company_id' => $company->id, 'business_unit_id' => $buServices->id, 'name' => 'Legal & Compliance', 'code' => 'DEPT-LGL', 'head_employee_id' => null, 'description' => 'Corporate law, contracts, regulatory compliance, and risk.', 'status' => true]);
-        $deptMaint = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchFactory->id, 'company_id' => $company->id, 'business_unit_id' => $buManufacturing->id, 'name' => 'Plant Maintenance', 'code' => 'DEPT-MNT', 'head_employee_id' => null, 'description' => 'Machine repairs, preventive maintenance, and plant safety.', 'status' => true]);
-        $deptProc = Department::create(['tenant_id' => $tenant->id, 'branch_id' => $branchFactory->id, 'company_id' => $company->id, 'business_unit_id' => $buManufacturing->id, 'name' => 'Procurement & Sourcing', 'code' => 'DEPT-PROC', 'head_employee_id' => null, 'description' => 'Raw material acquisition, vendor negotiation, and purchase orders.', 'status' => true]);
-
-        // 12 Designations
-        $desigHRManager = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptHR->id, 'name' => 'HR Manager', 'level' => 'L4', 'description' => 'Heads human resources operations.', 'status' => true]);
-        $desigProdLead = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptProd->id, 'name' => 'Production Lead', 'level' => 'L3', 'description' => 'Supervises shop floor shifts.', 'status' => true]);
-        $desigOperator = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptProd->id, 'name' => 'Machine Operator', 'level' => 'L1', 'description' => 'Runs assembly machines and welds parts.', 'status' => true]);
-        $desigEngLead = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptEng->id, 'name' => 'Senior Full Stack Lead', 'level' => 'L4', 'description' => 'Architects core software applications.', 'status' => true]);
-        $desigQAManager = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptQA->id, 'name' => 'QA Manager', 'level' => 'L4', 'description' => 'Directs quality control procedures.', 'status' => true]);
-        $desigSalesExec = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptSales->id, 'name' => 'Enterprise Sales Executive', 'level' => 'L2', 'description' => 'Drives B2B revenue and client deals.', 'status' => true]);
-        $desigFinAnalyst = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptFinance->id, 'name' => 'Senior Financial Analyst', 'level' => 'L3', 'description' => 'Manages budgets and payroll audits.', 'status' => true]);
-        $desigSysAdmin = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptIT->id, 'name' => 'IT Systems Administrator', 'level' => 'L2', 'description' => 'Maintains corporate IT infrastructure.', 'status' => true]);
-        $desigSCMManager = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptSCM->id, 'name' => 'Supply Chain Manager', 'level' => 'L4', 'description' => 'Oversees warehouse logistics and freight.', 'status' => true]);
-        $desigCustLead = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptSupport->id, 'name' => 'Customer Success Lead', 'level' => 'L3', 'description' => 'Manages key client relationships.', 'status' => true]);
-        $desigLegalCounsel = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptLegal->id, 'name' => 'Legal Counsel', 'level' => 'L4', 'description' => 'Handles corporate legal matters.', 'status' => true]);
-        $desigProcExec = Designation::create(['tenant_id' => $tenant->id, 'department_id' => $deptProc->id, 'name' => 'Senior Procurement Executive', 'level' => 'L3', 'description' => 'Negotiates vendor pricing and POs.', 'status' => true]);
-
-        // Production Shifts (12 Shifts)
-        $shiftsData = [
-            ['name' => 'Day Shift (Standard)', 'code' => 'SHIFT-DAY', 'start_time' => '08:00:00', 'end_time' => '16:00:00'],
-            ['name' => 'Morning Shift A', 'code' => 'SHIFT-AM', 'start_time' => '06:00:00', 'end_time' => '14:30:00'],
-            ['name' => 'Afternoon Shift B', 'code' => 'SHIFT-PM', 'start_time' => '14:00:00', 'end_time' => '22:30:00'],
-            ['name' => 'Night Shift C', 'code' => 'SHIFT-NIGHT', 'start_time' => '22:00:00', 'end_time' => '06:30:00'],
-            ['name' => 'Corporate General Shift', 'code' => 'SHIFT-GEN', 'start_time' => '09:00:00', 'end_time' => '18:00:00'],
-            ['name' => 'Flexible Executive Shift', 'code' => 'SHIFT-FLEX', 'start_time' => '10:00:00', 'end_time' => '19:00:00'],
-            ['name' => 'Early Dispatch Shift', 'code' => 'SHIFT-DISP', 'start_time' => '05:00:00', 'end_time' => '13:30:00'],
-            ['name' => 'Plant Maintenance Shift', 'code' => 'SHIFT-MNT', 'start_time' => '07:00:00', 'end_time' => '15:30:00'],
-            ['name' => 'QA Overtime Shift', 'code' => 'SHIFT-QA-OT', 'start_time' => '16:00:00', 'end_time' => '00:30:00'],
-            ['name' => 'Warehouse Night Duty', 'code' => 'SHIFT-WH-N', 'start_time' => '23:00:00', 'end_time' => '07:30:00'],
-            ['name' => 'Weekend Special Shift', 'code' => 'SHIFT-WKND', 'start_time' => '09:00:00', 'end_time' => '21:00:00'],
-            ['name' => 'Executive Mid-Day Shift', 'code' => 'SHIFT-MID', 'start_time' => '11:00:00', 'end_time' => '20:00:00'],
-        ];
-
-        $productionShift = null;
-        foreach ($shiftsData as $idx => $sData) {
-            $shiftObj = ProductionShift::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'name' => $sData['name'],
-                'code' => $sData['code'],
-                'start_time' => $sData['start_time'],
-                'end_time' => $sData['end_time'],
-                'break_minutes' => 30,
-                'overtime_allowed' => ($idx % 2 === 0),
-                'active' => true,
-            ]);
-            if ($idx === 0) {
-                $productionShift = $shiftObj;
-            }
-        }
-
-        $dbUsers = \App\Models\User::all();
-        if ($dbUsers->count() < 12) {
-            $needed = 12 - $dbUsers->count();
-            for ($i = 1; $i <= $needed; $i++) {
-                \App\Models\User::firstOrCreate(
-                    [
-                        'email' => 'demouser' . $i . '@example.com',
-                    ],
-                    [
-                        'tenant_id' => $tenant->id,
-                        'name' => 'Demo User ' . $i,
-                        'password' => bcrypt('password'),
-                    ]
-                );
-            }
-            $dbUsers = \App\Models\User::all()->take(15);
-        } else {
-            $dbUsers = $dbUsers->take(15);
-        }
-        $employeesList = [];
-        
-        $designations = [
-            $desigHRManager, $desigProdLead, $desigOperator, $desigEngLead, 
-            $desigQAManager, $desigSalesExec, $desigFinAnalyst, $desigSysAdmin,
-            $desigSCMManager, $desigCustLead, $desigLegalCounsel, $desigProcExec
-        ];
-
-        $departments = [
-            $deptHR, $deptProd, $deptProd, $deptEng,
-            $deptQA, $deptSales, $deptFinance, $deptIT,
-            $deptSCM, $deptSupport, $deptLegal, $deptProc
-        ];
-
-        $idx = 0;
-        foreach ($dbUsers as $user) {
-            $desig = $designations[$idx % count($designations)];
-            $dept = $departments[$idx % count($departments)];
-
-            $empObj = Employee::create([
-                'tenant_id' => $tenant->id,
-                'user_id' => $user->id,
-                'employee_id' => 'EMP-' . str_pad($idx + 1, 4, '0', STR_PAD_LEFT),
-                'company_id' => $company->id,
-                'business_unit_id' => ($idx % 2 === 0) ? $buServices->id : $buManufacturing->id,
-                'branch_id' => ($idx % 2 === 0) ? $branchHQ->id : $branchFactory->id,
-                'department_id' => $dept->id,
-                'designation_id' => $desig->id,
-                'pay_group_id' => ($idx < 3) ? $payGroupExecutive->id : $payGroupStandard->id,
-                'salary_structure_id' => $salaryStructureStandard->id,
-                'leave_plan_id' => $leavePlan->id,
-                'attendance_penalty_id' => $attendancePenalty->id,
-                'reporting_manager_id' => ($idx > 0) ? $employeesList[0]->id : null,
-                'shift_id' => $productionShift->id,
-                'full_name' => $user->name,
-                'nick_name' => explode(' ', $user->name)[0],
-                'blood_group' => 'O+',
-                'employee_stage' => 'Confirmed',
-                'job_title' => $desig->name,
-                'role' => 'Employee',
-                'employment_type' => 'Full-time',
-                'date_of_joining' => '2023-01-15',
-                'date_of_birth' => '1992-05-10',
-                'probation_end_date' => '2023-07-15',
-                'confirmation_date' => '2023-07-15',
-                'office' => ($idx % 3 === 0) ? 'office' : (($idx % 3 === 1) ? 'wfh' : 'onsite'),
-                'gender' => ($idx % 2 === 0) ? 'Male' : 'Female',
-                'marital_status' => 'Single',
-                'diet_preference' => 'Veg',
-                'aadhaar_card_number' => '1111-2222-' . str_pad($idx + 1, 4, '0', STR_PAD_LEFT),
-                'pan_card_number' => 'ABCDE' . str_pad($idx + 1, 4, '0', STR_PAD_LEFT) . 'F',
-                'present_address' => 'Sample Address ' . ($idx + 1),
-                'permanent_address' => 'Sample Address ' . ($idx + 1),
-                'city' => 'Bangalore',
-                'postal_code' => '560001',
-                'personal_mobile_number' => '+9198000000' . str_pad($idx + 1, 2, '0', STR_PAD_LEFT),
-                'personal_email' => $user->email,
-                'office_email' => $user->email,
-                'experience' => 5.0 + $idx,
-                'source_of_hire' => 'Internal',
-                'skill_set' => 'Management, Operations, Domain Expertise',
-                'current_salary' => 50000.00 + ($idx * 5000),
-                'qualification' => 'Bachelor Degree',
-                'bank_name' => 'HDFC Bank',
-                'account_number' => '501000' . str_pad($idx + 1, 8, '0', STR_PAD_LEFT),
-                'ifsc_code' => 'HDFC0000123',
-                'emergency_contact_name' => 'Emergency Contact ' . ($idx + 1),
-                'emergency_contact_number' => '+9198999900' . str_pad($idx + 1, 2, '0', STR_PAD_LEFT),
-                'emergency_contact_relation' => 'Spouse',
-                'status' => true,
-            ]);
-            $employeesList[] = $empObj;
-            $idx++;
-        }
-
-        $employeeHR = $employeesList[0];
-        $employeeLead = $employeesList[1] ?? $employeeHR;
-        $employeeOperator = $employeesList[2] ?? $employeeHR;
-
-        // Update Circular Manager/Head references in Organization tables
-        $buManufacturing->update(['head_employee_id' => $employeeLead->id]);
-        $buServices->update(['head_employee_id' => $employeeHR->id]);
-
-        $branchHQ->update(['manager_employee_id' => $employeeHR->id]);
-        $branchFactory->update(['manager_employee_id' => $employeeLead->id]);
-
-        $deptHR->update(['head_employee_id' => $employeeHR->id]);
-        $deptProd->update(['head_employee_id' => $employeeLead->id]);
-
-        // 11. Employee Logs & Histories
-        EmployeeEmploymentHistory::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employeeHR->id,
-            'company_name' => 'Global Logistics Corp',
-            'designation' => 'Senior HR Generalist',
-            'start_date' => '2018-01-10',
-            'end_date' => '2022-03-31',
-            'job_description' => 'Managed end-to-end recruitment pipelines, resolved employee grievances, and oversaw employee benefits program.',
-        ]);
-        EmployeeEmploymentHistory::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employeeHR->id,
-            'company_name' => 'Apex Solutions Ltd',
-            'designation' => 'HR Executive',
-            'start_date' => '2015-06-01',
-            'end_date' => '2017-12-30',
-            'job_description' => 'Handled payroll processing, employee onboarding, leaves administration, and performance appraisal tracking.',
-        ]);
-
-        EmployeeEmploymentHistory::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employeeOperator->id,
-            'company_name' => 'Tata Engineering Works',
-            'designation' => 'Apprentice Welder',
-            'start_date' => '2024-01-01',
-            'end_date' => '2025-12-31',
-            'job_description' => 'Assisted senior welders in manufacturing vehicle chassis, followed precision drawings, and maintained safety logs.',
-        ]);
-        EmployeeEmploymentHistory::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employeeOperator->id,
-            'company_name' => 'Steelcraft Industries',
-            'designation' => 'Junior Fitter',
-            'start_date' => '2021-03-10',
-            'end_date' => '2023-11-25',
-            'job_description' => 'Operated heavy machinery, adjusted machine settings, and performed basic welding repairs on pipeline connections.',
-        ]);
-
-        EmployeeEmploymentHistory::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employeeLead->id,
-            'company_name' => 'Schneider Electric',
-            'designation' => 'Production Supervisor',
-            'start_date' => '2020-05-15',
-            'end_date' => '2023-12-20',
-            'job_description' => 'Managed shop floor production lines, optimized resource scheduling, conducted regular safety drills, and audited product batches.',
-        ]);
-        EmployeeEmploymentHistory::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employeeLead->id,
-            'company_name' => 'Bosch India Pvt Ltd',
-            'designation' => 'Production Assistant Engineer',
-            'start_date' => '2016-08-01',
-            'end_date' => '2020-04-30',
-            'job_description' => 'Assisted in plant production runs, prepared operational performance dashboards, and troubleshot mechanical issues.',
-        ]);
-
-        // Attendance Penalization History (12 Penalties)
-        $penaltiesData = [
-            ['emp' => $employeeOperator, 'date' => '2026-06-15', 'rule' => 'late_arrival', 'amount' => 0.50, 'status' => 'processed', 'month' => '2026-06', 'remarks' => 'Arrived at 09:45 AM (Grace period ended at 08:15 AM)'],
-            ['emp' => $employeeOperator, 'date' => '2026-07-25', 'rule' => 'missing_swipe', 'amount' => 1.00, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Forgot to swipe out at shift end.'],
-            ['emp' => $employeeLead, 'date' => '2026-06-18', 'rule' => 'late_arrival', 'amount' => 0.25, 'status' => 'processed', 'month' => '2026-06', 'remarks' => 'Late arrival by 22 minutes due to traffic.'],
-            ['emp' => $employeeLead, 'date' => '2026-07-22', 'rule' => 'early_exit', 'amount' => 0.50, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Left early before core hours completed.'],
-            ['emp' => $employeeHR, 'date' => '2026-06-22', 'rule' => 'early_exit', 'amount' => 0.50, 'status' => 'processed', 'month' => '2026-06', 'remarks' => 'Early exit without approved gate pass.'],
-            ['emp' => $employeeHR, 'date' => '2026-07-20', 'rule' => 'late_arrival', 'amount' => 0.25, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Late arrival due to heavy rainfall.'],
-            ['emp' => $employeesList[3], 'date' => '2026-07-02', 'rule' => 'late_arrival', 'amount' => 0.25, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Late arrival by 18 minutes.'],
-            ['emp' => $employeesList[4], 'date' => '2026-07-03', 'rule' => 'missing_swipe', 'amount' => 1.00, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Missing evening out-swipe.'],
-            ['emp' => $employeesList[5], 'date' => '2026-07-05', 'rule' => 'late_arrival', 'amount' => 0.50, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Third consecutive late arrival.'],
-            ['emp' => $employeesList[6], 'date' => '2026-07-08', 'rule' => 'early_exit', 'amount' => 0.25, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Exited 30 mins before shift end.'],
-            ['emp' => $employeesList[7], 'date' => '2026-07-10', 'rule' => 'late_arrival', 'amount' => 0.25, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Late arrival by 20 minutes.'],
-            ['emp' => $employeesList[8], 'date' => '2026-07-12', 'rule' => 'missing_swipe', 'amount' => 0.50, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Missing morning in-swipe.'],
-            ['emp' => $employeesList[9], 'date' => '2026-07-14', 'rule' => 'late_arrival', 'amount' => 0.25, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Late arrival by 15 minutes.'],
-            ['emp' => $employeesList[10], 'date' => '2026-07-16', 'rule' => 'early_exit', 'amount' => 0.50, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Early exit for medical appointment.'],
-            ['emp' => $employeesList[11], 'date' => '2026-07-18', 'rule' => 'late_arrival', 'amount' => 0.50, 'status' => 'pending', 'month' => '2026-07', 'remarks' => 'Late arrival by 45 minutes.'],
-        ];
-
-        foreach ($penaltiesData as $p) {
-            EmployeePenalty::create([
-                'tenant_id' => $tenant->id,
-                'employee_id' => $p['emp']->id,
-                'date' => $p['date'],
-                'rule_type' => $p['rule'],
-                'penalty_amount' => $p['amount'],
-                'status' => $p['status'],
-                'payroll_month' => $p['month'],
-                'remarks' => $p['remarks'],
-            ]);
-        }
-
-        EmployeeAdhocComponent::create([
-            'tenant_id' => $tenant->id,
-            'employee_id' => $employeeOperator->id,
-            'salary_component_id' => $bonusComp->id,
-            'amount' => 5000.00,
-            'payroll_month' => '2026-06',
-            'status' => 'processed',
-            'remarks' => 'Excellent safety record and shift coverage bonus.',
-        ]);
-
-        // Leave Balances for Employees
-        foreach ($employeesList as $empItem) {
-            LeaveBalance::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $empItem->id,
-                'leave_type_id' => $leaveSick->id,
-                'allocated' => 10.0,
-                'used' => 1.0,
-                'encashed' => 0.0,
-            ]);
-
-            LeaveBalance::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $empItem->id,
-                'leave_type_id' => $leaveCasual->id,
-                'allocated' => 8.0,
-                'used' => 2.0,
-                'encashed' => 1.0,
-            ]);
-        }
-
-        // Leave Applications & History (12 Leave Requests)
-        $leaveRequestsData = [
-            ['emp' => $employeeOperator, 'type' => $leaveSick, 'start' => '2026-07-05', 'end' => '2026-07-05', 'dur' => 1.0, 'reason' => 'High fever and doctor advised rest.', 'status' => 'approved'],
-            ['emp' => $employeeLead, 'type' => $leaveCasual, 'start' => '2026-07-15', 'end' => '2026-07-16', 'dur' => 2.0, 'reason' => 'Personal family event.', 'status' => 'pending'],
-            ['emp' => $employeeHR, 'type' => $leaveCasual, 'start' => '2026-06-20', 'end' => '2026-06-20', 'dur' => 1.0, 'reason' => 'Annual health checkup.', 'status' => 'approved'],
-            ['emp' => $employeesList[3], 'type' => $leaveSick, 'start' => '2026-07-01', 'end' => '2026-07-02', 'dur' => 2.0, 'reason' => 'Viral infection recovery.', 'status' => 'approved'],
-            ['emp' => $employeesList[4], 'type' => $leaveCasual, 'start' => '2026-07-08', 'end' => '2026-07-08', 'dur' => 1.0, 'reason' => 'Urgent domestic work.', 'status' => 'approved'],
-            ['emp' => $employeesList[5], 'type' => $leaveSick, 'start' => '2026-07-10', 'end' => '2026-07-10', 'dur' => 1.0, 'reason' => 'Severe dental pain.', 'status' => 'pending'],
-            ['emp' => $employeesList[6], 'type' => $leaveCasual, 'start' => '2026-07-12', 'end' => '2026-07-13', 'dur' => 2.0, 'reason' => 'Family travel.', 'status' => 'approved'],
-            ['emp' => $employeesList[7], 'type' => $leaveSick, 'start' => '2026-07-14', 'end' => '2026-07-14', 'dur' => 1.0, 'reason' => 'Migraine headache.', 'status' => 'approved'],
-            ['emp' => $employeesList[8], 'type' => $leaveCasual, 'start' => '2026-07-18', 'end' => '2026-07-19', 'dur' => 2.0, 'reason' => 'Outstation trip.', 'status' => 'pending'],
-            ['emp' => $employeesList[9], 'type' => $leaveSick, 'start' => '2026-07-20', 'end' => '2026-07-20', 'dur' => 1.0, 'reason' => 'Back pain rest.', 'status' => 'approved'],
-            ['emp' => $employeesList[10], 'type' => $leaveCasual, 'start' => '2026-07-22', 'end' => '2026-07-22', 'dur' => 1.0, 'reason' => 'Bank work.', 'status' => 'rejected'],
-            ['emp' => $employeesList[11], 'type' => $leaveSick, 'start' => '2026-07-24', 'end' => '2026-07-24', 'dur' => 1.0, 'reason' => 'Doctor appointment.', 'status' => 'approved'],
-        ];
-
-        foreach ($leaveRequestsData as $lr) {
-            LeaveRequest::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $lr['emp']->id,
-                'leave_type_id' => $lr['type']->id,
-                'start_date' => $lr['start'],
-                'end_date' => $lr['end'],
-                'duration' => $lr['dur'],
-                'start_date_type' => 'full_day',
-                'end_date_type' => 'full_day',
-                'notified_contacts' => [],
-                'reason' => $lr['reason'],
-                'status' => $lr['status'],
-                'current_level' => ($lr['status'] === 'approved') ? 'approved' : '1',
-                'approved_by' => ($lr['status'] === 'approved') ? $employeeHR->id : null,
-            ]);
-        }
-
-        // Leave Encashments (12 Leave Encashment Records)
-        $encashmentsData = [
-            ['emp' => $employeeOperator, 'days' => 1.0, 'status' => 'approved', 'reason' => 'Encashment of unutilized casual leave days.'],
-            ['emp' => $employeeLead, 'days' => 1.0, 'status' => 'pending', 'reason' => 'Requesting encashment for 1 casual leave day.'],
-            ['emp' => $employeeHR, 'days' => 2.0, 'status' => 'approved', 'reason' => 'Annual leave encashment application.'],
-            ['emp' => $employeesList[3], 'days' => 1.5, 'status' => 'approved', 'reason' => 'Encashment of accrued casual leave.'],
-            ['emp' => $employeesList[4], 'days' => 2.0, 'status' => 'pending', 'reason' => 'Requesting encashment for 2 leave days.'],
-            ['emp' => $employeesList[5], 'days' => 1.0, 'status' => 'approved', 'reason' => 'Unused privilege leave encashment.'],
-            ['emp' => $employeesList[6], 'days' => 3.0, 'status' => 'approved', 'reason' => 'Quarterly leave encashment.'],
-            ['emp' => $employeesList[7], 'days' => 1.0, 'status' => 'pending', 'reason' => 'Casual leave encashment.'],
-            ['emp' => $employeesList[8], 'days' => 2.5, 'status' => 'approved', 'reason' => 'Year-end leave encashment.'],
-            ['emp' => $employeesList[9], 'days' => 1.0, 'status' => 'rejected', 'reason' => 'Encashment request beyond policy cap.'],
-            ['emp' => $employeesList[10], 'days' => 2.0, 'status' => 'approved', 'reason' => 'Encashment of balance leave.'],
-            ['emp' => $employeesList[11], 'days' => 1.0, 'status' => 'pending', 'reason' => 'Special leave encashment request.'],
-        ];
-
-        foreach ($encashmentsData as $enc) {
-            LeaveEncashment::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $enc['emp']->id,
-                'leave_type_id' => $leaveCasual->id,
-                'requested_days' => $enc['days'],
-                'status' => $enc['status'],
-                'reason' => $enc['reason'],
-                'approved_by' => ($enc['status'] === 'approved') ? $adminUser->id : null,
-                'approved_at' => ($enc['status'] === 'approved') ? now() : null,
-            ]);
-        }
-
-        // Shift Rosters
-        $rosterDates = ['2026-07-10', '2026-07-11', '2026-07-12', '2026-07-13', '2026-07-14'];
-        foreach ($rosterDates as $rDate) {
-            foreach ($employeesList as $empRoster) {
-                ShiftRoster::create([
-                    'tenant_id' => $tenant->id,
-                    'employee_id' => $empRoster->id,
-                    'shift_id' => $productionShift->id,
-                    'date' => $rDate,
-                    'status' => 'approved',
-                    'notes' => 'Regular roster assignment.',
-                ]);
-            }
-        }
-
-        // 13. Asset Management (Equipment & Catalog Items)
-        $assetCatElectronics = AssetCategory::create([
+        $compSpl = SalaryComponent::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'name' => 'IT Electronics & Workstations',
-            'description' => 'Laptops, mobile devices, external drives, and high-performance monitors.',
+            'pay_group_id' => $payGroup1->id,
+            'name' => 'Special Allowance',
+            'code' => 'SPL',
+            'type' => 'earning',
+            'calculation_type' => 'balancing',
+            'default_value' => '0',
+            'description' => 'Balancing allowance',
+            'is_adhoc' => false,
+            'status' => true
         ]);
 
-        $assetCatSafety = AssetCategory::create([
+        $compPf = SalaryComponent::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'name' => 'Safety & Technical Gear',
-            'description' => 'Welding masks, fireproof suits, protective helmets, and specialized industrial toolsets.',
+            'pay_group_id' => $payGroup1->id,
+            'name' => 'Provident Fund',
+            'code' => 'PF',
+            'type' => 'deduction',
+            'calculation_type' => 'fixed',
+            'default_value' => '1800',
+            'description' => 'Provident Fund Deduction',
+            'is_adhoc' => false,
+            'status' => true
         ]);
 
-        $assetCatPeripherals = AssetCategory::create([
+        $compEsi = SalaryComponent::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'name' => 'Office Peripherals & Accessories',
-            'description' => 'Docking stations, mechanical keyboards, ergonomic mice, and headgear.',
+            'pay_group_id' => $payGroup1->id,
+            'name' => 'Employee State Insurance',
+            'code' => 'ESI',
+            'type' => 'deduction',
+            'calculation_type' => 'fixed',
+            'default_value' => '0',
+            'description' => 'ESI Deduction',
+            'is_adhoc' => false,
+            'status' => true
         ]);
 
-        // Seed 12 Asset Items (Master Catalog)
-        $itemMacBook = AssetItem::create([
+        // Structure 1 (with deductions)
+        $structure1 = SalaryStructure::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'name' => 'MacBook Pro 16 Inch M3',
-            'description' => 'High performance Apple workstation for senior staff and executive administration.',
+            'pay_group_id' => $payGroup1->id,
+            'name' => 'Regular Employee Salary Package',
+            'min_ctc' => 0,
+            'max_ctc' => 50000,
+            'status' => true
         ]);
 
-        $itemWeldingMask = AssetItem::create([
+        SalaryStructureItem::create([
+            'tenant_id' => $tenant->id,
+            'salary_structure_id' => $structure1->id,
+            'salary_component_id' => $compBasic->id,
+            'calculation_type' => 'fixed',
+            'value' => 30000
+        ]);
+        SalaryStructureItem::create([
+            'tenant_id' => $tenant->id,
+            'salary_structure_id' => $structure1->id,
+            'salary_component_id' => $compSpl->id,
+            'calculation_type' => 'balancing',
+            'value' => 10000
+        ]);
+        SalaryStructureItem::create([
+            'tenant_id' => $tenant->id,
+            'salary_structure_id' => $structure1->id,
+            'salary_component_id' => $compPf->id,
+            'calculation_type' => 'fixed',
+            'value' => 1800
+        ]);
+        SalaryStructureItem::create([
+            'tenant_id' => $tenant->id,
+            'salary_structure_id' => $structure1->id,
+            'salary_component_id' => $compEsi->id,
+            'calculation_type' => 'fixed',
+            'value' => 0
+        ]);
+
+        // Salary components for Pay Group 2 (Exec)
+        $compBasicExec = SalaryComponent::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'name' => 'Auto-Darkening Industrial Heavy Duty Welding & Technical Protection Helmet (Grade A Standard)',
-            'description' => 'Industrial protective helmet for factory floor welders with automatic lens tinting.',
+            'pay_group_id' => $payGroup2->id,
+            'name' => 'Basic Salary Executive',
+            'code' => 'BASIC_EXEC',
+            'type' => 'earning',
+            'calculation_type' => 'fixed',
+            'default_value' => '60000',
+            'description' => 'Base salary executive',
+            'is_adhoc' => false,
+            'status' => true
         ]);
 
-        $itemDellLaptop = AssetItem::create([
+        $compSplExec = SalaryComponent::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'name' => 'Dell Latitude 5440',
-            'description' => 'Enterprise Dell laptop for business & technical team members.',
+            'pay_group_id' => $payGroup2->id,
+            'name' => 'Special Allowance Executive',
+            'code' => 'SPL_EXEC',
+            'type' => 'earning',
+            'calculation_type' => 'balancing',
+            'default_value' => '0',
+            'description' => 'Balancing allowance executive',
+            'is_adhoc' => false,
+            'status' => true
         ]);
 
-        $itemHPElite = AssetItem::create([
+        // Structure 2 (No deductions)
+        $structure2 = SalaryStructure::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'name' => 'HP EliteBook 840 G8 Workstation',
-            'description' => 'High speed Intel i7 16GB RAM laptop for technical lead and shop floor managers.',
+            'pay_group_id' => $payGroup2->id,
+            'name' => 'Executive Employee Salary Package',
+            'min_ctc' => 0,
+            'max_ctc' => 100000,
+            'status' => true
         ]);
 
-        $itemDellMonitor = AssetItem::create([
+        SalaryStructureItem::create([
+            'tenant_id' => $tenant->id,
+            'salary_structure_id' => $structure2->id,
+            'salary_component_id' => $compBasicExec->id,
+            'calculation_type' => 'fixed',
+            'value' => 60000
+        ]);
+        SalaryStructureItem::create([
+            'tenant_id' => $tenant->id,
+            'salary_structure_id' => $structure2->id,
+            'salary_component_id' => $compSplExec->id,
+            'calculation_type' => 'balancing',
+            'value' => 20000
+        ]);
+
+        // 4. Leave Structure: Two Leave Plans
+        $leavePlanStandard = LeavePlan::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'name' => 'Dell P2422H 24-inch Professional IPS Ultra-Thin Bezel Monitor Display',
-            'description' => 'FHD IPS LED backlit monitor with adjustable height stand and HDMI/DisplayPort connections.',
+            'name' => 'Standard Leave Plan',
+            'effective_from' => '2026-08-01',
+            'description' => 'Regular corporate leave plan',
+            'status' => true
         ]);
 
-        $itemMobileHandset = AssetItem::create([
+        $ltCasualStandard = LeaveType::create([
+            'tenant_id' => $tenant->id,
+            'leave_plan_id' => $leavePlanStandard->id,
+            'name' => 'Casual Leave',
+            'code' => 'CL',
+            'type' => 'paid',
+            'quota' => 12,
+            'status' => true
+        ]);
+
+        $ltSickStandard = LeaveType::create([
+            'tenant_id' => $tenant->id,
+            'leave_plan_id' => $leavePlanStandard->id,
+            'name' => 'Sick Leave',
+            'code' => 'SL',
+            'type' => 'paid',
+            'quota' => 12,
+            'status' => true
+        ]);
+
+        $ltEarnedStandard = LeaveType::create([
+            'tenant_id' => $tenant->id,
+            'leave_plan_id' => $leavePlanStandard->id,
+            'name' => 'Earned Leave',
+            'code' => 'EL',
+            'type' => 'paid',
+            'quota' => 18,
+            'status' => true
+        ]);
+
+        $leavePlanExecutive = LeavePlan::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'name' => 'Samsung Galaxy M34 Factory Duty Smartphone',
-            'description' => 'Ruggedized mobile handset for plant floor shift coordination.',
+            'name' => 'Executive Leave Plan',
+            'effective_from' => '2026-08-01',
+            'description' => 'Executive corporate leave plan',
+            'status' => true
         ]);
 
-        $itemDockingStation = AssetItem::create([
+        $ltCasualExecutive = LeaveType::create([
+            'tenant_id' => $tenant->id,
+            'leave_plan_id' => $leavePlanExecutive->id,
+            'name' => 'Casual Leave (Exec)',
+            'code' => 'CL-EXE',
+            'type' => 'paid',
+            'quota' => 15,
+            'status' => true
+        ]);
+
+        $ltSickExecutive = LeaveType::create([
+            'tenant_id' => $tenant->id,
+            'leave_plan_id' => $leavePlanExecutive->id,
+            'name' => 'Sick Leave (Exec)',
+            'code' => 'SL-EXE',
+            'type' => 'paid',
+            'quota' => 15,
+            'status' => true
+        ]);
+
+        $ltEarnedExecutive = LeaveType::create([
+            'tenant_id' => $tenant->id,
+            'leave_plan_id' => $leavePlanExecutive->id,
+            'name' => 'Earned Leave (Exec)',
+            'code' => 'EL-EXE',
+            'type' => 'paid',
+            'quota' => 24,
+            'status' => true
+        ]);
+
+        // 5. Shift Master: 2 Valid Shifts
+        $shiftDay = ProductionShift::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'asset_category_id' => $assetCatPeripherals->id,
-            'name' => 'Lenovo ThinkPad Thunderbolt 4 Workstation Dock',
-            'description' => 'Dual 4K display output dock with 100W power delivery for engineering laptops.',
+            'name' => 'Day Shift',
+            'code' => 'DAY',
+            'start_time' => '09:00:00',
+            'end_time' => '18:00:00',
+            'active' => true
         ]);
 
-        $itemErgonomicChair = AssetItem::create([
+        $shiftNight = ProductionShift::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'asset_category_id' => $assetCatPeripherals->id,
-            'name' => 'Featherlite High Back Ergonomic Mesh Chair with Adjustable Lumbar Support & Armrests',
-            'description' => 'Ergonomic lumbar support chair for long hours at administrative desks.',
+            'name' => 'Night Shift',
+            'code' => 'NIGHT',
+            'start_time' => '21:00:00',
+            'end_time' => '06:00:00',
+            'active' => true
         ]);
 
-        $itemFireSuit = AssetItem::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'name' => 'Nomex Thermal Resistant Heavy Industrial Fireproof Protective Suit Coverall',
-            'description' => 'Multi-layer flame retardant suit for boiler room and casting operators.',
-        ]);
-
-        $itemHeadset = AssetItem::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatPeripherals->id,
-            'name' => 'Jabra Evolve2 65 Noise Canceling Wireless Headset',
-            'description' => 'Dual-ear Bluetooth headset with boom microphone for customer support calls.',
-        ]);
-
-        $itemToolKit = AssetItem::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'name' => 'Stanley 110-Piece Mechanical & Maintenance Master Tool Kit Box Set',
-            'description' => 'Comprehensive chrome vanadium socket and wrench set for plant technicians.',
-        ]);
-
-        $itemTablet = AssetItem::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'name' => 'Apple iPad Air 10.9-inch 256GB Wi-Fi',
-            'description' => 'Tablet for quality assurance inspectors to conduct digital audit checklists.',
-        ]);
-
-
-        // Seed 15 Physical Assets
-        $assetLaptop = Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemMacBook->id,
-            'asset_code' => 'AST-LAP-001',
-            'name' => 'MacBook Pro 16 Inch M3',
-            'brand' => 'Apple',
-            'model_number' => 'MBP2025-16',
-            'serial_number' => 'C02H41Z0Q05D',
-            'purchase_date' => '2025-05-10',
-            'purchase_cost' => 199999.00,
-            'condition' => 'good',
-            'status' => 'allocated',
-            'assigned_employee_id' => $employeeHR->id,
-            'allocated_at' => '2025-05-15',
-            'expected_return_date' => '2028-05-15',
-            'notes' => 'Assigned for HR administration use.',
-        ]);
-
-        $assetWeldingMask = Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'asset_item_id' => $itemWeldingMask->id,
-            'asset_code' => 'AST-SAF-002',
-            'name' => 'Auto-Darkening Welding Helmet',
-            'brand' => '3M Speedglas',
-            'model_number' => 'SG9100',
-            'serial_number' => 'WM-90812-B',
-            'purchase_date' => '2026-02-05',
-            'purchase_cost' => 15000.00,
-            'condition' => 'new',
-            'status' => 'allocated',
-            'assigned_employee_id' => $employeeOperator->id,
-            'allocated_at' => '2026-02-10',
-            'expected_return_date' => '2027-02-10',
-            'notes' => 'Assigned welder mask.',
-        ]);
-
-        $assetSpareLaptop = Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemDellLaptop->id,
-            'asset_code' => 'AST-LAP-003',
-            'name' => 'Dell Latitude 5440',
-            'brand' => 'Dell',
-            'model_number' => 'LAT-5440',
-            'serial_number' => 'D-778899A',
-            'purchase_date' => '2026-03-01',
-            'purchase_cost' => 65000.00,
-            'condition' => 'new',
-            'status' => 'available',
-            'assigned_employee_id' => null,
-            'allocated_at' => null,
-            'expected_return_date' => null,
-            'notes' => 'Spare laptop in IT storage.',
-        ]);
-
-        $assetHPElite = Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemHPElite->id,
-            'asset_code' => 'AST-LAP-004',
-            'name' => 'HP EliteBook 840 G8 Workstation',
-            'brand' => 'HP',
-            'model_number' => 'EB-840-G8',
-            'serial_number' => '5CG123456X',
-            'purchase_date' => '2026-01-15',
-            'purchase_cost' => 88000.00,
-            'condition' => 'good',
-            'status' => 'allocated',
-            'assigned_employee_id' => $employeeLead->id,
-            'allocated_at' => '2026-01-20',
-            'notes' => 'Assigned to production lead.',
-        ]);
-
-        Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemDellMonitor->id,
-            'asset_code' => 'AST-MON-005',
-            'name' => 'Dell P2422H 24-inch Monitor',
-            'brand' => 'Dell',
-            'model_number' => 'P2422H',
-            'serial_number' => 'CN-048291-72910-112',
-            'purchase_date' => '2026-04-10',
-            'purchase_cost' => 14500.00,
-            'condition' => 'new',
-            'status' => 'available',
-            'notes' => 'Unassigned monitor in IT lab.',
-        ]);
-
-        $assetMobile = Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemMobileHandset->id,
-            'asset_code' => 'AST-MOB-006',
-            'name' => 'Samsung Galaxy M34',
-            'brand' => 'Samsung',
-            'model_number' => 'SM-M346B',
-            'serial_number' => '358920194829102',
-            'purchase_date' => '2026-05-01',
-            'purchase_cost' => 18000.00,
-            'condition' => 'good',
-            'status' => 'allocated',
-            'assigned_employee_id' => $employeeOperator->id,
-            'allocated_at' => '2026-05-05',
-            'notes' => 'Shift manager communication phone.',
-        ]);
-
-        Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatPeripherals->id,
-            'asset_item_id' => $itemDockingStation->id,
-            'asset_code' => 'AST-DCK-007',
-            'name' => 'Lenovo ThinkPad Thunderbolt 4 Dock',
-            'brand' => 'Lenovo',
-            'model_number' => '40B00135US',
-            'serial_number' => 'Z19A8201',
-            'purchase_date' => '2026-02-18',
-            'purchase_cost' => 22000.00,
-            'condition' => 'good',
-            'status' => 'available',
-            'notes' => 'Docking station available for request.',
-        ]);
-
-        $assetChair = Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatPeripherals->id,
-            'asset_item_id' => $itemErgonomicChair->id,
-            'asset_code' => 'AST-CHR-008',
-            'name' => 'Featherlite High Back Chair',
-            'brand' => 'Featherlite',
-            'model_number' => 'OPT-MESH-HB',
-            'serial_number' => 'FL-CH-9921',
-            'purchase_date' => '2025-11-20',
-            'purchase_cost' => 12500.00,
-            'condition' => 'good',
-            'status' => 'allocated',
-            'assigned_employee_id' => $employeeHR->id,
-            'allocated_at' => '2025-11-25',
-            'notes' => 'Office desk chair.',
-        ]);
-
-        Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'asset_item_id' => $itemFireSuit->id,
-            'asset_code' => 'AST-SAF-009',
-            'name' => 'Nomex Thermal Resistant Fireproof Suit',
-            'brand' => 'DuPont Nomex',
-            'model_number' => 'NX-FR-400',
-            'serial_number' => 'SUIT-2026-091',
-            'purchase_date' => '2026-03-15',
-            'purchase_cost' => 28000.00,
-            'condition' => 'new',
-            'status' => 'available',
-            'notes' => 'Safety gear in warehouse bay B.',
-        ]);
-
-        Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatPeripherals->id,
-            'asset_item_id' => $itemHeadset->id,
-            'asset_code' => 'AST-AUD-010',
-            'name' => 'Jabra Evolve2 65 Headset',
-            'brand' => 'Jabra',
-            'model_number' => 'EV2-65-MS',
-            'serial_number' => 'JB-8829103',
-            'purchase_date' => '2026-06-10',
-            'purchase_cost' => 16000.00,
-            'condition' => 'new',
-            'status' => 'available',
-            'notes' => 'Call center wireless headset.',
-        ]);
-
-        $assetToolKit = Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'asset_item_id' => $itemToolKit->id,
-            'asset_code' => 'AST-TLK-011',
-            'name' => 'Stanley 110-Piece Mechanical Tool Kit',
-            'brand' => 'Stanley',
-            'model_number' => 'STMT73795',
-            'serial_number' => 'ST-TK-110-88',
-            'purchase_date' => '2026-01-10',
-            'purchase_cost' => 9500.00,
-            'condition' => 'good',
-            'status' => 'allocated',
-            'assigned_employee_id' => $employeeOperator->id,
-            'allocated_at' => '2026-01-12',
-            'notes' => 'Maintenance toolset.',
-        ]);
-
-        Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemTablet->id,
-            'asset_code' => 'AST-TAB-012',
-            'name' => 'Apple iPad Air 10.9-inch',
-            'brand' => 'Apple',
-            'model_number' => 'IPAD-AIR-5',
-            'serial_number' => 'DMPZ9810293',
-            'purchase_date' => '2026-04-20',
-            'purchase_cost' => 54000.00,
-            'condition' => 'new',
-            'status' => 'available',
-            'notes' => 'Quality audit tablet.',
-        ]);
-
-        $assetDellLaptop2 = Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemDellLaptop->id,
-            'asset_code' => 'AST-LAP-013',
-            'name' => 'Dell Latitude 5440 (Unit 2)',
-            'brand' => 'Dell',
-            'model_number' => 'LAT-5440-B',
-            'serial_number' => 'D-991122B',
-            'purchase_date' => '2026-03-01',
-            'purchase_cost' => 65000.00,
-            'condition' => 'good',
-            'status' => 'allocated',
-            'assigned_employee_id' => $employeeLead->id,
-            'allocated_at' => '2026-03-05',
-            'notes' => 'Assigned for shop floor reporting.',
-        ]);
-
-        $assetDellMonitor2 = Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemDellMonitor->id,
-            'asset_code' => 'AST-MON-014',
-            'name' => 'Dell P2422H 24-inch Monitor (Unit 2)',
-            'brand' => 'Dell',
-            'model_number' => 'P2422H',
-            'serial_number' => 'CN-048291-72910-115',
-            'purchase_date' => '2026-04-10',
-            'purchase_cost' => 14500.00,
-            'condition' => 'good',
-            'status' => 'allocated',
-            'assigned_employee_id' => $employeeLead->id,
-            'allocated_at' => '2026-04-15',
-            'notes' => 'Secondary monitor assigned.',
-        ]);
-
-        Asset::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'asset_item_id' => $itemWeldingMask->id,
-            'asset_code' => 'AST-SAF-015',
-            'name' => 'Auto-Darkening Welding Helmet (Unit 2)',
-            'brand' => '3M Speedglas',
-            'model_number' => 'SG9100',
-            'serial_number' => 'WM-90812-C',
-            'purchase_date' => '2026-02-05',
-            'purchase_cost' => 15000.00,
-            'condition' => 'new',
-            'status' => 'available',
-            'notes' => 'Backup welding helmet.',
-        ]);
-
-        // Seed Asset Allocations
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetLaptop->id,
-            'employee_id' => $employeeHR->id,
-            'allocated_at' => '2025-05-15',
-            'allocation_condition' => 'good',
-            'notes' => 'Assigned for HR administration use.',
-        ]);
-
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetWeldingMask->id,
-            'employee_id' => $employeeOperator->id,
-            'allocated_at' => '2026-02-10',
-            'allocation_condition' => 'new',
-            'notes' => 'Assigned welder mask.',
-        ]);
-
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetHPElite->id,
-            'employee_id' => $employeeLead->id,
-            'allocated_at' => '2026-01-20',
-            'allocation_condition' => 'good',
-            'notes' => 'Assigned to production lead.',
-        ]);
-
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetMobile->id,
-            'employee_id' => $employeeOperator->id,
-            'allocated_at' => '2026-05-05',
-            'allocation_condition' => 'good',
-            'notes' => 'Shift manager communication phone.',
-        ]);
-
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetChair->id,
-            'employee_id' => $employeeHR->id,
-            'allocated_at' => '2025-11-25',
-            'allocation_condition' => 'good',
-            'notes' => 'Office desk chair.',
-        ]);
-
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetToolKit->id,
-            'employee_id' => $employeeOperator->id,
-            'allocated_at' => '2026-01-12',
-            'allocation_condition' => 'good',
-            'notes' => 'Maintenance toolset.',
-        ]);
-
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetDellLaptop2->id,
-            'employee_id' => $employeeLead->id,
-            'allocated_at' => '2026-03-05',
-            'allocation_condition' => 'good',
-            'notes' => 'Assigned for shop floor reporting.',
-        ]);
-
-        AssetAllocation::create([
-            'tenant_id' => $tenant->id,
-            'asset_id' => $assetDellMonitor2->id,
-            'employee_id' => $employeeLead->id,
-            'allocated_at' => '2026-04-15',
-            'allocation_condition' => 'good',
-            'notes' => 'Secondary monitor assigned.',
-        ]);
-
-
-        // Seed 14 Asset Requests (for testing search, pagination, sort, filter, and line breaking)
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeOperator->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemDellLaptop->id,
-            'quantity' => 1,
-            'reason' => 'Need a computing device to access shift logs, training portals, and payroll slips.',
-            'request_date' => '2026-07-08',
-            'status' => 'pending',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Pending approval from department head Rajesh Sharma.',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeLead->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemMobileHandset->id,
-            'quantity' => 1,
-            'reason' => 'Supervisor mobile phone for coordination of shop floor issues.',
-            'request_date' => '2026-07-01',
-            'status' => 'approved',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Request approved. Procurement is preparing a standard factory mobile handset.',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeOperator->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'asset_item_id' => $itemWeldingMask->id,
-            'quantity' => 1,
-            'reason' => 'Replacement request for scratched visor welding helmet on assembly line 3.',
-            'request_date' => '2026-06-15',
-            'status' => 'allocated',
-            'allocated_asset_id' => $assetWeldingMask->id,
-            'admin_notes' => 'Allocated: AST-SAF-002 on 16 Jun, 2026',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeLead->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemDellMonitor->id,
-            'quantity' => 2,
-            'reason' => 'Dual monitor setup for multi-screen CAD drawings and production schedule monitoring.',
-            'request_date' => '2026-06-20',
-            'status' => 'partially_allocated',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Allocated: AST-MON-014 on 22 Jun, 2026 | Waiting for stock for second monitor unit.',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeHR->id,
-            'asset_category_id' => $assetCatPeripherals->id,
-            'asset_item_id' => $itemErgonomicChair->id,
-            'quantity' => 1,
-            'reason' => 'Requesting an ergonomic lumbar support chair for long hours at administrative desk to address posture guidelines.',
-            'request_date' => '2026-05-12',
-            'status' => 'allocated',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Allocated: AST-CHR-008 on 15 May, 2026',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeOperator->id,
-            'asset_category_id' => $assetCatPeripherals->id,
-            'asset_item_id' => $itemHeadset->id,
-            'quantity' => 1,
-            'reason' => 'Noise-canceling wireless headset needed for virtual shift handover briefings with remote engineering lead.',
-            'request_date' => '2026-07-12',
-            'status' => 'pending',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Reviewing stock availability in central warehouse.',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeLead->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'asset_item_id' => $itemFireSuit->id,
-            'quantity' => 1,
-            'reason' => 'Thermal resistant protective suit for upcoming furnace area inspection and quality certification audit.',
-            'request_date' => '2026-06-05',
-            'status' => 'rejected',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Rejected: Inspection suits are provided on a temporary sign-out basis from the safety locker room. Permanent individual allocation is not permitted.',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeOperator->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemTablet->id,
-            'quantity' => 1,
-            'reason' => 'Requesting a tablet for digital quality assurance checklists on assembly line B.',
-            'request_date' => '2026-07-14',
-            'status' => 'pending',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Pending IT security provisioning.',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeHR->id,
-            'asset_category_id' => $assetCatPeripherals->id,
-            'asset_item_id' => $itemDockingStation->id,
-            'quantity' => 1,
-            'reason' => 'Thunderbolt 4 docking station for seamless dual-screen hot desking between HR office and interview rooms.',
-            'request_date' => '2026-07-10',
-            'status' => 'approved',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Approved by IT Asset Manager.',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeLead->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'asset_item_id' => $itemToolKit->id,
-            'quantity' => 1,
-            'reason' => 'Requesting a 110-piece master maintenance tool kit for machine line calibration tasks.',
-            'request_date' => '2026-05-20',
-            'status' => 'allocated',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Allocated: AST-TLK-011 on 22 May, 2026',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeOperator->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemHPElite->id,
-            'quantity' => 1,
-            'reason' => 'Ultra-long text test: Requesting a high-performance workstation laptop with discrete GPU capabilities, dual external monitor docking adapter, high-durability carrying case, and noise-canceling headset for remote project coordination and CAD modeling tasks across multiple plant sites.',
-            'request_date' => '2026-07-15',
-            'status' => 'pending',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Evaluating GPU requirement justification with engineering department head.',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeHR->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemMacBook->id,
-            'quantity' => 1,
-            'reason' => 'Upgrade request to latest M3 workstation for video production and employee onboarding media rendering.',
-            'request_date' => '2026-04-10',
-            'status' => 'allocated',
-            'allocated_asset_id' => $assetLaptop->id,
-            'admin_notes' => 'Allocated: AST-LAP-001 on 15 Apr, 2026',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeOperator->id,
-            'asset_category_id' => $assetCatSafety->id,
-            'asset_item_id' => $itemFireSuit->id,
-            'quantity' => 2,
-            'reason' => 'Need 2 sets of Nomex flame retardant suits for new furnace line team members.',
-            'request_date' => '2026-07-18',
-            'status' => 'pending',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Waiting for size confirmation from safety officer.',
-        ]);
-
-        AssetRequest::create([
-            'tenant_id' => $tenant->id,
-            'company_id' => $company->id,
-            'employee_id' => $employeeLead->id,
-            'asset_category_id' => $assetCatElectronics->id,
-            'asset_item_id' => $itemDellLaptop->id,
-            'quantity' => 1,
-            'reason' => 'Backup laptop request for shop floor supervisor station during maintenance overhaul week.',
-            'request_date' => '2026-06-28',
-            'status' => 'rejected',
-            'allocated_asset_id' => null,
-            'admin_notes' => 'Rejected: Existing unit AST-LAP-013 is fully functional and covers supervisor duties.',
-        ]);
-
-
-        // 14. Morphable Documents (12 Seeded Employee Documents)
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Aadhaar Card Copy',
-            'description' => 'Govt verification ID document for identity verification.',
-            'file_name' => 'aadhaar_amit_patel.pdf',
-            'file_path' => 'uploads/documents/employees/aadhaar_amit_patel.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 124500,
-            'status' => 'approved',
-            'has_expiry' => false,
-            'expiry_date' => null,
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeHR->id,
-            'name' => 'MBA Degree Certificate',
-            'description' => 'Educational credential check from university.',
-            'file_name' => 'mba_degree_sophia.pdf',
-            'file_path' => 'uploads/documents/employees/mba_degree_sophia.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 458000,
-            'status' => 'approved',
-            'has_expiry' => false,
-            'expiry_date' => null,
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeHR->id,
-            'name' => 'Passport Copy (Front & Back)',
-            'description' => 'Government issued passport document for international identity validation.',
-            'file_name' => 'passport_sophia.pdf',
-            'file_path' => 'uploads/documents/employees/passport_sophia.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 285000,
-            'status' => 'approved',
-            'has_expiry' => true,
-            'expiry_date' => '2030-10-15',
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeLead->id,
-            'name' => 'Aadhaar Card Copy',
-            'description' => 'Govt issued resident card for regional address and identity check.',
-            'file_name' => 'aadhaar_rajesh.pdf',
-            'file_path' => 'uploads/documents/employees/aadhaar_rajesh.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 195000,
-            'status' => 'approved',
-            'has_expiry' => false,
-            'expiry_date' => null,
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeLead->id,
-            'name' => 'B.Tech Mechanical Degree Certificate',
-            'description' => 'Official engineering qualification certificate from technical university.',
-            'file_name' => 'btech_mechanical_rajesh.pdf',
-            'file_path' => 'uploads/documents/employees/btech_mechanical_rajesh.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 380000,
-            'status' => 'approved',
-            'has_expiry' => false,
-            'expiry_date' => null,
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Passport Copy (Front & Back)',
-            'description' => 'International travel and identity verification passport pages.',
-            'file_name' => 'passport_amit_patel.pdf',
-            'file_path' => 'uploads/documents/employees/passport_amit_patel.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 312000,
-            'status' => 'approved',
-            'has_expiry' => true,
-            'expiry_date' => '2028-12-31',
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Heavy Equipment Commercial Driving License (Grade A Industrial Forklift Operator)',
-            'description' => 'Mandatory industrial forklift & heavy transport vehicle driving permit.',
-            'file_name' => 'dl_amit_patel.pdf',
-            'file_path' => 'uploads/documents/employees/dl_amit_patel.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 205000,
-            'status' => 'approved',
-            'has_expiry' => true,
-            'expiry_date' => '2026-09-15',
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Relieving & Experience Certificate from Previous Employer',
-            'description' => 'Service verification and conduct clearance letter from previous industrial employer.',
-            'file_name' => 'relieving_letter_previous.pdf',
-            'file_path' => 'uploads/documents/employees/relieving_letter_previous.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 512000,
-            'status' => 'approved',
-            'has_expiry' => false,
-            'expiry_date' => null,
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'PAN Card Scan Copy',
-            'description' => 'Permanent Account Number tax verification document.',
-            'file_name' => 'pan_amit_patel.pdf',
-            'file_path' => 'uploads/documents/employees/pan_amit_patel.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 180000,
-            'status' => 'approved',
-            'has_expiry' => false,
-            'expiry_date' => null,
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Annual Tax Exemption Declaration Form 12BB with Supporting HRA Rent Receipts and Investment Certificates',
-            'description' => 'Annual tax proof submission detailing home rent allowance receipts, LIC insurance policies, and PPF deposits.',
-            'file_name' => 'form12bb_tax_declaration_2026.pdf',
-            'file_path' => 'uploads/documents/employees/form12bb_tax_declaration_2026.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 845000,
-            'status' => 'requested',
-            'has_expiry' => true,
-            'expiry_date' => '2027-03-31',
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Medical Fitness & Pre-Employment Health Checkup Certificate',
-            'description' => 'Certified medical officer clearance for shop floor industrial operations.',
-            'file_name' => 'medical_fitness_amit.pdf',
-            'file_path' => 'uploads/documents/employees/medical_fitness_amit.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 290000,
-            'status' => 'approved',
-            'has_expiry' => true,
-            'expiry_date' => '2027-01-10',
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Bank Account Details & Cancelled Cheque Leaf Copy',
-            'description' => 'Salary credit bank account proof for monthly payroll processing.',
-            'file_name' => 'cancelled_cheque_hdfc.pdf',
-            'file_path' => 'uploads/documents/employees/cancelled_cheque_hdfc.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 195000,
-            'status' => 'approved',
-            'has_expiry' => false,
-            'expiry_date' => null,
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Signed Non-Disclosure Agreement (NDA) & Code of Conduct Acknowledgement',
-            'description' => 'Legal agreement covering proprietary manufacturing designs and plant safety regulations.',
-            'file_name' => 'signed_nda_amit.pdf',
-            'file_path' => 'uploads/documents/employees/signed_nda_amit.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 410000,
-            'status' => 'approved',
-            'has_expiry' => false,
-            'expiry_date' => null,
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Industrial Safety Training & First Aid Certification Card',
-            'description' => 'Plant safety protocol and emergency response training completion certificate.',
-            'file_name' => 'safety_cert_amit.pdf',
-            'file_path' => 'uploads/documents/employees/safety_cert_amit.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 330000,
-            'status' => 'requested',
-            'has_expiry' => true,
-            'expiry_date' => '2026-08-30',
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        Document::create([
-            'tenant_id' => $tenant->id,
-            'documentable_type' => Employee::class,
-            'documentable_id' => $employeeOperator->id,
-            'name' => 'Educational Higher Secondary School Leaving Certificate (10+2 Standard Marksheet)',
-            'description' => 'Secondary education completion marksheet for HR verification records.',
-            'file_name' => 'hsc_marksheet_amit.pdf',
-            'file_path' => 'uploads/documents/employees/hsc_marksheet_amit.pdf',
-            'file_type' => 'application/pdf',
-            'file_size' => 275000,
-            'status' => 'approved',
-            'has_expiry' => false,
-            'expiry_date' => null,
-            'requested_by_id' => $adminUser->id,
-        ]);
-
-        // Seed new HRMS-related tables: WfhRequest, ShiftChangeRequest, OvertimeRequest
-        $seederEmployees = Employee::all();
-        
-        $requestedShift1 = ProductionShift::where('code', 'SHIFT-AM')->first() ?? $productionShift ?? ProductionShift::first();
-        $requestedShift2 = ProductionShift::where('code', 'SHIFT-PM')->first() ?? $productionShift ?? ProductionShift::first();
-
-        foreach ($seederEmployees as $emp) {
-            // Find another employee to act as the manager/approver (so they don't self-approve)
-            $approver = $seederEmployees->where('id', '!=', $emp->id)->first() ?? $emp;
-
-            // 1. Seed 2 WFH Requests for every employee
-            WfhRequest::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $emp->id,
-                'start_date' => now()->addDays(2)->format('Y-m-d'),
-                'end_date' => now()->addDays(4)->format('Y-m-d'),
-                'duration' => 3.0,
-                'start_date_type' => 'full_day',
-                'end_date_type' => 'full_day',
-                'reason' => 'Quarterly remote work arrangement.',
-                'status' => 'approved',
-                'approved_by' => $approver->id,
-            ]);
-
-            WfhRequest::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $emp->id,
-                'start_date' => now()->addDays(12)->format('Y-m-d'),
-                'end_date' => now()->addDays(12)->format('Y-m-d'),
-                'duration' => 1.0,
-                'start_date_type' => 'full_day',
-                'end_date_type' => 'full_day',
-                'reason' => 'Broadband upgrade and maintenance.',
-                'status' => 'pending',
-            ]);
-
-            // 2. Seed 2 Shift Change Requests for every employee
-            ShiftChangeRequest::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $emp->id,
-                'type' => 'recurring',
-                'start_date' => now()->addDays(1)->format('Y-m-d'),
-                'end_date' => now()->addDays(10)->format('Y-m-d'),
-                'recurring_days' => ['Monday', 'Wednesday', 'Friday'],
-                'current_shift_id' => $emp->shift_id ?? ($productionShift->id ?? null),
-                'requested_shift_id' => $requestedShift1->id ?? null,
-                'reason' => 'Family commitments require morning timings.',
-                'status' => 'pending',
-            ]);
-
-            ShiftChangeRequest::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $emp->id,
-                'type' => 'temporary',
-                'start_date' => now()->addDays(15)->format('Y-m-d'),
-                'end_date' => now()->addDays(15)->format('Y-m-d'),
-                'current_shift_id' => $emp->shift_id ?? ($productionShift->id ?? null),
-                'requested_shift_id' => $requestedShift2->id ?? null,
-                'reason' => 'Doctor appointment shift swap.',
-                'status' => 'approved',
-                'approved_by' => $approver->id,
-            ]);
-
-            // 3. Seed 2 Overtime Requests for every employee
-            OvertimeRequest::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $emp->id,
-                'date' => now()->subDays(2)->format('Y-m-d'),
-                'start_time' => '18:00:00',
-                'end_time' => '21:00:00',
-                'duration_hours' => 3.00,
-                'approved_duration_hours' => 3.00,
-                'compensation_type' => 'pay',
-                'reason' => 'Extra support for monthly inventory count.',
-                'status' => 'approved',
-                'approved_by' => $approver->id,
-            ]);
-
-            OvertimeRequest::create([
-                'tenant_id' => $tenant->id,
-                'company_id' => $company->id,
-                'employee_id' => $emp->id,
-                'date' => now()->subDays(5)->format('Y-m-d'),
-                'start_time' => '18:00:00',
-                'end_time' => '20:00:00',
-                'duration_hours' => 2.00,
-                'approved_duration_hours' => 0.00,
-                'compensation_type' => 'pay',
-                'reason' => 'Unscheduled troubleshooting assistance.',
-                'status' => 'rejected',
-                'rejection_reason' => 'Not pre-approved by shift lead.',
-            ]);
-        }
-
-        // 4. Seed Default Attendance Rule for the Company
+        // 6. Penalization Policy (Attendance Rules)
         AttendanceRule::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
-            'office_biometric' => false,
             'office_web' => true,
-            'office_geofence' => true,
-            'office_latitude' => '28.61390000',
-            'office_longitude' => '77.20900000',
-            'office_radius' => 200,
-            'office_tracking' => true,
-            'office_tracking_minutes' => 15,
-            'wfh_location' => true,
-            'wfh_selfie' => true,
-            'wfh_geofence' => true,
-            'wfh_tracking' => true,
-            'wfh_tracking_meters' => 150,
-            'wfh_tracking_minutes' => 15,
-            'site_location' => true,
-            'site_selfie' => true,
-            'site_geofence' => false,
-            'site_tracking' => true,
-            'site_tracking_meters' => 100,
-            'site_tracking_minutes' => 15,
-            'status' => true,
+            'status' => true
         ]);
 
-        // 5. Seed Attendance Logs, Breaks, and Location Tracking Logs for the last 10 days
-        $today = \Carbon\Carbon::now();
-        for ($dayOffset = 9; $dayOffset >= 0; $dayOffset--) {
-            $date = (clone $today)->subDays($dayOffset);
-            
-            // Skip weekends for a more realistic dataset
-            if ($date->isWeekend()) {
-                continue;
+        // 7. Asset Management: 2 Categories & Items
+        $catIt = AssetCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'IT Hardware',
+            'description' => 'Laptops, monitors, accessories'
+        ]);
+
+        $catFurniture = AssetCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Office Furniture',
+            'description' => 'Chairs, desks, cabinets'
+        ]);
+
+        // Create AssetItems (parent category item definitions)
+        $itemLaptop = AssetItem::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $catIt->id,
+            'name' => 'MacBook Pro 16"',
+            'description' => 'MacBook Pro Laptops'
+        ]);
+
+        $itemMonitor = AssetItem::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $catIt->id,
+            'name' => 'Dell 27" 4K Monitor',
+            'description' => '4K Monitors'
+        ]);
+
+        $itemChair = AssetItem::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $catFurniture->id,
+            'name' => 'Ergonomic Office Chair',
+            'description' => 'Ergonomic Office Chairs'
+        ]);
+
+        // Create Assets (physical serialized instances)
+        $assetLaptop1 = Asset::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $catIt->id,
+            'asset_item_id' => $itemLaptop->id,
+            'name' => 'MacBook Pro 16"',
+            'asset_code' => 'MBP-001',
+            'serial_number' => 'SN-MBP-001',
+            'status' => 'available'
+        ]);
+
+        $assetLaptop2 = Asset::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $catIt->id,
+            'asset_item_id' => $itemLaptop->id,
+            'name' => 'MacBook Pro 16"',
+            'asset_code' => 'MBP-002',
+            'serial_number' => 'SN-MBP-002',
+            'status' => 'available'
+        ]);
+
+        $assetMonitor1 = Asset::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $catIt->id,
+            'asset_item_id' => $itemMonitor->id,
+            'name' => 'Dell 27" 4K Monitor',
+            'asset_code' => 'MON-001',
+            'serial_number' => 'SN-DEL-001',
+            'status' => 'available'
+        ]);
+
+        $assetChair1 = Asset::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $catFurniture->id,
+            'asset_item_id' => $itemChair->id,
+            'name' => 'Ergonomic Office Chair',
+            'asset_code' => 'CHR-001',
+            'serial_number' => 'SN-CHR-001',
+            'status' => 'available'
+        ]);
+
+        // 8. Document Master: 2 Categories & Documents
+        $docCatId = DocumentCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Identity Proofs',
+            'description' => 'Government issued identity cards'
+        ]);
+
+        $docCatAcad = DocumentCategory::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Academic Credentials',
+            'description' => 'Degrees and certificates'
+        ]);
+
+        $masterPassport = DocumentMaster::create([
+            'tenant_id' => $tenant->id,
+            'document_category_id' => $docCatId->id,
+            'name' => 'Passport',
+            'code' => 'PASSPORT',
+            'is_required' => true,
+            'status' => 'active'
+        ]);
+
+        $masterAadhaar = DocumentMaster::create([
+            'tenant_id' => $tenant->id,
+            'document_category_id' => $docCatId->id,
+            'name' => 'Aadhaar Card',
+            'code' => 'AADHAAR',
+            'is_required' => true,
+            'status' => 'active'
+        ]);
+
+        $masterHighSchool = DocumentMaster::create([
+            'tenant_id' => $tenant->id,
+            'document_category_id' => $docCatAcad->id,
+            'name' => 'High School Certificate',
+            'code' => 'HIGHSCHOOL',
+            'is_required' => false,
+            'status' => 'active'
+        ]);
+
+        $masterGraduation = DocumentMaster::create([
+            'tenant_id' => $tenant->id,
+            'document_category_id' => $docCatAcad->id,
+            'name' => 'Graduation Degree',
+            'code' => 'GRADUATION',
+            'is_required' => true,
+            'status' => 'active'
+        ]);
+
+        // 9. Valid Holidays
+        \App\Domains\HRMS\Models\HolidayCalendar::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'New Year Day',
+            'holiday_date' => '2026-01-01',
+            'status' => true
+        ]);
+        \App\Domains\HRMS\Models\HolidayCalendar::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Independence Day',
+            'holiday_date' => '2026-08-15',
+            'status' => true
+        ]);
+        \App\Domains\HRMS\Models\HolidayCalendar::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Christmas Day',
+            'holiday_date' => '2026-12-25',
+            'status' => true
+        ]);
+
+        // 10. Valid Expense Policies
+        $expCatTravel = \App\Domains\HRMS\Models\ExpenseCategory::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Travel',
+            'code' => 'TRAVEL',
+            'status' => true
+        ]);
+
+        $expCatMeals = \App\Domains\HRMS\Models\ExpenseCategory::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Meals',
+            'code' => 'MEALS',
+            'status' => true
+        ]);
+
+        $expPolicy = \App\Domains\HRMS\Models\ExpensePolicy::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'name' => 'Standard Corporate Expense Policy',
+            'description' => 'Standard corporate limits',
+            'status' => true
+        ]);
+
+        \App\Domains\HRMS\Models\ExpensePolicyRule::create([
+            'expense_policy_id' => $expPolicy->id,
+            'expense_category_id' => $expCatTravel->id,
+            'max_monthly_limit' => 15000,
+            'receipt_required' => true
+        ]);
+
+        \App\Domains\HRMS\Models\ExpensePolicyRule::create([
+            'expense_policy_id' => $expPolicy->id,
+            'expense_category_id' => $expCatMeals->id,
+            'max_daily_limit' => 1000,
+            'receipt_required' => false
+        ]);
+
+        // 11. Create 5 Employees including Admin User with Realistic Names
+        $empNames = [
+            ['first' => 'Admin', 'last' => 'User', 'email' => 'admin@demo.com', 'desig' => $desigTl->id, 'dept' => $deptEng->id, 'structure' => $structure2->id, 'gender' => 'Male', 'is_admin' => true],
+            ['first' => 'Rahul', 'last' => 'Sharma', 'email' => 'rahul@warrg.com', 'desig' => $desigSe->id, 'dept' => $deptEng->id, 'structure' => $structure1->id, 'gender' => 'Male', 'is_admin' => false],
+            ['first' => 'Priya', 'last' => 'Nair', 'email' => 'priya@warrg.com', 'desig' => $desigTl->id, 'dept' => $deptEng->id, 'structure' => $structure2->id, 'gender' => 'Female', 'is_admin' => false],
+            ['first' => 'Amit', 'last' => 'Patel', 'email' => 'amit@warrg.com', 'desig' => $desigHra->id, 'dept' => $deptHr->id, 'structure' => $structure1->id, 'gender' => 'Male', 'is_admin' => false],
+            ['first' => 'Sneha', 'last' => 'Rao', 'email' => 'sneha@warrg.com', 'desig' => $desigHrm->id, 'dept' => $deptHr->id, 'structure' => $structure2->id, 'gender' => 'Female', 'is_admin' => false],
+        ];
+
+        $employeesList = [];
+        foreach ($empNames as $index => $item) {
+            if ($item['is_admin']) {
+                $empUser = $user;
+            } else {
+                $empUser = User::where('tenant_id', $tenant->id)->where('email', $item['email'])->first() ?? User::create([
+                    'name' => $item['first'] . ' ' . $item['last'],
+                    'email' => $item['email'],
+                    'password' => bcrypt('password'),
+                    'tenant_id' => $tenant->id
+                ]);
             }
+
+            $isExec = ($item['structure'] == $structure2->id);
+            $planId = $isExec ? $leavePlanExecutive->id : $leavePlanStandard->id;
+            $clId = $isExec ? $ltCasualExecutive->id : $ltCasualStandard->id;
+            $slId = $isExec ? $ltSickExecutive->id : $ltSickStandard->id;
+            $clQuota = $isExec ? 15 : 12;
+            $slQuota = $isExec ? 15 : 12;
+
+            $emp = Employee::create([
+                'tenant_id' => $tenant->id,
+                'user_id' => $empUser->id,
+                'employee_id' => 'WRG-' . str_pad($index, 3, '0', STR_PAD_LEFT),
+                'full_name' => $item['first'] . ' ' . $item['last'],
+                'personal_email' => $item['email'],
+                'company_id' => $company->id,
+                'business_unit_id' => $bu->id,
+                'branch_id' => $branch->id,
+                'department_id' => $item['dept'],
+                'designation_id' => $item['desig'],
+                'pay_group_id' => $item['structure'] == $structure1->id ? $payGroup1->id : $payGroup2->id,
+                'salary_structure_id' => $item['structure'],
+                'leave_plan_id' => $planId,
+                'current_salary' => $item['structure'] == $structure1->id ? 40000 : 80000,
+                'date_of_joining' => '2026-08-01',
+                'weekly_pattern' => [0 => 'off', 1 => $shiftDay->id, 2 => $shiftDay->id, 3 => $shiftDay->id, 4 => $shiftDay->id, 5 => $shiftDay->id, 6 => 'off'], // Sat & Sun off
+                'gender' => $item['gender'],
+                'status' => true
+            ]);
+            $employeesList[] = $emp;
+
+            // Setup initial leave balances
+            LeaveBalance::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'employee_id' => $emp->id,
+                'leave_type_id' => $clId,
+                'allocated' => $clQuota,
+                'used' => 0,
+                'encashed' => 0
+            ]);
+            LeaveBalance::create([
+                'tenant_id' => $tenant->id,
+                'company_id' => $company->id,
+                'employee_id' => $emp->id,
+                'leave_type_id' => $slId,
+                'allocated' => $slQuota,
+                'used' => 0,
+                'encashed' => 0
+            ]);
+        }
+
+        // 12. Feed Data in Document according to the Master
+        foreach ($employeesList as $emp) {
+            Document::create([
+                'tenant_id' => $tenant->id,
+                'documentable_id' => $emp->id,
+                'documentable_type' => Employee::class,
+                'document_master_id' => $masterPassport->id,
+                'name' => 'Passport',
+                'file_name' => 'passport.pdf',
+                'file_path' => 'demo/passport.pdf',
+                'status' => 'approved'
+            ]);
+            Document::create([
+                'tenant_id' => $tenant->id,
+                'documentable_id' => $emp->id,
+                'documentable_type' => Employee::class,
+                'document_master_id' => $masterAadhaar->id,
+                'name' => 'Aadhaar Card',
+                'file_name' => 'aadhaar.pdf',
+                'file_path' => 'demo/aadhaar.pdf',
+                'status' => 'approved'
+            ]);
+        }
+
+        // 13. Feed Data in Asset: Allocations and Requests
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetLaptop1->id,
+            'employee_id' => $employeesList[1]->id, // Rahul
+            'allocated_at' => '2026-08-02',
+            'allocation_condition' => 'good'
+        ]);
+        $assetLaptop1->update(['status' => 'allocated', 'assigned_employee_id' => $employeesList[1]->id]);
+
+        AssetAllocation::create([
+            'tenant_id' => $tenant->id,
+            'asset_id' => $assetMonitor1->id,
+            'employee_id' => $employeesList[2]->id, // Priya
+            'allocated_at' => '2026-08-02',
+            'allocation_condition' => 'good'
+        ]);
+        $assetMonitor1->update(['status' => 'allocated', 'assigned_employee_id' => $employeesList[2]->id]);
+
+        // Asset Request from Amit
+        AssetRequest::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeesList[3]->id,
+            'asset_category_id' => $catFurniture->id,
+            'asset_item_id' => $itemChair->id,
+            'quantity' => 1,
+            'reason' => 'Need ergonomic chair for home office setup',
+            'status' => 'approved',
+            'request_date' => '2026-08-05'
+        ]);
+
+        // 14. Feed WFH, Leave, Overtime, Travel & Expense
+        // Rahul WFH on Aug 10-11
+        WfhRequest::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeesList[1]->id,
+            'start_date' => '2026-08-10',
+            'end_date' => '2026-08-11',
+            'duration' => 2,
+            'reason' => 'Broadband installation at home',
+            'status' => 'approved'
+        ]);
+
+        // Amit Leave on Aug 18-19
+        LeaveRequest::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeesList[3]->id,
+            'leave_type_id' => $ltCasualStandard->id,
+            'start_date' => '2026-08-18',
+            'end_date' => '2026-08-19',
+            'duration' => 2,
+            'reason' => 'Family event',
+            'status' => 'approved'
+        ]);
+        $bal = LeaveBalance::where('employee_id', $employeesList[3]->id)->where('leave_type_id', $ltCasualStandard->id)->first();
+        $bal->update([
+            'used' => 2
+        ]);
+
+        // Rahul Overtime on Aug 15 (Holiday!)
+        OvertimeRequest::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeesList[1]->id,
+            'date' => '2026-08-15',
+            'start_time' => '09:00:00',
+            'end_time' => '13:00:00',
+            'duration_hours' => 4,
+            'compensation_type' => 'pay',
+            'reason' => 'Server maintenance deployment support',
+            'status' => 'approved'
+        ]);
+
+        // Travel & Expense: Priya
+        \App\Domains\HRMS\Models\TravelRequest::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employeesList[2]->id,
+            'purpose' => 'Quarterly branch audit',
+            'destination' => 'Branch Office',
+            'start_date' => '2026-08-12',
+            'end_date' => '2026-08-13',
+            'estimated_budget' => 5000,
+            'status' => 'approved'
+        ]);
+
+        $expReport = \App\Domains\HRMS\Models\ExpenseReport::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employeesList[2]->id,
+            'title' => 'Branch Audit Travel Expenses',
+            'status' => 'approved'
+        ]);
+
+        \App\Domains\HRMS\Models\ExpenseClaim::create([
+            'expense_report_id' => $expReport->id,
+            'expense_category_id' => $expCatTravel->id,
+            'expense_date' => '2026-08-14',
+            'amount' => 4200,
+            'receipt_path' => 'demo/receipt_travel.pdf',
+            'description' => 'Travel flight tickets'
+        ]);
+
+        // 15. Shift Rosters: Scheduled day shift for Aug 1 to Sep 30
+        $current = \Carbon\Carbon::parse('2026-08-01');
+        $end = \Carbon\Carbon::parse('2026-09-30');
+        while ($current->lte($end)) {
+            foreach ($employeesList as $emp) {
+                ShiftRoster::create([
+                    'tenant_id' => $tenant->id,
+                    'employee_id' => $emp->id,
+                    'shift_id' => $shiftDay->id,
+                    'date' => $current->format('Y-m-d'),
+                    'status' => 'scheduled'
+                ]);
+            }
+            $current->addDay();
+        }
+
+        // 16. Feed Attendance Logs
+        $current = \Carbon\Carbon::parse('2026-08-01');
+        $attEnd = \Carbon\Carbon::parse('2026-08-29');
+        while ($current->lte($attEnd)) {
+            $dateStr = $current->format('Y-m-d');
+            $dayOfWeek = $current->dayOfWeek;
             
-            foreach ($seederEmployees as $emp) {
-                // Determine check-in and check-out times based on shift or defaults
-                $checkin = (clone $date)->setTime(9, rand(0, 20), rand(0, 59));
-                $checkout = (clone $date)->setTime(18, rand(0, 15), rand(0, 59));
+            $isWeekend = ($dayOfWeek === 0 || $dayOfWeek === 6);
+            $isHoliday = ($dateStr === '2026-08-15');
+            
+            foreach ($employeesList as $emp) {
+                $onLeave = ($emp->id === $employeesList[3]->id && ($dateStr === '2026-08-18' || $dateStr === '2026-08-19'));
                 
-                // Location type matches the employee's work mode
-                $locationType = $emp->office ?: 'office';
+                if ($isWeekend || $isHoliday || $onLeave) {
+                    continue;
+                }
                 
-                // Let's vary the status (some present, some late)
+                $locType = 'office';
+                $checkIn = '08:55:00';
+                $checkOut = '18:05:00';
                 $status = 'present';
-                if ($checkin->format('H:i:s') > '09:15:00') {
+                
+                // Rahul WFH
+                if ($emp->id === $employeesList[1]->id && ($dateStr === '2026-08-10' || $dateStr === '2026-08-11')) {
+                    $locType = 'wfh';
+                }
+                
+                // Absent on Aug 25
+                if ($dateStr === '2026-08-25') {
+                    continue;
+                }
+                
+                // Late on Aug 12
+                if ($dateStr === '2026-08-12') {
+                    $checkIn = '09:25:00';
                     $status = 'late';
                 }
                 
-                // Calculate hours
-                $workHours = 8.5 + (rand(-30, 30) / 60.0);
-                
-                // Set coordinates near the designated WFH/office geofence
-                $lat = null;
-                $lng = null;
-                if ($locationType === 'office') {
-                    // Near New Delhi Connaught Place (Office coordinates 28.6139, 77.2090)
-                    $lat = 28.6139 + (rand(-50, 50) / 100000.0);
-                    $lng = 77.2090 + (rand(-50, 50) / 100000.0);
-                } elseif ($locationType === 'wfh') {
-                    // Near employee's WFH coordinates (default to 28.6200, 77.2200 if not configured)
-                    $baseLat = $emp->wfh_latitude ? (float)$emp->wfh_latitude : 28.6200;
-                    $baseLng = $emp->wfh_longitude ? (float)$emp->wfh_longitude : 77.2200;
-                    $lat = $baseLat + (rand(-30, 30) / 100000.0);
-                    $lng = $baseLng + (rand(-30, 30) / 100000.0);
-                } else {
-                    // Onsite: arbitrary location near Mumbai
-                    $lat = 19.0760 + (rand(-100, 100) / 100000.0);
-                    $lng = 72.8777 + (rand(-100, 100) / 100000.0);
+                // Half day on Aug 20
+                if ($dateStr === '2026-08-20') {
+                    $checkOut = '13:00:00';
+                    $status = 'half_day';
                 }
                 
-                $attendance = Attendance::create([
+                $checkInDt = \Carbon\Carbon::parse($dateStr . ' ' . $checkIn);
+                $checkOutDt = \Carbon\Carbon::parse($dateStr . ' ' . $checkOut);
+                
+                $att = Attendance::create([
                     'tenant_id' => $tenant->id,
                     'employee_id' => $emp->id,
-                    'date' => $date->format('Y-m-d'),
-                    'check_in' => $checkin,
-                    'check_out' => $checkout,
-                    'location_type' => $locationType,
-                    'status' => $status,
-                    'total_work_hours' => $workHours,
-                    'total_break_hours' => 0.75, // 45 mins break
-                    'check_in_latitude' => $lat,
-                    'check_in_longitude' => $lng,
-                    'check_out_latitude' => $lat ? $lat + (rand(-5, 5) / 100000.0) : null,
-                    'check_out_longitude' => $lng ? $lng + (rand(-5, 5) / 100000.0) : null,
+                    'date' => $dateStr,
+                    'check_in' => $checkInDt,
+                    'check_out' => $checkOutDt,
+                    'location_type' => $locType,
+                    'status' => $status
                 ]);
-                
-                // Add a break for every attendance
+
                 AttendanceBreak::create([
-                    'attendance_id' => $attendance->id,
-                    'break_in' => (clone $date)->setTime(13, rand(0, 10), 0),
-                    'break_out' => (clone $date)->setTime(13, rand(40, 55), 0),
-                    'duration_minutes' => 45,
+                    'attendance_id' => $att->id,
+                    'break_in' => \Carbon\Carbon::parse($dateStr . ' 13:00:00'),
+                    'break_out' => \Carbon\Carbon::parse($dateStr . ' 14:00:00'),
                 ]);
-                
-                // Seed 15-minute intermediate location tracking logs (e.g. 4 logs per day)
-                if ($lat && $lng) {
-                    for ($hourOffset = 10; $hourOffset <= 16; $hourOffset += 2) {
-                        AttendanceLocationLog::create([
-                            'tenant_id' => $tenant->id,
-                            'attendance_id' => $attendance->id,
-                            'latitude' => $lat + (rand(-10, 10) / 100000.0),
-                            'longitude' => $lng + (rand(-10, 10) / 100000.0),
-                            'created_at' => (clone $date)->setTime($hourOffset, rand(0, 59), 0),
-                        ]);
-                    }
-                }
             }
+            $current->addDay();
         }
+
+        // 17. Feed Payroll Data (completed payrun for July 2026)
+        \App\Domains\HRMS\Models\PayrollRun::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'payroll_month' => '2026-07',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-31',
+            'status' => 'completed',
+            'processed_by' => $user->id
+        ]);
+        
+        \App\Domains\HRMS\Models\SalaryRevision::create([
+            'tenant_id' => $tenant->id,
+            'employee_id' => $employeesList[1]->id,
+            'old_salary_structure_id' => $structure1->id,
+            'new_salary_structure_id' => $structure1->id,
+            'effective_date' => '2026-08-01',
+            'old_ctc' => 40000,
+            'new_ctc' => 45000,
+            'arrears_paid' => false
+        ]);
     }
 }

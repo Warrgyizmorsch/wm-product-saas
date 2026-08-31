@@ -5,10 +5,14 @@
 @section('breadcrumb', 'HRMS / ' . __('hrms.wfh.title'))
 
 @push('styles')
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-@endpush
-@push('scripts')
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+@once
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
+<style>
+    .pac-container {
+        z-index: 9999 !important;
+    }
+</style>
+@endonce
 @endpush
 
 @push('styles')
@@ -1022,7 +1026,7 @@ const runWfhReqSetup = () => {
     let reqWfhMarker = null;
 
     const initWfhReqMapPicker = () => {
-        if (typeof L === 'undefined') {
+        if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
             setTimeout(initWfhReqMapPicker, 100);
             return;
         }
@@ -1035,34 +1039,40 @@ const runWfhReqSetup = () => {
 
         let initialLat = parseFloat(latInput.val()) || 28.6139; // Default center
         let initialLng = parseFloat(lngInput.val()) || 77.2090;
+        const initialPos = { lat: initialLat, lng: initialLng };
         
         if (reqWfhMap) {
-            setTimeout(() => {
-                reqWfhMap.invalidateSize();
-            }, 300);
+            google.maps.event.trigger(reqWfhMap, 'resize');
+            reqWfhMap.setCenter(initialPos);
             return;
         }
 
-        reqWfhMap = L.map(mapContainerId).setView([initialLat, initialLng], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(reqWfhMap);
+        reqWfhMap = new google.maps.Map(document.getElementById(mapContainerId), {
+            center: initialPos,
+            zoom: 13,
+            mapTypeControl: false,
+            fullscreenControl: false,
+            streetViewControl: false
+        });
 
-        reqWfhMarker = L.marker([initialLat, initialLng], { draggable: true }).addTo(reqWfhMap);
+        reqWfhMarker = new google.maps.Marker({
+            position: initialPos,
+            map: reqWfhMap,
+            draggable: true
+        });
 
         // Update inputs on marker drag
-        reqWfhMarker.on('dragend', function(e) {
-            const position = reqWfhMarker.getLatLng();
-            latInput.val(position.lat.toFixed(8));
-            lngInput.val(position.lng.toFixed(8));
+        reqWfhMarker.addListener('dragend', function() {
+            const position = reqWfhMarker.getPosition();
+            latInput.val(position.lat().toFixed(8));
+            lngInput.val(position.lng().toFixed(8));
         });
 
         // Update marker and inputs on map click
-        reqWfhMap.on('click', function(e) {
-            reqWfhMarker.setLatLng(e.latlng);
-            latInput.val(e.latlng.lat.toFixed(8));
-            lngInput.val(e.latlng.lng.toFixed(8));
+        reqWfhMap.addListener('click', function(e) {
+            reqWfhMarker.setPosition(e.latLng);
+            latInput.val(e.latLng.lat().toFixed(8));
+            lngInput.val(e.latLng.lng().toFixed(8));
         });
 
         // Update map when inputs change manually
@@ -1070,83 +1080,42 @@ const runWfhReqSetup = () => {
             const lat = parseFloat(latInput.val());
             const lng = parseFloat(lngInput.val());
             if (!isNaN(lat) && !isNaN(lng)) {
-                const latlng = [lat, lng];
-                reqWfhMarker.setLatLng(latlng);
-                reqWfhMap.setView(latlng, reqWfhMap.getZoom());
+                const latlng = { lat: lat, lng: lng };
+                reqWfhMarker.setPosition(latlng);
+                reqWfhMap.setCenter(latlng);
             }
         };
 
         latInput.on('input', updateMapFromInputs);
         lngInput.on('input', updateMapFromInputs);
 
-        // Address Search Geocoding logic
-        const searchInput = $('#wfh_req_map_search');
+        // Bind Google Places Autocomplete search input
+        const searchInputEl = document.getElementById('wfh_req_map_search');
+        if (searchInputEl) {
+            const autocomplete = new google.maps.places.Autocomplete(searchInputEl);
+            autocomplete.bindTo('bounds', reqWfhMap);
 
-        const performSearch = () => {
-            const query = searchInput.val();
-            if (!query) return;
+            autocomplete.addListener('place_changed', function() {
+                const place = autocomplete.getPlace();
+                if (!place.geometry || !place.geometry.location) {
+                    return;
+                }
 
-            searchInput.prop('disabled', true).attr('placeholder', 'Searching...');
-            
-            // Use ArcGIS World Geocoding Service (Free public lookup) for high accuracy address/subarea search
-            fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&singleLine=${encodeURIComponent(query)}&maxLocations=1`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data && data.candidates && data.candidates.length > 0) {
-                        const lat = parseFloat(data.candidates[0].location.y);
-                        const lng = parseFloat(data.candidates[0].location.x);
-                        
-                        latInput.val(lat.toFixed(8));
-                        lngInput.val(lng.toFixed(8));
+                reqWfhMap.setCenter(place.geometry.location);
+                reqWfhMap.setZoom(15);
+                reqWfhMarker.setPosition(place.geometry.location);
 
-                        if (reqWfhMap && reqWfhMarker) {
-                            reqWfhMarker.setLatLng([lat, lng]);
-                            reqWfhMap.setView([lat, lng], 15);
-                        }
-                        searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
-                    } else {
-                        // Fallback to OSM Nominatim
-                        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
-                            .then(res2 => res2.json())
-                            .then(data2 => {
-                                if (data2 && data2.length > 0) {
-                                    const lat = parseFloat(data2[0].lat);
-                                    const lng = parseFloat(data2[0].lon);
-                                    
-                                    latInput.val(lat.toFixed(8));
-                                    lngInput.val(lng.toFixed(8));
+                latInput.val(place.geometry.location.lat().toFixed(8));
+                lngInput.val(place.geometry.location.lng().toFixed(8));
+            });
 
-                                    if (reqWfhMap && reqWfhMarker) {
-                                        reqWfhMarker.setLatLng([lat, lng]);
-                                        reqWfhMap.setView([lat, lng], 15);
-                                    }
-                                } else {
-                                    alert("Location not found. Please try a different query.");
-                                }
-                                searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
-                            })
-                            .catch(err => {
-                                alert("Location not found. Please try a different query.");
-                                searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
-                            });
-                    }
-                })
-                .catch(err => {
-                    console.error("Geocoding error:", err);
-                    searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
-                });
-        };
-
-        searchInput.on('keypress', function(e) {
-            if (e.which === 13) {
-                e.preventDefault();
-                performSearch();
-            }
-        });
-
-        setTimeout(() => {
-            reqWfhMap.invalidateSize();
-        }, 300);
+            // Prevent form submission when pressing enter on search box
+            $(searchInputEl).on('keypress', function(e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                }
+            });
+        }
     };
 
     const setupWfhRequestCoords = () => {
@@ -1218,9 +1187,11 @@ const runWfhReqSetup = () => {
                     $('#wfh_req_latitude').val(lat.toFixed(8));
                     $('#wfh_req_longitude').val(lng.toFixed(8));
                     
+                    const latlng = { lat: lat, lng: lng };
                     if (reqWfhMap && reqWfhMarker) {
-                        reqWfhMarker.setLatLng([lat, lng]);
-                        reqWfhMap.setView([lat, lng], 15);
+                        reqWfhMarker.setPosition(latlng);
+                        reqWfhMap.setCenter(latlng);
+                        reqWfhMap.setZoom(15);
                     } else {
                         // Auto-open map to show detected location
                         const mapWrap = document.getElementById('wfh_req_map_wrap');
@@ -1228,8 +1199,9 @@ const runWfhReqSetup = () => {
                             window.toggleWfhReqMap();
                             setTimeout(() => {
                                 if (reqWfhMap && reqWfhMarker) {
-                                    reqWfhMarker.setLatLng([lat, lng]);
-                                    reqWfhMap.setView([lat, lng], 15);
+                                    reqWfhMarker.setPosition(latlng);
+                                    reqWfhMap.setCenter(latlng);
+                                    reqWfhMap.setZoom(15);
                                 }
                             }, 600);
                         }

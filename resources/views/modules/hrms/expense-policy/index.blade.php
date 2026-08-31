@@ -258,7 +258,7 @@
                                             data-bs-target="#editPolicyModal"
                                         />
                                         
-                                        <form method="POST" action="{{ route('hrms.expense-policy.destroy', $policy) }}" onsubmit="return confirm('Delete this policy and all its category limits?');" class="m-0 d-flex">
+                                        <form method="POST" action="{{ route('hrms.expense-policy.destroy', $policy) }}" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this policy and all its category limits?', { title: 'Delete Policy', variant: 'danger', confirmButtonText: 'Delete' });" class="m-0 d-flex">
                                             @csrf @method('DELETE')
                                             <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="Delete Policy" />
                                         </form>
@@ -392,7 +392,7 @@
                                         data-bs-toggle="modal"
                                         data-bs-target="#editCategoryModal"
                                     />
-                                    <form method="POST" action="{{ route('hrms.expense-categories.destroy', $cat) }}" onsubmit="return confirm('Delete this category?');" class="m-0 d-flex">
+                                    <form method="POST" action="{{ route('hrms.expense-categories.destroy', $cat) }}" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this category?', { title: 'Delete Category', variant: 'danger', confirmButtonText: 'Delete' });" class="m-0 d-flex">
                                         @csrf @method('DELETE')
                                         <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="Delete Category" />
                                     </form>

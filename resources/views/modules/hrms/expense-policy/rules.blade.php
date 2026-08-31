@@ -194,7 +194,7 @@
                         <td class="text-muted fs-12">{{ $rule->notes ?: '—' }}</td>
                         <td class="text-end">
                             <form method="POST" action="{{ route('hrms.expense-policy.rules.destroy', [$policy, $rule]) }}"
-                                  onsubmit="return confirm('Remove this category limit?');" class="m-0 d-inline-flex">
+                                  onsubmit="return confirmFormSubmit(event, 'Are you sure you want to remove this category limit?', { title: 'Remove Category Limit', variant: 'danger', confirmButtonText: 'Remove' });" class="m-0 d-inline-flex">
                                 @csrf @method('DELETE')
                                 <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="Remove Limit" />
                             </form>

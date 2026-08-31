@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\DB;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\OvertimeRequest;
-use Illuminate\Support\Facades\Log;
+use App\Exports\PayrollBankExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PayrollRunController extends Controller
 {
@@ -582,5 +583,85 @@ class PayrollRunController extends Controller
             DB::rollBack();
             return redirect()->back()->with('error', 'Failed to create bulk adjustments: ' . $e->getMessage());
         }
+    }
+
+    public function exportBankFile(PayrollRun $run)
+    {
+        $fileName = 'bank_transfer_' . $run->payroll_month . '.xlsx';
+        return Excel::download(new PayrollBankExport($run), $fileName);
+    }
+
+    public function downloadPayslip(PayrollRun $run, Employee $employee)
+    {
+        // Security check: If the logged-in user is an employee, they can only access their own payslip
+        $user = auth()->user();
+        if ($user->employee && $user->employee->id !== $employee->id) {
+            abort(403, 'Unauthorized access to this payslip.');
+        }
+
+        $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
+        $company = $employee->company ?? \App\Domains\HRMS\Models\Company::first();
+
+        // Convert Net Payout to Words (Rupees)
+        $netPayout = $calc['summary']['net_payout'] ?? 0;
+        $netPayoutInWords = $this->convertNumberToWords($netPayout) . ' Only';
+
+        $data = [
+            'run' => $run,
+            'employee' => $employee,
+            'company' => $company,
+            'calc' => $calc['summary'] ?? null,
+            'details' => $calc['items'] ?? [],
+            'netPayoutInWords' => $netPayoutInWords,
+            'payroll_month_formatted' => \Carbon\Carbon::parse($run->payroll_month . '-01')->format('F Y'),
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.hrms.payroll.pdf_payslip', $data);
+        $fileName = 'payslip_' . $employee->employee_id . '_' . $run->payroll_month . '.pdf';
+        
+        return $pdf->download($fileName);
+    }
+
+    private function convertNumberToWords($number)
+    {
+        $no = (int)floor($number);
+        $point = (int)round(($number - $no) * 100);
+        $hundred = null;
+        $digits_1 = strlen($no);
+        $i = 0;
+        $str = [];
+        $words = [
+            0 => '', 1 => 'One', 2 => 'Two',
+            3 => 'Three', 4 => 'Four', 5 => 'Five',
+            6 => 'Six', 7 => 'Seven', 8 => 'Eight',
+            9 => 'Nine', 10 => 'Ten', 11 => 'Eleven',
+            12 => 'Twelve', 13 => 'Thirteen', 14 => 'Fourteen',
+            15 => 'Fifteen', 16 => 'Sixteen', 17 => 'Seventeen',
+            18 => 'Eighteen', 19 => 'Nineteen', 20 => 'Twenty',
+            30 => 'Thirty', 40 => 'Forty', 50 => 'Fifty',
+            60 => 'Sixty', 70 => 'Seventy', 80 => 'Eighty',
+            90 => 'Ninety'
+        ];
+        $digits = ['', 'Hundred', 'Thousand', 'Lakh', 'Crore'];
+        while ($i < $digits_1) {
+            $divider = ($i == 2) ? 10 : 100;
+            $number = floor($no % $divider);
+            $no = floor($no / $divider);
+            $i += ($divider == 10) ? 1 : 2;
+            if ($number) {
+                $plural = (($counter = count($str)) && $number > 9) ? 's' : null;
+                $hundred = ($counter == 1 && $str[0]) ? ' and ' : null;
+                $str[] = ($number < 21) ? $words[$number] . ' ' . $digits[$counter] . $plural . ' ' . $hundred
+                    : $words[floor($number / 10) * 10] . ' ' . $words[$number % 10] . ' ' . $digits[$counter] . $plural . ' ' . $hundred;
+            } else {
+                $str[] = null;
+            }
+        }
+        $Rupees = implode('', array_reverse($str));
+        $paise = '';
+        if ($point > 0) {
+            $paise = ' and ' . ($point < 21 ? $words[$point] : $words[floor($point / 10) * 10] . ' ' . $words[$point % 10]) . ' Paise';
+        }
+        return ($Rupees ? $Rupees . 'Rupees' : '') . $paise;
     }
 }

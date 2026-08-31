@@ -28,10 +28,12 @@ class EmployeeController extends Controller
         if ($request->filled('user_id')) {
             $targetUser = \App\Models\User::find($request->user_id);
             if ($targetUser) {
-                $request->merge([
-                    'full_name' => $targetUser->name,
-                    'personal_email' => $targetUser->email,
-                ]);
+                if (!$request->filled('full_name')) {
+                    $request->merge(['full_name' => $targetUser->name]);
+                }
+                if (!$request->filled('personal_email')) {
+                    $request->merge(['personal_email' => $targetUser->email]);
+                }
             }
         }
 
@@ -104,7 +106,7 @@ class EmployeeController extends Controller
                 Rule::unique('employees', 'employee_id')->ignore($employeeId),
             ],
             'user_id' => [
-                'nullable',
+                'required',
                 Rule::unique('employees', 'user_id')->ignore($employeeId),
             ],
             'role_id' => ['nullable', 'exists:roles,id'],
@@ -376,6 +378,24 @@ class EmployeeController extends Controller
         }
 
         return redirect()->back()->with('success', 'Employee status updated successfully.');
+    }
+
+    public function updateStage(Request $request, Employee $employee)
+    {
+        $validated = $request->validate([
+            'employee_stage' => 'required|string|in:Probation,Confirmed,Notice Period,Exited',
+        ]);
+
+        $employee->update(['employee_stage' => $validated['employee_stage']]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Employee stage updated successfully.',
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Employee stage updated successfully.');
     }
 }
 
