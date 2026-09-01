@@ -12,6 +12,7 @@
                 ['label' => 'Plans', 'route' => 'platform.plans.index'],
                 ['label' => 'Subscriptions'],
                 ['label' => 'Usage Limits', 'route' => 'platform.usage.index'],
+                ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
             ]],
             ['label' => __('ui.approvals_center'), 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
         ],
@@ -66,6 +67,7 @@
                 ['label' => 'Stock Valuation Report', 'route' => 'inventory.reports.valuation'],
             ]],
             ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => [
+                ['label' => 'Vendors / Suppliers', 'route' => 'purchase.vendors.index'],
                 ['label' => __('purchase.savings_dashboard'), 'route' => 'purchase.rfqs.savings'],
                 ['label' => __('ui.purchase_requests') ?: __('purchase.purchase_requests'), 'route' => 'purchase.requisitions.index'],
                 ['label' => __('purchase.pending_pr_items'), 'route' => 'purchase.requisitions.pending-items'],

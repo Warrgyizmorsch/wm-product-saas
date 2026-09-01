@@ -34,4 +34,8 @@ Route::prefix('platform')
 
         Route::get('usage', [UsageOverviewController::class, 'index'])
             ->name('usage.index');
+
+        Route::post('payment-terms/{paymentTerm}/toggle-status', [\App\Domains\Platform\Controllers\PaymentTermController::class, 'toggleStatus'])
+            ->name('payment-terms.toggle-status');
+        Route::resource('payment-terms', \App\Domains\Platform\Controllers\PaymentTermController::class);
     });

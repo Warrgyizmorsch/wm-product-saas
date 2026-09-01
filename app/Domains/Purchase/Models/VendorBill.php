@@ -107,4 +107,16 @@ class VendorBill extends BaseModel
     {
         return (float)($this->attributes['grand_total'] ?? $this->attributes['total_amount'] ?? 0);
     }
+
+    public function getAmountPaidAttribute(): float
+    {
+        return (float)($this->attributes['paid_amount'] ?? $this->attributes['amount_paid'] ?? 0);
+    }
+
+    public function getBalanceDueAttribute(): float
+    {
+        $total = $this->total_amount;
+        $paid = $this->amount_paid;
+        return (float)($this->attributes['due_amount'] ?? max(0, $total - $paid));
+    }
 }
