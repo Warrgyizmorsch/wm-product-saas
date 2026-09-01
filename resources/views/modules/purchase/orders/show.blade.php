@@ -377,41 +377,51 @@
                         <thead>
                             <tr>
                                 <th style="width: 4%;">#</th>
-                                <th style="width: 32%;">Product & SKU</th>
-                                <th class="text-end" style="width: 10%;">Qty</th>
-                                <th class="text-end" style="width: 14%;">Rate</th>
-                                <th class="text-end" style="width: 14%;">Amount</th>
+                                <th style="width: 28%;">Product & SKU</th>
+                                <th class="text-end" style="width: 8%;">Qty</th>
+                                <th class="text-end" style="width: 12%;">Rate</th>
+                                <th class="text-end" style="width: 12%;">Gross Amount</th>
 
                                 @if($order->discount_type === 'item_wise')
-                                    <th class="text-end text-danger" style="width: 12%;">Disc. Amt</th>
+                                    <th class="text-end text-danger" style="width: 10%;">Disc %</th>
                                 @endif
+
+                                <th class="text-end text-dark" style="width: 13%;">Taxable Amt</th>
 
                                 @if($order->tax_type === 'item_wise_tax')
-                                    <th class="text-end text-muted" style="width: 12%;">Tax Amt</th>
+                                    <th class="text-end text-muted" style="width: 10%;">Tax Rate</th>
                                 @endif
 
-                                <th class="text-end" style="width: 14%;">Total Amount</th>
+                                <th class="text-end" style="width: 13%;">Total Amount</th>
                             </tr>
                         </thead>
                         <tbody>
                             @php
                                 $groupedItems = $order->items->groupBy('product_id')->map(function($items) {
                                     $first = $items->first();
+                                    $qty = $items->sum('quantity');
+                                    $rate = $first->rate;
+                                    $grossAmt = $qty * $rate;
+                                    $discAmt = $items->sum('discount_amount');
+                                    $taxableAmt = max(0, $grossAmt - $discAmt);
+                                    $taxAmt = $items->sum('tax_amount');
+                                    $totalAmt = $items->sum('total_amount');
                                     return (object) [
                                         'id' => $first->id,
                                         'product' => $first->product,
                                         'product_id' => $first->product_id,
-                                        'quantity' => $items->sum('quantity'),
-                                        'rate' => $first->rate,
-                                        'amount' => $items->sum('amount'),
+                                        'quantity' => $qty,
+                                        'rate' => $rate,
+                                        'gross_amount' => $grossAmt,
                                         'discount_percent' => $first->discount_percent,
-                                        'discount_amount' => $items->sum('discount_amount'),
+                                        'discount_amount' => $discAmt,
+                                        'taxable_amount' => $taxableAmt,
                                         'tax_percent' => $first->tax_percent,
                                         'cgst_percent' => $first->cgst_percent,
                                         'sgst_percent' => $first->sgst_percent,
                                         'igst_percent' => $first->igst_percent,
-                                        'tax_amount' => $items->sum('tax_amount'),
-                                        'total_amount' => $items->sum('total_amount'),
+                                        'tax_amount' => $taxAmt,
+                                        'total_amount' => $totalAmt,
                                     ];
                                 })->values();
                             @endphp
@@ -439,18 +449,22 @@
                                         {{ $currencySymbol }}{{ number_format($item->rate, 2) }}
                                     </td>
                                     <td class="text-end font-monospace fw-semibold text-dark">
-                                        {{ $currencySymbol }}{{ number_format($item->amount, 2) }}
+                                        {{ $currencySymbol }}{{ number_format($item->gross_amount, 2) }}
                                     </td>
 
                                     @if($order->discount_type === 'item_wise')
                                         <td class="text-end font-monospace text-danger">
-                                            -{{ $currencySymbol }}{{ number_format($item->discount_amount, 2) }}
+                                            {{ (float)$item->discount_percent }}%
                                         </td>
                                     @endif
 
+                                    <td class="text-end font-monospace fw-semibold text-dark">
+                                        {{ $currencySymbol }}{{ number_format($item->taxable_amount, 2) }}
+                                    </td>
+
                                     @if($order->tax_type === 'item_wise_tax')
                                         <td class="text-end font-monospace text-muted">
-                                            +{{ $currencySymbol }}{{ number_format($item->tax_amount, 2) }}
+                                            {{ (float)$item->tax_percent }}%
                                         </td>
                                     @endif
 

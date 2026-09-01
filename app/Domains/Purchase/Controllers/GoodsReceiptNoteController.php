@@ -106,11 +106,23 @@ class GoodsReceiptNoteController extends Controller
             ->with(['vendor', 'warehouse', 'items.product.uom'])
             ->findOrFail($poId);
 
-        $items = $order->items->groupBy('product_id')->map(function ($productItems) {
+        $items = $order->items->groupBy('product_id')->map(function ($productItems) use ($order) {
             $first = $productItems->first();
             $orderedQty = (float)$productItems->sum('quantity');
             $prevReceived = (float)$productItems->sum('received_qty');
             $remainingQty = max(0.0, $orderedQty - $prevReceived);
+
+            $grossPrice = (float)$first->rate;
+            $lineGrossTotal = $orderedQty * $grossPrice;
+            $itemDiscount = (float)$productItems->sum('discount_amount');
+
+            $orderDiscShare = 0;
+            if ($order->discount_type === 'order_wise' && (float)$order->discount_amount > 0 && (float)$order->subtotal > 0) {
+                $orderDiscShare = ($lineGrossTotal / (float)$order->subtotal) * (float)$order->discount_amount;
+            }
+
+            $totalItemDisc = ($order->discount_type === 'order_wise') ? $orderDiscShare : $itemDiscount;
+            $netUnitRate = ($orderedQty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $orderedQty, 2) : $grossPrice;
 
             return [
                 'purchase_order_item_id' => $first->id,
@@ -121,7 +133,7 @@ class GoodsReceiptNoteController extends Controller
                 'ordered_qty' => $orderedQty,
                 'previous_received_qty' => $prevReceived,
                 'remaining_qty' => $remainingQty,
-                'unit_rate' => (float)$first->rate,
+                'unit_rate' => $netUnitRate,
                 'track_serial_number' => (bool)($first->product?->track_serial_number ?? false),
                 'track_batch' => (bool)($first->product?->track_batch ?? false),
             ];
