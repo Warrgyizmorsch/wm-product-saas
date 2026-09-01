@@ -228,7 +228,8 @@
                                             }
 
                                             $qty = (float) $item->accepted_qty;
-                                            $rate = (float) $item->unit_rate;
+                                            $poRate = (float) ($poItem?->rate ?? 0);
+                                            $rate = $poRate > 0 ? $poRate : (float) $item->unit_rate;
                                             $lineSub = $qty * $rate;
                                         @endphp
                                         <tr class="bill-line-row">

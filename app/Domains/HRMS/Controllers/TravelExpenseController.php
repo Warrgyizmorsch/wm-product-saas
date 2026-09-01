@@ -21,41 +21,6 @@ class TravelExpenseController extends Controller
 {
     public function index(Request $request): View
     {
-        // Auto-run schema check for approved_budget column if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('travel_requests', 'approved_budget')) {
-            \Illuminate\Support\Facades\Schema::table('travel_requests', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->decimal('approved_budget', 10, 2)->nullable()->after('estimated_budget');
-            });
-        }
-
-        // Auto-run schema check for approved_amount column if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('cash_advances', 'approved_amount')) {
-            \Illuminate\Support\Facades\Schema::table('cash_advances', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->decimal('approved_amount', 10, 2)->nullable()->after('amount');
-            });
-        }
-
-        // Auto-run schema check for approved_amount on expense_reports if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('expense_reports', 'approved_amount')) {
-            \Illuminate\Support\Facades\Schema::table('expense_reports', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->decimal('approved_amount', 10, 2)->nullable()->after('total_amount');
-            });
-        }
-
-        // Auto-run schema check for approved_net_reimbursement on expense_reports if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('expense_reports', 'approved_net_reimbursement')) {
-            \Illuminate\Support\Facades\Schema::table('expense_reports', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->decimal('approved_net_reimbursement', 10, 2)->nullable()->after('net_reimbursement');
-            });
-        }
-
-        // Auto-run schema check for payout_channel on expense_reports if not present
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('expense_reports', 'payout_channel')) {
-            \Illuminate\Support\Facades\Schema::table('expense_reports', function (\Illuminate\Database\Schema\Blueprint $table) {
-                $table->string('payout_channel')->default('accounting')->after('status');
-            });
-        }
-
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $user = auth()->user();
 

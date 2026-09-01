@@ -61,7 +61,22 @@ class GoodsReceiptNoteService
                     throw new \InvalidArgumentException("Cannot receive {$qtyReceived} units. Total received would exceed ordered quantity {$orderedQty}.");
                 }
                 $remainingQty = max(0.0, $orderedQty - ($prevReceived + $qtyReceived));
-                $unitRate = (float) ($poItem->rate ?? $poItem->unit_price ?? 0.00);
+                
+                $grossPrice = (float) ($poItem->rate ?? $poItem->unit_price ?? 0.00);
+                $poQty = (float) ($poItem->quantity ?: 1);
+                $lineGrossTotal = $poQty * $grossPrice;
+                $itemDiscount = (float) ($poItem->discount_amount ?? 0.00);
+
+                $orderDiscShare = 0;
+                if ($po && $po->discount_type === 'order_wise' && (float)$po->discount_amount > 0 && (float)$po->subtotal > 0) {
+                    $orderDiscShare = ($lineGrossTotal / (float)$po->subtotal) * (float)$po->discount_amount;
+                }
+                $totalItemDisc = ($po && $po->discount_type === 'order_wise') ? $orderDiscShare : $itemDiscount;
+                
+                $unitRate = isset($item['unit_rate']) && (float)$item['unit_rate'] > 0
+                    ? (float)$item['unit_rate']
+                    : (($poQty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $poQty, 2) : $grossPrice);
+
                 $totalAmount = round($qtyAccepted * $unitRate, 2);
 
                 $batchNumber = $item['batch_number'] ?? null;
