@@ -105,6 +105,9 @@ class BomExplosionService
             $grossQty = $this->applyScrap($netQty, $item->material_scrap_percentage);
 
             $childProduct = $item->material;
+            if (!$childProduct) {
+                continue;
+            }
 
             // Recurse using calculate
             $childTree = $this->calculate($childProduct, $grossQty, $tenantId, $level + 1, $visited, $item->child_bom_id);

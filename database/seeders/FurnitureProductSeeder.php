@@ -384,10 +384,17 @@ class FurnitureProductSeeder extends Seeder
             ],
         ];
 
+        $company = DB::table('companies')->where('tenant_id', $tenantId)->first();
+        $companyId = $company?->id ?? 1;
+        $branch = DB::table('branches')->where('company_id', $companyId)->first();
+        $branchId = $branch?->id ?? 1;
+
         foreach ($items as $key => $item) {
             $product = Product::updateOrCreate(
                 ['tenant_id' => $tenantId, 'sku' => $item['sku']],
                 [
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'name' => $item['name'],
                     'type' => $item['type'],
                     'planning_type' => $item['planning_type'],
@@ -429,6 +436,11 @@ class FurnitureProductSeeder extends Seeder
      */
     private function seedInitialStock(int $tenantId, array $products, array $warehouses): void
     {
+        $company = DB::table('companies')->where('tenant_id', $tenantId)->first();
+        $companyId = $company?->id ?? 1;
+        $branch = DB::table('branches')->where('company_id', $companyId)->first();
+        $branchId = $branch?->id ?? 1;
+
         foreach ($products as $key => $pInfo) {
             /** @var Product $product */
             $product = $pInfo['model'];
@@ -445,6 +457,8 @@ class FurnitureProductSeeder extends Seeder
                     'warehouse_id' => $warehouseId,
                 ],
                 [
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'quantity' => $qty,
                     'available_qty' => $qty,
                     'reserved_qty' => 0.00,
@@ -461,6 +475,8 @@ class FurnitureProductSeeder extends Seeder
                     'reference_type' => 'Opening Stock',
                 ],
                 [
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'type' => 'IN',
                     'reference_id' => $product->id,
                     'quantity' => $qty,

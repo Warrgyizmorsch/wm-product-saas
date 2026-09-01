@@ -197,6 +197,11 @@ class CrusherMachineInventorySeeder extends Seeder
         ];
 
         // 4. Seed Products, Warehouse Stocks & Stock Transactions
+        $company = DB::table('companies')->where('tenant_id', $tenant->id)->first();
+        $companyId = $company?->id ?? 1;
+        $branch = DB::table('branches')->where('company_id', $companyId)->first();
+        $branchId = $branch?->id ?? 1;
+
         foreach ($items as $data) {
             $whId = $data['warehouse_id'];
             unset($data['warehouse_id']);
@@ -210,6 +215,8 @@ class CrusherMachineInventorySeeder extends Seeder
                 ],
                 array_merge($data, [
                     'tenant_id'          => $tenant->id,
+                    'company_id'         => $companyId,
+                    'branch_id'          => $branchId,
                     'item_type'          => 'Goods',
                     'variation_type'     => 'Single',
                     'status'             => 'active',
@@ -225,6 +232,8 @@ class CrusherMachineInventorySeeder extends Seeder
                     'warehouse_id' => $whId,
                 ],
                 [
+                    'company_id'    => $companyId,
+                    'branch_id'     => $branchId,
                     'quantity'      => $qty,
                     'reserved_qty'  => 0.0000,
                     'available_qty' => $qty,   // available = onhand - reserved
@@ -242,6 +251,8 @@ class CrusherMachineInventorySeeder extends Seeder
 
             StockTransaction::create([
                 'tenant_id'      => $tenant->id,
+                'company_id'     => $companyId,
+                'branch_id'      => $branchId,
                 'product_id'     => $product->id,
                 'warehouse_id'   => $whId,
                 'batch_id'       => null,

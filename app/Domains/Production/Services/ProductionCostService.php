@@ -18,7 +18,7 @@ class ProductionCostService
         foreach ($bom->items as $item) {
             $scrapFactor = 1 + ($item->material_scrap_percentage / 100);
             $grossQty = $item->quantity * $scrapFactor;
-            $unitCost = $item->material->unit_cost ?? 0.0;
+            $unitCost = $item->material?->unit_cost ?? 0.0;
             $totalCost += $grossQty * $unitCost;
         }
 
@@ -129,7 +129,7 @@ class ProductionCostService
         foreach ($bom->items as $item) {
             $scrapPct = $item->material_scrap_percentage ?? 0.0;
             $scrapQty = $item->quantity * ($scrapPct / 100);
-            $unitCost = $item->material->unit_cost ?? 0.0;
+            $unitCost = $item->material?->unit_cost ?? 0.0;
             $scrapCost += $scrapQty * $unitCost;
         }
 
