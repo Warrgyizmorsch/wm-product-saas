@@ -92,14 +92,60 @@ class ProductionOrderService
 
             // 3. Clone Planning Operations -> Order Operations (snapshot)
             $createdOps = [];
+            $bom = $order->bom ?? ProductionBom::withoutGlobalScopes()->find($order->bom_id);
+            $routing = $order->routing ?? ($order->routing_id ? Routing::withoutGlobalScopes()->find($order->routing_id) : null);
+
             foreach ($plan->operations as $idx => $planOp) {
                 $status = ($idx === 0) ? ProductionOrderOperation::STATUS_READY : ProductionOrderOperation::STATUS_WAITING;
-
                 $routingOp = $planOp->routingOperation;
+
+                $opTargetQty = (float) ($order->quantity_ordered ?? 1.0);
+                $opSourceProductId = $order->product_id;
+
+                if ($routingOp && $bom) {
+                    $opRouting = $routing ?? $routingOp?->routing;
+                    if ($opRouting && (int) $opRouting->product_id === (int) $order->product_id) {
+                        $routingMaterials = RoutingOperationMaterial::where('routing_operation_id', $routingOp->id)->get();
+                        if ($routingMaterials->isNotEmpty()) {
+                            foreach ($routingMaterials as $mat) {
+                                if ((int) $mat->material_id === (int) $order->product_id) {
+                                    continue;
+                                }
+                                $matProduct = $mat->material ?: Product::find($mat->material_id);
+                                if ($matProduct && $matProduct->type === 'raw_material') {
+                                    continue;
+                                }
+                                $ratio = $this->calculateBomComponentRatio($bom, $mat->material_id);
+                                if ($ratio !== null && $ratio > 0) {
+                                    $calculatedTarget = round((float) $order->quantity_ordered * $ratio, 4);
+                                    if ($calculatedTarget > 0) {
+                                        $opTargetQty = $calculatedTarget;
+                                        if ($idx < count($plan->operations) - 1) {
+                                            $opSourceProductId = $mat->material_id;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $processingTime = $planOp->processing_time_minutes > 0
+                    ? (float) $planOp->processing_time_minutes
+                    : ((float) ($routingOp?->processing_time_minutes ?? 0) * $opTargetQty);
+                $totalTime = (float) $planOp->setup_time_minutes + $processingTime;
+
                 $op = ProductionOrderOperation::create([
                     'tenant_id' => $order->tenant_id,
                     'production_order_id' => $order->id,
                     'routing_operation_id' => $planOp->routing_operation_id,
+                    'source_product_id' => $opSourceProductId,
+                    'source_bom_id' => $order->bom_id,
+                    'source_routing_id' => $order->routing_id,
+                    'bom_level' => 1,
+                    'target_produced_qty' => $opTargetQty,
+                    'is_intermediate' => ($opSourceProductId !== $order->product_id),
                     'sequence' => $planOp->sequence,
                     'operation_number' => $planOp->operation_number,
                     'name' => $planOp->name,
@@ -107,8 +153,8 @@ class ProductionOrderService
                     'machine_id' => $planOp->machine_id,
                     'status' => $status,
                     'setup_time_planned' => $planOp->setup_time_minutes,
-                    'processing_time_planned' => $planOp->processing_time_minutes,
-                    'total_time_planned' => $planOp->total_time_minutes,
+                    'processing_time_planned' => $processingTime,
+                    'total_time_planned' => $totalTime,
                     'setup_time_actual' => 0.00,
                     'processing_time_actual' => 0.00,
                     'quantity_produced' => 0.0000,
@@ -645,12 +691,14 @@ class ProductionOrderService
         int $uomId,
         ?int $childBomId = null
     ): ?ProductionOrderReservation {
-        // Prevent duplicate reservation if already created for this order & product
+        // Consolidate reservation if already created for this order & product
         $existingRes = ProductionOrderReservation::where('production_order_id', $order->id)
             ->where('product_id', $productId)
             ->first();
 
         if ($existingRes) {
+            $existingRes->quantity_planned = round((float) $existingRes->quantity_planned + $plannedQty, 4);
+            $existingRes->save();
             return $existingRes;
         }
 
@@ -667,8 +715,15 @@ class ProductionOrderService
             $effectiveReservationQty = min($plannedQty, $availableQty);
         }
 
-        $reservation = null;
-        if ($effectiveReservationQty > 0 || !($product && ($product->type === 'semi_finished' || $childBomId))) {
+        $reservation = ProductionOrderReservation::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $order->id)
+            ->where('product_id', $productId)
+            ->first();
+
+        if ($reservation) {
+            $reservation->quantity_planned = round((float) $reservation->quantity_planned + $effectiveReservationQty, 4);
+            $reservation->save();
+        } elseif ($effectiveReservationQty > 0 || !($product && ($product->type === 'semi_finished' || $childBomId))) {
             $reservation = ProductionOrderReservation::create([
                 'tenant_id' => $order->tenant_id,
                 'production_order_id' => $order->id,
@@ -958,6 +1013,17 @@ class ProductionOrderService
         int $uomId,
         ?int $warehouseId
     ): ProductionRequisitionSlipItem {
+        $existingItem = ProductionRequisitionSlipItem::where('tenant_id', $slip->tenant_id)
+            ->where('production_requisition_slip_id', $slip->id)
+            ->where('product_id', $productId)
+            ->first();
+
+        if ($existingItem) {
+            $existingItem->quantity_planned = round((float) $existingItem->quantity_planned + $plannedQty, 4);
+            $existingItem->save();
+            return $existingItem;
+        }
+
         return ProductionRequisitionSlipItem::create([
             'tenant_id' => $slip->tenant_id,
             'production_requisition_slip_id' => $slip->id,
@@ -996,6 +1062,8 @@ class ProductionOrderService
             $createdComponentOps,
             $userId
         );
+
+        $this->reconcileOperationReadiness($order);
     }
 
     protected function buildMultiLevelSnapshot(
@@ -1025,19 +1093,50 @@ class ProductionOrderService
         foreach ($routing->operations as $idx => $routingOp) {
             $status = ($idx === 0) ? ProductionOrderOperation::STATUS_READY : ProductionOrderOperation::STATUS_WAITING;
 
-            $processingTime = ($routingOp->processing_time_minutes * $targetQty);
+            $opTargetQty = $targetQty;
+            $opSourceProductId = $productId;
+
+            // Apply RoutingOperationMaterial target scaling ONLY when routing is Master FG Routing
+            // and material is a component (not raw material input or FG product).
+            if ((int) $routing->product_id === (int) $order->product_id) {
+                $routingMaterials = RoutingOperationMaterial::where('routing_operation_id', $routingOp->id)->get();
+                if ($routingMaterials->isNotEmpty()) {
+                    foreach ($routingMaterials as $mat) {
+                        if ((int) $mat->material_id === (int) $order->product_id) {
+                            continue;
+                        }
+                        $matProduct = $mat->material ?: Product::find($mat->material_id);
+                        if ($matProduct && $matProduct->type === 'raw_material') {
+                            continue;
+                        }
+                        $ratio = $this->calculateBomComponentRatio($bom, $mat->material_id);
+                        if ($ratio !== null && $ratio > 0) {
+                            $calculatedTarget = round($targetQty * $ratio, 4);
+                            if ($calculatedTarget > 0) {
+                                $opTargetQty = $calculatedTarget;
+                                if ($idx < count($routing->operations) - 1 || (int) $productId !== (int) $order->product_id) {
+                                    $opSourceProductId = $mat->material_id;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            $processingTime = ($routingOp->processing_time_minutes * $opTargetQty);
             $totalTime = $routingOp->setup_time_minutes + $processingTime;
 
             $op = ProductionOrderOperation::create([
                 'tenant_id' => $tenantId,
                 'production_order_id' => $order->id,
                 'routing_operation_id' => $routingOp->id,
-                'source_product_id' => $productId,
+                'source_product_id' => $opSourceProductId,
                 'source_bom_id' => $bom->id,
                 'source_routing_id' => $routing->id,
                 'bom_level' => $level,
-                'target_produced_qty' => $targetQty,
-                'is_intermediate' => $isIntermediate,
+                'target_produced_qty' => $opTargetQty,
+                'is_intermediate' => ($opSourceProductId !== $order->product_id) || $isIntermediate,
                 'quantity_claimed' => 0.0000,
                 'sequence' => $routingOp->sequence,
                 'operation_number' => $routingOp->operation_number,
@@ -1198,5 +1297,134 @@ class ProductionOrderService
         $createdComponentOps[$productId] = $createdOps;
         unset($visited[$productId]);
         return $createdOps;
+    }
+
+    /**
+     * Recursively calculate component requirement ratio across multi-level BOM tree.
+     */
+    public function calculateBomComponentRatio(?ProductionBom $bom, int $materialId, int $depth = 0): ?float
+    {
+        if (!$bom || $depth > 5) {
+            return null;
+        }
+
+        $baseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
+        $directItem = $bom->items->firstWhere('material_id', $materialId);
+        if ($directItem && (float) $directItem->quantity > 0) {
+            return (float) $directItem->quantity / $baseQty;
+        }
+
+        // Recursively search child BOMs
+        foreach ($bom->items as $item) {
+            if ((float) $item->quantity <= 0) {
+                continue;
+            }
+            $childBom = ProductionBom::where('tenant_id', $bom->tenant_id)
+                ->where('product_id', $item->material_id)
+                ->where('status', 'approved')
+                ->first();
+
+            if ($childBom) {
+                $childRatio = $this->calculateBomComponentRatio($childBom, $materialId, $depth + 1);
+                if ($childRatio !== null && $childRatio > 0) {
+                    $parentRatio = (float) $item->quantity / $baseQty;
+                    return $parentRatio * $childRatio;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Reconcile initial readiness status for all operations of an order.
+     * An operation is READY if it has no uncompleted predecessor operations.
+     * An operation is WAITING if any of its predecessors are incomplete.
+     */
+    public function reconcileOperationReadiness(ProductionOrder|int $orderOrId): void
+    {
+        $order = is_numeric($orderOrId) ? ProductionOrder::find((int) $orderOrId) : $orderOrId;
+        if (!$order) {
+            return;
+        }
+
+        $ops = $order->operations()->with(['predecessorDependencies', 'scheduleOperation'])->get();
+        if ($ops->isEmpty()) {
+            return;
+        }
+
+        $isMultiRouting = $ops->contains(fn($o) => !empty($o->source_product_id) && (int) $o->source_product_id !== (int) $order->product_id)
+            || \App\Domains\Production\Models\ProductionOrderOperationDependency::where('production_order_id', $order->id)->exists();
+
+        foreach ($ops as $op) {
+            // Do not override terminal or active progress states
+            if (in_array($op->status, [
+                ProductionOrderOperation::STATUS_COMPLETED,
+                ProductionOrderOperation::STATUS_SKIPPED,
+                ProductionOrderOperation::STATUS_CANCELLED,
+                ProductionOrderOperation::STATUS_RUNNING,
+                ProductionOrderOperation::STATUS_PAUSED,
+            ], true)) {
+                continue;
+            }
+
+            // Gather all predecessor operation IDs
+            $predIds = [];
+            if ($op->previous_operation_id) {
+                $predIds[] = (int) $op->previous_operation_id;
+            }
+            foreach ($op->predecessorDependencies as $pred) {
+                $predIds[] = (int) $pred->id;
+            }
+
+            // Single-routing fallback if no explicit dependencies exist
+            if (empty($predIds) && !$isMultiRouting && $op->sequence > $ops->min('sequence')) {
+                $prevSeqOp = $ops->where('sequence', '<', $op->sequence)->sortByDesc('sequence')->first();
+                if ($prevSeqOp) {
+                    $predIds[] = (int) $prevSeqOp->id;
+                }
+            }
+
+            if (empty($predIds)) {
+                // No predecessors -> Initial ready operation
+                $newStatus = ProductionOrderOperation::STATUS_READY;
+            } else {
+                // Check if all predecessors are completed, skipped, or have transferred output
+                $incompletePreds = $ops->whereIn('id', $predIds)->reject(function ($predOp) {
+                    return in_array($predOp->status, [
+                        ProductionOrderOperation::STATUS_COMPLETED,
+                        ProductionOrderOperation::STATUS_SKIPPED,
+                        ProductionOrderOperation::STATUS_CANCELLED,
+                    ], true) || (float) $predOp->quantity_transferred_out > 0
+                             || ($predOp->target_produced_qty > 0 && (float) $predOp->quantity_produced >= (float) $predOp->target_produced_qty);
+                });
+
+                $newStatus = $incompletePreds->isEmpty()
+                    ? ProductionOrderOperation::STATUS_READY
+                    : ProductionOrderOperation::STATUS_WAITING;
+            }
+
+            if ($op->status !== $newStatus) {
+                $op->status = $newStatus;
+                $op->save();
+            }
+
+            if ($op->scheduleOperation && !in_array($op->scheduleOperation->status, [
+                ProductionScheduleOperation::STATUS_COMPLETED,
+                ProductionScheduleOperation::STATUS_SKIPPED,
+                ProductionScheduleOperation::STATUS_CANCELLED,
+                ProductionScheduleOperation::STATUS_RUNNING,
+                ProductionScheduleOperation::STATUS_PAUSED,
+            ], true)) {
+                $schedStatus = ($newStatus === ProductionOrderOperation::STATUS_READY)
+                    ? ProductionScheduleOperation::STATUS_READY
+                    : ProductionScheduleOperation::STATUS_WAITING;
+
+                if ($op->scheduleOperation->status !== $schedStatus) {
+                    $op->scheduleOperation->status = $schedStatus;
+                    $op->scheduleOperation->save();
+                }
+            }
+        }
     }
 }

@@ -62,6 +62,7 @@ class UpdateRoutingRequest extends FormRequest
             'operations.*.overlap_enabled'                    => 'nullable|boolean',
             'operations.*.transfer_batch_quantity'            => 'nullable|numeric|min:0',
             'operations.*.transfer_lag_minutes'               => 'nullable|integer|min:0',
+            'operations.*.material_id'                        => 'nullable|exists:products,id',
         ];
     }
 

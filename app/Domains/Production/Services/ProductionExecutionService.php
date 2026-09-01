@@ -389,6 +389,11 @@ class ProductionExecutionService
                         }
                     }
                 }
+
+                // Reconcile order operation readiness for all successor operations
+                if ($op->order) {
+                    app(ProductionOrderService::class)->reconcileOperationReadiness($op->order);
+                }
             } else {
                 if ($op->status !== ProductionOrderOperation::STATUS_PAUSED) {
                     $op->status = ProductionOrderOperation::STATUS_RUNNING;

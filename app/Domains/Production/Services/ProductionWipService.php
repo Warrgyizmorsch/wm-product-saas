@@ -335,6 +335,12 @@ class ProductionWipService
 
             // Update quantity states: only final FG operations increment FG completed_quantity
             if ($isFinalFgOperation) {
+                if ($orderOp->routing_operation_id) {
+                    $wip->current_routing_operation_id = $orderOp->routing_operation_id;
+                }
+                if ($orderOp->work_center_id) {
+                    $wip->current_work_center_id = $orderOp->work_center_id;
+                }
                 $wip->completed_quantity += $goodQty;
                 $wip->available_quantity = $wip->completed_quantity;
             } else {
@@ -348,6 +354,9 @@ class ProductionWipService
             if (!$nextOpExists && $isCompleted) {
                 $wip->status = 'completed';
                 $wip->completed_at = now();
+                if ($isFinalFgOperation && $wip->completed_quantity <= 0 && $wip->available_quantity > 0) {
+                    $wip->completed_quantity = $wip->available_quantity;
+                }
             }
 
             $wip->updated_by = $userId;
@@ -514,7 +523,9 @@ class ProductionWipService
                 ->whereIn('transaction_type', ['operation_completed', 'progress_logged', 'rework_completed'])
                 ->sum('quantity');
 
-            $goodOutput = max($logQty, $txQty, (float) ($fromOrderOp?->quantity_produced ?? 0));
+            $goodOutput = ($logQty > 0 || $txQty > 0)
+                ? max($logQty, $txQty)
+                : (float) ($fromOrderOp?->quantity_produced ?? 0);
 
             $scrapQuery = \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $wip->tenant_id)
                 ->where('production_order_id', $wip->production_order_id)
@@ -719,7 +730,9 @@ class ProductionWipService
                     ->whereIn('transaction_type', ['operation_completed', 'progress_logged', 'rework_completed'])
                     ->sum('quantity');
 
-                $goodOutput = max($logQty, $txQty, ($batchId && !$sourceOp->is_external) ? 0.0 : (float) ($sourceOp->quantity_produced ?? 0));
+                $goodOutput = ($logQty > 0 || $txQty > 0)
+                    ? max($logQty, $txQty)
+                    : (($batchId && !$sourceOp->is_external) ? 0.0 : (float) ($sourceOp->quantity_produced ?? 0));
 
                 $alreadyTransferred = (float) ProductionWipTransaction::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
@@ -1280,7 +1293,36 @@ class ProductionWipService
             return;
         }
 
-        // Align batch WIP records to their batch target product ID
+        // Align batch WIP records to their batch target product ID and consolidate duplicate batch cards
+        $batchWipsByBatch = ProductionWip::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $orderId)
+            ->whereNotNull('production_batch_id')
+            ->get()
+            ->groupBy('production_batch_id');
+
+        foreach ($batchWipsByBatch as $bId => $cards) {
+            if ($cards->count() > 1) {
+                $canonical = $cards->sortByDesc(fn($c) => $c->currentRoutingOperation?->sequence ?? 0)->first();
+                $duplicates = $cards->reject(fn($c) => $c->id === $canonical->id);
+
+                $canonical->update([
+                    'material_cost' => $cards->sum('material_cost'),
+                    'labor_cost' => $cards->sum('labor_cost'),
+                    'machine_cost' => $cards->sum('machine_cost'),
+                    'overhead_cost' => $cards->sum('overhead_cost'),
+                    'total_value' => $cards->sum('total_value'),
+                ]);
+
+                foreach ($duplicates as $dup) {
+                    $dup->update([
+                        'status' => 'transferred',
+                        'available_quantity' => 0.0000,
+                        'completed_quantity' => 0.0000,
+                    ]);
+                }
+            }
+        }
+
         ProductionWip::where('tenant_id', $order->tenant_id)
             ->where('production_order_id', $orderId)
             ->whereNotNull('production_batch_id')
@@ -1291,6 +1333,84 @@ class ProductionWipService
                     $wip->update(['product_id' => $wip->batch->product_id]);
                 }
             });
+
+        // Reconcile final FG operation WIP cards if final operation or entire order is completed
+        $finalFgOp = ProductionOrderOperation::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $orderId)
+            ->where(function ($q) use ($order) {
+                $q->where('source_product_id', $order->product_id)
+                  ->orWhereNull('source_product_id');
+            })
+            ->where('is_intermediate', false)
+            ->orderBy('sequence', 'desc')
+            ->first()
+            ?? ProductionOrderOperation::where('tenant_id', $order->tenant_id)
+            ->where('production_order_id', $orderId)
+            ->orderBy('sequence', 'desc')
+            ->first();
+
+        if ($finalFgOp) {
+            $isOrderOrFinalOpCompleted = ($finalFgOp->status === ProductionOrderOperation::STATUS_COMPLETED)
+                || in_array($order->status, ['completed', 'closed'])
+                || !$order->operations()->whereNotIn('status', [
+                    ProductionOrderOperation::STATUS_COMPLETED,
+                    ProductionOrderOperation::STATUS_SKIPPED,
+                    ProductionOrderOperation::STATUS_CANCELLED,
+                ])->exists();
+
+            ProductionWip::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $orderId)
+                ->get()
+                ->each(function ($wip) use ($finalFgOp, $order, $isOrderOrFinalOpCompleted) {
+                    if ($wip->status === 'transferred') {
+                        $wip->update([
+                            'completed_quantity' => 0.0000,
+                            'available_quantity' => 0.0000,
+                        ]);
+                        return;
+                    }
+
+                    if ($wip->production_batch_id === null) {
+                        $sumBatchPlanned = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $order->tenant_id)
+                            ->where('production_order_id', $order->id)
+                            ->whereNotIn('status', ['cancelled'])
+                            ->sum('planned_quantity');
+
+                        $unallocatedQty = max(0.0000, (float) $order->quantity_ordered - (float) $sumBatchPlanned);
+                        if ($unallocatedQty <= 0) {
+                            $wip->update([
+                                'completed_quantity' => 0.0000,
+                                'available_quantity' => 0.0000,
+                                'quantity' => 0.0000,
+                                'status' => 'completed',
+                            ]);
+                            return;
+                        }
+                    }
+
+                    $opSeq = $wip->currentRoutingOperation?->sequence ?? 0;
+                    $isAtFinalStage = ($wip->current_routing_operation_id == $finalFgOp->routing_operation_id)
+                        || ($opSeq >= $finalFgOp->sequence);
+
+                    $isWipCompleted = ($isOrderOrFinalOpCompleted && $isAtFinalStage) || $wip->status === 'completed';
+
+                    if ($isWipCompleted) {
+                        $batchPlanned = $wip->batch ? (float) $wip->batch->planned_quantity : (float) $order->quantity_ordered;
+                        $completedProduced = max((float) $wip->completed_quantity, (float) $wip->available_quantity, (float) $finalFgOp->quantity_produced, $batchPlanned);
+                        $alreadyReceived = (float) $order->quantity_produced;
+                        $unreceivedQty = max(0.0000, $completedProduced - $alreadyReceived);
+
+                        $wip->update([
+                            'product_id' => $order->product_id,
+                            'current_routing_operation_id' => $finalFgOp->routing_operation_id ?? $wip->current_routing_operation_id,
+                            'current_work_center_id' => $finalFgOp->work_center_id ?? $wip->current_work_center_id,
+                            'completed_quantity' => $unreceivedQty,
+                            'available_quantity' => $unreceivedQty,
+                            'status' => 'completed',
+                        ]);
+                    }
+                });
+        }
 
         // 1. Reconcile Main Order (unbatched) WIP card
         $mainWip = ProductionWip::where('tenant_id', $order->tenant_id)
@@ -1528,7 +1648,7 @@ class ProductionWipService
             ->selectRaw('
                 count(*) as batch_count,
                 sum(available_quantity) as total_available,
-                sum(case when product_id = ? and current_routing_operation_id = ? then completed_quantity else 0 end) as total_completed,
+                sum(case when (product_id = ? or product_id is null) and (current_routing_operation_id = ? or status = "completed" or completed_quantity > 0) then (case when completed_quantity > 0 then completed_quantity else available_quantity end) else 0 end) as total_completed,
                 sum(rejected_quantity) as total_rejected,
                 sum(scrap_quantity) as total_scrap,
                 sum(rework_quantity) as total_rework,

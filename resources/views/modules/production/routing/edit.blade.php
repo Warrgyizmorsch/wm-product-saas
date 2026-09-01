@@ -92,7 +92,6 @@
                                 <tr>
                                     <th style="width: 45px;" class="text-center">{{ __('production.seq') }}</th>
                                     <th style="min-width: 310px;">{{ __('production.operation_name_yield') }}</th>
-                                    <th style="width: 125px;">{{ __('production.type') }}</th>
                                     <th style="width: 165px;">{{ __('production.work_center') }}</th>
                                     <th style="width: 165px;">{{ __('production.machine') }}</th>
                                     <th style="width: 65px;" class="text-end">{{ __('production.setup') }} (m)</th>
@@ -107,6 +106,7 @@
                                           <!-- Sequence -->
                                           <td class="align-middle text-center">
                                               <input type="number" x-bind:name="'operations['+index+'][sequence]'" class="odoo-table-input text-center font-monospace" x-model="operation.sequence" x-bind:readonly="autoSequence" required min="1" />
+                                              <input type="hidden" x-bind:name="'operations['+index+'][operation_type]'" :value="operation.is_external ? 'outsourcing' : (operation.quality_required ? 'inspection' : 'manufacturing')" />
                                           </td>
                                           
                                           <!-- Operation Name & Details -->
@@ -146,15 +146,15 @@
                                                       <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_batch_quantity" min="0.0001" />
                                                   </div>
                                               </div>
-                                          </td>
-                                          
-                                          <!-- Operation Type -->
-                                          <td class="align-middle">
-                                              <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][operation_type]'" class="odoo-table-select" x-model="operation.operation_type" required select2Selector="default">
-                                                  @foreach ($operationTypes as $val => $label)
-                                                      <option value="{{ $val }}">{{ __('production.op_type_' . $val) }}</option>
-                                                  @endforeach
-                                              </x-ui.odoo-form-ui>
+
+                                              <div class="mt-1">
+                                                  <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][material_id]'" class="odoo-table-select text-muted" x-model="operation.material_id" select2Selector="default">
+                                                      <option value="">-- Consumed Component Material (Optional) --</option>
+                                                      @foreach ($rawMaterials as $mat)
+                                                          <option value="{{ $mat->id }}">{{ $mat->name }} ({{ $mat->sku }})</option>
+                                                      @endforeach
+                                                  </x-ui.odoo-form-ui>
+                                              </div>
                                           </td>
                                           
                                           <!-- Work Center -->
@@ -213,7 +213,7 @@
 
                                       <!-- Subcontract Details Expanded Panel -->
                                      <tr x-show="operation.is_external" class="bg-light-subtle">
-                                         <td colspan="9" class="p-2 border-top-0">
+                                         <td colspan="8" class="p-2 border-top-0">
                                              <div class="row g-2 align-items-center fs-12 px-2 py-2 bg-white rounded border">
                                                  <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="select" label="Vendor *" x-bind:name="'operations['+index+'][vendor_id]'" class="form-select form-select-sm fs-11" x-model="operation.vendor_id" x-bind:required="operation.is_external">
@@ -270,7 +270,8 @@
 
                 <!-- Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">{{ __('production.update_routing') }}</button>
+                    <x-ui.button type="submit" variant="primary" class="px-4">{{ __('production.update_routing') }}</x-ui.button>
+                    <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-light px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
             </form>
@@ -310,6 +311,10 @@
                                 queue_threshold_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 overlap_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 transfer_batch_quantity: "{{ number_format($op->transfer_batch_quantity ?? 0, 2, '.', '') }}",
+                                @php
+                                    $firstMat = \App\Domains\Production\Models\RoutingOperationMaterial::where('routing_operation_id', $op->id)->first();
+                                @endphp
+                                material_id: "{{ $firstMat?->material_id ?? '' }}",
                                 availableMachines: []
                             });
                             // Fetch machines for the preloaded work center
@@ -354,6 +359,7 @@
                             queue_threshold_enabled: false,
                             overlap_enabled: false,
                             transfer_batch_quantity: '0.00',
+                            material_id: '',
                             availableMachines: []
                         });
                     },

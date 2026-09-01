@@ -30,6 +30,8 @@ class OperatorAssignmentService
                 ])
                 ->update(['status' => ProductionOperatorAssignment::STATUS_REJECTED]);
 
+            $op->update(['operator_id' => $operatorId]);
+
             $assignment = ProductionOperatorAssignment::create([
                 'tenant_id'                      => $tenantId,
                 'production_order_operation_id'  => $operationId,
@@ -67,6 +69,8 @@ class OperatorAssignmentService
             $this->validateOperatorQualification($newOperatorId, $op, $tenantId);
 
             $oldOperatorId = $assignment->user_id;
+
+            $op->update(['operator_id' => $newOperatorId]);
 
             $assignment->update([
                 'user_id'     => $newOperatorId,

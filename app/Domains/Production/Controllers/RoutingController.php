@@ -48,11 +48,12 @@ class RoutingController extends Controller
         $workCenters = $this->workCenterRepository->getActiveWorkCenters();
         $vendors     = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
+        $rawMaterials    = Product::whereIn('type', ['raw_material', 'semi_finished', 'finished_good'])->get();
         $operationTypes = config('production.operation_types', []);
         $selectedProductId = $request->query('product_id');
 
         return view('modules.production.routing.create', compact(
-            'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'selectedProductId'
+            'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'selectedProductId', 'rawMaterials'
         ));
     }
 
@@ -106,10 +107,11 @@ class RoutingController extends Controller
         $workCenters    = $this->workCenterRepository->getActiveWorkCenters();
         $vendors        = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
+        $rawMaterials   = Product::whereIn('type', ['raw_material', 'semi_finished', 'finished_good'])->get();
         $operationTypes = config('production.operation_types', []);
 
         return view('modules.production.routing.edit', compact(
-            'routing', 'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes'
+            'routing', 'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'rawMaterials'
         ));
     }
 

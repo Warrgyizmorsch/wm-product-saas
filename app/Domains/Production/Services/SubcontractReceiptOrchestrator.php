@@ -122,8 +122,17 @@ class SubcontractReceiptOrchestrator
                         $op->status = ProductionOrderOperation::STATUS_RUNNING;
                     } else {
                         $op->status = ProductionOrderOperation::STATUS_COMPLETED;
+                        $op->actual_end_time = now();
+
+                        \App\Domains\Production\Models\ProductionScheduleOperation::where('production_order_operation_id', $op->id)
+                            ->update([
+                                'status' => \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_COMPLETED,
+                                'actual_finish' => now(),
+                            ]);
                     }
                     $op->save();
+
+                    app(ProductionOrderService::class)->reconcileOperationReadiness($op->production_order_id);
 
                     // Ensure WIP record exists before transfer (preserving batch continuity)
                     $wip = ProductionWip::where('tenant_id', $op->tenant_id)
@@ -209,8 +218,17 @@ class SubcontractReceiptOrchestrator
                     $op->status = ProductionOrderOperation::STATUS_RUNNING;
                 } else {
                     $op->status = ProductionOrderOperation::STATUS_COMPLETED;
+                    $op->actual_end_time = now();
+
+                    \App\Domains\Production\Models\ProductionScheduleOperation::where('production_order_operation_id', $op->id)
+                        ->update([
+                            'status' => \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_COMPLETED,
+                            'actual_finish' => now(),
+                        ]);
                 }
                 $op->save();
+
+                app(ProductionOrderService::class)->reconcileOperationReadiness($op->production_order_id);
 
                 $batchId = $inspection->batch_id ?? $op->order?->batches?->first()?->id;
 
