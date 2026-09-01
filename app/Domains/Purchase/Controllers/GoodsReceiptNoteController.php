@@ -8,6 +8,7 @@ use App\Domains\Purchase\Services\GoodsReceiptNoteService;
 use App\Domains\Purchase\Models\GoodsReceiptNote;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\PurchaseOrderItem;
+use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Accounting\Services\JournalService;
@@ -79,6 +80,19 @@ class GoodsReceiptNoteController extends Controller
 
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $vendors = Vendor::where('tenant_id', $tenantId)->get();
+        $products = Product::where('tenant_id', $tenantId)->with('uom')->sellable()->orderBy('name')->get();
+        $productsPayload = $products->map(function($p) {
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'code' => $p->sku ?? $p->code ?? '',
+                'hsn_sac' => $p->hsn_sac ?? $p->hsn_code ?? '',
+                'uom_name' => $p->uom?->name ?? 'Pcs',
+                'cost_price' => (float)($p->cost_price ?? $p->unit_cost ?? 0.00),
+                'track_serial_number' => (bool)$p->track_serial_number,
+                'track_batch' => (bool)$p->track_batch,
+            ];
+        });
 
         $selectedPo = null;
         if ($request->filled('po_id')) {
@@ -93,6 +107,8 @@ class GoodsReceiptNoteController extends Controller
             'approvedOrders',
             'warehouses',
             'vendors',
+            'products',
+            'productsPayload',
             'selectedPo',
             'grnNumber'
         ));
@@ -129,6 +145,7 @@ class GoodsReceiptNoteController extends Controller
                 'product_id' => $first->product_id,
                 'product_name' => $first->product?->name ?? 'Product #' . $first->product_id,
                 'product_code' => $first->product?->sku ?? $first->product?->code ?? '',
+                'hsn_sac' => $first->product?->hsn_sac ?? $first->product?->hsn_code ?? '',
                 'uom_name' => $first->product?->uom?->name ?? 'Pcs',
                 'ordered_qty' => $orderedQty,
                 'previous_received_qty' => $prevReceived,
@@ -156,7 +173,7 @@ class GoodsReceiptNoteController extends Controller
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
-            'purchase_order_id' => 'required|exists:purchase_orders,id',
+            'purchase_order_id' => 'nullable|exists:purchase_orders,id',
             'vendor_id' => 'required|exists:vendors,id',
             'warehouse_id' => 'nullable|exists:warehouses,id',
             'received_date' => 'required|date',
@@ -167,10 +184,11 @@ class GoodsReceiptNoteController extends Controller
             'lr_number' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
-            'items.*.purchase_order_item_id' => 'required|exists:purchase_order_items,id',
-            'items.*.product_id' => 'nullable|exists:products,id',
-            'items.*.received_qty' => 'required|numeric|min:0',
+            'items.*.purchase_order_item_id' => 'nullable|exists:purchase_order_items,id',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.received_qty' => 'required|numeric|min:0.0001',
             'items.*.rejected_qty' => 'nullable|numeric|min:0',
+            'items.*.unit_rate' => 'nullable|numeric|min:0',
             'items.*.remarks' => 'nullable|string',
             'items.*.batch_number' => 'nullable|string',
             'items.*.manufacturing_date' => 'nullable|date',
