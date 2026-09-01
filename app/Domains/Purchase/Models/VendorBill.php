@@ -3,6 +3,8 @@
 namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,12 +14,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VendorBill extends BaseModel
 {
-    use HasFactory;
+    use BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'vendor_bills';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'bill_number',
         'vendor_invoice_number',
         'vendor_bill_number',

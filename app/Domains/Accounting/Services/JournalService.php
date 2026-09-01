@@ -25,6 +25,8 @@ class JournalService
      * @param array<int, array{chart_of_account_id: int, debit?: float, credit?: float, description?: string}> $lines
      * @param array{
      *     tenant_id?: int,
+     *     company_id?: int,
+     *     branch_id?: int,
      *     journal_date?: string|\DateTimeInterface,
      *     source?: string,
      *     voucher_type?: string,
@@ -38,11 +40,13 @@ class JournalService
     public function post(array $lines, array $meta = []): Journal
     {
         $tenantId = $meta['tenant_id'] ?? tenant_id();
+        $companyId = $meta['company_id'] ?? company_id();
+        $branchId = $meta['branch_id'] ?? branch_id();
         $journalDate = Carbon::parse($meta['journal_date'] ?? now());
 
         $this->assertLinesAreBalanced($lines);
 
-        return DB::transaction(function () use ($lines, $meta, $tenantId, $journalDate) {
+        return DB::transaction(function () use ($lines, $meta, $tenantId, $companyId, $branchId, $journalDate) {
             $period = $this->periods->assertOpenPeriodForDate($journalDate);
 
             $totalDebit = array_sum(array_column($lines, 'debit'));
@@ -52,6 +56,8 @@ class JournalService
 
             return $this->journals->createWithEntries([
                 'tenant_id' => $tenantId,
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
                 'accounting_period_id' => $period->id,
                 'journal_number' => $journalNumber,
                 'journal_date' => $journalDate,
@@ -96,6 +102,8 @@ class JournalService
 
             $reversal = $this->post($reversalLines, [
                 'tenant_id' => $original->tenant_id,
+                'company_id' => $original->company_id,
+                'branch_id' => $original->branch_id,
                 'journal_date' => now(),
                 'source' => $original->source,
                 'voucher_type' => $original->voucher_type,

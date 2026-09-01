@@ -3,14 +3,20 @@
 namespace App\Domains\Inventory\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductWarehouseStock extends BaseModel
 {
+    use BelongsToCompany, BelongsToBranch;
+
     protected $table = 'product_warehouse_stocks';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'product_id',
         'warehouse_id',
         'quantity',

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
@@ -16,11 +18,13 @@ use App\Domains\Production\Models\ProductionOrder;
 
 class MaterialRequirementItem extends Model
 {
-    use BelongsToTenant, HasFactory;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'material_requirement_items';
 
     protected $fillable = [
+        'company_id',
+        'branch_id',
         'material_requirement_id',
         'sales_order_item_id',
         'product_id',
@@ -139,6 +143,12 @@ class MaterialRequirementItem extends Model
         static::creating(function (self $item) {
             if (empty($item->tenant_id) && $item->materialRequirement) {
                 $item->tenant_id = $item->materialRequirement->tenant_id;
+            }
+            if (empty($item->company_id) && $item->materialRequirement) {
+                $item->company_id = $item->materialRequirement->company_id;
+            }
+            if (empty($item->branch_id) && $item->materialRequirement) {
+                $item->branch_id = $item->materialRequirement->branch_id;
             }
         });
     }

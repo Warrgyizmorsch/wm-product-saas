@@ -2,6 +2,8 @@
 
 namespace App\Domains\Purchase\Models;
 
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,10 +13,12 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ApprovalReminder extends Model
 {
-    use BelongsToTenant, HasFactory;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'remindable_type',
         'remindable_id',
         'user_id',

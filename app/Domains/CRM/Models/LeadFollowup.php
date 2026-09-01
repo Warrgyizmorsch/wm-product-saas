@@ -3,15 +3,19 @@
 namespace App\Domains\CRM\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LeadFollowup extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch;
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'lead_id',
         'crm_deal_id',
         'followup_date',

@@ -3,17 +3,21 @@
 namespace App\Domains\Inventory\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockReservation extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'stock_reservations';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'product_id',
         'warehouse_id',
         'reference_type', // Sales Order, Transfer, Manufacturing

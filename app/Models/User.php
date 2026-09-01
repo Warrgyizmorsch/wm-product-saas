@@ -30,6 +30,8 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'role_id',
         'name',
         'email',
@@ -87,4 +89,13 @@ class User extends Authenticatable
         return $this->hasOne(\App\Domains\HRMS\Models\Employee::class);
     }
 
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\HRMS\Models\Company::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\HRMS\Models\Branch::class);
+    }
 }

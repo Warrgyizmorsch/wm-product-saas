@@ -3,6 +3,8 @@
 namespace App\Domains\CRM\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,7 +18,7 @@ use App\Domains\Sales\Models\Invoice;
 
 class CrmAccount extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'crm_accounts';
 
@@ -36,6 +38,8 @@ class CrmAccount extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'customer_id',
         'account_number',
         'name',

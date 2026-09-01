@@ -3,6 +3,8 @@
 namespace App\Domains\Sales\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,12 +13,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MaterialRequirement extends BaseModel
 {
-    use BelongsToTenant, HasFactory, SoftDeletes;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
     protected $table = 'material_requirements';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'sales_order_id',
         'requirement_number',
         'requirement_date',

@@ -3,6 +3,8 @@
 namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use App\Domains\Sales\Models\SalesOrder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,12 +13,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PurchaseRequisition extends BaseModel
 {
-    use HasFactory;
+    use BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'purchase_requisitions';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'requisition_number',
         'requested_by',
         'requisition_date',

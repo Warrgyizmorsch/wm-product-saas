@@ -3,18 +3,22 @@
 namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TaxRate extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'accounting_tax_rates';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'name',
         'type',
         'rate',

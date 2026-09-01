@@ -2,6 +2,8 @@
 
 namespace App\Domains\CRM\Models;
 
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,12 +11,14 @@ use Illuminate\Support\Collection;
 
 class LeadStatus extends Model
 {
-    use BelongsToTenant, HasFactory;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'lead_statuses';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'name',
         'sort_order',
         'color',

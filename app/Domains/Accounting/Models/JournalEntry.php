@@ -3,17 +3,21 @@
 namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class JournalEntry extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'journal_entries';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'journal_id',
         'chart_of_account_id',
         'cost_center_id',

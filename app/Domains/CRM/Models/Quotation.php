@@ -3,6 +3,8 @@
 namespace App\Domains\CRM\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
 use App\Domains\Sales\Models\SalesOrder;
@@ -15,7 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Quotation extends BaseModel
 {
-    use BelongsToTenant, HasFactory, SoftDeletes;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
     protected function quotationNumber(): Attribute
     {
@@ -27,6 +29,8 @@ class Quotation extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'lead_id',        // Links this quotation to a specific lead (not just email)
         'crm_account_id',
         'crm_deal_id',

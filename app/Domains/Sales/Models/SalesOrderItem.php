@@ -5,17 +5,21 @@ namespace App\Domains\Sales\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 
 class SalesOrderItem extends Model
 {
-    use BelongsToTenant, HasFactory;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'sales_order_items';
 
     protected $fillable = [
+        'company_id',
+        'branch_id',
         'sales_order_id',
         'product_id',
         'warehouse_id',
@@ -58,6 +62,12 @@ class SalesOrderItem extends Model
         static::creating(function (self $item) {
             if (empty($item->tenant_id) && $item->salesOrder) {
                 $item->tenant_id = $item->salesOrder->tenant_id;
+            }
+            if (empty($item->company_id) && $item->salesOrder) {
+                $item->company_id = $item->salesOrder->company_id;
+            }
+            if (empty($item->branch_id) && $item->salesOrder) {
+                $item->branch_id = $item->salesOrder->branch_id;
             }
         });
     }

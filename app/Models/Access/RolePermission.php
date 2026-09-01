@@ -11,6 +11,7 @@ class RolePermission extends Model
     public const SCOPE_TEAM = 'team';
     public const SCOPE_DEPARTMENT = 'department';
     public const SCOPE_BRANCH = 'branch';
+    public const SCOPE_COMPANY = 'company';
     public const SCOPE_TENANT = 'tenant';
     public const SCOPE_PLATFORM = 'platform';
 
@@ -19,6 +20,7 @@ class RolePermission extends Model
         self::SCOPE_TEAM,
         self::SCOPE_DEPARTMENT,
         self::SCOPE_BRANCH,
+        self::SCOPE_COMPANY,
         self::SCOPE_TENANT,
         self::SCOPE_PLATFORM,
     ];

@@ -3,18 +3,22 @@
 namespace App\Domains\Projects\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TaskDependency extends BaseModel
 {
-    use BelongsToTenant, HasFactory;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'project_task_dependencies';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'project_id',
         'task_id',
         'depends_on_task_id',

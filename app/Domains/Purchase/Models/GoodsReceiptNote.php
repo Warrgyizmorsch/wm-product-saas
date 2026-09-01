@@ -5,6 +5,8 @@ namespace App\Domains\Purchase\Models;
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,12 +15,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class GoodsReceiptNote extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
     protected $table = 'goods_receipt_notes';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'grn_number',
         'purchase_order_id',
         'production_order_id',

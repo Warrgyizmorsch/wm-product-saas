@@ -3,6 +3,8 @@
 namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,12 +12,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PurchaseAdvancePayment extends BaseModel
 {
-    use HasFactory;
+    use BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'purchase_advance_payments';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'purchase_order_id',
         'vendor_id',
         'payment_number',

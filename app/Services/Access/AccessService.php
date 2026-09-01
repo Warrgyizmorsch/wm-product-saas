@@ -15,6 +15,7 @@ class AccessService
     /**
      * @param array{
      *     tenant_id?: int|null,
+     *     company_id?: int|null,
      *     branch_id?: int|null,
      *     department_id?: int|null,
      *     owner_id?: int|null
@@ -164,6 +165,7 @@ class AccessService
             RolePermission::SCOPE_PLATFORM => true,
             RolePermission::SCOPE_TENANT => $this->sameValue($context['tenant_id'] ?? null, $user->tenant_id),
             RolePermission::SCOPE_BRANCH => isset($context['branch_id']),
+            RolePermission::SCOPE_COMPANY => isset($context['company_id']),
             RolePermission::SCOPE_DEPARTMENT => isset($context['department_id']),
             RolePermission::SCOPE_OWN => $this->sameValue($context['owner_id'] ?? null, $user->id),
             RolePermission::SCOPE_TEAM => $this->sameValue($context['owner_id'] ?? null, $user->id),

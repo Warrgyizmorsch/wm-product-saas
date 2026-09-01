@@ -8,16 +8,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Sales\Models\SalesOrderItem;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 
 class PurchaseRequisitionItem extends Model
 {
-    use BelongsToTenant, HasFactory;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'purchase_requisition_items';
 
     protected $fillable = [
         'purchase_requisition_id',
+        'company_id',
+        'branch_id',
         'sales_order_item_id',
         'product_id',
         'warehouse_id',
@@ -59,6 +63,12 @@ class PurchaseRequisitionItem extends Model
         static::creating(function (self $item) {
             if (empty($item->tenant_id) && $item->requisition) {
                 $item->tenant_id = $item->requisition->tenant_id;
+            }
+            if (empty($item->company_id) && $item->requisition) {
+                $item->company_id = $item->requisition->company_id;
+            }
+            if (empty($item->branch_id) && $item->requisition) {
+                $item->branch_id = $item->requisition->branch_id;
             }
         });
     }

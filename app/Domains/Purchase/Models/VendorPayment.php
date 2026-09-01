@@ -3,6 +3,8 @@
 namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,12 +13,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VendorPayment extends BaseModel
 {
-    use HasFactory;
+    use BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'vendor_payments';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'payment_number',
         'vendor_id',
         'purchase_order_id',

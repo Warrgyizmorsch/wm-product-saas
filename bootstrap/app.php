@@ -3,6 +3,8 @@
 require_once __DIR__ . '/../app/helpers.php';
 
 use App\Http\Middleware\IdentifyTenant;
+use App\Http\Middleware\ResolveBranch;
+use App\Http\Middleware\ResolveCompany;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SetCurrency;
 use App\Http\Middleware\SetLocale;
@@ -26,6 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'identify.tenant' => IdentifyTenant::class,
             'tenant' => ResolveTenant::class,
             'tenant.required' => TenantMiddleware::class,
+            'company' => ResolveCompany::class,
+            'branch' => ResolveBranch::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [

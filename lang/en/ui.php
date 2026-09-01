@@ -98,6 +98,8 @@ return [
     'stock_adjustment' => 'Stock Adjustment',
     'supply_chain' => 'Supply Chain',
     'switch_tenant' => 'Switch Tenant',
+    'switch_company' => 'Switch Company',
+    'switch_branch' => 'Switch Branch',
     'tenant_dashboard' => 'Tenant Dashboard',
     'tenant_isolation' => 'Tenant isolation',
     'welcome_back' => 'Welcome back',

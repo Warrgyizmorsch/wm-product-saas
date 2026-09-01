@@ -3,6 +3,8 @@
 namespace App\Domains\Projects\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ActivityLog extends BaseModel
 {
-    use BelongsToTenant;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch;
 
     public const UPDATED_AT = null;
 
@@ -18,6 +20,8 @@ class ActivityLog extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'project_id',
         'subject_type',
         'subject_id',

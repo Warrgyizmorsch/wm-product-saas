@@ -3,6 +3,8 @@
 namespace App\Domains\Inventory\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,12 +12,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StockAdjustment extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'stock_adjustments';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'adjustment_number',
         'warehouse_id',
         'adjustment_date',

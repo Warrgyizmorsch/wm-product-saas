@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Core\Branch\BranchContext;
+use App\Core\Company\CompanyContext;
 use App\Core\Tenant\TenantContext;
+use App\Support\Branching;
+use App\Support\Companying;
 use App\Support\Tenancy;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
@@ -24,6 +28,12 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(Tenancy::class);
         $this->app->singleton(TenantContext::class, fn ($app) => $app->make(Tenancy::class));
+
+        $this->app->singleton(Companying::class);
+        $this->app->singleton(CompanyContext::class, fn ($app) => $app->make(Companying::class));
+
+        $this->app->singleton(Branching::class);
+        $this->app->singleton(BranchContext::class, fn ($app) => $app->make(Branching::class));
 
         \Illuminate\Support\Facades\Auth::provider('tenant-eloquent', function ($app, array $config) {
             return new \App\Support\Auth\TenantAwareUserProvider($app['hash'], $config['model']);
