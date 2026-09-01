@@ -40,10 +40,13 @@
             icon="feather-sliders">
             {{ __('production.adjust') }}
         </x-ui.button>
-        @if($wip->status === 'completed')
-            <x-ui.button variant="primary" data-bs-toggle="modal" data-bs-target="#convertToFgModal"
-                icon="feather-check-circle">
-                {{ __('production.convert') }}
+        @php
+            $unreceivedDetailQty = max(0, (float) ($wip->completed_quantity > 0 ? $wip->completed_quantity : ($wip->status === 'completed' ? $wip->available_quantity : 0)));
+        @endphp
+        @if($unreceivedDetailQty > 0)
+            <x-ui.button variant="success" data-bs-toggle="modal" data-bs-target="#convertToFgModal"
+                icon="feather-arrow-down-right">
+                Receive Completed FG ({{ number_format($unreceivedDetailQty, 0) }})
             </x-ui.button>
         @endif
     </div>
@@ -326,19 +329,19 @@
     </x-ui.modal>
 
     {{-- Convert WIP Modal --}}
-    @if($wip->status === 'completed' || $wip->available_quantity > 0)
-        <x-ui.modal id="convertToFgModal" title="{{ __('production.convert_to_fg') }}"
-            formAction="{{ route('production.wip.convert', $wip->id) }}" submitText="Complete FG Inflow" closeText="Cancel">
-            <x-ui.odoo-form-ui type="input" label="Convert Qty" name="convert_qty_dummy"
-                :value="number_format($wip->available_quantity, 2) . ' units'" readonly />
+    @if($wip->status === 'completed' || $wip->available_quantity > 0 || $wip->completed_quantity > 0)
+        <x-ui.modal id="convertToFgModal" title="Receive Finished Goods into Warehouse"
+            formAction="{{ route('production.wip.convert', $wip->id) }}" submitText="Receive {{ number_format($wip->completed_quantity > 0 ? $wip->completed_quantity : $wip->available_quantity, 2) }} Units into Warehouse" closeText="Cancel">
+            <x-ui.odoo-form-ui type="input" label="Receive Quantity" name="convert_qty_dummy"
+                :value="number_format($wip->completed_quantity > 0 ? $wip->completed_quantity : $wip->available_quantity, 2) . ' units'" readonly />
 
-            <x-ui.odoo-form-ui type="select" label="Warehouse" name="warehouse_id" :searchable="false" required>
+            <x-ui.odoo-form-ui type="select" label="Target Warehouse" name="warehouse_id" :searchable="false" required>
                 @foreach($warehouses as $w)
                     <option value="{{ $w->id }}">{{ $w->name }} {{ $w->is_default ? '(Default)' : '' }}</option>
                 @endforeach
             </x-ui.odoo-form-ui>
 
-            <x-ui.odoo-form-ui type="input" label="Remarks" name="remarks" placeholder="Comments..." />
+            <x-ui.odoo-form-ui type="input" label="Remarks" name="remarks" placeholder="Optional receipt comments..." />
         </x-ui.modal>
     @endif
 @endsection

@@ -329,12 +329,25 @@ class RoutingService
 
         foreach ($operationDTOs as $index => $opDto) {
             $seq = $opDto->sequence ?: (($index + 1) * 10);
-            RoutingOperation::create(array_merge($opDto->toArray(), [
+            $createdOp = RoutingOperation::create(array_merge($opDto->toArray(), [
                 'tenant_id'        => $tenantId,
                 'routing_id'       => $routing->id,
                 'sequence'         => $seq,
                 'operation_number' => $opDto->operation_number ?: 'OP-' . str_pad((string) $seq, 3, '0', STR_PAD_LEFT),
             ]));
+
+            if (!empty($opDto->material_id)) {
+                $matProd = \App\Domains\Inventory\Models\Product::find($opDto->material_id);
+                $uomId = $matProd?->uom_id ?? \App\Domains\Inventory\Models\Uom::first()?->id ?? 1;
+
+                \App\Domains\Production\Models\RoutingOperationMaterial::updateOrCreate(
+                    ['tenant_id' => $tenantId, 'routing_operation_id' => $createdOp->id, 'material_id' => $opDto->material_id],
+                    [
+                        'quantity' => 1.0,
+                        'uom_id' => $uomId,
+                    ]
+                );
+            }
         }
     }
 

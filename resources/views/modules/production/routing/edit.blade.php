@@ -146,6 +146,15 @@
                                                       <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_batch_quantity" min="0.0001" />
                                                   </div>
                                               </div>
+
+                                              <div class="mt-1">
+                                                  <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][material_id]'" class="odoo-table-select text-muted" x-model="operation.material_id" select2Selector="default">
+                                                      <option value="">-- Consumed Component Material (Optional) --</option>
+                                                      @foreach ($rawMaterials as $mat)
+                                                          <option value="{{ $mat->id }}">{{ $mat->name }} ({{ $mat->sku }})</option>
+                                                      @endforeach
+                                                  </x-ui.odoo-form-ui>
+                                              </div>
                                           </td>
                                           
                                           <!-- Operation Type -->
@@ -270,7 +279,8 @@
 
                 <!-- Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">{{ __('production.update_routing') }}</button>
+                    <x-ui.button type="submit" variant="primary" class="px-4">{{ __('production.update_routing') }}</x-ui.button>
+                    <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-light px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
             </form>
@@ -310,6 +320,10 @@
                                 queue_threshold_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 overlap_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 transfer_batch_quantity: "{{ number_format($op->transfer_batch_quantity ?? 0, 2, '.', '') }}",
+                                @php
+                                    $firstMat = \App\Domains\Production\Models\RoutingOperationMaterial::where('routing_operation_id', $op->id)->first();
+                                @endphp
+                                material_id: "{{ $firstMat?->material_id ?? '' }}",
                                 availableMachines: []
                             });
                             // Fetch machines for the preloaded work center
@@ -354,6 +368,7 @@
                             queue_threshold_enabled: false,
                             overlap_enabled: false,
                             transfer_batch_quantity: '0.00',
+                            material_id: '',
                             availableMachines: []
                         });
                     },

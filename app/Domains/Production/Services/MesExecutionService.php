@@ -83,29 +83,60 @@ class MesExecutionService
             }
 
             // Validate predecessor operations are complete or have transferred WIP via overlap
-            $incompletePredecessors = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                ->where('sequence', '<', $schedOp->sequence)
-                ->whereNotIn('status', [
-                    ProductionScheduleOperation::STATUS_COMPLETED,
-                    ProductionScheduleOperation::STATUS_SKIPPED,
-                    ProductionScheduleOperation::STATUS_CANCELLED,
-                ])
-                ->get();
+            $predOrderOpIds = [];
+            if ($orderOp) {
+                if ($orderOp->previous_operation_id) {
+                    $predOrderOpIds[] = (int) $orderOp->previous_operation_id;
+                }
+                $orderOp->loadMissing('predecessorDependencies');
+                foreach ($orderOp->predecessorDependencies as $predDep) {
+                    $predOrderOpIds[] = (int) $predDep->id;
+                }
+            }
 
-            $blockingPredecessors = $incompletePredecessors->filter(function (ProductionScheduleOperation $predOp) use ($orderOp, $schedOp): bool {
-                $predOrderOp = $predOp->orderOperation;
-                if ($predOrderOp && ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled)) {
-                    if (($orderOp && (float) $orderOp->quantity_transferred_in > 0) || ((float) $predOrderOp->quantity_transferred_out > 0) || ($schedOp->status === ProductionScheduleOperation::STATUS_READY)) {
-                        return false;
+            // Single-routing fallback if no explicit dependencies exist
+            if (empty($predOrderOpIds) && $orderOp) {
+                $isMultiRoutingOrder = ProductionOrderOperation::where('production_order_id', $orderOp->production_order_id)
+                    ->whereNotNull('source_product_id')
+                    ->where('source_product_id', '!=', $orderOp->order?->product_id)
+                    ->exists();
+
+                if (!$isMultiRoutingOrder && $schedOp->sequence > 10) {
+                    $prevSched = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                        ->where('sequence', '<', $schedOp->sequence)
+                        ->orderBy('sequence', 'desc')
+                        ->first();
+                    if ($prevSched && $prevSched->production_order_operation_id) {
+                        $predOrderOpIds[] = (int) $prevSched->production_order_operation_id;
                     }
                 }
-                return true;
-            });
+            }
 
-            if ($blockingPredecessors->isNotEmpty()) {
-                throw new InvalidArgumentException(
-                    "Cannot start operation #{$schedOp->sequence}. All predecessor operations must be completed or skipped first."
-                );
+            if (!empty($predOrderOpIds)) {
+                $incompletePredecessors = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->whereIn('production_order_operation_id', $predOrderOpIds)
+                    ->whereNotIn('status', [
+                        ProductionScheduleOperation::STATUS_COMPLETED,
+                        ProductionScheduleOperation::STATUS_SKIPPED,
+                        ProductionScheduleOperation::STATUS_CANCELLED,
+                    ])
+                    ->get();
+
+                $blockingPredecessors = $incompletePredecessors->filter(function (ProductionScheduleOperation $predOp) use ($orderOp, $schedOp): bool {
+                    $predOrderOp = $predOp->orderOperation;
+                    if ($predOrderOp && ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled)) {
+                        if (($orderOp && (float) $orderOp->quantity_transferred_in > 0) || ((float) $predOrderOp->quantity_transferred_out > 0) || ($schedOp->status === ProductionScheduleOperation::STATUS_READY)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+
+                if ($blockingPredecessors->isNotEmpty()) {
+                    throw new InvalidArgumentException(
+                        "Cannot start operation #{$schedOp->sequence}. All predecessor operations must be completed or skipped first."
+                    );
+                }
             }
 
             $blockedByQuality = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
@@ -453,7 +484,7 @@ class MesExecutionService
 
                 // Overproduction Limit Check
                 // Scrapped quantities represent discarded material and should not count toward the overproduction limit.
-                $plannedQty = (float) $schedOp->schedule->order->quantity_ordered;
+                $plannedQty = (float) ($orderOp->target_produced_qty > 0 ? $orderOp->target_produced_qty : ($schedOp->schedule->order->quantity_ordered ?? 1.0));
                 $totalProcessedSoFar = $orderOp->quantity_produced;
                 $currentProcessed = $produced;
                 $totalProcessed = $totalProcessedSoFar + $currentProcessed;
@@ -525,7 +556,14 @@ class MesExecutionService
 
                 $order = $schedOp->order ?? $schedOp->schedule->order ?? null;
                 if ($order) {
-                    $order->quantity_produced += $produced;
+                    $isFinalFgOp = !ProductionOrderOperation::where('tenant_id', $orderOp->tenant_id)
+                        ->where('production_order_id', $orderOp->production_order_id)
+                        ->where('sequence', '>', $orderOp->sequence)
+                        ->exists() && (!$orderOp->is_intermediate && ($orderOp->source_product_id === null || (int) $orderOp->source_product_id === (int) $order->product_id));
+
+                    if ($isFinalFgOp) {
+                        $order->quantity_produced += $produced;
+                    }
                     $order->quantity_rejected += $rejected;
                     $order->quantity_scrapped += $scrapped;
                     $order->save();
@@ -643,44 +681,9 @@ class MesExecutionService
                 app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($orderOp->id, $operatorId);
             }
 
-            // Advance successor operations in the same routing only if target quantity is reached
-            if ($orderOp && ($isTargetReached ?? false)) {
-                $successorOps = ProductionOrderOperation::where('production_order_id', $orderOp->production_order_id)
-                    ->where('previous_operation_id', $orderOp->id)
-                    ->where('status', ProductionOrderOperation::STATUS_WAITING)
-                    ->get();
-
-                foreach ($successorOps as $succOp) {
-                    $succOp->update(['status' => ProductionOrderOperation::STATUS_READY]);
-                    ProductionScheduleOperation::where('production_order_operation_id', $succOp->id)
-                        ->where('status', ProductionScheduleOperation::STATUS_WAITING)
-                        ->update(['status' => ProductionScheduleOperation::STATUS_READY]);
-                }
-            }
-
-            // Fallback for schedule operations
-            $nextSequence = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                ->where('sequence', '>', $schedOp->sequence)
-                ->min('sequence');
-
-            if ($nextSequence) {
-                $nextSchedOps = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                    ->where('sequence', $nextSequence)
-                    ->get();
-
-                foreach ($nextSchedOps as $nsOp) {
-                    if ($nsOp->isWaiting()) {
-                        // Ensure nsOp belongs to same routing/product if orderOp is present
-                        $nsOrderOp = ProductionOrderOperation::find($nsOp->production_order_operation_id);
-                        if (!$orderOp || !$nsOrderOp || $nsOrderOp->source_product_id === $orderOp->source_product_id) {
-                            $nsOp->update(['status' => ProductionScheduleOperation::STATUS_READY]);
-                            if ($nsOrderOp && $nsOrderOp->status === ProductionOrderOperation::STATUS_WAITING) {
-                                $nsOrderOp->status = ProductionOrderOperation::STATUS_READY;
-                                $nsOrderOp->save();
-                            }
-                        }
-                    }
-                }
+            // Advance successor operations to READY immediately via readiness reconciliation
+            if ($schedOp->production_order_id) {
+                app(\App\Domains\Production\Services\ProductionOrderService::class)->reconcileOperationReadiness($schedOp->production_order_id);
             }
 
             // Check if all schedule operations are terminal — if so, auto-complete schedule

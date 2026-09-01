@@ -256,4 +256,29 @@ class ProductionOrderOperation extends BaseModel
     {
         return (bool) ($this->is_external || $this->routingOperation?->isOutsourced() || $this->purchase_order_id !== null);
     }
+
+    public function getTargetProducedQtyAttribute(): float
+    {
+        if (array_key_exists('target_produced_qty', $this->attributes) && (float) $this->attributes['target_produced_qty'] > 0) {
+            return (float) $this->attributes['target_produced_qty'];
+        }
+
+        $order = $this->order;
+        if (!$order) {
+            return 1.0;
+        }
+
+        if (!empty($this->source_product_id) && (int) $this->source_product_id !== (int) $order->product_id) {
+            $bomItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $this->tenant_id)
+                ->where('bom_id', $order->bom_id)
+                ->where('material_id', $this->source_product_id)
+                ->first();
+            if ($bomItem && (float) $bomItem->quantity > 0) {
+                $baseQty = $order->bom?->base_quantity > 0 ? (float) $order->bom->base_quantity : 1.0;
+                return (float) $order->quantity_ordered * ((float) $bomItem->quantity / $baseQty);
+            }
+        }
+
+        return (float) ($order->quantity_ordered ?? 1.0);
+    }
 }

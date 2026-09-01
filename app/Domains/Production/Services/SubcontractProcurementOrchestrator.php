@@ -175,9 +175,9 @@ class SubcontractProcurementOrchestrator
                 throw new \InvalidArgumentException("Operation {$op->name} has no associated production order.");
             }
 
-            // Determine product to procure (subcontract service product or FG product)
-            $productId = $op->subcontract_service_product_id ?? $order->product_id;
-            $qty = (float) $order->quantity_ordered;
+            // Determine product to procure (subcontract service product, component product, or FG product)
+            $productId = $op->subcontract_service_product_id ?? $op->source_product_id ?? $order->product_id;
+            $qty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1.0));
             $unitCost = (float) ($op->subcontract_cost_per_unit ?? 0.0);
 
             // Check if PR already exists for this order/operation to prevent duplicate generation

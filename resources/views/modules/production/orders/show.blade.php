@@ -17,7 +17,7 @@
             max-height: calc(100vh - 260px);
             min-height: 480px;
             overflow-y: auto;
-            overflow-x: hidden;
+            overflow-x: auto;
             padding-right: 8px;
             padding-top: 10px;
             background-color: #F8FAFC;
@@ -51,7 +51,7 @@
             flex-shrink: 0;
         }
 
-        .table-responsive:has(.dropdown.show) {
+        .table-responsive {
             overflow: visible !important;
         }
 
@@ -116,7 +116,7 @@
                 </li>
                 <li>
                     <form method="POST" action="{{ route('production.orders.destroy', $order->id) }}"
-                        onsubmit="return confirmFormSubmit(event, '{{ __('production.confirm_delete_draft') }}', { title: 'Delete Production Order', variant: 'danger', confirmButtonText: 'Delete' });">
+                        onsubmit="return confirm('{{ __('production.confirm_delete_draft') }}');">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
@@ -140,7 +140,7 @@
             <x-ui.action-dropdown id="headerActionsDropdown">
                 <li>
                     <form method="POST" action="{{ route('production.orders.complete', $order->id) }}"
-                        onsubmit="return confirmFormSubmit(event, '{{ __('production.confirm_complete_order') }}', { title: 'Complete Production Order', variant: 'success', confirmButtonText: 'Complete' });">
+                        onsubmit="return confirm('{{ __('production.confirm_complete_order') }}');">
                         @csrf
                         <button type="submit" class="dropdown-item py-1.5 fs-12 text-success">
                             <i class="feather-check-circle me-2 text-success fs-12"></i>{{ __('production.complete_order') }}
@@ -185,7 +185,7 @@
                 </li>
                 <li>
                     <form method="POST" action="{{ route('production.orders.cancel', $order->id) }}"
-                        onsubmit="return confirmFormSubmit(event, '{{ __('production.confirm_cancel_order') }}', { title: 'Cancel Production Order', variant: 'danger', confirmButtonText: 'Cancel Order' });">
+                        onsubmit="return confirm('{{ __('production.confirm_cancel_order') }}');">
                         @csrf
                         <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
                             <i class="feather-slash me-2 text-danger fs-12"></i>{{ __('production.cancel_order') }}
@@ -198,7 +198,7 @@
         @if($order->isCompleted())
             {{-- Close & Archive Order Button --}}
             <form method="POST" action="{{ route('production.orders.close', $order->id) }}"
-                onsubmit="return confirmFormSubmit(event, '{{ __('production.confirm_close_order') }}', { title: 'Close & Archive Order', variant: 'secondary', confirmButtonText: 'Close & Archive' });"
+                onsubmit="return confirm('{{ __('production.confirm_close_order') }}');"
                 class="d-inline">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1.5">
@@ -400,6 +400,7 @@
             $verticalTabs = [
                 ['id' => 'vtab-overview', 'label' => __('production.overview'), 'active' => $activeTab === 'vtab-overview', 'icon' => 'feather-activity'],
                 ['id' => 'vtab-operations', 'label' => __('production.operations_routing'), 'active' => $activeTab === 'vtab-operations', 'icon' => 'feather-cpu'],
+                ['id' => 'vtab-component-plan', 'label' => 'Component Plan', 'active' => $activeTab === 'vtab-component-plan', 'icon' => 'feather-grid'],
             ];
 
             if ($order->production_model !== 'pure_manufacturing' || $order->operations->contains('is_external', true)) {
@@ -1395,6 +1396,486 @@
                         </div>
                     </div>
 
+                    {{-- Tab 2.1: Component Production Plan --}}
+                    <div class="tab-pane fade {{ $activeTab === 'vtab-component-plan' ? 'show active' : '' }}"
+                        id="vtab-component-plan" role="tabpanel" aria-labelledby="vtab-component-plan-tab">
+                        
+                        {{-- Section Summary Header Context Banner --}}
+                        <div class="card mb-3 border shadow-sm rounded-3 bg-light">
+                            <div class="card-body p-3">
+                                <div class="row align-items-center g-3">
+                                    <div class="col-md-5">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="avatar-text bg-soft-primary text-primary rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                                                <i class="feather-layers fs-16"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark fs-14 d-flex align-items-center gap-2">
+                                                    <span>{{ $order->order_number }}</span>
+                                                    <span class="text-muted">&middot;</span>
+                                                    <span class="text-primary">{{ $order->product->name ?? 'Finished Good' }}</span>
+                                                </div>
+                                                <div class="fs-12 text-muted">
+                                                    Finished Good Target: <strong class="text-dark">{{ number_format($order->quantity_ordered, 2) }} {{ $order->product->uom->code ?? 'units' }}</strong>
+                                                    <span class="mx-1">&bull;</span> Due: <strong>{{ $order->due_date ? \Carbon\Carbon::parse($order->due_date)->format('d M Y') : 'N/A' }}</strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-7">
+                                        @php
+                                            $cTotalOps = $order->operations->count();
+                                            $cCompletedOps = $order->operations->where('status', 'completed')->count();
+                                            $cRunningOps = $order->operations->where('status', 'running')->count();
+                                            $cWaitingOps = $order->operations->whereIn('status', ['ready', 'waiting', 'scheduled'])->count();
+                                            $cRoutingProgress = $cTotalOps > 0 ? round(($cCompletedOps / $cTotalOps) * 100, 1) : 0;
+                                        @endphp
+                                        <div class="row text-center g-2 fs-11">
+                                            <div class="col-3">
+                                                <div class="p-2 border rounded bg-white">
+                                                    <span class="text-muted d-block fs-10 text-uppercase fw-semibold">Total Operations</span>
+                                                    <span class="fw-bold fs-13 text-dark">{{ $cTotalOps }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-3">
+                                                <div class="p-2 border rounded bg-white">
+                                                    <span class="text-muted d-block fs-10 text-uppercase fw-semibold">Completed</span>
+                                                    <span class="fw-bold fs-13 text-success">{{ $cCompletedOps }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-3">
+                                                <div class="p-2 border rounded bg-white">
+                                                    <span class="text-muted d-block fs-10 text-uppercase fw-semibold">Active / Running</span>
+                                                    <span class="fw-bold fs-13 text-primary">{{ $cRunningOps }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-3">
+                                                <div class="p-2 border rounded bg-white">
+                                                    <span class="text-muted d-block fs-10 text-uppercase fw-semibold">Routing Progress</span>
+                                                    <span class="fw-bold fs-13 text-info">{{ $cRoutingProgress }}%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <style>
+                            #componentPlanSubTabs .nav-link {
+                                transition: all 0.2s ease-in-out;
+                            }
+                            #componentPlanSubTabs .nav-link.active {
+                                background-color: var(--bs-primary, #0000FF) !important;
+                                color: #ffffff !important;
+                                box-shadow: 0 2px 6px rgba(0, 0, 255, 0.25) !important;
+                            }
+                            .accordion-rotate-icon {
+                                transition: transform 0.25s ease-in-out;
+                                display: inline-block;
+                            }
+                            .collapsed .accordion-rotate-icon {
+                                transform: rotate(0deg);
+                            }
+                            button:not(.collapsed) .accordion-rotate-icon {
+                                transform: rotate(90deg);
+                            }
+                        </style>
+
+                        {{-- Sub-view Navigation Toggle: Matrix View vs Hierarchical Tree View --}}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <ul class="nav nav-pills nav-pills-sm border p-1 rounded-3 bg-white shadow-sm" id="componentPlanSubTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active py-1.5 px-3 fs-12 fw-bold rounded-2" id="cp-matrix-tab" data-bs-toggle="pill" data-bs-target="#cp-matrix-view" type="button" role="tab">
+                                        <i class="feather-grid me-1.5"></i> Component Plan Matrix
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link py-1.5 px-3 fs-12 fw-bold rounded-2" id="cp-tree-tab" data-bs-toggle="pill" data-bs-target="#cp-tree-view" type="button" role="tab">
+                                        <i class="feather-list me-1.5"></i> Hierarchical Process & BOM Tree
+                                    </button>
+                                </li>
+                            </ul>
+                            <div class="fs-12 text-muted">
+                                <i class="feather-info me-1 text-primary"></i> Process operations & component materials mapped automatically via BOM & Routing
+                            </div>
+                        </div>
+
+                        <div class="tab-content" id="componentPlanSubTabsContent">
+                            {{-- View 1: Standard Component Matrix View --}}
+                            <div class="tab-pane fade show active" id="cp-matrix-view" role="tabpanel">
+                                <div class="table-responsive border rounded-3 shadow-sm">
+                                    <x-ui.odoo-form-ui type="table">
+                                        <thead class="bg-light text-uppercase fs-11 text-muted border-bottom">
+                                            <tr>
+                                                <th style="width: 25%">Item / Component</th>
+                                                <th style="width: 17%">Operation</th>
+                                                <th style="width: 17%">Resource</th>
+                                                <th style="width: 13%" class="text-end">Requirement</th>
+                                                <th style="width: 12%">Schedule</th>
+                                                <th style="width: 11%">Execution</th>
+                                                <th style="width: 5%" class="text-center">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($order->operations as $cOp)
+                                                @php
+                                                    $itemProduct = $cOp->sourceProduct ?? $order->product;
+                                                    $bomItemRatio = 1.0;
+                                                    if ($itemProduct && (int) $itemProduct->id !== (int) $order->product_id) {
+                                                        $bItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $cOp->tenant_id)
+                                                            ->where('bom_id', $order->bom_id)
+                                                            ->where('material_id', $itemProduct->id)
+                                                            ->first();
+                                                        if ($bItem && (float) $bItem->quantity > 0) {
+                                                            $bBase = $order->bom?->base_quantity > 0 ? (float) $order->bom->base_quantity : 1.0;
+                                                            $bomItemRatio = (float) $bItem->quantity / $bBase;
+                                                        }
+                                                    }
+                                                    $targetQty = (float) ($cOp->target_produced_qty > 0 ? $cOp->target_produced_qty : ($order->quantity_ordered * $bomItemRatio));
+                                                    $doneQty = (float) $cOp->quantity_produced;
+                                                    $rejectedQty = (float) $cOp->quantity_rejected;
+                                                    $scrappedQty = (float) $cOp->quantity_scrapped;
+                                                    $reworkQty = (float) ($cOp->quantity_rework ?? 0);
+                                                    $pendingQty = max(0.0, $targetQty - $doneQty);
+                                                    $pct = $targetQty > 0 ? min(100.0, ($doneQty / $targetQty) * 100) : 0.0;
+                                                    $itemUom = $itemProduct->uom->code ?? 'Pcs';
+                                                    
+                                                    $isSfg = ($itemProduct && (int) $itemProduct->id !== (int) $order->product_id);
+                                                    $isExternal = (bool) $cOp->is_external;
+                                                    $level = $cOp->bom_level ?? ($isSfg ? 2 : 1);
+                                                @endphp
+                                                <tr class="bg-white">
+                                                    {{-- Cell 1: Item / Component --}}
+                                                    <td class="bg-white">
+                                                        <div class="d-flex align-items-start gap-2">
+                                                            <button type="button" class="btn btn-xs btn-outline-primary p-1 border-0 text-primary bg-transparent rounded-2 shadow-none me-1 collapsed" 
+                                                                data-bs-toggle="collapse" data-bs-target="#op-detail-{{ $cOp->id }}" 
+                                                                aria-expanded="false" aria-controls="op-detail-{{ $cOp->id }}" title="Toggle operation details">
+                                                                <i class="feather-chevron-right fs-12 accordion-rotate-icon"></i>
+                                                            </button>
+                                                            <div>
+                                                                <div class="d-flex align-items-center gap-1.5 mb-0.5">
+                                                                    <span class="badge {{ $level > 1 ? 'bg-soft-purple text-purple border border-purple-subtle' : 'bg-soft-primary text-primary border' }} fs-10 py-0.5 px-1.5">
+                                                                        {{ $level > 1 ? 'L'.$level.' SFG' : 'L1 FG' }}
+                                                                    </span>
+                                                                    <span class="fw-bold text-dark fs-12">{{ $itemProduct->name }}</span>
+                                                                </div>
+                                                                <div class="fs-10 text-muted font-monospace d-flex align-items-center gap-2">
+                                                                    <span><i class="feather-tag me-0.5"></i>{{ $itemProduct->sku ?? 'SKU-N/A' }}</span>
+                                                                    <span>&bull;</span>
+                                                                    <span class="text-secondary fw-semibold">{{ number_format($bomItemRatio, 2) }} {{ $itemUom }}/FG</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    {{-- Cell 2: Operation --}}
+                                                    <td class="bg-white">
+                                                        <div class="fw-bold text-primary fs-12">
+                                                            OP{{ $cOp->sequence ?? $loop->iteration * 10 }} &middot; {{ $cOp->name }}
+                                                        </div>
+                                                        <div class="fs-10 text-muted">
+                                                            @if($isExternal)
+                                                                <span class="badge bg-soft-purple text-purple border fs-10 px-1.5 py-0.5">
+                                                                    <i class="feather-truck me-1"></i>External Subcontract
+                                                                </span>
+                                                            @else
+                                                                <span class="badge bg-soft-secondary text-secondary border fs-10 px-1.5 py-0.5">
+                                                                    <i class="feather-cpu me-1"></i>Internal Routing
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    </td>
+
+                                                    {{-- Cell 3: Resource --}}
+                                                    <td class="bg-white">
+                                                        @if($isExternal)
+                                                            <div class="fw-semibold text-dark fs-11"><i class="feather-users me-1 text-purple"></i>{{ $cOp->vendor->name ?? 'Outsourced Vendor' }}</div>
+                                                            <div class="fs-10 text-muted">Subcontract Vendor</div>
+                                                        @else
+                                                            <div class="fw-semibold text-dark fs-11"><i class="feather-grid me-1 text-primary"></i>{{ $cOp->workCenter->name ?? 'Workstation Unassigned' }}</div>
+                                                            <div class="fs-10 text-muted">
+                                                                @if($cOp->machine)
+                                                                    <i class="feather-cpu me-1"></i>{{ $cOp->machine->name }}
+                                                                @else
+                                                                    <span class="fst-italic">Machine not assigned</span>
+                                                                @endif
+                                                            </div>
+                                                        @endif
+                                                    </td>
+
+                                                    {{-- Cell 4: Requirement --}}
+                                                    <td class="text-end bg-white">
+                                                        <div class="fw-bold text-dark fs-13 font-monospace">
+                                                            {{ number_format($targetQty, 2) }} <small class="text-muted fs-10">{{ $itemUom }}</small>
+                                                        </div>
+                                                        <div class="fs-10 text-muted">
+                                                            {{ number_format($bomItemRatio, 2) }} &times; {{ number_format($order->quantity_ordered, 0) }} FG
+                                                        </div>
+                                                    </td>
+
+                                                    {{-- Cell 5: Schedule --}}
+                                                    <td class="fs-11 text-muted bg-white">
+                                                        @if($cOp->scheduleOperation)
+                                                            @php
+                                                                $isOverdue = $cOp->scheduleOperation->planned_finish && $cOp->scheduleOperation->planned_finish->isPast() && $cOp->status !== 'completed';
+                                                            @endphp
+                                                            <div class="{{ $isOverdue ? 'text-danger fw-bold' : '' }}">
+                                                                <i class="feather-calendar me-1"></i>{{ $cOp->scheduleOperation->planned_start ? $cOp->scheduleOperation->planned_start->format('d M H:i') : '-' }}
+                                                            </div>
+                                                            <div class="{{ $isOverdue ? 'text-danger fw-bold' : '' }}">
+                                                                <i class="feather-flag me-1"></i>{{ $cOp->scheduleOperation->planned_finish ? $cOp->scheduleOperation->planned_finish->format('d M H:i') : '-' }}
+                                                            </div>
+                                                        @else
+                                                            <span class="badge bg-soft-secondary text-secondary border fs-10">Not Scheduled</span>
+                                                        @endif
+                                                    </td>
+
+                                                    {{-- Cell 6: Execution Progress --}}
+                                                    <td class="bg-white">
+                                                        <div class="d-flex justify-content-between fs-11 mb-1">
+                                                            <span class="fw-bold text-success font-monospace">{{ number_format($doneQty, 1) }}</span>
+                                                            <span class="text-muted font-monospace">/ {{ number_format($targetQty, 0) }} {{ $itemUom }}</span>
+                                                        </div>
+                                                        <div class="progress style-3" style="height: 6px;">
+                                                            <div class="progress-bar {{ $pct >= 100 ? 'bg-success' : ($pct > 0 ? 'bg-primary' : 'bg-secondary') }}" 
+                                                                role="progressbar" style="width: {{ $pct }}%" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                                        </div>
+                                                        @if($rejectedQty > 0 || $scrappedQty > 0 || $reworkQty > 0)
+                                                            <div class="fs-10 mt-1 d-flex flex-wrap gap-1">
+                                                                @if($rejectedQty > 0)
+                                                                    <span class="badge bg-soft-danger text-danger fs-9 p-0.5 px-1">Rej: {{ number_format($rejectedQty, 0) }}</span>
+                                                                @endif
+                                                                @if($scrappedQty > 0)
+                                                                    <span class="badge bg-soft-dark text-dark fs-9 p-0.5 px-1">Scrap: {{ number_format($scrappedQty, 0) }}</span>
+                                                                @endif
+                                                                @if($reworkQty > 0)
+                                                                    <span class="badge bg-soft-warning text-warning fs-9 p-0.5 px-1">Rework: {{ number_format($reworkQty, 0) }}</span>
+                                                                @endif
+                                                            </div>
+                                                        @endif
+                                                    </td>
+
+                                                    {{-- Cell 7: Status --}}
+                                                    <td class="text-center bg-white">
+                                                        @if($cOp->status === 'completed')
+                                                            <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fs-11"><i class="feather-check-circle me-1"></i>Completed</span>
+                                                        @elseif($cOp->status === 'running')
+                                                            <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-1 fs-11"><i class="feather-play me-1"></i>Running</span>
+                                                        @elseif($cOp->status === 'ready')
+                                                            <span class="badge bg-soft-info text-info border border-info-subtle px-2 py-1 fs-11"><i class="feather-clock me-1"></i>Ready</span>
+                                                        @elseif($cOp->status === 'qc_hold')
+                                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle px-2 py-1 fs-11"><i class="feather-shield me-1"></i>QC Hold</span>
+                                                        @elseif($cOp->status === 'rework')
+                                                            <span class="badge bg-soft-danger text-danger border border-danger-subtle px-2 py-1 fs-11"><i class="feather-alert-triangle me-1"></i>Rework</span>
+                                                        @else
+                                                            <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle px-2 py-1 fs-11">{{ ucfirst($cOp->status) }}</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+
+                                                {{-- Expandable Drawer Detail Panel --}}
+                                                <tr id="op-detail-{{ $cOp->id }}" class="collapse bg-white border-bottom">
+                                                    <td colspan="7" class="p-3 bg-white">
+                                                        <div class="card border border-light-subtle shadow-sm mb-0 rounded-3 bg-light-subtle">
+                                                            <div class="card-body p-3">
+                                                                <div class="row g-3 fs-11">
+                                                                    {{-- Column 1: Material Inputs Required --}}
+                                                                    <div class="col-md-4 border-end">
+                                                                        <h6 class="fw-bold text-dark fs-12 mb-2 d-flex align-items-center gap-1">
+                                                                            <i class="feather-box text-primary"></i>Material Inputs Required
+                                                                        </h6>
+                                                                        @php
+                                                                            $bomMaterials = \App\Domains\Production\Models\RoutingOperationMaterial::where('routing_operation_id', $cOp->routing_operation_id)->get();
+                                                                        @endphp
+                                                                        @if($bomMaterials->isNotEmpty())
+                                                                            <ul class="list-group list-group-flush border rounded-2 fs-11">
+                                                                                @foreach($bomMaterials as $bMat)
+                                                                                    @php
+                                                                                        $matProd = \App\Domains\Inventory\Models\Product::find($bMat->material_id);
+                                                                                    @endphp
+                                                                                    <li class="list-group-item d-flex justify-content-between align-items-center py-1.5 px-2 bg-white">
+                                                                                        <span>{{ $matProd->name ?? 'Material Item' }}</span>
+                                                                                        <span class="fw-bold text-dark font-monospace">{{ number_format($bMat->quantity * $order->quantity_ordered, 2) }} {{ $matProd->uom->code ?? 'units' }}</span>
+                                                                                    </li>
+                                                                                @endforeach
+                                                                            </ul>
+                                                                        @else
+                                                                            <div class="text-muted fs-11 fst-italic">Standard BOM component routing operation</div>
+                                                                        @endif
+                                                                    </div>
+
+                                                                    {{-- Column 2: Execution & Quality Metrics --}}
+                                                                    <div class="col-md-4 border-end">
+                                                                        <h6 class="fw-bold text-dark fs-12 mb-2 d-flex align-items-center gap-1">
+                                                                            <i class="feather-check-square text-success"></i>Execution & Quality Summary
+                                                                        </h6>
+                                                                        <div class="bg-white p-2 border rounded-2">
+                                                                            <div class="d-flex justify-content-between mb-1">
+                                                                                <span class="text-muted">Assigned Operator:</span>
+                                                                                <strong class="text-dark">{{ $cOp->operator->name ?? 'Unassigned' }}</strong>
+                                                                            </div>
+                                                                            <div class="d-flex justify-content-between mb-1">
+                                                                                <span class="text-muted">Target Requirement:</span>
+                                                                                <strong class="text-dark">{{ number_format($targetQty, 2) }} {{ $itemUom }}</strong>
+                                                                            </div>
+                                                                            <div class="d-flex justify-content-between mb-1">
+                                                                                <span class="text-muted">Good Output Produced:</span>
+                                                                                <strong class="text-success">{{ number_format($doneQty, 2) }} {{ $itemUom }}</strong>
+                                                                            </div>
+                                                                            <div class="d-flex justify-content-between">
+                                                                                <span class="text-muted">Pending Balance:</span>
+                                                                                <strong class="text-primary">{{ number_format($pendingQty, 2) }} {{ $itemUom }}</strong>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {{-- Column 3: Contextual Quick Actions --}}
+                                                                    <div class="col-md-4">
+                                                                        <h6 class="fw-bold text-dark fs-12 mb-2 d-flex align-items-center gap-1">
+                                                                            <i class="feather-command text-info"></i>Contextual Action Shortcuts
+                                                                        </h6>
+                                                                        <div class="d-flex flex-wrap gap-2">
+                                                                            <a href="{{ route('production.mes.dashboard') }}" class="btn btn-sm btn-outline-primary fs-11 py-1 px-2">
+                                                                                <i class="feather-play me-1"></i>Open MES Console
+                                                                            </a>
+                                                                            @if($isExternal)
+                                                                                <a href="{{ route('production.subcontract.delivery-challans.index') }}" class="btn btn-sm btn-outline-purple fs-11 py-1 px-2">
+                                                                                    <i class="feather-file-text me-1"></i>Manage Subcontract
+                                                                                </a>
+                                                                            @endif
+                                                                            <a href="{{ route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-operations']) }}" class="btn btn-sm btn-outline-secondary fs-11 py-1 px-2">
+                                                                                <i class="feather-edit me-1"></i>View Operations Tab
+                                                                            </a>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                            </div>
+
+                            {{-- View 2: Hierarchical Process & BOM Tree (Image Format) --}}
+                            <div class="tab-pane fade" id="cp-tree-view" role="tabpanel">
+                                <div class="table-responsive border rounded-3 shadow-sm">
+                                    <x-ui.odoo-form-ui type="table">
+                                        <thead class="bg-light text-uppercase fs-11 text-muted border-bottom">
+                                            <tr>
+                                                <th style="width: 8%" class="ps-3">Sr. No</th>
+                                                <th style="width: 32%">Process Name</th>
+                                                <th style="width: 35%">Component Name</th>
+                                        <th style="width: 13%" class="text-end">Requirement</th>
+                                        <th style="width: 12%" class="text-center">Status / Scrap</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($order->operations as $opIndex => $treeOp)
+                                        @php
+                                            $opSrNo = $opIndex + 1; // 1, 2, 3, 4...
+                                            $opProduct = $treeOp->sourceProduct ?? $order->product;
+                                            $bomMaterials = \App\Domains\Production\Models\RoutingOperationMaterial::where('routing_operation_id', $treeOp->routing_operation_id)->get();
+                                            $targetQty = (float) ($treeOp->target_produced_qty > 0 ? $treeOp->target_produced_qty : $order->quantity_ordered);
+                                        @endphp
+
+                                        {{-- Operation Step Row --}}
+                                        <tr class="fw-semibold bg-light-subtle">
+                                            <td class="ps-3 text-dark fw-bold font-monospace fs-12">{{ $opSrNo }}</td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-1.5">
+                                                    <i class="feather-cpu text-primary fs-13"></i>
+                                                    <span class="fw-bold text-dark fs-12">{{ $treeOp->name }}</span>
+                                                    <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-9 font-monospace">OP{{ $treeOp->sequence }}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="text-dark fw-medium">{{ $opProduct->name }}</span>
+                                                @if($opProduct?->sku)
+                                                    <small class="text-muted font-monospace fs-10">({{ $opProduct->sku }})</small>
+                                                @endif
+                                            </td>
+                                            <td class="text-end font-monospace fw-bold">{{ number_format($targetQty, 2) }} {{ $opProduct->uom->code ?? 'Pcs' }}</td>
+                                            <td class="text-center">
+                                                @if($treeOp->status === 'completed')
+                                                    <span class="badge bg-soft-success text-success border border-success-subtle fs-10 px-2 py-0.5"><i class="feather-check-circle me-1"></i>Completed</span>
+                                                @elseif($treeOp->status === 'running')
+                                                    <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 px-2 py-0.5"><i class="feather-play me-1"></i>Running</span>
+                                                @elseif($treeOp->status === 'ready')
+                                                    <span class="badge bg-soft-info text-info border border-info-subtle fs-10 px-2 py-0.5"><i class="feather-clock me-1"></i>Ready</span>
+                                                @else
+                                                    <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle fs-10 px-2 py-0.5">{{ ucfirst($treeOp->status) }}</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+
+                                        {{-- Child Material Consumption Rows under this Process Step --}}
+                                        @forelse($bomMaterials as $matIdx => $bMat)
+                                            @php
+                                                $subSrNo = $opSrNo . "." . ($matIdx + 1); // 1.1, 1.2, 2.1, 2.2...
+                                                $matProd = \App\Domains\Inventory\Models\Product::find($bMat->material_id);
+                                                $reqQty = (float) $bMat->quantity * $order->quantity_ordered;
+                                            @endphp
+                                            <tr>
+                                                <td class="ps-4 text-muted font-monospace fs-11">{{ $subSrNo }}</td>
+                                                <td class="ps-4 text-muted fs-11">
+                                                    <i class="feather-corner-down-right text-secondary me-1"></i> {{ $treeOp->name }} (Input Material)
+                                                </td>
+                                                <td class="ps-4 fw-medium text-dark fs-11">
+                                                    <i class="feather-box text-primary me-1 fs-11"></i>
+                                                    <span>{{ $matProd->name ?? 'Material Component' }}</span>
+                                                    @if($matProd?->sku)
+                                                        <small class="text-muted font-monospace fs-10">({{ $matProd->sku }})</small>
+                                                    @endif
+                                                </td>
+                                                <td class="text-end font-monospace fs-11">{{ number_format($reqQty, 2) }} {{ $matProd->uom->code ?? 'units' }}</td>
+                                                <td class="text-center fs-11">
+                                                    @if(($treeOp->quantity_scrapped + $treeOp->quantity_rejected) > 0)
+                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-10">Scrap: {{ number_format($treeOp->quantity_scrapped + $treeOp->quantity_rejected, 1) }}</span>
+                                                    @else
+                                                        <span class="text-muted fs-10">OK</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td class="ps-4 text-muted font-monospace fs-11">{{ $opSrNo }}.1</td>
+                                                <td class="ps-4 text-muted fs-11"><i class="feather-corner-down-right text-secondary me-1"></i> Direct Processing</td>
+                                                <td class="ps-4 text-muted fs-11 fst-italic">Standard BOM process routing component</td>
+                                                <td class="text-end font-monospace fs-11">—</td>
+                                                <td class="text-center text-muted fs-11">—</td>
+                                            </tr>
+                                        @endforelse
+                                    @endforeach
+
+                                    {{-- LAST ROW: Final Assembly & FG Finished Good Receipt --}}
+                                    <tr class="table-primary border-top border-primary-subtle fw-bold fs-12">
+                                        <td class="text-center text-primary fs-11"><i class="feather-check-square"></i></td>
+                                        <td class="text-primary fw-bold">
+                                            <i class="feather-package me-1"></i> Final Product Receipt (FG Assembly)
+                                        </td>
+                                        <td>
+                                            <span class="fw-bold text-dark">{{ $order->product->name }}</span>
+                                            <span class="badge bg-primary text-white ms-1 fs-9">Finished Good Output</span>
+                                        </td>
+                                        <td class="text-end font-monospace text-dark fw-bold">{{ number_format($order->quantity_ordered, 2) }} {{ $order->product->uom->code ?? 'Pcs' }}</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fs-11">
+                                                <i class="feather-check-circle me-1"></i>{{ number_format($order->quantity_produced, 2) }} Received
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </x-ui.table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
                     {{-- Tab 4: Reservations & Store Requisitions --}}
                     <div class="tab-pane fade {{ $activeTab === 'vtab-reservations' ? 'show active' : '' }}"
                         id="vtab-reservations" role="tabpanel" aria-labelledby="vtab-reservations-tab">
@@ -1449,8 +1930,8 @@
                                 </div>
                                 <div class="d-flex align-items-center gap-3">
                                     <div class="text-end">
-                                        <span class="fs-11 text-muted d-block">Requested Components</span>
-                                        <span class="fw-bold text-dark fs-13">{{ $order->reservations->count() }} items</span>
+                                         <span class="fs-11 text-muted d-block">Requested Components</span>
+                                        <span class="fw-bold text-dark fs-13">{{ $order->reservations->pluck('product_id')->unique()->count() }} items</span>
                                     </div>
                                 </div>
                             </div>
@@ -1472,7 +1953,16 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($order->reservations as $res)
+                                    @php
+                                        $displayReservations = $order->reservations->groupBy('product_id')->map(function($group) {
+                                            $first = clone $group->first();
+                                            $first->quantity_planned = $group->sum('quantity_planned');
+                                            $first->quantity_reserved = $group->sum('quantity_reserved');
+                                            $first->quantity_issued = $group->sum('quantity_issued');
+                                            return $first;
+                                        });
+                                    @endphp
+                                    @foreach($displayReservations as $res)
                                         @php
                                             $isSemiFinished = ($res->product->type === 'semi_finished' || $res->product->supplier_method === 'manufacture');
 
@@ -2320,7 +2810,7 @@
                                                     <span class="badge bg-soft-danger text-danger text-uppercase">Pending</span>
                                                 @endif
                                             </td>
-                                            <td class="text-center fw-semibold">{{ $slip->items->count() }}</td>
+                                            <td class="text-center fw-semibold">{{ $slip->items->pluck('product_id')->unique()->count() }}</td>
                                             <td>
                                                 @if($slip->purchaseRequisitions->isNotEmpty())
                                                     @foreach($slip->purchaseRequisitions as $pr)

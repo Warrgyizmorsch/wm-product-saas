@@ -284,7 +284,7 @@
                                         <th style="width: 7%;">Shifts</th>
                                         <th style="width: 9%;">Schedule Start</th>
                                         <th style="width: 9%;">Schedule Finish</th>
-                                        <th class="text-center" style="width: 5%;">MO Qty</th>
+                                        <th class="text-center" style="width: 5%;">Target Qty</th>
                                         <th style="width: 8%;">Actual Start</th>
                                         <th style="width: 8%;">Actual Finish</th>
                                         <th class="text-center" style="width: 5%;">Done Qty</th>
@@ -322,7 +322,33 @@
                                             $pendingQty = max(0.0, $moQty - $doneQty);
                                             $isCompleted = ($op->status === 'completed') || ($doneQty >= $moQty && $moQty > 0);
 
-                                            $assignedName = $op->assignedOperator->name ?? $orderOp->operator->name ?? 'Unassigned';
+                                            $activeAssignment = $orderOp->relationLoaded('operatorAssignments')
+                                                ? $orderOp->operatorAssignments->whereIn('status', ['assigned', 'accepted'])->sortByDesc('id')->first()
+                                                : \App\Domains\Production\Models\ProductionOperatorAssignment::where('tenant_id', $op->tenant_id)
+                                                    ->where('production_order_operation_id', $orderOp->id)
+                                                    ->whereIn('status', ['assigned', 'accepted'])
+                                                    ->latest('id')
+                                                    ->first();
+
+                                            $assignedUser = $activeAssignment?->user ?? $orderOp->operator ?? null;
+                                            $assignmentStatus = $activeAssignment?->status ?? ($assignedUser ? 'accepted' : null);
+
+                                            if ($assignmentStatus === 'assigned') {
+                                                $assignedName = 'Pending: ' . ($assignedUser->name ?? 'Operator');
+                                                $assignedBadgeClass = 'bg-soft-warning text-dark border border-warning-subtle';
+                                                $assignedIcon = 'feather-clock text-warning';
+                                                $assignedTooltip = 'Pending Acceptance by ' . ($assignedUser->name ?? 'Operator');
+                                            } elseif ($assignmentStatus === 'accepted' || $assignedUser) {
+                                                $assignedName = $assignedUser->name ?? 'Assigned Operator';
+                                                $assignedBadgeClass = 'bg-soft-success text-success border border-success-subtle';
+                                                $assignedIcon = 'feather-user-check text-success';
+                                                $assignedTooltip = 'Assigned & Accepted by ' . ($assignedUser->name ?? '');
+                                            } else {
+                                                $assignedName = 'Unassigned';
+                                                $assignedBadgeClass = 'bg-soft-secondary text-dark border';
+                                                $assignedIcon = 'feather-user';
+                                                $assignedTooltip = 'No Operator Assigned';
+                                            }
                                         @endphp
 
                                                     <tr
@@ -576,18 +602,18 @@
                                                                 </span>
                                                             @else
                                                                 <div class="d-flex align-items-center gap-1 flex-wrap">
-                                                                    <span class="badge bg-soft-secondary text-dark border fs-10 text-wrap d-inline-block"
-                                                                        data-bs-toggle="tooltip" data-bs-placement="top"
-                                                                        title="Assigned Operator: {{ $assignedName }}">
-                                                                        <i class="feather-user me-1"></i>{{ $assignedName }}
-                                                                    </span>
-                                                                    @if(!$isCompleted)
-                                                                        <button type="button" class="btn btn-xs btn-outline-primary p-0.5 px-1 fs-10 border shadow-none"
-                                                                            title="{{ $assignedName !== 'Unassigned' ? 'Reassign Operator' : 'Assign Operator' }}"
-                                                                            data-bs-toggle="modal" data-bs-target="#assignOperatorModal{{ $op->id }}">
-                                                                            <i class="feather-user-plus me-1"></i>{{ $assignedName !== 'Unassigned' ? 'Edit' : 'Assign' }}
-                                                                        </button>
-                                                                    @endif
+                                                                    <span class="badge {{ $assignedBadgeClass }} fs-10 text-wrap d-inline-block"
+                                                                         data-bs-toggle="tooltip" data-bs-placement="top"
+                                                                         title="{{ $assignedTooltip }}">
+                                                                         <i class="{{ $assignedIcon }} me-1"></i>{{ $assignedName }}
+                                                                     </span>
+                                                                     @if(!$isCompleted)
+                                                                         <button type="button" class="btn btn-xs btn-outline-primary p-0.5 px-1 fs-10 border shadow-none"
+                                                                             title="{{ $assignedName !== 'Unassigned' ? 'Reassign Operator' : 'Assign Operator' }}"
+                                                                             data-bs-toggle="modal" data-bs-target="#assignOperatorModal{{ $op->id }}">
+                                                                             <i class="feather-user-plus me-1"></i>{{ $assignedName !== 'Unassigned' ? 'Edit' : 'Assign' }}
+                                                                         </button>
+                                                                     @endif
                                                                 </div>
                                                             @endif
                                                         </td>
@@ -801,7 +827,7 @@
                                                 <x-ui.odoo-form-ui type="select" label="Select Operator" name="user_id" :required="true">
                                                     <option value="">-- Choose Operator --</option>
                                                     @foreach($operators as $operator)
-                                                        <option value="{{ $operator->id }}" {{ ($activeOp->assignedOperator->id ?? null) == $operator->id ? 'selected' : '' }}>
+                                                        <option value="{{ $operator->id }}" {{ (($assignedUser->id ?? $activeOp->assignedOperator->id ?? $activeOrderOp->operator_id ?? null) == $operator->id) ? 'selected' : '' }}>
                                                             {{ $operator->name }} ({{ ucfirst($operator->role) }})
                                                         </option>
                                                     @endforeach

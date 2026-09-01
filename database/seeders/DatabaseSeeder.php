@@ -49,8 +49,12 @@ class DatabaseSeeder extends Seeder
             RbacSeeder::class,
             AccountingChartOfAccountsSeeder::class,
             InventoryMasterDemoSeeder::class,
-            PoonaRadiatorsProductSeeder::class,
-            PoonaRadiatorsProductionSeeder::class,
+            // Kept for future Poona Radiators demo usage:
+            // PoonaRadiatorsProductSeeder::class,
+            // PoonaRadiatorsProductionSeeder::class,
+
+            TableManufacturingProductSeeder::class,
+            TableManufacturingProductionSeeder::class,
             HrmsDemoSeeder::class,
         ]);
 
