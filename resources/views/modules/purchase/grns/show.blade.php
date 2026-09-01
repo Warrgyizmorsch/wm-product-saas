@@ -359,16 +359,32 @@
                                         <th class="text-end pe-3">{{ __('purchase.total_amount') }} ({{ $currency }})</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    @php
+                                                        @php
                                          $totRec = 0; $totRej = 0; $totAcc = 0; $totAmt = 0;
                                          $groupedItems = $grn->items->groupBy('product_id')->map(function($items) {
                                              $first = $items->first();
-                                             $poQty = (float)($first->purchaseOrderItem?->quantity ?? 0);
-                                             $poPrevRec = (float)($first->purchaseOrderItem?->received_qty ?? 0) - $items->sum('received_qty');
+                                             $poItem = $first->purchaseOrderItem;
+                                             $poQty = (float)($poItem?->quantity ?? 0);
+                                             $poPrevRec = (float)($poItem?->received_qty ?? 0) - $items->sum('received_qty');
                                              $ordQty = $items->sum('ordered_qty') > 0 ? $items->sum('ordered_qty') : $poQty;
                                              $prevRecQty = $items->sum('previous_received_qty') > 0 ? $items->sum('previous_received_qty') : max(0, $poPrevRec);
-                                             $rate = (float)($first->unit_rate ?: ($first->purchaseOrderItem?->rate ?? 0));
+                                             
+                                             $grossPrice = (float)($poItem?->rate ?? $first->unit_rate ?? 0);
+                                             $lineGross = ($poQty > 0 ? $poQty : 1) * $grossPrice;
+                                             $discAmount = (float)($poItem?->discount_amount ?? 0);
+                                             $po = $poItem?->purchaseOrder;
+                                             
+                                             $orderDiscShare = 0;
+                                             if ($po && $po->discount_type === 'order_wise' && (float)$po->discount_amount > 0 && (float)$po->subtotal > 0) {
+                                                 $orderDiscShare = ($lineGross / (float)$po->subtotal) * (float)$po->discount_amount;
+                                             }
+                                             $totalItemDisc = ($po && $po->discount_type === 'order_wise') ? $orderDiscShare : $discAmount;
+
+                                             $rate = (float)$first->unit_rate;
+                                             if ($rate >= $grossPrice && $totalItemDisc > 0 && $poQty > 0) {
+                                                 $rate = round(($lineGross - $totalItemDisc) / $poQty, 2);
+                                             }
+                                             
                                              $recQty = $items->sum('received_qty');
                                              $rejQty = $items->sum('rejected_qty');
                                              $accQty = max(0, $recQty - $rejQty);
@@ -388,7 +404,7 @@
                                                  'remarks' => $items->pluck('remarks')->filter()->implode(', '),
                                              ];
                                          })->values();
-                                     @endphp
+                                     @endphp              @endphp
                                     @foreach($groupedItems as $idx => $item)
                                         @php
                                             $totRec += (float)$item->received_qty;
