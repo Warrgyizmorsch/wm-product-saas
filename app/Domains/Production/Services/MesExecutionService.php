@@ -94,21 +94,14 @@ class MesExecutionService
                 }
             }
 
-            // Single-routing fallback if no explicit dependencies exist
-            if (empty($predOrderOpIds) && $orderOp) {
-                $isMultiRoutingOrder = ProductionOrderOperation::where('production_order_id', $orderOp->production_order_id)
-                    ->whereNotNull('source_product_id')
-                    ->where('source_product_id', '!=', $orderOp->order?->product_id)
-                    ->exists();
-
-                if (!$isMultiRoutingOrder && $schedOp->sequence > 10) {
-                    $prevSched = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
-                        ->where('sequence', '<', $schedOp->sequence)
-                        ->orderBy('sequence', 'desc')
-                        ->first();
-                    if ($prevSched && $prevSched->production_order_operation_id) {
-                        $predOrderOpIds[] = (int) $prevSched->production_order_operation_id;
-                    }
+            // Single-routing or fallback sequence check if no explicit dependencies exist
+            if (empty($predOrderOpIds) && $orderOp && $schedOp->sequence > 10) {
+                $prevSched = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->where('sequence', '<', $schedOp->sequence)
+                    ->orderBy('sequence', 'desc')
+                    ->first();
+                if ($prevSched && $prevSched->production_order_operation_id) {
+                    $predOrderOpIds[] = (int) $prevSched->production_order_operation_id;
                 }
             }
 
@@ -124,9 +117,24 @@ class MesExecutionService
 
                 $blockingPredecessors = $incompletePredecessors->filter(function (ProductionScheduleOperation $predOp) use ($orderOp, $schedOp): bool {
                     $predOrderOp = $predOp->orderOperation;
-                    if ($predOrderOp && ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled)) {
-                        if (($orderOp && (float) $orderOp->quantity_transferred_in > 0) || ((float) $predOrderOp->quantity_transferred_out > 0) || ($schedOp->status === ProductionScheduleOperation::STATUS_READY)) {
+                    if ($predOrderOp) {
+                        // If underlying order operation is completed or target quantity is produced, not blocking!
+                        if (
+                            $predOrderOp->status === ProductionOrderOperation::STATUS_COMPLETED ||
+                            ($predOrderOp->target_produced_qty > 0 && (float) $predOrderOp->quantity_produced >= (float) $predOrderOp->target_produced_qty)
+                        ) {
+                            // Auto-heal schedule operation status
+                            $predOp->update([
+                                'status' => ProductionScheduleOperation::STATUS_COMPLETED,
+                                'actual_finish' => $predOp->actual_finish ?? now(),
+                            ]);
                             return false;
+                        }
+
+                        if ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled) {
+                            if (($orderOp && (float) $orderOp->quantity_transferred_in > 0) || ((float) $predOrderOp->quantity_transferred_out > 0) || ($schedOp->status === ProductionScheduleOperation::STATUS_READY)) {
+                                return false;
+                            }
                         }
                     }
                     return true;
@@ -438,7 +446,8 @@ class MesExecutionService
                 ->lockForUpdate()
                 ->findOrFail($scheduleOpId);
 
-            if (!$schedOp->isRunning() && !$schedOp->isPaused()) {
+            $isExtOp = (bool) ($schedOp->orderOperation?->is_external ?? false);
+            if (!$schedOp->isRunning() && !$schedOp->isPaused() && !($isExtOp && in_array($schedOp->status, [ProductionScheduleOperation::STATUS_READY, ProductionScheduleOperation::STATUS_RUNNING]))) {
                 throw new InvalidArgumentException(
                     "Only running or paused operations can be completed. Current status: [{$schedOp->status}]."
                 );

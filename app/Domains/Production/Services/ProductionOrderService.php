@@ -1395,7 +1395,8 @@ class ProductionOrderService
                         ProductionOrderOperation::STATUS_COMPLETED,
                         ProductionOrderOperation::STATUS_SKIPPED,
                         ProductionOrderOperation::STATUS_CANCELLED,
-                    ], true) || (float) $predOp->quantity_transferred_out > 0;
+                    ], true) || (float) $predOp->quantity_transferred_out > 0
+                             || ($predOp->target_produced_qty > 0 && (float) $predOp->quantity_produced >= (float) $predOp->target_produced_qty);
                 });
 
                 $newStatus = $incompletePreds->isEmpty()

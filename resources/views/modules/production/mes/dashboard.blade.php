@@ -358,42 +358,58 @@
                                                         {{-- Action Column --}}
                                                         <td class="align-top">
                                                             @if($isOutsourced)
-                                                                <div class="d-flex flex-column align-items-start gap-1">
-                                                                    <div class="d-flex align-items-center gap-1">
-                                                                        @if($isCompleted)
-                                                                            <span
-                                                                                class="badge bg-success rounded-circle me-1 d-inline-flex align-items-center justify-content-center flex-shrink-0"
-                                                                                style="width: 26px; height: 26px; min-width: 26px; min-height: 26px; padding: 0;"
-                                                                                data-bs-toggle="tooltip" data-bs-placement="top"
-                                                                                title="Process Completed (Subcontract Received & Done)">
-                                                                                <i class="feather-check text-white fs-12"></i>
-                                                                            </span>
-                                                                        @endif
-                                                                        <button type="button" class="btn btn-sm btn-purple fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
-                                                                            data-bs-toggle="modal" data-bs-target="#manageChallanModal{{ $op->id }}"
-                                                                            title="Manage Subcontract Delivery Challans">
-                                                                            <i class="feather-file-text fs-12"></i>Manage Challan
-                                                                        </button>
-                                                                    </div>
-                                                                    @if($latestChallan)
-                                                                        @if($latestChallan->status === 'draft')
-                                                                            <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
-                                                                                class="badge bg-soft-warning text-dark border border-warning fs-9 text-decoration-none" title="Draft Gate Pass pending dispatch">
-                                                                                <i class="feather-clock me-1"></i>Draft Gate Pass
-                                                                            </a>
-                                                                        @elseif($latestChallan->status === 'dispatched')
-                                                                            <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
-                                                                                class="badge bg-soft-info text-info border border-info-subtle fs-9 text-decoration-none" title="Material Dispatched to Vendor">
-                                                                                <i class="feather-truck me-1"></i>Dispatched
-                                                                            </a>
-                                                                        @elseif($latestChallan->status === 'completed')
-                                                                            <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
-                                                                                class="badge bg-soft-success text-success border border-success-subtle fs-9 text-decoration-none" title="Subcontract Received & Completed">
-                                                                                <i class="feather-check-circle me-1"></i>Received
-                                                                            </a>
-                                                                        @endif
-                                                                    @endif
-                                                                </div>
+                                                                 @php
+                                                                     $opSupplyType = $orderOp->material_supply_type ?? 'company_supplied';
+                                                                     $isVendorSupplied = ($opSupplyType === 'vendor_supplied');
+                                                                 @endphp
+                                                                 <div class="d-flex flex-column align-items-start gap-1">
+                                                                     <div class="d-flex align-items-center gap-1">
+                                                                         @if($isCompleted)
+                                                                             <span
+                                                                                 class="badge bg-success rounded-circle me-1 d-inline-flex align-items-center justify-content-center flex-shrink-0"
+                                                                                 style="width: 26px; height: 26px; min-width: 26px; min-height: 26px; padding: 0;"
+                                                                                 data-bs-toggle="tooltip" data-bs-placement="top"
+                                                                                 title="Process Completed (Subcontract Received & Done)">
+                                                                                 <i class="feather-check text-white fs-12"></i>
+                                                                             </span>
+                                                                         @endif
+                                                                         @if($isVendorSupplied)
+                                                                             <button type="button" class="btn btn-sm btn-info fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
+                                                                                 data-bs-toggle="modal" data-bs-target="#completeModal{{ $op->id }}"
+                                                                                 title="Record Subcontract Receipt (Vendor Supplied - No Company Material Sent)">
+                                                                                 <i class="feather-download-cloud fs-12"></i>Record Subcontract Receipt
+                                                                             </button>
+                                                                         @else
+                                                                             <button type="button" class="btn btn-sm btn-purple fw-semibold px-2 py-1 fs-11 text-white shadow-sm d-inline-flex align-items-center gap-1 text-nowrap"
+                                                                                 data-bs-toggle="modal" data-bs-target="#manageChallanModal{{ $op->id }}"
+                                                                                 title="Manage Subcontract Delivery Challans (Company Material Sent)">
+                                                                                 <i class="feather-file-text fs-12"></i>Manage Challan
+                                                                             </button>
+                                                                         @endif
+                                                                     </div>
+                                                                     @if($isVendorSupplied)
+                                                                         <span class="badge bg-soft-info text-info border border-info-subtle fs-9">
+                                                                             <i class="feather-box me-1"></i>Vendor Supplied Material
+                                                                         </span>
+                                                                     @elseif($latestChallan)
+                                                                         @if($latestChallan->status === 'draft')
+                                                                             <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
+                                                                                 class="badge bg-soft-warning text-dark border border-warning fs-9 text-decoration-none" title="Draft Gate Pass pending dispatch">
+                                                                                 <i class="feather-clock me-1"></i>Draft Gate Pass
+                                                                             </a>
+                                                                         @elseif($latestChallan->status === 'dispatched')
+                                                                             <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
+                                                                                 class="badge bg-soft-info text-info border border-info-subtle fs-9 text-decoration-none" title="Material Dispatched to Vendor">
+                                                                                 <i class="feather-truck me-1"></i>Dispatched
+                                                                             </a>
+                                                                         @elseif($latestChallan->status === 'completed')
+                                                                             <a href="{{ route('production.subcontract.delivery-challans.show', $latestChallan->id) }}"
+                                                                                 class="badge bg-soft-success text-success border border-success-subtle fs-9 text-decoration-none" title="Subcontract Received & Completed">
+                                                                                 <i class="feather-check-circle me-1"></i>Received
+                                                                             </a>
+                                                                         @endif
+                                                                     @endif
+                                                                 </div>
                                                             @else
                                                                 <div class="d-flex align-items-center gap-1 flex-wrap">
                                                                     @if($isCompleted)
@@ -632,7 +648,12 @@
                                     $isActiveOutsourced = (bool) ($activeOrderOp->is_external || $activeOrderOp->isOutsourced() || $activeOp->work_center_id === null);
                                 @endphp
 
-                                @if($isActiveOutsourced)
+                                @php
+                                    $activeOpSupplyType = $activeOrderOp->material_supply_type ?? 'company_supplied';
+                                    $isActiveCompanySupplied = $isActiveOutsourced && ($activeOpSupplyType === 'company_supplied');
+                                @endphp
+
+                                @if($isActiveCompanySupplied)
                                     @php
                                         $activeVendorName = $activeOrderOp->vendor->name ?? $activeOrderOp->vendor_name ?? 'Outsourced Vendor';
                                         $activeChallans = $activeOrderOp->relationLoaded('deliveryChallans') ? $activeOrderOp->deliveryChallans : ($activeOrderOp->deliveryChallans ?? collect());
@@ -646,7 +667,7 @@
                                         <div class="d-flex justify-content-between align-items-center bg-soft-purple p-3 rounded mb-3 border border-purple-subtle">
                                             <div>
                                                 <h6 class="fw-bold text-purple mb-1">
-                                                    <i class="feather-truck me-2"></i>Outsourced Subcontract Operation
+                                                    <i class="feather-truck me-2"></i>Outsourced Subcontract Operation (Company Supplied Material)
                                                 </h6>
                                                 <span class="text-muted fs-11">Supplier / Vendor: <strong>{{ $activeVendorName }}</strong> | Production Order: <strong>{{ $activeOrder->order_number ?? '' }}</strong></span>
                                             </div>
@@ -717,7 +738,9 @@
                                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                         </x-slot>
                                     </x-ui.modal>
-                                @else
+                                @endif
+
+                                @if(!$isActiveCompanySupplied)
                                     @php
                                         $activeTargetQty = 0.0;
                                         if ($activeOrderOp && (float) ($activeOrderOp->target_produced_qty ?? 0) > 0) {
@@ -743,18 +766,28 @@
                                         $activeRemainingToComplete = max(0.0, $activeTargetQty - (($activeOrderOp->quantity_produced ?? 0.0) + $activeScrapQty + ($activeOrderOp->quantity_rejected ?? 0.0)));
                                     @endphp
                                     <x-ui.modal id="completeModal{{ $activeOp->id }}"
-                                        title="ADD PRODUCTION OF — {{ html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
+                                        title="{{ ($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied') ? 'RECEIVE SUBCONTRACT GOODS (VENDOR SUPPLIED) — ' . html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') : 'ADD PRODUCTION OF — ' . html_entity_decode($activeOrderOp->name ?? 'Op #' . $activeOp->sequence, ENT_QUOTES, 'UTF-8') }}"
                                         class="text-start" size="lg">
                                         <form method="POST" action="{{ route('production.mes.complete', $activeOp->id) }}"
                                             id="completeForm{{ $activeOp->id }}">
                                             @csrf
                                             <div class="card border-0 bg-light p-3 mb-3 rounded">
                                                 <h6 class="fw-bold text-primary mb-1 fs-12 text-uppercase">
-                                                    <i class="feather-edit me-1"></i>Add Production OF -
-                                                    {{ $activeOrderOp->name ?? 'Process' }}, {{ $activeOp->workCenter->name ?? 'Workstation' }}
+                                                    <i class="feather-edit me-1"></i>
+                                                    @if($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied')
+                                                        Receive Subcontract Goods From {{ $activeOrderOp->vendor->name ?? 'Vendor' }} - {{ $activeOrderOp->name }}
+                                                    @else
+                                                        Add Production OF - {{ $activeOrderOp->name ?? 'Process' }}, {{ $activeOp->workCenter->name ?? 'Workstation' }}
+                                                    @endif
                                                     For {{ $activeOrderOp->sourceProduct->name ?? $activeOrder->product->name ?? 'Item' }}
                                                 </h6>
-                                                <div class="text-muted fs-11">How many have you Done?</div>
+                                                <div class="text-muted fs-11">
+                                                    @if($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied')
+                                                        Record completed items received from vendor (Vendor Supplied - No raw material dispatch required).
+                                                    @else
+                                                        How many have you Done?
+                                                    @endif
+                                                </div>
                                             </div>
 
                                             <div class="row g-3">
@@ -788,7 +821,9 @@
                                                 </div>
 
                                                 <div class="col-md-4">
-                                                    <x-ui.odoo-form-ui type="input" label="Quantity Done" name="quantity_produced"
+                                                    <x-ui.odoo-form-ui type="input"
+                                                        label="{{ ($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied') ? 'Quantity Received' : 'Quantity Done' }}"
+                                                        name="quantity_produced"
                                                         inputType="number" step="any" value="{{ $activeRemainingToComplete }}"
                                                         :required="true" />
                                                 </div>
@@ -803,7 +838,7 @@
 
                                                 <div class="col-md-12">
                                                     <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks"
-                                                        placeholder="Optional comments..." rows="2" />
+                                                        placeholder="{{ ($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied') ? 'Optional vendor invoice / delivery note reference...' : 'Optional comments...' }}" rows="2" />
                                                 </div>
                                             </div>
                                         </form>
@@ -812,7 +847,7 @@
                                                 data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
                                             <button type="submit" class="btn btn-success px-4"
                                                 onclick="document.getElementById('completeForm{{ $activeOp->id }}').submit();">
-                                                <i class="feather-check me-1"></i>Save Production Log
+                                                <i class="feather-check me-1"></i>{{ ($activeOrderOp->is_external && ($activeOrderOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied') ? 'Record Subcontract Receipt' : 'Save Production Log' }}
                                             </button>
                                         </x-slot>
                                     </x-ui.modal>

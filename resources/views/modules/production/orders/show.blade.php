@@ -683,8 +683,12 @@
                                                         <span class="badge bg-soft-secondary text-secondary fs-10 mt-1">{{ ucfirst($extOp->status ?? 'ready') }}</span>
                                                     </td>
                                                     <td class="align-top">
-                                                        <div class="fw-bold text-dark"><i class="feather-truck me-1 text-primary"></i>{{ $extOp->vendor->name ?? 'Subcontractor' }}</div>
-                                                        <small class="text-muted fs-11">Supply: <strong>{{ str_replace('_', ' ', ucfirst($extOp->material_supply_type ?? 'company_supplied')) }}</strong></small>
+                                                         <div class="fw-bold text-dark"><i class="feather-truck me-1 text-primary"></i>{{ $extOp->vendor->name ?? 'Subcontractor' }}</div>
+                                                         @if(($extOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied')
+                                                             <span class="badge bg-soft-info text-info border border-info-subtle fs-10 mt-1"><i class="feather-box me-1"></i>Vendor Supplied</span>
+                                                         @else
+                                                             <span class="badge bg-soft-warning text-dark border border-warning-subtle fs-10 mt-1"><i class="feather-truck me-1"></i>Company Supplied</span>
+                                                         @endif
                                                     </td>
                                                     <td class="align-top font-monospace fs-11">
                                                         <div>Lead: <strong>{{ $extOp->subcontract_lead_time_days ?? 0 }}d</strong></div>
@@ -795,7 +799,7 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                @forelse($order->operations->where('is_external', true) as $extOp)
+                                                @forelse($order->operations->where('is_external', true)->filter(fn($op) => ($op->material_supply_type ?? 'company_supplied') === 'company_supplied') as $extOp)
                                                     @php
                                                         $bal = $matBalanceService->getMaterialBalance($order->tenant_id, $order->id, $extOp->id);
                                                     @endphp

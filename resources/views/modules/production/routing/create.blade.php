@@ -105,7 +105,6 @@
                                 <tr>
                                     <th style="width: 45px;" class="text-center">{{ __('production.seq') }}</th>
                                     <th style="min-width: 310px;">{{ __('production.operation_name_yield') }}</th>
-                                    <th style="width: 125px;">{{ __('production.type') }}</th>
                                     <th style="width: 165px;">{{ __('production.work_center') }}</th>
                                     <th style="width: 165px;">{{ __('production.machine') }}</th>
                                     <th style="width: 65px;" class="text-end">{{ __('production.setup') }} (m)</th>
@@ -120,6 +119,7 @@
                                         <!-- Sequence -->
                                         <td class="align-middle text-center">
                                             <input type="number" x-bind:name="'operations['+index+'][sequence]'" class="odoo-table-input text-center font-monospace" x-model="operation.sequence" x-bind:readonly="autoSequence" required min="1" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][operation_type]'" :value="operation.is_external ? 'outsourcing' : (operation.quality_required ? 'inspection' : 'manufacturing')" />
                                         </td>
                                         
                                         <!-- Operation Name & Details -->
@@ -168,15 +168,6 @@
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
                                             </div>
-                                        </td>
-                                        
-                                        <!-- Operation Type -->
-                                        <td class="align-middle">
-                                            <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][operation_type]'" class="odoo-table-select" x-model="operation.operation_type" required select2Selector="default">
-                                                @foreach ($operationTypes as $val => $label)
-                                                    <option value="{{ $val }}">{{ __('production.op_type_' . $val) }}</option>
-                                                @endforeach
-                                            </x-ui.odoo-form-ui>
                                         </td>
                                         
                                         <!-- Work Center -->
@@ -235,7 +226,7 @@
 
                                      <!-- Subcontract Details Expanded Panel -->
                                      <tr x-show="operation.is_external" class="bg-light-subtle">
-                                         <td colspan="9" class="p-2 border-top-0">
+                                         <td colspan="8" class="p-2 border-top-0">
                                              <div class="row g-2 align-items-center fs-12 px-2 py-2 bg-white rounded border">
                                                  <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="select" label="Vendor *" x-bind:name="'operations['+index+'][vendor_id]'" class="form-select form-select-sm fs-11" x-model="operation.vendor_id" x-bind:required="operation.is_external">
