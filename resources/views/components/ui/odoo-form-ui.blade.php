@@ -56,7 +56,7 @@
             .odoo-form-control:focus {
                 border-color: var(--bs-primary) !important;
                 outline: none;
-                box-shadow: none;
+                box-shadow: 0 1px 0 0 var(--bs-primary);
             }
             .odoo-form-control[readonly] {
                 border-bottom: none;
@@ -73,6 +73,7 @@
             }
             textarea.odoo-form-control:focus {
                 border-color: var(--bs-primary) !important;
+                box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-primary) 12%, transparent) !important;
             }
 
             /* Custom Styled Checkboxes & Radios Globally */
@@ -89,7 +90,7 @@
             }
             .form-check-input:focus {
                 border-color: var(--bs-primary) !important;
-                box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.15) !important;
+                box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-primary) 18%, transparent) !important;
             }
             .form-check-label {
                 font-size: 13px;
@@ -108,7 +109,7 @@
                 align-items: center;
                 justify-content: center;
                 border: 2px dashed #ced4da;
-                border-radius: 6px;
+                border-radius: 8px;
                 padding: 10px 15px;
                 background-color: #f8fafc;
                 color: #495057;
@@ -119,7 +120,7 @@
                 width: 100%;
             }
             .erp-custom-file-upload .file-upload-label:hover {
-                background-color: #f1f5f9;
+                background-color: color-mix(in srgb, var(--bs-primary) 6%, #ffffff);
                 border-color: var(--bs-primary);
                 color: var(--bs-primary);
             }
@@ -137,7 +138,7 @@
             .select2-container--bootstrap-5 .select2-selection:focus,
             .select2-container--bootstrap-5.select2-container--focus .select2-selection {
                 border-bottom-color: var(--bs-primary) !important;
-                box-shadow: none !important;
+                box-shadow: 0 1px 0 0 var(--bs-primary) !important;
             }
             .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
                 padding-left: 0 !important;
@@ -224,7 +225,7 @@
             .odoo-table-input:focus {
                 border-bottom-color: var(--bs-primary) !important;
                 outline: none;
-                box-shadow: none;
+                box-shadow: 0 1px 0 0 var(--bs-primary);
                 background: transparent !important;
             }
             .odoo-table-input[readonly],
@@ -245,6 +246,7 @@
             .odoo-table-select:focus {
                 border-bottom-color: var(--bs-primary) !important;
                 outline: none;
+                box-shadow: 0 1px 0 0 var(--bs-primary);
             }
 
             /* Quill rich text editor custom theme for Odoo Form look */
@@ -257,6 +259,7 @@
             }
             .odoo-editor-wrapper:focus-within {
                 border-color: var(--bs-primary) !important;
+                box-shadow: 0 0 0 3px color-mix(in srgb, var(--bs-primary) 12%, transparent);
             }
             .odoo-editor-wrapper .ql-toolbar.ql-snow {
                 border: none;
@@ -308,7 +311,7 @@
             .select2-container--bootstrap-5 .select2-selection--multiple:focus,
             .select2-container--bootstrap-5.select2-container--focus .select2-selection--multiple {
                 border-bottom-color: var(--bs-primary) !important;
-                box-shadow: none !important;
+                box-shadow: 0 1px 0 0 var(--bs-primary) !important;
             }
             .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
                 display: flex !important;
@@ -319,13 +322,13 @@
                 width: 100% !important;
             }
             .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
-                background-color: #f1f5f9 !important;
-                border: 1px solid #cbd5e1 !important;
+                background-color: color-mix(in srgb, var(--bs-primary) 8%, #ffffff) !important;
+                border: 1px solid color-mix(in srgb, var(--bs-primary) 22%, transparent) !important;
                 border-radius: 4px !important;
                 padding: 2px 8px !important;
                 font-size: 12px !important;
                 font-weight: 500 !important;
-                color: #334155 !important;
+                color: color-mix(in srgb, var(--bs-primary) 72%, #1e293b) !important;
                 margin-right: 6px !important;
                 margin-top: 4px !important;
                 margin-bottom: 4px !important;
@@ -687,7 +690,7 @@
     @endphp
     @if($label)
         <div class="odoo-form-group">
-            <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
+            <label class="odoo-form-label" for="{{ $fieldId }}">
                 {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
@@ -726,7 +729,7 @@
     @endphp
     @if($label)
         <div class="odoo-form-group">
-            <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
+            <label class="odoo-form-label" for="{{ $fieldId }}">
                 {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
@@ -769,7 +772,7 @@
     @endphp
     @if($label)
         <div class="odoo-form-group">
-            <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
+            <label class="odoo-form-label" for="{{ $fieldId }}">
                 {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
@@ -804,7 +807,7 @@
     @endphp
     @if($label)
         <div class="odoo-form-group">
-            <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
+            <label class="odoo-form-label" for="{{ $fieldId }}">
                 {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
@@ -842,7 +845,7 @@
 @elseif ($type === 'radio')
     @if($label)
         <div class="odoo-form-group align-items-start">
-            <label class="odoo-form-label pt-1" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
+            <label class="odoo-form-label pt-1">
                 {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
@@ -871,7 +874,7 @@
     @endphp
     @if($label)
         <div class="odoo-form-group">
-            <label class="odoo-form-label" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
+            <label class="odoo-form-label" for="{{ $fieldId }}">
                 {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
             <div class="flex-grow-1">
@@ -912,7 +915,7 @@
     @endphp
     @if($label)
         <div class="mb-3">
-            <label class="fw-bold text-dark mb-1 fs-12 d-block" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
+            <label class="fw-bold text-dark mb-1 fs-12 d-block" for="{{ $fieldId }}">
                 {{ html_entity_decode($label, ENT_QUOTES, 'UTF-8') }} @if($required)<span class="text-danger">*</span>@endif
             </label>
     @endif

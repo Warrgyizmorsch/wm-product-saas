@@ -6,6 +6,7 @@
 
 <div {{ $attributes->class([
     'alert',
+    'erp-alert',
     'alert-' . $variant,
     'alert-dismissible fade show' => $dismissible,
     'd-flex align-items-center' => $icon

@@ -5,9 +5,9 @@
 
 @php
     if ($soft) {
-        $classes = 'badge bg-soft-' . $variant . ' text-' . $variant;
+        $classes = 'badge erp-badge bg-soft-' . $variant . ' text-' . $variant;
     } else {
-        $classes = 'badge bg-' . $variant;
+        $classes = 'badge erp-badge bg-' . $variant;
         if ($variant === 'warning' || $variant === 'light') {
             $classes .= ' text-dark';
         } else {

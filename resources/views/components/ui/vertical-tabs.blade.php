@@ -31,7 +31,7 @@
             }
             .erp-vertical-tabs .nav-link:hover {
                 color: var(--bs-primary) !important;
-                background-color: rgba(var(--bs-primary-rgb), 0.04) !important;
+                background-color: color-mix(in srgb, var(--bs-primary) 5%, transparent) !important;
             }
             .erp-vertical-tabs .nav-link:hover i {
                 transform: scale(1.1);
@@ -41,7 +41,7 @@
                 background-color: var(--bs-primary) !important;
                 border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
                 font-weight: 700;
-                box-shadow: 0 4px 12px rgba(var(--bs-primary-rgb), 0.4);
+                box-shadow: 0 4px 12px color-mix(in srgb, var(--bs-primary) 40%, transparent);
             }
             .erp-vertical-tabs .nav-link.active i {
                 transform: scale(1.15);

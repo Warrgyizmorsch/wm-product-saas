@@ -51,7 +51,7 @@
                 color: #0f172a !important;
             }
             .erp-sort-dropdown .dropdown-item.active {
-                background-color: rgba(var(--bs-primary-rgb), 0.08) !important;
+                background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent) !important;
                 color: var(--bs-primary) !important;
                 font-weight: 600 !important;
             }
