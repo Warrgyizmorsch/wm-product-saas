@@ -17,9 +17,10 @@ use App\Domains\HRMS\Controllers\Api\OvertimeRequestApiController;
 use App\Domains\HRMS\Controllers\Api\DocumentApiController;
 use App\Domains\HRMS\Controllers\Api\DocumentMasterApiController;
 use App\Domains\HRMS\Controllers\Api\AttendanceApiController;
-use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 use App\Domains\HRMS\Controllers\Api\TravelExpenseApiController;
 use App\Domains\HRMS\Controllers\Api\PayrollRunApiController;
+use App\Domains\HRMS\Controllers\Api\ProbationApiController;
+use App\Domains\HRMS\Controllers\Api\EmployeeExitApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -512,6 +513,30 @@ Route::prefix('api/hrms/payroll')
         Route::get('/my-salary', [PayrollRunApiController::class, 'mySalary'])->name('my-salary');
         Route::post('/bulk-adhoc', [PayrollRunApiController::class, 'storeBulkAdhoc'])->name('bulk-adhoc');
     });
+
+// ==========================================
+// 16. PROBATION API ROUTES
+// ==========================================
+Route::prefix('api/hrms/probation')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.probation.')
+    ->group(function () {
+        Route::get('/', [ProbationApiController::class, 'index'])->name('index');
+        Route::post('/{employee}/evaluate', [ProbationApiController::class, 'evaluate'])->name('evaluate');
+    });
+
+// ==========================================
+// 17. EMPLOYEE EXITS & OFFBOARDING API ROUTES
+// ==========================================
+Route::prefix('api/hrms/exits')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.exits.')
+    ->group(function () {
+        Route::get('/', [EmployeeExitApiController::class, 'index'])->name('index');
+        Route::post('/initiate', [EmployeeExitApiController::class, 'initiate'])->name('initiate');
+        Route::get('/{exit}', [EmployeeExitApiController::class, 'show'])->name('show');
+    });
+
 
 
 

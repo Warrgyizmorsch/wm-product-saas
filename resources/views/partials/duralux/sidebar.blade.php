@@ -167,6 +167,8 @@
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
             ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
+            ['label' => 'Probation Reviews', 'icon' => 'feather-award', 'route' => 'hrms.probation.index'],
+            ['label' => 'Exit & Offboarding', 'icon' => 'feather-log-out', 'route' => 'hrms.exits.index'],
             ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => [
                 ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'],
                 ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary'],

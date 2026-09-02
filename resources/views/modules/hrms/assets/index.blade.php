@@ -730,18 +730,32 @@
                     html = '<tr><td colspan="6" class="text-center py-4 text-muted fs-12">No allocation logs found for this asset.</td></tr>';
                 } else {
                     allocations.forEach(function(log) {
-                        var empName = log.employee ? log.employee.full_name : 'Unknown';
+                        var empName = log.employee ? (log.employee.full_name || log.employee.display_name) : 'Unknown';
                         var empCode = log.employee && log.employee.employee_id ? ' (' + log.employee.employee_id + ')' : '';
                         var checkInDate = log.returned_at ? log.returned_at.substring(0, 10) : 'Active';
-                        var returnCondition = log.return_condition ? log.return_condition : '-';
+                        var allocCond = log.allocation_condition || 'good';
+                        var returnCond = log.return_condition || (log.returned_at ? 'good' : null);
                         var notes = log.notes ? log.notes : '-';
+                        
+                        function getCondBadge(cond) {
+                            if (!cond) return '<span class="text-muted fs-11">-</span>';
+                            var c = String(cond).toLowerCase();
+                            var cls = 'bg-soft-info text-info';
+                            if (c === 'new' || c === 'good') cls = 'bg-soft-success text-success';
+                            else if (c === 'fair') cls = 'bg-soft-warning text-warning';
+                            else if (c === 'damaged') cls = 'bg-soft-danger text-danger';
+                            else if (c === 'scrapped' || c === 'lost') cls = 'bg-soft-secondary text-secondary';
+                            return '<span class="badge ' + cls + ' text-capitalize px-2 py-1 fs-11 rounded-pill">' + cond + '</span>';
+                        }
+
+                        var returnCondBadge = log.returned_at ? getCondBadge(returnCond) : '<span class="text-muted fs-11">In Possession</span>';
                         
                         html += '<tr>' +
                             '<td class="text-start" style="padding-left: 20px;"><strong>' + empName + '</strong><span class="text-muted fs-11">' + empCode + '</span></td>' +
-                            '<td><span class="fs-12">' + log.allocated_at.substring(0, 10) + '</span></td>' +
+                            '<td><span class="fs-12">' + (log.allocated_at ? log.allocated_at.substring(0, 10) : '-') + '</span></td>' +
                             '<td><span class="badge ' + (log.returned_at ? 'bg-soft-success text-success' : 'bg-soft-primary text-primary') + '">' + checkInDate + '</span></td>' +
-                            '<td><span class="badge badge-' + log.allocation_condition + ' text-capitalize">' + log.allocation_condition + '</span></td>' +
-                            '<td><span class="badge ' + (log.return_condition ? 'badge-' + log.return_condition : 'bg-light text-secondary') + ' text-capitalize">' + returnCondition + '</span></td>' +
+                            '<td>' + getCondBadge(allocCond) + '</td>' +
+                            '<td>' + returnCondBadge + '</td>' +
                             '<td class="text-start text-muted fs-11" style="max-width: 180px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; padding-right: 20px;" title="' + notes + '">' + notes + '</td>' +
                             '</tr>';
                     });

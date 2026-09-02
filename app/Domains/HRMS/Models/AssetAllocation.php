@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AssetAllocation extends BaseModel
 {
     protected $fillable = [
+        'tenant_id',
         'asset_id',
         'employee_id',
         'allocated_at',

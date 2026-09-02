@@ -24,7 +24,7 @@ class AssetController extends Controller
      */
     public function index(Request $request): View
     {
-        // Self-healing: Ensure all currently allocated assets have an active AssetAllocation record
+        // Self-healing 1: Ensure all currently allocated assets have an active AssetAllocation record
         $allocatedAssetsWithoutActiveAlloc = Asset::where('status', 'allocated')
             ->whereNotNull('assigned_employee_id')
             ->whereDoesntHave('allocations', function ($query) {
@@ -41,6 +41,22 @@ class AssetController extends Controller
                 'notes'                => 'Auto-generated active allocation record (self-healing)',
             ]);
         }
+
+        // Self-healing 2: Ensure any returned allocations have return_condition populated
+        \App\Domains\HRMS\Models\AssetAllocation::whereNotNull('returned_at')
+            ->whereNull('return_condition')
+            ->get()
+            ->each(function($alloc) {
+                $cond = 'good';
+                if ($alloc->notes && str_contains($alloc->notes, 'Condition: lost')) {
+                    $cond = 'scrapped';
+                } elseif ($alloc->notes && str_contains($alloc->notes, 'Condition: damaged')) {
+                    $cond = 'damaged';
+                } elseif ($alloc->notes && str_contains($alloc->notes, 'Condition: fair')) {
+                    $cond = 'fair';
+                }
+                $alloc->update(['return_condition' => $cond]);
+            });
 
         $data = $this->assetRepository->getIndexData($request->all());
 

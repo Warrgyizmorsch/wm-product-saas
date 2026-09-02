@@ -235,6 +235,31 @@ class Employee extends BaseModel
         return $this->hasMany(Department::class, 'head_employee_id');
     }
 
+    public function probationEvaluations(): HasMany
+    {
+        return $this->hasMany(EmployeeProbationEvaluation::class, 'employee_id')->orderBy('evaluation_date', 'desc');
+    }
+
+    public function exits(): HasMany
+    {
+        return $this->hasMany(EmployeeExit::class, 'employee_id')->orderBy('created_at', 'desc');
+    }
+
+    public function activeExit()
+    {
+        return $this->hasOne(EmployeeExit::class, 'employee_id')->whereNotIn('status', ['rejected', 'cancelled'])->latestOfMany();
+    }
+
+    public function fnfSettlements(): HasMany
+    {
+        return $this->hasMany(EmployeeFnfSettlement::class, 'employee_id')->orderBy('calculation_date', 'desc');
+    }
+
+    public function exitDocuments(): HasMany
+    {
+        return $this->hasMany(EmployeeExitDocument::class, 'employee_id')->orderBy('issue_date', 'desc');
+    }
+
     public function getFirstNameAttribute(): string
     {
         return (string) str($this->full_name)->before(' ');
@@ -251,6 +276,11 @@ class Employee extends BaseModel
         array_shift($parts);
 
         return implode(' ', $parts);
+    }
+
+    public function getJobTitleAttribute($value): ?string
+    {
+        return $value ?: ($this->designation?->name ?? null);
     }
 
     public function getDisplayNameAttribute(): string
