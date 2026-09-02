@@ -21,6 +21,8 @@ use App\Domains\HRMS\Controllers\ExpenseCategoryController;
 use App\Domains\HRMS\Controllers\ExpensePolicyController;
 use App\Domains\HRMS\Controllers\TravelExpenseController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
+use App\Domains\HRMS\Controllers\ProbationController;
+use App\Domains\HRMS\Controllers\EmployeeExitController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -388,5 +390,30 @@ Route::prefix('hrms')
             Route::post('/hold/{employee}/{month}', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'toggleHold'])->name('payroll.hold.toggle');
             Route::get('/run/{run}/export-bank-file', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'exportBankFile'])->name('payroll.run.export-bank-file');
             Route::get('/payslip/{run}/{employee}/download', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'downloadPayslip'])->name('payroll.payslip.download');
+        });
+
+        // Probation Reviews & Evaluations
+        Route::prefix('probation')->group(function (): void {
+            Route::get('/', [ProbationController::class, 'index'])->name('probation.index');
+            Route::post('/{employee}/evaluate', [ProbationController::class, 'evaluate'])->name('probation.evaluate');
+            Route::post('/{employee}/quick-confirm', [ProbationController::class, 'quickConfirm'])->name('probation.quick-confirm');
+        });
+
+        // Exit Management & Offboarding Hub
+        Route::prefix('exits')->group(function (): void {
+            Route::get('/', [EmployeeExitController::class, 'index'])->name('exits.index');
+            Route::post('/initiate', [EmployeeExitController::class, 'initiate'])->name('exits.initiate');
+            Route::post('/{exit}/approve', [EmployeeExitController::class, 'approve'])->name('exits.approve');
+            Route::post('/clearance/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearance.update');
+            Route::post('/clearances/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearances.update');
+            Route::post('/{exit}/clearances/{department}/batch-update', [EmployeeExitController::class, 'updateDepartmentClearances'])->name('exits.clearances.batch-update');
+            Route::post('/{exit}/assets/{asset}/return', [EmployeeExitController::class, 'returnAssetDirect'])->name('exits.assets.return');
+            Route::post('/{exit}/fnf/recalculate', [EmployeeExitController::class, 'recalculateFnF'])->name('exits.fnf.recalculate');
+            Route::post('/{exit}/fnf/finalize', [EmployeeExitController::class, 'finalizeFnF'])->name('exits.fnf.finalize');
+            Route::get('/documents/{document}/view', [EmployeeExitController::class, 'viewDocument'])->name('exits.documents.view');
+            Route::get('/{exit}/fnf-statement', [EmployeeExitController::class, 'viewFnFStatement'])->name('exits.fnf-statement.view');
+            Route::get('/{exit}/relieving-letter', [EmployeeExitController::class, 'viewRelievingLetter'])->name('exits.relieving-letter.view');
+            Route::get('/{exit}/experience-certificate', [EmployeeExitController::class, 'viewExperienceCertificate'])->name('exits.experience-certificate.view');
+            Route::get('/{exit}/noc-certificate', [EmployeeExitController::class, 'viewNocCertificate'])->name('exits.noc-certificate.view');
         });
     });

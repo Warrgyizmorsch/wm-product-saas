@@ -121,12 +121,7 @@
         <div class="row g-3">
             <div class="col-md-6">
                 @php
-                    $usersList = $unmappedUsers ?? collect();
-                    if ($isEdit && isset($employee) && $employee->user) {
-                        if (!$usersList->contains('id', $employee->user_id)) {
-                            $usersList = collect([$employee->user])->concat($usersList);
-                        }
-                    }
+                    $usersList = $isEdit ? ($allTenantUsers ?? $unmappedUsers ?? collect()) : ($unmappedUsers ?? collect());
                 @endphp
                 <x-ui.odoo-form-ui type="select" label="User Account (Link to login)" name="user_id" id="{{ $prefix }}_user_id" :required="true" select2-selector="default" :errorText="$errors->first('user_id')">
                     <option value="">Select User Account</option>

@@ -381,8 +381,12 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'reportingManagers' => Employee::query()->orderBy('full_name')->get(),
             'shifts' => \App\Domains\Production\Models\ProductionShift::query()->where('active', true)->orderBy('name')->get(),
             'unmappedUsers' => \App\Models\User::query()
-                ->where('tenant_id', auth()->user()?->tenant_id)
+                ->where('tenant_id', auth()->user()?->tenant_id ?: 1)
                 ->whereDoesntHave('employee')
+                ->orderBy('name')
+                ->get(),
+            'allTenantUsers' => \App\Models\User::query()
+                ->where('tenant_id', auth()->user()?->tenant_id ?: 1)
                 ->orderBy('name')
                 ->get(),
             'roles' => \App\Models\Access\Role::all(),

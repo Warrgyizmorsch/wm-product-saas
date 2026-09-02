@@ -462,6 +462,34 @@
             gap: 10px;
         }
 
+        .btn-doc-card {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+            text-decoration: none;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .btn-doc-card:hover {
+            color: var(--bs-primary);
+            border-color: var(--bs-primary);
+            background-color: rgba(var(--bs-primary-rgb), 0.04);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .btn-doc-card i {
+            font-size: 15px;
+        }
+
         .tab-nav-custom {
             border-bottom: 2px solid #e2e8f0;
             gap: 8px;
@@ -1001,6 +1029,16 @@
                     <i class="feather-clock"></i> Attendance
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {{ $activeTabName === 'probation' ? 'active' : '' }}" id="probation-tab" data-bs-toggle="tab" data-bs-target="#probation-pane" type="button" role="tab" aria-controls="probation-pane" aria-selected="{{ $activeTabName === 'probation' ? 'true' : 'false' }}">
+                    <i class="feather-award"></i> Probation
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {{ $activeTabName === 'exit-clearance' ? 'active' : '' }}" id="exit-clearance-tab" data-bs-toggle="tab" data-bs-target="#exit-clearance-pane" type="button" role="tab" aria-controls="exit-clearance-pane" aria-selected="{{ $activeTabName === 'exit-clearance' ? 'true' : 'false' }}">
+                    <i class="feather-log-out"></i> Exit & NOC
+                </button>
+            </li>
         </ul>
 
         <!-- Tab Content -->
@@ -1015,6 +1053,8 @@
 
             @include('modules.hrms.employees.tabs.assets')
             @include('modules.hrms.employees.tabs.attendance')
+            @include('modules.hrms.employees.tabs.probation')
+            @include('modules.hrms.employees.tabs.exit-clearance')
         </div>
     </div>
     
@@ -1026,6 +1066,9 @@
 
             $(document).ready(function() {
                 // Move modals to body root to prevent Bootstrap backdrop overlay issues inside tabs
+                $('.tab-content .modal, #profileExitModal, #profileEvaluateModal').each(function() {
+                    $(this).appendTo('body');
+                });
                 $('#addAdhocModal').appendTo('body');
                 $('#addPenaltyModal').appendTo('body');
                 $('[id^="leaveRulesModal"]').appendTo('body');
@@ -1033,6 +1076,8 @@
                 $('#uploadDocumentModal').appendTo('body');
                 $('#addHistoryModal').appendTo('body');
                 $('#returnAssetModal').appendTo('body');
+                $('#profileEvaluateModal').appendTo('body');
+                $('#profileExitModal').appendTo('body');
                 $('#viewAssetDetailsModal').appendTo('body');
                 $('#requestAssetModal').appendTo('body');
                 $('#empApplyLeaveModal').appendTo('body');

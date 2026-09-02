@@ -808,6 +808,8 @@ class EmployeeApiController extends Controller
 
     private function validatePayload(Request $request, ?Employee $employee = null): array
     {
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
         return $request->validate([
             'company_id'                  => ['required', 'exists:companies,id'],
             'business_unit_id'            => ['nullable', 'exists:business_units,id'],
@@ -818,8 +820,8 @@ class EmployeeApiController extends Controller
             'leave_plan_id'               => ['nullable', 'exists:leave_plans,id'],
             'leave_transition_action'     => ['nullable', 'string', 'in:transfer,prorate'],
             'leave_transition_unused'     => ['nullable', 'string', 'in:carry,lapse'],
-            'employee_id'                 => ['nullable', 'string', 'max:255', Rule::unique('employees', 'employee_id')->ignore($employee?->id)],
-            'user_id'                     => ['required', Rule::unique('employees', 'user_id')->ignore($employee?->id)],
+            'employee_id'                 => ['nullable', 'string', 'max:255', Rule::unique('employees', 'employee_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
+            'user_id'                     => ['required', Rule::unique('employees', 'user_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
             'role_id'                     => ['nullable', 'exists:roles,id'],
             'full_name'                   => ['required', 'string', 'max:255'],
             'nick_name'                   => ['nullable', 'string', 'max:255'],

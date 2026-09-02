@@ -99,15 +99,22 @@ class EmployeeController extends Controller
     private function validatePayload(Request $request, ?Employee $employee = null): array
     {
         $employeeId = $employee?->id;
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
 
         return $request->validate([
             'employee_id' => [
                 $employee ? 'required' : 'nullable', 'string', 'max:255',
-                Rule::unique('employees', 'employee_id')->ignore($employeeId),
+                Rule::unique('employees', 'employee_id')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($employeeId),
             ],
             'user_id' => [
                 'required',
-                Rule::unique('employees', 'user_id')->ignore($employeeId),
+                Rule::unique('employees', 'user_id')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($employeeId),
             ],
             'role_id' => ['nullable', 'exists:roles,id'],
 
@@ -117,11 +124,17 @@ class EmployeeController extends Controller
             'last_name' => ['nullable', 'string', 'max:255'],
             'personal_email' => [
                 'required', 'email', 'max:255',
-                Rule::unique('employees', 'personal_email')->ignore($employeeId),
+                Rule::unique('employees', 'personal_email')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($employeeId),
             ],
             'office_email' => [
                 'nullable', 'email', 'max:255',
-                Rule::unique('employees', 'office_email')->ignore($employeeId),
+                Rule::unique('employees', 'office_email')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->ignore($employeeId),
             ],
             'company_id' => ['required', 'exists:companies,id'],
             'business_unit_id' => ['nullable', 'exists:business_units,id'],
