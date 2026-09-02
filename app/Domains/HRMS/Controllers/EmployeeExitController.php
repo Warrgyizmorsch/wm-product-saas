@@ -7,11 +7,14 @@ use App\Domains\HRMS\Models\EmployeeExit;
 use App\Domains\HRMS\Models\EmployeeExitClearance;
 use App\Domains\HRMS\Models\EmployeeFnfSettlement;
 use App\Domains\HRMS\Models\EmployeeExitDocument;
+use App\Domains\HRMS\Models\ExitClearanceTemplate;
+use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\Asset;
 use App\Domains\HRMS\Models\AssetAllocation;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Services\FnFCalculationService;
 use App\Domains\HRMS\Services\ExitDocumentationService;
+use App\Domains\HRMS\Services\ExitClearanceService;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -22,7 +25,8 @@ class EmployeeExitController extends Controller
 {
     public function __construct(
         private readonly FnFCalculationService $fnfService,
-        private readonly ExitDocumentationService $docService
+        private readonly ExitDocumentationService $docService,
+        private readonly ExitClearanceService $clearanceService
     ) {}
 
     public function index(Request $request): View
@@ -53,6 +57,7 @@ class EmployeeExitController extends Controller
             ->with([
                 'employee.department',
                 'employee.designation',
+                'employee.company',
                 'employee.reportingManager',
                 'employee.assets',
                 'clearances.clearedByUser',
@@ -80,11 +85,16 @@ class EmployeeExitController extends Controller
         }
 
         $departmentId = $request->input('department_id');
+        $selectedCompanyId = $request->input('company_id');
         $sortBy = $request->input('sort_by', 'created_at');
         $sortOrder = $request->input('sort_order', 'desc');
 
         if ($departmentId) {
             $exitsQuery->whereHas('employee', fn($q) => $q->where('department_id', $departmentId));
+        }
+
+        if ($selectedCompanyId) {
+            $exitsQuery->whereHas('employee', fn($q) => $q->where('company_id', $selectedCompanyId));
         }
 
         if ($sortBy === 'lwd') {
@@ -100,21 +110,26 @@ class EmployeeExitController extends Controller
 
         $exits = $exitsQuery->paginate(15)->withQueryString();
 
-        // 3. Dropdown helpers
-        $employees = Employee::where('tenant_id', $tenantId)
-            ->where('status', true)
-            ->orderBy('full_name')
-            ->get();
-        $departments = Department::where('status', true)->orderBy('name')->get();
+        if ($activeTab === 'clearances') {
+            foreach ($exits as $exit) {
+                $this->clearanceService->cleanDuplicateClearancesForExit($exit);
+                $exit->load('clearances.clearedByUser');
+            }
+        }
 
-        return view('modules.hrms.exits.index', compact(
+        // 3. Dropdown helpers
+        $departments = Department::where('status', true)->orderBy('name')->get();
+        $companies = Company::orderBy('company_name')->get();
+
+        return view('modules.hrms.employees.exits.index', compact(
             'exits',
-            'employees',
             'departments',
+            'companies',
             'activeTab',
             'search',
             'statusFilter',
             'departmentId',
+            'selectedCompanyId',
             'sortBy',
             'sortOrder',
             'activeExitsCount',
@@ -164,31 +179,8 @@ class EmployeeExitController extends Controller
             'approved_at' => now(),
         ]);
 
-        // Auto-generate standard multi-department clearance items
-        $standardChecklist = [
-            ['department' => 'it', 'item_name' => 'Hardware Asset Recovery (Laptop/Accessories)'],
-            ['department' => 'it', 'item_name' => 'Email, Slack & ERP System Logins Deactivation'],
-            ['department' => 'it', 'item_name' => 'Cloud Data Backup & File Handover'],
-            ['department' => 'admin', 'item_name' => 'Company Physical ID Card & Access Badge Handover'],
-            ['department' => 'admin', 'item_name' => 'Office Keys, Drawer Keys & Parking Tag Handover'],
-            ['department' => 'finance', 'item_name' => 'Reconcile Open Cash Advances & Loan Accounts'],
-            ['department' => 'finance', 'item_name' => 'Verify Pending Travel & Expense Reimbursements'],
-            ['department' => 'finance', 'item_name' => 'Notice Period Shortfall / Buyout Verification'],
-            ['department' => 'hr', 'item_name' => 'Exit Interview & Feedback Questionnaire Completed'],
-            ['department' => 'hr', 'item_name' => 'PF, Gratuity & Pension Settlement Verification'],
-            ['department' => 'manager', 'item_name' => 'Knowledge Transfer (KT) & Task Handover Sign-off'],
-            ['department' => 'manager', 'item_name' => 'Client Contacts, Repo & Credentials Handover'],
-        ];
-
-        foreach ($standardChecklist as $item) {
-            EmployeeExitClearance::create([
-                'tenant_id' => $tenantId,
-                'employee_exit_id' => $exit->id,
-                'department' => $item['department'],
-                'item_name' => $item['item_name'],
-                'status' => 'pending',
-            ]);
-        }
+        // Auto-generate dynamic clearance items from company/tenant templates
+        $this->clearanceService->generateClearancesForExit($exit, $tenantId);
 
         // Update employee stage
         $employee->update(['employee_stage' => 'Notice Period']);
@@ -202,6 +194,133 @@ class EmployeeExitController extends Controller
         }
 
         return redirect()->route('hrms.exits.index', ['tab' => 'exits'])->with('success', "Exit initiated successfully for {$employee->full_name}. Multi-department clearance checklist created.");
+    }
+
+    /**
+     * Store a new clearance template item.
+     */
+    public function storeClearanceTemplate(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'company_id' => 'nullable|exists:companies,id',
+            'clearance_category' => 'required|string|max:100',
+            'category_name' => 'required|string|max:150',
+            'item_name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:1000',
+            'is_mandatory' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        // Normalize category slug
+        $categoryKey = \Illuminate\Support\Str::slug($validated['clearance_category'], '_');
+
+        ExitClearanceTemplate::create([
+            'tenant_id' => $tenantId,
+            'company_id' => $validated['company_id'] ?: null,
+            'clearance_category' => $categoryKey,
+            'category_name' => trim($validated['category_name']),
+            'item_name' => trim($validated['item_name']),
+            'description' => $validated['description'] ?? null,
+            'is_mandatory' => $request->boolean('is_mandatory', true),
+            'sort_order' => $validated['sort_order'] ?? 0,
+            'status' => true,
+        ]);
+
+        return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $validated['company_id'] ?? null])->with('success', "Clearance checklist point '{$validated['item_name']}' created successfully.");
+    }
+
+    /**
+     * Update an existing clearance template item.
+     */
+    public function updateClearanceTemplate(Request $request, ExitClearanceTemplate $template): RedirectResponse
+    {
+        $validated = $request->validate([
+            'company_id' => 'nullable|exists:companies,id',
+            'clearance_category' => 'required|string|max:100',
+            'category_name' => 'required|string|max:150',
+            'item_name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:1000',
+            'is_mandatory' => 'nullable|boolean',
+            'sort_order' => 'nullable|integer|min:0',
+            'status' => 'nullable|boolean',
+        ]);
+
+        $categoryKey = \Illuminate\Support\Str::slug($validated['clearance_category'], '_');
+
+        $template->update([
+            'company_id' => $validated['company_id'] ?: null,
+            'clearance_category' => $categoryKey,
+            'category_name' => trim($validated['category_name']),
+            'item_name' => trim($validated['item_name']),
+            'description' => $validated['description'] ?? null,
+            'is_mandatory' => $request->boolean('is_mandatory'),
+            'sort_order' => $validated['sort_order'] ?? 0,
+            'status' => $request->boolean('status', true),
+        ]);
+
+        return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $template->company_id])->with('success', "Clearance checklist point '{$template->item_name}' updated successfully.");
+    }
+
+    /**
+     * Delete a clearance template item.
+     */
+    public function destroyClearanceTemplate(ExitClearanceTemplate $template): RedirectResponse
+    {
+        $name = $template->item_name;
+        $companyId = $template->company_id;
+        $template->delete();
+
+        return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $companyId])->with('success', "Clearance point '{$name}' removed from policy.");
+    }
+
+    /**
+     * Reset templates back to the system defaults.
+     */
+    public function resetClearanceTemplates(Request $request): RedirectResponse
+    {
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $companyId = $request->input('company_id') ? (int) $request->input('company_id') : null;
+
+        $this->clearanceService->resetTemplatesToDefaults($tenantId, $companyId);
+
+        return redirect()->route('hrms.offboarding-policies.index', ['company_id' => $companyId])->with('success', "Clearance checklist policies reset to standard 12 default items.");
+    }
+
+    /**
+     * Add an ad-hoc custom clearance item to an ongoing exit case.
+     */
+    public function storeAdhocExitClearance(Request $request, EmployeeExit $exit): RedirectResponse
+    {
+        $validated = $request->validate([
+            'clearance_category' => 'required|string|max:100',
+            'item_name' => 'required|string|max:255',
+            'remarks' => 'nullable|string|max:500',
+            'deduction_amount' => 'nullable|numeric|min:0',
+        ]);
+
+        $this->clearanceService->addAdhocClearanceItem($exit, $validated);
+
+        return redirect()->route('hrms.exits.index', ['tab' => 'clearances'])->with('success', "Custom clearance item '{$validated['item_name']}' added to {$exit->employee->full_name}'s checklist.");
+    }
+
+    /**
+     * Remove an ad-hoc clearance item from an exit case.
+     */
+    public function destroyExitClearance(EmployeeExitClearance $clearance): RedirectResponse
+    {
+        $exit = $clearance->exit;
+        $itemName = $clearance->item_name;
+        $clearance->delete();
+
+        // Re-calculate FnF
+        if ($exit) {
+            $computedFnF = $this->fnfService->calculateFnF($exit);
+            $this->fnfService->saveSettlement($exit, $computedFnF);
+        }
+
+        return redirect()->route('hrms.exits.index', ['tab' => 'clearances'])->with('success', "Clearance item '{$itemName}' removed.");
     }
 
     public function approve(Request $request, EmployeeExit $exit): RedirectResponse
@@ -441,14 +560,14 @@ class EmployeeExitController extends Controller
         $document->load(['employee.company', 'exit']);
         
         if ($document->document_type === 'relieving_letter') {
-            return view('modules.hrms.exits.documents.relieving-letter', compact('document'));
+            return view('modules.hrms.employees.exits.documents.relieving-letter', compact('document'));
         } elseif ($document->document_type === 'experience_certificate') {
-            return view('modules.hrms.exits.documents.experience-certificate', compact('document'));
+            return view('modules.hrms.employees.exits.documents.experience-certificate', compact('document'));
         } elseif ($document->document_type === 'noc_certificate') {
-            return view('modules.hrms.exits.documents.noc-certificate', compact('document'));
+            return view('modules.hrms.employees.exits.documents.noc-certificate', compact('document'));
         }
 
-        return view('modules.hrms.exits.documents.relieving-letter', compact('document'));
+        return view('modules.hrms.employees.exits.documents.relieving-letter', compact('document'));
     }
 
     public function viewFnFStatement(Request $request, EmployeeExit $exit): View
@@ -456,7 +575,7 @@ class EmployeeExitController extends Controller
         $exit->load(['employee.company', 'employee.designation', 'employee.department', 'fnfSettlement']);
         $settlement = $exit->fnfSettlement;
         
-        return view('modules.hrms.exits.documents.fnf-statement', compact('exit', 'settlement'));
+        return view('modules.hrms.employees.exits.documents.fnf-statement', compact('exit', 'settlement'));
     }
 
     public function viewRelievingLetter(Request $request, EmployeeExit $exit): View
@@ -466,7 +585,7 @@ class EmployeeExitController extends Controller
         if (!$document) {
             $document = $this->docService->generateRelievingLetter($exit);
         }
-        return view('modules.hrms.exits.documents.relieving-letter', compact('document', 'exit'));
+        return view('modules.hrms.employees.exits.documents.relieving-letter', compact('document', 'exit'));
     }
 
     public function viewExperienceCertificate(Request $request, EmployeeExit $exit): View
@@ -476,7 +595,7 @@ class EmployeeExitController extends Controller
         if (!$document) {
             $document = $this->docService->generateExperienceCertificate($exit);
         }
-        return view('modules.hrms.exits.documents.experience-certificate', compact('document', 'exit'));
+        return view('modules.hrms.employees.exits.documents.experience-certificate', compact('document', 'exit'));
     }
 
     public function viewNocCertificate(Request $request, EmployeeExit $exit): View
@@ -486,6 +605,6 @@ class EmployeeExitController extends Controller
         if (!$document) {
             $document = $this->docService->generateNocCertificate($exit);
         }
-        return view('modules.hrms.exits.documents.noc-certificate', compact('document', 'exit'));
+        return view('modules.hrms.employees.exits.documents.noc-certificate', compact('document', 'exit'));
     }
 }

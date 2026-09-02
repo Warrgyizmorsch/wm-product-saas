@@ -25,4 +25,12 @@ class Designation extends BaseModel
     {
         return $this->belongsTo(Department::class);
     }
+
+    /**
+     * Designation has many Employees.
+     */
+    public function employees()
+    {
+        return $this->hasMany(Employee::class, 'designation_id');
+    }
 }

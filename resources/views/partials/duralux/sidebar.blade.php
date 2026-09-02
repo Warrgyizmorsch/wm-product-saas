@@ -139,6 +139,7 @@
             ]],
         ],
         'HRMS' => [
+            ['label' => 'HRMS Dashboard', 'icon' => 'feather-home', 'route' => 'hrms.dashboard'],
             ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => array_filter([
                 ['label' => 'Org Structure', 'route' => 'hrms.org.index'],
                 ['label' => 'Salary Structure', 'route' => 'hrms.salary-structure.index'],
@@ -154,6 +155,7 @@
                 ['label' => 'Document Master', 'route' => 'hrms.documents-master.index'],
                 ['label' => 'Holiday Calendar', 'route' => 'hrms.holidays.index'],
                 ['label' => 'Expense Policies', 'route' => 'hrms.expense-policy.index'],
+                ['label' => 'Offboarding Policies', 'route' => 'hrms.offboarding-policies.index'],
             ])],
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
             ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'],
@@ -169,8 +171,6 @@
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
             ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
-            ['label' => 'Probation Reviews', 'icon' => 'feather-award', 'route' => 'hrms.probation.index'],
-            ['label' => 'Exit & Offboarding', 'icon' => 'feather-log-out', 'route' => 'hrms.exits.index'],
             ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => [
                 ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'],
                 ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary'],
@@ -260,6 +260,10 @@
                                         $hasActiveChild = true;
                                         break;
                                     }
+                                    if (is_array($c) && isset($c['url']) && request()->input('tab') === 'templates' && str_contains($c['url'], 'tab=templates')) {
+                                        $hasActiveChild = true;
+                                        break;
+                                    }
                                 }
                             }
                         @endphp
@@ -277,7 +281,8 @@
                                         @php
                                             $child = is_array($child) ? $child : ['label' => $child];
                                             $childHref = isset($child['route']) ? route($child['route']) : ($child['url'] ?? '#');
-                                            $childActive = isset($child['route']) && request()->routeIs($child['route']);
+                                            $childActive = (isset($child['route']) && request()->routeIs($child['route']) && request()->input('tab') !== 'templates')
+                                                || (isset($child['url']) && request()->input('tab') === 'templates' && str_contains($child['url'], 'tab=templates'));
                                         @endphp
                                         <li class="nxl-item {{ $childActive ? 'active' : '' }}">
                                             <a class="nxl-link" href="{{ $childHref }}">{{ $child['label'] }}</a>

@@ -746,7 +746,7 @@ class HrmsDemoSeeder extends Seeder
                 'gender' => $item['gender'],
                 'marital_status' => $index % 2 === 0 ? 'Married' : 'Single',
                 'blood_group' => ['A+', 'B+', 'O+', 'AB+', 'O-'][$index % 5],
-                'diet_preference' => $index % 2 === 0 ? 'Vegetarian' : 'Non-Vegetarian',
+                'diet_preference' => $index % 2 === 0 ? 'Veg' : 'Non Veg',
                 'office' => 'office',
                 'present_address' => 'Plot #' . (10 + $index) . ', Tech Park Road, Sector 62',
                 'permanent_address' => 'Plot #' . (10 + $index) . ', Tech Park Road, Sector 62',
@@ -1075,18 +1075,18 @@ class HrmsDemoSeeder extends Seeder
             $employeesList[4]->update(['employee_stage' => 'Notice Period']);
 
             $standardChecklist = [
-                ['department' => 'it', 'item_name' => 'Hardware Asset Recovery (Laptop/Accessories)', 'status' => 'pending'],
-                ['department' => 'it', 'item_name' => 'Email, Slack & ERP System Logins Deactivation', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'it', 'item_name' => 'Cloud Data Backup & File Handover', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'admin', 'item_name' => 'Company Physical ID Card & Access Badge Handover', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'admin', 'item_name' => 'Office Keys, Drawer Keys & Parking Tag Handover', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'finance', 'item_name' => 'Reconcile Open Cash Advances & Loan Accounts', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'finance', 'item_name' => 'Verify Pending Travel & Expense Reimbursements', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'finance', 'item_name' => 'Notice Period Shortfall / Buyout Verification', 'status' => 'waived', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'hr', 'item_name' => 'Exit Interview & Feedback Questionnaire Completed', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'hr', 'item_name' => 'PF, Gratuity & Pension Settlement Verification', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'manager', 'item_name' => 'Knowledge Transfer (KT) & Task Handover Sign-off', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
-                ['department' => 'manager', 'item_name' => 'Client Contacts, Repo & Credentials Handover', 'status' => 'pending'],
+                ['department' => 'it_assets', 'item_name' => 'Hardware Asset Recovery (Laptop/Accessories)', 'status' => 'pending'],
+                ['department' => 'it_assets', 'item_name' => 'Email, Slack & ERP System Logins Deactivation', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'it_assets', 'item_name' => 'Cloud Data Backup & File Handover', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'facilities_admin', 'item_name' => 'Company Physical ID Card & Access Badge Handover', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'facilities_admin', 'item_name' => 'Office Keys, Drawer Keys & Parking Tag Handover', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'finance_payroll', 'item_name' => 'Reconcile Open Cash Advances & Loan Accounts', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'finance_payroll', 'item_name' => 'Verify Pending Travel & Expense Reimbursements', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'finance_payroll', 'item_name' => 'Notice Period Shortfall / Buyout Verification', 'status' => 'waived', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'hr_operations', 'item_name' => 'Exit Interview & Feedback Questionnaire Completed', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'hr_operations', 'item_name' => 'PF, Gratuity & Pension Settlement Verification', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'reporting_manager', 'item_name' => 'Knowledge Transfer (KT) & Task Handover Sign-off', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'reporting_manager', 'item_name' => 'Client Contacts, Repo & Credentials Handover', 'status' => 'pending'],
             ];
 
             foreach ($standardChecklist as $item) {

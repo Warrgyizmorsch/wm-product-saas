@@ -130,11 +130,38 @@ class FnFCalculationService
     {
         $tenantId = $exit->tenant_id ?: tenant_id();
 
+        $allowedColumns = [
+            'calculation_date',
+            'lwd',
+            'unpaid_salary_days',
+            'unpaid_salary_amount',
+            'leave_encashment_days',
+            'leave_encashment_amount',
+            'gratuity_amount',
+            'bonus_amount',
+            'other_earnings',
+            'total_earnings',
+            'notice_shortfall_recovery',
+            'unsettled_advances_recovery',
+            'asset_damage_recovery',
+            'other_deductions',
+            'total_deductions',
+            'net_payable_amount',
+            'status',
+            'settlement_channel',
+            'payment_method',
+            'payment_reference',
+            'paid_at',
+            'notes',
+        ];
+
+        $payload = array_intersect_key($data, array_flip($allowedColumns));
+
         return EmployeeFnfSettlement::updateOrCreate(
             [
                 'employee_exit_id' => $exit->id,
             ],
-            array_merge($data, [
+            array_merge($payload, [
                 'tenant_id' => $tenantId,
                 'employee_id' => $exit->employee_id,
             ])

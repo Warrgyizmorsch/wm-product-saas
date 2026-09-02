@@ -5,7 +5,13 @@
 @section('breadcrumb', 'HRMS / Employees')
 
 @section('page-actions')
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <x-ui.button variant="outline-primary" icon="feather-award" href="{{ route('hrms.probation.index') }}" class="fw-semibold">
+            Probation Reviews
+        </x-ui.button>
+        <x-ui.button variant="outline-secondary" icon="feather-log-out" href="{{ route('hrms.exits.index') }}" class="fw-semibold">
+            Exit & Offboarding
+        </x-ui.button>
         <x-ui.import-export-dropdown 
             type="employee" 
             :exportRoute="route('hrms.employees.export')" 
