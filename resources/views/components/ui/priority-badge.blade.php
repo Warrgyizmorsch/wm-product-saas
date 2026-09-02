@@ -18,7 +18,7 @@
     $displayLabel = $label ?? $config['label'];
 @endphp
 
-<span {{ $attributes->merge(['class' => 'badge ' . $config['bg'] . ' ' . $config['text'] . ' px-2 py-1 fs-11 fw-semibold d-inline-flex align-items-center gap-1']) }}>
+<span {{ $attributes->merge(['class' => 'badge erp-badge ' . $config['bg'] . ' ' . $config['text']]) }}>
     @if ($icon)
         <i class="{{ $config['icon'] }} fs-10"></i>
     @endif

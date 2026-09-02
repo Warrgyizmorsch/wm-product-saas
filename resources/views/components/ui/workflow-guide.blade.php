@@ -6,9 +6,9 @@
 
 <div x-data="{ open: true }" x-show="open" x-transition.opacity.duration.200ms {{ $attributes->merge(['class' => 'erp-workflow-guide-box mb-2']) }}>
     <div class="p-1 rounded-1 shadow-xs d-flex align-items-start gap-3"
-         style="background-color: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.08); border: 1px solid rgba(var(--bs-primary-rgb, 13, 110, 253), 0.22); border-radius: 10px;">
+         style="background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent); border: 1px solid color-mix(in srgb, var(--bs-primary) 22%, transparent); border-radius: 10px;">
         <div class="avatar-text avatar-sm bg-white rounded-circle shadow-xs flex-shrink-0 mt-0.5"
-             style="color: var(--bs-primary) !important; border: 1px solid rgba(var(--bs-primary-rgb, 13, 110, 253), 0.3);">
+             style="color: var(--bs-primary) !important; border: 1px solid color-mix(in srgb, var(--bs-primary) 30%, transparent);">
             <i class="{{ $icon }} fs-14"></i>
         </div>
         <div class="flex-grow-1 fs-13 text-dark">
