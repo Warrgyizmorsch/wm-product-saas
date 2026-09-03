@@ -142,21 +142,24 @@
             foreach ($bill->items as $bItem) {
                 $grossTaxableValue += ((float)$bItem->quantity * (float)$bItem->unit_rate);
             }
+            $hasProRataFreight = (float)$bill->freight_amount > 0 && ($bill->freight_allocation_method ?? 'by_amount') !== 'none';
+            $isProRata = $hasProRataFreight && in_array($bill->freight_terms, ['to_be_billed', 'prepaid']);
             if ($bill->discount_amount > 0 && $bill->discount_type === 'order_wise') {
                 $grossTaxableValue = max(0.01, $grossTaxableValue - (float)$bill->discount_amount);
             }
+            $isServiceBill = $bill->items->every(fn($i) => empty($i->product_id) && empty($i->goods_receipt_note_item_id));
         @endphp
 
         <!-- Billed Items Table -->
-        <h6 class="fw-bold text-dark mb-2">{{ __('purchase.billed_items') }}</h6>
+        <h6 class="fw-bold text-dark mb-2">{{ $isServiceBill ? 'Billed Services & Charges' : __('purchase.billed_items') }}</h6>
         <div class="table-responsive rounded border mb-4">
             <table class="table table-bordered table-sm align-middle fs-13 text-dark mb-0">
                 <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
                     <tr>
                         <th class="ps-3" style="width: 5%;">#</th>
-                        <th style="width: 32%;">{{ __('purchase.product') }}</th>
-                        <th class="text-center" style="width: 10%;">{{ __('purchase.billed_qty') }}</th>
-                        <th class="text-end" style="width: 12%;">{{ __('purchase.unit_rate') }}</th>
+                        <th style="width: 32%;">{{ $isServiceBill ? 'Item / Service Description' : __('purchase.product') }}</th>
+                        <th class="text-center" style="width: 10%;">{{ $isServiceBill ? 'Qty / Job' : __('purchase.billed_qty') }}</th>
+                        <th class="text-end" style="width: 12%;">{{ $isServiceBill ? 'Service Rate' : __('purchase.unit_rate') }}</th>
                         <th class="text-end" style="width: 12%;">Amount (₹)</th>
 
                         @if($isProRata)
@@ -192,12 +195,24 @@
                         <tr>
                             <td class="ps-3 text-muted fw-semibold">{{ $idx + 1 }}</td>
                             <td>
-                                <strong class="text-dark">{{ $item->product?->name }}</strong>
-                                @if($item->product?->sku)
-                                    <small class="text-muted d-block">{{ __('purchase.sku') }}: {{ $item->product->sku }}</small>
+                                @if($item->product)
+                                    <strong class="text-dark">{{ $item->product->name }}</strong>
+                                    @if($item->product->sku)
+                                        <small class="text-muted d-block">{{ __('purchase.sku') }}: {{ $item->product->sku }}</small>
+                                    @endif
+                                @elseif(!empty($item->description))
+                                    <strong class="text-dark">{{ $item->description }}</strong>
+                                @elseif($item->grnItem?->product)
+                                    <strong class="text-dark">{{ $item->grnItem->product->name }}</strong>
+                                    @if($item->grnItem->product->sku)
+                                        <small class="text-muted d-block">{{ __('purchase.sku') }}: {{ $item->grnItem->product->sku }}</small>
+                                    @endif
+                                @else
+                                    <strong class="text-dark">{{ str_replace('Transporter Service Bill', 'Service Bill', $bill->notes ?: 'Freight Charges / Service Charge') }}</strong>
+                                    <small class="text-muted d-block">Freight &amp; Logistics Service Charge</small>
                                 @endif
                             </td>
-                            <td class="text-center font-monospace">{{ $qty }}</td>
+                            <td class="text-center font-monospace">{{ $isServiceBill ? '1 (Job)' : $qty }}</td>
                             <td class="text-end font-monospace">₹{{ number_format($rate, 2) }}</td>
                             <td class="text-end font-monospace">₹{{ number_format($lineSub, 2) }}</td>
 

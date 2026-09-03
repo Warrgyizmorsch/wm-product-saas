@@ -26,19 +26,19 @@
             <input type="hidden" name="mode" id="currentModeInput" value="{{ $mode }}">
 
             <x-ui.odoo-form-ui type="sheet">
-                <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                <div class="d-flex align-items-center mb-4 border-bottom pb-2">
                     <div>
                         <h5 class="fw-bold text-dark mb-0">Generate Customer Invoice</h5>
                         <span class="fs-12 text-muted">Create billing invoice against Sales Order, Dispatch Order, or directly for Customer.</span>
                     </div>
-                    <div class="d-flex gap-2">
-                        <x-ui.button href="{{ route('sales.invoices.index') }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
-                        <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save" style="background-color: #1e40af; border-color: #1e40af;">Save Invoice</x-ui.button>
-                    </div>
                 </div>
 
+                @php
+                    $activeInvoicingPolicy = $invoicingPolicy ?? 'both';
+                @endphp
+
                 <!-- 3-Mode Selection Radio Bar -->
-                <div class="mb-4 bg-light p-3 rounded border">
+                <div class="mb-4 bg-light p-3 rounded border {{ $activeInvoicingPolicy !== 'both' ? 'd-none' : '' }}">
                     <label class="form-label fw-bold fs-11 text-uppercase text-muted d-block mb-2">Create Invoice Based On:</label>
                     <div class="d-flex gap-4 flex-wrap align-items-center">
                         <div class="form-check">
@@ -236,7 +236,8 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $index }}][quantity]" class="text-end qty-input" step="0.0001" min="0.0001" :required="true" :value="(float)$item['quantity']" />
+                                            <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $index }}][quantity]" class="text-end qty-input" step="0.0001" min="0.0001" :required="true" :value="(float)$item['quantity']" data-max="{{ isset($item['max_quantity']) ? (float)$item['max_quantity'] : '' }}" />
+                                            <div class="qty-error-msg text-danger fs-11 fw-bold text-end mt-1 d-none" style="white-space: normal; line-height: 1.2;"></div>
                                         </td>
                                         <td>
                                             <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $index }}][unit_price]" class="text-end rate-input" step="0.01" min="0" :required="true" :value="(float)$item['unit_price']" />
@@ -496,7 +497,13 @@
 
             // Mode radio buttons
             $('.mode-radio').on('change', function() {
-                window.location.href = "{{ route('sales.invoices.create') }}?mode=" + $(this).val();
+                const urlParams = new URLSearchParams(window.location.search);
+                const soId = $('#salesOrderSelect').val() || urlParams.get('sales_order_id') || '{{ $salesOrder?->id ?? "" }}';
+                let url = "{{ route('sales.invoices.create') }}?mode=" + $(this).val();
+                if (soId) {
+                    url += "&sales_order_id=" + soId;
+                }
+                window.location.href = url;
             });
 
             // Sales Order Selection Switch
@@ -569,15 +576,74 @@
                 recalculateInvoiceTotals();
             });
 
-            // Event listeners for recalculating
+            function validateInvoiceQtyRow($tr) {
+                const $qtyInput = $tr.find('.qty-input');
+                if (!$qtyInput.length) return true;
+
+                const val = parseFloat($qtyInput.val());
+                const maxAttr = $qtyInput.attr('data-max') || $qtyInput.data('max');
+                const maxQty = (maxAttr !== undefined && maxAttr !== '' && !isNaN(parseFloat(maxAttr))) ? parseFloat(maxAttr) : Infinity;
+
+                let $error = $tr.find('.qty-error-msg');
+                if (!$error.length) {
+                    $error = $('<div class="qty-error-msg text-danger fs-11 fw-bold text-end mt-1 d-none" style="white-space: normal; line-height: 1.2;"></div>');
+                    $qtyInput.after($error);
+                }
+
+                let errorMsg = '';
+                if (isNaN(val) || val <= 0) {
+                    errorMsg = 'Invoice Qty must be greater than 0.';
+                } else if (maxQty !== Infinity && val > (maxQty + 0.0001)) {
+                    errorMsg = `Qty cannot exceed remaining order/dispatch quantity (Max: ${maxQty}).`;
+                }
+
+                if (errorMsg) {
+                    $qtyInput.addClass('is-invalid').css({'border-color': '#ef4444', 'color': '#ef4444'});
+                    $error.text(errorMsg).removeClass('d-none').show();
+                    return false;
+                } else {
+                    $qtyInput.removeClass('is-invalid').css({'border-color': '', 'color': ''});
+                    $error.text('').addClass('d-none').hide();
+                    return true;
+                }
+            }
+
+            function validateAllInvoiceRows() {
+                let isValid = true;
+                $('#invoiceItemsTable tbody tr.item-row').each(function() {
+                    const rowValid = validateInvoiceQtyRow($(this));
+                    if (!rowValid) {
+                        isValid = false;
+                    }
+                });
+
+                const $submitBtns = $('#invoiceForm button[type="submit"], button[type="submit"]');
+                if (!isValid) {
+                    $submitBtns.prop('disabled', true).addClass('disabled opacity-50');
+                } else {
+                    $submitBtns.prop('disabled', false).removeClass('disabled opacity-50');
+                }
+
+                return isValid;
+            }
+
+            // Event listeners for recalculating & validation
+            $(document).on('input change', '.qty-input', function() {
+                validateInvoiceQtyRow($(this).closest('tr'));
+                validateAllInvoiceRows();
+            });
+
             $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect, #invFreightTaxRateSelect, #summaryFreightText, #adjustmentInput', function() {
                 recalculateInvoiceTotals();
             });
 
             $(document).on('click', '.remove-row-btn', function() {
                 $(this).closest('tr').remove();
+                validateAllInvoiceRows();
                 recalculateInvoiceTotals();
             });
+
+            validateAllInvoiceRows();
 
             function recalculateInvoiceTotals() {
                 const discountType = $('#discountTypeSelect').val() || 'item_wise';

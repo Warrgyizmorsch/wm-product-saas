@@ -9,11 +9,15 @@ use App\Domains\CRM\Controllers\LeadActivityController;
 use App\Domains\CRM\Controllers\LeadStatusController;
 use App\Domains\CRM\Controllers\DealStatusController;
 use App\Domains\CRM\Controllers\QuotationController;
+use App\Domains\CRM\Controllers\CrmSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('crm')
     ->as('crm.')
     ->group(function (): void {
+        // CRM Settings Routes
+        Route::get('settings', [CrmSettingsController::class, 'index'])->name('settings.index');
+        Route::post('settings/invoicing-policy', [CrmSettingsController::class, 'updateInvoicingPolicy'])->name('settings.update-invoicing-policy');
         // CRM Masters Routes
         Route::prefix('masters')->as('masters.')->group(function (): void {
             Route::get('lead-statuses', [LeadStatusController::class, 'index'])->name('lead-statuses.index');

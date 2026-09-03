@@ -177,26 +177,42 @@
                             <td class="text-center py-2">
                                 @if($order->status !== 'Cancelled')
                                     @php
+                                        $invoicingPolicy = tenant()?->settings['invoicing_policy'] ?? 'both';
                                         $unbilledDo = $order->dispatches ? $order->dispatches->first(function($d) {
-                                            return !in_array($d->status, ['Invoiced', 'Fully Invoiced', 'Completed', 'Cancelled']);
+                                            return !in_array($d->status, ['Invoiced', 'Fully Invoiced', 'Completed', 'Cancelled']) && empty($d->invoice_id);
                                         }) : null;
-                                        $doInvoiceParams = ['sales_order_id' => $order->id, 'mode' => 'dispatch_order'];
-                                        if ($unbilledDo) {
-                                            $doInvoiceParams['dispatch_order_id'] = $unbilledDo->id;
+
+                                        if ($invoicingPolicy === 'sales_order') {
+                                            $invoiceParams = ['sales_order_id' => $order->id, 'mode' => 'sales_order'];
+                                            $invoiceBtnLabel = 'Create Invoice';
+                                            $invoiceBtnTitle = 'Create Invoice directly against Sales Order';
+                                        } elseif ($invoicingPolicy === 'dispatch_order') {
+                                            $invoiceParams = ['sales_order_id' => $order->id, 'mode' => 'dispatch_order'];
+                                            if ($unbilledDo) {
+                                                $invoiceParams['dispatch_order_id'] = $unbilledDo->id;
+                                            }
+                                            $invoiceBtnLabel = 'Add Invoice From DO';
+                                            $invoiceBtnTitle = 'Create Invoice against Dispatches of this order';
+                                        } else {
+                                            if ($unbilledDo) {
+                                                $invoiceParams = ['sales_order_id' => $order->id, 'mode' => 'dispatch_order', 'dispatch_order_id' => $unbilledDo->id];
+                                                $invoiceBtnLabel = 'Add Invoice From DO';
+                                                $invoiceBtnTitle = 'Create Invoice against Dispatches of this order';
+                                            } else {
+                                                $invoiceParams = ['sales_order_id' => $order->id, 'mode' => 'sales_order'];
+                                                $invoiceBtnLabel = 'Create Invoice';
+                                                $invoiceBtnTitle = 'Create Invoice against Sales Order';
+                                            }
                                         }
                                     @endphp
                                     <div class="d-flex flex-column gap-1 align-items-center justify-content-center">
                                         @if($billingStatusLabel === 'Fully Invoiced' || ($invoicedAmt > 0 && $balancedAmt <= 0.01))
                                             <span class="badge bg-soft-success text-success fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>Fully Invoiced</span>
-                                        @elseif($unbilledDo)
-                                            <x-ui.button href="{!! route('sales.invoices.create', $doInvoiceParams) !!}" variant="soft-primary" size="xs" icon="feather-file-text" class="fw-bold px-2.5 py-1 fs-11 text-nowrap" title="Create Invoice against Dispatches of this order">
-                                                Add Invoice From DO
-                                            </x-ui.button>
-                                        @elseif($doCount > 0)
+                                        @elseif($invoicingPolicy === 'dispatch_order' && $doCount > 0 && !$unbilledDo)
                                             <span class="badge bg-soft-success text-success fs-11 fw-semibold">All DOs Invoiced</span>
                                         @else
-                                            <x-ui.button href="{!! route('sales.invoices.create', $doInvoiceParams) !!}" variant="soft-primary" size="xs" icon="feather-file-text" class="fw-bold px-2.5 py-1 fs-11 text-nowrap" title="Create Invoice against Dispatches of this order">
-                                                Add Invoice From DO
+                                            <x-ui.button href="{!! route('sales.invoices.create', $invoiceParams) !!}" variant="soft-primary" size="xs" icon="feather-file-text" class="fw-bold px-2.5 py-1 fs-11 text-nowrap" :title="$invoiceBtnTitle">
+                                                {{ $invoiceBtnLabel }}
                                             </x-ui.button>
                                         @endif
                                         @if($doCount > 0)

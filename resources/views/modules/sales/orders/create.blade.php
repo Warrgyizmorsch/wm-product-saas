@@ -17,7 +17,7 @@
             @csrf
         
         <x-ui.odoo-form-ui type="sheet">
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 border-bottom pb-3 gap-2">
+            <div class="d-flex align-items-center mb-4 border-bottom pb-3">
                 <div class="d-flex align-items-center gap-3">
                     <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-3 fs-18">
                         <i class="feather-shopping-bag"></i>
@@ -26,14 +26,6 @@
                         <h4 class="fw-bold text-dark mb-0">Sales Order Details</h4>
                         <span class="text-muted fs-12">Create a new confirmed sales order or convert from an approved quotation.</span>
                     </div>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <a href="{{ route('sales.orders.index') }}" class="btn btn-light border px-3.5 py-2 fs-13">
-                        CANCEL
-                    </a>
-                    <button type="submit" form="salesOrderForm" class="btn btn-primary px-4 py-2 fs-13 fw-bold shadow-sm">
-                        <i class="feather-check-circle me-1.5"></i>SAVE SALES ORDER
-                    </button>
                 </div>
             </div>
 
@@ -232,6 +224,16 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Bottom Form Action Footer -->
+            <div class="d-flex justify-content-end align-items-center gap-2 mt-4 pt-3 border-top">
+                <a href="{{ route('sales.orders.index') }}" class="btn btn-light border px-4 py-2 fs-13 fw-semibold">
+                    CANCEL
+                </a>
+                <button type="submit" form="salesOrderForm" class="btn btn-primary px-4 py-2 fs-13 fw-bold shadow-sm">
+                    <i class="feather-check-circle me-1.5"></i>SAVE SALES ORDER
+                </button>
             </div>
         </x-ui.odoo-form-ui>
     </form>

@@ -39,7 +39,16 @@ class InvoiceController extends Controller
         $salesOrderId = $request->input('sales_order_id') ?: $request->input('amp;sales_order_id') ?: $request->query('sales_order_id') ?: $request->query('amp;sales_order_id');
         $dispatchOrderId = $request->input('dispatch_order_id') ?? $request->input('dispatch_id') ?? $request->input('material_requirement_id') ?? $request->input('amp;dispatch_order_id') ?? $request->query('dispatch_order_id');
 
-        $mode = $requestedMode ?: ($customerId ? 'direct' : 'sales_order');
+        $tenantSettings = tenant()?->settings ?? [];
+        $invoicingPolicy = $tenantSettings['invoicing_policy'] ?? 'both';
+
+        if ($invoicingPolicy === 'sales_order') {
+            $mode = 'sales_order';
+        } elseif ($invoicingPolicy === 'dispatch_order') {
+            $mode = 'dispatch_order';
+        } else {
+            $mode = $requestedMode ?: ($customerId ? 'direct' : 'sales_order');
+        }
 
         // Fetch Sales Orders that have unbilled quantities remaining
         $allSalesOrders = SalesOrder::with(['customer', 'items.product', 'items.warehouse', 'invoices' => function($q) {
@@ -60,14 +69,19 @@ class InvoiceController extends Controller
             ->latest()->get();
 
         $dispatchOrders = $allDispatchOrders->filter(function ($do) {
-            if (in_array($do->status, ['Invoiced', 'Fully Invoiced', 'Completed', 'Cancelled'])) {
+            if (!empty($do->invoice_id) || in_array($do->status, ['Invoiced', 'Fully Invoiced', 'Completed', 'Cancelled'])) {
                 return false;
             }
 
             // Check if an active non-cancelled invoice exists for this dispatch order's material_requirement_id
             if ($do->material_requirement_id) {
                 $hasInvoice = Invoice::where('status', '!=', 'Cancelled')
-                    ->where('material_requirement_id', $do->material_requirement_id)
+                    ->where(function($q) use ($do) {
+                        $q->where('material_requirement_id', $do->material_requirement_id);
+                        if ($do->invoice_id) {
+                            $q->orWhere('id', $do->invoice_id);
+                        }
+                    })
                     ->exists();
 
                 if ($hasInvoice) {
@@ -78,6 +92,10 @@ class InvoiceController extends Controller
             return true;
         });
 
+        if ($salesOrderId) {
+            $dispatchOrders = $dispatchOrders->filter(fn($do) => $do->sales_order_id == $salesOrderId)->values();
+        }
+
         $customers  = \App\Domains\CRM\Models\Customer::query()->orderBy('name')->get();
         $products   = \App\Domains\Inventory\Models\Product::where('status', 'active')->orderBy('name')->get();
         $warehouses = Warehouse::query()->orderBy('name')->get();
@@ -85,18 +103,8 @@ class InvoiceController extends Controller
         $dispatchOrder = null;
         $materialRequirement = null;
 
-        if (!$dispatchOrderId && $salesOrderId) {
-            $targetDo = $dispatchOrders->where('sales_order_id', $salesOrderId)->first();
-            if ($targetDo) {
-                $dispatchOrder = $targetDo;
-                $dispatchOrderId = $targetDo->id;
-            }
-        }
-
         if ($dispatchOrderId) {
-            if (!$dispatchOrder) {
-                $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])->find($dispatchOrderId);
-            }
+            $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])->find($dispatchOrderId);
             if (!$dispatchOrder) {
                 $dispatchOrder = \App\Domains\Sales\Models\DispatchOrder::with(['items.product', 'items.warehouse', 'salesOrder.customer', 'salesOrder.items', 'materialRequirement'])
                     ->where('material_requirement_id', $dispatchOrderId)
@@ -106,7 +114,9 @@ class InvoiceController extends Controller
             if ($dispatchOrder) {
                 $salesOrderId = $dispatchOrder->sales_order_id;
                 $materialRequirementId = $dispatchOrder->material_requirement_id;
-                $mode = 'dispatch_order';
+                if (!$requestedMode) {
+                    $mode = 'dispatch_order';
+                }
 
                 if (!$dispatchOrders->contains('id', $dispatchOrder->id)) {
                     $dispatchOrders->push($dispatchOrder);
@@ -116,20 +126,8 @@ class InvoiceController extends Controller
 
         if ($requestedMode === 'dispatch' || $requestedMode === 'dispatch_order') {
             $mode = 'dispatch_order';
-
-            if ($salesOrderId) {
-                $soDOs = $dispatchOrders->filter(fn($do) => $do->sales_order_id == $salesOrderId)->values();
-                if ($soDOs->isNotEmpty()) {
-                    $dispatchOrders = $soDOs;
-                }
-
-                if (!$dispatchOrder && $dispatchOrders->isNotEmpty()) {
-                    $dispatchOrder = $dispatchOrders->first();
-                    if ($dispatchOrder) {
-                        $dispatchOrderId = $dispatchOrder->id;
-                    }
-                }
-            }
+        } elseif ($requestedMode === 'sales_order' || $requestedMode === 'so') {
+            $mode = 'sales_order';
         }
 
         $salesOrder = $salesOrderId ? SalesOrder::with('items.product', 'items.warehouse', 'customer')->find($salesOrderId) : null;
@@ -203,6 +201,7 @@ class InvoiceController extends Controller
                         'item_name'                    => $doItem->product?->name ?? 'Item',
                         'description'                  => null,
                         'quantity'                     => $unbilledQty,
+                        'max_quantity'                 => $unbilledQty,
                         'unit_price'                   => $unitPrice,
                         'discount'                     => $discount,
                         'tax_rate'                     => $taxRate,
@@ -245,6 +244,7 @@ class InvoiceController extends Controller
                     'item_name'                    => $soItem->product?->name ?? 'Item',
                     'description'                  => $soItem->description,
                     'quantity'                     => $unbilledQty,
+                    'max_quantity'                 => $unbilledQty,
                     'unit_price'                   => $unitPrice,
                     'discount'                     => $discount,
                     'tax_rate'                     => $taxRate,
@@ -259,7 +259,7 @@ class InvoiceController extends Controller
 
         return view('modules.sales.invoices.create', compact(
             'mode', 'salesOrders', 'dispatchOrders', 'customers', 'products', 'warehouses',
-            'salesOrder', 'dispatchOrder', 'nextInvoiceNumber', 'advanceAllocations', 'invoiceItems', 'customerId'
+            'salesOrder', 'dispatchOrder', 'nextInvoiceNumber', 'advanceAllocations', 'invoiceItems', 'customerId', 'invoicingPolicy'
         ));
     }
 
@@ -294,6 +294,25 @@ class InvoiceController extends Controller
             'items.*.product_id.required' => 'Please select a valid Product for each line item.',
             'items.*.product_id.exists'   => 'The selected product does not exist in inventory.',
         ]);
+
+        if (!empty($validated['sales_order_id'])) {
+            $so = SalesOrder::with(['items', 'invoices' => fn($q) => $q->where('status', '!=', 'Cancelled')->with('items')])->find($validated['sales_order_id']);
+            if ($so) {
+                foreach ($validated['items'] as $item) {
+                    $soItemId = $item['sales_order_item_id'] ?? null;
+                    if ($soItemId) {
+                        $soItem = $so->items->firstWhere('id', $soItemId);
+                        if ($soItem) {
+                            $alreadyInvoiced = $so->invoices->flatMap->items->where('sales_order_item_id', $soItemId)->sum('quantity');
+                            $maxAllowed = max(0, (float)$soItem->quantity - $alreadyInvoiced);
+                            if (floatval($item['quantity']) > $maxAllowed + 0.0001) {
+                                return redirect()->back()->withInput()->with('error', "Cannot invoice {$item['quantity']} units for '{$item['item_name']}'. Maximum remaining quantity allowed is {$maxAllowed}.");
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         $salesOrder = !empty($validated['sales_order_id']) ? SalesOrder::find($validated['sales_order_id']) : null;
         $customerId = $validated['customer_id'] ?? $salesOrder?->customer_id;
