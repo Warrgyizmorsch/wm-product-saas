@@ -85,6 +85,7 @@ class PayrollRunApiController extends Controller
 
         $registerData = [];
         $pendingPriorHolds = [];
+        
         if ($selectedRun) {
             $excludeEmployeeIds = [];
             if (empty($selectedRun->employee_ids)) {

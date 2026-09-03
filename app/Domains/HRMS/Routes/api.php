@@ -535,6 +535,13 @@ Route::prefix('api/hrms/exits')
     ->group(function () {
         Route::get('/', [EmployeeExitApiController::class, 'index'])->name('index');
         Route::post('/initiate', [EmployeeExitApiController::class, 'initiate'])->name('initiate');
+        Route::get('/clearance-templates', [EmployeeExitApiController::class, 'listTemplates'])->name('templates.index');
+        Route::post('/clearance-templates', [EmployeeExitApiController::class, 'storeTemplate'])->name('templates.store');
+        Route::put('/clearance-templates/{template}', [EmployeeExitApiController::class, 'updateTemplate'])->name('templates.update');
+        Route::delete('/clearance-templates/{template}', [EmployeeExitApiController::class, 'destroyTemplate'])->name('templates.destroy');
+        Route::post('/clearance-templates/reset', [EmployeeExitApiController::class, 'resetTemplates'])->name('templates.reset');
+        Route::post('/{exit}/clearances/adhoc', [EmployeeExitApiController::class, 'storeAdhocClearance'])->name('clearances.adhoc.store');
+        Route::delete('/clearances/{clearance}/adhoc', [EmployeeExitApiController::class, 'destroyAdhocClearance'])->name('clearances.adhoc.destroy');
         Route::get('/{exit}', [EmployeeExitApiController::class, 'show'])->name('show');
     });
 

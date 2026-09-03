@@ -23,11 +23,19 @@ use App\Domains\HRMS\Controllers\TravelExpenseController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 use App\Domains\HRMS\Controllers\ProbationController;
 use App\Domains\HRMS\Controllers\EmployeeExitController;
+use App\Domains\HRMS\Controllers\ExitClearancePolicyController;
+use App\Domains\HRMS\Controllers\OrgStructureController;
+use App\Domains\HRMS\Controllers\HrmsDashboardController;
 
 Route::prefix('hrms')
     ->as('hrms.')
     ->group(function (): void {
         
+        // HRMS Executive & Role Dashboard & Web Punch
+        Route::get('/dashboard', [HrmsDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/', [HrmsDashboardController::class, 'index']);
+        Route::post('/dashboard/punch', [HrmsDashboardController::class, 'webPunch'])->name('dashboard.punch');
+
         // Org Structure Management
         Route::prefix('org')->group(function (): void {
             Route::get('/', [OrgController::class, 'index'])->name('org.index');
@@ -399,6 +407,16 @@ Route::prefix('hrms')
             Route::post('/{employee}/quick-confirm', [ProbationController::class, 'quickConfirm'])->name('probation.quick-confirm');
         });
 
+        // Offboarding Policies (HRMS Master Settings)
+        Route::prefix('offboarding-policies')->name('offboarding-policies.')->group(function (): void {
+            Route::get('/', [ExitClearancePolicyController::class, 'index'])->name('index');
+            Route::post('/', [ExitClearancePolicyController::class, 'store'])->name('store');
+            Route::delete('/category', [ExitClearancePolicyController::class, 'destroyCategory'])->name('destroy-category');
+            Route::put('/{template}', [ExitClearancePolicyController::class, 'update'])->name('update');
+            Route::delete('/{template}', [ExitClearancePolicyController::class, 'destroy'])->name('destroy');
+            Route::post('/reset', [ExitClearancePolicyController::class, 'reset'])->name('reset');
+        });
+
         // Exit Management & Offboarding Hub
         Route::prefix('exits')->group(function (): void {
             Route::get('/', [EmployeeExitController::class, 'index'])->name('exits.index');
@@ -407,6 +425,12 @@ Route::prefix('hrms')
             Route::post('/clearance/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearance.update');
             Route::post('/clearances/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearances.update');
             Route::post('/{exit}/clearances/{department}/batch-update', [EmployeeExitController::class, 'updateDepartmentClearances'])->name('exits.clearances.batch-update');
+            Route::post('/{exit}/clearances/adhoc', [EmployeeExitController::class, 'storeAdhocExitClearance'])->name('exits.clearances.adhoc.store');
+            Route::delete('/clearances/{clearance}/adhoc', [EmployeeExitController::class, 'destroyExitClearance'])->name('exits.clearances.adhoc.destroy');
+            Route::post('/templates', [EmployeeExitController::class, 'storeClearanceTemplate'])->name('exits.templates.store');
+            Route::put('/templates/{template}', [EmployeeExitController::class, 'updateClearanceTemplate'])->name('exits.templates.update');
+            Route::delete('/templates/{template}', [EmployeeExitController::class, 'destroyClearanceTemplate'])->name('exits.templates.destroy');
+            Route::post('/templates/reset', [EmployeeExitController::class, 'resetClearanceTemplates'])->name('exits.templates.reset');
             Route::post('/{exit}/assets/{asset}/return', [EmployeeExitController::class, 'returnAssetDirect'])->name('exits.assets.return');
             Route::post('/{exit}/fnf/recalculate', [EmployeeExitController::class, 'recalculateFnF'])->name('exits.fnf.recalculate');
             Route::post('/{exit}/fnf/finalize', [EmployeeExitController::class, 'finalizeFnF'])->name('exits.fnf.finalize');

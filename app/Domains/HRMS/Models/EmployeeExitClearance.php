@@ -36,4 +36,36 @@ class EmployeeExitClearance extends BaseModel
     {
         return $this->belongsTo(User::class, 'cleared_by');
     }
+
+    public function getDepartmentAttribute(?string $value): string
+    {
+        return ExitClearanceTemplate::normalizeCategoryKey($value ?? 'other');
+    }
+
+    public function setDepartmentAttribute(string $value): void
+    {
+        $this->attributes['department'] = ExitClearanceTemplate::normalizeCategoryKey($value);
+    }
+
+    /**
+     * Semantic alias for clearance authority / category.
+     */
+    public function getClearanceCategoryAttribute(): string
+    {
+        return $this->department;
+    }
+
+    public function setClearanceCategoryAttribute(string $value): void
+    {
+        $this->department = $value;
+    }
+
+    /**
+     * Get display metadata for this clearance item's category.
+     */
+    public function getCategoryMeta(): array
+    {
+        return ExitClearanceTemplate::getCategoryMetadata($this->department);
+    }
 }
+
