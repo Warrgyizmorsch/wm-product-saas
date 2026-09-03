@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Domains\Sales\Models;
+namespace App\Domains\Platform\Models;
 
+use App\Domains\Sales\Models\DispatchOrder;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
@@ -21,8 +22,10 @@ class Transporter extends Model
         'company_id',
         'branch_id',
         'name',
+        'code',
         'transporter_id',
         'gstin',
+        'pan_number',
         'phone',
         'email',
         'address',
@@ -30,6 +33,24 @@ class Transporter extends Model
         'state',
         'pincode',
         'status',
+        'tds_section',
+        'tds_rate',
+        'has_194c_declaration',
+        'declaration_reference',
+        'sac_code',
+        'transport_mode',
+        'fleet_type',
+        'serviceable_zones',
+        'bank_name',
+        'branch_name',
+        'account_name',
+        'account_number',
+        'ifsc_code',
+        'payment_terms',
+        'opening_balance',
+        'contact_person_name',
+        'contact_person_phone',
+        'contact_person_email',
     ];
 
     protected $casts = [

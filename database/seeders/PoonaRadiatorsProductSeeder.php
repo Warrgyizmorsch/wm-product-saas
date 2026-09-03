@@ -153,6 +153,14 @@ class PoonaRadiatorsProductSeeder extends Seeder
     private function ensureWarehouses(int $tenantId): array
     {
         $warehouses = [];
+        $company = \App\Domains\HRMS\Models\Company::firstOrCreate(
+            ['tenant_id' => $tenantId, 'company_name' => 'Warrgyizmorsch'],
+            ['legal_name' => 'Warrgyizmorsch Pvt Ltd', 'status' => true]
+        );
+        $branch = \App\Domains\HRMS\Models\Branch::firstOrCreate(
+            ['tenant_id' => $tenantId, 'company_id' => $company->id, 'code' => 'HQ'],
+            ['name' => 'Headquarters', 'status' => true]
+        );
 
         $whList = [
             ['name' => 'Main Raw Material Store', 'code' => 'WH-RM-01', 'is_default' => true],
@@ -164,6 +172,8 @@ class PoonaRadiatorsProductSeeder extends Seeder
             $wh = Warehouse::firstOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $w['code']],
                 [
+                    'company_id' => $company->id,
+                    'branch_id' => $branch->id,
                     'name' => $w['name'],
                     'status' => 'active',
                     'address' => 'Plot No. 42, Chakan Industrial Area, Phase II, Pune, Maharashtra - 410501',

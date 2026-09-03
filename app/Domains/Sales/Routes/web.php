@@ -44,13 +44,8 @@ Route::prefix('sales')
         Route::post('material-requests/items/{id}/issue', [MaterialRequestController::class, 'issue'])->name('material-requests.issue');
         Route::post('material-requests/items/{id}/create-pr', [MaterialRequestController::class, 'createPurchaseRequisition'])->name('material-requests.create-pr');
         Route::post('material-requests/{id}/bulk-action', [MaterialRequestController::class, 'bulkAction'])->name('material-requests.bulk-action');
-
-        // Transporter Master Routes
-        Route::get('transporters', [\App\Domains\Sales\Controllers\TransporterController::class, 'index'])->name('transporters.index');
-        Route::post('transporters', [\App\Domains\Sales\Controllers\TransporterController::class, 'store'])->name('transporters.store');
-        Route::put('transporters/{transporter}', [\App\Domains\Sales\Controllers\TransporterController::class, 'update'])->name('transporters.update');
-        Route::delete('transporters/{transporter}', [\App\Domains\Sales\Controllers\TransporterController::class, 'destroy'])->name('transporters.destroy');
-        Route::post('transporters/quick-create', [\App\Domains\Sales\Controllers\TransporterController::class, 'quickCreate'])->name('transporters.quick-create');
+        // Transporter Master Routes (Alias Redirect to Platform Transporters)
+        Route::get('transporters', fn() => redirect()->route('platform.transporters.index'))->name('transporters.index');
 
         // Dispatch Orders Routes (Alias Redirects to /inventory/dispatches)
         Route::get('dispatches', fn() => redirect()->route('inventory.dispatches.index'))->name('dispatches.index');

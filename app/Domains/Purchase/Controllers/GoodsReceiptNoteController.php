@@ -103,10 +103,20 @@ class GoodsReceiptNoteController extends Controller
 
         $grnNumber = $this->grnRepo->getNextGrnNumber($tenantId);
 
+        $transporters = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+
+        $trpCount = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)->count() + 1;
+        $autoCode = 'TRP-' . str_pad($trpCount, 4, '0', STR_PAD_LEFT);
+
         return view('modules.purchase.grns.create', compact(
             'approvedOrders',
             'warehouses',
             'vendors',
+            'transporters',
+            'autoCode',
             'products',
             'productsPayload',
             'selectedPo',
@@ -180,6 +190,7 @@ class GoodsReceiptNoteController extends Controller
             'challan_number' => 'nullable|string|max:100',
             'challan_date' => 'nullable|date',
             'vehicle_number' => 'nullable|string|max:50',
+            'transporter_id' => 'nullable|integer',
             'transporter_name' => 'nullable|string|max:100',
             'lr_number' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
@@ -224,8 +235,15 @@ class GoodsReceiptNoteController extends Controller
 
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $vendors = Vendor::where('tenant_id', $tenantId)->get();
+        $transporters = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
 
-        return view('modules.purchase.grns.edit', compact('grn', 'warehouses', 'vendors'));
+        $trpCount = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)->count() + 1;
+        $autoCode = 'TRP-' . str_pad($trpCount, 4, '0', STR_PAD_LEFT);
+
+        return view('modules.purchase.grns.edit', compact('grn', 'warehouses', 'vendors', 'transporters', 'autoCode'));
     }
 
     public function update(Request $request, $id)

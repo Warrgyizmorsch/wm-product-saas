@@ -512,8 +512,8 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
-            \App\Domains\Sales\Models\Transporter::class,
-            \App\Domains\Sales\Policies\TransporterPolicy::class
+            \App\Domains\Platform\Models\Transporter::class,
+            \App\Domains\Platform\Policies\TransporterPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(

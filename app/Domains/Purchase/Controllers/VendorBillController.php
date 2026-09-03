@@ -125,6 +125,7 @@ class VendorBillController extends Controller
             'freight_amount'        => 'nullable|numeric|min:0',
             'freight_tax_percent'   => 'nullable|numeric|min:0',
             'freight_tax_method'    => 'nullable|string',
+            'freight_allocation_method' => 'nullable|string|in:by_amount,by_quantity',
             'notes'                 => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|integer',

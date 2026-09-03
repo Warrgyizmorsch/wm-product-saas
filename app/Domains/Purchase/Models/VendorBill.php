@@ -31,6 +31,8 @@ class VendorBill extends BaseModel
         'freight_terms',
         'freight_amount',
         'freight_tax_method',
+        'freight_allocation_method',
+        'landed_cost_revaluation_data',
         'discount_amount',
         'cgst_amount',
         'sgst_amount',
@@ -64,6 +66,7 @@ class VendorBill extends BaseModel
         'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'due_amount' => 'decimal:2',
+        'landed_cost_revaluation_data' => 'array',
     ];
 
     public function items(): HasMany

@@ -59,16 +59,26 @@
                                     </div>
                                 </div>
 
+                                <div class="mb-2">
+                                    <x-ui.odoo-form-ui type="select" label="Transporter Name" name="transporter_id" id="transporter_id" :error-text="$errors->first('transporter_id')">
+                                        <option value="">-- Choose Transporter --</option>
+                                        <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Transporter</option>
+                                        @foreach($transporters as $transporter)
+                                            <option value="{{ $transporter->id }}" @selected(old('transporter_id', $grn->transporter_id) == $transporter->id)>
+                                                {{ $transporter->name }} @if($transporter->transporter_id) ({{ $transporter->transporter_id }}) @endif
+                                            </option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
                                 <div class="row g-2">
-                                    <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.transporter_name') }}" name="transporter_name" id="transporter_name" value="{{ old('transporter_name', $grn->transporter_name) }}" placeholder="{{ __('purchase.courier_transporter_placeholder') }}" :error-text="$errors->first('transporter_name')" />
-                                    </div>
                                     <div class="col-md-6">
                                         <x-ui.odoo-form-ui type="input" label="{{ __('purchase.vehicle_number') }}" name="vehicle_number" id="vehicle_number" value="{{ old('vehicle_number', $grn->vehicle_number) }}" placeholder="e.g. MH-12-AB-1234" :error-text="$errors->first('vehicle_number')" />
                                     </div>
+                                    <div class="col-md-6">
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.lr_number') }}" name="lr_number" id="lr_number" value="{{ old('lr_number', $grn->lr_number) }}" placeholder="Lorry Receipt / Docket No" :error-text="$errors->first('lr_number')" />
+                                    </div>
                                 </div>
-
-                                <x-ui.odoo-form-ui type="input" label="{{ __('purchase.lr_number') }}" name="lr_number" id="lr_number" value="{{ old('lr_number', $grn->lr_number) }}" placeholder="Lorry Receipt / Docket No" :error-text="$errors->first('lr_number')" />
                             </div>
                         </div>
 
@@ -148,11 +158,117 @@
                 </div>
             </form>
         </div>
-    </div>
+    <!-- Quick Transporter Add Modal Component -->
+    <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>Quick Add Transporter Master" size="lg" :centered="true" :showFooter="false">
+        <form id="quickTransporterForm">
+            @csrf
+            <div class="p-1">
+                <!-- Section 1: Basic Logistics Info -->
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>1. Basic Transporter Information</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-7">
+                        <x-ui.odoo-form-ui type="input" label="Transporter Name" name="name" placeholder="e.g. V-Trans, TCI Logistics, GATI KWE" :required="true" />
+                    </div>
+                    <div class="col-md-5">
+                        <x-ui.odoo-form-ui type="input" label="Transporter Code" name="code" value="{{ $autoCode }}" placeholder="e.g. TRP-0005" />
+                    </div>
+                    <div class="col-md-7">
+                        <x-ui.odoo-form-ui type="input" label="15-Digit E-Way Transporter ID" name="transporter_id" placeholder="e.g. 27AAACM1234F1Z1" />
+                    </div>
+                    <div class="col-md-5">
+                        <x-ui.odoo-form-ui type="select" label="Transport Mode" name="transport_mode" :searchable="false">
+                            <option value="road">Road Transport</option>
+                            <option value="rail">Rail Logistics</option>
+                            <option value="air">Air Freight</option>
+                            <option value="sea">Sea Cargo</option>
+                            <option value="multimodal">Multimodal</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+                </div>
+
+                <hr class="my-3 text-muted opacity-25">
+
+                <!-- Section 2: Taxation & Contact Info -->
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-shield me-1.5"></i>2. Taxation & Contact Details</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="GSTIN Number" name="gstin" placeholder="e.g. 27AAAAA0000A1Z5" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" placeholder="e.g. ABCDE1234F" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="Phone / Mobile" name="phone" placeholder="Contact number" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" placeholder="dispatch@transporter.com" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" />
+                    </div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top mt-3">
+                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-bold px-4" id="saveQuickTransporterBtn">
+                        <i class="feather-save me-1.5"></i>Save Transporter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </x-ui.modal>
 @endsection
 
 @push('scripts')
 <script>
+    // Trigger Quick Add Transporter Modal when "+ Add New Transporter" option is selected
+    $(document).on('change', '#transporter_id', function() {
+        if ($(this).val() === '__ADD_NEW__') {
+            $(this).val('');
+            if ($(this).data('select2')) {
+                $(this).val(null).trigger('change.select2');
+            }
+            const modalEl = document.getElementById('quickTransporterModal');
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modalInstance.show();
+        }
+    });
+
+    // Quick Transporter AJAX Store
+    $(document).on('submit', '#quickTransporterForm', function(e) {
+        e.preventDefault();
+        const $btn = $('#saveQuickTransporterBtn');
+        $btn.prop('disabled', true).text('Saving...');
+
+        $.ajax({
+            url: "{{ route('platform.transporters.quick-create') }}",
+            type: "POST",
+            data: $(this).serialize(),
+            success: function(response) {
+                $btn.prop('disabled', false).text('Save Transporter');
+                if (response.success && response.transporter) {
+                    const t = response.transporter;
+                    const labelText = t.name + (t.transporter_id ? ` (${t.transporter_id})` : (t.gstin ? ` (${t.gstin})` : ''));
+                    const newOpt = new Option(labelText, t.id, true, true);
+                    $('#transporter_id').append(newOpt).trigger('change');
+
+                    const modalEl = document.getElementById('quickTransporterModal');
+                    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                    if (modalInstance) modalInstance.hide();
+                    $('#quickTransporterForm')[0].reset();
+                }
+            },
+            error: function(err) {
+                $btn.prop('disabled', false).text('Save Transporter');
+                alert('Error saving transporter: ' + (err.responseJSON?.message || 'Invalid data'));
+            }
+        });
+    });
+
     $(document).ready(function() {
         $(document).on('click', '.btn-toggle-remark', function() {
             var target = $($(this).data('target'));

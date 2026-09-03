@@ -32,6 +32,7 @@ class GoodsReceiptNote extends BaseModel
         'challan_number',
         'challan_date',
         'vehicle_number',
+        'transporter_id',
         'transporter_name',
         'lr_number',
         'status', // Draft, Approved, Cancelled
@@ -68,6 +69,11 @@ class GoodsReceiptNote extends BaseModel
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
     }
 
+    public function transporter(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Platform\Models\Transporter::class, 'transporter_id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(GoodsReceiptNoteItem::class, 'goods_receipt_note_id');
@@ -91,6 +97,11 @@ class GoodsReceiptNote extends BaseModel
     public function vendorBills(): HasMany
     {
         return $this->hasMany(VendorBill::class, 'goods_receipt_note_id');
+    }
+
+    public function landedCostReceipts(): HasMany
+    {
+        return $this->hasMany(LandedCostReceipt::class, 'goods_receipt_note_id');
     }
 
     public function getBillingStatusAttribute(): string

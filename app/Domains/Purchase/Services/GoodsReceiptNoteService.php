@@ -29,6 +29,12 @@ class GoodsReceiptNoteService
             $vendorId = $validated['vendor_id'] ?? $po?->vendor_id;
             $warehouseId = $validated['warehouse_id'] ?? $po?->warehouse_id ?? Warehouse::where('tenant_id', $tenantId)->first()?->id;
 
+            $transporterId = $validated['transporter_id'] ?? null;
+            $transporterName = $validated['transporter_name'] ?? null;
+            if ($transporterId && !$transporterName) {
+                $transporterName = \App\Domains\Platform\Models\Transporter::find($transporterId)?->name;
+            }
+
             $grn = $this->grnRepo->create([
                 'tenant_id'         => $tenantId,
                 'grn_number'        => $grnNumber,
@@ -39,7 +45,8 @@ class GoodsReceiptNoteService
                 'challan_number'    => $validated['challan_number'] ?? $validated['chalan_number'] ?? null,
                 'challan_date'      => $validated['challan_date'] ?? $validated['chalan_date'] ?? null,
                 'vehicle_number'    => $validated['vehicle_number'] ?? null,
-                'transporter_name'  => $validated['transporter_name'] ?? null,
+                'transporter_id'    => $transporterId,
+                'transporter_name'  => $transporterName,
                 'lr_number'         => $validated['lr_number'] ?? null,
                 'status'            => 'Approved',
                 'notes'             => $validated['notes'] ?? null,

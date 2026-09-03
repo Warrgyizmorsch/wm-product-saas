@@ -93,10 +93,12 @@
                     <x-ui.odoo-form-ui type="table" id="expensesTable">
                         <thead>
                             <tr>
-                                <th style="width: 25%">Expense Head <span class="text-danger">*</span></th>
-                                <th style="width: 25%">Vendor / Supplier</th>
-                                <th style="width: 20%" class="text-end">Amount (₹) <span class="text-danger">*</span></th>
-                                <th style="width: 25%">Allocation Basis <span class="text-danger">*</span></th>
+                                <th style="width: 20%">Expense Head <span class="text-danger">*</span></th>
+                                <th style="width: 22%">Vendor / Transporter</th>
+                                <th style="width: 15%" class="text-end">Base Amount (₹) <span class="text-danger">*</span></th>
+                                <th style="width: 13%">GST Rate (%)</th>
+                                <th style="width: 15%">Tax Mechanism</th>
+                                <th style="width: 10%">Allocation Basis</th>
                                 <th style="width: 5%" class="text-center"></th>
                             </tr>
                         </thead>
@@ -114,7 +116,7 @@
                                 </td>
                                 <td>
                                     <x-ui.odoo-form-ui type="select" name="expenses[0][vendor_id]">
-                                        <option value="">Select Vendor...</option>
+                                        <option value="">Select Vendor / Transporter...</option>
                                         @foreach($vendors as $v)
                                             <option value="{{ $v->id }}">{{ $v->name }}</option>
                                         @endforeach
@@ -124,10 +126,26 @@
                                     <x-ui.odoo-form-ui type="input" inputType="number" name="expenses[0][amount]" class="text-end expense-amount font-monospace fw-bold" step="0.0001" min="0.0001" placeholder="0.00" required="true" />
                                 </td>
                                 <td>
+                                    <x-ui.odoo-form-ui type="select" name="expenses[0][tax_rate]" class="tax-rate-select">
+                                        <option value="0" selected>0% (No Tax)</option>
+                                        <option value="5">5% GST</option>
+                                        <option value="12">12% GST</option>
+                                        <option value="18">18% GST</option>
+                                        <option value="28">28% GST</option>
+                                    </x-ui.odoo-form-ui>
+                                </td>
+                                <td>
+                                    <x-ui.odoo-form-ui type="select" name="expenses[0][gst_type]" class="gst-type-select">
+                                        <option value="cgst_sgst" selected>CGST + SGST (FCM)</option>
+                                        <option value="igst">IGST (FCM Inter-state)</option>
+                                        <option value="rcm">RCM (Reverse Charge 5%)</option>
+                                    </x-ui.odoo-form-ui>
+                                </td>
+                                <td>
                                     <x-ui.odoo-form-ui type="select" name="expenses[0][allocation_basis]" class="basis-select" required="true">
-                                        <option value="by_qty" selected>By Quantity / Weight (Recommended)</option>
-                                        <option value="by_amount">By Item Base Amount</option>
-                                        <option value="equal">Equal Distribution</option>
+                                        <option value="by_qty" selected>By Qty</option>
+                                        <option value="by_amount">By Value</option>
+                                        <option value="equal">Equal</option>
                                     </x-ui.odoo-form-ui>
                                 </td>
                                 <td class="text-center align-middle">
@@ -216,7 +234,7 @@
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][vendor_id]">
-                                <option value="">Select Vendor...</option>
+                                <option value="">Select Vendor / Transporter...</option>
                                 ${vendorsOptions}
                             </x-ui.odoo-form-ui>
                         </td>
@@ -224,10 +242,26 @@
                             <x-ui.odoo-form-ui type="input" inputType="number" name="expenses[${expenseRowIndex}][amount]" class="text-end expense-amount font-monospace fw-bold" step="0.0001" min="0.0001" placeholder="0.00" required="true" />
                         </td>
                         <td>
+                            <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][tax_rate]" class="tax-rate-select">
+                                <option value="0" selected>0% (No Tax)</option>
+                                <option value="5">5% GST</option>
+                                <option value="12">12% GST</option>
+                                <option value="18">18% GST</option>
+                                <option value="28">28% GST</option>
+                            </x-ui.odoo-form-ui>
+                        </td>
+                        <td>
+                            <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][gst_type]" class="gst-type-select">
+                                <option value="cgst_sgst" selected>CGST + SGST (FCM)</option>
+                                <option value="igst">IGST (FCM Inter-state)</option>
+                                <option value="rcm">RCM (Reverse Charge 5%)</option>
+                            </x-ui.odoo-form-ui>
+                        </td>
+                        <td>
                             <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][allocation_basis]" class="basis-select" required="true">
-                                <option value="by_qty" selected>By Quantity / Weight (Recommended)</option>
-                                <option value="by_amount">By Item Base Amount</option>
-                                <option value="equal">Equal Distribution</option>
+                                <option value="by_qty" selected>By Qty</option>
+                                <option value="by_amount">By Value</option>
+                                <option value="equal">Equal</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td class="text-center align-middle">
@@ -258,7 +292,7 @@
                 }
             }
 
-            $(document).on('input change', '.expense-amount, .basis-select', function () {
+            $(document).on('input change', '.expense-amount, .basis-select, .tax-rate-select, .gst-type-select', function () {
                 recalculateAllocations();
             });
 
@@ -289,9 +323,25 @@
 
             function recalculateAllocations() {
                 let totalExpenses = 0.0;
+                let totalTax = 0.0;
+                let totalPayable = 0.0;
+
                 $('#expensesTbody tr.expense-row').each(function () {
                     const amt = parseFloat($(this).find('.expense-amount').val()) || 0.0;
+                    const taxRate = parseFloat($(this).find('.tax-rate-select').val()) || 0.0;
+                    const gstType = $(this).find('.gst-type-select').val() || 'cgst_sgst';
+                    const isRcm = gstType === 'rcm';
+
+                    let taxAmt = 0.0;
+                    if (taxRate > 0) {
+                        taxAmt = amt * (taxRate / 100);
+                    }
+
+                    const linePayable = isRcm ? amt : (amt + taxAmt);
+
                     totalExpenses += amt;
+                    totalTax += taxAmt;
+                    totalPayable += linePayable;
                 });
 
                 $('#totalExpensesDisplay').val('₹' + totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
