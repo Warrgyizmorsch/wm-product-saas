@@ -52,6 +52,7 @@ Route::prefix('sales')
         Route::get('dispatches/create', fn() => redirect()->route('inventory.dispatches.create', request()->query()))->name('dispatches.create');
         Route::post('dispatches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'store'])->name('dispatches.store');
         Route::get('dispatches/material-requirements', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'pendingMaterialRequirements'])->name('dispatches.pending-mr');
+        Route::get('dispatches/sales-order-invoices', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'getSalesOrderInvoices'])->name('dispatches.sales-order-invoices');
         Route::get('dispatches/available-serials', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'getAvailableSerials'])->name('dispatches.available-serials');
         Route::get('dispatches/available-batches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'getAvailableBatches'])->name('dispatches.available-batches');
         Route::get('dispatches/warehouse/{warehouse}/address', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'warehouseAddress'])->name('dispatches.warehouse-address');

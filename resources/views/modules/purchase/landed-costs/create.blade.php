@@ -37,6 +37,10 @@
 @endpush
 
 @section('content')
+    @php
+        $transportersGroup = $vendors->filter(fn($v) => $v->is_transporter);
+        $suppliersGroup = $vendors->filter(fn($v) => !$v->is_transporter);
+    @endphp
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
         <form method="POST" action="{{ route('purchase.landed-costs.store') }}" id="landedCostForm" class="odoo-sheet">
             @csrf
@@ -117,9 +121,20 @@
                                 <td>
                                     <x-ui.odoo-form-ui type="select" name="expenses[0][vendor_id]">
                                         <option value="">Select Vendor / Transporter...</option>
-                                        @foreach($vendors as $v)
-                                            <option value="{{ $v->id }}">{{ $v->name }}</option>
-                                        @endforeach
+                                        @if($transportersGroup->isNotEmpty())
+                                            <optgroup label="🚛 Transporters &amp; Logistics">
+                                                @foreach($transportersGroup as $v)
+                                                    <option value="{{ $v->id }}">{{ $v->name }} (Transporter / Logistics)</option>
+                                                @endforeach
+                                            </optgroup>
+                                        @endif
+                                        @if($suppliersGroup->isNotEmpty())
+                                            <optgroup label="🏭 Material Suppliers &amp; Vendors">
+                                                @foreach($suppliersGroup as $v)
+                                                    <option value="{{ $v->id }}">{{ $v->name }} (Supplier / Vendor)</option>
+                                                @endforeach
+                                            </optgroup>
+                                        @endif
                                     </x-ui.odoo-form-ui>
                                 </td>
                                 <td>
@@ -216,7 +231,26 @@
             });
 
             let expenseRowIndex = 1;
-            const vendorsOptions = `@foreach($vendors as $v)<option value="{{ $v->id }}">{{ addslashes($v->name) }}</option>@endforeach`;
+            @php
+                $transportersGroup = $vendors->filter(fn($v) => $v->is_transporter);
+                $suppliersGroup = $vendors->filter(fn($v) => !$v->is_transporter);
+            @endphp
+            const vendorsOptions = `
+                @if($transportersGroup->isNotEmpty())
+                    <optgroup label="🚛 Transporters &amp; Logistics">
+                        @foreach($transportersGroup as $v)
+                            <option value="{{ $v->id }}">{{ addslashes($v->name) }} (Transporter / Logistics)</option>
+                        @endforeach
+                    </optgroup>
+                @endif
+                @if($suppliersGroup->isNotEmpty())
+                    <optgroup label="🏭 Material Suppliers &amp; Vendors">
+                        @foreach($suppliersGroup as $v)
+                            <option value="{{ $v->id }}">{{ addslashes($v->name) }} (Supplier / Vendor)</option>
+                        @endforeach
+                    </optgroup>
+                @endif
+            `;
 
             // Add Line
             $('#addExpenseBtn').on('click', function () {

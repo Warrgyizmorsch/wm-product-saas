@@ -5,6 +5,7 @@ namespace App\Domains\Sales\Controllers;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Sales\Models\DispatchOrder;
+use App\Domains\Sales\Models\MaterialRequirement;
 use App\Domains\Platform\Models\Transporter;
 use App\Domains\Sales\Repositories\DispatchOrderRepository;
 use App\Domains\Sales\Services\DispatchOrderService;
@@ -39,7 +40,22 @@ class DispatchOrderController extends Controller
         $tenantId = require_tenant_id();
         $warehouses   = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get();
         $transporters = Transporter::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get();
-        $pendingDOs   = $this->dispatchRepo->getAllPendingMaterialRequirements();
+        $pendingDOsFormatted = $this->dispatchService->getPendingMaterialRequirementsFormatted();
+        $pendingDOIds = array_column($pendingDOsFormatted, 'id');
+        $mrIdTemp = $request->input('material_requirement_id') ?: $request->input('mr_id');
+        if ($mrIdTemp && !in_array((int)$mrIdTemp, $pendingDOIds)) {
+            $pendingDOIds[] = (int)$mrIdTemp;
+        }
+
+        $pendingDOs = MaterialRequirement::with([
+            'salesOrder.customer',
+            'items.product',
+            'items.warehouse',
+        ])
+        ->whereIn('id', $pendingDOIds)
+        ->latest()
+        ->get();
+
         $customers    = \App\Domains\CRM\Models\Customer::where('tenant_id', $tenantId)->orderBy('name')->get();
         $products     = Product::where('tenant_id', $tenantId)->with(['uom'])->orderBy('name')->get();
 
@@ -49,9 +65,14 @@ class DispatchOrderController extends Controller
         $prefillSalesOrder = null;
         if ($soId) {
             $prefillSalesOrder = \App\Domains\Sales\Models\SalesOrder::find($soId);
+            if (!$mrId && $prefillSalesOrder) {
+                $mr = \App\Domains\Sales\Models\MaterialRequirement::where('sales_order_id', $prefillSalesOrder->id)->first();
+                $mrId = $mr?->id;
+            }
         } elseif ($mrId) {
             $mr = \App\Domains\Sales\Models\MaterialRequirement::with('salesOrder')->find($mrId);
             $prefillSalesOrder = $mr?->salesOrder;
+            $soId = $prefillSalesOrder?->id;
         }
 
         $formattedWarehouses = $warehouses->map(fn ($w) => ['id' => $w->id, 'name' => $w->name])->values()->all();
@@ -66,7 +87,7 @@ class DispatchOrderController extends Controller
         $trpCount = Transporter::where('tenant_id', $tenantId)->count() + 1;
         $autoCode = 'TRP-' . str_pad($trpCount, 4, '0', STR_PAD_LEFT);
 
-        return view('modules.sales.dispatches.create', compact('warehouses', 'transporters', 'autoCode', 'pendingDOs', 'customers', 'products', 'formattedWarehouses', 'formattedProducts', 'mrId', 'prefillSalesOrder'));
+        return view('modules.sales.dispatches.create', compact('warehouses', 'transporters', 'autoCode', 'pendingDOs', 'customers', 'products', 'formattedWarehouses', 'formattedProducts', 'mrId', 'prefillSalesOrder', 'soId'));
     }
 
     public function pendingMaterialRequirements(Request $request): JsonResponse
@@ -76,6 +97,20 @@ class DispatchOrderController extends Controller
         $result = $this->dispatchService->getPendingMaterialRequirementsFormatted();
 
         return response()->json(['data' => $result]);
+    }
+
+    public function getSalesOrderInvoices(Request $request): JsonResponse
+    {
+        $this->authorize('create', DispatchOrder::class);
+        $salesOrderId = (int) $request->input('sales_order_id');
+
+        if (!$salesOrderId) {
+            return response()->json(['invoices' => []]);
+        }
+
+        $invoices = $this->dispatchService->getFormattedInvoicesForSalesOrder($salesOrderId);
+
+        return response()->json(['invoices' => $invoices]);
     }
 
     public function getAvailableSerials(Request $request): JsonResponse
@@ -150,7 +185,9 @@ class DispatchOrderController extends Controller
         $this->authorize('create', DispatchOrder::class);
 
         $validated = $request->validate([
+            'sales_order_id'          => ['nullable', 'exists:sales_orders,id'],
             'material_requirement_id' => ['nullable', 'exists:material_requirements,id'],
+            'invoice_id'              => ['nullable', 'exists:invoices,id'],
             'customer_id'             => ['nullable', 'exists:customers,id'],
             'transporter_id'          => ['nullable', 'exists:transporters,id'],
             'carrier'                 => ['nullable', 'string', 'max:255'],
@@ -173,6 +210,7 @@ class DispatchOrderController extends Controller
             'notes'                   => ['nullable', 'string'],
             'items'                   => ['required', 'array', 'min:1'],
             'items.*.material_requirement_item_id' => ['nullable', 'exists:material_requirement_items,id'],
+            'items.*.invoice_item_id' => ['nullable', 'exists:invoice_items,id'],
             'items.*.product_id'      => ['required', 'exists:products,id'],
             'items.*.warehouse_id'    => ['required', 'exists:warehouses,id'],
             'items.*.quantity'        => ['required', 'numeric', 'min:0.0001'],
@@ -209,7 +247,7 @@ class DispatchOrderController extends Controller
 
         try {
             $dispatch = $this->dispatchService->confirmDispatchOrder($dispatch);
-            return redirect()->route('sales.dispatches.show', $dispatch->id)
+            return redirect()->back()
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} confirmed and warehouse stock reserved successfully. Invoice creation is now enabled.");
         } catch (Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -224,7 +262,7 @@ class DispatchOrderController extends Controller
 
         try {
             $dispatch = $this->dispatchService->shipDispatchOrder($dispatch);
-            return redirect()->route('sales.dispatches.show', $dispatch->id)
+            return redirect()->back()
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} marked as Shipped (Gate Outward) and physical stock deducted from warehouse successfully.");
         } catch (Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());

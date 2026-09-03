@@ -16,6 +16,7 @@
                 $q->where('sales_order_id', $order->id)->where('status', '!=', 'Cancelled');
             })->sum('quantity');
             $hasUnbilledQty = ($totalOrderedQty - $totalInvoicedQty) > 0.0001;
+            $invoicingPolicy = tenant()?->settings['invoicing_policy'] ?? 'both';
         @endphp
 
         <!-- Primary Action Buttons (Confirm & Cancel together) -->
@@ -34,14 +35,14 @@
                 </button>
             </form>
         @elseif (in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped']))
-            <x-ui.button href="{{ route('sales.dispatches.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" class="fw-bold px-3 d-print-none">
+            {{-- <x-ui.button href="{{ route('sales.dispatches.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" class="fw-bold px-3 d-print-none">
                 <i class="feather-truck me-1.5"></i>Dispatch Order
-            </x-ui.button>
+            </x-ui.button> --}}
 
-            @if ($hasUnbilledQty)
-                <x-ui.button href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id]) }}" variant="soft-primary" size="sm" class="fw-bold px-3 d-print-none">
+            @if ($hasUnbilledQty && $invoicingPolicy !== 'dispatch_order')
+                <a href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id, 'mode' => 'sales_order']) }}" class="btn btn-sm btn-primary fw-bold px-3 d-print-none">
                     <i class="feather-file-text me-1.5"></i>Create Invoice
-                </x-ui.button>
+                </a>
             @endif
 
             @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
@@ -154,24 +155,11 @@
                 border-left-color: #e2e8f0;
             }
 
-            /* Tabs styling */
+            /* Tabs container styling */
             .so-tab-header-strip {
-                background: #ffffff;
+                background: #f8fafc;
                 border-bottom: 1px solid #e2e8f0;
-                padding: 0 24px;
-            }
-            #salesOrderTabs .nav-link {
-                padding: 12px 18px !important;
-                font-weight: 600 !important;
-                font-size: 13px !important;
-                color: #64748b !important;
-                border-bottom: 2px solid transparent !important;
-                border-radius: 0 !important;
-            }
-            #salesOrderTabs .nav-link.active {
-                color: #1e40af !important;
-                border-bottom-color: #1e40af !important;
-                background: transparent !important;
+                padding: 10px 24px;
             }
         </style>
     @endpush
@@ -542,11 +530,14 @@
                                         elseif ($dispatch->status === 'Cancelled') $dispBadge = 'bg-soft-danger text-danger';
 
                                         $isDispatchInvoiced = false;
-                                        if ($dispatch->status === 'Invoiced') {
+                                        if ($dispatch->status === 'Invoiced' || !empty($dispatch->invoice_id)) {
+                                            $isDispatchInvoiced = true;
+                                        } elseif (!$hasUnbilledQty) {
                                             $isDispatchInvoiced = true;
                                         } elseif ($order->invoices) {
                                             $isDispatchInvoiced = $order->invoices->where('status', '!=', 'Cancelled')->contains(function($inv) use ($dispatch) {
-                                                return ($dispatch->material_requirement_id && $inv->material_requirement_id == $dispatch->material_requirement_id);
+                                                return ($dispatch->invoice_id && $inv->id == $dispatch->invoice_id)
+                                                    || ($dispatch->material_requirement_id && $inv->material_requirement_id == $dispatch->material_requirement_id);
                                             });
                                         }
                                     @endphp
@@ -608,8 +599,8 @@
                             <i class="feather-file-text fs-16 text-primary"></i>
                             <h6 class="mb-0 fw-bold text-dark fs-14">Sales Invoices</h6>
                         </div>
-                        @if (($order->status === 'Confirmed' || $order->status === 'Partially Shipped' || $order->status === 'Shipped') && ($hasUnbilledQty ?? true))
-                            <x-ui.button href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
+                        @if (($order->status === 'Confirmed' || $order->status === 'Partially Shipped' || $order->status === 'Shipped') && ($hasUnbilledQty ?? true) && $invoicingPolicy !== 'dispatch_order')
+                            <x-ui.button href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id, 'mode' => 'sales_order']) }}" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
                                 Create Invoice
                             </x-ui.button>
                         @endif
@@ -632,7 +623,7 @@
                                         $invBadge = 'bg-soft-secondary text-secondary';
                                         if ($inv->status === 'Paid') $invBadge = 'bg-soft-success text-success';
                                         elseif ($inv->status === 'Partially Paid') $invBadge = 'bg-soft-warning text-warning';
-                                        elseif ($inv->status === 'Sent') $invBadge = 'bg-soft-info text-info';
+                                        elseif ($inv->status === 'Sent' || $inv->status === 'Posted') $invBadge = 'bg-soft-info text-info';
                                         elseif ($inv->status === 'Cancelled') $invBadge = 'bg-soft-danger text-danger';
                                     @endphp
                                     <tr>
@@ -641,15 +632,19 @@
                                         </td>
                                         <td class="text-muted">{{ date('d/m/Y', strtotime($inv->invoice_date)) }}</td>
                                         <td>
-                                            @if ($inv->materialRequirement)
-                                                <a href="{{ route('sales.material-requirements.show', $inv->material_requirement_id) }}" class="text-muted fw-semibold">
+                                            @if ($inv->dispatchOrders && $inv->dispatchOrders->isNotEmpty())
+                                                <a href="{{ route('sales.dispatches.show', $inv->dispatchOrders->first()->id) }}" class="text-primary fw-semibold font-monospace">
+                                                    <i class="feather-truck me-1"></i>{{ $inv->dispatchOrders->first()->dispatch_number }}
+                                                </a>
+                                            @elseif ($inv->materialRequirement)
+                                                <a href="{{ route('sales.material-requirements.show', $inv->material_requirement_id) }}" class="text-muted fw-semibold font-monospace">
                                                     {{ $inv->materialRequirement->requirement_number }}
                                                 </a>
                                             @else
-                                                <span class="text-muted fs-12">Full Order Billing</span>
+                                                <span class="text-muted fs-12">Advance / SO Billing</span>
                                             @endif
                                         </td>
-                                        <td class="text-end fw-bold text-dark">₹{{ number_format($inv->grand_total, 2) }}</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($inv->total_amount ?? $inv->grand_total, 2) }}</td>
                                         <td>
                                             <span class="badge {{ $invBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $inv->status }}</span>
                                         </td>

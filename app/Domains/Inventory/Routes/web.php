@@ -123,6 +123,7 @@ Route::prefix('inventory')
         Route::get('dispatches/create', [DispatchOrderController::class, 'create'])->name('dispatches.create');
         Route::post('dispatches', [DispatchOrderController::class, 'store'])->name('dispatches.store');
         Route::get('dispatches/material-requirements', [DispatchOrderController::class, 'pendingMaterialRequirements'])->name('dispatches.pending-mr');
+        Route::get('dispatches/sales-order-invoices', [DispatchOrderController::class, 'getSalesOrderInvoices'])->name('dispatches.sales-order-invoices');
         Route::get('dispatches/available-serials', [DispatchOrderController::class, 'getAvailableSerials'])->name('dispatches.available-serials');
         Route::get('dispatches/available-batches', [DispatchOrderController::class, 'getAvailableBatches'])->name('dispatches.available-batches');
         Route::get('dispatches/warehouse/{warehouse}/address', [DispatchOrderController::class, 'warehouseAddress'])->name('dispatches.warehouse-address');

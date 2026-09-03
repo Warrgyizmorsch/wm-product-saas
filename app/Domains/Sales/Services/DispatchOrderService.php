@@ -53,6 +53,7 @@ class DispatchOrderService
             return [
                 'id' => $requirement->id,
                 'requirement_number' => $requirement->requirement_number,
+                'sales_order_id' => $requirement->sales_order_id,
                 'sales_order_number' => $requirement->salesOrder?->sales_order_number ?? 'N/A',
                 'sales_order' => $requirement->salesOrder?->sales_order_number ?? 'N/A',
                 'customer_name' => $requirement->salesOrder?->customer?->name ?? 'N/A',
@@ -65,6 +66,53 @@ class DispatchOrderService
     }
 
     /**
+     * Get unfulfilled active invoices for a given Sales Order.
+     */
+    public function getFormattedInvoicesForSalesOrder(int $salesOrderId): array
+    {
+        $invoices = \App\Domains\Sales\Models\Invoice::with(['items.product', 'items.warehouse'])
+            ->where('sales_order_id', $salesOrderId)
+            ->whereNotIn('status', ['Cancelled'])
+            ->get();
+
+        return $invoices->map(function ($invoice) {
+            $itemsData = $invoice->items->map(function ($item) {
+                $alreadyDispatched = $this->dispatchRepo->getDispatchedQtyForInvoiceItem($item->id);
+                $remainingQty = max(0, (float) $item->quantity - $alreadyDispatched);
+                $unreservedAvail = StockService::getAvailableStock((int) $item->product_id, (int) ($item->warehouse_id ?? 0));
+
+                return [
+                    'id' => $item->id,
+                    'invoice_item_id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'product_name' => $item->product?->name ?? 'Unknown',
+                    'product_sku' => $item->product?->sku ?? '',
+                    'sku' => $item->product?->sku ?? '',
+                    'warehouse_id' => $item->warehouse_id,
+                    'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
+                    'available_qty' => $unreservedAvail,
+                    'quantity_ordered' => (float) $item->quantity,
+                    'invoiced_qty' => (float) $item->quantity,
+                    'already_dispatched' => $alreadyDispatched,
+                    'dispatched_qty' => $alreadyDispatched,
+                    'remaining_qty' => $remainingQty,
+                    'dispatch_qty' => $remainingQty,
+                    'fully_dispatched' => $remainingQty <= 0,
+                ];
+            })->filter(fn ($i) => $i['remaining_qty'] > 0)->values();
+
+            return [
+                'id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->format('d-M-Y') : '',
+                'total_amount' => (float) $invoice->total_amount,
+                'status' => $invoice->status,
+                'items' => $itemsData,
+            ];
+        })->filter(fn ($inv) => count($inv['items']) > 0)->values()->toArray();
+    }
+
+    /**
      * Validate and create a new Dispatch Order, reserving stock immediately in Pending state.
      *
      * @throws Exception
@@ -72,7 +120,11 @@ class DispatchOrderService
     public function createDispatchOrder(array $validated, int $userId): DispatchOrder
     {
         $mrId = $validated['material_requirement_id'] ?? null;
-        $req  = $mrId ? MaterialRequirement::find($mrId) : null;
+        $soId = $validated['sales_order_id'] ?? null;
+
+        $req = $mrId ? MaterialRequirement::find($mrId) : ($soId ? MaterialRequirement::where('sales_order_id', $soId)->first() : null);
+        $finalSalesOrderId = $soId ?? $req?->sales_order_id;
+        $finalMrId = $req?->id ?? $mrId;
         $tenantId = require_tenant_id();
 
         // 1. Remaining ordered qty & Stock availability validation
@@ -85,6 +137,17 @@ class DispatchOrderService
 
                 if ((float) $item['quantity'] > $remainingQty) {
                     throw new Exception("Cannot dispatch {$item['quantity']} units for '{$mrItem->product?->name}'. Maximum remaining ordered quantity is {$remainingQty}.");
+                }
+            }
+
+            $invItemId = $item['invoice_item_id'] ?? null;
+            $invItem = $invItemId ? \App\Domains\Sales\Models\InvoiceItem::find($invItemId) : null;
+            if ($invItem) {
+                $alreadyDispatchedInv = $this->dispatchRepo->getDispatchedQtyForInvoiceItem($invItem->id);
+                $remainingInvQty = max(0, (float) $invItem->quantity - $alreadyDispatchedInv);
+
+                if ((float) $item['quantity'] > $remainingInvQty) {
+                    throw new Exception("Cannot dispatch {$item['quantity']} units for '{$invItem->product?->name}'. Maximum remaining invoiced quantity is {$remainingInvQty}.");
                 }
             }
 
@@ -115,8 +178,9 @@ class DispatchOrderService
             'tenant_id' => $tenantId,
             'customer_id' => $validated['customer_id'] ?? ($req?->salesOrder?->customer_id),
             'transporter_id' => $validated['transporter_id'] ?? null,
-            'material_requirement_id' => $req?->id,
-            'sales_order_id' => $req?->sales_order_id,
+            'material_requirement_id' => $finalMrId,
+            'sales_order_id' => $finalSalesOrderId,
+            'invoice_id' => $validated['invoice_id'] ?? null,
             'dispatch_number' => $dispatchNumber,
             'dispatch_date' => $validated['dispatch_date'],
             'status' => 'Pending',
@@ -148,6 +212,15 @@ class DispatchOrderService
             foreach ($dispatch->items as $item) {
                 $qtyToReserve = (float) ($item->quantity_dispatched ?? $item->quantity_ordered);
                 $mrItem = $item->material_requirement_item_id ? MaterialRequirementItem::find($item->material_requirement_item_id) : null;
+                if (!$mrItem && !empty($dispatchData['sales_order_id'])) {
+                    $mrItem = MaterialRequirementItem::whereHas('materialRequirement', function($q) use ($dispatchData) {
+                        $q->where('sales_order_id', $dispatchData['sales_order_id']);
+                    })->where('product_id', $item->product_id)->first();
+
+                    if ($mrItem) {
+                        $item->update(['material_requirement_item_id' => $mrItem->id]);
+                    }
+                }
                 $mrReserved = $mrItem ? (float) ($mrItem->quantity_reserved ?? 0) : 0;
 
                 $coveredByMR = min($qtyToReserve, $mrReserved);

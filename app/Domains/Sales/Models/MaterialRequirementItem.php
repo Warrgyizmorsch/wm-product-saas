@@ -100,11 +100,23 @@ class MaterialRequirementItem extends Model
 
     public function getDispatchedQtyAttribute(): float
     {
-        return (float) $this->dispatchItems()
-            ->whereHas('dispatchOrder', function ($q) {
+        $mrItemId = $this->id;
+        $productId = $this->product_id;
+        $salesOrderId = $this->materialRequirement?->sales_order_id;
+
+        return (float) \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($salesOrderId) {
                 $q->where('status', '!=', 'Cancelled');
+                if ($salesOrderId) {
+                    $q->where('sales_order_id', $salesOrderId);
+                }
             })
-            ->sum('quantity_dispatched');
+            ->where(function ($q) use ($mrItemId, $productId) {
+                $q->where('material_requirement_item_id', $mrItemId);
+                if ($productId) {
+                    $q->orWhere('product_id', $productId);
+                }
+            })
+            ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
     }
 
     public function getPendingQtyAttribute(): float
