@@ -52,14 +52,6 @@
                         <h4 class="fw-bold text-dark mb-0">New Dispatch Order</h4>
                         <span class="fs-12 text-muted">Issue an Outward Dispatch Order against a Material Requirement or create a Direct Outward Dispatch.</span>
                     </div>
-                    <div class="d-flex gap-2">
-                        <x-ui.button href="{{ route('sales.dispatches.index') }}" variant="light" size="sm" class="border">
-                            Cancel
-                        </x-ui.button>
-                        <x-ui.button type="submit" id="saveDispatchBtn" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">
-                            Save Dispatch Order
-                        </x-ui.button>
-                    </div>
                 </div>
 
                 <!-- MR Selection Banner (Against Material Requirement) -->
@@ -81,20 +73,15 @@
                         <x-ui.odoo-form-ui type="input" inputType="date" label="Dispatch Date" name="dispatch_date" :value="old('dispatch_date', now()->toDateString())" :required="true" />
                         
                         <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <label class="form-label mb-0 fw-bold fs-12 text-muted">TRANSPORTER MASTER</label>
-                                <button type="button" class="btn btn-xs btn-link text-primary p-0 text-decoration-none fw-semibold" data-bs-toggle="modal" data-bs-target="#quickTransporterModal">
-                                    <i class="feather-plus-circle me-1"></i>Quick Add
-                                </button>
-                            </div>
-                            <select name="transporter_id" id="transporterSelect" class="form-select odoo-select2">
-                                <option value="">— Select Transporter —</option>
+                            <x-ui.odoo-form-ui type="select" label="Transporter Master" name="transporter_id" id="transporterSelect" :error-text="$errors->first('transporter_id')">
+                                <option value="">-- Choose Transporter --</option>
+                                <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Transporter</option>
                                 @foreach($transporters as $t)
                                     <option value="{{ $t->id }}" data-id="{{ $t->transporter_id }}" data-gstin="{{ $t->gstin }}" @selected(old('transporter_id') == $t->id)>
                                         {{ $t->name }} {{ $t->transporter_id ? "({$t->transporter_id})" : ($t->gstin ? "({$t->gstin})" : '') }}
                                     </option>
                                 @endforeach
-                            </select>
+                            </x-ui.odoo-form-ui>
                         </div>
 
                         <x-ui.odoo-form-ui type="input" label="Carrier / Courier Partner" name="carrier" id="carrierInput" :value="old('carrier')" placeholder="e.g. Blue Dart, DHL, Professional Courier" />
@@ -173,9 +160,9 @@
                 <!-- Bottom Action Bar -->
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
                     <x-ui.button href="{{ route('sales.dispatches.index') }}" variant="light" class="border px-4">
-                        Discard
+                        Cancel
                     </x-ui.button>
-                    <x-ui.button type="submit" id="saveDispatchBtnFooter" variant="primary" icon="feather-save" class="px-4" style="background-color: #714B67; border-color: #714B67;" disabled="disabled">
+                    <x-ui.button type="submit" id="saveDispatchBtn" variant="primary" icon="feather-save" class="px-4 fw-bold">
                         Save Dispatch Order
                     </x-ui.button>
                 </div>
@@ -198,28 +185,65 @@
         </x-slot:footer>
     </x-ui.modal>
     <!-- Quick Transporter Add Modal Component -->
-    <x-ui.modal id="quickTransporterModal" title="Add Transporter Master" size="md" :centered="true">
+    <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>Quick Add Transporter Master" size="lg" :centered="true" :showFooter="false">
         <form id="quickTransporterForm">
             @csrf
-            <div class="mb-3">
-                <label class="form-label fw-semibold fs-12 text-dark mb-1">Transporter Name <span class="text-danger">*</span></label>
-                <input type="text" name="name" class="form-control form-control-sm" placeholder="e.g. Blue Dart Express, V-Trans" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold fs-12 text-dark mb-1">15-Digit Transporter ID (E-Way Bill)</label>
-                <input type="text" name="transporter_id" class="form-control form-control-sm font-monospace" placeholder="Optional 15-digit E-Way ID">
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold fs-12 text-dark mb-1">GSTIN Number</label>
-                <input type="text" name="gstin" class="form-control form-control-sm font-monospace text-uppercase" placeholder="Optional 15-digit GSTIN">
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold fs-12 text-dark mb-1">Phone Number</label>
-                <input type="text" name="phone" class="form-control form-control-sm" placeholder="Contact number">
-            </div>
-            <div class="d-flex justify-content-end gap-2 pt-2 border-top">
-                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="saveQuickTransporterBtn">Save Transporter</button>
+            <div class="p-1">
+                <!-- Section 1: Basic Logistics Info -->
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>1. Basic Transporter Information</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-7">
+                        <x-ui.odoo-form-ui type="input" label="Transporter Name" name="name" placeholder="e.g. V-Trans, TCI Logistics, GATI KWE" :required="true" />
+                    </div>
+                    <div class="col-md-5">
+                        <x-ui.odoo-form-ui type="input" label="Transporter Code" name="code" value="{{ $autoCode }}" placeholder="e.g. TRP-0005" />
+                    </div>
+                    <div class="col-md-7">
+                        <x-ui.odoo-form-ui type="input" label="15-Digit E-Way Transporter ID" name="transporter_id" placeholder="e.g. 27AAACM1234F1Z1" />
+                    </div>
+                    <div class="col-md-5">
+                        <x-ui.odoo-form-ui type="select" label="Transport Mode" name="transport_mode" :searchable="false">
+                            <option value="road">Road Transport</option>
+                            <option value="rail">Rail Logistics</option>
+                            <option value="air">Air Freight</option>
+                            <option value="sea">Sea Cargo</option>
+                            <option value="multimodal">Multimodal</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+                </div>
+
+                <hr class="my-3 text-muted opacity-25">
+
+                <!-- Section 2: Taxation & Contact Info -->
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-shield me-1.5"></i>2. Taxation & Contact Details</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="GSTIN Number" name="gstin" placeholder="e.g. 27AAAAA0000A1Z5" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" placeholder="e.g. ABCDE1234F" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="Phone / Mobile" name="phone" placeholder="Contact number" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" placeholder="dispatch@transporter.com" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" />
+                    </div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top mt-3">
+                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-bold px-4" id="saveQuickTransporterBtn">
+                        <i class="feather-save me-1.5"></i>Save Transporter
+                    </button>
+                </div>
             </div>
         </form>
     </x-ui.modal>
@@ -239,6 +263,19 @@
                 .replace(/'/g, '&#039;');
         }
 
+        // Trigger Quick Add Transporter Modal when "+ Add New Transporter" option is selected
+        $(document).on('change', '#transporterSelect', function() {
+            if ($(this).val() === '__ADD_NEW__') {
+                $(this).val('');
+                if ($(this).data('select2')) {
+                    $(this).val(null).trigger('change.select2');
+                }
+                const modalEl = document.getElementById('quickTransporterModal');
+                const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modalInstance.show();
+            }
+        });
+
         // Quick Transporter AJAX Store
         $('#quickTransporterForm').on('submit', function(e) {
             e.preventDefault();
@@ -246,7 +283,7 @@
             $btn.prop('disabled', true).text('Saving...');
 
             $.ajax({
-                url: "{{ route('sales.transporters.quick-create') }}",
+                url: "{{ route('platform.transporters.quick-create') }}",
                 type: "POST",
                 data: $(this).serialize(),
                 success: function(response) {

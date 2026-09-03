@@ -112,11 +112,11 @@ Route::prefix('inventory')
         Route::post('material-requests/{id}/bulk-action', [MaterialRequestController::class, 'bulkAction'])->name('material-requests.bulk-action');
 
         // Transporter Master Routes (/inventory/transporters)
-        Route::get('transporters', [\App\Domains\Sales\Controllers\TransporterController::class, 'index'])->name('transporters.index');
-        Route::post('transporters', [\App\Domains\Sales\Controllers\TransporterController::class, 'store'])->name('transporters.store');
-        Route::put('transporters/{transporter}', [\App\Domains\Sales\Controllers\TransporterController::class, 'update'])->name('transporters.update');
-        Route::delete('transporters/{transporter}', [\App\Domains\Sales\Controllers\TransporterController::class, 'destroy'])->name('transporters.destroy');
-        Route::post('transporters/quick-create', [\App\Domains\Sales\Controllers\TransporterController::class, 'quickCreate'])->name('transporters.quick-create');
+        Route::get('transporters', [\App\Domains\Platform\Controllers\TransporterController::class, 'index'])->name('transporters.index');
+        Route::post('transporters', [\App\Domains\Platform\Controllers\TransporterController::class, 'store'])->name('transporters.store');
+        Route::put('transporters/{transporter}', [\App\Domains\Platform\Controllers\TransporterController::class, 'update'])->name('transporters.update');
+        Route::delete('transporters/{transporter}', [\App\Domains\Platform\Controllers\TransporterController::class, 'destroy'])->name('transporters.destroy');
+        Route::post('transporters/quick-create', [\App\Domains\Platform\Controllers\TransporterController::class, 'quickCreate'])->name('transporters.quick-create');
 
         // Dispatch Orders Routes (/inventory/dispatches)
         Route::get('dispatches', [DispatchOrderController::class, 'index'])->name('dispatches.index');

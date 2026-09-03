@@ -23,12 +23,22 @@ class LandedCostExpense extends BaseModel
         'cost_head',
         'vendor_id',
         'amount',
+        'tax_rate',
+        'gst_type',
+        'is_rcm',
+        'tax_amount',
+        'total_with_tax',
+        'vendor_bill_id',
         'allocation_basis',
         'description',
     ];
 
     protected $casts = [
-        'amount' => 'float',
+        'amount'         => 'float',
+        'tax_rate'       => 'float',
+        'is_rcm'         => 'boolean',
+        'tax_amount'     => 'float',
+        'total_with_tax' => 'float',
     ];
 
     public function landedCostVoucher(): BelongsTo
@@ -39,5 +49,10 @@ class LandedCostExpense extends BaseModel
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class, 'vendor_id');
+    }
+
+    public function vendorBill(): BelongsTo
+    {
+        return $this->belongsTo(VendorBill::class, 'vendor_bill_id');
     }
 }

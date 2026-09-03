@@ -46,7 +46,11 @@ class LandedCostController extends Controller
             'grn_ids.*' => 'integer|exists:goods_receipt_notes,id',
             'expenses' => 'required|array|min:1',
             'expenses.*.cost_head' => 'required|string',
+            'expenses.*.vendor_id' => 'nullable|integer',
             'expenses.*.amount' => 'required|numeric|min:0.0001',
+            'expenses.*.tax_rate' => 'nullable|numeric|min:0',
+            'expenses.*.gst_type' => 'nullable|string|in:cgst_sgst,igst,rcm',
+            'expenses.*.is_rcm' => 'nullable',
             'expenses.*.allocation_basis' => 'required|string|in:by_qty,by_amount,equal',
             'notes' => 'nullable|string',
         ]);

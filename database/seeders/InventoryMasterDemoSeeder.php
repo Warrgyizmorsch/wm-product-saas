@@ -19,6 +19,21 @@ class InventoryMasterDemoSeeder extends Seeder
             return;
         }
 
+        $company = \App\Domains\HRMS\Models\Company::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'company_name' => 'Warrgyizmorsch'],
+            ['legal_name' => 'Warrgyizmorsch Pvt Ltd', 'status' => true]
+        );
+
+        $bu = \App\Domains\HRMS\Models\BusinessUnit::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'TBU'],
+            ['name' => 'Technology Business Unit', 'status' => true]
+        );
+
+        $branch = \App\Domains\HRMS\Models\Branch::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'HQ'],
+            ['business_unit_id' => $bu->id, 'name' => 'Headquarters', 'status' => true]
+        );
+
         // Seed Vendors
         $vendors = [
             ['name' => 'Acme Supplies Ltd', 'code' => 'VEND-ACME', 'email' => 'info@acme.com', 'phone' => '1234567890'],
@@ -30,6 +45,8 @@ class InventoryMasterDemoSeeder extends Seeder
             Vendor::query()->updateOrCreate(
                 ['tenant_id' => $tenant->id, 'name' => $v['name']],
                 [
+                    'company_id' => $company->id,
+                    'branch_id' => $branch->id,
                     'code' => $v['code'],
                     'email' => $v['email'],
                     'phone' => $v['phone'],
@@ -48,6 +65,8 @@ class InventoryMasterDemoSeeder extends Seeder
             Warehouse::query()->updateOrCreate(
                 ['tenant_id' => $tenant->id, 'code' => $wh['code']],
                 [
+                    'company_id' => $company->id,
+                    'branch_id' => $branch->id,
                     'name' => $wh['name'],
                     'address' => $wh['address'],
                     'is_default' => $wh['is_default'],

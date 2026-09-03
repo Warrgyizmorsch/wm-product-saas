@@ -85,7 +85,7 @@ class PayrollRunApiController extends Controller
 
         $registerData = [];
         $pendingPriorHolds = [];
-        
+        if ($selectedRun) {
             $excludeEmployeeIds = [];
             if (empty($selectedRun->employee_ids)) {
                 $otherRuns = PayrollRun::where('payroll_month', $selectedRun->payroll_month)

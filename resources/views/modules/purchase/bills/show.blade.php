@@ -257,19 +257,25 @@
 
                     <hr class="my-2">
 
+                    @php
+                        $displayCgst = $bill->cgst_amount > 0 ? (float)$bill->cgst_amount : ($bill->gst_type !== 'igst' ? round((float)$bill->tax_amount / 2, 2) : 0);
+                        $displaySgst = $bill->sgst_amount > 0 ? (float)$bill->sgst_amount : ($bill->gst_type !== 'igst' ? round((float)$bill->tax_amount / 2, 2) : 0);
+                        $displayIgst = $bill->igst_amount > 0 ? (float)$bill->igst_amount : ($bill->gst_type === 'igst' ? round((float)$bill->tax_amount, 2) : 0);
+                    @endphp
+
                     @if($bill->gst_type === 'igst')
                         <div class="d-flex justify-content-between mb-2 text-muted">
                             <span>IGST (Integrated Tax):</span>
-                            <strong class="font-monospace">+₹{{ number_format($bill->igst_amount, 2) }}</strong>
+                            <strong class="font-monospace">+₹{{ number_format($displayIgst, 2) }}</strong>
                         </div>
                     @else
                         <div class="d-flex justify-content-between mb-2 text-muted">
                             <span>CGST (Central Tax):</span>
-                            <strong class="font-monospace">+₹{{ number_format($bill->cgst_amount, 2) }}</strong>
+                            <strong class="font-monospace">+₹{{ number_format($displayCgst, 2) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 text-muted">
                             <span>SGST (State Tax):</span>
-                            <strong class="font-monospace">+₹{{ number_format($bill->sgst_amount, 2) }}</strong>
+                            <strong class="font-monospace">+₹{{ number_format($displaySgst, 2) }}</strong>
                         </div>
                     @endif
 
@@ -343,6 +349,64 @@
         @else
             <div class="text-center py-3 text-muted fs-12 border rounded mb-4">
                 <i class="feather-info me-1"></i>{{ __('purchase.no_payments_registered_yet') }}
+            </div>
+        @endif
+
+        <!-- Freight & Stock Valuation Revaluation Notes (Positioned at Bottom of Bill) -->
+        @if($bill->freight_terms === 'to_pay')
+            <div class="alert alert-warning border-warning p-3 mb-4 rounded shadow-sm">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-info text-warning fs-18"></i>
+                    <div>
+                        <strong class="text-dark fs-13">Freight Terms: To Pay (Freight Collect on Delivery)</strong>
+                        <p class="mb-0 fs-12 text-muted">Freight charges were <strong>not</strong> added to this Material Vendor Invoice. Pay 3rd party Transporter via <strong>Landed Cost Voucher</strong> to update item stock valuation.</p>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        @if(!empty($bill->landed_cost_revaluation_data) && !empty($bill->landed_cost_revaluation_data['revaluation_items']))
+            <div class="alert alert-info border-info p-3 mb-4 rounded shadow-sm">
+                <div class="d-flex align-items-start gap-2">
+                    <i class="feather-info text-info fs-18 mt-0.5"></i>
+                    <div class="w-100">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                            <strong class="text-dark fs-13"><i class="feather-box text-primary me-1"></i>Stock Valuation Note: Landed Cost Updated for Received Items</strong>
+                            <span class="badge bg-primary text-white font-monospace fs-11 px-2.5 py-1">
+                                Allocation: {{ ($bill->landed_cost_revaluation_data['allocation_method'] ?? '') === 'by_quantity' ? 'Equal Allocation per Unit Qty' : 'Proportional to Item Value (By Amount)' }}
+                            </span>
+                        </div>
+                        <p class="mb-2 fs-12 text-muted">Base freight of <strong>₹{{ number_format($bill->landed_cost_revaluation_data['total_base_freight'] ?? $bill->freight_amount, 2) }}</strong> was allocated to GRN received items. Effective Landed Stock Rate updated in Stock Ledger:</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered bg-white fs-12 mb-0 shadow-xs rounded">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Product Item</th>
+                                        <th class="text-center">SKU</th>
+                                        <th class="text-center">Qty</th>
+                                        <th class="text-end">Base PO Cost</th>
+                                        <th class="text-end">Allocated Freight</th>
+                                        <th class="text-end">Freight / Unit</th>
+                                        <th class="text-end text-primary">Effective Landed Cost / Unit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($bill->landed_cost_revaluation_data['revaluation_items'] as $revItem)
+                                        <tr>
+                                            <td><strong class="text-dark">{{ $revItem['product_name'] }}</strong></td>
+                                            <td class="text-center"><span class="font-monospace text-muted">{{ $revItem['sku'] }}</span></td>
+                                            <td class="text-center">{{ $revItem['quantity'] }}</td>
+                                            <td class="text-end font-monospace">₹{{ number_format($revItem['base_unit_cost'], 2) }}</td>
+                                            <td class="text-end font-monospace text-success">+₹{{ number_format($revItem['freight_share'], 2) }}</td>
+                                            <td class="text-end font-monospace text-success">+₹{{ number_format($revItem['freight_per_unit'], 2) }}</td>
+                                            <td class="text-end font-monospace fw-bold text-primary">₹{{ number_format($revItem['new_landed_cost'], 2) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         @endif
 

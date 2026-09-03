@@ -3,6 +3,7 @@
 namespace App\Domains\Sales\Models;
 
 use App\Core\Database\BaseModel;
+use App\Domains\Platform\Models\Transporter;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

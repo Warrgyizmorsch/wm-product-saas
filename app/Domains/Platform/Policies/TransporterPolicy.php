@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Domains\Sales\Policies;
+namespace App\Domains\Platform\Policies;
 
-use App\Domains\Sales\Models\Transporter;
+use App\Domains\Platform\Models\Transporter;
 use App\Models\User;
 use App\Services\Access\AccessService;
 

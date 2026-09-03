@@ -21,6 +21,7 @@ use App\Domains\HRMS\Controllers\Api\TravelExpenseApiController;
 use App\Domains\HRMS\Controllers\Api\PayrollRunApiController;
 use App\Domains\HRMS\Controllers\Api\ProbationApiController;
 use App\Domains\HRMS\Controllers\Api\EmployeeExitApiController;
+use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
 |--------------------------------------------------------------------------

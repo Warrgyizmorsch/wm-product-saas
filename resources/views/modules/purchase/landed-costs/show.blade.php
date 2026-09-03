@@ -84,34 +84,58 @@
 
         <!-- Section 1: Expenses Breakdown Table -->
         <div class="mt-4 pt-3 border-top">
-            <h6 class="fw-bold text-primary mb-3"><i class="feather-layers me-2"></i>1. Additional Procurement Expenses</h6>
+            <h6 class="fw-bold text-primary mb-3"><i class="feather-layers me-2"></i>1. Additional Procurement Expenses &amp; Transporter Bills</h6>
             <div class="table-responsive">
                 <x-ui.odoo-form-ui type="table">
                     <thead>
                         <tr>
-                            <th style="width: 25%">Expense Head</th>
-                            <th style="width: 30%">Vendor / Supplier</th>
-                            <th style="width: 25%">Allocation Basis</th>
-                            <th style="width: 20%" class="text-end">Amount (₹)</th>
+                            <th style="width: 18%">Expense Head</th>
+                            <th style="width: 22%">Vendor / Transporter</th>
+                            <th style="width: 12%" class="text-end">Base Amount (₹)</th>
+                            <th style="width: 13%">GST &amp; Mechanism</th>
+                            <th style="width: 12%" class="text-end">Tax Amt (₹)</th>
+                            <th style="width: 13%" class="text-end">Total Payable (₹)</th>
+                            <th style="width: 10%">Vendor Bill</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($voucher->expenses as $exp)
                             <tr>
                                 <td class="fw-bold text-dark">{{ $exp->cost_head }}</td>
-                                <td>{{ $exp->vendor->name ?? '—' }}</td>
                                 <td>
-                                    <span class="badge bg-light text-dark border px-2 py-1 fs-11">
-                                        @if($exp->allocation_basis === 'by_amount')
-                                            By Item Base Amount
-                                        @elseif($exp->allocation_basis === 'equal')
-                                            Equal Distribution
-                                        @else
-                                            By Quantity / Weight
-                                        @endif
+                                    <div class="fw-semibold text-dark">{{ $exp->vendor->name ?? '—' }}</div>
+                                    <span class="badge bg-light text-dark border px-1.5 py-0.5 fs-11">
+                                        Basis: {{ $exp->allocation_basis === 'by_amount' ? 'By Value' : ($exp->allocation_basis === 'equal' ? 'Equal' : 'By Qty') }}
                                     </span>
                                 </td>
                                 <td class="text-end font-monospace fw-bold text-dark">₹{{ number_format($exp->amount, 2) }}</td>
+                                <td>
+                                    @if($exp->tax_rate > 0)
+                                        <span class="badge bg-soft-info text-info border border-info font-monospace px-2 py-1 fs-11">{{ (float)$exp->tax_rate }}% GST</span>
+                                        <small class="d-block text-muted fs-11 mt-1 fw-semibold">
+                                            @if($exp->is_rcm)
+                                                <span class="text-danger fw-bold"><i class="feather-alert-circle me-1"></i>RCM (Reverse Charge)</span>
+                                            @elseif($exp->gst_type === 'igst')
+                                                IGST (Inter-State)
+                                            @else
+                                                CGST + SGST (Intra-State)
+                                            @endif
+                                        </small>
+                                    @else
+                                        <span class="badge bg-light text-muted border px-2 py-1 fs-11">No Tax</span>
+                                    @endif
+                                </td>
+                                <td class="text-end font-monospace text-primary">₹{{ number_format($exp->tax_amount, 2) }}</td>
+                                <td class="text-end font-monospace fw-bold text-success">₹{{ number_format($exp->total_with_tax, 2) }}</td>
+                                <td>
+                                    @if($exp->vendorBill)
+                                        <a href="{{ route('purchase.bills.show', $exp->vendor_bill_id) }}" class="badge bg-primary text-white text-decoration-none font-monospace">
+                                            <i class="feather-file-text me-1"></i>{{ $exp->vendorBill->bill_number }}
+                                        </a>
+                                    @else
+                                        <span class="text-muted fs-11">[Pending Post]</span>
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>

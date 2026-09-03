@@ -51,11 +51,11 @@ class DatabaseSeeder extends Seeder
             PaymentTermSeeder::class,
             InventoryMasterDemoSeeder::class,
             // Kept for future Poona Radiators demo usage:
-            // PoonaRadiatorsProductSeeder::class,
-            // PoonaRadiatorsProductionSeeder::class,
+            PoonaRadiatorsProductSeeder::class,
+            PoonaRadiatorsProductionSeeder::class,
 
-            TableManufacturingProductSeeder::class,
-            TableManufacturingProductionSeeder::class,
+            // TableManufacturingProductSeeder::class,
+            // TableManufacturingProductionSeeder::class,
             HrmsDemoSeeder::class,
         ]);
 

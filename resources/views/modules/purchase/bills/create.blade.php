@@ -161,17 +161,28 @@
                                 <option value="customer_pickup" @selected(old('freight_terms', $po?->freight_terms ?? '') === 'customer_pickup')>Self Pickup (Ex-Works)</option>
                             </x-ui.odoo-form-ui>
 
+                            <div id="toPayFreightNoticeBanner" class="alert alert-warning border-warning p-2.5 mt-2 fs-12 mb-3 d-none">
+                                <i class="feather-info text-warning me-1.5"></i>
+                                <strong>To Pay (Freight Collect):</strong> Freight will <strong>NOT</strong> be charged on this Material Vendor Bill. Pay 3rd party Transporter via <strong>Landed Cost Voucher</strong> to update item stock valuation.
+                            </div>
+
                             <!-- Dynamic Freight Fields Container -->
                             <div id="freightFieldsContainer">
-                                <div class="row g-2">
-                                    <div class="col-md-6" id="freightAmountCol">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-5" id="freightAmountCol">
                                         <x-ui.odoo-form-ui type="input" label="Freight Amount (₹)" name="freight_amount" id="freightAmountInput" inputType="number" step="0.01" min="0" :value="old('freight_amount', number_format($po?->freight_amount ?? 0, 2, '.', ''))" />
                                     </div>
-                                    <div class="col-md-6" id="freightTaxMethodContainer">
-                                        <x-ui.odoo-form-ui type="select" label="Freight Tax Method" name="freight_tax_method" id="freightTaxMethodSelect">
-                                            <option value="highest_rate" @selected(old('freight_tax_method') === 'highest_rate')>Highest Item GST Rate (Composite Rule)</option>
-                                            <option value="pro_rata" @selected(old('freight_tax_method') === 'pro_rata')>Pro-Rata Apportionment (Item Value Ratio)</option>
-                                            <option value="manual" @selected(old('freight_tax_method') === 'manual')>Custom Specific Tax Rate (%)</option>
+                                    <div class="col-7" id="freightAllocationMethodCol">
+                                        <x-ui.odoo-form-ui type="select" label="Allocation Rule" name="freight_allocation_method" id="freightAllocationMethodSelect">
+                                            <option value="by_amount" @selected(old('freight_allocation_method', 'by_amount') === 'by_amount')>By Amount Ratio</option>
+                                            <option value="by_quantity" @selected(old('freight_allocation_method') === 'by_quantity')>By Quantity</option>
+                                        </x-ui.odoo-form-ui>
+                                    </div>
+                                    <div class="col-4 d-none" id="freightTaxMethodContainer">
+                                        <x-ui.odoo-form-ui type="select" label="Tax Method" name="freight_tax_method" id="freightTaxMethodSelect">
+                                            <option value="highest_rate" @selected(old('freight_tax_method') === 'highest_rate')>Highest GST Rate</option>
+                                            <option value="pro_rata" @selected(old('freight_tax_method') === 'pro_rata')>Pro-Rata Ratio</option>
+                                            <option value="manual" @selected(old('freight_tax_method') === 'manual')>Custom Rate (%)</option>
                                         </x-ui.odoo-form-ui>
                                     </div>
                                 </div>
@@ -437,7 +448,13 @@
                 var isOrderWiseTax = (taxType === 'order_wise_tax');
 
                 var isIgst = (gstType === 'igst');
-                var isFreightEligible = (freightTerms === 'to_pay' || freightTerms === 'to_be_billed');
+                var isFreightEligible = (freightTerms === 'to_be_billed' || freightTerms === 'prepaid');
+
+                if (freightTerms === 'to_pay') {
+                    $('#toPayFreightNoticeBanner').removeClass('d-none').show();
+                } else {
+                    $('#toPayFreightNoticeBanner').addClass('d-none').hide();
+                }
 
                 // 1. Discount Option Layout Toggles
                 if (discType === 'item_wise') {
@@ -467,7 +484,10 @@
                     $('.tax-column').removeClass('d-none').show();
                     $('#gstTypeContainer').removeClass('d-none').show();
                     $('#freightTaxMethodContainer').removeClass('d-none').show();
-                    $('#freightAmountCol').removeClass('col-md-12').addClass('col-md-6');
+
+                    $('#freightAmountCol').attr('class', 'col-4');
+                    $('#freightAllocationMethodCol').attr('class', 'col-4');
+                    $('#freightTaxMethodContainer').attr('class', 'col-4');
 
                     $('#summaryItemsTaxRow').removeClass('d-none').show();
                     $('#summaryItemsTotalRow').removeClass('d-none').show();
@@ -481,7 +501,9 @@
 
                     // Hide Freight Tax Method container in Order Wise Tax
                     $('#freightTaxMethodContainer').addClass('d-none').hide();
-                    $('#freightAmountCol').removeClass('col-md-6').addClass('col-md-12');
+
+                    $('#freightAmountCol').attr('class', 'col-5');
+                    $('#freightAllocationMethodCol').attr('class', 'col-7');
 
                     $('#summaryItemsTaxRow').addClass('d-none').hide();
                     $('#summaryItemsTotalRow').addClass('d-none').hide();
@@ -501,6 +523,9 @@
                     $('#gstTypeContainer').addClass('d-none').hide();
                     $('#freightTaxMethodContainer').addClass('d-none').hide();
 
+                    $('#freightAmountCol').attr('class', 'col-5');
+                    $('#freightAllocationMethodCol').attr('class', 'col-7');
+
                     $('#summaryItemsTaxRow').addClass('d-none').hide();
                     $('#summaryItemsTotalRow').addClass('d-none').hide();
                     $('#summaryFreightSectionContainer').addClass('d-none').hide();
@@ -516,6 +541,7 @@
                     freightAmount = parseFloat($('#freightAmountInput').val()) || 0;
                 } else {
                     $('#freightFieldsContainer').addClass('d-none').hide();
+                    $('#freightAmountInput').val('0.00');
                     freightAmount = 0;
                 }
 

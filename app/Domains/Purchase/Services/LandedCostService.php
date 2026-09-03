@@ -69,13 +69,35 @@ class LandedCostService
                 $amt = (float) ($exp['amount'] ?? 0);
                 if ($amt <= 0) continue;
 
+                $taxRate = (float) ($exp['tax_rate'] ?? 0);
+                $gstType = $exp['gst_type'] ?? 'cgst_sgst';
+                $isRcm   = !empty($exp['is_rcm']) && ($exp['is_rcm'] === '1' || $exp['is_rcm'] === true || $exp['is_rcm'] === 'true');
+                if ($gstType === 'rcm') {
+                    $isRcm = true;
+                }
+
+                $taxAmount = 0.0;
+                if ($taxRate > 0) {
+                    $taxAmount = round($amt * ($taxRate / 100), 4);
+                }
+
+                // If FCM: total payable = base + tax amount. If RCM: vendor payable = base amount (tax paid to govt).
+                $totalWithTax = $isRcm ? $amt : ($amt + $taxAmount);
+
                 $totalExpenses += $amt;
                 LandedCostExpense::create([
                     'tenant_id'              => $tenantId,
+                    'company_id'             => $voucher->company_id,
+                    'branch_id'              => $voucher->branch_id,
                     'landed_cost_voucher_id' => $voucher->id,
                     'cost_head'              => $exp['cost_head'] ?? 'Freight',
                     'vendor_id'              => !empty($exp['vendor_id']) ? (int) $exp['vendor_id'] : null,
                     'amount'                 => $amt,
+                    'tax_rate'               => $taxRate,
+                    'gst_type'               => $gstType,
+                    'is_rcm'                 => $isRcm,
+                    'tax_amount'             => $taxAmount,
+                    'total_with_tax'         => $totalWithTax,
                     'allocation_basis'       => $exp['allocation_basis'] ?? 'by_qty',
                     'description'            => $exp['description'] ?? null,
                 ]);
@@ -95,7 +117,7 @@ class LandedCostService
     {
         return DB::transaction(function () use ($tenantId, $voucherId) {
             $voucher = LandedCostVoucher::where('tenant_id', $tenantId)
-                ->with(['items.goodsReceiptNote', 'items.product'])
+                ->with(['items.goodsReceiptNote', 'items.product', 'expenses'])
                 ->findOrFail($voucherId);
 
             if ($voucher->status !== 'Draft') {
@@ -117,7 +139,6 @@ class LandedCostService
                 if ($allocatedCostTotal <= 0 || !$warehouseId) continue;
 
                 // ── Step 1: Update ONLY the specific GRN's stock_transaction entry ──
-                // This ensures Opening Stock and other GRN batches are completely untouched.
                 $stockTxn = StockTransaction::where('tenant_id', $tenantId)
                     ->where('product_id', $productId)
                     ->where('warehouse_id', $warehouseId)
@@ -146,8 +167,6 @@ class LandedCostService
             }
 
             // ── Step 2: Recalculate warehouse unit_cost as FIFO weighted average ──
-            // Formula: total value of all unconsumed IN batches / total balance qty
-            // This correctly blends Opening Stock (₹100) with updated GRN batch (₹220).
             foreach ($affectedProductWarehouse as $pair) {
                 $productId   = $pair['product_id'];
                 $warehouseId = $pair['warehouse_id'];
@@ -174,12 +193,67 @@ class LandedCostService
                     $stock->save();
                 }
 
-                // Update product master cost_price with new weighted average
+                // Preserve Product Master Base Purchase Cost benchmark
                 $product = Product::find($productId);
-                if ($product) {
-                    $product->unit_cost  = $newAvgCost;
+                if ($product && !$product->cost_price) {
                     $product->cost_price = $newAvgCost;
                     $product->save();
+                }
+            }
+
+            // ── Step 3: Auto-generate Vendor Bills for Transporters ──
+            $billRepo = app(\App\Domains\Purchase\Repositories\VendorBillRepository::class);
+            $vendorExpensesGrouped = $voucher->expenses->whereNotNull('vendor_id')->groupBy('vendor_id');
+
+            foreach ($vendorExpensesGrouped as $vendorId => $expLines) {
+                $billNumber = $billRepo->getNextBillNumber($tenantId);
+                $subtotal   = (float) $expLines->sum('amount');
+                $taxAmount  = (float) $expLines->sum('tax_amount');
+                $grandTotal = (float) $expLines->sum('total_with_tax');
+
+                $firstExp   = $expLines->first();
+                $gstType    = $firstExp?->gst_type ?? 'cgst_sgst';
+                $isIgst     = $gstType === 'igst';
+
+                $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
+                $sgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
+                $igstAmount = $isIgst ? round($taxAmount, 2) : 0;
+
+                $bill = \App\Domains\Purchase\Models\VendorBill::create([
+                    'tenant_id'             => $tenantId,
+                    'company_id'            => $voucher->company_id,
+                    'branch_id'             => $voucher->branch_id,
+                    'bill_number'           => $billNumber,
+                    'vendor_invoice_number' => "LCV-INV-{$voucher->voucher_number}",
+                    'vendor_id'             => (int) $vendorId,
+                    'bill_date'             => $voucher->voucher_date,
+                    'due_date'              => $voucher->voucher_date,
+                    'status'                => 'Unpaid',
+                    'gst_type'              => $gstType,
+                    'subtotal'              => $subtotal,
+                    'tax_amount'            => $taxAmount,
+                    'cgst_amount'           => $cgstAmount,
+                    'sgst_amount'           => $sgstAmount,
+                    'igst_amount'           => $igstAmount,
+                    'grand_total'           => $grandTotal,
+                    'paid_amount'           => 0,
+                    'due_amount'            => round($grandTotal, 2),
+                    'notes'                 => "Auto-generated Transporter Service Bill for Landed Cost Voucher {$voucher->voucher_number}",
+                    'created_by'            => auth()->id() ?: 1,
+                ]);
+
+                foreach ($expLines as $expLine) {
+                    $expLine->vendor_bill_id = $bill->id;
+                    $expLine->save();
+
+                    \App\Domains\Purchase\Models\VendorBillItem::create([
+                        'tenant_id'      => $tenantId,
+                        'vendor_bill_id' => $bill->id,
+                        'quantity'       => 1,
+                        'unit_rate'      => (float) $expLine->amount,
+                        'tax_percentage' => (float) $expLine->tax_rate,
+                        'total_amount'   => (float) $expLine->total_with_tax,
+                    ]);
                 }
             }
 
@@ -189,34 +263,122 @@ class LandedCostService
             $voucher->posted_at    = now();
             $voucher->save();
 
-            // ── Step 3: Post GL Journal Entry for Landed Cost Revaluation ──
+            // ── Step 4: Post GL Journal Entry for Landed Cost Revaluation & Transporter AP/GST ──
             try {
                 $inventoryAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1200')->first();
-                $expenseAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '5030')->first()
+                $apAccount    = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2010')->first();
+                $freightAcc   = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '5030')->first()
                     ?: (\App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '5900')->first());
 
-                if ($inventoryAcc && $expenseAcc && (float)$voucher->total_expenses > 0) {
+                $inputCgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1610')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1600')->first();
+                $inputSgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1620')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1600')->first();
+                $inputIgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1630')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1600')->first();
+
+                $rcmPayableAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2080')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2100')->first();
+
+                $journalLines = [];
+
+                // 1. Debit Inventory for base freight amount allocated to stock
+                if ($inventoryAcc && (float)$voucher->total_expenses > 0) {
+                    $journalLines[] = [
+                        'chart_of_account_id' => $inventoryAcc->id,
+                        'debit'               => round((float)$voucher->total_expenses, 2),
+                        'credit'              => 0,
+                        'description'         => "Landed Cost Revaluation (Inventory) - Voucher {$voucher->voucher_number}",
+                    ];
+                }
+
+                // 2. Process GST Debits & AP Credits per expense line
+                $totalVendorPayable = 0.0;
+                $nonVendorExpenseTotal = 0.0;
+
+                foreach ($voucher->expenses as $exp) {
+                    $taxAmt = (float) $exp->tax_amount;
+                    $isRcm  = (bool) $exp->is_rcm;
+                    $gstType = $exp->gst_type;
+
+                    if ($taxAmt > 0) {
+                        if ($gstType === 'igst') {
+                            if ($inputIgstAcc) {
+                                $journalLines[] = [
+                                    'chart_of_account_id' => $inputIgstAcc->id,
+                                    'debit'               => round($taxAmt, 2),
+                                    'credit'              => 0,
+                                    'description'         => "Input IGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                ];
+                            }
+                        } else {
+                            // cgst_sgst or rcm split
+                            $halfTax = round($taxAmt / 2, 2);
+                            if ($inputCgstAcc) {
+                                $journalLines[] = [
+                                    'chart_of_account_id' => $inputCgstAcc->id,
+                                    'debit'               => $halfTax,
+                                    'credit'              => 0,
+                                    'description'         => "Input CGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                ];
+                            }
+                            if ($inputSgstAcc) {
+                                $journalLines[] = [
+                                    'chart_of_account_id' => $inputSgstAcc->id,
+                                    'debit'               => round($taxAmt - $halfTax, 2),
+                                    'credit'              => 0,
+                                    'description'         => "Input SGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                ];
+                            }
+                        }
+
+                        // If RCM, credit RCM Tax Liability account
+                        if ($isRcm && $rcmPayableAcc) {
+                            $journalLines[] = [
+                                'chart_of_account_id' => $rcmPayableAcc->id,
+                                'debit'               => 0,
+                                'credit'              => round($taxAmt, 2),
+                                'description'         => "RCM Tax Liability for {$exp->cost_head} ({$voucher->voucher_number})",
+                            ];
+                        }
+                    }
+
+                    if (!empty($exp->vendor_id)) {
+                        $totalVendorPayable += (float) $exp->total_with_tax;
+                    } else {
+                        $nonVendorExpenseTotal += (float) $exp->amount;
+                    }
+                }
+
+                // 3. Credit Transporter Accounts Payable (2010)
+                if ($apAccount && $totalVendorPayable > 0) {
+                    $journalLines[] = [
+                        'chart_of_account_id' => $apAccount->id,
+                        'debit'               => 0,
+                        'credit'              => round($totalVendorPayable, 2),
+                        'description'         => "Transporter Accounts Payable - Voucher {$voucher->voucher_number}",
+                    ];
+                }
+
+                // 4. Credit Freight Expense Clearing for non-vendor expenses
+                if ($freightAcc && $nonVendorExpenseTotal > 0) {
+                    $journalLines[] = [
+                        'chart_of_account_id' => $freightAcc->id,
+                        'debit'               => 0,
+                        'credit'              => round($nonVendorExpenseTotal, 2),
+                        'description'         => "Freight Expense Allocation - Voucher {$voucher->voucher_number}",
+                    ];
+                }
+
+                if (!empty($journalLines)) {
                     $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                    $journalService->post([
-                        [
-                            'chart_of_account_id' => $inventoryAcc->id,
-                            'debit'               => round((float)$voucher->total_expenses, 2),
-                            'credit'              => 0,
-                            'description'         => "Landed Cost Revaluation - Voucher {$voucher->voucher_number}",
-                        ],
-                        [
-                            'chart_of_account_id' => $expenseAcc->id,
-                            'debit'               => 0,
-                            'credit'              => round((float)$voucher->total_expenses, 2),
-                            'description'         => "Freight Expense Allocation - Voucher {$voucher->voucher_number}",
-                        ],
-                    ], [
+                    $journalService->post($journalLines, [
                         'tenant_id'      => $tenantId,
                         'journal_date'   => $voucher->voucher_date,
                         'source'         => \App\Domains\Accounting\Models\Journal::SOURCE_PURCHASE,
                         'reference_type' => 'landed_cost_voucher',
                         'reference_id'   => $voucher->id,
-                        'memo'           => "Landed Cost Allocation Voucher {$voucher->voucher_number}",
+                        'memo'           => "Landed Cost Allocation & Transporter AP Voucher {$voucher->voucher_number}",
                     ]);
                 }
             } catch (\Throwable $e) {
