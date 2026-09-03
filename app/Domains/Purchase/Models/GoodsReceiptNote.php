@@ -5,6 +5,8 @@ namespace App\Domains\Purchase\Models;
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,12 +15,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class GoodsReceiptNote extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
     protected $table = 'goods_receipt_notes';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'grn_number',
         'purchase_order_id',
         'production_order_id',
@@ -28,6 +32,7 @@ class GoodsReceiptNote extends BaseModel
         'challan_number',
         'challan_date',
         'vehicle_number',
+        'transporter_id',
         'transporter_name',
         'lr_number',
         'status', // Draft, Approved, Cancelled
@@ -64,6 +69,11 @@ class GoodsReceiptNote extends BaseModel
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
     }
 
+    public function transporter(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Platform\Models\Transporter::class, 'transporter_id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(GoodsReceiptNoteItem::class, 'goods_receipt_note_id');
@@ -87,6 +97,11 @@ class GoodsReceiptNote extends BaseModel
     public function vendorBills(): HasMany
     {
         return $this->hasMany(VendorBill::class, 'goods_receipt_note_id');
+    }
+
+    public function landedCostReceipts(): HasMany
+    {
+        return $this->hasMany(LandedCostReceipt::class, 'goods_receipt_note_id');
     }
 
     public function getBillingStatusAttribute(): string

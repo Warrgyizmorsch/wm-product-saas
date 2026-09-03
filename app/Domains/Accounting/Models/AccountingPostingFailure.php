@@ -3,13 +3,19 @@
 namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 
 class AccountingPostingFailure extends BaseModel
 {
+    use BelongsToCompany, BelongsToBranch;
+
     protected $table = 'accounting_posting_failures';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'event_class',
         'model_class',
         'model_id',

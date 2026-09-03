@@ -24,21 +24,29 @@ class GoodsReceiptNoteService
         $grn = DB::transaction(function () use ($validated, $tenantId, &$assetLineIds) {
             $grnNumber = $this->grnRepo->getNextGrnNumber($tenantId);
 
-            $po = PurchaseOrder::find($validated['purchase_order_id']);
+            $poId = $validated['purchase_order_id'] ?? null;
+            $po = $poId ? PurchaseOrder::find($poId) : null;
             $vendorId = $validated['vendor_id'] ?? $po?->vendor_id;
             $warehouseId = $validated['warehouse_id'] ?? $po?->warehouse_id ?? Warehouse::where('tenant_id', $tenantId)->first()?->id;
 
+            $transporterId = $validated['transporter_id'] ?? null;
+            $transporterName = $validated['transporter_name'] ?? null;
+            if ($transporterId && !$transporterName) {
+                $transporterName = \App\Domains\Platform\Models\Transporter::find($transporterId)?->name;
+            }
+
             $grn = $this->grnRepo->create([
                 'tenant_id'         => $tenantId,
-                'grn_number'         => $grnNumber,
-                'purchase_order_id' => $validated['purchase_order_id'],
+                'grn_number'        => $grnNumber,
+                'purchase_order_id' => $poId,
                 'vendor_id'         => $vendorId,
                 'warehouse_id'      => $warehouseId,
                 'received_date'     => $validated['received_date'] ?? $validated['receipt_date'] ?? now()->toDateString(),
                 'challan_number'    => $validated['challan_number'] ?? $validated['chalan_number'] ?? null,
                 'challan_date'      => $validated['challan_date'] ?? $validated['chalan_date'] ?? null,
                 'vehicle_number'    => $validated['vehicle_number'] ?? null,
-                'transporter_name'  => $validated['transporter_name'] ?? null,
+                'transporter_id'    => $transporterId,
+                'transporter_name'  => $transporterName,
                 'lr_number'         => $validated['lr_number'] ?? null,
                 'status'            => 'Approved',
                 'notes'             => $validated['notes'] ?? null,
@@ -52,30 +60,44 @@ class GoodsReceiptNoteService
                 $qtyRejected = (float)($item['rejected_qty'] ?? 0);
                 $qtyAccepted = max(0.0, $qtyReceived - $qtyRejected);
 
-                $poItem = PurchaseOrderItem::findOrFail($item['purchase_order_item_id']);
+                $poItemId = $item['purchase_order_item_id'] ?? null;
+                $poItem = $poItemId ? PurchaseOrderItem::find($poItemId) : null;
 
-                $orderedQty = (float) $poItem->quantity;
-                $prevReceived = (float) ($poItem->received_qty ?? 0.0);
-
-                if (($prevReceived + $qtyReceived) > $orderedQty + 0.0001) {
-                    throw new \InvalidArgumentException("Cannot receive {$qtyReceived} units. Total received would exceed ordered quantity {$orderedQty}.");
+                $productId = $item['product_id'] ?? $poItem?->product_id;
+                if (!$productId) {
+                    throw new \InvalidArgumentException("Product ID is required for all receipt items.");
                 }
-                $remainingQty = max(0.0, $orderedQty - ($prevReceived + $qtyReceived));
-                
-                $grossPrice = (float) ($poItem->rate ?? $poItem->unit_price ?? 0.00);
-                $poQty = (float) ($poItem->quantity ?: 1);
-                $lineGrossTotal = $poQty * $grossPrice;
-                $itemDiscount = (float) ($poItem->discount_amount ?? 0.00);
+                $product = \App\Domains\Inventory\Models\Product::find($productId);
 
-                $orderDiscShare = 0;
-                if ($po && $po->discount_type === 'order_wise' && (float)$po->discount_amount > 0 && (float)$po->subtotal > 0) {
-                    $orderDiscShare = ($lineGrossTotal / (float)$po->subtotal) * (float)$po->discount_amount;
+                if ($poItem) {
+                    $orderedQty = (float) $poItem->quantity;
+                    $prevReceived = (float) ($poItem->received_qty ?? 0.0);
+
+                    if (($prevReceived + $qtyReceived) > $orderedQty + 0.0001) {
+                        throw new \InvalidArgumentException("Cannot receive {$qtyReceived} units. Total received would exceed ordered quantity {$orderedQty}.");
+                    }
+                    $remainingQty = max(0.0, $orderedQty - ($prevReceived + $qtyReceived));
+                    
+                    $grossPrice = (float) ($poItem->rate ?? $poItem->unit_price ?? 0.00);
+                    $poQty = (float) ($poItem->quantity ?: 1);
+                    $lineGrossTotal = $poQty * $grossPrice;
+                    $itemDiscount = (float) ($poItem->discount_amount ?? 0.00);
+
+                    $orderDiscShare = 0;
+                    if ($po && $po->discount_type === 'order_wise' && (float)$po->discount_amount > 0 && (float)$po->subtotal > 0) {
+                        $orderDiscShare = ($lineGrossTotal / (float)$po->subtotal) * (float)$po->discount_amount;
+                    }
+                    $totalItemDisc = ($po && $po->discount_type === 'order_wise') ? $orderDiscShare : $itemDiscount;
+                    
+                    $unitRate = isset($item['unit_rate']) && (float)$item['unit_rate'] >= 0
+                        ? (float)$item['unit_rate']
+                        : (($poQty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $poQty, 2) : $grossPrice);
+                } else {
+                    $orderedQty = 0.0;
+                    $prevReceived = 0.0;
+                    $remainingQty = 0.0;
+                    $unitRate = isset($item['unit_rate']) ? (float)$item['unit_rate'] : (float)($product?->cost_price ?? $product?->unit_cost ?? 0.00);
                 }
-                $totalItemDisc = ($po && $po->discount_type === 'order_wise') ? $orderDiscShare : $itemDiscount;
-                
-                $unitRate = isset($item['unit_rate']) && (float)$item['unit_rate'] > 0
-                    ? (float)$item['unit_rate']
-                    : (($poQty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $poQty, 2) : $grossPrice);
 
                 $totalAmount = round($qtyAccepted * $unitRate, 2);
 
@@ -90,17 +112,19 @@ class GoodsReceiptNoteService
                 }
                 $serialNumbers = array_values(array_filter(array_map('trim', $serialNumbers)));
 
+                $lineType = $poItem?->line_type ?? ($product && strtolower((string)($product->item_type ?? '')) === 'asset' ? PurchaseOrderItem::LINE_TYPE_ASSET : PurchaseOrderItem::LINE_TYPE_STOCK);
+
                 $grnItem = GoodsReceiptNoteItem::create([
                     'tenant_id'              => $tenantId,
                     'goods_receipt_note_id'  => $grn->id,
-                    'purchase_order_item_id' => $poItem->id,
-                    'product_id'             => $poItem->product_id,
-                    'line_type'              => $poItem->line_type ?? PurchaseOrderItem::LINE_TYPE_STOCK,
-                    'chart_of_account_id'    => $poItem->chart_of_account_id,
-                    'asset_category_id'      => $poItem->asset_category_id,
-                    'production_order_id'           => $poItem->production_order_id ?? $po?->production_order_id,
-                    'production_order_operation_id' => $poItem->production_order_operation_id,
-                    'production_batch_id'           => $poItem->production_batch_id,
+                    'purchase_order_item_id' => $poItem?->id,
+                    'product_id'             => $productId,
+                    'line_type'              => $lineType,
+                    'chart_of_account_id'    => $poItem?->chart_of_account_id,
+                    'asset_category_id'      => $poItem?->asset_category_id,
+                    'production_order_id'           => $poItem?->production_order_id ?? $po?->production_order_id,
+                    'production_order_operation_id' => $poItem?->production_order_operation_id,
+                    'production_batch_id'           => $poItem?->production_batch_id,
                     'ordered_qty'            => $orderedQty,
                     'previous_received_qty'  => $prevReceived,
                     'received_qty'           => $qtyReceived,
@@ -116,14 +140,19 @@ class GoodsReceiptNoteService
                     $assetLineIds[] = $grnItem->id;
                 }
 
-                if ($qtyAccepted > 0 && $this->shouldAffectPhysicalInventory($poItem)) {
+                $shouldAffectStock = $poItem
+                    ? $this->shouldAffectPhysicalInventory($poItem)
+                    : ($product && strtolower((string)($product->item_type ?? '')) !== 'service' && strtolower((string)($product->type ?? '')) !== 'service');
+
+                if ($qtyAccepted > 0 && $shouldAffectStock) {
                     if (!empty($item['batches']) && is_array($item['batches'])) {
                         $sumBatchQty = 0;
                         foreach ($item['batches'] as $b) {
                             $sumBatchQty += (float)($b['received_qty'] ?? 0);
                         }
                         if ($sumBatchQty > ($qtyAccepted + 0.0001)) {
-                            throw new \Exception("Total batch allocation quantity ({$sumBatchQty}) cannot exceed accepted item quantity ({$qtyAccepted}) for product '{$poItem->product?->name}'.");
+                            $prodName = $product?->name ?? 'Product';
+                            throw new \Exception("Total batch allocation quantity ({$sumBatchQty}) cannot exceed accepted item quantity ({$qtyAccepted}) for product '{$prodName}'.");
                         }
 
                         foreach ($item['batches'] as $b) {
@@ -135,7 +164,7 @@ class GoodsReceiptNoteService
 
                             StockService::recordInflow(
                                 $tenantId,
-                                $poItem->product_id,
+                                $productId,
                                 $warehouseId,
                                 $bQty,
                                 $unitRate,
@@ -150,7 +179,7 @@ class GoodsReceiptNoteService
                     } else {
                         StockService::recordInflow(
                             $tenantId,
-                            $poItem->product_id,
+                            $productId,
                             $warehouseId,
                             $qtyAccepted,
                             $unitRate,
@@ -164,7 +193,9 @@ class GoodsReceiptNoteService
                     }
                 }
 
-                $poItem->increment('received_qty', $qtyReceived);
+                if ($poItem) {
+                    $poItem->increment('received_qty', $qtyReceived);
+                }
             }
 
             if ($po) {

@@ -60,7 +60,7 @@
                     </div>
                     <div>
                         <h6 class="alert-heading fw-bold mb-1 text-success">{{ __('production.child_bom_success') }}</h6>
-                        <p class="fs-12 mb-0 text-success-800">Configure child BOM for <strong>{{ $bom->product->name }}</strong>. The parent form has been updated automatically. You can close this tab now to return to the parent form.</p>
+                        <p class="fs-12 mb-0 text-success-800">Configure child BOM for <strong>{{ $bom->product?->name ?? 'Product' }}</strong>. The parent form has been updated automatically. You can close this tab now to return to the parent form.</p>
                     </div>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
@@ -117,7 +117,7 @@
                         <span class="fw-semibold text-muted fs-13">{{ __('production.item_to_produce') }}:</span>
                     </div>
                     <div class="col-md-8">
-                        <span class="text-dark fw-bold fs-13">{{ $bom->product->name }} ({{ $bom->product->sku }})</span>
+                        <span class="text-dark fw-bold fs-13">{{ $bom->product?->name ?? '—' }} @if($bom->product?->sku)({{ $bom->product->sku }})@endif</span>
                     </div>
                 </div>
 
@@ -238,7 +238,7 @@
                                             $padding = ($level - 1) * 24;
                                             $scrapFactor = 1 + (($item->material_scrap_percentage ?? 0) / 100);
                                             $grossQty = $item->quantity * $scrapFactor;
-                                            $unitCost = $item->material->unit_cost ?? 0.0;
+                                            $unitCost = $item->material?->unit_cost ?? 0.0;
                                             $itemTotalCost = $grossQty * $unitCost;
                                             
                                             echo '<tr class="' . ($level > 1 ? 'table-light bg-light-soft erp-child-bom-row' : '') . '">';
@@ -259,8 +259,10 @@
                                                 echo '<i class="feather-corner-down-right text-muted me-2 fs-12"></i>';
                                             }
                                             echo '<div class="d-flex flex-column">';
-                                            echo '<span class="fw-bold text-dark">' . e($item->material->name) . '</span>';
-                                            echo '<small class="text-muted font-monospace fs-10">' . e($item->material->sku) . '</small>';
+                                            $matName = $item->material?->name ?? 'Unknown Component';
+                                            $matSku = $item->material?->sku ?? '—';
+                                            echo '<span class="fw-bold text-dark">' . e($matName) . '</span>';
+                                            echo '<small class="text-muted font-monospace fs-10">' . e($matSku) . '</small>';
                                             
                                             if ($item->childBom) {
                                                 echo '<small class="mt-1">';
@@ -434,7 +436,7 @@
                                                         @foreach($op->materials as $opMat)
                                                             <li>
                                                                  <span class="text-secondary fw-semibold">{{ __('production.seq') }} {{ $opMat->sequence }}:</span>
-                                                                <strong>{{ $opMat->material->name }}</strong>: {{ number_format($opMat->quantity, 2) }} {{ $opMat->uom->code }}
+                                                                <strong>{{ $opMat->material?->name ?? 'Material' }}</strong>: {{ number_format($opMat->quantity, 2) }} {{ $opMat->uom?->code ?? 'PCS' }}
                                                                 <span class="badge bg-light text-dark fs-8">{{ $opMat->consumption_type ?? 'manual' }}</span>
                                                             </li>
                                                         @endforeach
@@ -653,8 +655,8 @@
                                 @foreach($whereUsedBoms as $wBom)
                                     <tr>
                                         <td class="fw-bold text-dark">
-                                            {{ $wBom->product->name }}
-                                            <small class="text-muted d-block font-monospace fs-10">{{ $wBom->product->sku }}</small>
+                                            {{ $wBom->product?->name ?? '—' }}
+                                            <small class="text-muted d-block font-monospace fs-10">{{ $wBom->product?->sku ?? '—' }}</small>
                                         </td>
                                         <td>{{ $wBom->bom_number }}</td>
                                         <td>v{{ $wBom->version }}</td>

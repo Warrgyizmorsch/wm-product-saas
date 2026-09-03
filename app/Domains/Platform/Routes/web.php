@@ -2,6 +2,7 @@
 
 use App\Domains\Platform\Controllers\PlanController;
 use App\Domains\Platform\Controllers\TenantController;
+use App\Domains\Platform\Controllers\TransporterController;
 use App\Domains\Platform\Controllers\UsageOverviewController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,4 +35,13 @@ Route::prefix('platform')
 
         Route::get('usage', [UsageOverviewController::class, 'index'])
             ->name('usage.index');
+
+        Route::post('payment-terms/{paymentTerm}/toggle-status', [\App\Domains\Platform\Controllers\PaymentTermController::class, 'toggleStatus'])
+            ->name('payment-terms.toggle-status');
+        Route::resource('payment-terms', \App\Domains\Platform\Controllers\PaymentTermController::class);
+
+        Route::post('transporters/quick-create', [TransporterController::class, 'quickCreate'])
+            ->name('transporters.quick-create');
+        Route::resource('transporters', TransporterController::class);
     });
+

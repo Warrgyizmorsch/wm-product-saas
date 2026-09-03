@@ -67,8 +67,26 @@ class TravelExpenseApiController extends Controller
     }
 
     /**
+     * Resolves the authenticated user's employee model and admin status.
+     *
+     * @return array{0: ?\App\Domains\HRMS\Models\Employee, 1: bool}
+     */
+    private function resolveEmployeeContext(): array
+    {
+        $user = auth()->user();
+        $employee = null;
+        if ($user && $user->email) {
+            $employee = Employee::where('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->first();
+        }
+        $isAdmin = ($user->role ?? '') === 'admin' || ($user && method_exists($user, 'hasRole') && $user->hasRole('admin'));
+        return [$employee, $isAdmin];
+    }
+
+    /**
      * GET /api/hrms/travel-expense
-     * Dashboard listings of travel requests, cash advances, and reports.
+     * Concise summary metrics for Travel & Expense dashboard.
      */
     public function index(Request $request): JsonResponse
     {
@@ -77,22 +95,11 @@ class TravelExpenseApiController extends Controller
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $user = auth()->user();
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
 
-        // 1. Resolve employee context
-        $employee = null;
-        if ($user && $user->email) {
-            $employee = Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
-        }
-
-        $isAdmin = ($user->role ?? '') === 'admin';
-
-        // 2. Query lists
-        $travelQuery = TravelRequest::where('tenant_id', $tenantId)->with('employee');
-        $advanceQuery = CashAdvance::where('tenant_id', $tenantId)->with(['employee', 'travelRequest']);
-        $reportQuery = ExpenseReport::where('tenant_id', $tenantId)->with(['employee', 'claims.category']);
+        $travelQuery = TravelRequest::where('tenant_id', $tenantId);
+        $advanceQuery = CashAdvance::where('tenant_id', $tenantId);
+        $reportQuery = ExpenseReport::where('tenant_id', $tenantId);
 
         if (!$isAdmin && $employee) {
             $travelQuery->where('employee_id', $employee->id);
@@ -100,73 +107,503 @@ class TravelExpenseApiController extends Controller
             $reportQuery->where('employee_id', $employee->id);
         }
 
-        // Apply travel search & status
-        if ($travelSearch = $request->input('travel_search')) {
-            $travelQuery->where(function($q) use ($travelSearch) {
-                $q->where('purpose', 'like', "%{$travelSearch}%")
-                  ->orWhere('destination', 'like', "%{$travelSearch}%");
-            });
-        }
-        if ($travelStatus = $request->input('travel_status')) {
-            $travelQuery->where('status', $travelStatus);
-        }
-
-        // Apply advance search & status
-        if ($advanceSearch = $request->input('advance_search')) {
-            $advanceQuery->where(function($q) use ($advanceSearch) {
-                $q->where('purpose', 'like', "%{$advanceSearch}%");
-            });
-        }
-        if ($advanceStatus = $request->input('advance_status')) {
-            $advanceQuery->where('status', $advanceStatus);
-        }
-
-        // Apply report search & status
-        if ($reportSearch = $request->input('report_search')) {
-            $reportQuery->where(function($q) use ($reportSearch) {
-                $q->where('title', 'like', "%{$reportSearch}%");
-            });
-        }
-        if ($reportStatus = $request->input('report_status')) {
-            $reportQuery->where('status', $reportStatus);
-        }
-
-        // Resolve company currency symbol
         $company = \App\Domains\HRMS\Models\Company::first();
         $currencyCode = $company?->currency ?? 'USD';
         $currencySymbol = self::currencySymbol($currencyCode);
 
-        // Load all approved travel requests and open cash advances to show all options
-        $myApprovedTravelRequests = TravelRequest::where('status', 'approved')
-            ->where('tenant_id', $tenantId)
-            ->orderBy('created_at', 'desc')
-            ->get();
-        $myOpenCashAdvances = CashAdvance::whereIn('status', ['approved', 'disbursed'])
-            ->where('tenant_id', $tenantId)
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        // Metadata dropdowns
-        $categories = ExpenseCategory::where('tenant_id', $tenantId)->where('status', true)->orderBy('name')->get();
-        $designations = Designation::where('status', true)->orderBy('name')->get();
-        $employees = Employee::where('status', true)->orderBy('full_name')->get();
-
-        return $this->sendSuccess([
-            'employee'                  => $employee,
-            'is_admin'                  => $isAdmin,
-            'currency_code'             => $currencyCode,
-            'currency_symbol'           => $currencySymbol,
-            'my_approved_travel_requests'=> $myApprovedTravelRequests,
-            'my_open_cash_advances'     => $myOpenCashAdvances,
-            'dropdowns'                 => [
-                'employees'          => $employees,
-                'expense_categories' => $categories,
-                'designations'       => $designations,
+        $data = [
+            'currency_code'   => $currencyCode,
+            'currency_symbol' => $currencySymbol,
+            'travel_requests' => [
+                'total'    => (clone $travelQuery)->count(),
+                'pending'  => (clone $travelQuery)->where('status', 'pending')->count(),
+                'approved' => (clone $travelQuery)->where('status', 'approved')->count(),
+                'rejected' => (clone $travelQuery)->where('status', 'rejected')->count(),
             ],
-            'travel_requests'           => $travelQuery->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10), ['*'], 'travel_page'),
-            'cash_advances'             => $advanceQuery->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10), ['*'], 'advance_page'),
-            'expense_reports'           => $reportQuery->orderBy('created_at', 'desc')->paginate($request->integer('per_page', 10), ['*'], 'report_page'),
-        ], 'Travel & Expense dashboard data loaded successfully');
+            'cash_advances' => [
+                'total'     => (clone $advanceQuery)->count(),
+                'pending'   => (clone $advanceQuery)->where('status', 'pending')->count(),
+                'approved'  => (clone $advanceQuery)->where('status', 'approved')->count(),
+                'disbursed' => (clone $advanceQuery)->where('status', 'disbursed')->count(),
+                'settled'   => (clone $advanceQuery)->where('status', 'settled')->count(),
+            ],
+            'expense_reports' => [
+                'total'     => (clone $reportQuery)->count(),
+                'draft'     => (clone $reportQuery)->where('status', 'draft')->count(),
+                'submitted' => (clone $reportQuery)->where('status', 'submitted')->count(),
+                'approved'  => (clone $reportQuery)->where('status', 'approved')->count(),
+                'paid'      => (clone $reportQuery)->where('status', 'paid')->count(),
+                'rejected'  => (clone $reportQuery)->where('status', 'rejected')->count(),
+                'total_claimed_amount' => (float)(clone $reportQuery)->whereIn('status', ['approved', 'paid'])->sum('total_amount'),
+            ],
+        ];
+
+        return $this->sendSuccess($data, 'Travel & Expense summary loaded successfully.');
+    }
+
+    /**
+     * Formats a LengthAwarePaginator into a clean, concise response structure.
+     */
+    private function formatPaginatedData(\Illuminate\Contracts\Pagination\LengthAwarePaginator $paginator, callable $transformItem): array
+    {
+        return [
+            'items' => collect($paginator->items())->map($transformItem)->values(),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+                'last_page'    => $paginator->lastPage(),
+                'has_more'     => $paginator->hasMorePages(),
+            ],
+        ];
+    }
+
+    /**
+     * Transforms a TravelRequest model into a clean array structure.
+     */
+    private function transformTravelRequest(TravelRequest $tr, bool $detailed = false): array
+    {
+        $data = [
+            'id'               => $tr->id,
+            'purpose'          => $tr->purpose,
+            'destination'      => $tr->destination,
+            'start_date'       => $tr->start_date ? $tr->start_date->format('Y-m-d') : null,
+            'end_date'         => $tr->end_date ? $tr->end_date->format('Y-m-d') : null,
+            'estimated_budget' => floatval($tr->estimated_budget),
+            'approved_budget'  => $tr->approved_budget !== null ? floatval($tr->approved_budget) : null,
+            'status'           => $tr->status,
+            'created_at'       => $tr->created_at?->toDateTimeString(),
+        ];
+
+        if ($tr->relationLoaded('employee') && $tr->employee) {
+            $data['employee'] = [
+                'id'            => $tr->employee->id,
+                'employee_code' => $tr->employee->employee_id,
+                'full_name'     => $tr->employee->full_name,
+                'photo'         => $tr->employee->photo,
+            ];
+        }
+
+        if ($tr->relationLoaded('cashAdvances')) {
+            $data['cash_advances'] = $tr->cashAdvances->map(fn($ca) => [
+                'id'              => $ca->id,
+                'amount'          => floatval($ca->amount),
+                'approved_amount' => $ca->approved_amount !== null ? floatval($ca->approved_amount) : null,
+                'status'          => $ca->status,
+            ])->values();
+        }
+
+        if ($detailed && $tr->relationLoaded('expenseReports')) {
+            $data['expense_reports'] = $tr->expenseReports->map(fn($er) => [
+                'id'           => $er->id,
+                'title'        => $er->title,
+                'total_amount' => floatval($er->total_amount),
+                'status'       => $er->status,
+                'created_at'   => $er->created_at?->toDateTimeString(),
+            ])->values();
+        }
+
+        return $data;
+    }
+
+    /**
+     * Transforms a CashAdvance model into a clean array structure.
+     */
+    private function transformCashAdvance(CashAdvance $ca, bool $detailed = false): array
+    {
+        $data = [
+            'id'              => $ca->id,
+            'amount'          => floatval($ca->amount),
+            'approved_amount' => $ca->approved_amount !== null ? floatval($ca->approved_amount) : null,
+            'purpose'         => $ca->purpose,
+            'status'          => $ca->status,
+            'created_at'      => $ca->created_at?->toDateTimeString(),
+        ];
+
+        if ($ca->relationLoaded('employee') && $ca->employee) {
+            $data['employee'] = [
+                'id'            => $ca->employee->id,
+                'employee_code' => $ca->employee->employee_id,
+                'full_name'     => $ca->employee->full_name,
+                'photo'         => $ca->employee->photo,
+            ];
+        }
+
+        if ($ca->relationLoaded('travelRequest') && $ca->travelRequest) {
+            $tr = $ca->travelRequest;
+            $data['travel_request'] = [
+                'id'               => $tr->id,
+                'purpose'          => $tr->purpose,
+                'destination'      => $tr->destination,
+                'start_date'       => $tr->start_date ? $tr->start_date->format('Y-m-d') : null,
+                'end_date'         => $tr->end_date ? $tr->end_date->format('Y-m-d') : null,
+                'estimated_budget' => floatval($tr->estimated_budget),
+                'status'           => $tr->status,
+            ];
+        }
+
+        if ($detailed && $ca->relationLoaded('expenseReport') && $ca->expenseReport) {
+            $er = $ca->expenseReport;
+            $data['expense_report'] = [
+                'id'           => $er->id,
+                'title'        => $er->title,
+                'total_amount' => floatval($er->total_amount),
+                'status'       => $er->status,
+            ];
+        }
+
+        return $data;
+    }
+
+    /**
+     * Transforms an ExpenseReport model into a clean array structure.
+     */
+    private function transformExpenseReport(ExpenseReport $er, bool $detailed = false): array
+    {
+        $data = [
+            'id'                         => $er->id,
+            'title'                      => $er->title,
+            'total_amount'               => floatval($er->total_amount),
+            'advance_adjusted'           => floatval($er->advance_adjusted),
+            'net_reimbursement'          => floatval($er->net_reimbursement),
+            'approved_amount'            => $er->approved_amount !== null ? floatval($er->approved_amount) : null,
+            'approved_net_reimbursement' => $er->approved_net_reimbursement !== null ? floatval($er->approved_net_reimbursement) : null,
+            'status'                     => $er->status,
+            'payout_channel'             => $er->payout_channel,
+            'created_at'                 => $er->created_at?->toDateTimeString(),
+        ];
+
+        if ($er->claims_count !== null) {
+            $data['claims_count'] = (int) $er->claims_count;
+        }
+
+        if ($er->relationLoaded('employee') && $er->employee) {
+            $data['employee'] = [
+                'id'            => $er->employee->id,
+                'employee_code' => $er->employee->employee_id,
+                'full_name'     => $er->employee->full_name,
+                'photo'         => $er->employee->photo,
+            ];
+        }
+
+        if ($er->relationLoaded('travelRequest') && $er->travelRequest) {
+            $tr = $er->travelRequest;
+            $data['travel_request'] = [
+                'id'          => $tr->id,
+                'purpose'     => $tr->purpose,
+                'destination' => $tr->destination,
+                'status'      => $tr->status,
+            ];
+        }
+
+        if ($er->relationLoaded('cashAdvance') && $er->cashAdvance) {
+            $ca = $er->cashAdvance;
+            $data['cash_advance'] = [
+                'id'              => $ca->id,
+                'amount'          => floatval($ca->amount),
+                'approved_amount' => $ca->approved_amount !== null ? floatval($ca->approved_amount) : null,
+                'status'          => $ca->status,
+            ];
+        }
+
+        if ($detailed && $er->relationLoaded('claims')) {
+            $data['claims'] = $er->claims->map(fn($c) => [
+                'id'                  => $c->id,
+                'expense_category_id' => $c->expense_category_id,
+                'category_name'       => $c->category?->name,
+                'category_code'       => $c->category?->code,
+                'expense_date'        => $c->expense_date ? $c->expense_date->format('Y-m-d') : null,
+                'amount'              => floatval($c->amount),
+                'tax_amount'          => floatval($c->tax_amount),
+                'merchant'            => $c->merchant,
+                'description'         => $c->description,
+                'receipt_path'        => $c->receipt_path,
+            ])->values();
+        }
+
+        return $data;
+    }
+
+    // ==========================================
+    // 1. TRAVEL REQUEST INDIVIDUAL APIs
+    // ==========================================
+
+    /**
+     * GET /api/hrms/travel-expense/travel
+     * List paginated travel requests with filtering.
+     */
+    public function indexTravelRequests(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+
+        $query = TravelRequest::where('tenant_id', $tenantId)
+            ->with([
+                'employee:id,employee_id,full_name,photo',
+                'cashAdvances:id,travel_request_id,amount,approved_amount,status',
+            ]);
+
+        if ($request->filled('employee_id')) {
+            if ($isAdmin || ($employee && (int)$request->employee_id === (int)$employee->id)) {
+                $query->where('employee_id', $request->employee_id);
+            } else {
+                $query->where('employee_id', $employee?->id ?? 0);
+            }
+        } elseif (!$isAdmin && $employee) {
+            $query->where('employee_id', $employee->id);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('purpose', 'like', "%{$search}%")
+                  ->orWhere('destination', 'like', "%{$search}%")
+                  ->orWhereHas('employee', function ($sq) use ($search) {
+                      $sq->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_id', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('start_date', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('end_date', '<=', $request->to_date);
+        }
+
+        $perPage = min($request->integer('per_page', 10), 100);
+        $travelRequests = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+        $formatted = $this->formatPaginatedData($travelRequests, fn($tr) => $this->transformTravelRequest($tr));
+
+        return $this->sendSuccess($formatted, 'Travel requests retrieved successfully.');
+    }
+
+    /**
+     * GET /api/hrms/travel-expense/travel/{id}
+     * Get single travel request details.
+     */
+    public function showTravelRequest(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+
+        $travelRequest = TravelRequest::where('tenant_id', $tenantId)
+            ->with([
+                'employee:id,employee_id,full_name,office_email,personal_email,photo,job_title',
+                'cashAdvances:id,travel_request_id,amount,approved_amount,purpose,status,created_at',
+                'expenseReports:id,travel_request_id,title,total_amount,status,created_at',
+            ])
+            ->find($id);
+
+        if (!$travelRequest) {
+            return $this->sendError("Travel request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isAdmin && $employee && (int)$travelRequest->employee_id !== (int)$employee->id) {
+            return $this->sendError('Unauthorized access to this travel request.', 403);
+        }
+
+        return $this->sendSuccess($this->transformTravelRequest($travelRequest, true), 'Travel request details loaded successfully.');
+    }
+
+    // ==========================================
+    // 2. CASH ADVANCE INDIVIDUAL APIs
+    // ==========================================
+
+    /**
+     * GET /api/hrms/travel-expense/advance
+     * List paginated cash advances with filtering.
+     */
+    public function indexCashAdvances(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+
+        $query = CashAdvance::where('tenant_id', $tenantId)
+            ->with([
+                'employee:id,employee_id,full_name,photo',
+                'travelRequest:id,purpose,destination,start_date,end_date,estimated_budget,status',
+                'expenseReport:id,title,status',
+            ]);
+
+        if ($request->filled('employee_id')) {
+            if ($isAdmin || ($employee && (int)$request->employee_id === (int)$employee->id)) {
+                $query->where('employee_id', $request->employee_id);
+            } else {
+                $query->where('employee_id', $employee?->id ?? 0);
+            }
+        } elseif (!$isAdmin && $employee) {
+            $query->where('employee_id', $employee->id);
+        }
+
+        if ($request->filled('travel_request_id')) {
+            $query->where('travel_request_id', $request->travel_request_id);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('purpose', 'like', "%{$search}%")
+                  ->orWhereHas('employee', function ($sq) use ($search) {
+                      $sq->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_id', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $perPage = min($request->integer('per_page', 10), 100);
+        $cashAdvances = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+        $formatted = $this->formatPaginatedData($cashAdvances, fn($ca) => $this->transformCashAdvance($ca));
+
+        return $this->sendSuccess($formatted, 'Cash advances retrieved successfully.');
+    }
+
+    /**
+     * GET /api/hrms/travel-expense/advance/{id}
+     * Get single cash advance details.
+     */
+    public function showCashAdvance(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+
+        $cashAdvance = CashAdvance::where('tenant_id', $tenantId)
+            ->with([
+                'employee:id,employee_id,full_name,office_email,personal_email,photo,job_title',
+                'travelRequest:id,purpose,destination,start_date,end_date,estimated_budget,approved_budget,status',
+                'expenseReport:id,title,total_amount,status',
+            ])
+            ->find($id);
+
+        if (!$cashAdvance) {
+            return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isAdmin && $employee && (int)$cashAdvance->employee_id !== (int)$employee->id) {
+            return $this->sendError('Unauthorized access to this cash advance.', 403);
+        }
+
+        return $this->sendSuccess($this->transformCashAdvance($cashAdvance, true), 'Cash advance details loaded successfully.');
+    }
+
+    // ==========================================
+    // 3. EXPENSE REPORT INDIVIDUAL APIs
+    // ==========================================
+
+    /**
+     * GET /api/hrms/travel-expense/report
+     * List paginated expense reports with filtering.
+     */
+    public function indexExpenseReports(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+
+        $query = ExpenseReport::where('tenant_id', $tenantId)
+            ->with([
+                'employee:id,employee_id,full_name,photo',
+                'travelRequest:id,purpose,destination,status',
+                'cashAdvance:id,expense_report_id,amount,approved_amount,status',
+            ])
+            ->withCount('claims');
+
+        if ($request->filled('employee_id')) {
+            if ($isAdmin || ($employee && (int)$request->employee_id === (int)$employee->id)) {
+                $query->where('employee_id', $request->employee_id);
+            } else {
+                $query->where('employee_id', $employee?->id ?? 0);
+            }
+        } elseif (!$isAdmin && $employee) {
+            $query->where('employee_id', $employee->id);
+        }
+
+        if ($request->filled('travel_request_id')) {
+            $query->where('travel_request_id', $request->travel_request_id);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhereHas('employee', function ($sq) use ($search) {
+                      $sq->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_id', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $perPage = min($request->integer('per_page', 10), 100);
+        $expenseReports = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+        $formatted = $this->formatPaginatedData($expenseReports, fn($er) => $this->transformExpenseReport($er));
+
+        return $this->sendSuccess($formatted, 'Expense reports retrieved successfully.');
+    }
+
+    /**
+     * GET /api/hrms/travel-expense/report/{id}
+     * Get single expense report details with claims and category.
+     */
+    public function showExpenseReport(mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+
+        $expenseReport = ExpenseReport::where('tenant_id', $tenantId)
+            ->with([
+                'employee:id,employee_id,full_name,office_email,personal_email,photo,job_title',
+                'travelRequest:id,purpose,destination,start_date,end_date,status',
+                'cashAdvance:id,expense_report_id,amount,approved_amount,purpose,status',
+                'claims.category:id,name,code',
+            ])
+            ->find($id);
+
+        if (!$expenseReport) {
+            return $this->sendError("Expense report with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isAdmin && $employee && (int)$expenseReport->employee_id !== (int)$employee->id) {
+            return $this->sendError('Unauthorized access to this expense report.', 403);
+        }
+
+        return $this->sendSuccess($this->transformExpenseReport($expenseReport, true), 'Expense report details loaded successfully.');
     }
 
     /**
@@ -240,7 +677,7 @@ class TravelExpenseApiController extends Controller
             return $tr;
         });
 
-        return $this->sendSuccess($travelRequest->load('cashAdvances'), 'Travel request submitted successfully.');
+        return $this->sendSuccess($travelRequest->load('cashAdvances'), 'Travel request submitted successfully.', 201);
     }
 
     /**
@@ -298,7 +735,7 @@ class TravelExpenseApiController extends Controller
 
         $cashAdvance = CashAdvance::create($validated);
 
-        return $this->sendSuccess($cashAdvance, 'Cash advance request submitted successfully.');
+        return $this->sendSuccess($cashAdvance, 'Cash advance request submitted successfully.', 201);
     }
 
     /**
@@ -516,7 +953,7 @@ class TravelExpenseApiController extends Controller
             return $rep;
         });
 
-        return $this->sendSuccess($report->load('claims'), 'Expense report saved to drafts.');
+        return $this->sendSuccess($report->load('claims.category'), 'Expense report saved to drafts.', 201);
     }
 
     /**
@@ -655,7 +1092,7 @@ class TravelExpenseApiController extends Controller
             }
         });
 
-        return $this->sendSuccess($expenseReport->fresh()->load('claims'), 'Expense report updated successfully.');
+        return $this->sendSuccess($expenseReport->fresh()->load('claims.category'), 'Expense report updated successfully.');
     }
 
     /**

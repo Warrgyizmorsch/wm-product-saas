@@ -12,8 +12,12 @@ class BomWhereUsedService
      * Finds parent products consuming the product as a subassembly or component.
      * Checks approved/active parent BOMs.
      */
-    public function findParents(Product $product): Collection
+    public function findParents(?Product $product): Collection
     {
+        if (!$product) {
+            return collect();
+        }
+
         $tenantId = $product->tenant_id;
 
         $items = ProductionBomItem::where('material_id', $product->id)
@@ -33,8 +37,12 @@ class BomWhereUsedService
      * Finds full parent BOM records consuming the product as a subassembly or component.
      * Includes all statuses for full engineering traceability.
      */
-    public function findParentBoms(Product $product): Collection
+    public function findParentBoms(?Product $product): Collection
     {
+        if (!$product) {
+            return collect();
+        }
+
         $tenantId = $product->tenant_id;
 
         $items = ProductionBomItem::where('material_id', $product->id)

@@ -18,7 +18,7 @@ class ProductionCostService
         foreach ($bom->items as $item) {
             $scrapFactor = 1 + ($item->material_scrap_percentage / 100);
             $grossQty = $item->quantity * $scrapFactor;
-            $unitCost = $item->material->unit_cost ?? 0.0;
+            $unitCost = $item->material?->unit_cost ?? 0.0;
             $totalCost += $grossQty * $unitCost;
         }
 
@@ -129,7 +129,7 @@ class ProductionCostService
         foreach ($bom->items as $item) {
             $scrapPct = $item->material_scrap_percentage ?? 0.0;
             $scrapQty = $item->quantity * ($scrapPct / 100);
-            $unitCost = $item->material->unit_cost ?? 0.0;
+            $unitCost = $item->material?->unit_cost ?? 0.0;
             $scrapCost += $scrapQty * $unitCost;
         }
 
@@ -172,7 +172,8 @@ class ProductionCostService
         $actualCost = 0.0;
 
         foreach ($externalOps as $op) {
-            $opEstimated = (float) ($op->subcontract_cost_per_unit * ($op->quantity_ordered ?: $order->quantity_ordered));
+            $opTarget = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1.0));
+            $opEstimated = (float) ($op->subcontract_cost_per_unit * $opTarget);
             $estimatedCost += $opEstimated;
 
             $poItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('purchase_order_id', function ($q) use ($tenantId, $order) {

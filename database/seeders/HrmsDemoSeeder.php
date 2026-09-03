@@ -92,6 +92,11 @@ class HrmsDemoSeeder extends Seeder
         DB::table('travel_requests')->truncate();
         DB::table('payroll_runs')->truncate();
         DB::table('salary_revisions')->truncate();
+        if (Schema::hasTable('employee_exit_documents')) DB::table('employee_exit_documents')->truncate();
+        if (Schema::hasTable('employee_fnf_settlements')) DB::table('employee_fnf_settlements')->truncate();
+        if (Schema::hasTable('employee_exit_clearances')) DB::table('employee_exit_clearances')->truncate();
+        if (Schema::hasTable('employee_exits')) DB::table('employee_exits')->truncate();
+        if (Schema::hasTable('employee_probation_evaluations')) DB::table('employee_probation_evaluations')->truncate();
 
         Schema::enableForeignKeyConstraints();
 
@@ -708,24 +713,57 @@ class HrmsDemoSeeder extends Seeder
             $clQuota = $isExec ? 15 : 12;
             $slQuota = $isExec ? 15 : 12;
 
+            $desigModel = Designation::find($item['desig']);
             $emp = Employee::create([
                 'tenant_id' => $tenant->id,
                 'user_id' => $empUser->id,
                 'employee_id' => 'WRG-' . str_pad($index, 3, '0', STR_PAD_LEFT),
                 'full_name' => $item['first'] . ' ' . $item['last'],
+                'nick_name' => $item['first'],
+                'job_title' => $desigModel?->name ?? 'Professional',
+                'employment_type' => 'Full-time',
+                'employee_stage' => 'Probation',
                 'personal_email' => $item['email'],
+                'office_email' => strtolower($item['first']) . '@company.com',
+                'personal_mobile_number' => '+91 98765 ' . str_pad((string)(43210 + $index * 111), 5, '0', STR_PAD_LEFT),
+                'home_phone' => '011-2345678' . $index,
                 'company_id' => $company->id,
                 'business_unit_id' => $bu->id,
                 'branch_id' => $branch->id,
                 'department_id' => $item['dept'],
                 'designation_id' => $item['desig'],
+                'reporting_manager_id' => $index > 0 && isset($employeesList[0]) ? $employeesList[0]->id : null,
+                'shift_id' => $shiftDay->id,
                 'pay_group_id' => $item['structure'] == $structure1->id ? $payGroup1->id : $payGroup2->id,
                 'salary_structure_id' => $item['structure'],
                 'leave_plan_id' => $planId,
                 'current_salary' => $item['structure'] == $structure1->id ? 480000 : 960000,
+                'experience' => 3.5 + $index,
                 'date_of_joining' => '2026-08-01',
-                'weekly_pattern' => [0 => 'off', 1 => $shiftDay->id, 2 => $shiftDay->id, 3 => $shiftDay->id, 4 => $shiftDay->id, 5 => $shiftDay->id, 6 => 'off'], // Sat & Sun off
+                'date_of_birth' => '1995-0' . min(9, $index + 1) . '-15',
+                'probation_end_date' => '2026-11-01',
+                'confirmation_date' => '2026-11-01',
                 'gender' => $item['gender'],
+                'marital_status' => $index % 2 === 0 ? 'Married' : 'Single',
+                'blood_group' => ['A+', 'B+', 'O+', 'AB+', 'O-'][$index % 5],
+                'diet_preference' => $index % 2 === 0 ? 'Veg' : 'Non Veg',
+                'office' => 'office',
+                'present_address' => 'Plot #' . (10 + $index) . ', Tech Park Road, Sector 62',
+                'permanent_address' => 'Plot #' . (10 + $index) . ', Tech Park Road, Sector 62',
+                'city' => 'Noida',
+                'postal_code' => '201301',
+                'aadhaar_card_number' => '5432 8765 ' . str_pad((string)(1000 + $index * 111), 4, '0', STR_PAD_LEFT),
+                'pan_card_number' => 'ABCDE' . (1234 + $index) . 'F',
+                'bank_name' => 'HDFC Bank',
+                'account_number' => '5010023456789' . $index,
+                'ifsc_code' => 'HDFC0001234',
+                'emergency_contact_name' => 'Emergency Contact ' . ($index + 1),
+                'emergency_contact_number' => '+91 91234 5678' . $index,
+                'emergency_contact_relation' => $index % 2 === 0 ? 'Spouse' : 'Parent',
+                'qualification' => 'B.Tech / MCA in Computer Science',
+                'source_of_hire' => 'LinkedIn / Direct Referral',
+                'skill_set' => 'PHP, Laravel, MySQL, JavaScript, Vue.js, System Architecture',
+                'weekly_pattern' => [0 => 'off', 1 => $shiftDay->id, 2 => $shiftDay->id, 3 => $shiftDay->id, 4 => $shiftDay->id, 5 => $shiftDay->id, 6 => 'off'], // Sat & Sun off
                 'status' => true
             ]);
             $employeesList[] = $emp;
@@ -987,5 +1025,86 @@ class HrmsDemoSeeder extends Seeder
             'new_ctc' => 45000,
             'arrears_paid' => false
         ]);
+
+        // 18. Sample Probation Evaluation
+        if (class_exists(\App\Domains\HRMS\Models\EmployeeProbationEvaluation::class) && Schema::hasTable('employee_probation_evaluations')) {
+            \App\Domains\HRMS\Models\EmployeeProbationEvaluation::create([
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employeesList[1]->id,
+                'reviewer_id' => $user->id,
+                'evaluation_date' => '2026-08-10',
+                'performance_rating' => 4,
+                'attendance_rating' => 5,
+                'culture_rating' => 4,
+                'recommendation' => 'confirm',
+                'remarks' => 'Exceptional onboarding velocity and excellent technical contribution.',
+                'status' => 'completed',
+            ]);
+            $employeesList[1]->update([
+                'employee_stage' => 'Confirmed',
+                'confirmation_date' => '2026-08-10',
+            ]);
+
+            // Set Amit (employee 3) in active probation ending in 10 days
+            $employeesList[3]->update([
+                'employee_stage' => 'Probation',
+                'probation_end_date' => \Carbon\Carbon::today()->addDays(10)->format('Y-m-d'),
+            ]);
+        }
+
+        // 19. Sample Employee Exit & Clearance
+        if (class_exists(\App\Domains\HRMS\Models\EmployeeExit::class) && Schema::hasTable('employee_exits')) {
+            $sampleExit = \App\Domains\HRMS\Models\EmployeeExit::create([
+                'tenant_id' => $tenant->id,
+                'employee_id' => $employeesList[4]->id, // Sneha
+                'separation_type' => 'resignation',
+                'resignation_date' => '2026-08-15',
+                'preferred_lwd' => '2026-09-15',
+                'approved_lwd' => '2026-09-15',
+                'notice_period_days' => 30,
+                'notice_shortfall_days' => 0,
+                'notice_action' => 'serve',
+                'reason_category' => 'Better Opportunity',
+                'reason_details' => 'Accepted senior leadership role.',
+                'status' => 'in_clearance',
+                'initiated_by' => 'employee',
+                'approved_by' => $user->id,
+                'approved_at' => '2026-08-16 10:00:00',
+            ]);
+
+            $employeesList[4]->update(['employee_stage' => 'Notice Period']);
+
+            $standardChecklist = [
+                ['department' => 'it_assets', 'item_name' => 'Hardware Asset Recovery (Laptop/Accessories)', 'status' => 'pending'],
+                ['department' => 'it_assets', 'item_name' => 'Email, Slack & ERP System Logins Deactivation', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'it_assets', 'item_name' => 'Cloud Data Backup & File Handover', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'facilities_admin', 'item_name' => 'Company Physical ID Card & Access Badge Handover', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'facilities_admin', 'item_name' => 'Office Keys, Drawer Keys & Parking Tag Handover', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'finance_payroll', 'item_name' => 'Reconcile Open Cash Advances & Loan Accounts', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'finance_payroll', 'item_name' => 'Verify Pending Travel & Expense Reimbursements', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'finance_payroll', 'item_name' => 'Notice Period Shortfall / Buyout Verification', 'status' => 'waived', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'hr_operations', 'item_name' => 'Exit Interview & Feedback Questionnaire Completed', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'hr_operations', 'item_name' => 'PF, Gratuity & Pension Settlement Verification', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'reporting_manager', 'item_name' => 'Knowledge Transfer (KT) & Task Handover Sign-off', 'status' => 'cleared', 'cleared_by' => $user->id, 'cleared_at' => now()],
+                ['department' => 'reporting_manager', 'item_name' => 'Client Contacts, Repo & Credentials Handover', 'status' => 'pending'],
+            ];
+
+            foreach ($standardChecklist as $item) {
+                \App\Domains\HRMS\Models\EmployeeExitClearance::create([
+                    'tenant_id' => $tenant->id,
+                    'employee_exit_id' => $sampleExit->id,
+                    'department' => $item['department'],
+                    'item_name' => $item['item_name'],
+                    'status' => $item['status'],
+                    'cleared_by' => $item['cleared_by'] ?? null,
+                    'cleared_at' => $item['cleared_at'] ?? null,
+                ]);
+            }
+
+            // Generate initial FnF settlement draft
+            $fnfService = new \App\Domains\HRMS\Services\FnFCalculationService();
+            $computedFnF = $fnfService->calculateFnF($sampleExit);
+            $fnfService->saveSettlement($sampleExit, $computedFnF);
+        }
     }
 }

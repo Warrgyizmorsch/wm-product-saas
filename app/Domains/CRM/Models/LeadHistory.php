@@ -3,16 +3,20 @@
 namespace App\Domains\CRM\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\User;
 
 class LeadHistory extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch;
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'lead_id',
         'user_id',
         'event_type',

@@ -3,6 +3,8 @@
 namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,12 +14,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VendorBill extends BaseModel
 {
-    use HasFactory;
+    use BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'vendor_bills';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'bill_number',
         'vendor_invoice_number',
         'vendor_bill_number',
@@ -27,6 +31,8 @@ class VendorBill extends BaseModel
         'freight_terms',
         'freight_amount',
         'freight_tax_method',
+        'freight_allocation_method',
+        'landed_cost_revaluation_data',
         'discount_amount',
         'cgst_amount',
         'sgst_amount',
@@ -60,6 +66,7 @@ class VendorBill extends BaseModel
         'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'due_amount' => 'decimal:2',
+        'landed_cost_revaluation_data' => 'array',
     ];
 
     public function items(): HasMany
@@ -102,5 +109,17 @@ class VendorBill extends BaseModel
     public function getTotalAmountAttribute(): float
     {
         return (float)($this->attributes['grand_total'] ?? $this->attributes['total_amount'] ?? 0);
+    }
+
+    public function getAmountPaidAttribute(): float
+    {
+        return (float)($this->attributes['paid_amount'] ?? $this->attributes['amount_paid'] ?? 0);
+    }
+
+    public function getBalanceDueAttribute(): float
+    {
+        $total = $this->total_amount;
+        $paid = $this->amount_paid;
+        return (float)($this->attributes['due_amount'] ?? max(0, $total - $paid));
     }
 }

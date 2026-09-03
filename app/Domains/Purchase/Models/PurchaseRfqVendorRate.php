@@ -4,14 +4,20 @@ namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PurchaseRfqVendorRate extends BaseModel
 {
+    use BelongsToCompany, BelongsToBranch;
+
     protected $table = 'purchase_rfq_vendor_rates';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'purchase_rfq_vendor_id',
         'product_id',
         'rate',

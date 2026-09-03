@@ -3,6 +3,8 @@
 namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,12 +13,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class LandedCostVoucher extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
     protected $table = 'landed_cost_vouchers';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'voucher_number',
         'voucher_date',
         'status', // Draft, Posted, Cancelled

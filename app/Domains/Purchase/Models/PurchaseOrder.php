@@ -3,6 +3,8 @@
 namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
@@ -13,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseOrder extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
     protected static function boot()
     {
@@ -30,6 +32,8 @@ class PurchaseOrder extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'purchase_order_number',
         'purchase_requisition_id',
         'source_type',

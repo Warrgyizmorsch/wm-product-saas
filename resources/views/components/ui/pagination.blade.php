@@ -47,7 +47,7 @@
             cursor: pointer;
         }
         .erp-pagination .page-link:hover {
-            background-color: rgba(var(--bs-primary-rgb), 0.08);
+            background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent);
             border-color: var(--bs-primary);
             color: var(--bs-primary);
         }
@@ -55,7 +55,7 @@
             background-color: var(--bs-primary) !important;
             border-color: var(--bs-primary) !important;
             color: #ffffff !important;
-            box-shadow: 0 4px 10px rgba(var(--bs-primary-rgb), 0.2);
+            box-shadow: 0 4px 10px color-mix(in srgb, var(--bs-primary) 20%, transparent);
         }
         .erp-pagination .page-item.disabled .page-link {
             background-color: #f8fafc;

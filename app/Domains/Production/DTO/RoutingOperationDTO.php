@@ -32,6 +32,7 @@ class RoutingOperationDTO
         public readonly ?string $material_supply_type = null,
         public readonly int     $dispatch_buffer_days = 0,
         public readonly int     $return_buffer_days = 0,
+        public readonly ?int    $material_id = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -66,6 +67,7 @@ class RoutingOperationDTO
             material_supply_type:           $data['material_supply_type'] ?? (!empty($data['is_external']) ? 'company_supplied' : 'none'),
             dispatch_buffer_days:          isset($data['dispatch_buffer_days']) ? (int) $data['dispatch_buffer_days'] : 0,
             return_buffer_days:            isset($data['return_buffer_days']) ? (int) $data['return_buffer_days'] : 0,
+            material_id:                   !empty($data['material_id']) ? (int) $data['material_id'] : null,
         );
     }
 
@@ -99,6 +101,7 @@ class RoutingOperationDTO
             'material_supply_type'           => $this->material_supply_type,
             'dispatch_buffer_days'           => $this->dispatch_buffer_days,
             'return_buffer_days'             => $this->return_buffer_days,
+            'material_id'                    => $this->material_id,
         ];
     }
 }

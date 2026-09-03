@@ -682,6 +682,12 @@ class PayrollCalculationService
             ->where('status', 'on_hold')
             ->exists();
 
+        // Check for active FnF exit settlement in this month
+        $activeExit = \App\Domains\HRMS\Models\EmployeeExit::where('employee_id', $employee->id)
+            ->whereIn('status', ['approved', 'in_clearance', 'settled'])
+            ->first();
+        $fnfSettlement = $activeExit ? $activeExit->fnfSettlement : null;
+
         return [
             'success' => true,
             'status'  => $isHeld ? 'on_hold' : 'calculated',
@@ -709,6 +715,9 @@ class PayrollCalculationService
                 'attendance_penalty_days'   => round($penaltyDays, 2),
                 'total_deductions'          => round($finalDeductions, 2),
                 'net_payout'                => round($netPayout, 2),
+                'is_fnf'                    => (bool) $activeExit,
+                'fnf_exit_id'               => $activeExit?->id,
+                'fnf_net_amount'            => $fnfSettlement ? round(floatval($fnfSettlement->net_payable_amount), 2) : null,
             ],
             'items' => $computedSalaryItems,
         ];

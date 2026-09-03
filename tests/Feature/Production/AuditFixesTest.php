@@ -288,11 +288,13 @@ class AuditFixesTest extends TestCase
         $response->assertViewHas('logs');
 
         // Export scan logs to CSV
+        \Illuminate\Support\Carbon::setTestNow(now());
         $response = $this->actingAs($this->pmUser)
             ->withHeader('X-Tenant', 'test-tenant')
             ->get(route('production.scan-logs.export'));
         $response->assertOk();
         $response->assertHeader('Content-Disposition', 'attachment; filename=production_scan_logs_' . date('Ymd_His') . '.csv');
+        \Illuminate\Support\Carbon::setTestNow();
     }
 
     /** @test */
@@ -454,5 +456,46 @@ class AuditFixesTest extends TestCase
         $hasActuals = $service->hasExecutionHistory($scheduleA);
 
         $this->assertFalse($hasActuals, 'Cross-tenant WIP record should not trigger hasExecutionHistory for Tenant A schedule.');
+    }
+
+    /** @test */
+    public function test_repeated_material_reservation_and_requisition_aggregation(): void
+    {
+        $uom = Uom::create(['tenant_id' => $this->tenant->id, 'name' => 'Meters', 'code' => 'MTR']);
+        $product = Product::create([
+            'tenant_id'      => $this->tenant->id,
+            'name'           => 'Steel Square Pipe',
+            'sku'            => 'RM-PIPE',
+            'type'           => 'raw_material',
+            'item_type'      => 'Goods',
+            'variation_type' => 'Single',
+            'status'         => 'active',
+            'selling_price'  => 10,
+            'cost_price'     => 5,
+            'unit_cost'      => 5,
+            'uom_id'         => $uom->id,
+        ]);
+
+        $order = ProductionOrder::create([
+            'tenant_id'        => $this->tenant->id,
+            'order_number'     => 'ORD-AGG-001',
+            'product_id'        => $product->id,
+            'quantity_ordered' => 2,
+            'start_date'       => today(),
+            'end_date'         => today()->addDays(2),
+            'status'           => 'draft',
+        ]);
+
+        $orderService = app(\App\Domains\Production\Services\ProductionOrderService::class);
+
+        // Add material reservation twice for the same product (6.0m + 2.6m)
+        $refMethod = new \ReflectionMethod($orderService, 'createMaterialReservation');
+        $refMethod->setAccessible(true);
+        $refMethod->invoke($orderService, $order, null, $product->id, 6.0, $uom->id, null);
+        $refMethod->invoke($orderService, $order, null, $product->id, 2.6, $uom->id, null);
+
+        $reservations = \App\Domains\Production\Models\ProductionOrderReservation::where('production_order_id', $order->id)->get();
+        $this->assertCount(1, $reservations, 'Repeated materials should consolidate into a single reservation line.');
+        $this->assertEquals(8.6, (float) $reservations->first()->quantity_planned);
     }
 }

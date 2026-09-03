@@ -3,18 +3,23 @@
 namespace App\Domains\Sales\Models;
 
 use App\Core\Database\BaseModel;
+use App\Domains\Platform\Models\Transporter;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DispatchOrder extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'dispatch_orders';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'customer_id',
         'transporter_id',
         'material_requirement_id',

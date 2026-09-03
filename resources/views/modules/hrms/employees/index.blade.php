@@ -5,7 +5,13 @@
 @section('breadcrumb', 'HRMS / Employees')
 
 @section('page-actions')
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <x-ui.button variant="outline-primary" icon="feather-award" href="{{ route('hrms.probation.index') }}" class="fw-semibold">
+            Probation Reviews
+        </x-ui.button>
+        <x-ui.button variant="outline-secondary" icon="feather-log-out" href="{{ route('hrms.exits.index') }}" class="fw-semibold">
+            Exit & Offboarding
+        </x-ui.button>
         <x-ui.import-export-dropdown 
             type="employee" 
             :exportRoute="route('hrms.employees.export')" 
@@ -585,75 +591,23 @@
                                     <td>{{ $employee->company?->company_name ?? 'Not assigned' }}</td>
                                     <td>
                                         @php
-                                            $stageBadge = match($employee->employee_stage) {
-                                                'Probation'     => ['color' => '#f59e0b', 'bg' => '#fef3c7'],
-                                                'Confirmed'     => ['color' => '#10b981', 'bg' => '#d1fae5'],
-                                                'Notice Period' => ['color' => '#f97316', 'bg' => '#ffedd5'],
-                                                'Exited'        => ['color' => '#ef4444', 'bg' => '#fee2e2'],
-                                                default         => ['color' => '#64748b', 'bg' => '#f1f5f9'],
+                                            $stageVariant = match($employee->employee_stage) {
+                                                'Probation'     => 'warning',
+                                                'Confirmed'     => 'success',
+                                                'Notice Period' => 'danger',
+                                                'Exited'        => 'secondary',
+                                                default         => 'light',
                                             };
                                             $stageLabel = $employee->employee_stage ?: 'Not Set';
                                         @endphp
-                                        <div class="dropdown d-inline-block">
-                                            <span class="dropdown-toggle fw-bold employee-stage-toggle"
-                                                  id="stageDropdown_{{ $employee->id }}"
-                                                  data-bs-toggle="dropdown"
-                                                  aria-expanded="false"
-                                                  style="cursor: pointer; border-bottom: 1px solid #ced4da; padding-bottom: 2px; font-size: 13px; color: {{ $stageBadge['color'] }};">
-                                                {{ $stageLabel }}
-                                            </span>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm stage-dropdown-menu" aria-labelledby="stageDropdown_{{ $employee->id }}" style="min-width: auto !important; width: 130px !important; z-index: 1050;">
-                                                @foreach(['Probation' => '#f59e0b', 'Confirmed' => '#10b981', 'Notice Period' => '#f97316', 'Exited' => '#ef4444'] as $stageOpt => $stageColor)
-                                                <li>
-                                                    <button type="button" class="dropdown-item change-stage-btn fw-bold d-flex align-items-center justify-content-between gap-2"
-                                                            data-employee-id="{{ $employee->id }}"
-                                                            data-stage="{{ $stageOpt }}"
-                                                            style="background: transparent !important; color: {{ $stageColor }} !important; box-shadow: none !important; border: 0; width: 100%;">
-                                                        {{ $stageOpt }}
-                                                        @if($employee->employee_stage === $stageOpt)
-                                                            <i class="feather feather-check ms-2"></i>
-                                                        @endif
-                                                    </button>
-                                                </li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
+                                        <x-ui.badge soft :variant="$stageVariant" class="fs-12 fw-semibold px-2.5 py-1">
+                                            {{ $stageLabel }}
+                                        </x-ui.badge>
                                     </td>
                                     <td>
-                                        <div class="dropdown d-inline-block">
-                                            <span class="dropdown-toggle fw-bold employee-status-toggle" 
-                                                  id="statusDropdown_{{ $employee->id }}" 
-                                                  data-bs-toggle="dropdown" 
-                                                  aria-expanded="false" 
-                                                  style="cursor: pointer; border-bottom: 1px solid #ced4da; padding-bottom: 2px; font-size: 13px;
-                                                         color: {{ $employee->status ? '#10b981' : '#ef4444' }};">
-                                                {{ $employee->status ? 'Active' : 'Inactive' }}
-                                            </span>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm status-dropdown-menu" aria-labelledby="statusDropdown_{{ $employee->id }}" style="min-width: auto !important; width: 110px !important; z-index: 1050;">
-                                                <li>
-                                                    <button type="button" class="dropdown-item change-status-btn fw-bold text-success d-flex align-items-center justify-content-between gap-2" 
-                                                            data-employee-id="{{ $employee->id }}" 
-                                                            data-status="1"
-                                                            style="background: transparent !important; color: var(--bs-success) !important; box-shadow: none !important; border: 0; width: 100%;">
-                                                        Active
-                                                        @if($employee->status)
-                                                            <i class="feather feather-check ms-2"></i>
-                                                        @endif
-                                                    </button>
-                                                </li>
-                                                <li>
-                                                    <button type="button" class="dropdown-item change-status-btn fw-bold text-danger d-flex align-items-center justify-content-between gap-2" 
-                                                            data-employee-id="{{ $employee->id }}" 
-                                                            data-status="0"
-                                                            style="background: transparent !important; color: var(--bs-danger) !important; box-shadow: none !important; border: 0; width: 100%;">
-                                                        Inactive
-                                                        @if(!$employee->status)
-                                                            <i class="feather feather-check ms-2"></i>
-                                                        @endif
-                                                    </button>
-                                                </li>
-                                            </ul>
-                                        </div>
+                                        <x-ui.badge soft :variant="$employee->status ? 'success' : 'danger'" class="fs-12 fw-semibold px-2.5 py-1">
+                                            {{ $employee->status ? 'Active' : 'Inactive' }}
+                                        </x-ui.badge>
                                     </td>
                                     <td class="text-end">
                                         <x-ui.action-dropdown>
@@ -669,7 +623,7 @@
                                                     'employee_id'               => $employee->employee_id,
                                                     'full_name'                 => $employee->full_name,
                                                     'nick_name'                 => $employee->nick_name,
-                                                    'job_title'                 => $employee->job_title,
+                                                    'job_title'                 => $employee->job_title ?: ($employee->designation?->name ?? ''),
                                                     'photo'                     => $employee->photo,
                                                     'company_id'                => $employee->company_id,
                                                     'business_unit_id'          => $employee->business_unit_id,
@@ -680,18 +634,21 @@
                                                     'shift_id'                  => $employee->shift_id,
                                                     'pay_group_id'              => $employee->pay_group_id,
                                                     'leave_plan_id'             => $employee->leave_plan_id,
-                                                    'role_id'                   => $employee->user?->role_id,
+                                                    'user_id'                   => $employee->user_id,
+                                                    'role_id'                   => $employee->user?->role_id ?? $employee->user?->roles->first()?->id ?? '',
                                                     'employment_type'           => $employee->employment_type,
                                                     'employee_stage'            => $employee->employee_stage,
-                                                    'date_of_joining'           => $employee->date_of_joining,
-                                                    'date_of_birth'             => $employee->date_of_birth,
-                                                    'probation_end_date'        => $employee->probation_end_date,
-                                                    'confirmation_date'         => $employee->confirmation_date,
+                                                    'date_of_joining'           => $employee->date_of_joining ? (is_string($employee->date_of_joining) ? substr($employee->date_of_joining, 0, 10) : $employee->date_of_joining->format('Y-m-d')) : '',
+                                                    'date_of_birth'             => $employee->date_of_birth ? (is_string($employee->date_of_birth) ? substr($employee->date_of_birth, 0, 10) : $employee->date_of_birth->format('Y-m-d')) : '',
+                                                    'probation_end_date'        => $employee->probation_end_date ? (is_string($employee->probation_end_date) ? substr($employee->probation_end_date, 0, 10) : $employee->probation_end_date->format('Y-m-d')) : '',
+                                                    'confirmation_date'         => $employee->confirmation_date ? (is_string($employee->confirmation_date) ? substr($employee->confirmation_date, 0, 10) : $employee->confirmation_date->format('Y-m-d')) : '',
                                                     'gender'                    => $employee->gender,
                                                     'marital_status'            => $employee->marital_status,
                                                     'blood_group'               => $employee->blood_group,
                                                     'diet_preference'           => $employee->diet_preference,
-                                                    'office'                    => $employee->office,
+                                                    'office'                    => $employee->office ?: 'office',
+                                                    'wfh_latitude'              => $employee->wfh_latitude,
+                                                    'wfh_longitude'             => $employee->wfh_longitude,
                                                     'personal_mobile_number'    => $employee->personal_mobile_number,
                                                     'personal_email'            => $employee->personal_email,
                                                     'office_email'              => $employee->office_email,
@@ -1167,11 +1124,12 @@
                     edit_full_name: employee.full_name || '',
                     edit_nick_name: employee.nick_name || '',
                     edit_job_title: employee.job_title || '',
-                    edit_date_of_joining: employee.date_of_joining ? employee.date_of_joining.substring(0, 10) : '',
-                    edit_date_of_birth: employee.date_of_birth ? employee.date_of_birth.substring(0, 10) : '',
-                    edit_probation_end_date: employee.probation_end_date ? employee.probation_end_date.substring(0, 10) : '',
-                    edit_confirmation_date: employee.confirmation_date ? employee.confirmation_date.substring(0, 10) : '',
-                    edit_office: employee.office || '',
+                    edit_date_of_joining: employee.date_of_joining ? String(employee.date_of_joining).substring(0, 10) : '',
+                    edit_date_of_birth: employee.date_of_birth ? String(employee.date_of_birth).substring(0, 10) : '',
+                    edit_probation_end_date: employee.probation_end_date ? String(employee.probation_end_date).substring(0, 10) : '',
+                    edit_confirmation_date: employee.confirmation_date ? String(employee.confirmation_date).substring(0, 10) : '',
+                    edit_wfh_latitude: employee.wfh_latitude || '',
+                    edit_wfh_longitude: employee.wfh_longitude || '',
                     edit_personal_mobile_number: employee.personal_mobile_number || '',
                     edit_personal_email: employee.personal_email || '',
                     edit_office_email: employee.office_email || '',
@@ -1182,8 +1140,8 @@
                     edit_postal_code: employee.postal_code || '',
                     edit_qualification: employee.qualification || '',
                     edit_source_of_hire: employee.source_of_hire || '',
-                    edit_experience: employee.experience || '0',
-                    edit_current_salary: employee.current_salary || '0',
+                    edit_experience: employee.experience !== undefined && employee.experience !== null ? employee.experience : '0',
+                    edit_current_salary: employee.current_salary !== undefined && employee.current_salary !== null ? employee.current_salary : '0',
                     edit_present_address: employee.present_address || '',
                     edit_permanent_address: employee.permanent_address || '',
                     edit_skill_set: employee.skill_set || '',
@@ -1226,9 +1184,11 @@
                     edit_marital_status: employee.marital_status || '',
                     edit_blood_group: employee.blood_group || '',
                     edit_diet_preference: employee.diet_preference || '',
-                    edit_status: employee.status ? '1' : '0',
+                    edit_office: employee.office || 'office',
+                    edit_status: (employee.status == 1 || employee.status === true || employee.status === '1') ? '1' : '0',
                     edit_pay_group_id: employee.pay_group_id || '',
                     edit_leave_plan_id: employee.leave_plan_id || '',
+                    edit_user_id: employee.user_id || '',
                     edit_role_id: employee.role_id || '',
                 };
 
@@ -1252,6 +1212,16 @@
                 setPreview('edit', employee.photo, employee.full_name);
 
                 initModalSelects(document.getElementById('editEmployeeModal'));
+                
+                Object.keys(selectAssignments).forEach(function (id) {
+                    const val = selectAssignments[id];
+                    const $el = $('#' + id);
+                    if ($el.length && val) {
+                        $el.val(String(val)).trigger('change.select2');
+                    }
+                });
+                
+                $('#edit_office').trigger('change');
                 
                 // Store original leave plan ID for migration detection
                 $('#edit_leave_plan_id').attr('data-original-val', employee.leave_plan_id || '');

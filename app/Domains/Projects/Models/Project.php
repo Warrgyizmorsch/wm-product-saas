@@ -4,6 +4,8 @@ namespace App\Domains\Projects\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\CRM\Models\Customer;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -14,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Project extends BaseModel
 {
-    use BelongsToTenant, HasFactory, SoftDeletes;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
     public function getRouteKeyName(): string
     {
@@ -61,6 +63,8 @@ class Project extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'project_code',
         'name',
         'customer_id',

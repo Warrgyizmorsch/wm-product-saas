@@ -4,13 +4,21 @@
     $tenantPlan = ucfirst((string) ($resolvedTenant?->plan ?? 'Starter'));
     $tenantSlug = $resolvedTenant?->slug ?? 'central';
 
+    $resolvedCompany = company();
+    $resolvedBranch = branch();
+
     $currentTenant = [
         'name' => $resolvedTenant?->name ?? 'Central Workspace',
         'code' => strtoupper(str_replace('-', ' ', $tenantSlug)),
         'plan' => $tenantPlan,
-        'branch' => $tenantSettings['branch'] ?? 'Main Office',
+        'branch' => $resolvedBranch?->name ?? ($tenantSettings['branch'] ?? 'Main Office'),
         'currency' => $tenantSettings['currency'] ?? 'INR',
         'year' => $tenantSettings['financial_year'] ?? 'FY ' . now()->format('Y'),
+    ];
+
+    $currentCompany = [
+        'name' => $resolvedCompany?->company_name ?? 'No Company',
+        'code' => $resolvedCompany?->gst_number ?? '',
     ];
 
     $tenants = \Illuminate\Support\Facades\Schema::hasTable('tenants')
@@ -23,6 +31,30 @@
                 'code' => strtoupper($tenant->slug),
                 'slug' => $tenant->slug,
                 'active' => $resolvedTenant?->is($tenant) ?? false,
+            ])
+        : collect();
+
+    $companies = ($resolvedTenant && \Illuminate\Support\Facades\Schema::hasTable('companies'))
+        ? \App\Domains\HRMS\Models\Company::withoutGlobalScopes()
+            ->where('tenant_id', $resolvedTenant->id)
+            ->orderBy('company_name')
+            ->get()
+            ->map(fn ($company) => [
+                'id' => $company->id,
+                'name' => $company->company_name,
+                'active' => $resolvedCompany?->is($company) ?? false,
+            ])
+        : collect();
+
+    $branches = ($resolvedCompany && \Illuminate\Support\Facades\Schema::hasTable('branches'))
+        ? \App\Domains\HRMS\Models\Branch::withoutGlobalScopes()
+            ->where('company_id', $resolvedCompany->id)
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($branch) => [
+                'id' => $branch->id,
+                'name' => $branch->name,
+                'active' => $resolvedBranch?->is($branch) ?? false,
             ])
         : collect();
 
@@ -252,6 +284,66 @@
                                 <span>{{ __('ui.add_tenant') }}</span>
                             </x-ui.dropdown-item>
                     </x-ui.dropdown>
+
+                    @if ($companies->count() > 1)
+                        <x-ui.dropdown class="nxl-h-item erp-company-switcher d-none d-xl-flex" menu-class="nxl-h-dropdown erp-company-dropdown">
+                            <x-slot name="trigger">
+                                <x-ui.button href="javascript:void(0);" variant="light-brand" class="erp-company-button dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                                    <span class="avatar-text avatar-sm bg-soft-info text-info">
+                                        <i class="feather-home"></i>
+                                    </span>
+                                    <span class="erp-tenant-copy">
+                                        <strong>{{ $currentCompany['name'] }}</strong>
+                                        <small>{{ __('ui.switch_company') }}</small>
+                                    </span>
+                                    <i class="feather-chevron-down ms-2"></i>
+                                </x-ui.button>
+                            </x-slot>
+
+                                <div class="px-4 py-3 border-bottom">
+                                    <h6 class="mb-1">{{ __('ui.switch_company') }}</h6>
+                                </div>
+                                @foreach ($companies as $companyOption)
+                                    <x-ui.dropdown-item href="{{ route('company.switch', $companyOption['id']) }}" :active="!empty($companyOption['active'])">
+                                        <span class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($companyOption['name'], 0, 1) }}</span>
+                                        <span class="d-block fw-semibold">{{ $companyOption['name'] }}</span>
+                                        @if (!empty($companyOption['active']))
+                                            <i class="feather-check ms-auto me-0 text-success"></i>
+                                        @endif
+                                    </x-ui.dropdown-item>
+                                @endforeach
+                        </x-ui.dropdown>
+                    @endif
+
+                    @if ($branches->count() > 1)
+                        <x-ui.dropdown class="nxl-h-item erp-branch-switcher d-none d-xl-flex" menu-class="nxl-h-dropdown erp-branch-dropdown">
+                            <x-slot name="trigger">
+                                <x-ui.button href="javascript:void(0);" variant="light-brand" class="erp-branch-button dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                                    <span class="avatar-text avatar-sm bg-soft-warning text-warning">
+                                        <i class="feather-map-pin"></i>
+                                    </span>
+                                    <span class="erp-tenant-copy">
+                                        <strong>{{ $currentTenant['branch'] }}</strong>
+                                        <small>{{ __('ui.switch_branch') }}</small>
+                                    </span>
+                                    <i class="feather-chevron-down ms-2"></i>
+                                </x-ui.button>
+                            </x-slot>
+
+                                <div class="px-4 py-3 border-bottom">
+                                    <h6 class="mb-1">{{ __('ui.switch_branch') }}</h6>
+                                </div>
+                                @foreach ($branches as $branchOption)
+                                    <x-ui.dropdown-item href="{{ route('branch.switch', $branchOption['id']) }}" :active="!empty($branchOption['active'])">
+                                        <span class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($branchOption['name'], 0, 1) }}</span>
+                                        <span class="d-block fw-semibold">{{ $branchOption['name'] }}</span>
+                                        @if (!empty($branchOption['active']))
+                                            <i class="feather-check ms-auto me-0 text-success"></i>
+                                        @endif
+                                    </x-ui.dropdown-item>
+                                @endforeach
+                        </x-ui.dropdown>
+                    @endif
                 </div>
             </div>
         </div>

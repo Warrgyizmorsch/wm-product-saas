@@ -264,7 +264,11 @@
                                         <span class="fw-semibold text-dark">{{ $op->orderOperation->name ?? '—' }}</span>
                                         <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
                                         @if($op->orderOperation && $op->orderOperation->is_external)
-                                            <br><span class="badge bg-soft-warning text-dark border border-warning font-monospace mt-1"><i class="feather-external-link me-1"></i>SUBCONTRACT — {{ $op->orderOperation->vendor->name ?? 'Vendor' }}</span>
+                                            @php
+                                                $supplyType = $op->orderOperation->material_supply_type ?? 'company_supplied';
+                                                $isVendorSupplied = ($supplyType === 'vendor_supplied');
+                                            @endphp
+                                            <br><span class="badge {{ $isVendorSupplied ? 'bg-soft-info text-info border border-info-subtle' : 'bg-soft-warning text-dark border border-warning' }} font-monospace mt-1"><i class="feather-external-link me-1"></i>SUBCONTRACT ({{ $isVendorSupplied ? 'Vendor Supplied' : 'Company Supplied' }}) — {{ $op->orderOperation->vendor->name ?? 'Vendor' }}</span>
                                             <br><small class="text-warning font-monospace fs-11">Lead: {{ $op->orderOperation->subcontract_lead_time_days ?? 0 }}d | Buffer: {{ $op->orderOperation->dispatch_buffer_days ?? 0 }}d / {{ $op->orderOperation->return_buffer_days ?? 0 }}d</small>
                                         @endif
                                     </td>

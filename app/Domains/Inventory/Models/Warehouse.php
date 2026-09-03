@@ -3,11 +3,13 @@
 namespace App\Domains\Inventory\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Warehouse extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'warehouses';
 
@@ -17,6 +19,8 @@ class Warehouse extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'name',
         'code',
         'type',

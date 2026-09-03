@@ -282,7 +282,12 @@
                                         data-net="{{ (float)($summary['net_payout'] ?? 0) }}"
                                         data-lop="{{ (float)($summary['lop_days'] ?? 0) }}">
                                         <td>
-                                            <div class="fw-bold text-dark">{{ $row['employee']->full_name }}</div>
+                                            <div class="fw-bold text-dark">
+                                                {{ $row['employee']->full_name }}
+                                                @if($summary['is_fnf'] ?? false)
+                                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 fs-10 ms-1">F&F Settlement</span>
+                                                @endif
+                                            </div>
                                             <span class="fs-12 text-muted">{{ $row['employee']->employee_id }} &bull; {{ $row['employee']->job_title }}</span>
                                         </td>
                                         <td class="text-center">

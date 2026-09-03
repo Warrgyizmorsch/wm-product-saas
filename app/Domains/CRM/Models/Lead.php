@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
 use App\Domains\Inventory\Models\Product;
@@ -15,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Lead extends Model
 {
-    use BelongsToTenant, HasFactory, SoftDeletes;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
 
     protected static function boot()
     {
@@ -36,6 +38,8 @@ class Lead extends Model
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'lead_number',
         'lead_owner_id',
         'call_date',

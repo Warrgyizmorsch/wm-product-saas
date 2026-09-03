@@ -3,17 +3,21 @@
 namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class VendorPaymentAllocation extends BaseModel
 {
-    use HasFactory;
+    use BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'vendor_payment_allocations';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'vendor_payment_id',
         'vendor_bill_id',
         'allocated_amount',

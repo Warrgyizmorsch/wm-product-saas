@@ -221,11 +221,11 @@
                 <table class="erp-thin-table">
                     <thead>
                         <tr>
-                            <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
-                            <th style="width: 25%">{{ __('production.operation_details') }}</th>
-                            <th style="width: 12%">{{ __('production.type') }}</th>
-                            <th style="width: 18%">{{ __('production.work_center') }}</th>
-                            <th style="width: 15%">{{ __('production.machine') }}</th>
+                            <th style="width: 20%">{{ __('production.operation_details') }}</th>
+                            <th style="width: 16%">Consumed Component / Input Item</th>
+                            <th style="width: 10%">{{ __('production.type') }}</th>
+                            <th style="width: 15%">{{ __('production.work_center') }}</th>
+                            <th style="width: 13%">{{ __('production.machine') }}</th>
                             <th class="text-end" style="width: 8%">{{ __('production.setup') }}</th>
                             <th class="text-end" style="width: 8%">{{ __('production.run') }}</th>
                             <th class="text-end" style="width: 8%">{{ __('production.yield') }}</th>
@@ -245,6 +245,17 @@
                                     @endif
                                     @if ($op->is_external)
                                         <span class="badge bg-soft-danger text-danger mt-1 fs-9 text-uppercase">{{ __('production.outsourced') }}</span>
+                                    @endif
+                                </td>
+                                <td class="align-middle">
+                                    @php
+                                        $opMat = \App\Domains\Production\Models\RoutingOperationMaterial::with('material')->where('routing_operation_id', $op->id)->first();
+                                    @endphp
+                                    @if ($opMat && $opMat->material)
+                                        <span class="fw-semibold text-dark fs-12"><i class="feather-box text-primary me-1"></i>{{ $opMat->material->name }}</span>
+                                        <small class="text-muted d-block fs-10 font-monospace">{{ $opMat->material->sku }}</small>
+                                    @else
+                                        <span class="text-muted fs-11 fst-italic">BOM Auto-Mapped</span>
                                     @endif
                                 </td>
                                 <td class="align-middle">

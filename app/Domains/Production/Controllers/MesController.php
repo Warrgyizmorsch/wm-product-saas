@@ -46,10 +46,11 @@ class MesController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
-        // Auto-evaluate completion for active schedules so finished orders auto-complete
+        // Auto-evaluate readiness & completion for active schedules so next operations show ready instantly
         $poService = app(\App\Domains\Production\Services\ProductionOrderService::class);
         foreach ($activeSchedules as $sched) {
             if ($sched->production_order_id) {
+                $poService->reconcileOperationReadiness($sched->production_order_id);
                 $poService->evaluateAndAutoCompleteOrder($sched->production_order_id, $userId);
             }
         }
@@ -239,6 +240,18 @@ class MesController extends Controller
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
         $userId = auth()->id();
+
+        // Auto-reconcile operation readiness for active orders
+        $poService = app(\App\Domains\Production\Services\ProductionOrderService::class);
+        $activeOrderIds = ProductionScheduleOperation::where('tenant_id', $tenantId)
+            ->whereHas('schedule', fn($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
+            ->pluck('production_order_id')
+            ->unique();
+        foreach ($activeOrderIds as $orderId) {
+            if ($orderId) {
+                $poService->reconcileOperationReadiness($orderId);
+            }
+        }
 
         // My operator assignments
         $myAssignments = ProductionOperatorAssignment::with(['operation.order.product', 'operation.workCenter'])

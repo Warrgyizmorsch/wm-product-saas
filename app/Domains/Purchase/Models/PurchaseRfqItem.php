@@ -9,16 +9,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 
 class PurchaseRfqItem extends Model
 {
-    use BelongsToTenant, HasFactory;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'purchase_rfq_items';
 
     protected $fillable = [
         'purchase_rfq_id',
+        'company_id',
+        'branch_id',
         'product_id',
         'quantity',
         'estimated_cost',
@@ -52,6 +56,12 @@ class PurchaseRfqItem extends Model
         static::creating(function (self $item) {
             if (empty($item->tenant_id) && $item->rfq) {
                 $item->tenant_id = $item->rfq->tenant_id;
+            }
+            if (empty($item->company_id) && $item->rfq) {
+                $item->company_id = $item->rfq->company_id;
+            }
+            if (empty($item->branch_id) && $item->rfq) {
+                $item->branch_id = $item->rfq->branch_id;
             }
         });
     }

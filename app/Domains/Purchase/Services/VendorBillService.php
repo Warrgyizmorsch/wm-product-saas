@@ -48,9 +48,13 @@ class VendorBillService
             $taxType = $validated['tax_type'] ?? $po?->tax_type ?? ($hasItemTax ? 'item_wise_tax' : 'order_wise_tax');
             $gstType = $validated['gst_type'] ?? $po?->gst_type ?? 'cgst_sgst';
             $freightTerms = $validated['freight_terms'] ?? $po?->freight_terms ?? 'to_pay';
-            $isFreightEligible = in_array($freightTerms, ['to_pay', 'to_be_billed']);
-            $freightAmount = $isFreightEligible ? (float)($validated['freight_amount'] ?? $po?->freight_amount ?? 0) : 0.0;
-            $freightTaxPercent = $isFreightEligible ? (float)($validated['freight_tax_percent'] ?? 18.0) : 0.0;
+            $freightAllocationMethod = $validated['freight_allocation_method'] ?? 'by_amount';
+
+            // Freight Terms Logic: "to_pay" means Freight is paid to 3rd party Transporter via Landed Cost Voucher.
+            // Therefore, Freight Amount MUST NOT be billed on Material Vendor Bill!
+            $isFreightBilledOnInvoice = in_array($freightTerms, ['to_be_billed', 'prepaid']);
+            $freightAmount = $isFreightBilledOnInvoice ? (float)($validated['freight_amount'] ?? $po?->freight_amount ?? 0) : 0.0;
+            $freightTaxPercent = $isFreightBilledOnInvoice ? (float)($validated['freight_tax_percent'] ?? 18.0) : 0.0;
             $orderTaxPercent = (float)($validated['order_tax_percent'] ?? $validated['tax_rate'] ?? 0);
 
             $subtotal = 0;
@@ -97,10 +101,11 @@ class VendorBillService
             }
 
             $grossBeforeTax = max(0, $subtotal - $discountAmount);
+            $totalQtySum = array_sum(array_column($itemsData, 'qty'));
 
             $freightTaxMethod = $validated['freight_tax_method'] ?? 'highest_rate';
 
-            if ($taxType === 'without_tax' || !$isFreightEligible || $freightAmount <= 0) {
+            if ($taxType === 'without_tax' || !$isFreightBilledOnInvoice || $freightAmount <= 0) {
                 $itemsTaxAmount = 0;
                 $freightTaxAmount = 0;
                 if ($taxType === 'order_wise_tax') {
@@ -160,33 +165,90 @@ class VendorBillService
 
             $grandTotal = max(0, $grossBeforeTax + $freightAmount + $taxAmount);
 
+            // Calculate Landed Cost Revaluation Data for "to_be_billed" mode
+            $revaluationData = null;
+            if ($isFreightBilledOnInvoice && $freightAmount > 0) {
+                $revaluationItems = [];
+                foreach ($itemsData as $row) {
+                    $item = $row['item'];
+                    $poItem = $po ? $po->items->firstWhere('id', $item['purchase_order_item_id'] ?? null) : null;
+                    $productId = $item['product_id'] ?? $poItem?->product_id;
+                    $product = $productId ? \App\Domains\Inventory\Models\Product::find($productId) : null;
+
+                    $itemNetSub = max(0, $row['line_subtotal'] - $row['disc_amt']);
+                    if ($freightAllocationMethod === 'by_quantity' && $totalQtySum > 0) {
+                        $freightShare = round($freightAmount * ($row['qty'] / $totalQtySum), 2);
+                    } else {
+                        // by_amount (default)
+                        $freightShare = ($grossBeforeTax > 0) ? round($freightAmount * ($itemNetSub / $grossBeforeTax), 2) : 0;
+                    }
+
+                    $freightPerUnit = ($row['qty'] > 0) ? round($freightShare / $row['qty'], 2) : 0;
+                    $baseUnitCost = $row['price'];
+                    $newLandedCost = round($baseUnitCost + $freightPerUnit, 2);
+
+                    $revaluationItems[] = [
+                        'product_id' => $productId,
+                        'product_name' => $product?->name ?? 'Item #' . $productId,
+                        'sku' => $product?->sku ?? 'SKU-N/A',
+                        'quantity' => $row['qty'],
+                        'base_unit_cost' => $baseUnitCost,
+                        'freight_share' => $freightShare,
+                        'freight_per_unit' => $freightPerUnit,
+                        'new_landed_cost' => $newLandedCost,
+                    ];
+
+                    // Perform Stock Valuation Revaluation in warehouse stock ONLY
+                    if ($product && $grn) {
+                        $whStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('product_id', $product->id)
+                            ->where('warehouse_id', $grn->warehouse_id)
+                            ->first();
+
+                        if ($whStock) {
+                            $whStock->unit_cost = $newLandedCost;
+                            $whStock->save();
+                        }
+                    }
+                }
+
+                $revaluationData = [
+                    'mode' => $freightTerms,
+                    'allocation_method' => $freightAllocationMethod,
+                    'total_base_freight' => $freightAmount,
+                    'total_freight_tax' => $freightTaxAmount,
+                    'revaluation_items' => $revaluationItems,
+                ];
+            }
+
             $bill = $this->billRepo->create([
-                'tenant_id'             => $tenantId,
-                'bill_number'           => $billNumber,
-                'vendor_invoice_number' => $validated['vendor_invoice_number'] ?? $validated['vendor_bill_number'] ?? null,
-                'discount_type'         => $discountType,
-                'tax_type'              => $taxType,
-                'discount_amount'       => $discountAmount,
-                'gst_type'              => $gstType,
-                'freight_terms'         => $freightTerms,
-                'freight_amount'        => $freightAmount,
-                'freight_tax_method'    => $freightTaxMethod,
-                'cgst_amount'           => $cgstAmount,
-                'sgst_amount'           => $sgstAmount,
-                'igst_amount'           => $igstAmount,
-                'goods_receipt_note_id' => $grn?->id,
-                'purchase_order_id'     => $po?->id,
-                'vendor_id'             => $vendorId,
-                'bill_date'             => $validated['bill_date'],
-                'due_date'              => $validated['due_date'],
-                'status'                => 'Unpaid',
-                'subtotal'              => $subtotal,
-                'tax_amount'            => $taxAmount,
-                'grand_total'           => $grandTotal,
-                'paid_amount'           => 0,
-                'due_amount'            => round($grandTotal, 2),
-                'notes'                 => $validated['notes'] ?? null,
-                'created_by'            => auth()->id() ?: 1,
+                'tenant_id'                    => $tenantId,
+                'bill_number'                  => $billNumber,
+                'vendor_invoice_number'        => $validated['vendor_invoice_number'] ?? $validated['vendor_bill_number'] ?? null,
+                'discount_type'                => $discountType,
+                'tax_type'                     => $taxType,
+                'discount_amount'              => $discountAmount,
+                'gst_type'                     => $gstType,
+                'freight_terms'                => $freightTerms,
+                'freight_amount'               => $freightAmount,
+                'freight_tax_method'           => $freightTaxMethod,
+                'freight_allocation_method'    => $freightAllocationMethod,
+                'landed_cost_revaluation_data' => $revaluationData,
+                'cgst_amount'                  => $cgstAmount,
+                'sgst_amount'                  => $sgstAmount,
+                'igst_amount'                  => $igstAmount,
+                'goods_receipt_note_id'        => $grn?->id,
+                'purchase_order_id'            => $po?->id,
+                'vendor_id'                    => $vendorId,
+                'bill_date'                    => $validated['bill_date'],
+                'due_date'                     => $validated['due_date'],
+                'status'                       => 'Unpaid',
+                'subtotal'                     => $subtotal,
+                'tax_amount'                   => $taxAmount,
+                'grand_total'                  => $grandTotal,
+                'paid_amount'                  => 0,
+                'due_amount'                   => round($grandTotal, 2),
+                'notes'                        => $validated['notes'] ?? null,
+                'created_by'                   => auth()->id() ?: 1,
             ]);
 
             foreach ($itemsData as $row) {
@@ -198,7 +260,7 @@ class VendorBillService
                 $itemTaxRate = ($taxType === 'order_wise_tax') ? $orderTaxPercent : $row['tax_rate'];
 
                 $finalLineTotal = $row['line_total'];
-                if ($freightTaxMethod === 'pro_rata' && $isFreightEligible && $freightAmount > 0 && $grossBeforeTax > 0) {
+                if ($freightTaxMethod === 'pro_rata' && $isFreightBilledOnInvoice && $freightAmount > 0 && $grossBeforeTax > 0) {
                     $ratio = $itemNetSub / $grossBeforeTax;
                     $itemFreightShare = $freightAmount * $ratio;
                     $lineTaxWithFreight = ($itemNetSub + $itemFreightShare) * ($itemTaxRate / 100);

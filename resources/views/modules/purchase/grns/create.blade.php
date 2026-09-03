@@ -8,7 +8,66 @@
     <x-ui.button href="{{ route('grns.index') }}" variant="light" icon="feather-arrow-left" class="border">
         {{ __('purchase.back_to_grns') }}
     </x-ui.button>
-@endsection
+ @endsection   
+@push('styles')
+<style>
+    .grn-table-wrapper {
+        overflow-x: hidden !important;
+        overflow-y: hidden !important;
+        max-width: 100% !important;
+    }
+    @media (max-width: 991.98px) {
+        .grn-table-wrapper {
+            overflow-x: auto !important;
+        }
+    }
+    .grn-table-wrapper::-webkit-scrollbar {
+        height: 5px;
+    }
+    .grn-table-wrapper::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .grn-table-wrapper::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+    .grn-table-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    #grnItemsTable {
+        table-layout: fixed !important;
+        width: 100% !important;
+        margin-bottom: 0 !important;
+    }
+    #grnItemsTable td, #grnItemsTable th {
+        vertical-align: middle !important;
+    }
+    .product-select-container {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+    .product-select-dropdown,
+    .select2-container {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single,
+    .select2-container .select2-selection--single {
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered,
+    .select2-container .select2-selection--single .select2-selection__rendered {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 100% !important;
+        display: block !important;
+        padding-right: 18px !important;
+    }
+</style>
+@endpush
 
 @section('content')
     @php
@@ -52,8 +111,8 @@
                             <div class="col-md-6 border-end">
                                 <h6 class="fw-bold text-primary mb-3">{{ __('purchase.po_supplier_details') }}</h6>
 
-                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.select_po') }}" name="purchase_order_id" id="po_selector" :required="true" :error-text="$errors->first('purchase_order_id')">
-                                    <option value="">-- {{ __('purchase.choose_approved_po') }} --</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.select_po') }} (Optional / Direct GRN)" name="purchase_order_id" id="po_selector" :required="false" :error-text="$errors->first('purchase_order_id')">
+                                    <option value="">-- Direct GRN (No Purchase Order) / Choose Approved PO --</option>
                                     @foreach($approvedOrders as $po)
                                         @php
                                             $ordQty = (float)$po->items->sum('quantity');
@@ -68,8 +127,14 @@
 
                                 <div class="row g-2">
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.supplier_vendor') }}" name="vendor_display" id="vendor_display" value="{{ $selectedPo?->vendor?->name ?? '' }}" readonly="true" placeholder="{{ __('purchase.autoloaded_from_po') }}" :error-text="$errors->first('vendor_id')" />
-                                        <input type="hidden" name="vendor_id" id="vendor_id" value="{{ $selectedPo?->vendor_id ?? '' }}">
+                                        <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_vendor') }}" name="vendor_id" id="vendor_id" :required="true" :error-text="$errors->first('vendor_id')">
+                                            <option value="">-- Choose Supplier / Vendor --</option>
+                                            @foreach($vendors as $v)
+                                                <option value="{{ $v->id }}" @selected(old('vendor_id', $selectedPo?->vendor_id) == $v->id)>
+                                                    {{ $v->name }}
+                                                </option>
+                                            @endforeach
+                                        </x-ui.odoo-form-ui>
                                     </div>
                                     <div class="col-md-6">
                                         <x-ui.odoo-form-ui type="select" label="{{ __('purchase.warehouse') }}" name="warehouse_id" id="warehouse_id" :required="true" :error-text="$errors->first('warehouse_id')">
@@ -98,16 +163,26 @@
                                     </div>
                                 </div>
 
+                                <div class="mb-2">
+                                    <x-ui.odoo-form-ui type="select" label="Transporter Name" name="transporter_id" id="transporter_id" :error-text="$errors->first('transporter_id')">
+                                        <option value="">-- Choose Transporter --</option>
+                                        <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Transporter</option>
+                                        @foreach($transporters as $transporter)
+                                            <option value="{{ $transporter->id }}" {{ old('transporter_id') == $transporter->id ? 'selected' : '' }}>
+                                                {{ $transporter->name }} @if($transporter->transporter_id) ({{ $transporter->transporter_id }}) @endif
+                                            </option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
                                 <div class="row g-2">
-                                    <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.transporter_name') }}" name="transporter_name" id="transporter_name" value="{{ old('transporter_name') }}" placeholder="{{ __('purchase.courier_transporter_placeholder') }}" :error-text="$errors->first('transporter_name')" />
-                                    </div>
                                     <div class="col-md-6">
                                         <x-ui.odoo-form-ui type="input" label="{{ __('purchase.vehicle_number') }}" name="vehicle_number" id="vehicle_number" value="{{ old('vehicle_number') }}" placeholder="e.g. MH-12-AB-1234" :error-text="$errors->first('vehicle_number')" />
                                     </div>
+                                    <div class="col-md-6">
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.lr_number') }}" name="lr_number" id="lr_number" value="{{ old('lr_number') }}" placeholder="Lorry Receipt / Docket No" :error-text="$errors->first('lr_number')" />
+                                    </div>
                                 </div>
-
-                                <x-ui.odoo-form-ui type="input" label="{{ __('purchase.lr_number') }}" name="lr_number" id="lr_number" value="{{ old('lr_number') }}" placeholder="Lorry Receipt / Docket No" :error-text="$errors->first('lr_number')" />
                             </div>
                         </div>
 
@@ -118,9 +193,14 @@
 
                         <!-- Item Matrix Section using Common Odoo Table Component -->
                         <div class="mt-4">
-                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                                <h6 class="fw-bold text-primary mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.received_products_matrix') }}</h6>
-                                <div class="d-flex align-items-center gap-2" style="width: 420px;">
+                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom flex-wrap gap-2">
+                                <div class="d-flex align-items-center gap-3">
+                                    <h6 class="fw-bold text-primary mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.received_products_matrix') }}</h6>
+                                    <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" id="btnAddItemRow">
+                                        <i class="feather-plus me-1"></i>+ Add Item
+                                    </button>
+                                </div>
+                                <div class="d-flex align-items-center gap-2" style="width: 380px;">
                                     <div class="input-group input-group-sm shadow-2xs rounded overflow-hidden" style="border: 1px solid #cbd5e1 !important;">
                                         <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
                                         <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
@@ -129,37 +209,39 @@
                                 </div>
                             </div>
 
-                             <div class="table-responsive border rounded bg-white">
+                             <div class="table-responsive grn-table-wrapper border rounded bg-white">
                                 <x-ui.odoo-form-ui type="table" id="grnItemsTable">
                                     <thead class="table-light">
                                         <tr>
-                                            <th style="width: 4%;">#</th>
+                                            <th style="width: 3%;">#</th>
                                             <th style="width: 25%;">{{ __('purchase.product_description') }}</th>
-                                            <th style="width: 10%;" class="text-center">{{ __('purchase.ordered') }}</th>
-                                            <th style="width: 10%;" class="text-center">{{ __('purchase.prev_received') }}</th>
-                                            <th style="width: 10%;" class="text-center">{{ __('purchase.remaining_qty') }}</th>
-                                            <th style="width: 11%;" class="text-center">{{ __('purchase.receive_qty') }} <span class="text-danger">*</span></th>
-                                            <th style="width: 10%;" class="text-center">{{ __('purchase.reject_qty') }}</th>
-                                            <th style="width: 10%;" class="text-center">{{ __('purchase.accepted') }}</th>
+                                            <th style="width: 8%;" class="text-center po-col">{{ __('purchase.ordered') }}</th>
+                                            <th style="width: 8%;" class="text-center po-col">{{ __('purchase.prev_received') }}</th>
+                                            <th style="width: 8%;" class="text-center po-col">{{ __('purchase.remaining_qty') }}</th>
+                                            <th style="width: 10%;" class="text-center">{{ __('purchase.receive_qty') }} <span class="text-danger">*</span></th>
+                                            <th style="width: 9%;" class="text-center">{{ __('purchase.reject_qty') }}</th>
+                                            <th style="width: 9%;" class="text-center">{{ __('purchase.accepted') }}</th>
                                             <th style="width: 10%;" class="text-end">{{ __('purchase.unit_rate') }} ({{ $currency }})</th>
-                                            <th style="width: 12%;" class="text-end">{{ __('purchase.total_amount') }} ({{ $currency }})</th>
+                                            <th style="width: 11%;" class="text-end">{{ __('purchase.total_amount') }} ({{ $currency }})</th>
+                                            <th style="width: 4%;" class="text-center remove-col"></th>
                                         </tr>
                                     </thead>
                                     <tbody id="grnItemsTbody">
                                         <tr>
-                                            <td colspan="10" class="text-center py-4 text-muted">
+                                            <td colspan="11" class="text-center py-4 text-muted">
                                                 <i class="feather-info me-1"></i>{{ __('purchase.select_po_to_load_details') }}
                                             </td>
                                         </tr>
                                     </tbody>
                                     <tfoot class="table-light fw-bold" id="grnItemsTfoot" style="display: none;">
                                         <tr>
-                                            <td colspan="5" class="text-end">{{ __('purchase.totals') }}:</td>
+                                            <td colspan="5" class="text-end" id="footTotalLabel">{{ __('purchase.totals') }}:</td>
                                             <td class="text-center font-monospace text-primary fs-13" id="footTotalReceive">0.00</td>
                                             <td class="text-center font-monospace text-danger fs-13" id="footTotalReject">0.00</td>
                                             <td class="text-center font-monospace text-success fs-13" id="footTotalAccepted">0.00</td>
                                             <td></td>
                                             <td class="text-end font-monospace text-dark fs-13" id="footTotalAmount">0.00</td>
+                                            <td></td>
                                         </tr>
                                     </tfoot>
                                 </x-ui.odoo-form-ui>
@@ -170,10 +252,120 @@
             </form>
         </div>
     </div>
+
+    <!-- Quick Transporter Add Modal Component -->
+    <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>Quick Add Transporter Master" size="lg" :centered="true" :showFooter="false">
+        <form id="quickTransporterForm">
+            @csrf
+            <div class="p-1">
+                <!-- Section 1: Basic Logistics Info -->
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>1. Basic Transporter Information</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-7">
+                        <x-ui.odoo-form-ui type="input" label="Transporter Name" name="name" placeholder="e.g. V-Trans, TCI Logistics, GATI KWE" :required="true" />
+                    </div>
+                    <div class="col-md-5">
+                        <x-ui.odoo-form-ui type="input" label="Transporter Code" name="code" value="{{ $autoCode }}" placeholder="e.g. TRP-0005" />
+                    </div>
+                    <div class="col-md-7">
+                        <x-ui.odoo-form-ui type="input" label="15-Digit E-Way Transporter ID" name="transporter_id" placeholder="e.g. 27AAACM1234F1Z1" />
+                    </div>
+                    <div class="col-md-5">
+                        <x-ui.odoo-form-ui type="select" label="Transport Mode" name="transport_mode" :searchable="false">
+                            <option value="road">Road Transport</option>
+                            <option value="rail">Rail Logistics</option>
+                            <option value="air">Air Freight</option>
+                            <option value="sea">Sea Cargo</option>
+                            <option value="multimodal">Multimodal</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+                </div>
+
+                <hr class="my-3 text-muted opacity-25">
+
+                <!-- Section 2: Taxation & Contact Info -->
+                <h6 class="fw-bold text-primary mb-3"><i class="feather-shield me-1.5"></i>2. Taxation & Contact Details</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="GSTIN Number" name="gstin" placeholder="e.g. 27AAAAA0000A1Z5" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" placeholder="e.g. ABCDE1234F" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="Phone / Mobile" name="phone" placeholder="Contact number" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" placeholder="dispatch@transporter.com" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" />
+                    </div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top mt-3">
+                    <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-bold px-4" id="saveQuickTransporterBtn">
+                        <i class="feather-save me-1.5"></i>Save Transporter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </x-ui.modal>
 @endsection
 
 @push('scripts')
 <script>
+    const availableProducts = @json($productsPayload);
+
+    // Trigger Quick Add Transporter Modal when "+ Add New Transporter" option is selected
+    $(document).on('change', '#transporter_id', function() {
+        if ($(this).val() === '__ADD_NEW__') {
+            $(this).val('');
+            if ($(this).data('select2')) {
+                $(this).val(null).trigger('change.select2');
+            }
+            const modalEl = document.getElementById('quickTransporterModal');
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modalInstance.show();
+        }
+    });
+
+    // Quick Transporter AJAX Store
+    $(document).on('submit', '#quickTransporterForm', function(e) {
+        e.preventDefault();
+        const $btn = $('#saveQuickTransporterBtn');
+        $btn.prop('disabled', true).text('Saving...');
+
+        $.ajax({
+            url: "{{ route('platform.transporters.quick-create') }}",
+            type: "POST",
+            data: $(this).serialize(),
+            success: function(response) {
+                $btn.prop('disabled', false).text('Save Transporter');
+                if (response.success && response.transporter) {
+                    const t = response.transporter;
+                    const labelText = t.name + (t.transporter_id ? ` (${t.transporter_id})` : (t.gstin ? ` (${t.gstin})` : ''));
+                    const newOpt = new Option(labelText, t.id, true, true);
+                    $('#transporter_id').append(newOpt).trigger('change');
+
+                    const modalEl = document.getElementById('quickTransporterModal');
+                    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                    if (modalInstance) modalInstance.hide();
+                    $('#quickTransporterForm')[0].reset();
+                }
+            },
+            error: function(err) {
+                $btn.prop('disabled', false).text('Save Transporter');
+                alert('Error saving transporter: ' + (err.responseJSON?.message || 'Invalid data'));
+            }
+        });
+    });
+
     function showWarningModal(title, message, callback) {
         if (typeof confirmAction === 'function') {
             confirmAction({
@@ -202,28 +394,40 @@
         }
     }
 
+    var manualRowCounter = 0;
+
     $(document).ready(function() {
-        // Initialize PO Selector
         $('#po_selector').on('change', function() {
             var poId = $(this).val();
             if (!poId) {
-                resetGrnItems();
+                $('.po-col').hide();
+                $('.remove-col').show();
+                $('#btnAddItemRow').show();
+                $('.remark-colspan').attr('colspan', 7);
+                $('#footTotalLabel').attr('colspan', 2);
+                $('#grnItemsTbody').empty();
+                addManualItemRow();
                 return;
             }
 
+            $('.po-col').show();
+            $('.remove-col').hide();
+            $('#btnAddItemRow').hide();
+            $('.remark-colspan').attr('colspan', 10);
+            $('#footTotalLabel').attr('colspan', 5);
+
             var url = "{{ route('grns.get-po-items', ':poId') }}".replace(':poId', poId);
             
-            $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div>{{ __('purchase.js_loading_po_items') }}</td></tr>');
+            $('#grnItemsTbody').html('<tr><td colspan="11" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div>{{ __('purchase.js_loading_po_items') }}</td></tr>');
 
             $.ajax({
                 url: url,
                 type: 'GET',
                 success: function(res) {
                     if (res.success) {
-                        $('#vendor_display').val(res.vendor_name);
-                        $('#vendor_id').val(res.vendor_id);
+                        $('#vendor_id').val(res.vendor_id).trigger('change');
                         if (res.warehouse_id) {
-                            $('#warehouse_id').val(res.warehouse_id);
+                            $('#warehouse_id').val(res.warehouse_id).trigger('change');
                         }
 
                         renderPoItems(res.items);
@@ -238,22 +442,32 @@
             });
         });
 
-        // Trigger change if PO pre-selected
         if ($('#po_selector').val()) {
             $('#po_selector').trigger('change');
+        } else {
+            $('.po-col').hide();
+            $('.remove-col').show();
+            $('#btnAddItemRow').show();
+            $('.remark-colspan').attr('colspan', 7);
+            $('#footTotalLabel').attr('colspan', 2);
+            addManualItemRow();
         }
 
+        $(document).on('click', '#btnAddItemRow', function(e) {
+            e.preventDefault();
+            addManualItemRow();
+        });
+
         function resetGrnItems() {
-            $('#vendor_display').val('');
             $('#vendor_id').val('');
             $('#itemsCountBadge').text('0 {{ __('purchase.items') }}');
-            $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted"><i class="feather-info me-1"></i>{{ __('purchase.select_po_to_load_details') }}</td></tr>');
+            $('#grnItemsTbody').html('<tr><td colspan="11" class="text-center py-4 text-muted"><i class="feather-info me-1"></i>{{ __('purchase.select_po_to_load_details') }}</td></tr>');
             $('#grnItemsTfoot').hide();
         }
 
         function renderPoItems(items) {
             if (!items || items.length === 0) {
-                $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted">{{ __('purchase.js_no_pending_items_found') }}</td></tr>');
+                $('#grnItemsTbody').html('<tr><td colspan="11" class="text-center py-4 text-muted">{{ __('purchase.js_no_pending_items_found') }}</td></tr>');
                 $('#grnItemsTfoot').hide();
                 return;
             }
@@ -379,14 +593,14 @@
 
                 html += `
                     <tr class="grn-item-row" data-idx="${idx}">
-                        <td class="text-center fw-semibold text-muted">${idx + 1}</td>
+                        <td class="text-center fw-semibold text-muted row-number">${idx + 1}</td>
                         <td>
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
                                     <div class="fw-bold text-dark d-flex align-items-center">
                                         ${item.product_name} ${trackingBadgeHtml}
                                     </div>
-                                    <div class="fs-11 text-muted">Code: ${item.product_code || 'N/A'} | UOM: <strong>${item.uom_name}</strong></div>
+                                    <div class="fs-11 text-muted">HSN: <strong>${item.hsn_sac || item.product_code || 'N/A'}</strong> | UOM: <strong>${item.uom_name}</strong></div>
                                 </div>
                                 <button type="button" class="btn btn-xs ${isAutoExpanded ? 'bg-soft-danger text-danger' : 'bg-soft-primary text-primary'} border-0 btn-toggle-remark ms-2 px-2 py-1 rounded-pill fw-semibold" data-target="#remark_row_${idx}">
                                     <i class="${isAutoExpanded ? 'feather-minus' : 'feather-plus'} me-1 fs-11"></i><span class="btn-lbl">${isAutoExpanded ? '{{ __('purchase.hide_lbl') }}' : '{{ __('purchase.note_lbl') }}'}</span>
@@ -395,9 +609,9 @@
                             <input type="hidden" name="items[${idx}][purchase_order_item_id]" value="${item.purchase_order_item_id}">
                             <input type="hidden" name="items[${idx}][product_id]" value="${item.product_id}">
                         </td>
-                        <td class="text-center font-monospace font-semibold">${item.ordered_qty.toFixed(2)}</td>
-                        <td class="text-center font-monospace text-muted">${item.previous_received_qty.toFixed(2)}</td>
-                        <td class="text-center font-monospace fw-bold text-danger item-remaining" data-remaining="${remaining}">
+                        <td class="text-center font-monospace font-semibold po-col">${item.ordered_qty.toFixed(2)}</td>
+                        <td class="text-center font-monospace text-muted po-col">${item.previous_received_qty.toFixed(2)}</td>
+                        <td class="text-center font-monospace fw-bold text-danger item-remaining po-col" data-remaining="${remaining}">
                             ${remaining.toFixed(2)}
                         </td>
                         <td>
@@ -415,14 +629,22 @@
                         <td class="text-center font-monospace fw-bold text-success cell-accepted">
                             ${defaultAcc.toFixed(2)}
                         </td>
-                        <td class="text-end font-monospace">${unitRate.toFixed(2)}</td>
+                        <td class="text-end font-monospace">
+                            <input type="hidden" name="items[${idx}][unit_rate]" value="${unitRate.toFixed(2)}">
+                            ${unitRate.toFixed(2)}
+                        </td>
                         <td class="text-end font-monospace fw-bold text-dark cell-total">
                             ${totalAmt.toFixed(2)}
+                        </td>
+                        <td class="text-center remove-col" style="${poSelected ? 'display:none;' : ''}">
+                            <button type="button" class="btn btn-xs btn-link text-danger remove-grn-row-btn p-0 border-0" title="Remove Item">
+                                <i class="feather-trash-2 fs-14"></i>
+                            </button>
                         </td>
                     </tr>
                     <tr id="remark_row_${idx}" class="remark-row bg-white" style="${isAutoExpanded ? '' : 'display: none;'}">
                         <td class="border-0"></td>
-                        <td colspan="9" class="py-2 px-3 border-top-0">
+                        <td colspan="10" class="py-2 px-3 border-top-0 remark-colspan">
                             <div class="p-3 rounded-3 border bg-white shadow-xs">
                                 <div class="row g-3">
                                     ${trackingSectionHtml}
@@ -443,14 +665,256 @@
                 `;
             });
 
+            var poSelected = !!$('#po_selector').val();
+
             $('#grnItemsTbody').html(html);
-            $('#itemsCountBadge').text(items.length + ' ' + (items.length === 1 ? '{{ __('purchase.item') }}' : '{{ __('purchase.items') }}'));
+            if (poSelected) {
+                $('.remove-col').hide();
+            } else {
+                $('.remove-col').show();
+            }
+            updateRowNumbers();
             $('#grnItemsTfoot').show();
 
             recalculateTotals();
         }
 
-        // Toggle Remarks Row via Soft Primary Button
+        function addManualItemRow(preselectProdId) {
+            var idx = 'm_' + (manualRowCounter++);
+            var poSelected = !!$('#po_selector').val();
+
+            var prodOptions = '<option value="">-- Select Product --</option>';
+            availableProducts.forEach(function(p) {
+                var sel = (preselectProdId && preselectProdId == p.id) ? 'selected' : '';
+                prodOptions += `<option value="${p.id}" ${sel} data-code="${p.code}" data-hsn="${p.hsn_sac || ''}" data-uom="${p.uom_name}" data-rate="${p.cost_price}" data-serial="${p.track_serial_number ? 1 : 0}" data-batch="${p.track_batch ? 1 : 0}">${p.name} (${p.code || 'N/A'})</option>`;
+            });
+
+            var rowHtml = `
+                <tr class="grn-item-row manual-item-row" data-idx="${idx}">
+                    <td class="text-center fw-semibold text-muted row-number">#</td>
+                    <td>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="flex-grow-1 me-2 product-select-container">
+                                <select class="odoo-table-select odoo-select2 product-select-dropdown" name="items[${idx}][product_id]" id="product_select_${idx}" data-idx="${idx}" required>
+                                    ${prodOptions}
+                                </select>
+                                <div class="fs-11 text-muted mt-1 product-info-text" id="prod_info_${idx}"></div>
+                            </div>
+                            <button type="button" class="btn btn-xs bg-soft-primary text-primary border-0 btn-toggle-remark px-2 py-1 rounded-pill fw-semibold ms-1" data-target="#remark_row_${idx}">
+                                <i class="feather-plus me-1 fs-11"></i><span class="btn-lbl">{{ __('purchase.note_lbl') }}</span>
+                            </button>
+                        </div>
+                        <input type="hidden" name="items[${idx}][purchase_order_item_id]" value="">
+                    </td>
+                    <td class="text-center font-monospace text-muted po-col" style="${poSelected ? '' : 'display:none;'}">—</td>
+                    <td class="text-center font-monospace text-muted po-col" style="${poSelected ? '' : 'display:none;'}">—</td>
+                    <td class="text-center font-monospace text-muted po-col" style="${poSelected ? '' : 'display:none;'}">—</td>
+                    <td>
+                        <input type="number" step="0.0001" min="0.0001" 
+                               class="odoo-table-input text-center font-monospace fw-bold input-receive" 
+                               name="items[${idx}][received_qty]" 
+                               value="1.00" required>
+                    </td>
+                    <td>
+                        <input type="number" step="0.0001" min="0" 
+                               class="odoo-table-input text-center font-monospace input-reject text-danger" 
+                               name="items[${idx}][rejected_qty]" 
+                               value="0.00">
+                    </td>
+                    <td class="text-center font-monospace fw-bold text-success cell-accepted">
+                        1.00
+                    </td>
+                    <td>
+                        <input type="number" step="0.01" min="0" 
+                               class="odoo-table-input text-end font-monospace input-unit-rate" 
+                               name="items[${idx}][unit_rate]" 
+                               value="0.00">
+                    </td>
+                    <td class="text-end font-monospace fw-bold text-dark cell-total">
+                        0.00
+                    </td>
+                    <td class="text-center remove-col">
+                        <button type="button" class="btn btn-xs btn-link text-danger remove-grn-row-btn p-0 border-0" title="Remove Item">
+                            <i class="feather-trash-2 fs-14"></i>
+                        </button>
+                    </td>
+                </tr>
+                <tr id="remark_row_${idx}" class="remark-row bg-white" style="display: none;">
+                    <td class="border-0"></td>
+                    <td colspan="${poSelected ? 10 : 7}" class="py-2 px-3 border-top-0 remark-colspan">
+                        <div class="p-3 rounded-3 border bg-white shadow-xs">
+                            <div class="row g-3">
+                                <div class="col-md-12 tracking-section-container" id="tracking_container_${idx}"></div>
+                                <div class="col-md-12">
+                                    <label class="form-label fs-11 fw-bold text-uppercase text-muted mb-1.5">
+                                        <i class="feather-message-square me-1"></i>Rejection Reason / Remarks
+                                    </label>
+                                    <textarea class="form-control form-control-sm fs-12 text-dark" 
+                                              name="items[${idx}][remarks]" 
+                                              rows="2" 
+                                              placeholder="{{ __('purchase.js_enter_rejection_remarks') }}..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            if ($('#grnItemsTbody tr').length === 1 && $('#grnItemsTbody td[colspan]').length) {
+                $('#grnItemsTbody').empty();
+            }
+
+            $('#grnItemsTbody').append(rowHtml);
+            $('#grnItemsTfoot').show();
+
+            var $select = $('#product_select_' + idx);
+            if ($.fn.select2) {
+                $select.select2({
+                    theme: "bootstrap-5",
+                    width: "100%"
+                });
+            }
+
+            if (preselectProdId) {
+                $select.val(preselectProdId).trigger('change');
+            }
+
+            updateRowNumbers();
+            recalculateTotals();
+        }
+
+        $(document).on('change', '.product-select-dropdown', function() {
+            var selectedOpt = $(this).find('option:selected');
+            var idx = $(this).data('idx');
+            var prodId = $(this).val();
+
+            if (!prodId) {
+                $('#prod_info_' + idx).html('');
+                $('#tracking_container_' + idx).html('');
+                return;
+            }
+
+            var code = selectedOpt.data('code') || '';
+            var hsn = selectedOpt.data('hsn') || '';
+            var uom = selectedOpt.data('uom') || 'Pcs';
+            var rate = parseFloat(selectedOpt.data('rate')) || 0;
+            var isSerial = selectedOpt.data('serial') == 1;
+            var isBatch = selectedOpt.data('batch') == 1;
+            var prodName = selectedOpt.text();
+
+            $('#prod_info_' + idx).html(`HSN: <strong>${hsn || code || 'N/A'}</strong> | UOM: <strong>${uom}</strong>`);
+
+            var row = $('tr.grn-item-row[data-idx="' + idx + '"]');
+            var rateInput = row.find('.input-unit-rate');
+            rateInput.val(rate.toFixed(2));
+            recalculateTotals();
+
+            var trackingHtml = '';
+            var defaultPrefix = (code || 'SN-').replace(/[^a-zA-Z0-9]/g, '').toUpperCase() + '-';
+
+            if (isSerial) {
+                trackingHtml = `
+                    <div class="d-flex align-items-center justify-content-between mb-1.5">
+                        <label class="form-label fs-11 fw-bold text-uppercase text-primary mb-0">
+                            <i class="feather-hash me-1"></i>Serial Numbers (Scan / Manual)
+                        </label>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-soft-warning text-warning fs-11 serial-count-badge" id="serial_count_badge_${idx}">0 Serials</span>
+                            <button type="button" class="btn btn-xs btn-soft-primary fw-semibold btn-auto-serial" 
+                                    data-idx="${idx}" data-product="${prodName}" data-prefix="${defaultPrefix}" data-count="1">
+                                <i class="feather-zap me-1"></i>Auto-Generate
+                            </button>
+                        </div>
+                    </div>
+                    <textarea class="form-control form-control-sm fs-12 text-dark font-monospace serial-textarea" 
+                              name="items[${idx}][serial_numbers]" id="serial_input_${idx}" data-idx="${idx}" rows="2"
+                              placeholder="Scan barcodes or enter serial numbers separated by comma or new line..."></textarea>
+                `;
+            } else if (isBatch) {
+                var defaultBatchNo = 'BAT-' + (code || 'LOT').replace(/[^a-zA-Z0-9]/g, '') + '-01';
+                var defaultMfg = new Date().toISOString().split('T')[0];
+                var nextYear = new Date();
+                nextYear.setFullYear(nextYear.getFullYear() + 1);
+                var defaultExp = nextYear.toISOString().split('T')[0];
+
+                trackingHtml = `
+                    <div class="d-flex align-items-center justify-content-between mb-1.5">
+                        <label class="form-label fs-11 fw-bold text-uppercase text-warning mb-0">
+                            <i class="feather-layers me-1"></i>Batch / Lot Inward Allocation
+                        </label>
+                        <button type="button" class="btn btn-xs btn-outline-warning fw-semibold btn-add-batch-row" data-idx="${idx}" data-code="${code || 'LOT'}">
+                            <i class="feather-plus me-1"></i>+ Add Another Batch
+                        </button>
+                    </div>
+                    <div id="batch_rows_container_${idx}" class="d-grid gap-2">
+                        <div class="batch-split-row border p-2 rounded-3 bg-white shadow-xs" data-batch-idx="0">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-md-3">
+                                    <label class="fs-10 text-muted mb-0 fw-semibold">Batch No <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-sm font-monospace fw-bold text-dark" name="items[${idx}][batches][0][batch_number]" value="${defaultBatchNo}" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="fs-10 text-muted mb-0 fw-semibold">Qty Rec. <span class="text-danger">*</span></label>
+                                    <input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm text-center font-monospace fw-bold text-primary batch-qty-input" data-idx="${idx}" name="items[${idx}][batches][0][received_qty]" value="1.00" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="fs-10 text-muted mb-0 fw-semibold">Mfg Date</label>
+                                    <input type="date" class="form-control form-control-sm text-dark fs-11" name="items[${idx}][batches][0][manufacturing_date]" value="${defaultMfg}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="fs-10 text-muted mb-0 fw-semibold">Expiry Date</label>
+                                    <input type="date" class="form-control form-control-sm text-dark fs-11" name="items[${idx}][batches][0][expiry_date]" value="${defaultExp}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="batch_error_${idx}" class="mt-1.5 fs-11 fw-bold p-2 rounded shadow-xs" style="display: none;"></div>
+                `;
+            }
+
+            $('#tracking_container_' + idx).html(trackingHtml);
+
+            if (isSerial || isBatch) {
+                var remarkRow = $('#remark_row_' + idx);
+                var toggleBtn = row.find('.btn-toggle-remark');
+                if (!remarkRow.is(':visible')) {
+                    remarkRow.slideDown(150);
+                    toggleBtn.find('i').removeClass('feather-plus').addClass('feather-minus');
+                    toggleBtn.removeClass('bg-soft-primary text-primary').addClass('bg-soft-danger text-danger');
+                    toggleBtn.find('.btn-lbl').text('{{ __('purchase.hide_lbl') }}');
+                }
+            }
+
+            row.find('.input-receive').trigger('input');
+        });
+
+        $(document).on('click', '.remove-grn-row-btn', function() {
+            var row = $(this).closest('tr.grn-item-row');
+            var idx = row.data('idx');
+            $('#remark_row_' + idx).remove();
+            row.remove();
+
+            if ($('#grnItemsTbody tr.grn-item-row').length === 0) {
+                var poSelected = !!$('#po_selector').val();
+                if (!poSelected) {
+                    addManualItemRow();
+                } else {
+                    resetGrnItems();
+                }
+            } else {
+                updateRowNumbers();
+                recalculateTotals();
+            }
+        });
+
+        function updateRowNumbers() {
+            $('#grnItemsTbody tr.grn-item-row').each(function(i) {
+                $(this).find('.row-number').text(i + 1);
+            });
+            var count = $('#grnItemsTbody tr.grn-item-row').length;
+            $('#itemsCountBadge').text(count + ' ' + (count === 1 ? '{{ __('purchase.item') }}' : '{{ __('purchase.items') }}'));
+        }
+
         $(document).on('click', '.btn-toggle-remark', function() {
             var target = $($(this).data('target'));
             var icon = $(this).find('i');
@@ -468,7 +932,6 @@
             }
         });
 
-        // Open Auto-Generate Modal
         $(document).on('click', '.btn-auto-serial', function() {
             var idx = $(this).data('idx');
             var product = $(this).data('product');
@@ -488,7 +951,6 @@
             modal.show();
         });
 
-        // Confirm Auto-Generate Serials
         $('#btn_confirm_auto_serial').on('click', function() {
             var idx = $('#auto_serial_target_idx').val();
             var prefix = $('#auto_serial_prefix').val().trim();
@@ -508,7 +970,6 @@
             if (modal) modal.hide();
         });
 
-        // Dynamic + Add Another Batch Row Handler
         $(document).on('click', '.btn-add-batch-row', function() {
             var idx = $(this).data('idx');
             var prodCode = $(this).data('code') || 'LOT';
@@ -669,7 +1130,6 @@
             }
         });
 
-        // Live validation and count update for Serial Textarea
         $(document).on('input change', '.serial-textarea', function() {
             var idx = $(this).data('idx');
             var text = $(this).val();
@@ -696,21 +1156,25 @@
             }
         });
 
-        // Live calculation on input change
-        $(document).on('input change', '.input-receive, .input-reject', function() {
+        $(document).on('input change', '.input-receive, .input-reject, .input-unit-rate', function() {
             var row = $(this).closest('tr.grn-item-row');
             var idx = row.data('idx');
-            var remaining = parseFloat(row.find('.item-remaining').data('remaining')) || 0;
+            var isPoRow = !row.hasClass('manual-item-row');
+
             var receiveInput = row.find('.input-receive');
             var rejectInput = row.find('.input-reject');
+            var rateInput = row.find('.input-unit-rate');
 
             var recVal = parseFloat(receiveInput.val()) || 0;
             var rejVal = parseFloat(rejectInput.val()) || 0;
 
-            if (recVal > remaining) {
-                showWarningModal('Quantity Exceeded', '{{ __('purchase.js_rec_qty_exceed_rem') }} (' + remaining.toFixed(2) + ')');
-                recVal = remaining;
-                receiveInput.val(recVal.toFixed(2));
+            if (isPoRow) {
+                var remaining = parseFloat(row.find('.item-remaining').data('remaining')) || 0;
+                if (recVal > remaining) {
+                    showWarningModal('Quantity Exceeded', '{{ __('purchase.js_rec_qty_exceed_rem') }} (' + remaining.toFixed(2) + ')');
+                    recVal = remaining;
+                    receiveInput.val(recVal.toFixed(2));
+                }
             }
 
             if (rejVal > recVal) {
@@ -719,7 +1183,6 @@
                 rejectInput.val(rejVal.toFixed(2));
             }
 
-            // Auto-expand remarks row if rejection quantity > 0
             var remarkRow = $('#remark_row_' + idx);
             var toggleBtn = row.find('.btn-toggle-remark');
             if (rejVal > 0 && !remarkRow.is(':visible')) {
@@ -730,15 +1193,13 @@
             }
 
             var accVal = Math.max(0, recVal - rejVal);
-            var rateVal = parseFloat(row.find('td:nth-child(9)').text()) || 0;
+            var rateVal = rateInput.length ? (parseFloat(rateInput.val()) || 0) : (parseFloat(row.find('td:nth-child(9)').text()) || 0);
             var totalAmt = accVal * rateVal;
 
             row.find('.cell-accepted').text(accVal.toFixed(2));
             row.find('.cell-total').text(totalAmt.toFixed(2));
 
-            // Trigger serial count re-validation
             $('#serial_input_' + idx).trigger('input');
-
             recalculateTotals();
         });
 
@@ -768,7 +1229,6 @@
     });
 </script>
 
-<!-- Auto-Generate Serials Modal -->
 <div class="modal fade" id="autoSerialModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content border-0 shadow-lg">
@@ -803,7 +1263,6 @@
 </div>
 
 <script>
-    // Fast Barcode Scan Lookup for GRN Received Items
     function handleGrnBarcodeScan() {
         const input = document.getElementById('fastBarcodeScanInput');
         const code = input ? input.value.trim() : '';
@@ -817,19 +1276,30 @@
                 if (data.success && data.product) {
                     const prod = data.product;
                     let foundMatch = false;
-                    document.querySelectorAll('#grnItemsTbody tr').forEach(row => {
-                        const prodNameEl = row.querySelector('.product-name, td:nth-child(2)');
-                        if (prodNameEl && (prodNameEl.textContent.includes(prod.name) || prodNameEl.textContent.includes(prod.sku))) {
-                            const rxInput = row.querySelector('input[name$="[quantity_received]"]');
+                    
+                    document.querySelectorAll('#grnItemsTbody tr.grn-item-row').forEach(row => {
+                        const prodSelect = row.querySelector('.product-select-dropdown');
+                        const prodHidden = row.querySelector('input[name$="[product_id]"]');
+                        const currentProdId = prodSelect ? prodSelect.value : (prodHidden ? prodHidden.value : null);
+
+                        if (currentProdId == prod.id) {
+                            const rxInput = row.querySelector('.input-receive');
                             if (rxInput) {
                                 rxInput.value = (parseFloat(rxInput.value) || 0) + 1;
-                                rxInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                $(rxInput).trigger('input');
                                 foundMatch = true;
                             }
                         }
                     });
+
                     if (!foundMatch) {
-                        alert('Scanned item (' + prod.name + ') is not present in the selected Purchase Order items.');
+                        const poSelected = !!$('#po_selector').val();
+                        if (!poSelected) {
+                            addManualItemRow(prod.id);
+                            foundMatch = true;
+                        } else {
+                            alert('Scanned item (' + prod.name + ') is not present in the selected Purchase Order items.');
+                        }
                     }
                     input.value = '';
                 } else {

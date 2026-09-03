@@ -4,17 +4,21 @@ namespace App\Domains\Purchase\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class GoodsReceiptNoteItem extends BaseModel
 {
-    use HasFactory;
+    use BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'goods_receipt_note_items';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'goods_receipt_note_id',
         'purchase_order_item_id',
         'product_id',

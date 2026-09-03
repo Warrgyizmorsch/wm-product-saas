@@ -4,13 +4,19 @@ namespace App\Domains\Sales\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\CRM\Models\Customer;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends BaseModel
 {
+    use BelongsToCompany, BelongsToBranch;
+
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'customer_id',
         'sales_order_id',
         'material_requirement_id',

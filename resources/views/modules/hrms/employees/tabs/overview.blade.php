@@ -37,7 +37,20 @@
                         </div>
                         <div class="col-6">
                             <div class="info-label">{{ __('hrms.employees.lbl_stage') }}</div>
-                            <div class="info-value">{{ $employee->employee_stage ?: 'N/A' }}</div>
+                            <div class="info-value">
+                                @php
+                                    $stageVariant = match($employee->employee_stage) {
+                                        'Probation'     => 'warning',
+                                        'Confirmed'     => 'success',
+                                        'Notice Period' => 'danger',
+                                        'Exited'        => 'secondary',
+                                        default         => 'light',
+                                    };
+                                @endphp
+                                <x-ui.badge soft :variant="$stageVariant" class="fs-12 fw-semibold px-2.5 py-0.5">
+                                    {{ $employee->employee_stage ?: 'Not Set' }}
+                                </x-ui.badge>
+                            </div>
                         </div>
                         <div class="col-6">
                             <div class="info-label">{{ __('hrms.employees.lbl_manager') }}</div>

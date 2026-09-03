@@ -3,18 +3,22 @@
 namespace App\Domains\Inventory\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Batch extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'batches';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'product_id',
         'warehouse_id',
         'batch_number',

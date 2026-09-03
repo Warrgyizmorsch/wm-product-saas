@@ -125,13 +125,13 @@ class ProductionBomController extends Controller
         foreach ($bom->items as $item) {
             $qty = $item->quantity;
             $grossQty = $qty * (1 + ($item->material_scrap_percentage / 100));
-            $unitCost = $item->material->unit_cost ?? 0.0;
+            $unitCost = $item->material?->unit_cost ?? 0.0;
             $itemCost = $grossQty * $unitCost;
             $totalCost += $itemCost;
 
             $costDetails[] = [
-                'material_name' => $item->material->name,
-                'material_sku' => $item->material->sku,
+                'material_name' => $item->material?->name ?? 'Unknown Material',
+                'material_sku' => $item->material?->sku ?? '—',
                 'quantity' => $qty,
                 'scrap_percentage' => $item->material_scrap_percentage,
                 'gross_quantity' => $grossQty,

@@ -299,8 +299,8 @@
                             </td>
                             <td>
                                 <div class="d-flex flex-column">
-                                    <span class="fw-semibold text-dark">{{ $bom->product->name }}</span>
-                                    <small class="text-muted font-monospace fs-10">{{ $bom->product->sku }}</small>
+                                    <span class="fw-semibold text-dark">{{ $bom->product?->name ?? '—' }}</span>
+                                    <small class="text-muted font-monospace fs-10">{{ $bom->product?->sku ?? '—' }}</small>
                                 </div>
                             </td>
                             <td class="text-end fw-bold">

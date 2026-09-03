@@ -89,6 +89,9 @@ class SchedulingService
             // Lock order for update
             $order = ProductionOrder::lockForUpdate()->findOrFail($order->id);
 
+            // Reconcile operation readiness before generating schedule
+            app(ProductionOrderService::class)->reconcileOperationReadiness($order);
+
             // Fetch existing draft/scheduled schedules for the order
             $existingSchedules = ProductionSchedule::withoutGlobalScopes()
                 ->where('production_order_id', $order->id)
@@ -225,7 +228,8 @@ class SchedulingService
                     $machineId = null;
                     $priority = 1;
                 } else {
-                    $times = $this->calculateOperationTimes($op, $order->quantity_ordered);
+                    $opQty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1.0));
+                    $times = $this->calculateOperationTimes($op, $opQty);
                     $duration = $times['total_minutes'];
 
                     // Calculate earliest start based on predecessors
@@ -293,7 +297,7 @@ class SchedulingService
                     'baseline_start' => $plannedStart,
                     'baseline_finish' => $plannedFinish,
                     'planned_duration_minutes' => $duration,
-                    'status' => $op->sequence === $operations->first()->sequence
+                    'status' => ($op->status === ProductionOrderOperation::STATUS_READY)
                         ? ProductionScheduleOperation::STATUS_READY
                         : ProductionScheduleOperation::STATUS_WAITING,
                     'warnings' => $warnings,
@@ -431,7 +435,8 @@ class SchedulingService
                     $machineId = null;
                     $priority = 1;
                 } else {
-                    $times = $this->calculateOperationTimes($op, $order->quantity_ordered);
+                    $opQty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1.0));
+                    $times = $this->calculateOperationTimes($op, $opQty);
                     $duration = $times['total_minutes'];
 
                     // Calculate latest finish cursor based on successors
@@ -506,6 +511,7 @@ class SchedulingService
                     'resource_id' => $resourceId,
                     '_parallel_group' => $op->parallel_group,
                     '_is_parallel' => $op->is_parallel,
+                    'order_op' => $op,
                 ];
 
                 $scheduledData[] = [
@@ -520,16 +526,22 @@ class SchedulingService
                 ];
             }
 
-            // Write in correct sequence
+            // Write in correct sequence and derive status from order operation readiness
             usort($records, fn($a, $b) => $a['sequence'] <=> $b['sequence']);
-            if (count($records) > 0) {
-                $records[0]['status'] = ProductionScheduleOperation::STATUS_READY;
+            foreach ($records as &$record) {
+                $orderOp = $record['order_op'] ?? null;
+                if ($orderOp && $orderOp->status === \App\Domains\Production\Models\ProductionOrderOperation::STATUS_READY) {
+                    $record['status'] = ProductionScheduleOperation::STATUS_READY;
+                } else {
+                    $record['status'] = ProductionScheduleOperation::STATUS_WAITING;
+                }
             }
+            unset($record);
 
             foreach ($records as $record) {
                 $parallelGroup = $record['_parallel_group'] ?? null;
                 $isParallel = $record['_is_parallel'] ?? false;
-                unset($record['_parallel_group'], $record['_is_parallel']);
+                unset($record['_parallel_group'], $record['_is_parallel'], $record['order_op']);
                 $schedOp = ProductionScheduleOperation::create($record);
                 if ($isParallel && $parallelGroup !== null) {
                     $parallelGroupOpIds[$parallelGroup][] = $schedOp->id;
@@ -1244,10 +1256,22 @@ class SchedulingService
 
     // ─── Private Helpers ─────────────────────────────────────────────────────
 
-    private function calculateOperationTimes(ProductionOrderOperation $op, float $quantity): array
+    public function calculateOperationTimes(ProductionOrderOperation $op, float $quantity = 1.0): array
     {
         $setup = (float) $op->setup_time_planned;
-        $proc = (float) $op->processing_time_planned * $quantity;
+        $targetQty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($op->order?->quantity_ordered ?? 1.0));
+
+        if ((float) $op->processing_time_planned > 0) {
+            $proc = (float) $op->processing_time_planned;
+            if ($quantity > 0 && $targetQty > 0 && $quantity < $targetQty) {
+                $proc = ($proc / $targetQty) * $quantity;
+            }
+        } else {
+            $routingOp = $op->routingOperation;
+            $unitProc = (float) ($routingOp?->processing_time_minutes ?? 0.0);
+            $proc = $unitProc * ($quantity > 0 ? $quantity : $targetQty);
+        }
+
         return [
             'setup_minutes' => $setup,
             'processing_minutes' => $proc,
@@ -2224,7 +2248,8 @@ class SchedulingService
                         (float) ($order->quantity_ordered ?? 1)
                     );
 
-                    $times = $this->calculateOperationTimes($op->orderOperation, $order->quantity_ordered);
+                    $opTarget = (float) ($op->orderOperation?->target_produced_qty > 0 ? $op->orderOperation->target_produced_qty : ($order->quantity_ordered ?? 1.0));
+                    $times = $this->calculateOperationTimes($op->orderOperation, $opTarget);
                     $duration = $times['total_minutes'];
 
                     // Find slot
@@ -2315,7 +2340,8 @@ class SchedulingService
                         $op->orderOperation
                     );
 
-                    $times = $this->calculateOperationTimes($op->orderOperation, $order->quantity_ordered);
+                    $opTarget = (float) ($op->orderOperation?->target_produced_qty > 0 ? $op->orderOperation->target_produced_qty : ($order->quantity_ordered ?? 1.0));
+                    $times = $this->calculateOperationTimes($op->orderOperation, $opTarget);
                     $duration = $times['total_minutes'];
 
                     if ($op->orderOperation?->routing_operation_id) {

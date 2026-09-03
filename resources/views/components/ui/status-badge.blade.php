@@ -35,14 +35,14 @@
     $config = $statusMap[$normalized] ?? ['bg' => 'bg-soft-secondary', 'text' => 'text-secondary', 'dot' => 'bg-secondary', 'default_label' => ucfirst($status)];
     $displayLabel = $label ?? $config['default_label'];
 
-    $paddingClass = match($size) {
-        'sm' => 'px-2 py-1 fs-11',
-        'lg' => 'px-3 py-2 fs-13',
-        default => 'px-2.5 py-1.5 fs-12',
+    $sizeClass = match($size) {
+        'sm' => 'erp-badge--sm',
+        'lg' => 'erp-badge--lg',
+        default => '',
     };
 @endphp
 
-<span {{ $attributes->merge(['class' => 'badge ' . $config['bg'] . ' ' . $config['text'] . ' ' . $paddingClass . ' fw-bold d-inline-flex align-items-center gap-1.5']) }}>
+<span {{ $attributes->merge(['class' => 'badge erp-badge ' . $config['bg'] . ' ' . $config['text'] . ' ' . $sizeClass]) }}>
     @if ($dot)
         <span class="rounded-circle d-inline-block {{ $config['dot'] }}" style="width: 6px; height: 6px;"></span>
     @endif

@@ -3,6 +3,8 @@
 namespace App\Domains\CRM\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
@@ -10,10 +12,12 @@ use App\Domains\Sales\Models\CustomerPayment;
 
 class Customer extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, BelongsToCompany, BelongsToBranch;
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'name',
         'email',
         'phone',

@@ -5,7 +5,7 @@ namespace App\Domains\Sales\Controllers;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Sales\Models\DispatchOrder;
-use App\Domains\Sales\Models\Transporter;
+use App\Domains\Platform\Models\Transporter;
 use App\Domains\Sales\Repositories\DispatchOrderRepository;
 use App\Domains\Sales\Services\DispatchOrderService;
 use App\Http\Controllers\Controller;
@@ -63,7 +63,10 @@ class DispatchOrderController extends Controller
             'track_batch' => (bool) $p->track_batch,
         ])->values()->all();
 
-        return view('modules.sales.dispatches.create', compact('warehouses', 'transporters', 'pendingDOs', 'customers', 'products', 'formattedWarehouses', 'formattedProducts', 'mrId', 'prefillSalesOrder'));
+        $trpCount = Transporter::where('tenant_id', $tenantId)->count() + 1;
+        $autoCode = 'TRP-' . str_pad($trpCount, 4, '0', STR_PAD_LEFT);
+
+        return view('modules.sales.dispatches.create', compact('warehouses', 'transporters', 'autoCode', 'pendingDOs', 'customers', 'products', 'formattedWarehouses', 'formattedProducts', 'mrId', 'prefillSalesOrder'));
     }
 
     public function pendingMaterialRequirements(Request $request): JsonResponse

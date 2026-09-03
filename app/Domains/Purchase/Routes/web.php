@@ -63,7 +63,15 @@ Route::prefix('purchase')
         Route::post('returns', [PurchaseReturnController::class, 'store'])->name('returns.store');
         Route::get('returns/{return}', [PurchaseReturnController::class, 'show'])->name('returns.show');
         Route::post('returns/{return}/approve', [PurchaseReturnController::class, 'approve'])->name('returns.approve');
+
+        // Vendor / Supplier Management Routes
+        Route::post('vendors/quick-create', [\App\Domains\Purchase\Controllers\VendorController::class, 'quickCreate'])->name('vendors.quick-create');
+        Route::post('vendors/{vendor}/toggle-status', [\App\Domains\Purchase\Controllers\VendorController::class, 'toggleStatus'])->name('vendors.toggle-status');
+        Route::resource('vendors', \App\Domains\Purchase\Controllers\VendorController::class);
     });
+
+// Top level alias /vendors resource
+Route::resource('vendors', \App\Domains\Purchase\Controllers\VendorController::class);
 
 // Standalone Top-Level GRN Routes (/grns/...)
 Route::prefix('grns')

@@ -12,6 +12,7 @@
                 ['label' => 'Plans', 'route' => 'platform.plans.index'],
                 ['label' => 'Subscriptions'],
                 ['label' => 'Usage Limits', 'route' => 'platform.usage.index'],
+                ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
             ]],
             ['label' => __('ui.approvals_center'), 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
         ],
@@ -50,7 +51,7 @@
                 ['label' => 'MRP & Shortage Analysis', 'route' => 'inventory.mrp-shortage.index'],
                 ['label' => 'Material Requests (Prod)', 'route' => 'inventory.material-requests.index'],
                 ['label' => 'Dispatch Orders', 'route' => 'inventory.dispatches.index'],
-                ['label' => 'Transporters Master', 'route' => 'sales.transporters.index'],
+                ['label' => 'Transporters Master', 'route' => 'platform.transporters.index'],
             ]],
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => [
                 ['label' => __('inventory.products'), 'route' => 'inventory.products.index'],
@@ -66,6 +67,7 @@
                 ['label' => 'Stock Valuation Report', 'route' => 'inventory.reports.valuation'],
             ]],
             ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => [
+                ['label' => 'Vendors / Suppliers', 'route' => 'purchase.vendors.index'],
                 ['label' => __('purchase.savings_dashboard'), 'route' => 'purchase.rfqs.savings'],
                 ['label' => __('ui.purchase_requests') ?: __('purchase.purchase_requests'), 'route' => 'purchase.requisitions.index'],
                 ['label' => __('purchase.pending_pr_items'), 'route' => 'purchase.requisitions.pending-items'],
@@ -137,6 +139,7 @@
             ]],
         ],
         'HRMS' => [
+            ['label' => 'HRMS Dashboard', 'icon' => 'feather-home', 'route' => 'hrms.dashboard'],
             ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => array_filter([
                 ['label' => 'Org Structure', 'route' => 'hrms.org.index'],
                 ['label' => 'Salary Structure', 'route' => 'hrms.salary-structure.index'],
@@ -152,6 +155,7 @@
                 ['label' => 'Document Master', 'route' => 'hrms.documents-master.index'],
                 ['label' => 'Holiday Calendar', 'route' => 'hrms.holidays.index'],
                 ['label' => 'Expense Policies', 'route' => 'hrms.expense-policy.index'],
+                ['label' => 'Offboarding Policies', 'route' => 'hrms.offboarding-policies.index'],
             ])],
             ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
             ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'],
@@ -256,6 +260,10 @@
                                         $hasActiveChild = true;
                                         break;
                                     }
+                                    if (is_array($c) && isset($c['url']) && request()->input('tab') === 'templates' && str_contains($c['url'], 'tab=templates')) {
+                                        $hasActiveChild = true;
+                                        break;
+                                    }
                                 }
                             }
                         @endphp
@@ -273,7 +281,8 @@
                                         @php
                                             $child = is_array($child) ? $child : ['label' => $child];
                                             $childHref = isset($child['route']) ? route($child['route']) : ($child['url'] ?? '#');
-                                            $childActive = isset($child['route']) && request()->routeIs($child['route']);
+                                            $childActive = (isset($child['route']) && request()->routeIs($child['route']) && request()->input('tab') !== 'templates')
+                                                || (isset($child['url']) && request()->input('tab') === 'templates' && str_contains($child['url'], 'tab=templates'));
                                         @endphp
                                         <li class="nxl-item {{ $childActive ? 'active' : '' }}">
                                             <a class="nxl-link" href="{{ $childHref }}">{{ $child['label'] }}</a>

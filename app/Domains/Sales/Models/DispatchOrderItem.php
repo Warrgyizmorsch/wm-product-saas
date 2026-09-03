@@ -5,17 +5,21 @@ namespace App\Domains\Sales\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 
 class DispatchOrderItem extends Model
 {
-    use BelongsToTenant, HasFactory;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'dispatch_order_items';
 
     protected $fillable = [
+        'company_id',
+        'branch_id',
         'dispatch_order_id',
         'material_requirement_item_id',
         'product_id',
@@ -56,6 +60,12 @@ class DispatchOrderItem extends Model
         static::creating(function (self $item) {
             if (empty($item->tenant_id) && $item->dispatchOrder) {
                 $item->tenant_id = $item->dispatchOrder->tenant_id;
+            }
+            if (empty($item->company_id) && $item->dispatchOrder) {
+                $item->company_id = $item->dispatchOrder->company_id;
+            }
+            if (empty($item->branch_id) && $item->dispatchOrder) {
+                $item->branch_id = $item->dispatchOrder->branch_id;
             }
         });
     }

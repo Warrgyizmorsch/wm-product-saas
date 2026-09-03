@@ -17,9 +17,11 @@ use App\Domains\HRMS\Controllers\Api\OvertimeRequestApiController;
 use App\Domains\HRMS\Controllers\Api\DocumentApiController;
 use App\Domains\HRMS\Controllers\Api\DocumentMasterApiController;
 use App\Domains\HRMS\Controllers\Api\AttendanceApiController;
-use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 use App\Domains\HRMS\Controllers\Api\TravelExpenseApiController;
 use App\Domains\HRMS\Controllers\Api\PayrollRunApiController;
+use App\Domains\HRMS\Controllers\Api\ProbationApiController;
+use App\Domains\HRMS\Controllers\Api\EmployeeExitApiController;
+use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -476,16 +478,27 @@ Route::prefix('api/hrms/travel-expense')
     ->middleware(['auth:sanctum', 'throttle:100,1'])
     ->name('api.hrms.travel-expense.')
     ->group(function () {
+        // Summary & Dashboard
         Route::get('/', [TravelExpenseApiController::class, 'index'])->name('index');
+        
+        // Travel Requests (Individual list, single get, store, approve, reject)
+        Route::get('/travel', [TravelExpenseApiController::class, 'indexTravelRequests'])->name('travel.index');
+        Route::get('/travel/{id}', [TravelExpenseApiController::class, 'showTravelRequest'])->name('travel.show');
         Route::post('/travel/store', [TravelExpenseApiController::class, 'storeTravelRequest'])->name('travel.store');
         Route::post('/travel/{travelRequest}/approve', [TravelExpenseApiController::class, 'approveTravelRequest'])->name('travel.approve');
         Route::post('/travel/{travelRequest}/reject', [TravelExpenseApiController::class, 'rejectTravelRequest'])->name('travel.reject');
         
+        // Cash Advances (Individual list, single get, store, approve, disburse, reject)
+        Route::get('/advance', [TravelExpenseApiController::class, 'indexCashAdvances'])->name('advance.index');
+        Route::get('/advance/{id}', [TravelExpenseApiController::class, 'showCashAdvance'])->name('advance.show');
         Route::post('/advance/store', [TravelExpenseApiController::class, 'storeCashAdvance'])->name('advance.store');
         Route::post('/advance/{cashAdvance}/approve', [TravelExpenseApiController::class, 'approveCashAdvance'])->name('advance.approve');
         Route::post('/advance/{cashAdvance}/disburse', [TravelExpenseApiController::class, 'disburseCashAdvance'])->name('advance.disburse');
         Route::post('/advance/{cashAdvance}/reject', [TravelExpenseApiController::class, 'rejectCashAdvance'])->name('advance.reject');
         
+        // Expense Reports (Individual list, single get, store, update, submit, approve, reject, pay)
+        Route::get('/report', [TravelExpenseApiController::class, 'indexExpenseReports'])->name('report.index');
+        Route::get('/report/{id}', [TravelExpenseApiController::class, 'showExpenseReport'])->name('report.show');
         Route::post('/report/store', [TravelExpenseApiController::class, 'storeExpenseReport'])->name('report.store');
         Route::post('/report/{expenseReport}/update', [TravelExpenseApiController::class, 'updateExpenseReport'])->name('report.update');
         Route::post('/report/{expenseReport}/submit', [TravelExpenseApiController::class, 'submitExpenseReport'])->name('report.submit');
@@ -493,6 +506,7 @@ Route::prefix('api/hrms/travel-expense')
         Route::post('/report/{expenseReport}/reject', [TravelExpenseApiController::class, 'rejectExpenseReport'])->name('report.reject');
         Route::post('/report/{expenseReport}/pay', [TravelExpenseApiController::class, 'payExpenseReport'])->name('report.pay');
         
+        // Policy lookup
         Route::get('/employee-policy/{employee}', [TravelExpenseApiController::class, 'getEmployeePolicy'])->name('employee-policy');
     });
 
@@ -512,6 +526,37 @@ Route::prefix('api/hrms/payroll')
         Route::get('/my-salary', [PayrollRunApiController::class, 'mySalary'])->name('my-salary');
         Route::post('/bulk-adhoc', [PayrollRunApiController::class, 'storeBulkAdhoc'])->name('bulk-adhoc');
     });
+
+// ==========================================
+// 16. PROBATION API ROUTES
+// ==========================================
+Route::prefix('api/hrms/probation')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.probation.')
+    ->group(function () {
+        Route::get('/', [ProbationApiController::class, 'index'])->name('index');
+        Route::post('/{employee}/evaluate', [ProbationApiController::class, 'evaluate'])->name('evaluate');
+    });
+
+// ==========================================
+// 17. EMPLOYEE EXITS & OFFBOARDING API ROUTES
+// ==========================================
+Route::prefix('api/hrms/exits')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.exits.')
+    ->group(function () {
+        Route::get('/', [EmployeeExitApiController::class, 'index'])->name('index');
+        Route::post('/initiate', [EmployeeExitApiController::class, 'initiate'])->name('initiate');
+        Route::get('/clearance-templates', [EmployeeExitApiController::class, 'listTemplates'])->name('templates.index');
+        Route::post('/clearance-templates', [EmployeeExitApiController::class, 'storeTemplate'])->name('templates.store');
+        Route::put('/clearance-templates/{template}', [EmployeeExitApiController::class, 'updateTemplate'])->name('templates.update');
+        Route::delete('/clearance-templates/{template}', [EmployeeExitApiController::class, 'destroyTemplate'])->name('templates.destroy');
+        Route::post('/clearance-templates/reset', [EmployeeExitApiController::class, 'resetTemplates'])->name('templates.reset');
+        Route::post('/{exit}/clearances/adhoc', [EmployeeExitApiController::class, 'storeAdhocClearance'])->name('clearances.adhoc.store');
+        Route::delete('/clearances/{clearance}/adhoc', [EmployeeExitApiController::class, 'destroyAdhocClearance'])->name('clearances.adhoc.destroy');
+        Route::get('/{exit}', [EmployeeExitApiController::class, 'show'])->name('show');
+    });
+
 
 
 

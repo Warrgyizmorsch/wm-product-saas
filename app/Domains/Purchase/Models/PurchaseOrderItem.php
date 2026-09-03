@@ -7,16 +7,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 
 class PurchaseOrderItem extends Model
 {
-    use BelongsToTenant, HasFactory;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory;
 
     protected $table = 'purchase_order_items';
 
     protected $fillable = [
         'purchase_order_id',
+        'company_id',
+        'branch_id',
         'product_id',
         'line_type',
         'chart_of_account_id',
@@ -130,6 +134,12 @@ class PurchaseOrderItem extends Model
         static::creating(function (self $item) {
             if (empty($item->tenant_id) && $item->order) {
                 $item->tenant_id = $item->order->tenant_id;
+            }
+            if (empty($item->company_id) && $item->order) {
+                $item->company_id = $item->order->company_id;
+            }
+            if (empty($item->branch_id) && $item->order) {
+                $item->branch_id = $item->order->branch_id;
             }
         });
     }

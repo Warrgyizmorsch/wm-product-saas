@@ -1,6 +1,10 @@
 <?php
 
+use App\Core\Branch\BranchContext;
+use App\Core\Company\CompanyContext;
 use App\Core\Tenant\TenantContext;
+use App\Domains\HRMS\Models\Branch;
+use App\Domains\HRMS\Models\Company;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -41,6 +45,84 @@ if (! function_exists('tenant_context')) {
     function tenant_context(): TenantContext
     {
         return app(TenantContext::class);
+    }
+}
+
+if (! function_exists('company')) {
+    function company(): ?Company
+    {
+        return app(CompanyContext::class)->company();
+    }
+}
+
+if (! function_exists('company_id')) {
+    function company_id(): ?int
+    {
+        return app(CompanyContext::class)->id();
+    }
+}
+
+if (! function_exists('current_company_id')) {
+    function current_company_id(): ?int
+    {
+        return auth()->user()?->company_id ?? company_id();
+    }
+}
+
+if (! function_exists('require_company_id')) {
+    function require_company_id(): int
+    {
+        $companyId = current_company_id();
+
+        abort_if($companyId === null, 422, 'Company context is required.');
+
+        return (int) $companyId;
+    }
+}
+
+if (! function_exists('company_context')) {
+    function company_context(): CompanyContext
+    {
+        return app(CompanyContext::class);
+    }
+}
+
+if (! function_exists('branch')) {
+    function branch(): ?Branch
+    {
+        return app(BranchContext::class)->branch();
+    }
+}
+
+if (! function_exists('branch_id')) {
+    function branch_id(): ?int
+    {
+        return app(BranchContext::class)->id();
+    }
+}
+
+if (! function_exists('current_branch_id')) {
+    function current_branch_id(): ?int
+    {
+        return auth()->user()?->branch_id ?? branch_id();
+    }
+}
+
+if (! function_exists('require_branch_id')) {
+    function require_branch_id(): int
+    {
+        $branchId = current_branch_id();
+
+        abort_if($branchId === null, 422, 'Branch context is required.');
+
+        return (int) $branchId;
+    }
+}
+
+if (! function_exists('branch_context')) {
+    function branch_context(): BranchContext
+    {
+        return app(BranchContext::class);
     }
 }
 

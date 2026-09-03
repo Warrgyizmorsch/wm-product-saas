@@ -103,6 +103,8 @@ class JournalRepository implements JournalRepositoryInterface
         foreach ($entryLines as $line) {
             $journal->entries()->create([
                 'tenant_id' => $journal->tenant_id,
+                'company_id' => $journal->company_id,
+                'branch_id' => $journal->branch_id,
                 'chart_of_account_id' => $line['chart_of_account_id'],
                 'cost_center_id' => $line['cost_center_id'] ?? null,
                 'debit' => $line['debit'] ?? 0,

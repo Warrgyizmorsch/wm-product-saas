@@ -107,13 +107,21 @@ class PostPurchaseBillJournal
 
             $lines = [];
 
-            // 1. Inventory / Stock Asset (Debit) - Item Base Amount Only
-            if ($goodsSubtotal > 0 && $inventory) {
+            // Freight Terms Logic: If Freight is billed on invoice (to_be_billed / prepaid), capitalize Freight directly into Inventory Asset!
+            $isFreightCapitalized = in_array($bill->freight_terms, ['to_be_billed', 'prepaid']);
+            $freightAmt = (float)$bill->freight_amount;
+
+            $totalInventoryDebit = $goodsSubtotal + ($isFreightCapitalized ? $freightAmt : 0);
+
+            // 1. Inventory / Stock Asset (Debit) - Landed Stock Value (Items + Freight)
+            if ($totalInventoryDebit > 0 && $inventory) {
                 $lines[] = [
                     'chart_of_account_id' => $inventory->id,
-                    'debit'               => round($goodsSubtotal, 2),
+                    'debit'               => round($totalInventoryDebit, 2),
                     'credit'              => 0,
-                    'description'         => "Bill {$bill->bill_number} - Stock Purchase (Base Item Value)",
+                    'description'         => $isFreightCapitalized && $freightAmt > 0
+                        ? "Bill {$bill->bill_number} - Stock Purchase & Capitalized Freight Landed Cost"
+                        : "Bill {$bill->bill_number} - Stock Purchase (Base Item Value)",
                 ];
             }
 
@@ -141,11 +149,11 @@ class PostPurchaseBillJournal
                 }
             }
 
-            // 4. Freight Charges Expense (Debit) - Dedicated Separate Freight Account (5400)
-            if ((float)$bill->freight_amount > 0 && $freightExpense) {
+            // 4. Freight Charges Expense (Debit) - Only if NOT capitalized to inventory asset
+            if (!$isFreightCapitalized && $freightAmt > 0 && $freightExpense) {
                 $lines[] = [
                     'chart_of_account_id' => $freightExpense->id,
-                    'debit'               => round((float)$bill->freight_amount, 2),
+                    'debit'               => round($freightAmt, 2),
                     'credit'              => 0,
                     'description'         => "Bill {$bill->bill_number} - Freight & Transport Charges",
                 ];
