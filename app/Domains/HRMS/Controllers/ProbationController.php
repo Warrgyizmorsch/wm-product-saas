@@ -92,7 +92,7 @@ class ProbationController extends Controller
         $employees = $query->paginate(15)->withQueryString();
         $departments = Department::where('status', true)->orderBy('name')->get();
 
-        return view('modules.hrms.probation.index', compact(
+        return view('modules.hrms.employees.probation.index', compact(
             'employees',
             'departments',
             'totalInProbation',
@@ -190,33 +190,8 @@ class ProbationController extends Controller
                 ]
             );
 
-            // Auto-generate standard multi-department clearance items if not already existing
-            if ($exit->clearances()->count() === 0) {
-                $standardChecklist = [
-                    ['department' => 'it', 'item_name' => 'Hardware Asset Recovery (Laptop/Accessories)'],
-                    ['department' => 'it', 'item_name' => 'Email, Slack & ERP System Logins Deactivation'],
-                    ['department' => 'it', 'item_name' => 'Cloud Data Backup & File Handover'],
-                    ['department' => 'admin', 'item_name' => 'Company Physical ID Card & Access Badge Handover'],
-                    ['department' => 'admin', 'item_name' => 'Office Keys, Drawer Keys & Parking Tag Handover'],
-                    ['department' => 'finance', 'item_name' => 'Reconcile Open Cash Advances & Loan Accounts'],
-                    ['department' => 'finance', 'item_name' => 'Verify Pending Travel & Expense Reimbursements'],
-                    ['department' => 'finance', 'item_name' => 'Notice Period Shortfall / Buyout Verification'],
-                    ['department' => 'hr', 'item_name' => 'Exit Interview & Feedback Questionnaire Completed'],
-                    ['department' => 'hr', 'item_name' => 'PF, Gratuity & Pension Settlement Verification'],
-                    ['department' => 'manager', 'item_name' => 'Knowledge Transfer (KT) & Task Handover Sign-off'],
-                    ['department' => 'manager', 'item_name' => 'Client Contacts, Repo & Credentials Handover'],
-                ];
-
-                foreach ($standardChecklist as $item) {
-                    EmployeeExitClearance::create([
-                        'tenant_id' => $tenantId,
-                        'employee_exit_id' => $exit->id,
-                        'department' => $item['department'],
-                        'item_name' => $item['item_name'],
-                        'status' => 'pending',
-                    ]);
-                }
-            }
+            // Auto-generate dynamic clearance items from company/tenant templates
+            app(\App\Domains\HRMS\Services\ExitClearanceService::class)->generateClearancesForExit($exit, $tenantId);
 
             // Generate initial FnF settlement draft
             $fnfService = $this->fnfService ?? app(FnFCalculationService::class);
@@ -235,6 +210,10 @@ class ProbationController extends Controller
     public function quickConfirm(Request $request, Employee $employee): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $confirmationDate = $request->filled('confirmation_date') 
+            ? Carbon::parse($request->input('confirmation_date'))->format('Y-m-d') 
+            : Carbon::today()->format('Y-m-d');
+        $remarks = $request->input('remarks') ?: 'Directly confirmed from probation review.';
 
         EmployeeProbationEvaluation::create([
             'tenant_id' => $tenantId,
@@ -245,13 +224,13 @@ class ProbationController extends Controller
             'attendance_rating' => 4,
             'culture_rating' => 4,
             'recommendation' => 'confirm',
-            'remarks' => $request->input('remarks', 'Directly confirmed by HR/Admin.'),
+            'remarks' => $remarks,
             'status' => 'completed',
         ]);
 
         $employee->update([
             'employee_stage' => 'Confirmed',
-            'confirmation_date' => Carbon::today()->format('Y-m-d'),
+            'confirmation_date' => $confirmationDate,
         ]);
 
         return redirect()->back()->with('success', "Employee {$employee->full_name} confirmed successfully.");

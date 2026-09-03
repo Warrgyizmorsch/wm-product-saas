@@ -57,4 +57,12 @@ class Department extends BaseModel
     {
         return $this->hasMany(Designation::class);
     }
+
+    /**
+     * Department has many Employees.
+     */
+    public function employees()
+    {
+        return $this->hasMany(Employee::class, 'department_id');
+    }
 }
