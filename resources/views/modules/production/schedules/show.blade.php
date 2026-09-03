@@ -263,6 +263,14 @@
                                     <td class="align-middle">
                                         <span class="fw-semibold text-dark">{{ $op->orderOperation->name ?? '—' }}</span>
                                         <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
+                                        @php
+                                            $schedOpIsQc = (bool) ($op->orderOperation?->quality_required || ($op->orderOperation?->routingOperation?->quality_required ?? false));
+                                        @endphp
+                                        @if($schedOpIsQc)
+                                            <span class="badge bg-soft-info text-info border border-info-subtle font-monospace mt-1 ms-1">
+                                                <i class="feather-shield me-1"></i>QC REQUIRED
+                                            </span>
+                                        @endif
                                         @if($op->orderOperation && $op->orderOperation->is_external)
                                             @php
                                                 $supplyType = $op->orderOperation->material_supply_type ?? 'company_supplied';

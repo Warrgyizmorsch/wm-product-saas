@@ -79,7 +79,7 @@ class MultiModelPhase3CoverageTest extends TestCase
         return Warehouse::create([
             'tenant_id' => $tenantId,
             'name' => ($type === 'subcontractor' ? 'Vendor WH ' : 'Main WH ') . rand(100, 999),
-            'code' => 'WH-' . strtoupper($type[0]) . '-' . rand(100, 999),
+            'code' => 'WH-' . strtoupper($type[0]) . '-' . strtoupper(uniqid()),
             'type' => $type,
             'vendor_id' => $vendorId,
             'status' => 'active',

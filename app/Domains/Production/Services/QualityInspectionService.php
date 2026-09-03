@@ -306,4 +306,141 @@ class QualityInspectionService
             }
         });
     }
+
+    /**
+     * Record a Shopfloor QC Inspection with accepted and rejected quantities.
+     */
+    public function processShopfloorInspection(int $tenantId, array $data, ?int $userId = null): ProductionQualityInspection
+    {
+        return DB::transaction(function () use ($tenantId, $data, $userId) {
+            $orderOpId = $data['production_order_operation_id'];
+            $orderOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($orderOpId);
+            $orderId = $orderOp->production_order_id;
+            $batchId = $data['batch_id'] ?? null;
+
+            $acceptedQty = max(0.0, (float) ($data['accepted_qty'] ?? 0));
+            $rejectedQty = max(0.0, (float) ($data['rejected_qty'] ?? 0));
+            $inspectedQty = $acceptedQty + $rejectedQty;
+
+            if ($inspectedQty <= 0) {
+                throw new \InvalidArgumentException('Inspected quantity must be greater than zero.');
+            }
+
+            $result = ($rejectedQty > 0) ? ($acceptedQty > 0 ? 'partially_passed' : 'failed') : 'passed';
+
+            // Find or fallback Quality Plan
+            $planId = !empty($data['quality_plan_id']) ? (int) $data['quality_plan_id'] : (
+                ProductionQualityPlan::where('tenant_id', $tenantId)
+                    ->where('product_id', $orderOp->order?->product_id)
+                    ->value('id') ?? ProductionQualityPlan::where('tenant_id', $tenantId)->value('id')
+            );
+
+            if (!$planId) {
+                $plan = ProductionQualityPlan::create([
+                    'tenant_id' => $tenantId,
+                    'name' => 'Standard In-Process Quality Plan',
+                    'code' => 'QP-STD-' . rand(100, 999),
+                    'type' => 'in_process',
+                    'status' => 'approved',
+                    'created_by' => $userId ?? auth()->id() ?? 1,
+                ]);
+                $planId = $plan->id;
+            }
+
+            $inspection = ProductionQualityInspection::create([
+                'tenant_id' => $tenantId,
+                'quality_plan_id' => $planId,
+                'inspection_number' => 'INSP-SF-' . date('Ymd') . '-' . rand(1000, 9999),
+                'stage' => 'in_process',
+                'status' => 'approved',
+                'result' => $result,
+                'inspected_quantity' => $inspectedQty,
+                'passed_qty' => $acceptedQty,
+                'failed_qty' => $rejectedQty,
+                'production_order_id' => $orderId,
+                'production_order_operation_id' => $orderOpId,
+                'machine_id' => $orderOp->machine_used_id ?? $orderOp->machine_id,
+                'operator_id' => $userId ?? auth()->id() ?? 1,
+                'batch_id' => $batchId,
+                'remarks' => $data['remarks'] ?? "Shopfloor QC inspection: {$acceptedQty} accepted, {$rejectedQty} rejected.",
+                'inspected_at' => now(),
+                'audited_by' => $userId ?? auth()->id() ?? 1,
+                'audited_at' => now(),
+            ]);
+
+            // Increment good output quantity_produced on operation for accepted units
+            if ($acceptedQty > 0) {
+                $orderOp->quantity_produced += $acceptedQty;
+            }
+            if ($rejectedQty > 0) {
+                $orderOp->quantity_rejected += $rejectedQty;
+            }
+
+            // Target check: if accepted good output meets or exceeds target_produced_qty, mark COMPLETED
+            $targetQty = (float) ($orderOp->target_produced_qty > 0 ? $orderOp->target_produced_qty : ($orderOp->order->quantity_ordered ?? 0));
+            $totalProcessed = max((float) $orderOp->quantity_produced, (float) ($inspection->inspected_quantity ?? 0), $acceptedQty);
+            if ($targetQty > 0 && ((float) $orderOp->quantity_produced >= ($targetQty - 0.0001) || ($orderOp->is_external && $totalProcessed >= ($targetQty - 0.0001)))) {
+                $orderOp->status = \App\Domains\Production\Models\ProductionOrderOperation::STATUS_COMPLETED;
+                $orderOp->actual_end_time = now();
+
+                \App\Domains\Production\Models\ProductionScheduleOperation::where('production_order_operation_id', $orderOp->id)
+                    ->update([
+                        'status' => \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_COMPLETED,
+                        'actual_finish' => now(),
+                    ]);
+            }
+            $orderOp->save();
+
+            // Update WIP tracking so successor operations can consume accepted WIP
+            if ($acceptedQty > 0) {
+                $effectiveBatchId = $batchId ?? $inspection->batch_id;
+                $batch = $effectiveBatchId ? \App\Domains\Production\Models\ProductionBatch::find($effectiveBatchId) : null;
+                $wip = $effectiveBatchId ? app(ProductionWipService::class)->getOrCreateWipForBatchOperation(
+                    $orderId,
+                    $effectiveBatchId,
+                    $orderOp->routing_operation_id,
+                    $userId
+                ) : \App\Domains\Production\Models\ProductionWip::where('production_order_id', $orderId)->first();
+
+                if ($wip) {
+                    $wip->available_quantity += $acceptedQty;
+                    $wip->completed_quantity += $acceptedQty;
+                    $wip->save();
+                }
+
+                // Unlock successor operations for partial/full WIP transfer
+                app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($orderOpId, $userId, $effectiveBatchId);
+            }
+
+            // Auto-create NCR for rejected quantity
+            if ($rejectedQty > 0) {
+                $ncr = \App\Domains\Production\Models\ProductionNcr::create([
+                    'tenant_id' => $tenantId,
+                    'ncr_number' => 'NCR-SF-' . strtoupper(uniqid()),
+                    'category' => 'process',
+                    'status' => 'open',
+                    'disposition_type' => 'pending',
+                    'production_order_id' => $orderId,
+                    'production_order_operation_id' => $orderOpId,
+                    'batch_id' => $batchId,
+                    'machine_id' => $orderOp->machine_used_id ?? $orderOp->machine_id,
+                    'operator_id' => $userId ?? auth()->id() ?? 1,
+                    'description' => "Shopfloor Quality Inspection failed for {$rejectedQty} units on operation #{$orderOp->operation_number}.",
+                ]);
+            }
+
+            $this->eventService->writeEvent($tenantId, [
+                'production_order_id' => $orderId,
+                'production_order_operation_id' => $orderOpId,
+                'operator_id' => $userId ?? auth()->id() ?? 1,
+                'event_type' => 'Shopfloor QC Inspection',
+                'title' => 'Shopfloor QC Inspection Recorded',
+                'description' => "Inspection recorded: {$acceptedQty} accepted, {$rejectedQty} rejected for Op #{$orderOp->operation_number}.",
+                'severity' => ($result === 'passed') ? 'success' : 'warning',
+                'event_source' => 'QualityInspectionService',
+            ]);
+
+            return $inspection;
+        });
+    }
 }

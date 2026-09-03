@@ -170,6 +170,7 @@ class SubcontractReceiptOrchestrator
                         'operation_id' => $op->id,
                         'production_batch_id' => $batchId,
                         'quantity_completed' => $receivedQty,
+                        'quantity_produced' => $receivedQty,
                         'recorded_at' => now(),
                         'status' => $op->status,
                         'log_type' => 'subcontract_receipt',
@@ -214,7 +215,8 @@ class SubcontractReceiptOrchestrator
                 $newProducedQty = max((float) $op->quantity_produced, $acceptedQty);
                 $op->quantity_produced = $newProducedQty;
 
-                if ($targetQty > 0 && $newProducedQty < ($targetQty - 0.0001)) {
+                $totalInspected = max($newProducedQty, (float) ($inspection->inspected_quantity ?? 0));
+                if ($targetQty > 0 && $totalInspected < ($targetQty - 0.0001)) {
                     $op->status = ProductionOrderOperation::STATUS_RUNNING;
                 } else {
                     $op->status = ProductionOrderOperation::STATUS_COMPLETED;
@@ -254,6 +256,7 @@ class SubcontractReceiptOrchestrator
                     ]);
                 } else {
                     $wip->available_quantity = max((float)$wip->available_quantity, $newProducedQty);
+                    $wip->completed_quantity = max((float)$wip->completed_quantity, $newProducedQty);
                     if ($batchId && !$wip->production_batch_id) {
                         $wip->production_batch_id = $batchId;
                     }
@@ -261,7 +264,7 @@ class SubcontractReceiptOrchestrator
                 }
 
                 // Evaluate and transfer WIP to successor operation
-                $this->wipService->evaluateAndExecuteWipTransfers($op->id);
+                $this->wipService->evaluateAndExecuteWipTransfers($op->id, null, $batchId);
             } else {
                 $op->status = 'failed';
                 $op->save();

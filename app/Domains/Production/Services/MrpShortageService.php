@@ -359,18 +359,23 @@ class MrpShortageService
             $year = now()->format('Y');
             $prefix = "PR-{$year}-";
 
-            $latest = PurchaseRequisition::where('tenant_id', $tenantId)
+            $maxNum = PurchaseRequisition::withoutGlobalScopes()
                 ->where('requisition_number', 'like', "{$prefix}%")
-                ->orderBy('id', 'desc')
-                ->first();
+                ->get()
+                ->map(function ($pr) use ($prefix) {
+                    $numStr = str_replace($prefix, '', $pr->requisition_number);
+                    return intval($numStr);
+                })
+                ->max() ?? 0;
 
-            $nextNum = 1;
-            if ($latest) {
-                $lastNumStr = str_replace($prefix, '', $latest->requisition_number);
-                $nextNum = intval($lastNumStr) + 1;
-            }
-
-            $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            $nextNum = $maxNum + 1;
+            do {
+                $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+                $exists = PurchaseRequisition::withoutGlobalScopes()->where('requisition_number', $requisitionNumber)->exists();
+                if ($exists) {
+                    $nextNum++;
+                }
+            } while ($exists);
 
             // Create Master PR Record
             $pr = PurchaseRequisition::create([

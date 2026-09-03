@@ -88,7 +88,7 @@ class ProductionPlanController extends Controller
         $tenantId = require_tenant_id();
 
         $products = Product::where('tenant_id', $tenantId)
-            ->whereIn('type', ['finished_good', 'semi_finished'])
+            ->whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])
             ->select(['id', 'name', 'sku'])
             ->orderBy('name')
             ->get();
@@ -172,7 +172,7 @@ class ProductionPlanController extends Controller
                 ->with('error', 'Frozen Production Plans cannot be edited.');
         }
 
-        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
 
         $tenantId = require_tenant_id();
 

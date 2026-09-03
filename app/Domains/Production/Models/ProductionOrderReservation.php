@@ -20,6 +20,7 @@ class ProductionOrderReservation extends BaseModel
         'product_id',
         'warehouse_id',
         'quantity_planned',
+        'quantity_additional_requested',
         'quantity_reserved',
         'quantity_issued',
         'uom_id',
@@ -27,9 +28,15 @@ class ProductionOrderReservation extends BaseModel
 
     protected $casts = [
         'quantity_planned' => 'float',
+        'quantity_additional_requested' => 'float',
         'quantity_reserved' => 'float',
         'quantity_issued' => 'float',
     ];
+
+    public function getTotalRequiredQuantityAttribute(): float
+    {
+        return (float) $this->quantity_planned + (float) ($this->quantity_additional_requested ?? 0.0);
+    }
 
     public function order(): BelongsTo
     {

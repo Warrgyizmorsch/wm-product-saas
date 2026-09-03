@@ -304,7 +304,7 @@
 
                                 @if($op->status === 'running' || $op->status === 'paused')
                                     @php
-                                        $isQcRequired = (bool) ($op->routingOperation?->quality_required ?? $op->quality_required ?? false);
+                                        $isQcRequired = (bool) ($op->quality_required || ($op->routingOperation?->quality_required ?? false));
                                     @endphp
 
                                     <div class="col">
@@ -511,21 +511,24 @@
                         }
                     }
 
+                    $opOutputProductId = $op->product_id ?? $op->source_product_id ?? $op->order?->product_id;
                     $totalScrappedAtOp = max(
                         (float) ($op->quantity_scrapped ?? 0),
                         (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $op->tenant_id)
                             ->where('production_order_id', $op->production_order_id)
                             ->where('production_order_operation_id', $op->id)
+                            ->where(function($q) use ($opOutputProductId) {
+                                $q->where('product_id', $opOutputProductId)
+                                  ->orWhereNull('product_id');
+                            })
                             ->sum('quantity')
                     );
                     $remainingToComplete = max(0.0, $opTargetQty - (($op->quantity_produced ?? 0) + $totalScrappedAtOp + ($op->quantity_rejected ?? 0)));
                 @endphp
                 <x-ui.odoo-form-ui type="input" label="Quantity Produced" name="quantity_produced" id="producedInput"
                     inputType="number" step="0.0001" :value="$remainingToComplete" :required="true" />
-                <x-ui.odoo-form-ui type="input" label="Quantity Rejected" name="quantity_rejected" id="rejectedInput"
-                    inputType="number" step="0.0001" value="0" />
-                <x-ui.odoo-form-ui type="input" label="Quantity Scrapped" name="quantity_scrapped" id="scrappedInput"
-                    inputType="number" step="0.0001" value="0" />
+                <input type="hidden" name="quantity_rejected" value="0" id="rejectedInput">
+                <input type="hidden" name="quantity_scrapped" value="0" id="scrappedInput">
                 <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" placeholder="Optional comments..."
                     rows="2" />
             </div>
@@ -618,45 +621,84 @@
             placeholder="Specify instructions or skill requirements..." rows="3" />
     </x-ui.modal>
 
-    {{-- Operator Quick Quality Check Modal --}}
-    <x-ui.modal id="quickQcModal" title="Operator Quality Inspection Check" centered="true"
-        formAction="{{ route('production.quality.inspections.quick') }}" submitText="Submit & Approve Quality Inspection"
-        closeText="Cancel">
-        <input type="hidden" name="production_order_operation_id" value="{{ $op->id }}">
-        <input type="hidden" name="production_order_id" value="{{ $order->id }}">
-        <input type="hidden" name="stage" value="in_process">
+    {{-- Operator Shopfloor Quality Inspection Modal --}}
+    @php
+        $touchPendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op->id);
+        $touchRejectedQty = (float) ($op->quantity_rejected ?? 0.0);
+    @endphp
 
-        <div class="alert alert-info py-2 fs-12 mb-3">
-            <i class="feather-shield me-1"></i> Perform inline quality inspection for <strong>{{ $op->name }}</strong>
-            before completing.
+    <x-ui.modal id="quickQcModal" title="Shopfloor Quality Inspection Check" centered="true" size="lg"
+        formAction="{{ route('production.mes.quality-inspection', $op->id) }}" submitText="Complete QC Inspection"
+        closeText="Cancel">
+        <div class="alert alert-info py-2 fs-12 mb-3 d-flex justify-content-between align-items-center">
+            <div>
+                <i class="feather-shield me-1"></i> Perform inline quality inspection for <strong>{{ $op->name }}</strong>.
+            </div>
+            <span class="badge bg-warning text-dark font-monospace fs-12 px-2 py-1">Pending QC: {{ number_format($touchPendingQcQty, 0) }}</span>
         </div>
 
-        <x-ui.odoo-form-ui type="select" label="Inspection Result" name="result" :required="true">
-            <option value="passed">PASSED — Meets Quality Standard</option>
-            <option value="hold">QUALITY HOLD — Requires QA Review</option>
-            <option value="failed">FAILED — Defective / NCR Generated</option>
-        </x-ui.odoo-form-ui>
-
-        <div class="mb-3">
-            <label class="form-label fw-semibold fs-12 text-uppercase text-dark mb-1">Quality Checklist Parameters</label>
-            <div class="p-2 border rounded bg-light fs-12">
-                <div class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" checked id="chkVisual">
-                    <label class="form-check-label" for="chkVisual">Visual Surface & Finish Inspection Passed</label>
-                </div>
-                <div class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" checked id="chkDim">
-                    <label class="form-check-label" for="chkDim">Dimensional Tolerance Check Within Specification</label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" checked id="chkFunc">
-                    <label class="form-check-label" for="chkFunc">Functional / Assembly Test Passed</label>
-                </div>
+        <div class="row g-3 text-start">
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" label="Accepted Quantity (Good Output)" name="accepted_qty" inputType="number" step="any" value="{{ $touchPendingQcQty }}" :required="true" />
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" label="Rejected Quantity (Defective Output)" name="rejected_qty" inputType="number" step="any" value="0" :required="true" />
+            </div>
+            <div class="col-md-12">
+                <x-ui.odoo-form-ui type="textarea" label="Inspection Remarks & Notes" name="remarks" placeholder="Enter measured dimensions, batch details, or quality observations..." rows="3" />
             </div>
         </div>
+    </x-ui.modal>
 
-        <x-ui.odoo-form-ui type="textarea" label="Inspection Remarks" name="remarks"
-            placeholder="Enter measured dimensions, batch details, or quality observations..." rows="3" />
+    {{-- Record Operational Scrap Modal --}}
+    <x-ui.modal id="scrapModal" title="Record Operational Scrap" centered="true" size="md"
+        formAction="{{ route('production.mes.scrap', $op->id) }}" submitText="Record Scrap" closeText="Cancel">
+        <div class="alert alert-danger py-2 fs-12 mb-3">
+            <i class="feather-trash-2 me-1"></i> Record operational scrap / setup damage for <strong>{{ $op->name }}</strong>.
+        </div>
+        <div class="row g-3 text-start">
+            <div class="col-md-12">
+                <x-ui.odoo-form-ui type="input" label="Scrap Quantity" name="quantity" inputType="number" step="any" value="1" :required="true" />
+            </div>
+            <div class="col-md-12">
+                <x-ui.odoo-form-ui type="select" label="Scrap Reason" name="reason" :required="true">
+                    <option value="Cutting Error / Wrong Dimension">Cutting Error / Wrong Dimension</option>
+                    <option value="Setup Damage / Calibration Loss">Setup Damage / Calibration Loss</option>
+                    <option value="Machine Breakdown / Tool Defect">Machine Breakdown / Tool Defect</option>
+                    <option value="Raw Material Defect">Raw Material Defect</option>
+                    <option value="Operator Error">Operator Error</option>
+                    <option value="Other Operational Loss">Other Operational Loss</option>
+                </x-ui.odoo-form-ui>
+            </div>
+        </div>
+    </x-ui.modal>
+
+    {{-- Rejected Quantity Disposition Modal --}}
+    <x-ui.modal id="dispositionModal" title="Rejected Output Disposition" centered="true" size="lg"
+        formAction="{{ route('production.mes.disposition', $op->id) }}" submitText="Submit Disposition" closeText="Cancel">
+        <div class="alert alert-warning py-2 fs-12 mb-3 d-flex justify-content-between align-items-center">
+            <div>
+                <i class="feather-alert-triangle me-1"></i> Disposition rejected units for <strong>{{ $op->name }}</strong>.
+            </div>
+            <span class="badge bg-danger text-white font-monospace fs-12 px-2 py-1">Rejected Qty: {{ number_format($touchRejectedQty, 0) }}</span>
+        </div>
+        <div class="row g-3 text-start">
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="select" label="Disposition Choice" name="disposition_type" :required="true">
+                    <option value="rework" selected>Rework (Reprocess Defect)</option>
+                    <option value="scrap">Scrap (Scrap & Request Replacement)</option>
+                </x-ui.odoo-form-ui>
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" label="Quantity to Dispose" name="quantity" inputType="number" step="any" value="{{ $touchRejectedQty }}" :required="true" />
+            </div>
+            <div class="col-md-12">
+                <x-ui.odoo-form-ui type="textarea" label="Reason / Defect Description" name="reason" placeholder="Explain rejection cause..." rows="2" />
+            </div>
+            <div class="col-md-12">
+                <x-ui.odoo-form-ui type="textarea" label="Rework Instructions (For Rework Disposition)" name="instructions" placeholder="Provide instructions for operator during rework execution..." rows="2" />
+            </div>
+        </div>
     </x-ui.modal>
 
     @push('scripts')

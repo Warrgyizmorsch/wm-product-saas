@@ -324,6 +324,11 @@ class BatchProductionService
             $isFirstOp = !\App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
                 ->where('production_order_id', $order->id)
                 ->where('sequence', '<', $operation->sequence)
+                ->where(function ($w) use ($operation, $order) {
+                    if ($operation->source_product_id && (int) $operation->source_product_id !== (int) ($order->product_id ?? 0)) {
+                        $w->where('source_product_id', $operation->source_product_id);
+                    }
+                })
                 ->exists();
 
             if ($isFirstOp) {
@@ -331,6 +336,7 @@ class BatchProductionService
                 $activeBatches = ProductionBatch::where('tenant_id', $tenantId)
                     ->where('production_order_id', $order->id)
                     ->whereNotIn('status', [ProductionBatch::STATUS_CANCELLED, ProductionBatch::STATUS_CONSUMED])
+                    ->when($operation->source_product_id, fn($q) => $q->where(fn($sub) => $sub->where('product_id', $operation->source_product_id)->orWhere('product_id', $order->product_id)))
                     ->orderBy('id', 'asc')
                     ->lockForUpdate()
                     ->get();
@@ -374,6 +380,7 @@ class BatchProductionService
             $allBatches = ProductionBatch::where('tenant_id', $tenantId)
                 ->where('production_order_id', $order->id)
                 ->whereNotIn('status', [ProductionBatch::STATUS_CANCELLED, ProductionBatch::STATUS_CONSUMED])
+                ->when($operation->source_product_id, fn($q) => $q->where(fn($sub) => $sub->where('product_id', $operation->source_product_id)->orWhere('product_id', $order->product_id)))
                 ->orderBy('id', 'asc')
                 ->lockForUpdate()
                 ->get();
@@ -408,7 +415,10 @@ class BatchProductionService
                 $txTransferredIn = (float) \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $tenantId)
                     ->where('production_order_id', $order->id)
                     ->where('production_batch_id', $b->id)
-                    ->whereIn('to_operation_id', $toOpIds)
+                    ->where(function ($q) use ($toOpIds, $operation) {
+                        $q->whereIn('to_operation_id', $toOpIds)
+                          ->orWhere('remarks', 'like', "%to Op {$operation->sequence}%");
+                    })
                     ->where('transaction_type', 'transferred')
                     ->sum('quantity');
 
@@ -416,7 +426,10 @@ class BatchProductionService
                     $unbatchedTx = (float) \App\Domains\Production\Models\ProductionWipTransaction::where('tenant_id', $tenantId)
                         ->where('production_order_id', $order->id)
                         ->whereNull('production_batch_id')
-                        ->whereIn('to_operation_id', $toOpIds)
+                        ->where(function ($q) use ($toOpIds, $operation) {
+                            $q->whereIn('to_operation_id', $toOpIds)
+                              ->orWhere('remarks', 'like', "%to Op {$operation->sequence}%");
+                        })
                         ->where('transaction_type', 'transferred')
                         ->sum('quantity');
 

@@ -36,7 +36,7 @@ class ProductionBomController extends Controller
         $filters = $request->only(['product_id', 'status', 'search', 'sort_by', 'sort_order']);
         $boms = $this->bomRepository->paginateAll($filters, 10)->withQueryString();
 
-        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
 
         return view('modules.production.bom.index', compact('boms', 'products'));
     }
@@ -186,8 +186,8 @@ class ProductionBomController extends Controller
     {
         $this->authorize('create', ProductionBom::class);
 
-        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
-        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'semi_finished'])->get(); // support multi-level
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
+        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get(); // support multi-level
         $uoms = Uom::all();
         $routings = Routing::all();
         $selectedProductId = $request->query('product_id');
@@ -227,8 +227,8 @@ class ProductionBomController extends Controller
 
         $this->authorize('update', $bom);
 
-        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
-        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'semi_finished'])->get(); // support multi-level
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
+        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get(); // support multi-level
         $uoms = Uom::all();
         $routings = Routing::all();
 

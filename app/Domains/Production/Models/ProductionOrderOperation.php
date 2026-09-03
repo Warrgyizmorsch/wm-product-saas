@@ -281,4 +281,60 @@ class ProductionOrderOperation extends BaseModel
 
         return (float) ($order->quantity_ordered ?? 1.0);
     }
+
+    public function getScrappableMaterialsAttribute(): \Illuminate\Support\Collection
+    {
+        $materials = collect();
+
+        // 1. Explicit RoutingOperationMaterial entries for this operation
+        if ($this->routing_operation_id) {
+            $opMaterials = RoutingOperationMaterial::where('routing_operation_id', $this->routing_operation_id)
+                ->with('material')
+                ->get();
+            foreach ($opMaterials as $opMat) {
+                if ($opMat->material) {
+                    $materials->push([
+                        'id' => $opMat->material->id,
+                        'name' => $opMat->material->name . ($opMat->material->sku ? " ({$opMat->material->sku})" : ''),
+                        'type_label' => 'Operation Input Raw Material',
+                    ]);
+                }
+            }
+        }
+
+        // 2. Items from the source BOM or order BOM
+        $bomId = $this->source_bom_id ?: $this->order?->bom_id;
+        if ($bomId) {
+            $bomItems = ProductionBomItem::where('bom_id', $bomId)->with('material')->get();
+            foreach ($bomItems as $item) {
+                if ($item->material) {
+                    $materials->push([
+                        'id' => $item->material->id,
+                        'name' => $item->material->name . ($item->material->sku ? " ({$item->material->sku})" : ''),
+                        'type_label' => 'BOM Component / Input',
+                    ]);
+                }
+            }
+        }
+
+        // 3. Operation target product (SFG component)
+        if ($this->sourceProduct) {
+            $materials->push([
+                'id' => $this->sourceProduct->id,
+                'name' => $this->sourceProduct->name . ($this->sourceProduct->sku ? " ({$this->sourceProduct->sku})" : ''),
+                'type_label' => 'Operation Output Component',
+            ]);
+        }
+
+        // 4. Master Production Order Product (FG)
+        if ($this->order && $this->order->product) {
+            $materials->push([
+                'id' => $this->order->product->id,
+                'name' => $this->order->product->name . ($this->order->product->sku ? " ({$this->order->product->sku})" : ''),
+                'type_label' => 'Finished Product Assembly',
+            ]);
+        }
+
+        return $materials->unique('id')->values();
+    }
 }
