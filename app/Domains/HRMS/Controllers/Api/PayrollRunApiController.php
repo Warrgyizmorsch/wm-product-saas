@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\OvertimeRequest;
@@ -65,6 +67,110 @@ class PayrollRunApiController extends Controller
             }
         }
         return null;
+    }
+
+    /**
+     * Formats a LengthAwarePaginator into a clean, concise response structure.
+     */
+    private function formatPaginatedData(LengthAwarePaginator $paginator, callable $transformItem): array
+    {
+        return [
+            'items' => collect($paginator->items())->map($transformItem)->values(),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+                'last_page'    => $paginator->lastPage(),
+                'has_more'     => $paginator->hasMorePages(),
+            ],
+        ];
+    }
+
+    /**
+     * Transforms a PayrollRun model into a clean array structure.
+     */
+    private function transformPayrollRun(?PayrollRun $run): ?array
+    {
+        if (!$run) {
+            return null;
+        }
+
+        return [
+            'id'            => $run->id,
+            'payroll_month' => $run->payroll_month,
+            'start_date'    => $run->start_date ? Carbon::parse($run->start_date)->format('Y-m-d') : null,
+            'end_date'      => $run->end_date ? Carbon::parse($run->end_date)->format('Y-m-d') : null,
+            'status'        => $run->status,
+            'pay_group'     => $run->payGroup ? [
+                'id'   => $run->payGroup->id,
+                'name' => $run->payGroup->name,
+                'code' => $run->payGroup->code ?? null,
+            ] : null,
+            'created_at'    => $run->created_at?->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Transforms a payroll register row into a clean employee register breakdown.
+     */
+    private function transformRegisterRow(array $row): array
+    {
+        /** @var Employee|null $employee */
+        $employee = $row['employee'] ?? null;
+        $calc = $row['calc'] ?? [];
+        $items = $row['items'] ?? [];
+
+        $earnings = [];
+        $deductions = [];
+
+        foreach ($items as $item) {
+            $formattedItem = [
+                'code'   => $item['code'] ?? null,
+                'name'   => $item['name'] ?? null,
+                'amount' => floatval($item['amount'] ?? 0.00),
+                'type'   => $item['type'] ?? 'earning',
+            ];
+            if (($item['type'] ?? 'earning') === 'earning') {
+                $earnings[] = $formattedItem;
+            } else {
+                $deductions[] = $formattedItem;
+            }
+        }
+
+        return [
+            'employee' => $employee ? [
+                'id'            => $employee->id,
+                'employee_code' => $employee->employee_id,
+                'full_name'     => $employee->full_name,
+                'department'    => $employee->department?->name,
+                'designation'   => $employee->designation?->name,
+            ] : null,
+            'is_held'     => (bool)($row['is_held'] ?? false),
+            'hold_status' => $row['hold_status'] ?? null,
+            'summary'     => [
+                'gross_earnings'    => floatval($calc['total_earnings'] ?? 0.00),
+                'total_deductions'  => floatval($calc['total_deductions'] ?? 0.00),
+                'net_payout'        => floatval($calc['net_payout'] ?? 0.00),
+                'lop_days'          => floatval($calc['lop_days'] ?? 0),
+                'penalty_days'      => floatval($calc['attendance_penalty_days'] ?? 0),
+                'penalty_deduction' => floatval($calc['attendance_penalties'] ?? 0.00),
+            ],
+            'earnings'   => $earnings,
+            'deductions' => $deductions,
+        ];
+    }
+
+    /**
+     * Transforms pending issue metrics into a clean summary array.
+     */
+    private function transformPendingIssues(array $issues): array
+    {
+        return [
+            'leaves_count'      => (int)($issues['leaves'] ?? 0),
+            'corrections_count' => (int)($issues['corrections'] ?? 0),
+            'overtime_count'    => (int)($issues['overtime'] ?? 0),
+            'total_pending'     => (int)($issues['total'] ?? 0),
+        ];
     }
 
     /**
@@ -171,20 +277,18 @@ class PayrollRunApiController extends Controller
                 if ($hold->employee) {
                     $calc = $this->payrollCalculationService->calculateSalary($hold->employee, $hold->payroll_month);
                     $pendingPriorHolds[] = [
-                        'hold'       => $hold,
-                        'employee'   => $hold->employee,
-                        'net_payout' => $calc['summary']['net_payout'] ?? 0.00
+                        'id'            => $hold->id,
+                        'employee_id'   => $hold->employee->id,
+                        'employee_code' => $hold->employee->employee_id,
+                        'employee_name' => $hold->employee->full_name,
+                        'payroll_month' => $hold->payroll_month,
+                        'net_payout'    => floatval($calc['summary']['net_payout'] ?? 0.00),
                     ];
                 }
             }
         }
 
         $pendingIssues = $selectedRun ? $this->getPendingIssues($selectedRun) : ['leaves' => 0, 'corrections' => 0, 'overtime' => 0, 'total' => 0];
-        $salaryComponents = \App\Domains\HRMS\Models\SalaryComponent::where('status', true)
-            ->where('is_adhoc', true)
-            ->get();
-        $allEmployees = Employee::where('status', true)->orderBy('full_name')->get();
-        $departments = \App\Domains\HRMS\Models\Department::orderBy('name')->get();
 
         $registerCollection = collect($registerData);
         
@@ -240,24 +344,35 @@ class PayrollRunApiController extends Controller
             });
         }
 
-        $registerData = $registerCollection->values()->all();
+        $perPage = min($request->integer('per_page', 10), 100);
+        $page = $request->integer('page', 1);
+        $slicedCollection = $registerCollection->forPage($page, $perPage)->values();
+        
+        $paginator = new LengthAwarePaginator(
+            $slicedCollection,
+            $registerCollection->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url()]
+        );
+
+        $formattedRegister = $this->formatPaginatedData($paginator, fn($row) => $this->transformRegisterRow($row));
+
+        $transformedRuns = $runs->map(fn($r) => $this->transformPayrollRun($r))->values();
+        $transformedSelectedRun = $this->transformPayrollRun($selectedRun);
+        $transformedPayGroups = $payGroups->map(fn($pg) => [
+            'id'   => $pg->id,
+            'name' => $pg->name,
+            'code' => $pg->code ?? null,
+        ])->values();
 
         return $this->sendSuccess([
-            'runs'               => $runs,
-            'selected_run'       => $selectedRun,
-            'register_data'      => $registerData,
-            'pay_groups'         => $payGroups,
-            'pending_prior_holds'=> $pendingPriorHolds,
-            'pending_issues'     => $pendingIssues,
-            'salary_components'  => $salaryComponents,
-            'all_employees'      => $allEmployees,
-            'departments'        => $departments,
-            'filters'            => [
-                'search'        => $request->get('search'),
-                'sort'          => $request->get('sort', 'name_asc'),
-                'status'        => $request->get('status'),
-                'department_id' => $request->get('department_id'),
-            ],
+            'runs'                => $transformedRuns,
+            'selected_run'        => $transformedSelectedRun,
+            'register'            => $formattedRegister,
+            'pay_groups'          => $transformedPayGroups,
+            'pending_prior_holds' => $pendingPriorHolds,
+            'pending_issues'      => $this->transformPendingIssues($pendingIssues),
         ], 'Payroll overview and registers loaded successfully');
     }
 
@@ -339,7 +454,7 @@ class PayrollRunApiController extends Controller
             'processed_by'  => auth()->id(),
         ]);
 
-        return $this->sendSuccess($run, 'Payroll run initiated successfully.');
+        return $this->sendSuccess($this->transformPayrollRun($run), 'Payroll run initiated successfully.', 201);
     }
 
     /**
@@ -356,12 +471,12 @@ class PayrollRunApiController extends Controller
             return $this->sendError(
                 "Cannot lock payroll: There are {$pending['total']} pending requests (Leaves: {$pending['leaves']}, Corrections: {$pending['corrections']}, Overtime: {$pending['overtime']}). Please resolve them first.",
                 400,
-                $pending
+                $this->transformPendingIssues($pending)
             );
         }
 
         $run->update(['status' => 'locked']);
-        return $this->sendSuccess($run, 'Payroll run locked successfully.');
+        return $this->sendSuccess($this->transformPayrollRun($run), 'Payroll run locked successfully.');
     }
 
     /**
@@ -459,7 +574,7 @@ class PayrollRunApiController extends Controller
             }
 
             DB::commit();
-            return $this->sendSuccess($run->fresh(), $message);
+            return $this->sendSuccess($this->transformPayrollRun($run->fresh()), $message);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -630,7 +745,7 @@ class PayrollRunApiController extends Controller
             }
         }
 
-        return $this->sendSuccess($run->fresh(), 'Payroll payouts released successfully.');
+        return $this->sendSuccess($this->transformPayrollRun($run->fresh()), 'Payroll payouts released successfully.');
     }
 
     /**
@@ -707,7 +822,12 @@ class PayrollRunApiController extends Controller
             $msg = 'Payout put on hold for ' . $employee->full_name;
         }
 
-        return $this->sendSuccess($hold, $msg);
+        return $this->sendSuccess([
+            'id'            => $hold->id,
+            'employee_id'   => $hold->employee_id,
+            'payroll_month' => $hold->payroll_month,
+            'status'        => $hold->status,
+        ], $msg);
     }
 
     /**
@@ -741,18 +861,51 @@ class PayrollRunApiController extends Controller
             }
 
             $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
+
+            $earnings = [];
+            $deductions = [];
+            foreach (($calc['items'] ?? []) as $item) {
+                $formattedItem = [
+                    'code'   => $item['code'] ?? null,
+                    'name'   => $item['name'] ?? null,
+                    'amount' => floatval($item['amount'] ?? 0.00),
+                ];
+                if (($item['type'] ?? 'earning') === 'earning') {
+                    $earnings[] = $formattedItem;
+                } else {
+                    $deductions[] = $formattedItem;
+                }
+            }
+
+            $summary = $calc['summary'] ?? [];
+
             $salaryHistory[] = [
                 'payroll_run_id'=> $run->id,
                 'payroll_month' => $run->payroll_month,
-                'start_date'    => $run->start_date,
-                'end_date'      => $run->end_date,
-                'calc'          => $calc['summary'] ?? null,
-                'details'       => $calc['items'] ?? [],
+                'start_date'    => $run->start_date ? Carbon::parse($run->start_date)->format('Y-m-d') : null,
+                'end_date'      => $run->end_date ? Carbon::parse($run->end_date)->format('Y-m-d') : null,
+                'summary'       => [
+                    'gross_earnings'    => floatval($summary['total_earnings'] ?? 0.00),
+                    'total_deductions'  => floatval($summary['total_deductions'] ?? 0.00),
+                    'net_payout'        => floatval($summary['net_payout'] ?? 0.00),
+                    'lop_days'          => floatval($summary['lop_days'] ?? 0),
+                    'penalty_days'      => floatval($summary['attendance_penalty_days'] ?? 0),
+                    'penalty_deduction' => floatval($summary['attendance_penalties'] ?? 0.00),
+                ],
+                'earnings'      => $earnings,
+                'deductions'    => $deductions,
             ];
         }
 
         return $this->sendSuccess([
-            'employee'       => $employee->load(['department', 'designation']),
+            'employee' => [
+                'id'            => $employee->id,
+                'employee_code' => $employee->employee_id,
+                'full_name'     => $employee->full_name,
+                'department'    => $employee->department?->name,
+                'designation'   => $employee->designation?->name,
+                'email'         => $employee->office_email ?? $employee->personal_email,
+            ],
             'salary_history' => $salaryHistory,
         ], 'Salary history loaded successfully.');
     }

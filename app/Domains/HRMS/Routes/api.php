@@ -478,16 +478,27 @@ Route::prefix('api/hrms/travel-expense')
     ->middleware(['auth:sanctum', 'throttle:100,1'])
     ->name('api.hrms.travel-expense.')
     ->group(function () {
+        // Summary & Dashboard
         Route::get('/', [TravelExpenseApiController::class, 'index'])->name('index');
+        
+        // Travel Requests (Individual list, single get, store, approve, reject)
+        Route::get('/travel', [TravelExpenseApiController::class, 'indexTravelRequests'])->name('travel.index');
+        Route::get('/travel/{id}', [TravelExpenseApiController::class, 'showTravelRequest'])->name('travel.show');
         Route::post('/travel/store', [TravelExpenseApiController::class, 'storeTravelRequest'])->name('travel.store');
         Route::post('/travel/{travelRequest}/approve', [TravelExpenseApiController::class, 'approveTravelRequest'])->name('travel.approve');
         Route::post('/travel/{travelRequest}/reject', [TravelExpenseApiController::class, 'rejectTravelRequest'])->name('travel.reject');
         
+        // Cash Advances (Individual list, single get, store, approve, disburse, reject)
+        Route::get('/advance', [TravelExpenseApiController::class, 'indexCashAdvances'])->name('advance.index');
+        Route::get('/advance/{id}', [TravelExpenseApiController::class, 'showCashAdvance'])->name('advance.show');
         Route::post('/advance/store', [TravelExpenseApiController::class, 'storeCashAdvance'])->name('advance.store');
         Route::post('/advance/{cashAdvance}/approve', [TravelExpenseApiController::class, 'approveCashAdvance'])->name('advance.approve');
         Route::post('/advance/{cashAdvance}/disburse', [TravelExpenseApiController::class, 'disburseCashAdvance'])->name('advance.disburse');
         Route::post('/advance/{cashAdvance}/reject', [TravelExpenseApiController::class, 'rejectCashAdvance'])->name('advance.reject');
         
+        // Expense Reports (Individual list, single get, store, update, submit, approve, reject, pay)
+        Route::get('/report', [TravelExpenseApiController::class, 'indexExpenseReports'])->name('report.index');
+        Route::get('/report/{id}', [TravelExpenseApiController::class, 'showExpenseReport'])->name('report.show');
         Route::post('/report/store', [TravelExpenseApiController::class, 'storeExpenseReport'])->name('report.store');
         Route::post('/report/{expenseReport}/update', [TravelExpenseApiController::class, 'updateExpenseReport'])->name('report.update');
         Route::post('/report/{expenseReport}/submit', [TravelExpenseApiController::class, 'submitExpenseReport'])->name('report.submit');
@@ -495,6 +506,7 @@ Route::prefix('api/hrms/travel-expense')
         Route::post('/report/{expenseReport}/reject', [TravelExpenseApiController::class, 'rejectExpenseReport'])->name('report.reject');
         Route::post('/report/{expenseReport}/pay', [TravelExpenseApiController::class, 'payExpenseReport'])->name('report.pay');
         
+        // Policy lookup
         Route::get('/employee-policy/{employee}', [TravelExpenseApiController::class, 'getEmployeePolicy'])->name('employee-policy');
     });
 
