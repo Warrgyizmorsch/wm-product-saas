@@ -35,7 +35,7 @@ class RoutingController extends Controller
 
         $filters  = $request->only(['product_id', 'status', 'search']);
         $routings = $this->routingRepository->paginateAll($filters, 15)->withQueryString();
-        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
 
         return view('modules.production.routing.index', compact('routings', 'products', 'filters'));
     }
@@ -44,11 +44,11 @@ class RoutingController extends Controller
     {
         Gate::authorize('create', Routing::class);
 
-        $products    = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+        $products    = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
         $workCenters = $this->workCenterRepository->getActiveWorkCenters();
         $vendors     = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
-        $rawMaterials    = Product::whereIn('type', ['raw_material', 'semi_finished', 'finished_good'])->get();
+        $rawMaterials    = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
         $operationTypes = config('production.operation_types', []);
         $selectedProductId = $request->query('product_id');
 
@@ -103,11 +103,11 @@ class RoutingController extends Controller
 
         abort_if($routing->isReadOnly(), 403, 'This routing is read-only. Only draft routings can be edited.');
 
-        $products       = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+        $products       = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
         $workCenters    = $this->workCenterRepository->getActiveWorkCenters();
         $vendors        = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
-        $rawMaterials   = Product::whereIn('type', ['raw_material', 'semi_finished', 'finished_good'])->get();
+        $rawMaterials   = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
         $operationTypes = config('production.operation_types', []);
 
         return view('modules.production.routing.edit', compact(

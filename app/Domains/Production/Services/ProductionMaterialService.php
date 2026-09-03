@@ -3,9 +3,12 @@
 namespace App\Domains\Production\Services;
 
 use App\Domains\Inventory\Models\Batch as InventoryBatch;
+use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\ProductWarehouseStock;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\ProductionBatch;
+use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionLotTrace;
 use App\Domains\Production\Models\ProductionOrderIssue;
 use App\Domains\Production\Models\ProductionOrderIssueBatch;
@@ -346,5 +349,209 @@ class ProductionMaterialService
             ->where('is_default', true)
             ->value('id')
             ?? Warehouse::query()->where('tenant_id', $tenantId)->value('id');
+    }
+
+    /**
+     * Evaluate replacement material demand resulting from scrap.
+     *
+     * Flow:
+     * - Checks physical stock availability in warehouse.
+     * - If store stock is available: reserves and issues material directly (type = 'additional').
+     * - If store stock is insufficient: issues available portion and records MRP shortage/requisition for net deficit ONLY.
+     */
+    public function evaluateAndIssueReplacementMaterial(
+        int $tenantId,
+        int $productionOrderId,
+        int $materialProductId,
+        float $replacementMaterialQty,
+        ?string $reason = null,
+        ?int $userId = null
+    ): array {
+        if ($replacementMaterialQty <= 0) {
+            return [
+                'status' => 'no_action',
+                'issued_qty' => 0.0,
+                'requested_qty' => 0.0,
+                'message' => 'No replacement quantity required.',
+            ];
+        }
+
+        return DB::transaction(function () use ($tenantId, $productionOrderId, $materialProductId, $replacementMaterialQty, $reason, $userId) {
+            $matProduct = Product::find($materialProductId);
+            $matName = $matProduct?->name ?? "Product #{$materialProductId}";
+            $defaultWarehouse = $this->defaultWarehouseId($tenantId);
+
+            // Check if store already has available physical stock of this product
+            $storeStockQty = (float) ProductWarehouseStock::where('tenant_id', $tenantId)
+                ->where('product_id', $materialProductId)
+                ->when($defaultWarehouse, fn($q) => $q->where('warehouse_id', $defaultWarehouse))
+                ->sum('available_qty');
+
+            $neededQty = $replacementMaterialQty;
+            $itemsToRequest = [];
+
+            if ($storeStockQty >= $neededQty) {
+                // Store has sufficient physical stock of this SFG/FG/RM product directly
+                $itemsToRequest[] = [
+                    'product_id' => $materialProductId,
+                    'quantity'   => $neededQty,
+                    'name'       => $matName,
+                    'uom_id'     => $matProduct?->uom_id ?? 1,
+                ];
+            } else {
+                // Insufficient ready stock in store for SFG/FG -> request ready stock portion if any, and explode deficit to Raw Materials via BOM
+                if ($storeStockQty > 0) {
+                    $itemsToRequest[] = [
+                        'product_id' => $materialProductId,
+                        'quantity'   => $storeStockQty,
+                        'name'       => $matName,
+                        'uom_id'     => $matProduct?->uom_id ?? 1,
+                    ];
+                    $neededQty -= $storeStockQty;
+                }
+
+                $explodedItems = $this->resolveMaterialRequisitionItems($tenantId, $materialProductId, $neededQty);
+                foreach ($explodedItems as $ei) {
+                    $itemsToRequest[] = $ei;
+                }
+            }
+
+            // 1. Dedicated NEW ProductionRequisitionSlip for Operational Scrap Replacement
+            $year = now()->format('Y');
+            $prefix = "MR-{$year}-";
+            $lastSlip = \App\Domains\Production\Models\ProductionRequisitionSlip::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('requisition_number', 'like', "{$prefix}%")
+                ->orderBy('id', 'desc')
+                ->first();
+            $nextNum = 1;
+            if ($lastSlip) {
+                $lastNumStr = str_replace($prefix, '', $lastSlip->requisition_number);
+                $nextNum = ((int) $lastNumStr) + 1;
+            }
+            $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+
+            $slipNotes = "Operational Scrap Replacement Request ({$matName}: {$replacementMaterialQty} units)";
+            if (!empty($reason)) {
+                $slipNotes .= " — Reason: {$reason}";
+            }
+
+            $slip = \App\Domains\Production\Models\ProductionRequisitionSlip::create([
+                'tenant_id' => $tenantId,
+                'production_order_id' => $productionOrderId,
+                'requisition_number' => $reqNumber,
+                'status' => 'pending',
+                'requested_by' => $userId ?? auth()->id() ?? 1,
+                'requisition_date' => now()->toDateString(),
+                'notes' => $slipNotes,
+            ]);
+
+            // 2. Process each required component/raw material item
+            foreach ($itemsToRequest as $reqItem) {
+                $reqPid = $reqItem['product_id'];
+                $reqQty = $reqItem['quantity'];
+                $reqUom = $reqItem['uom_id'];
+
+                $res = ProductionOrderReservation::where('tenant_id', $tenantId)
+                    ->where('production_order_id', $productionOrderId)
+                    ->where('product_id', $reqPid)
+                    ->first();
+
+                if (!$res) {
+                    $res = ProductionOrderReservation::create([
+                        'tenant_id' => $tenantId,
+                        'production_order_id' => $productionOrderId,
+                        'product_id' => $reqPid,
+                        'uom_id' => $reqUom,
+                        'warehouse_id' => $defaultWarehouse,
+                        'quantity_planned' => 0.0,
+                        'quantity_additional_requested' => $reqQty,
+                        'quantity_reserved' => 0.0,
+                        'quantity_issued' => 0.0,
+                    ]);
+                } else {
+                    $res->quantity_additional_requested += $reqQty;
+                    $res->save();
+                }
+
+                \App\Domains\Production\Models\ProductionRequisitionSlipItem::create([
+                    'tenant_id' => $tenantId,
+                    'production_requisition_slip_id' => $slip->id,
+                    'product_id' => $reqPid,
+                    'quantity_planned' => $reqQty,
+                    'quantity_reserved' => 0.0,
+                    'quantity_issued' => 0.0,
+                    'uom_id' => $reqUom,
+                    'warehouse_id' => $res->warehouse_id ?? $defaultWarehouse,
+                ]);
+            }
+
+            app(ProductionEventService::class)->writeEvent($tenantId, [
+                'production_order_id' => $productionOrderId,
+                'event_type' => 'Store Replacement Requested',
+                'title' => 'Replacement Material Requested from Store',
+                'description' => "Requested replacement materials on Material Request #{$slip->requisition_number} due to scrap of {$matName} ({$replacementMaterialQty} units): " . ($reason ?? 'Operational loss'),
+                'severity' => 'warning',
+                'event_source' => 'ProductionMaterialService',
+            ]);
+
+            return [
+                'status' => 'requested',
+                'issued_qty' => 0.0,
+                'requested_qty' => $replacementMaterialQty,
+                'slip_id' => $slip->id,
+                'message' => "Replacement material request for {$replacementMaterialQty} units of {$matName} added to Material Request #{$slip->requisition_number}.",
+            ];
+        });
+    }
+
+    /**
+     * Explode product into required raw materials if it is a manufactured SFG/FG with a BOM.
+     * Returns an array of items: [['product_id' => int, 'quantity' => float, 'name' => string, 'uom_id' => int]]
+     */
+    public function resolveMaterialRequisitionItems(int $tenantId, int $productId, float $qty): array
+    {
+        $product = Product::find($productId);
+        if (!$product) {
+            return [];
+        }
+
+        $isManufactured = in_array($product->type, ['semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])
+            || $product->supplier_method === 'manufacture';
+
+        if ($isManufactured) {
+            $bom = ProductionBom::where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->whereIn('status', ['approved', 'draft'])
+                ->with('items.material')
+                ->first();
+
+            if ($bom && $bom->items->count() > 0) {
+                $items = [];
+                foreach ($bom->items as $bomItem) {
+                    $childItems = $this->resolveMaterialRequisitionItems($tenantId, $bomItem->material_id, (float) $bomItem->quantity * $qty);
+                    if (!empty($childItems)) {
+                        foreach ($childItems as $ci) {
+                            $items[] = $ci;
+                        }
+                    } else {
+                        $items[] = [
+                            'product_id' => $bomItem->material_id,
+                            'quantity'   => (float) $bomItem->quantity * $qty,
+                            'name'       => $bomItem->material?->name ?? "Product #{$bomItem->material_id}",
+                            'uom_id'     => $bomItem->uom_id ?? $bomItem->material?->uom_id ?? 1,
+                        ];
+                    }
+                }
+                return $items;
+            }
+        }
+
+        return [[
+            'product_id' => $product->id,
+            'quantity'   => $qty,
+            'name'       => $product->name,
+            'uom_id'     => $product->uom_id ?? 1,
+        ]];
     }
 }
