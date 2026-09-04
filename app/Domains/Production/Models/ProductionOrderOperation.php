@@ -66,6 +66,7 @@ class ProductionOrderOperation extends BaseModel
         'subcontract_cost_per_unit',
         'subcontract_service_product_id',
         'material_supply_type',
+        'subcontract_input_type',
         'dispatch_buffer_days',
         'return_buffer_days',
         'purchase_order_id',
@@ -254,7 +255,12 @@ class ProductionOrderOperation extends BaseModel
 
     public function isOutsourced(): bool
     {
-        return (bool) ($this->is_external || $this->routingOperation?->isOutsourced() || $this->purchase_order_id !== null);
+        return (bool) ($this->is_external || !empty($this->vendor_id) || $this->routingOperation?->isOutsourced() || $this->purchase_order_id !== null);
+    }
+
+    public function isWipJobWork(): bool
+    {
+        return $this->isOutsourced() && ($this->subcontract_input_type === 'previous_operation_wip' || $this->routingOperation?->subcontract_input_type === 'previous_operation_wip');
     }
 
     public function getTargetProducedQtyAttribute(): float

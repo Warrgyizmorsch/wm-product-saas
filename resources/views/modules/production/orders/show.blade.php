@@ -682,10 +682,12 @@
                                                     </td>
                                                     <td class="align-top">
                                                          <div class="fw-bold text-dark"><i class="feather-truck me-1 text-primary"></i>{{ $extOp->vendor->name ?? 'Subcontractor' }}</div>
-                                                         @if(($extOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied')
+                                                         @if($extOp->isWipJobWork())
+                                                             <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 mt-1"><i class="feather-layers me-1"></i>Previous Op WIP (Job Work)</span>
+                                                         @elseif(($extOp->material_supply_type ?? 'company_supplied') === 'vendor_supplied')
                                                              <span class="badge bg-soft-info text-info border border-info-subtle fs-10 mt-1"><i class="feather-box me-1"></i>Vendor Supplied</span>
                                                          @else
-                                                             <span class="badge bg-soft-warning text-dark border border-warning-subtle fs-10 mt-1"><i class="feather-truck me-1"></i>Company Supplied</span>
+                                                             <span class="badge bg-soft-warning text-dark border border-warning-subtle fs-10 mt-1"><i class="feather-truck me-1"></i>Company Supplied (Raw Material)</span>
                                                          @endif
                                                     </td>
                                                     <td class="align-top font-monospace fs-11">
@@ -774,7 +776,7 @@
                             {{-- Company Material Balance Section (For Company Supplied Materials) --}}
                             @php
                                 $hasCompanyMaterialOps = $order->operations->contains(function($op) {
-                                    return $op->is_external && ($op->material_supply_type === 'company_supplied' || is_null($op->material_supply_type));
+                                    return $op->is_external && !$op->isWipJobWork() && ($op->material_supply_type === 'company_supplied' || is_null($op->material_supply_type));
                                 });
                             @endphp
 
@@ -797,7 +799,7 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                @forelse($order->operations->where('is_external', true)->filter(fn($op) => ($op->material_supply_type ?? 'company_supplied') === 'company_supplied') as $extOp)
+                                                @forelse($order->operations->where('is_external', true)->reject(fn($op) => $op->isWipJobWork())->filter(fn($op) => ($op->material_supply_type ?? 'company_supplied') === 'company_supplied') as $extOp)
                                                     @php
                                                         $bal = $matBalanceService->getMaterialBalance($order->tenant_id, $order->id, $extOp->id);
                                                     @endphp

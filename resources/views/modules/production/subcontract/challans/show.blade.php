@@ -150,10 +150,22 @@
             submitText="Confirm Inward Receipt & Complete"
             closeText="Cancel"
         >
-            <div class="alert alert-info fs-12 mb-3">
-                <strong class="d-block mb-1"><i class="feather-info me-1"></i>Inward Material Receipt & Backflushing:</strong>
-                Receiving items will add finished/processed stock into your store, backflush consumed company raw materials, update operation progress, and unlock the next shopfloor step.
-            </div>
+            @php
+                $isWipJobWork = $challan->operation?->isWipJobWork() ?? false;
+                $defaultQty = $challan->dispatched_wip_qty > 0 ? $challan->dispatched_wip_qty : $challan->items->sum('quantity');
+            @endphp
+
+            @if($isWipJobWork)
+                <div class="alert alert-info fs-12 mb-3">
+                    <strong class="d-block mb-1"><i class="feather-info me-1"></i>Inward Intermediate WIP Receipt:</strong>
+                    Receiving processed WIP from vendor will update shopfloor Work In Progress, record operation completion, and unlock the next shopfloor operation. <strong>No Finished Goods stock or raw material backflushing will occur for intermediate WIP.</strong>
+                </div>
+            @else
+                <div class="alert alert-info fs-12 mb-3">
+                    <strong class="d-block mb-1"><i class="feather-info me-1"></i>Inward Material Receipt & Backflushing:</strong>
+                    Receiving items will add finished/processed stock into your store, backflush consumed company raw materials, update operation progress, and unlock the next shopfloor step.
+                </div>
+            @endif
 
             <x-ui.input
                 label="Target Product"
@@ -170,7 +182,7 @@
                         type="number"
                         step="0.01"
                         min="0.01"
-                        value="{{ $challan->operation?->target_produced_qty ?: ($challan->productionOrder?->quantity_ordered ?: 30.00) }}"
+                        value="{{ number_format($defaultQty, 2, '.', '') }}"
                         :required="true"
                     />
                 </div>
@@ -181,7 +193,7 @@
                         type="number"
                         step="0.01"
                         min="0"
-                        value="{{ $challan->operation?->target_produced_qty ?: ($challan->productionOrder?->quantity_ordered ?: 30.00) }}"
+                        value="{{ number_format($defaultQty, 2, '.', '') }}"
                         :required="true"
                     />
                 </div>

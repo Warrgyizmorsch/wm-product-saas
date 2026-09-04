@@ -146,7 +146,7 @@ class ProductionWipService
             }
 
             if ($batchId) {
-                return $this->getOrCreateWipForBatchOperation($orderId, $batchId, $firstOp->routing_operation_id, $userId);
+                return $this->getOrCreateWipForBatchOperation($orderId, $batchId, $firstOp->routing_operation_id ?? $firstOp->id, $userId);
             }
 
             // Check if WIP already exists for this order/batch combination
@@ -727,7 +727,13 @@ class ProductionWipService
                 $txQty = (float) ProductionWipTransaction::where('tenant_id', $tenantId)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
-                    ->whereIn('from_operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                    ->where(function ($q) use ($sourceOp) {
+                        $fromOpIds = array_filter(array_unique([$sourceOp->routing_operation_id, $sourceOp->id]));
+                        if (!empty($fromOpIds)) {
+                            $q->whereIn('from_operation_id', $fromOpIds);
+                        }
+                        $q->orWhere('remarks', 'like', "%from Op {$sourceOp->sequence}%");
+                    })
                     ->whereIn('transaction_type', ['operation_completed', 'progress_logged', 'rework_completed', 'subcontract_received', 'subcontract_qc_passed', 'subcontract_completed'])
                     ->sum('quantity');
 
@@ -1440,10 +1446,12 @@ class ProductionWipService
 
                     $isWipCompleted = ($isOrderOrFinalOpCompleted && $isAtFinalStage) || $wip->status === 'completed';
 
+                    $batchPlanned = $wip->batch ? (float) $wip->batch->planned_quantity : (float) $order->quantity_ordered;
+                    $finalFgProduced = (float) ($finalFgOp->quantity_produced ?? 0);
+                    $alreadyReceived = (float) $order->quantity_produced;
+
                     if ($isWipCompleted) {
-                        $batchPlanned = $wip->batch ? (float) $wip->batch->planned_quantity : (float) $order->quantity_ordered;
-                        $completedProduced = max((float) $wip->completed_quantity, (float) $wip->available_quantity, (float) $finalFgOp->quantity_produced, $batchPlanned);
-                        $alreadyReceived = (float) $order->quantity_produced;
+                        $completedProduced = ($finalFgProduced > 0) ? $finalFgProduced : $batchPlanned;
                         $unreceivedQty = max(0.0000, $completedProduced - $alreadyReceived);
 
                         $wip->update([
@@ -1454,6 +1462,13 @@ class ProductionWipService
                             'available_quantity' => $unreceivedQty,
                             'status' => 'completed',
                         ]);
+                    } else {
+                        $unreceivedQty = max(0.0000, $finalFgProduced - $alreadyReceived);
+                        if ((float) $wip->completed_quantity !== $unreceivedQty) {
+                            $wip->update([
+                                'completed_quantity' => $unreceivedQty,
+                            ]);
+                        }
                     }
                 });
         }
@@ -1694,7 +1709,7 @@ class ProductionWipService
             ->selectRaw('
                 count(*) as batch_count,
                 sum(available_quantity) as total_available,
-                sum(case when (product_id = ? or product_id is null) and (current_routing_operation_id = ? or status = "completed" or completed_quantity > 0) then (case when completed_quantity > 0 then completed_quantity else available_quantity end) else 0 end) as total_completed,
+                sum(case when (product_id = ? or product_id is null) and (current_routing_operation_id = ? or status = "completed" or completed_quantity > 0) then completed_quantity else 0 end) as total_completed,
                 sum(rejected_quantity) as total_rejected,
                 sum(scrap_quantity) as total_scrap,
                 sum(rework_quantity) as total_rework,
