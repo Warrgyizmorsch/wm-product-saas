@@ -27,6 +27,7 @@ class DeliveryChallan extends Model
         'challan_date',
         'expected_return_date',
         'status',
+        'dispatched_wip_qty',
         'vehicle_number',
         'transporter_name',
         'lr_number',
@@ -38,6 +39,7 @@ class DeliveryChallan extends Model
     protected $casts = [
         'challan_date' => 'date',
         'expected_return_date' => 'date',
+        'dispatched_wip_qty' => 'float',
     ];
 
     public function productionOrder(): BelongsTo

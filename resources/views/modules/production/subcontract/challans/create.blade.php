@@ -30,26 +30,53 @@
                 </a>
             </div>
 
+            @php
+                $isWipJobWork = $operation?->isWipJobWork() ?? false;
+            @endphp
+
             @if($order)
-                <div class="alert alert-info border-0 shadow-sm d-flex align-items-center justify-content-between mb-4">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="avatar-md bg-info text-white rounded-circle d-flex align-items-center justify-content-center fs-20">
-                            <i class="feather-layers"></i>
-                        </div>
-                        <div>
-                            <h6 class="fw-bold text-dark mb-0">Linked Production Order: <span class="text-primary font-monospace">{{ $order->order_number }}</span></h6>
-                            <div class="fs-12 text-muted">
-                                Finished Product: <strong>{{ $order->product?->name }}</strong> (SKU: {{ $order->product?->sku }}) | Order Qty: <strong>{{ number_format($order->quantity_ordered, 2) }}</strong>
+                @if($isWipJobWork)
+                    <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center justify-content-between mb-4">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="avatar-md bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center fs-20">
+                                <i class="feather-layers"></i>
                             </div>
-                            @if($operation)
+                            <div>
+                                <h6 class="fw-bold text-dark mb-0">Subcontracted WIP Job Work Dispatch (Shopfloor Intermediate WIP)</h6>
                                 <div class="fs-12 text-dark mt-1">
-                                    Outsourced Operation: <span class="badge bg-primary text-white font-monospace">Op #{{ $operation->operation_number }} — {{ $operation->name }}</span>
+                                    Predecessor Operation: <strong>{{ $prevOp ? "Op #{$prevOp->operation_number} — {$prevOp->name}" : "Shopfloor Launch" }}</strong>
+                                    | Available Shopfloor WIP for Dispatch: <strong class="{{ ($availableWip ?? 0) > 0 ? 'text-success' : 'text-danger' }}">{{ number_format($availableWip ?? 0, 2) }} PCS</strong>
                                 </div>
-                            @endif
+                                @if(($availableWip ?? 0) <= 0)
+                                    <div class="fs-12 text-danger fw-bold mt-1">
+                                        <i class="feather-alert-triangle me-1"></i>Predecessor operation has not produced any available WIP yet (0.00 PCS). Dispatching to vendor is blocked until previous operation produces output.
+                                    </div>
+                                @endif
+                            </div>
                         </div>
+                        <span class="badge bg-soft-warning text-dark border font-monospace fs-11">WIP Job Work</span>
                     </div>
-                    <span class="badge bg-soft-info text-info border font-monospace fs-11">Subcontract Dispatch</span>
-                </div>
+                @else
+                    <div class="alert alert-info border-0 shadow-sm d-flex align-items-center justify-content-between mb-4">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="avatar-md bg-info text-white rounded-circle d-flex align-items-center justify-content-center fs-20">
+                                <i class="feather-layers"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold text-dark mb-0">Linked Production Order: <span class="text-primary font-monospace">{{ $order->order_number }}</span></h6>
+                                <div class="fs-12 text-muted">
+                                    Finished Product: <strong>{{ $order->product?->name }}</strong> (SKU: {{ $order->product?->sku }}) | Order Qty: <strong>{{ number_format($order->quantity_ordered, 2) }}</strong>
+                                </div>
+                                @if($operation)
+                                    <div class="fs-12 text-dark mt-1">
+                                        Outsourced Operation: <span class="badge bg-primary text-white font-monospace">Op #{{ $operation->operation_number }} — {{ $operation->name }}</span>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                        <span class="badge bg-soft-info text-info border font-monospace fs-11">Subcontract Dispatch</span>
+                    </div>
+                @endif
             @endif
 
             <!-- Master Header Fields (Using Odoo Form Component System) -->
@@ -98,13 +125,13 @@
                 <h5 class="fw-bold text-dark mb-3"><i class="feather-box me-1 text-warning"></i>Dispatched Company Material Lines</h5>
 
                 <div class="table-responsive mb-3">
-                    <x-ui.odoo-form-ui type="table" id="items-table">
+                    <x-ui.odoo-form-ui type="table" id="items-table" data-is-wip-job-work="{{ $isWipJobWork ? '1' : '0' }}">
                         <thead class="table-light fs-11 text-uppercase text-muted">
                             <tr>
                                 <th style="width: 5%" class="text-center">SEQ</th>
                                 <th style="width: 32%">MATERIAL / PRODUCT *</th>
-                                <th style="width: 25%">SOURCE WAREHOUSE *</th>
-                                <th style="width: 15%">AVAILABLE QTY</th>
+                                <th style="width: 25%">{{ $isWipJobWork ? 'DISPATCH LOCATION / WAREHOUSE *' : 'SOURCE WAREHOUSE *' }}</th>
+                                <th style="width: 15%">{{ $isWipJobWork ? 'AVAILABLE WIP QTY' : 'AVAILABLE QTY' }}</th>
                                 <th style="width: 12%">DISPATCH QTY *</th>
                                 <th style="width: 8%">UOM</th>
                                 <th style="width: 5%" class="text-center">ACTION</th>
@@ -112,10 +139,14 @@
                         </thead>
                         <tbody>
                             @forelse($prefilledItems as $idx => $item)
-                                <tr class="item-row" data-row-idx="{{ $idx }}">
-                                    <td class="fw-bold text-center align-middle row-seq">{{ $idx + 1 }}</td>
+                                <tr class="item-row" data-row-idx="{{ $idx }}" data-available-wip="{{ number_format($item['available_wip'] ?? $availableWip ?? 0, 2, '.', '') }}">
+                                    <td class="fw-bold text-center align-middle row-seq">
+                                        {{ $idx + 1 }}
+                                        <input type="hidden" name="items[{{ $idx }}][production_wip_id]" class="wip-id-input" value="{{ $item['production_wip_id'] ?? '' }}" />
+                                        <input type="hidden" name="items[{{ $idx }}][production_batch_id]" class="batch-id-input" value="{{ $item['production_batch_id'] ?? '' }}" />
+                                    </td>
                                     <td class="align-middle">
-                                        <x-ui.odoo-form-ui type="select" name="items[][product_id]" class="product-select" :searchable="false">
+                                        <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][product_id]" class="product-select" :searchable="false">
                                             <option value="">Select Product</option>
                                             @foreach($products as $p)
                                                 <option value="{{ $p->id }}" @selected($item['product_id'] == $p->id)>
@@ -125,7 +156,7 @@
                                         </x-ui.odoo-form-ui>
                                     </td>
                                     <td class="align-middle">
-                                        <x-ui.odoo-form-ui type="select" name="items[][warehouse_id]" class="warehouse-select" :searchable="false">
+                                        <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][warehouse_id]" class="warehouse-select" :searchable="false">
                                             <option value="">Select Warehouse</option>
                                             @foreach($warehouses as $wh)
                                                 <option value="{{ $wh->id }}" @selected(($item['warehouse_id'] ?? $defaultWarehouseId) == $wh->id)>
@@ -138,10 +169,10 @@
                                         <div class="stock-status-badge font-monospace py-1"><span class="text-muted">—</span></div>
                                     </td>
                                     <td class="align-middle">
-                                        <x-ui.odoo-form-ui type="input" name="items[][quantity]" inputType="number" class="quantity-input" :value="number_format($item['quantity'], 2, '.', '')" placeholder="0.00" />
+                                        <x-ui.odoo-form-ui type="input" name="items[{{ $idx }}][quantity]" inputType="number" class="quantity-input" :value="number_format($item['quantity'], 2, '.', '')" placeholder="0.00" />
                                     </td>
                                     <td class="align-middle">
-                                        <x-ui.odoo-form-ui type="input" name="items[][unit_of_measure]" class="uom-input text-uppercase" :value="$item['uom']" placeholder="PCS" />
+                                        <x-ui.odoo-form-ui type="input" name="items[{{ $idx }}][unit_of_measure]" class="uom-input text-uppercase" :value="$item['uom']" placeholder="PCS" />
                                     </td>
                                     <td class="text-center align-middle">
                                         <button type="button" class="erp-btn-delete remove-item-btn" title="Remove line">
@@ -150,8 +181,12 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr class="item-row" data-row-idx="0">
-                                    <td class="fw-bold text-center align-middle row-seq">1</td>
+                                <tr class="item-row" data-row-idx="0" data-available-wip="{{ number_format($availableWip ?? 0, 2, '.', '') }}">
+                                    <td class="fw-bold text-center align-middle row-seq">
+                                        1
+                                        <input type="hidden" name="items[0][production_wip_id]" class="wip-id-input" value="" />
+                                        <input type="hidden" name="items[0][production_batch_id]" class="batch-id-input" value="" />
+                                    </td>
                                     <td class="align-middle">
                                         <x-ui.odoo-form-ui type="select" name="items[0][product_id]" class="product-select" :searchable="false">
                                             <option value="">Select Product</option>
@@ -204,7 +239,7 @@
                     <i class="feather-save me-1"></i> Save Draft Gate Pass
                 </button>
                 <button type="submit" name="status" value="dispatched" id="dispatch-submit-btn" class="btn btn-sm btn-primary px-4 fw-bold shadow-sm">
-                    <i class="feather-send me-1"></i> Create & Dispatch Delivery Challan (Deduct Stock)
+                    <i class="feather-send me-1"></i> Create & Dispatch Delivery Challan {{ ($operation?->isWipJobWork() ?? false) ? '(Outward WIP Dispatch)' : '(Deduct Stock)' }}
                 </button>
             </div>
         </x-ui.odoo-form-ui>
@@ -217,13 +252,19 @@
     $(document).ready(function() {
         function fixRowInputNames() {
             $('#items-table tbody tr.item-row').each(function(idx) {
-                $(this).find('.row-seq').text(idx + 1);
+                $(this).find('.row-seq').contents().filter(function() {
+                    return this.nodeType === 3; // text node
+                }).first().replaceWith((idx + 1).toString());
 
+                const $wipInp = $(this).find('.wip-id-input');
+                const $batchInp = $(this).find('.batch-id-input');
                 const $prodSel = $(this).find('.product-select select, select.product-select');
                 const $whSel = $(this).find('.warehouse-select select, select.warehouse-select');
                 const $qtyInp = $(this).find('.quantity-input input, input.quantity-input');
                 const $uomInp = $(this).find('.uom-input input, input.uom-input');
 
+                if ($wipInp.length) $wipInp.attr('name', `items[${idx}][production_wip_id]`);
+                if ($batchInp.length) $batchInp.attr('name', `items[${idx}][production_batch_id]`);
                 if ($prodSel.length) $prodSel.attr('name', `items[${idx}][product_id]`);
                 if ($whSel.length) $whSel.attr('name', `items[${idx}][warehouse_id]`);
                 if ($qtyInp.length) $qtyInp.attr('name', `items[${idx}][quantity]`);
@@ -241,6 +282,18 @@
             const productId = $prodSel.length ? $prodSel.val() : null;
             const warehouseId = $whSel.length ? $whSel.val() : null;
             const reqQty = parseFloat($qtyInp.length ? $qtyInp.val() : 0) || 0;
+
+            const isWipJobWork = $('#items-table').data('is-wip-job-work') == '1';
+
+            if (isWipJobWork) {
+                const availableWip = parseFloat($tr.data('available-wip')) || 0;
+                if (availableWip > 0 && reqQty <= (availableWip + 0.0001)) {
+                    $badgeDiv.html(`<span class="fw-bold text-success font-monospace fs-13">${availableWip.toFixed(2)} PCS (WIP)</span>`);
+                } else {
+                    $badgeDiv.html(`<span class="fw-bold text-danger font-monospace fs-13">${availableWip.toFixed(2)} PCS (WIP)</span>`);
+                }
+                return;
+            }
 
             if (!warehouseId || !productId) {
                 $badgeDiv.html('<span class="text-muted">—</span>');

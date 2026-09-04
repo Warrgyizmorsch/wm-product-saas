@@ -346,8 +346,18 @@ class SubcontractDeliveryChallanTest extends TestCase
             'vendor_id' => $vendor->id,
             'warehouse_id' => $this->warehouse->id,
             'challan_date' => now()->toDateString(),
+            'dispatched_wip_qty' => 30.00,
             'status' => 'dispatched',
             'created_by' => $this->user->id,
+        ]);
+
+        \App\Domains\Production\Models\DeliveryChallanItem::create([
+            'tenant_id' => $this->tenant->id,
+            'delivery_challan_id' => $challan->id,
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'quantity' => 30.00,
+            'unit_of_measure' => 'PCS',
         ]);
 
         $response = $this->actingAs($this->user)
@@ -377,6 +387,191 @@ class SubcontractDeliveryChallanTest extends TestCase
         $this->assertNotNull($stock);
         $this->assertEquals(30.00, $stock->quantity);
     }
+
+    public function test_can_dispatch_and_receive_wip_job_work_without_creating_fg_stock(): void
+    {
+        $vendor = Vendor::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'ABC Paints Ltd',
+            'code' => 'VEND-ABC',
+            'status' => 'active',
+        ]);
+
+        $order = ProductionOrder::create([
+            'tenant_id' => $this->tenant->id,
+            'order_number' => 'MO-WIP-001',
+            'product_id' => $this->product->id,
+            'quantity_ordered' => 100,
+            'status' => ProductionOrder::STATUS_RELEASED,
+            'start_date' => now(),
+            'end_date' => now()->addDays(5),
+            'created_by' => $this->user->id,
+        ]);
+
+        $op10 = ProductionOrderOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'sequence' => 10,
+            'operation_number' => '010',
+            'name' => 'Sheet Cutting',
+            'is_external' => false,
+            'status' => 'completed',
+            'quantity_produced' => 100.00,
+        ]);
+
+        $op20 = ProductionOrderOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'previous_operation_id' => $op10->id,
+            'sequence' => 20,
+            'operation_number' => '020',
+            'name' => 'Spray Painting Service',
+            'is_external' => true,
+            'subcontract_input_type' => 'previous_operation_wip',
+            'vendor_id' => $vendor->id,
+            'status' => 'ready',
+            'target_produced_qty' => 100.00,
+        ]);
+
+        $op30 = ProductionOrderOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'previous_operation_id' => $op20->id,
+            'sequence' => 30,
+            'operation_number' => '030',
+            'name' => 'Final Assembly',
+            'is_external' => false,
+            'status' => 'waiting',
+            'target_produced_qty' => 100.00,
+        ]);
+
+        // Initialize WIP at OP10
+        $wipService = app(\App\Domains\Production\Services\ProductionWipService::class);
+        $wip = $wipService->initializeWipForOrder($order->id, $this->user->id);
+        $wipService->completeWipOperation($wip->id, $op10->id, 100.00, 0, 0, 10, 30, 'OP10 Completed', $this->user->id, true);
+
+        // 1. Create Delivery Challan for OP20 (pre-fills 100 WIP from OP10)
+        $payload = [
+            'production_order_id' => $order->id,
+            'production_order_operation_id' => $op20->id,
+            'vendor_id' => $vendor->id,
+            'warehouse_id' => $this->warehouse->id,
+            'challan_date' => date('Y-m-d'),
+            'vehicle_number' => 'MH-12-WIP-99',
+            'status' => 'dispatched',
+            'items' => [
+                [
+                    'product_id' => $this->product->id,
+                    'production_wip_id' => $wip->id,
+                    'warehouse_id' => $this->warehouse->id,
+                    'quantity' => 60.00,
+                    'unit_of_measure' => 'PCS',
+                ]
+            ]
+        ];
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->post(route('production.subcontract.delivery-challans.store'), $payload);
+
+        $challan = DeliveryChallan::where('tenant_id', $this->tenant->id)->latest('id')->first();
+        $this->assertNotNull($challan);
+        $this->assertEquals('dispatched', $challan->status);
+        $this->assertEquals(60.00, $challan->dispatched_wip_qty);
+
+        // Verify warehouse stock was NOT deducted (because it's WIP on shopfloor)
+        $stock = ProductWarehouseStock::where('tenant_id', $this->tenant->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->where('product_id', $this->product->id)
+            ->first();
+        $this->assertNull($stock); // Zero warehouse stock transactions
+
+        // 2. Receive 60 WIP back from vendor
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->post(route('production.subcontract.delivery-challans.receive', $challan->id), [
+                'received_qty' => 60.00,
+                'accepted_qty' => 60.00,
+                'rejected_qty' => 0.00,
+                'warehouse_id' => $this->warehouse->id,
+                'remarks' => '60 pcs returned painted cleanly',
+            ]);
+
+        $response->assertRedirect(route('production.subcontract.delivery-challans.show', $challan->id));
+
+        $challan->refresh();
+        $this->assertEquals('completed', $challan->status);
+
+        $op20->refresh();
+        $this->assertEquals(60.00, $op20->quantity_produced);
+
+        // CRITICAL ASSERTION 1: Finished Goods warehouse stock MUST remain 0 (NO FG stock created!)
+        $fgStock = ProductWarehouseStock::where('tenant_id', $this->tenant->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->where('product_id', $this->product->id)
+            ->first();
+        $this->assertNull($fgStock);
+
+        // CRITICAL ASSERTION 2: 60 WIP units transferred to OP-30 Assembly!
+        $op30->refresh();
+        $this->assertEquals(60.00, $op30->quantity_transferred_in);
+        $this->assertEquals('ready', $op30->status);
+    }
+
+    public function test_wip_job_work_blocks_over_receiving_returned_quantity(): void
+    {
+        $vendor = Vendor::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'ABC Paints Ltd',
+            'status' => 'active',
+        ]);
+
+        $order = ProductionOrder::create([
+            'tenant_id' => $this->tenant->id,
+            'order_number' => 'MO-WIP-OVER-001',
+            'product_id' => $this->product->id,
+            'quantity_ordered' => 100,
+            'status' => ProductionOrder::STATUS_RELEASED,
+            'start_date' => now(),
+            'end_date' => now()->addDays(5),
+        ]);
+
+        $op20 = ProductionOrderOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'sequence' => 20,
+            'operation_number' => '020',
+            'name' => 'Spray Painting Service',
+            'is_external' => true,
+            'subcontract_input_type' => 'previous_operation_wip',
+            'vendor_id' => $vendor->id,
+            'status' => 'vendor_dispatched',
+        ]);
+
+        $challan = DeliveryChallan::create([
+            'tenant_id' => $this->tenant->id,
+            'challan_number' => 'DC-OVER-001',
+            'production_order_id' => $order->id,
+            'production_order_operation_id' => $op20->id,
+            'vendor_id' => $vendor->id,
+            'warehouse_id' => $this->warehouse->id,
+            'challan_date' => now()->toDateString(),
+            'dispatched_wip_qty' => 60.00,
+            'status' => 'dispatched',
+            'created_by' => $this->user->id,
+        ]);
+
+        // Attempt to receive 70 (exceeding 60 dispatched)
+        $response = $this->withHeader('X-Tenant', $this->tenant->slug)
+            ->post(route('production.subcontract.delivery-challans.receive', $challan->id), [
+                'received_qty' => 70.00,
+                'accepted_qty' => 70.00,
+                'warehouse_id' => $this->warehouse->id,
+            ]);
+
+        $response->assertSessionHas('error');
+    }
 }
+
 
 
