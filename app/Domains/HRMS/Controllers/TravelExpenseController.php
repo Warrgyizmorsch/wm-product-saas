@@ -16,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class TravelExpenseController extends Controller
 {
@@ -43,8 +44,13 @@ class TravelExpenseController extends Controller
         $designations = Designation::where('status', true)->orderBy('name')->get();
 
         // 3. Fetch operational lists (Travel Requests, Advances, Reports)
-        // If user is Admin, show all records; otherwise, show only employee's records
-        $isAdmin = ($user->role ?? '') === 'admin';
+        $isAdmin = $user && (
+            in_array(strtolower($user->role ?? ''), ['admin', 'hr', 'super-admin', 'manager']) ||
+            (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'hr', 'super-admin', 'manager'])) ||
+            (method_exists($user, 'hasRole') && $user->hasRole('admin')) ||
+            ($employee && ($employee->is_admin ?? false)) ||
+            !$employee
+        );
 
         // 3. Query lists with sorting, searching, filtering, and tab-safe pagination
         $activeTab = $request->input('tab', 'travel');
@@ -56,7 +62,7 @@ class TravelExpenseController extends Controller
         $travelStatus = $request->input('travel_status');
         $travelSort = $request->input('travel_sort', 'newest');
 
-        $travelQuery = TravelRequest::where('tenant_id', $tenantId)->with('employee');
+        $travelQuery = TravelRequest::where('tenant_id', $tenantId)->with(['employee', 'expenseReports', 'cashAdvances']);
         if ($travelSearch) {
             $travelQuery->where(function($q) use ($travelSearch) {
                 $q->where('purpose', 'like', "%{$travelSearch}%")
@@ -113,6 +119,7 @@ class TravelExpenseController extends Controller
         // Load all approved travel requests and open cash advances to show all options
         $myApprovedTravelRequests = TravelRequest::where('status', 'approved')
             ->where('tenant_id', $tenantId)
+            ->with(['expenseReports', 'cashAdvances'])
             ->orderBy('created_at', 'desc')
             ->get();
         $myOpenCashAdvances = CashAdvance::whereIn('status', ['approved', 'disbursed'])
@@ -230,13 +237,27 @@ class TravelExpenseController extends Controller
             'approved_budget' => $approvedBudget
         ]);
 
-        return redirect()->back()->with('success', 'Travel request approved with budget: $' . number_format($approvedBudget, 2));
+        $advanceMsg = '';
+        if ($request->boolean('approve_cash_advance')) {
+            $linkedAdvance = $travelRequest->cashAdvances()->where('status', 'pending')->first();
+            if ($linkedAdvance) {
+                $approvedAdvanceAmt = $request->input('approved_advance_amount', $linkedAdvance->amount);
+                $linkedAdvance->update([
+                    'status' => 'approved',
+                    'approved_amount' => $approvedAdvanceAmt,
+                ]);
+                $advanceMsg = ' and linked cash advance';
+            }
+        }
+
+        return redirect()->back()->with('success', "Travel request{$advanceMsg} approved successfully.");
     }
 
     public function rejectTravelRequest(TravelRequest $travelRequest): RedirectResponse
     {
         $travelRequest->update(['status' => 'rejected']);
-        return redirect()->back()->with('success', 'Travel request rejected.');
+        $travelRequest->cashAdvances()->where('status', 'pending')->update(['status' => 'rejected']);
+        return redirect()->back()->with('success', 'Travel request and linked cash advance rejected.');
     }
 
     // ── CASH ADVANCES ─────────────────────────────────────────────────────────
@@ -342,6 +363,8 @@ class TravelExpenseController extends Controller
             'claims.*.merchant'    => 'nullable|string|max:255',
             'claims.*.desc'        => 'nullable|string|max:1000',
             'claims.*.receipt'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'claims.*.receipts'   => 'nullable|array',
+            'claims.*.receipts.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
         // Resolve active policy for the employee and enforce limits/receipt requirements
@@ -385,9 +408,12 @@ class TravelExpenseController extends Controller
                             $needsReceipt = true;
                         }
                         
-                        $fileKey = "claims.{$index}.receipt";
-                        if ($needsReceipt && !$request->hasFile($fileKey)) {
-                            $errorMessages[$fileKey] = "A receipt attachment is required for " . $rule->category->name . " claims above ₹" . number_format($rule->receipt_required_threshold ?: 0, 2) . ".";
+                        $fileKeySingle = "claims.{$index}.receipt";
+                        $fileKeyArray  = "claims.{$index}.receipts";
+                        $hasFile = $request->hasFile($fileKeySingle) || $request->hasFile($fileKeyArray);
+
+                        if ($needsReceipt && !$hasFile) {
+                            $errorMessages[$fileKeyArray] = "A receipt attachment is required for " . $rule->category->name . " claims above ₹" . number_format($rule->receipt_required_threshold ?: 0, 2) . ".";
                         }
                     }
                 }
@@ -437,10 +463,23 @@ class TravelExpenseController extends Controller
 
             // 4. Create individual claim lines
             foreach ($validated['claims'] as $index => $c) {
+                $storedPaths = [];
+                if ($request->hasFile("claims.{$index}.receipt")) {
+                    $storedPaths[] = $this->storeAndCompressReceipt($request->file("claims.{$index}.receipt"));
+                }
+                if ($request->hasFile("claims.{$index}.receipts")) {
+                    foreach ($request->file("claims.{$index}.receipts") as $uploadedFile) {
+                        if ($uploadedFile && $uploadedFile->isValid()) {
+                            $storedPaths[] = $this->storeAndCompressReceipt($uploadedFile);
+                        }
+                    }
+                }
+                $storedPaths = array_values(array_unique($storedPaths));
                 $receiptPath = null;
-                $fileKey = "claims.{$index}.receipt";
-                if ($request->hasFile($fileKey)) {
-                    $receiptPath = $request->file($fileKey)->store('expense_receipts', 'public');
+                if (count($storedPaths) === 1) {
+                    $receiptPath = $storedPaths[0];
+                } elseif (count($storedPaths) > 1) {
+                    $receiptPath = json_encode($storedPaths);
                 }
 
                 ExpenseClaim::create([
@@ -464,25 +503,28 @@ class TravelExpenseController extends Controller
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
-        // Enforce update only in draft state
-        if ($expenseReport->status !== 'draft') {
-            return redirect()->back()->with('error', 'Only draft expense reports can be edited.');
+        // Enforce update only in editable states (draft, partially_approved, rejected)
+        if (!in_array($expenseReport->status, ['draft', 'partially_approved', 'rejected'])) {
+            return redirect()->back()->with('error', 'Only draft, partially approved, or rejected expense reports can be edited.');
         }
 
         $validated = $request->validate([
-            'employee_id'       => 'required|exists:employees,id',
-            'travel_request_id' => 'nullable|exists:travel_requests,id',
-            'cash_advance_id'   => 'nullable|exists:cash_advances,id',
-            'title'             => 'required|string|max:255',
-            'claims'            => 'required|array|min:1',
-            'claims.*.category_id' => 'required|exists:expense_categories,id',
-            'claims.*.date'        => 'required|date',
-            'claims.*.amount'      => 'required|numeric|min:0.01',
-            'claims.*.tax'         => 'nullable|numeric|min:0',
-            'claims.*.merchant'    => 'nullable|string|max:255',
-            'claims.*.desc'        => 'nullable|string|max:1000',
-            'claims.*.receipt'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'claims.*.existing_receipt' => 'nullable|string',
+            'employee_id'              => 'required|exists:employees,id',
+            'travel_request_id'        => 'nullable|exists:travel_requests,id',
+            'cash_advance_id'          => 'nullable|exists:cash_advances,id',
+            'title'                    => 'required|string|max:255',
+            'claims'                   => 'required|array|min:1',
+            'claims.*.category_id'     => 'required|exists:expense_categories,id',
+            'claims.*.date'            => 'required|date',
+            'claims.*.amount'          => 'required|numeric|min:0.01',
+            'claims.*.tax'             => 'nullable|numeric|min:0',
+            'claims.*.merchant'        => 'nullable|string|max:255',
+            'claims.*.desc'            => 'nullable|string|max:1000',
+            'claims.*.receipt'         => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'claims.*.receipts'       => 'nullable|array',
+            'claims.*.receipts.*'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'claims.*.existing_receipt'  => 'nullable|string',
+            'claims.*.existing_receipts' => 'nullable|array',
         ]);
 
         // Enforce policies
@@ -524,10 +566,13 @@ class TravelExpenseController extends Controller
                             $needsReceipt = true;
                         }
                         
-                        $fileKey = "claims.{$index}.receipt";
-                        // If needs receipt and neither new file uploaded nor existing receipt path present
-                        if ($needsReceipt && !$request->hasFile($fileKey) && empty($c['existing_receipt'])) {
-                            $errorMessages[$fileKey] = "A receipt attachment is required for " . $rule->category->name . " claims.";
+                        $fileKeySingle = "claims.{$index}.receipt";
+                        $fileKeyArray  = "claims.{$index}.receipts";
+                        $hasFile = $request->hasFile($fileKeySingle) || $request->hasFile($fileKeyArray);
+                        $hasExisting = !empty($c['existing_receipt']) || !empty($c['existing_receipts']);
+
+                        if ($needsReceipt && !$hasFile && !$hasExisting) {
+                            $errorMessages[$fileKeyArray] = "A receipt attachment is required for " . $rule->category->name . " claims.";
                         }
                     }
                 }
@@ -560,11 +605,14 @@ class TravelExpenseController extends Controller
 
             // Update main report
             $expenseReport->update([
-                'travel_request_id' => $validated['travel_request_id'] ?: null,
-                'title'             => $validated['title'],
-                'total_amount'      => $totalAmount,
-                'advance_adjusted'  => $advanceAdjusted,
-                'net_reimbursement' => $netReimbursement,
+                'travel_request_id'          => $validated['travel_request_id'] ?: null,
+                'title'                      => $validated['title'],
+                'total_amount'               => $totalAmount,
+                'advance_adjusted'           => $advanceAdjusted,
+                'net_reimbursement'          => $netReimbursement,
+                'approved_amount'            => null,
+                'approved_net_reimbursement' => null,
+                'status'                     => 'submitted',
             ]);
 
             // Unlink any previously linked Cash Advance
@@ -575,15 +623,48 @@ class TravelExpenseController extends Controller
                 $advance->update(['expense_report_id' => $expenseReport->id]);
             }
 
-            // Delete old claim lines
-            $expenseReport->claims()->delete();
+            // Preserve previously paid claims; delete only pending/rejected/draft lines being resubmitted
+            $expenseReport->claims()->whereIn('status', ['pending', 'rejected', 'draft'])->delete();
 
-            // Create new claim lines
+            // Create/resubmit claim lines
             foreach ($validated['claims'] as $index => $c) {
-                $receiptPath = $c['existing_receipt'] ?? null;
-                $fileKey = "claims.{$index}.receipt";
-                if ($request->hasFile($fileKey)) {
-                    $receiptPath = $request->file($fileKey)->store('expense_receipts', 'public');
+                $storedPaths = [];
+
+                if (!empty($c['existing_receipts']) && is_array($c['existing_receipts'])) {
+                    foreach ($c['existing_receipts'] as $ep) {
+                        if (!empty($ep)) {
+                            $storedPaths[] = $ep;
+                        }
+                    }
+                } elseif (!empty($c['existing_receipt'])) {
+                    if (str_starts_with($c['existing_receipt'], '[')) {
+                        $dec = json_decode($c['existing_receipt'], true);
+                        if (is_array($dec)) {
+                            $storedPaths = array_merge($storedPaths, $dec);
+                        }
+                    } else {
+                        $storedPaths[] = $c['existing_receipt'];
+                    }
+                }
+
+                if ($request->hasFile("claims.{$index}.receipt")) {
+                    $storedPaths[] = $this->storeAndCompressReceipt($request->file("claims.{$index}.receipt"));
+                }
+
+                if ($request->hasFile("claims.{$index}.receipts")) {
+                    foreach ($request->file("claims.{$index}.receipts") as $uploadedFile) {
+                        if ($uploadedFile && $uploadedFile->isValid()) {
+                            $storedPaths[] = $this->storeAndCompressReceipt($uploadedFile);
+                        }
+                    }
+                }
+
+                $storedPaths = array_values(array_unique($storedPaths));
+                $receiptPath = null;
+                if (count($storedPaths) === 1) {
+                    $receiptPath = $storedPaths[0];
+                } elseif (count($storedPaths) > 1) {
+                    $receiptPath = json_encode($storedPaths);
                 }
 
                 ExpenseClaim::create([
@@ -595,12 +676,13 @@ class TravelExpenseController extends Controller
                     'merchant'            => $c['merchant'] ?? null,
                     'description'         => $c['desc'] ?? null,
                     'receipt_path'        => $receiptPath,
+                    'status'              => 'pending',
                 ]);
             }
         });
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
-            ->with('success', 'Expense report updated successfully.');
+            ->with('success', 'Expense report resubmitted successfully.');
     }
 
     public function submitExpenseReport(ExpenseReport $expenseReport): RedirectResponse
@@ -612,8 +694,65 @@ class TravelExpenseController extends Controller
     public function approveExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $approvedAmount = $request->input('approved_amount', $expenseReport->total_amount);
-        $approvedAmount = floatval($approvedAmount);
+
+        // Check for itemized claim line decisions
+        $itemDecisions = $request->input('items', []);
+        $status = 'approved';
+
+        if (!empty($itemDecisions)) {
+            $totalApproved = 0.00;
+            $approvedCount = 0;
+            $rejectedCount = 0;
+
+            foreach ($itemDecisions as $claimId => $itemData) {
+                $claim = ExpenseClaim::where('expense_report_id', $expenseReport->id)->find($claimId);
+                if ($claim) {
+                    $itemDecision = $itemData['decision'] ?? 'approved';
+                    $rejectionReason = $itemData['rejection_reason'] ?? null;
+
+                    if ($itemDecision === 'approved') {
+                        $itemApprovedVal = isset($itemData['approved_amount']) && $itemData['approved_amount'] !== '' 
+                            ? floatval($itemData['approved_amount']) 
+                            : floatval($claim->amount);
+
+                        $claim->update([
+                            'status'           => 'approved',
+                            'approved_amount'  => $itemApprovedVal,
+                            'rejection_reason' => null,
+                        ]);
+                        $totalApproved += $itemApprovedVal;
+                        $approvedCount++;
+                    } else {
+                        $claim->update([
+                            'status'           => 'rejected',
+                            'approved_amount'  => 0.00,
+                            'rejection_reason' => $rejectionReason ?: 'Rejected by administrator.',
+                        ]);
+                        $rejectedCount++;
+                    }
+                }
+            }
+
+            if ($approvedCount > 0 && $rejectedCount > 0) {
+                $status = 'partially_approved';
+            } elseif ($approvedCount > 0 && $rejectedCount === 0) {
+                $status = 'approved';
+            } else {
+                $status = 'rejected';
+            }
+
+            $approvedAmount = $totalApproved;
+        } else {
+            $approvedAmount = floatval($request->input('approved_amount', $expenseReport->total_amount));
+            $status = 'approved';
+
+            foreach ($expenseReport->claims as $c) {
+                $c->update([
+                    'status'          => 'approved',
+                    'approved_amount' => $c->amount,
+                ]);
+            }
+        }
 
         $advance = $expenseReport->cashAdvance;
         $totalAdvance = $advance ? floatval($advance->approved_amount ?? $advance->amount) : 0.00;
@@ -626,11 +765,11 @@ class TravelExpenseController extends Controller
         $payoutChannel = $request->input('payout_channel', 'accounting');
 
         $expenseReport->update([
-            'status' => 'approved',
-            'approved_amount' => $approvedAmount,
+            'status'                     => $status,
+            'approved_amount'            => $approvedAmount,
             'approved_net_reimbursement' => $approvedNet,
-            'advance_adjusted' => $adjusted,
-            'payout_channel' => $payoutChannel,
+            'advance_adjusted'          => $adjusted,
+            'payout_channel'             => $payoutChannel,
         ]);
 
         if ($payoutChannel === 'accounting') {
@@ -749,29 +888,46 @@ class TravelExpenseController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         DB::transaction(function () use ($expenseReport, $tenantId) {
-            $expenseReport->update(['status' => 'paid']);
+            // Find newly approved claims that have not been paid yet
+            $approvedClaims = $expenseReport->claims()->where('status', 'approved')->get();
+            $unpaidApprovedAmount = $approvedClaims->sum(function($c) {
+                return floatval($c->approved_amount ?? $c->amount);
+            });
+
+            // If no explicit claim lines are marked 'approved', fall back to report approved amount
+            if ($unpaidApprovedAmount <= 0 && in_array($expenseReport->status, ['approved', 'partially_approved'])) {
+                $unpaidApprovedAmount = floatval($expenseReport->approved_amount ?? $expenseReport->total_amount);
+            }
+
+            // Mark approved claim lines as paid
+            $expenseReport->claims()->where('status', 'approved')->update(['status' => 'paid']);
+
+            // Determine if all claim lines are now paid
+            $unpaidCount = $expenseReport->claims()->whereIn('status', ['pending', 'rejected'])->count();
+            if ($unpaidCount === 0) {
+                $expenseReport->update(['status' => 'paid']);
+            } else {
+                $expenseReport->update(['status' => 'partially_approved']);
+            }
 
             $advance = $expenseReport->cashAdvance;
             $isAccountingChannel = ($expenseReport->payout_channel ?? 'accounting') === 'accounting';
 
-            if ($isAccountingChannel) {
-                $totalAdvance = $advance ? floatval($advance->approved_amount ?? $advance->amount) : 0.00;
-                $approvedAmount = floatval($expenseReport->approved_amount ?? $expenseReport->total_amount);
-                $surplus = max($totalAdvance - $approvedAmount, 0.00);
-                $approvedNet = max($approvedAmount - $totalAdvance, 0.00);
+            if ($isAccountingChannel && $unpaidApprovedAmount > 0) {
+                $totalAdvance = ($advance && $advance->status !== 'settled') ? floatval($advance->approved_amount ?? $advance->amount) : 0.00;
+                $surplus = max($totalAdvance - $unpaidApprovedAmount, 0.00);
+                $approvedNet = max($unpaidApprovedAmount - $totalAdvance, 0.00);
 
                 $lines = [];
 
                 // 1. Debit Other Expense (Code 5900)
-                if ($approvedAmount > 0) {
-                    $expenseAccount = $this->getOrCreateAccount($tenantId, '5900', 'Other Expense', 'expense', 'debit', 'operating_expense');
-                    $lines[] = [
-                        'chart_of_account_id' => $expenseAccount->id,
-                        'debit' => $approvedAmount,
-                        'credit' => 0.00,
-                        'description' => "Expense Claim: " . $expenseReport->title
-                    ];
-                }
+                $expenseAccount = $this->getOrCreateAccount($tenantId, '5900', 'Other Expense', 'expense', 'debit', 'operating_expense');
+                $lines[] = [
+                    'chart_of_account_id' => $expenseAccount->id,
+                    'debit' => $unpaidApprovedAmount,
+                    'credit' => 0.00,
+                    'description' => "Expense Claim Payout: " . $expenseReport->title
+                ];
 
                 // 2. Credit Advances (Code 1400)
                 if ($totalAdvance > 0) {
@@ -779,7 +935,7 @@ class TravelExpenseController extends Controller
                     $lines[] = [
                         'chart_of_account_id' => $advancesAccount->id,
                         'debit' => 0.00,
-                        'credit' => $totalAdvance,
+                        'credit' => min($totalAdvance, $unpaidApprovedAmount),
                         'description' => "Clear Advance for Claim: " . $expenseReport->title
                     ];
                 }
@@ -815,7 +971,7 @@ class TravelExpenseController extends Controller
                             'source' => 'expense',
                             'reference_type' => 'ExpenseReport',
                             'reference_id' => $expenseReport->id,
-                            'memo' => "Paid Expense Claim: " . $expenseReport->title,
+                            'memo' => "Paid Expense Claim Portion: " . $expenseReport->title,
                             'posted_by' => auth()->id(),
                         ]);
                     } catch (\Exception $e) {
@@ -824,13 +980,13 @@ class TravelExpenseController extends Controller
                 }
             }
 
-            // If an advance was associated, mark it as settled
+            // Settle cash advance
             if ($advance) {
                 $advance->update(['status' => 'settled']);
             }
         });
 
-        return redirect()->back()->with('success', 'Expense report marked as paid and advance settled.');
+        return redirect()->back()->with('success', 'Expense payout processed successfully and accounting entries updated.');
     }
 
     // ── EXPENSE POLICIES (MANAGED INSIDE PENALIZATION POLICY) ──────────────────
@@ -996,5 +1152,105 @@ class TravelExpenseController extends Controller
                 'description' => 'Reimbursement of travel & expense claims'
             ]
         );
+    }
+    /**
+     * Store and automatically compress uploaded receipt files (Images/PDFs).
+     */
+    private function storeAndCompressReceipt($uploadedFile): string
+    {
+        if (!$uploadedFile || !$uploadedFile->isValid()) {
+            return '';
+        }
+
+        $extension = strtolower($uploadedFile->getClientOriginalExtension());
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+
+        // If not an image or GD library not available, fallback to standard file storage
+        if (!in_array($extension, $imageExtensions) || !extension_loaded('gd')) {
+            return $uploadedFile->store('expense_receipts', 'public');
+        }
+
+        try {
+            $filePath = $uploadedFile->getRealPath();
+            $image = null;
+
+            switch ($extension) {
+                case 'jpg':
+                case 'jpeg':
+                    if (function_exists('imagecreatefromjpeg')) {
+                        $image = @imagecreatefromjpeg($filePath);
+                    }
+                    break;
+                case 'png':
+                    if (function_exists('imagecreatefrompng')) {
+                        $image = @imagecreatefrompng($filePath);
+                    }
+                    break;
+                case 'webp':
+                    if (function_exists('imagecreatefromwebp')) {
+                        $image = @imagecreatefromwebp($filePath);
+                    }
+                    break;
+            }
+
+            if (!$image && function_exists('imagecreatefromstring')) {
+                $image = @imagecreatefromstring(file_get_contents($filePath));
+            }
+
+            if (!$image) {
+                return $uploadedFile->store('expense_receipts', 'public');
+            }
+
+            // Get dimensions
+            $origWidth = imagesx($image);
+            $origHeight = imagesy($image);
+            $maxDimension = 1920;
+
+            // Scale down if image is larger than 1920px
+            if ($origWidth > $maxDimension || $origHeight > $maxDimension) {
+                if ($origWidth > $origHeight) {
+                    $newWidth = $maxDimension;
+                    $newHeight = (int) round(($origHeight / $origWidth) * $maxDimension);
+                } else {
+                    $newHeight = $maxDimension;
+                    $newWidth = (int) round(($origWidth / $origHeight) * $maxDimension);
+                }
+
+                $resizedImage = imagecreatetruecolor($newWidth, $newHeight);
+
+                // Preserve PNG transparency
+                if ($extension === 'png') {
+                    imagealphablending($resizedImage, false);
+                    imagesavealpha($resizedImage, true);
+                }
+
+                imagecopyresampled($resizedImage, $image, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
+                imagedestroy($image);
+                $image = $resizedImage;
+            }
+
+            // Save to public storage
+            $fileName = 'receipt_' . uniqid() . '_' . time() . '.' . ($extension === 'png' ? 'png' : 'jpg');
+            $storageDir = storage_path('app/public/expense_receipts');
+            if (!file_exists($storageDir)) {
+                mkdir($storageDir, 0755, true);
+            }
+
+            $destinationPath = $storageDir . '/' . $fileName;
+
+            if ($extension === 'png' && function_exists('imagepng')) {
+                imagepng($image, $destinationPath, 6);
+            } else {
+                imagejpeg($image, $destinationPath, 80);
+            }
+
+            imagedestroy($image);
+
+            return 'expense_receipts/' . $fileName;
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("Receipt compression fallback: " . $e->getMessage());
+            return $uploadedFile->store('expense_receipts', 'public');
+        }
     }
 }

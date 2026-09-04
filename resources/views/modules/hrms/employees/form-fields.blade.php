@@ -1,8 +1,10 @@
 @php
     $isEdit = $mode === 'edit';
     $prefix = $isEdit ? 'edit' : 'create';
-    $fieldValue = function (string $field, $default = '') use ($isEdit) {
-        return old($field, $default);
+    $empObj = $employee ?? null;
+    $fieldValue = function (string $field, $default = '') use ($isEdit, $empObj) {
+        $fallback = ($isEdit && $empObj && isset($empObj->$field)) ? $empObj->$field : $default;
+        return old($field, $fallback);
     };
     // Prepared for future role-based lock: when $isEmployeeSelfService is true, HR fields become readonly/disabled
     $isEmployeeSelfService = $isEmployeeSelfService ?? false;
