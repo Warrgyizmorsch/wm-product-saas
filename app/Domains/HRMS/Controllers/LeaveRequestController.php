@@ -95,6 +95,18 @@ class LeaveRequestController extends Controller
         return redirect()->back()->with('success', __('hrms.leave.app.submitted_successfully'));
     }
 
+    public function approve(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $request->merge(['action' => 'approved']);
+        return $this->updateStatus($request, $leaveRequest);
+    }
+
+    public function reject(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $request->merge(['action' => 'rejected']);
+        return $this->updateStatus($request, $leaveRequest);
+    }
+
     public function updateStatus(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
         abort_unless($request->user()->hasHrPermission('hr.settings.manage'), 403);
