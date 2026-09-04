@@ -231,6 +231,9 @@ Route::prefix('production')
         Route::post('mes/{op}/hold', [MesController::class, 'hold'])->name('mes.hold');
         Route::post('mes/{op}/cancel', [MesController::class, 'cancel'])->name('mes.cancel');
         Route::post('mes/{op}/andon-alert', [MesController::class, 'reportAndonAlert'])->name('mes.andon-alert');
+        Route::post('mes/{op}/quality-inspection', [MesController::class, 'recordQualityInspection'])->name('mes.quality-inspection');
+        Route::post('mes/{op}/scrap', [MesController::class, 'recordOperationalScrap'])->name('mes.scrap');
+        Route::post('mes/{op}/disposition', [MesController::class, 'recordDisposition'])->name('mes.disposition');
 
         // ── Advanced MES Refinements ───────────────────────────────────────────
         // Touch Operator Dashboard and My Operations

@@ -43,6 +43,7 @@ class ProductionQualityInspection extends BaseModel
     protected $casts = [
         'attachments_json' => 'array',
         'audited_at'       => 'datetime',
+        'inspected_at'     => 'datetime',
     ];
 
     public function plan(): BelongsTo

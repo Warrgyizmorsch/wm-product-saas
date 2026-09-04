@@ -44,32 +44,47 @@
         <form action="{{ route('sales.dispatches.store') }}" method="POST" id="dispatchForm">
             @csrf
             <input type="hidden" name="material_requirement_id" id="deliveryOrderId" value="{{ old('material_requirement_id', $mrId ?? request('material_requirement_id') ?? request('mr_id')) }}">
+            <input type="hidden" name="sales_order_id" id="salesOrderId" value="{{ old('sales_order_id', $soId ?? $prefillSalesOrder?->id ?? request('sales_order_id') ?? request('so_id')) }}">
 
             <x-ui.odoo-form-ui type="sheet">
                 <!-- Actions Top Bar -->
                 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
                     <div>
                         <h4 class="fw-bold text-dark mb-0">New Dispatch Order</h4>
-                        <span class="fs-12 text-muted">Issue an Outward Dispatch Order against a Material Requirement or create a Direct Outward Dispatch.</span>
+                        <span class="fs-12 text-muted">Issue an Outward Dispatch Order against a Sales Order / Material Requirement or create a Direct Outward Dispatch.</span>
                     </div>
-                </div>
-
-                <!-- MR Selection Banner (Against Material Requirement) -->
-                <div id="mrBanner" class="d-flex align-items-center justify-content-between gap-3 mb-4 p-3 bg-light rounded border">
-                    <div>
-                        <span class="d-block fs-12 text-muted">Material Requirement Reference:</span>
-                        <strong id="selectedDeliveryOrder" class="text-dark fs-14">No material requirement selected</strong>
-                        <span id="selectedCustomer" class="d-block fs-12 text-muted"></span>
-                    </div>
-                    <x-ui.button type="button" variant="outline-primary" size="sm" icon="feather-truck" data-bs-toggle="modal" data-bs-target="#deliveryOrderPicker">
-                        Select Material Requirement
-                    </x-ui.button>
                 </div>
 
                 <!-- Header Details Section -->
                 <div class="row g-4 mb-4 fs-13 text-dark">
                     <div class="col-md-6 border-end pe-md-4">
-                        <h6 class="fw-bold text-primary mb-3"><i class="feather-calendar me-2"></i>Dispatch & Logistics Details</h6>
+                        <h6 class="fw-bold text-primary mb-3"><i class="feather-layers me-2"></i>1. Fulfillment & Document Source Reference</h6>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-12 text-dark">Sales Order / Material Requirement Reference *</label>
+                            <select id="orderSelectPicker" class="form-select odoo-select2 font-monospace fs-12 border-primary">
+                                <option value="">-- Choose Sales Order / Material Requirement --</option>
+                                @foreach($pendingDOs as $pDo)
+                                    <option value="{{ $pDo->id }}" data-so-id="{{ $pDo->sales_order_id }}" @selected($mrId == $pDo->id || $soId == $pDo->sales_order_id)>
+                                        {{ $pDo->salesOrder?->sales_order_number ?? 'N/A' }} ({{ $pDo->requirement_number }}) &mdash; {{ $pDo->salesOrder?->customer?->name ?? 'Customer' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <x-ui.odoo-form-ui type="input" label="Customer Name" id="displayCustomerNameInput" :value="$prefillSalesOrder?->customer?->name ?: '—'" readonly="true" style="font-weight: bold; background-color: #f8fafc;" />
+
+                        <div id="invoicePickerWrapper" class="mb-3 p-3 rounded border border-primary d-none" style="background-color: #eff6ff !important;">
+                            <label for="invoiceSelect" class="form-label fw-bold fs-12 text-primary mb-1">
+                                <i class="feather-file-text me-1"></i>Dispatch Against Customer Invoice (Optional):
+                            </label>
+                            <select name="invoice_id" id="invoiceSelect" class="form-select form-select-sm font-monospace fs-12 border-primary bg-white shadow-sm fw-bold text-dark">
+                                <option value="">-- Dispatch Full Order / Requirement --</option>
+                            </select>
+                            <span class="fs-11 text-muted d-block mt-1">Select an advance invoice to dispatch specifically against its items & remaining unfulfilled quantities.</span>
+                        </div>
+
+                        <h6 class="fw-bold text-primary mb-3 mt-4"><i class="feather-calendar me-2"></i>2. Dispatch & Logistics Details</h6>
                         <x-ui.odoo-form-ui type="input" inputType="date" label="Dispatch Date" name="dispatch_date" :value="old('dispatch_date', now()->toDateString())" :required="true" />
                         
                         <div class="mb-3">
@@ -97,16 +112,12 @@
                     </div>
 
                     <div class="col-md-6 ps-md-4">
-                        <h6 class="fw-bold text-primary mb-3"><i class="feather-truck me-2"></i>Vehicle & Driver Information</h6>
+                        <h6 class="fw-bold text-primary mb-3"><i class="feather-truck me-2"></i>3. Vehicle, Driver & Destination Address</h6>
                         <x-ui.odoo-form-ui type="input" label="Vehicle Number" name="vehicle_number" :value="old('vehicle_number')" placeholder="e.g. MH-12-AB-1234" />
                         <x-ui.odoo-form-ui type="input" label="Driver Name" name="driver_name" :value="old('driver_name')" placeholder="Driver's full name" />
                         <x-ui.odoo-form-ui type="input" label="Driver Phone Number" name="driver_phone" :value="old('driver_phone')" placeholder="e.g. +91 98765 43210" />
+                        <x-ui.odoo-form-ui type="textarea" label="Delivery / Shipping Address (Ship-To Destination)" name="shipping_address" rows="3" placeholder="Enter delivery location / destination address if different from default billing address...">{{ old('shipping_address') }}</x-ui.odoo-form-ui>
                     </div>
-                </div>
-
-                <!-- Shipping Address Section -->
-                <div class="mb-4">
-                    <x-ui.odoo-form-ui type="textarea" label="Delivery / Shipping Address (Ship-To Destination)" name="shipping_address" rows="2" placeholder="Enter delivery location / destination address if different from default billing address...">{{ old('shipping_address') }}</x-ui.odoo-form-ui>
                 </div>
 
                 <!-- Line Items Matrix Section -->
@@ -450,10 +461,67 @@
             bootstrap.Modal.getOrCreateInstance(pickerElement).hide();
         });
 
+        let activeSalesOrderInvoices = [];
+        let activeOrderItems = [];
+
+        function loadInvoicesForSalesOrder(salesOrderId) {
+            const $wrapper = $('#invoicePickerWrapper');
+            const $select = $('#invoiceSelect');
+            if (!salesOrderId) {
+                $wrapper.addClass('d-none');
+                $select.empty().append('<option value="">-- Dispatch Full Sales Order / Material Requirement --</option>');
+                activeSalesOrderInvoices = [];
+                return;
+            }
+
+            const url = "{{ route('sales.dispatches.sales-order-invoices') }}?sales_order_id=" + salesOrderId;
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(res) {
+                    if (res && res.invoices && res.invoices.length > 0) {
+                        activeSalesOrderInvoices = res.invoices;
+                        $select.empty().append('<option value="">-- Dispatch Full Sales Order / Material Requirement --</option>');
+                        res.invoices.forEach(function(inv) {
+                            $select.append(`<option value="${inv.id}">Invoice #${inv.invoice_number} (${inv.invoice_date}) - Total ₹${inv.total_amount} [${inv.items.length} unfulfilled item(s)]</option>`);
+                        });
+                        $wrapper.removeClass('d-none');
+                    } else {
+                        $wrapper.addClass('d-none');
+                        $select.empty().append('<option value="">-- Dispatch Full Sales Order / Material Requirement --</option>');
+                        activeSalesOrderInvoices = [];
+                    }
+                },
+                error: function() {
+                    $wrapper.addClass('d-none');
+                    activeSalesOrderInvoices = [];
+                }
+            });
+        }
+
+        $('#invoiceSelect').on('change', function() {
+            const selectedInvId = $(this).val();
+            if (selectedInvId) {
+                const inv = activeSalesOrderInvoices.find(i => i.id == selectedInvId);
+                if (inv && inv.items) {
+                    renderDispatchItems(inv.items, true);
+                }
+            } else {
+                if (activeOrderItems && activeOrderItems.length > 0) {
+                    renderDispatchItems(activeOrderItems, false);
+                }
+            }
+        });
+
         function selectDeliveryOrder(order) {
             deliveryOrderId.value = order.id;
-            document.getElementById('selectedDeliveryOrder').textContent = order.requirement_number;
-            document.getElementById('selectedCustomer').textContent = `${order.sales_order || ''}${order.customer ? ` — ${order.customer}` : ''}`;
+            const soId = order.sales_order_id || '';
+            if (document.getElementById('salesOrderId')) {
+                document.getElementById('salesOrderId').value = soId;
+            }
+
+            $('#orderSelectPicker').val(order.id).trigger('change.select2');
+            $('#displayCustomerNameInput').val(order.customer || '—');
 
             if (order.freight_terms) {
                 $('#freightTermsSelect').val(order.freight_terms).trigger('change');
@@ -462,10 +530,40 @@
                 $('#freightAmountInput').val(parseFloat(order.freight_amount).toFixed(2));
             }
 
-            renderDispatchItems(order.items);
+            activeOrderItems = order.items || [];
+            renderDispatchItems(activeOrderItems, false);
+
+            if (soId) {
+                loadInvoicesForSalesOrder(soId);
+            } else {
+                loadInvoicesForSalesOrder(null);
+            }
         }
 
-        function renderDispatchItems(items) {
+        $('#orderSelectPicker').on('change', function() {
+            const selectedMrId = $(this).val();
+            if (!selectedMrId) return;
+
+            if (deliveryOrders && deliveryOrders.length > 0) {
+                const targetOrder = deliveryOrders.find(o => o.id == selectedMrId);
+                if (targetOrder) {
+                    selectDeliveryOrder(targetOrder);
+                    return;
+                }
+            }
+
+            fetch('{{ route('sales.dispatches.pending-mr') }}', { headers: { Accept: 'application/json' } })
+                .then(res => res.ok ? res.json() : Promise.reject())
+                .then(res => {
+                    deliveryOrders = res.data || res || [];
+                    const targetOrder = deliveryOrders.find(o => o.id == selectedMrId);
+                    if (targetOrder) {
+                        selectDeliveryOrder(targetOrder);
+                    }
+                });
+        });
+
+        function renderDispatchItems(items, isInvoice = false) {
             let rowsHtml = '';
             let dispatchableCount = 0;
 
@@ -473,6 +571,10 @@
                 const options = warehouses.map(w =>
                     `<option value="${w.id}" ${Number(item.warehouse_id) === Number(w.id) ? 'selected' : ''}>${escapeHtml(w.name)}</option>`
                 ).join('');
+
+                const itemRefInput = isInvoice 
+                    ? `<input type="hidden" name="items[${index}][invoice_item_id]" value="${item.invoice_item_id || item.id}">`
+                    : `<input type="hidden" name="items[${index}][material_requirement_item_id]" value="${item.id}">`;
 
                 if (item.fully_dispatched) {
                     rowsHtml += `
@@ -484,7 +586,7 @@
                             <td class="align-top"><span class="text-muted fs-12">—</span></td>
                             <td class="text-end align-top">${item.quantity_ordered}</td>
                             <td class="text-end fw-semibold text-success align-top">${item.available_qty ?? 0}</td>
-                            <td class="text-end align-top">${item.quantity_reserved}</td>
+                            <td class="text-end align-top">${item.quantity_reserved ?? 0}</td>
                             <td class="text-end fw-bold text-success align-top">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-muted align-top">0</td>
                             <td class="text-end align-top">
@@ -496,7 +598,7 @@
                     rowsHtml += `
                         <tr>
                             <td class="ps-3 align-top product-detail-cell">
-                                <input type="hidden" name="items[${index}][material_requirement_item_id]" value="${item.id}">
+                                ${itemRefInput}
                                 <input type="hidden" name="items[${index}][product_id]" value="${item.product_id}">
                                 <strong class="text-dark fs-13 d-block">${escapeHtml(item.product_name || 'Unknown product')}</strong>
                                 ${item.product_sku ? `<small class="d-block text-muted font-monospace fs-11">SKU: ${escapeHtml(item.product_sku)}</small>` : ''}
@@ -504,7 +606,7 @@
                             <td class="align-top"><select name="items[${index}][warehouse_id]" class="form-select odoo-table-select odoo-select2 item-warehouse-select">${options}</select></td>
                             <td class="text-end fw-semibold mr-col align-top">${item.quantity_ordered}</td>
                             <td class="text-end fw-semibold text-success mr-col align-top avail-qty-cell">${item.available_qty ?? 0}</td>
-                            <td class="text-end fw-semibold text-info mr-col align-top reserved-qty-cell">${item.quantity_reserved}</td>
+                            <td class="text-end fw-semibold text-info mr-col align-top reserved-qty-cell">${item.quantity_reserved ?? 0}</td>
                             <td class="text-end fw-bold mr-col align-top ${item.already_dispatched > 0 ? 'text-warning' : 'text-muted'}">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-primary mr-col align-top">${item.remaining_qty}</td>
                             <td class="text-end pe-2 align-top qty-cell">
@@ -532,11 +634,20 @@
 
             itemsBody.innerHTML = rowsHtml;
             initSelect2(itemsBody);
-            itemsHint.textContent = `${dispatchableCount} item(s) available to dispatch.`;
+            itemsHint.textContent = `${dispatchableCount} item(s) available to dispatch ${isInvoice ? '(From Selected Invoice)' : ''}.`;
             
+            // Auto-trigger stock check AJAX for each row to fetch real-time warehouse available stock
+            $(itemsBody).find('tr').each(function() {
+                const $tr = $(this);
+                const $whSelect = $tr.find('select[name$="[warehouse_id]"]');
+                if ($whSelect.length && $whSelect.val()) {
+                    $whSelect.trigger('change');
+                }
+            });
+
             setTimeout(function() {
                 checkAllDispatchRowsValidation();
-            }, 50);
+            }, 100);
         }
 
         function escapeHtml(value) {
@@ -883,6 +994,13 @@
                     console.error('Failed to update stock for warehouse:', err);
                 }
             });
+        });
+
+        $(document).ready(function() {
+            const initialSoId = $('#salesOrderId').val();
+            if (initialSoId) {
+                loadInvoicesForSalesOrder(initialSoId);
+            }
         });
     </script>
 @endpush

@@ -521,9 +521,7 @@ class MesExecutionService
                     throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available transferred input WIP of {$availableWip} units.");
                 }
 
-                if ($this->qualityGateIsPendingOrFailed($orderOp)) {
-                    throw new InvalidArgumentException('This operation requires an approved passed quality inspection before completion.');
-                }
+                $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
 
                 // Create progress log
                 ProductionOrderProgressLog::create([
@@ -544,22 +542,33 @@ class MesExecutionService
                     'remarks' => $data['remarks'] ?? null,
                 ]);
 
-                // Determine if required target quantity has been reached
+                // Determine if required target GOOD quantity has been reached
                 $targetQty = (float) ($orderOp->target_produced_qty > 0 ? $orderOp->target_produced_qty : ($schedOp->order->quantity_ordered ?? 0));
-                $newTotalOutput = (float) $orderOp->quantity_produced + (float) $orderOp->quantity_scrapped + (float) $orderOp->quantity_rejected + $produced + $scrapped + $rejected;
-                $isTargetReached = ($targetQty <= 0) || ($newTotalOutput >= $targetQty) || !empty($data['force_complete']);
+                $newGoodTotalOutput = (float) $orderOp->quantity_produced + ($isQcRequired ? 0.0 : $produced);
+                $isTargetReached = ($targetQty <= 0) || ($newGoodTotalOutput >= ($targetQty - 0.0001)) || !empty($data['force_complete']);
+
+                if ($isTargetReached && $isQcRequired && $this->qualityGateIsPendingOrFailed($orderOp)) {
+                    if (!empty($data['force_complete'])) {
+                        throw new InvalidArgumentException('This operation requires an approved passed quality inspection before completion.');
+                    }
+                    $isTargetReached = false;
+                }
 
                 // Update order operation & parent production order metrics
                 if ($isTargetReached) {
                     $orderOp->status = ProductionOrderOperation::STATUS_COMPLETED;
                     $orderOp->actual_end_time = $now;
+                    $schedOp->status = ProductionScheduleOperation::STATUS_COMPLETED;
+                    $schedOp->actual_finish = $now;
                 } else {
                     $orderOp->status = ProductionOrderOperation::STATUS_RUNNING;
                 }
                 $orderOp->setup_time_actual += $setupMinutes;
                 $orderOp->processing_time_actual += $runMinutes;
-                $orderOp->quantity_produced += $produced;
-                $orderOp->quantity_rejected += $rejected;
+                if (!$isQcRequired) {
+                    $orderOp->quantity_produced += $produced;
+                    $orderOp->quantity_rejected += $rejected;
+                }
                 $orderOp->quantity_scrapped += $scrapped;
                 $orderOp->save();
 
@@ -617,7 +626,7 @@ class MesExecutionService
                         'production_order_id' => $schedOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'production_batch_id' => $batchId,
-                        'product_id' => $order->product_id,
+                        'product_id' => $orderOp->product_id ?? $orderOp->source_product_id ?? $order->product_id,
                         'quantity' => $scrapped,
                         'reason' => $data['remarks'] ?? 'Automatic log scrap from MES shopfloor operation execution.',
                         'recorded_by' => $operatorId,
@@ -1014,7 +1023,8 @@ class MesExecutionService
 
     private function qualityGateIsPendingOrFailed(ProductionOrderOperation $operation): bool
     {
-        if (!$operation->routingOperation?->quality_required) {
+        $isQcRequired = (bool) ($operation->quality_required || ($operation->routingOperation?->quality_required ?? false));
+        if (!$isQcRequired) {
             return false;
         }
 
@@ -1185,5 +1195,32 @@ class MesExecutionService
 
             return (float) $op->fresh()->quantity_claimed;
         });
+    }
+
+    /**
+     * Dynamically derive pending QC quantity without adding database columns.
+     * Pending QC = Cumulative Logged Output - Cumulative QC Inspected Output.
+     */
+    public function getPendingQcQuantity(int $operationId, ?int $batchId = null): float
+    {
+        $op = ProductionOrderOperation::with('routingOperation')->find($operationId);
+        if (!$op) {
+            return 0.0;
+        }
+        $isQcRequired = (bool) ($op->quality_required || ($op->routingOperation?->quality_required ?? false));
+        if (!$isQcRequired) {
+            return 0.0;
+        }
+
+        $totalLogged = ProductionOrderProgressLog::where('operation_id', $operationId)
+            ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
+            ->sum('quantity_produced');
+
+        $totalInspected = (float) ProductionQualityInspection::where('production_order_operation_id', $operationId)
+            ->when($batchId, fn($q) => $q->where('batch_id', $batchId))
+            ->selectRaw('COALESCE(SUM(COALESCE(inspected_quantity, passed_qty + failed_qty)), 0) as total')
+            ->value('total');
+
+        return max(0.0, (float) $totalLogged - (float) $totalInspected);
     }
 }

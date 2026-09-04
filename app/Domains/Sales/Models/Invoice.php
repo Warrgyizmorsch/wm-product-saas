@@ -73,9 +73,19 @@ class Invoice extends BaseModel
         return $this->belongsTo(MaterialRequirement::class, 'material_requirement_id');
     }
 
+    public function getGrandTotalAttribute(): float
+    {
+        return (float) ($this->attributes['total_amount'] ?? 0);
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class);
+    }
+
+    public function dispatchOrders(): HasMany
+    {
+        return $this->hasMany(DispatchOrder::class, 'invoice_id');
     }
 
     public function allocations(): HasMany

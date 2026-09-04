@@ -12,8 +12,10 @@ use App\Domains\Production\Requests\ProductionScheduleCalendarRequest;
 use App\Domains\Production\Services\SchedulingService;
 use App\Domains\Production\Services\SchedulingCalendarService;
 use App\Domains\Production\Services\CapacityPlanningService;
+use App\Domains\Production\Services\ProductionOrderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 use App\Domains\Production\Models\ProductionScheduleScenario;
 use App\Domains\Production\Services\SchedulePreReleaseValidationService;
@@ -100,6 +102,14 @@ class ProductionScheduleController extends Controller
             $startDate = Carbon::parse($request->validated()['start_date']);
             $type = $request->validated()['scheduling_type'];
 
+            $wasDraft = $order->isDraft();
+
+            if ($wasDraft) {
+                // Automatically release the draft production order
+                app(ProductionOrderService::class)->release($order->id, Auth::id() ?? 1);
+                $order->refresh();
+            }
+
             $schedule = $this->schedulingService->generateSchedule($order, $startDate, $type);
 
             // Apply optional notes
@@ -107,9 +117,13 @@ class ProductionScheduleController extends Controller
                 $schedule->update(['notes' => $request->input('notes')]);
             }
 
+            $msg = $wasDraft
+                ? "Production Order {$order->order_number} released and schedule generated successfully!"
+                : "Schedule generated for Order {$order->order_number} successfully!";
+
             return redirect()
                 ->route('production.schedules.show', $schedule->id)
-                ->with('success', "Scheduling created! Now you can release it to the shop floor.");
+                ->with('success', $msg);
         } catch (\LogicException $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         } catch (\Exception $e) {

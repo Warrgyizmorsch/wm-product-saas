@@ -740,6 +740,14 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'transfer_lag_minutes' => 5,
         ]);
 
+        RoutingOperationMaterial::create([
+            'tenant_id' => $tenant->id,
+            'routing_operation_id' => $opFg10->id,
+            'material_id' => $subCore->id,
+            'quantity' => 1.00,
+            'uom_id' => $pcs->id,
+        ]);
+
         $opFg20 = RoutingOperation::create([
             'tenant_id' => $tenant->id,
             'routing_id' => $routFg->id,

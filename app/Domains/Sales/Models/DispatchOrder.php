@@ -24,6 +24,7 @@ class DispatchOrder extends BaseModel
         'transporter_id',
         'material_requirement_id',
         'sales_order_id',
+        'invoice_id',
         'dispatch_number',
         'dispatch_date',
         'carrier',
@@ -73,6 +74,11 @@ class DispatchOrder extends BaseModel
     public function salesOrder(): BelongsTo
     {
         return $this->belongsTo(SalesOrder::class, 'sales_order_id');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class, 'invoice_id');
     }
 
     public function customer(): BelongsTo

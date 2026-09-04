@@ -238,7 +238,7 @@ class LandedCostService
                     'grand_total'           => $grandTotal,
                     'paid_amount'           => 0,
                     'due_amount'            => round($grandTotal, 2),
-                    'notes'                 => "Auto-generated Transporter Service Bill for Landed Cost Voucher {$voucher->voucher_number}",
+                    'notes'                 => "Auto-generated Service Bill for Landed Cost Voucher {$voucher->voucher_number}",
                     'created_by'            => auth()->id() ?: 1,
                 ]);
 

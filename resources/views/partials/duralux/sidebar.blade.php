@@ -27,6 +27,7 @@
             ['label' => 'CRM Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
                 ['label' => 'Lead Status Master', 'route' => 'crm.masters.lead-statuses.index'],
                 ['label' => 'Deal Stage Master', 'route' => 'crm.masters.deal-statuses.index'],
+                ['label' => 'CRM & Sales Settings', 'route' => 'crm.settings.index'],
             ]],
             ['label' => 'Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],

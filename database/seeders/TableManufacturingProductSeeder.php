@@ -49,28 +49,16 @@ class TableManufacturingProductSeeder extends Seeder
      */
     private function cleanupPreviousData(int $tenantId): void
     {
-        $skus = [
-            'FG-TBL-001',
-            'SFG-TBL-FRAME',
-            'SFG-TBL-LEG',
-            'SFG-TBL-SUPPORT',
-            'SFG-TBL-TOP',
-            'RM-TBL-PIPE',
-            'RM-TBL-TOP-BOARD',
-            'RM-TBL-FASTENER',
-        ];
-
         Schema::disableForeignKeyConstraints();
 
         $productIds = Product::where('tenant_id', $tenantId)
-            ->whereIn('sku', $skus)
             ->pluck('id')
             ->toArray();
 
         if (!empty($productIds)) {
-            StockTransaction::where('tenant_id', $tenantId)->whereIn('product_id', $productIds)->delete();
-            ProductWarehouseStock::where('tenant_id', $tenantId)->whereIn('product_id', $productIds)->delete();
-            Product::where('tenant_id', $tenantId)->whereIn('id', $productIds)->forceDelete();
+            StockTransaction::where('tenant_id', $tenantId)->delete();
+            ProductWarehouseStock::where('tenant_id', $tenantId)->delete();
+            Product::where('tenant_id', $tenantId)->forceDelete();
         }
 
         Schema::enableForeignKeyConstraints();
@@ -180,8 +168,8 @@ class TableManufacturingProductSeeder extends Seeder
                 ['tenant_id' => $tenantId, 'code' => $w['code']],
                 [
                     'name' => $w['name'],
+                    'type' => $w['type'],
                     'status' => 'active',
-                    'is_default' => false,
                 ]
             );
             $warehouses[$w['code']] = $wh->id;
@@ -241,21 +229,21 @@ class TableManufacturingProductSeeder extends Seeder
                 'opening_stock_rate' => 250.00,
                 'hsn_sac' => '73181500',
                 'gst_rate' => 18.00,
-                'description' => 'M8 Allen bolts, heavy washers, threaded inserts, and corner bracket hardware set.',
+                'description' => 'High tensile M8 hex bolts, locking nuts, spring washers, and leveling foot pads.',
                 'warehouse' => 'WH-RM-TBL',
             ],
             'sfg_leg' => [
-                'name' => 'Table Leg Heavy Steel',
+                'name' => 'Fabricated Steel Table Leg (750mm)',
                 'sku' => 'SFG-TBL-LEG',
                 'type' => 'semi_finished',
                 'planning_type' => 'manufacture',
                 'default_production_model' => Product::MODEL_PURE_MANUFACTURING,
                 'uom_id' => $uoms['Pcs'],
-                'cost_price' => 650.00,
-                'selling_price' => 950.00,
+                'cost_price' => 600.00,
+                'selling_price' => 900.00,
                 'reorder_point' => 20.00,
                 'opening_stock' => 0.00,
-                'opening_stock_rate' => 650.00,
+                'opening_stock_rate' => 600.00,
                 'hsn_sac' => '94039000',
                 'gst_rate' => 18.00,
                 'description' => 'Precision cut and deburred 750mm steel table leg component.',
@@ -309,32 +297,32 @@ class TableManufacturingProductSeeder extends Seeder
                 'opening_stock_rate' => 3200.00,
                 'hsn_sac' => '94039000',
                 'gst_rate' => 18.00,
-                'description' => 'Precision cut, edge-banded, and sealed engineered wood dining table top sub-assembly.',
+                'description' => 'Routed, edge-banded, sealed, and lacquered wood table top component.',
                 'warehouse' => 'WH-WIP-TBL',
             ],
             'fg_table' => [
-                'name' => 'Industrial Dining Table',
+                'name' => 'Industrial Dining Table (6-Seater 1800x900mm)',
                 'sku' => 'FG-TBL-001',
                 'type' => 'finished_good',
                 'planning_type' => 'manufacture',
                 'default_production_model' => Product::MODEL_PURE_MANUFACTURING,
                 'uom_id' => $uoms['Pcs'],
-                'cost_price' => 10200.00,
-                'selling_price' => 18500.00,
+                'cost_price' => 8500.00,
+                'selling_price' => 15500.00,
                 'reorder_point' => 5.00,
-                'opening_stock' => 0.00,
-                'opening_stock_rate' => 10200.00,
-                'hsn_sac' => '94032090',
+                'opening_stock' => 10.00,
+                'opening_stock_rate' => 8500.00,
+                'hsn_sac' => '94032010',
                 'gst_rate' => 18.00,
-                'description' => 'Premium Industrial Dining Table with heavy steel welded frame, 4 legs, cross support, and engineered wood top.',
+                'description' => 'Complete industrial dining table assembly comprising steel frame and engineered wood top.',
                 'warehouse' => 'WH-FG-TBL',
             ],
         ];
 
         $company = DB::table('companies')->where('tenant_id', $tenantId)->first();
-        $companyId = $company?->id ?? 1;
-        $branch = DB::table('branches')->where('company_id', $companyId)->first();
-        $branchId = $branch?->id ?? 1;
+        $companyId = $company?->id;
+        $branch = DB::table('branches')->where('tenant_id', $tenantId)->first();
+        $branchId = $branch?->id;
 
         $createdProducts = [];
 
@@ -384,9 +372,9 @@ class TableManufacturingProductSeeder extends Seeder
     private function seedInitialStock(int $tenantId, array $products, array $warehouses): void
     {
         $company = DB::table('companies')->where('tenant_id', $tenantId)->first();
-        $companyId = $company?->id ?? 1;
-        $branch = DB::table('branches')->where('company_id', $companyId)->first();
-        $branchId = $branch?->id ?? 1;
+        $companyId = $company?->id;
+        $branch = DB::table('branches')->where('tenant_id', $tenantId)->first();
+        $branchId = $branch?->id;
 
         foreach ($products as $key => $info) {
             $product = $info['model'];

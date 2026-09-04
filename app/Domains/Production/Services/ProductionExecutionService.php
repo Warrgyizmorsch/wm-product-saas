@@ -85,10 +85,8 @@ class ProductionExecutionService
                     } else {
                         $q->where('sequence', '<', $op->sequence)
                           ->where(function ($w) use ($op) {
-                              if ($op->source_product_id) {
+                              if ($op->source_product_id && (int) $op->source_product_id !== (int) ($op->order?->product_id ?? 0)) {
                                   $w->where('source_product_id', $op->source_product_id);
-                              } else {
-                                  $w->whereNull('source_product_id');
                               }
                           });
                     }
@@ -130,11 +128,16 @@ class ProductionExecutionService
                 $opFresh = $op->fresh();
                 $opWip = ProductionWip::where('tenant_id', $opFresh->tenant_id)
                     ->where('production_order_id', $opFresh->production_order_id)
+                    ->when($batch->id, fn($q) => $q->where(fn($sub) => $sub->whereNull('production_batch_id')->orWhere('production_batch_id', $batch->id)))
                     ->where(function ($q) use ($opFresh) {
                         $q->where('current_routing_operation_id', $opFresh->routing_operation_id)
                             ->orWhere('current_routing_operation_id', $opFresh->id);
+                        if (empty($opFresh->routing_operation_id)) {
+                            $q->orWhereNull('current_routing_operation_id');
+                        }
                     })
                     ->where('available_quantity', '>', 0)
+                    ->orderByDesc('available_quantity')
                     ->first();
 
                 if (!$opWip) {
@@ -143,11 +146,17 @@ class ProductionExecutionService
                         ->where(function ($q) use ($opFresh) {
                             $q->where('current_routing_operation_id', $opFresh->routing_operation_id)
                                 ->orWhere('current_routing_operation_id', $opFresh->id);
+                            if (empty($opFresh->routing_operation_id)) {
+                                $q->orWhereNull('current_routing_operation_id');
+                            }
                         })
+                        ->where('available_quantity', '>', 0)
+                        ->orderByDesc('available_quantity')
                         ->first();
                 }
                 $availableWipFromWip = max(0.0, (float) ($opWip?->available_quantity ?? $opWip?->quantity_available ?? 0.0) - (float) $opFresh->quantity_produced);
                 $availableWipFromService = app(ProductionWipService::class)->getAvailableInputWip($opFresh, $batch->id);
+                $orderAvailableWip = app(ProductionWipService::class)->getAvailableInputWip($opFresh, null);
 
                 $availableWip = max($availableWipFromWip, $availableWipFromService, $orderAvailableWip);
 
@@ -217,6 +226,7 @@ class ProductionExecutionService
             // Record physical SFG consumption for cross-assembly dependencies (Rule 7 & Rule 8, F-03)
             if ($produced > 0) {
                 app(ProductionWipService::class)->recordSfgConsumption($op, $produced, $userId, $batch->id);
+                app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($op->id, $userId, $batch->id);
             }
 
             // 4. Update Batch actual_quantity ONLY on final routing operation (or on initial op when overproduction occurs)
@@ -339,6 +349,9 @@ class ProductionExecutionService
 
                 $op->status = ProductionOrderOperation::STATUS_COMPLETED;
                 $op->actual_end_time = now();
+                $op->save();
+
+                app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($op->id, $userId);
 
                 // Advance next sequential operation in the same routing to READY
                 $nextOp = ProductionOrderOperation::where('production_order_id', $op->production_order_id)
@@ -493,7 +506,9 @@ class ProductionExecutionService
 
         return DB::transaction(function () use ($orderId, $operationId, $productId, $quantity, $reason, $userId, $warehouseId, $createNcr, $ncrParams, $batchId) {
             $order = ProductionOrder::findOrFail($orderId);
-            $scrapProductId = $productId ?? $order->product_id;
+            $orderOp = $operationId ? ProductionOrderOperation::find($operationId) : null;
+            $outputPid = $orderOp?->product_id ?? $orderOp?->source_product_id ?? $order->product_id;
+            $scrapProductId = $productId ?? $outputPid;
 
             // Create the scrap record (stock_transaction_id null = not yet posted)
             $scrap = ProductionOrderScrap::create([
@@ -509,12 +524,9 @@ class ProductionExecutionService
                 'stock_transaction_id' => null,
             ]);
 
-            if ($operationId) {
-                $orderOp = ProductionOrderOperation::find($operationId);
-                if ($orderOp) {
-                    $orderOp->quantity_scrapped += $quantity;
-                    $orderOp->save();
-                }
+            if ($orderOp && (int) $scrapProductId === (int) $outputPid) {
+                $orderOp->quantity_scrapped += $quantity;
+                $orderOp->save();
             }
 
             // Optional Quality NCR creation
@@ -929,8 +941,16 @@ class ProductionExecutionService
     public function reconcileOperationQuantities(int $operationId): ProductionOrderOperation
     {
         $op = ProductionOrderOperation::findOrFail($operationId);
+        $outputPid = $op->product_id ?? $op->source_product_id ?? $op->order?->product_id;
 
-        $scrapSum = (float) ProductionOrderScrap::where('production_order_operation_id', $op->id)->sum('quantity');
+        $scrapSum = (float) ProductionOrderScrap::where('production_order_operation_id', $op->id)
+            ->when($outputPid, function ($q) use ($outputPid) {
+                $q->where(function ($sub) use ($outputPid) {
+                    $sub->where('product_id', $outputPid)->orWhereNull('product_id');
+                });
+            })
+            ->sum('quantity');
+
         $logScrapSum = (float) ProductionOrderProgressLog::where('operation_id', $op->id)->sum('quantity_scrapped');
         $actualScrap = max($scrapSum, $logScrapSum);
 

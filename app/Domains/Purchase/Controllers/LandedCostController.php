@@ -34,6 +34,20 @@ class LandedCostController extends Controller
             ->get();
 
         $vendors = Vendor::where('tenant_id', $tenantId)->get();
+        $transporterVendorIds = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)
+            ->whereNotNull('vendor_id')
+            ->pluck('vendor_id')
+            ->toArray();
+
+        $vendors->each(function ($v) use ($transporterVendorIds) {
+            $nameLower = strtolower($v->name);
+            $v->is_transporter = in_array($v->id, $transporterVendorIds)
+                || str_contains($nameLower, 'logistics')
+                || str_contains($nameLower, 'transport')
+                || str_contains($nameLower, 'express')
+                || str_contains($nameLower, 'carrier');
+            $v->type_label = $v->is_transporter ? 'Transporter / Logistics' : 'Supplier / Vendor';
+        });
 
         return view('modules.purchase.landed-costs.create', compact('grns', 'vendors'));
     }

@@ -175,24 +175,35 @@
                                 <span class="badge {{ $badgeClass }} px-2.5 py-1 fs-11 fw-bold">{{ $dispatch->status }}</span>
                             </td>
                             <td class="text-end pe-4">
-                                <x-ui.action-dropdown :viewUrl="route('sales.dispatches.show', $dispatch->id)">
-                                    <li>
-                                        <a href="{{ route('sales.dispatches.show', $dispatch->id) }}" class="dropdown-item">
-                                            <i class="feather-eye me-2 text-muted fs-12"></i>View Dispatch
-                                        </a>
-                                    </li>
+                                <div class="hstack gap-1 justify-content-end align-items-center">
                                     @if ($dispatch->status === 'Pending')
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchForm_{{ $dispatch->id }}">
-                                                @csrf
-                                                <button type="button" class="dropdown-item text-success fw-semibold" onclick="confirmAction({ title: 'Confirm & Dispatch', message: 'Confirm dispatch {{ $dispatch->dispatch_number }}? This will deduct stock from inventory.', variant: 'success', confirmText: 'Confirm & Deduct Stock' }, function() { document.getElementById('confirmDispatchForm_{{ $dispatch->id }}').submit(); })">
-                                                    <i class="feather-check-circle me-2 text-success fs-12"></i>Confirm Dispatch
-                                                </button>
-                                            </form>
-                                        </li>
+                                        <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchForm_{{ $dispatch->id }}" class="d-inline">
+                                            @csrf
+                                            <x-ui.button type="button" variant="soft-success" size="xs" icon="feather-check-circle" class="fw-bold fs-11 text-nowrap" style="padding: 8px 8px !important;" onclick="confirmAction({ title: 'Confirm Dispatch Order', message: 'Confirm dispatch {{ $dispatch->dispatch_number }}? This will reserve stock in warehouse.', variant: 'success', confirmText: 'Confirm Dispatch' }, function() { document.getElementById('confirmDispatchForm_{{ $dispatch->id }}').submit(); })">
+                                                Confirm
+                                            </x-ui.button>
+                                        </form>
                                     @endif
-                                </x-ui.action-dropdown>
+
+                                    <x-ui.action-dropdown :viewUrl="route('sales.dispatches.show', $dispatch->id)">
+                                        <li>
+                                            <a href="{{ route('sales.dispatches.show', $dispatch->id) }}" class="dropdown-item">
+                                                <i class="feather-eye me-2 text-muted fs-12"></i>View Dispatch
+                                            </a>
+                                        </li>
+                                        @if ($dispatch->status === 'Pending')
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchFormDropdown_{{ $dispatch->id }}">
+                                                    @csrf
+                                                    <button type="button" class="dropdown-item text-success fw-semibold" onclick="confirmAction({ title: 'Confirm Dispatch Order', message: 'Confirm dispatch {{ $dispatch->dispatch_number }}? This will reserve stock in warehouse.', variant: 'success', confirmText: 'Confirm Dispatch' }, function() { document.getElementById('confirmDispatchFormDropdown_{{ $dispatch->id }}').submit(); })">
+                                                        <i class="feather-check-circle me-2 text-success fs-12"></i>Confirm Dispatch
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
+                                    </x-ui.action-dropdown>
+                                </div>
                             </td>
                         </tr>
                     @empty

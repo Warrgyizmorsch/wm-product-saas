@@ -47,7 +47,7 @@ class TransporterController extends Controller
         $this->authorize('view', $transporter);
 
         $dispatches = $transporter->dispatchOrders()
-            ->with(['materialRequirement.salesOrder.customer', 'warehouse'])
+            ->with(['materialRequirement.salesOrder.customer', 'customer', 'items.warehouse'])
             ->latest('dispatch_date')
             ->paginate(15);
 

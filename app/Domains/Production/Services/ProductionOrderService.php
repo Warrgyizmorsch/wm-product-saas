@@ -879,6 +879,28 @@ class ProductionOrderService
                     'quantity_issued' => 0.0,
                     'uom_id' => $uomId,
                 ]);
+
+                // Sync quantity_additional_requested on ProductionOrderReservation without altering quantity_planned
+                $res = ProductionOrderReservation::where('tenant_id', $order->tenant_id)
+                    ->where('production_order_id', $order->id)
+                    ->where('product_id', $productId)
+                    ->first();
+
+                if (!$res) {
+                    ProductionOrderReservation::create([
+                        'tenant_id' => $order->tenant_id,
+                        'production_order_id' => $order->id,
+                        'product_id' => $productId,
+                        'uom_id' => $uomId,
+                        'quantity_planned' => 0.0,
+                        'quantity_additional_requested' => $qty,
+                        'quantity_reserved' => 0.0,
+                        'quantity_issued' => 0.0,
+                    ]);
+                } else {
+                    $res->quantity_additional_requested += $qty;
+                    $res->save();
+                }
             }
 
             // Write timeline event
@@ -1168,10 +1190,14 @@ class ProductionOrderService
             $createdOps[] = $op;
         }
 
-        // Bind intra-routing sequential dependencies (previous_operation_id)
-        for ($i = 1; $i < count($createdOps); $i++) {
-            $createdOps[$i]->previous_operation_id = $createdOps[$i - 1]->id;
-            $createdOps[$i]->save();
+        // Bind intra-routing sequential dependencies (previous_operation_id) within each routing branch
+        $groupedOps = collect($createdOps)->groupBy(fn($op) => $op->source_routing_id ?: $op->source_product_id);
+        foreach ($groupedOps as $branchOps) {
+            $sortedOps = $branchOps->sortBy('sequence')->values();
+            for ($i = 1; $i < count($sortedOps); $i++) {
+                $sortedOps[$i]->previous_operation_id = $sortedOps[$i - 1]->id;
+                $sortedOps[$i]->save();
+            }
         }
 
         // Auto-orchestrate Subcontract Procurement according to tenant settings (Manual PR/PO, Auto Draft PO, Auto Approved PO)
@@ -1391,12 +1417,13 @@ class ProductionOrderService
             } else {
                 // Check if all predecessors are completed, skipped, or have transferred output
                 $incompletePreds = $ops->whereIn('id', $predIds)->reject(function ($predOp) {
-                    return in_array($predOp->status, [
+                    $freshPred = $predOp->fresh() ?? $predOp;
+                    return in_array($freshPred->status, [
                         ProductionOrderOperation::STATUS_COMPLETED,
                         ProductionOrderOperation::STATUS_SKIPPED,
                         ProductionOrderOperation::STATUS_CANCELLED,
-                    ], true) || (float) $predOp->quantity_transferred_out > 0
-                             || ($predOp->target_produced_qty > 0 && (float) $predOp->quantity_produced >= (float) $predOp->target_produced_qty);
+                    ], true) || (float) $freshPred->quantity_transferred_out > 0
+                             || ($freshPred->target_produced_qty > 0 && (float) $freshPred->quantity_produced >= (float) $freshPred->target_produced_qty);
                 });
 
                 $newStatus = $incompletePreds->isEmpty()

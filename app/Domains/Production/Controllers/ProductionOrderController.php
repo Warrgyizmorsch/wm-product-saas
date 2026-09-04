@@ -77,10 +77,10 @@ class ProductionOrderController extends Controller
                 });
                 $products = $salesOrderItems->map(fn($item) => $item->product)->unique('id');
             } else {
-                $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+                $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
             }
         } else {
-            $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+            $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
         }
 
         $selectedProductId = old('product_id', $productId ?? $selectedRequest?->product_id);
@@ -243,8 +243,8 @@ class ProductionOrderController extends Controller
                 $validated['notes'] ?? null
             );
 
-            return redirect()->route('sales.material-requests.show', $slip->id)
-                ->with('success', "Ad-hoc Material Requisition {$slip->requisition_number} successfully created for Order {$order->order_number}.");
+            return redirect()->route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-reservations'])
+                ->with('success', "Request sent to store for additional materials. (Requisition #{$slip->requisition_number})");
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -262,7 +262,7 @@ class ProductionOrderController extends Controller
                 ->with('error', 'Frozen Production Orders cannot be edited.');
         }
 
-        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
 
         return view('modules.production.orders.edit', compact('order', 'products'));
     }

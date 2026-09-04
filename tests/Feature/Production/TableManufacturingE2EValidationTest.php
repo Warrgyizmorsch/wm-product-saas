@@ -235,20 +235,22 @@ class TableManufacturingE2EValidationTest extends TestCase
         $this->assertTrue(in_array($op30->status, [ProductionOrderOperation::STATUS_RUNNING, ProductionOrderOperation::STATUS_COMPLETED]));
 
         // 11. MES Execution — OP50 Frame Surface Finishing (10 Frames)
-        $batch = \App\Domains\Production\Models\ProductionBatch::where('production_order_id', $order->id)->firstOrFail();
-        $mesService->logProgress(operationId: $op50->id, produced: 10.0, rejected: 0.0, scrapped: 0.0, setupMinutes: 0.0, runMinutes: 0.0, remarks: 'All Frames Finished', userId: $this->user->id, batchId: $batch->id);
+        $batch50 = app(\App\Domains\Production\Services\BatchProductionService::class)->resolveBatchForProgress($order, $op50, null, 10.0);
+        $mesService->logProgress(operationId: $op50->id, produced: 10.0, rejected: 0.0, scrapped: 0.0, setupMinutes: 0.0, runMinutes: 0.0, remarks: 'All Frames Finished', userId: $this->user->id, batchId: $batch50->id);
         $op50->refresh();
         $this->assertEquals(10.0, $op50->quantity_produced);
         $this->assertTrue(in_array($op50->status, [ProductionOrderOperation::STATUS_RUNNING, ProductionOrderOperation::STATUS_COMPLETED]));
 
         // 12. MES Execution — OP40 Table Top Processing (10 Tops)
-        $mesService->logProgress(operationId: $op40->id, produced: 10.0, rejected: 0.0, scrapped: 0.0, setupMinutes: 0.0, runMinutes: 0.0, remarks: 'All Tops Processed', userId: $this->user->id, batchId: $batch->id);
+        $batch40 = app(\App\Domains\Production\Services\BatchProductionService::class)->resolveBatchForProgress($order, $op40, null, 10.0);
+        $mesService->logProgress(operationId: $op40->id, produced: 10.0, rejected: 0.0, scrapped: 0.0, setupMinutes: 0.0, runMinutes: 0.0, remarks: 'All Tops Processed', userId: $this->user->id, batchId: $batch40->id);
         $op40->refresh();
         $this->assertEquals(10.0, $op40->quantity_produced);
         $this->assertTrue(in_array($op40->status, [ProductionOrderOperation::STATUS_RUNNING, ProductionOrderOperation::STATUS_COMPLETED]));
 
         // 13. MES Execution — OP60 Final Assembly (10 Tables)
-        $mesService->logProgress(operationId: $op60->id, produced: 10.0, rejected: 0.0, scrapped: 0.0, setupMinutes: 0.0, runMinutes: 0.0, remarks: 'Final Assembly Complete', userId: $this->user->id, batchId: $batch->id);
+        $batch60 = app(\App\Domains\Production\Services\BatchProductionService::class)->resolveBatchForProgress($order, $op60, null, 10.0);
+        $mesService->logProgress(operationId: $op60->id, produced: 10.0, rejected: 0.0, scrapped: 0.0, setupMinutes: 0.0, runMinutes: 0.0, remarks: 'Final Assembly Complete', userId: $this->user->id, batchId: $batch60->id);
         $op60->refresh();
         $this->assertEquals(10.0, $op60->quantity_produced);
         $this->assertTrue(in_array($op60->status, [ProductionOrderOperation::STATUS_RUNNING, ProductionOrderOperation::STATUS_COMPLETED]));

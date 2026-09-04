@@ -15,6 +15,11 @@ use App\Domains\Production\Models\ProductionBatch;
 use App\Domains\Production\Models\ProductionSerialNumber;
 use App\Domains\Production\Models\ProductionShift;
 
+use App\Domains\Production\Models\ProductionOrderScrap;
+use App\Domains\Production\Models\ProductionNcr;
+use App\Domains\Production\Models\ProductionReworkOrder;
+use Illuminate\Support\Facades\DB;
+
 class MesController extends Controller
 {
     public function __construct(
@@ -37,8 +42,10 @@ class MesController extends Controller
             'operations.workCenter',
             'operations.machine',
             'operations.orderOperation.vendor',
+            'operations.orderOperation.routingOperation',
             'operations.orderOperation.latestDeliveryChallan',
             'operations.orderOperation.deliveryChallans',
+            'operations.orderOperation.operatorAssignments.user',
         ])
             ->where('tenant_id', $tenantId)
             ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS])
@@ -101,8 +108,14 @@ class MesController extends Controller
         // Shifts assigned/active
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->get();
 
-        // Operators list for shopfloor operator assignment
+        // Operators list for shopfloor operator assignment, Quality Plans, Work Centers, & Machines
         $operators = \App\Models\User::where('tenant_id', $tenantId)->get();
+        $qualityPlans = \App\Domains\Production\Models\ProductionQualityPlan::where('tenant_id', $tenantId)
+            ->whereIn('status', ['approved', 'draft', 'active'])
+            ->with('parameters')
+            ->get();
+        $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->where(function($q) { $q->where('status', 'active')->orWhereNull('status'); })->get();
+        $machines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->get();
 
         return view('modules.production.mes.dashboard', compact(
             'activeSchedules',
@@ -112,7 +125,10 @@ class MesController extends Controller
             'completedToday',
             'readyCount',
             'shifts',
-            'operators'
+            'operators',
+            'qualityPlans',
+            'workCenters',
+            'machines'
         ));
     }
 
@@ -227,6 +243,190 @@ class MesController extends Controller
             );
 
             return redirect()->back()->with('success', 'Andon alert reported to supervisors successfully.');
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function recordQualityInspection(Request $request, int $op)
+    {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $request->validate([
+            'accepted_qty' => 'required|numeric|min:0',
+            'rejected_qty' => 'required|numeric|min:0',
+            'quality_plan_id' => 'nullable|integer',
+            'audited_by' => 'nullable|integer',
+            'defect_reason' => 'nullable|string|max:255',
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $tenantId = require_tenant_id();
+            app(\App\Domains\Production\Services\QualityInspectionService::class)->processShopfloorInspection($tenantId, [
+                'production_order_operation_id' => $op,
+                'accepted_qty' => (float) $request->input('accepted_qty'),
+                'rejected_qty' => (float) $request->input('rejected_qty'),
+                'quality_plan_id' => $request->input('quality_plan_id'),
+                'audited_by' => $request->input('audited_by'),
+                'defect_reason' => $request->input('defect_reason'),
+                'batch_id' => $request->input('batch_id'),
+                'remarks' => $request->input('remarks'),
+            ], $request->input('audited_by') ?? auth()->id());
+
+            return redirect()->back()->with('success', 'Shopfloor Quality Inspection recorded successfully.');
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function recordOperationalScrap(Request $request, int $op)
+    {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $request->validate([
+            'quantity' => 'required|numeric|min:0.01',
+            'reason' => 'required|string|max:255',
+            'product_id' => 'nullable|integer',
+            'batch_id' => 'nullable|integer',
+        ]);
+
+        try {
+            $tenantId = require_tenant_id();
+            $userId = auth()->id();
+            $orderOp = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($op);
+            $qty = (float) $request->input('quantity');
+            $reason = $request->input('reason');
+            $batchId = $request->input('batch_id');
+            $outputPid = $orderOp->product_id ?? $orderOp->source_product_id ?? $orderOp->order?->product_id;
+            $productId = $request->input('product_id') ?? $outputPid;
+            $isOutputProduct = ((int) $productId === (int) $outputPid);
+
+            DB::transaction(function () use ($tenantId, $orderOp, $qty, $reason, $batchId, $productId, $userId, $isOutputProduct) {
+                ProductionOrderScrap::create([
+                    'tenant_id' => $tenantId,
+                    'production_order_id' => $orderOp->production_order_id,
+                    'production_order_operation_id' => $orderOp->id,
+                    'production_batch_id' => $batchId,
+                    'product_id' => $productId,
+                    'quantity' => $qty,
+                    'reason' => $reason,
+                    'recorded_by' => $userId,
+                    'recorded_at' => now(),
+                ]);
+
+                // ONLY increment operation output scrap when the scrapped item is the output component/product itself!
+                if ($isOutputProduct) {
+                    $orderOp->quantity_scrapped += $qty;
+                    $orderOp->save();
+                }
+
+                app(\App\Domains\Production\Services\ProductionMaterialService::class)
+                    ->evaluateAndIssueReplacementMaterial($tenantId, $orderOp->production_order_id, $productId, $qty, $reason, $userId);
+            });
+
+            return redirect()->back()->with('success', "Operational scrap of {$qty} units recorded successfully.");
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function recordDisposition(Request $request, int $op)
+    {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $request->validate([
+            'disposition_type' => 'required|string|in:rework,scrap',
+            'quantity' => 'required|numeric|min:0.01',
+            'reason' => 'nullable|string|max:255',
+            'work_center_id' => 'nullable|integer',
+            'machine_id' => 'nullable|integer',
+            'instructions' => 'nullable|string|max:500',
+            'batch_id' => 'nullable|integer',
+        ]);
+
+        try {
+            $tenantId = require_tenant_id();
+            $userId = auth()->id();
+            $orderOp = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($op);
+            $dispType = $request->input('disposition_type');
+            $qty = (float) $request->input('quantity');
+            $reason = $request->input('reason', 'Quality Inspection Rejection');
+            $batchId = $request->input('batch_id');
+
+            DB::transaction(function () use ($tenantId, $orderOp, $dispType, $qty, $reason, $batchId, $userId, $request) {
+                $ncr = ProductionNcr::where('tenant_id', $tenantId)
+                    ->where('production_order_operation_id', $orderOp->id)
+                    ->where('status', 'open')
+                    ->latest()
+                    ->first();
+
+                if (!$ncr) {
+                    $ncr = ProductionNcr::create([
+                        'tenant_id' => $tenantId,
+                        'ncr_number' => 'NCR-SF-' . strtoupper(uniqid()),
+                        'category' => 'process',
+                        'status' => 'open',
+                        'disposition_type' => 'pending',
+                        'production_order_id' => $orderOp->production_order_id,
+                        'production_order_operation_id' => $orderOp->id,
+                        'batch_id' => $batchId,
+                        'machine_id' => $orderOp->machine_used_id ?? $orderOp->machine_id,
+                        'operator_id' => $userId,
+                        'description' => "Shopfloor Quality Rejection for {$qty} units on operation #{$orderOp->operation_number}.",
+                    ]);
+                }
+
+                if ($dispType === 'rework') {
+                    app(\App\Domains\Production\Services\ReworkService::class)->createReworkOrder($tenantId, $ncr->id, [
+                        'original_production_order_id' => $orderOp->production_order_id,
+                        'production_order_operation_id' => $orderOp->id,
+                        'batch_id' => $batchId,
+                        'rework_type' => $request->input('rework_type', 'reprocess'),
+                        'quantity' => $qty,
+                        'work_center_id' => $request->input('work_center_id') ?? $orderOp->work_center_id,
+                        'machine_id' => $request->input('machine_id') ?? $orderOp->machine_id,
+                        'instructions' => $request->input('instructions') ?? "Rework for {$qty} rejected units.",
+                        'assigned_to' => $request->input('assigned_to') ?? $userId,
+                        'cost_estimate' => (float) ($request->input('cost_estimate') ?? 150.00),
+                    ]);
+
+                    $orderOp->quantity_rejected = max(0, $orderOp->quantity_rejected - $qty);
+                    $orderOp->save();
+
+                    $ncr->update(['disposition_type' => 'rework']);
+                } else { // scrap
+                    ProductionOrderScrap::create([
+                        'tenant_id' => $tenantId,
+                        'production_order_id' => $orderOp->production_order_id,
+                        'production_order_operation_id' => $orderOp->id,
+                        'production_batch_id' => $batchId,
+                        'product_id' => $orderOp->source_product_id ?? $orderOp->order?->product_id,
+                        'quantity' => $qty,
+                        'reason' => $reason,
+                        'recorded_by' => $userId,
+                        'recorded_at' => now(),
+                    ]);
+
+                    $orderOp->quantity_scrapped += $qty;
+                    $orderOp->quantity_rejected = max(0, $orderOp->quantity_rejected - $qty);
+                    $orderOp->save();
+
+                    if ($ncr) {
+                        $ncr->update(['disposition_type' => 'scrap', 'status' => 'closed', 'closed_at' => now(), 'closed_by' => $userId]);
+                    }
+
+                    $scrapProductId = $orderOp->source_product_id ?? $orderOp->order?->product_id;
+                    app(\App\Domains\Production\Services\ProductionMaterialService::class)
+                        ->evaluateAndIssueReplacementMaterial($tenantId, $orderOp->production_order_id, $scrapProductId, $qty, $reason, $userId);
+                }
+            });
+
+            $msg = ($dispType === 'rework')
+                ? "Rework recorded for {$qty} units. Ready for Re-QC upon completion."
+                : "Scrap recorded and material replacement evaluated for {$qty} units.";
+
+            return redirect()->back()->with('success', $msg);
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

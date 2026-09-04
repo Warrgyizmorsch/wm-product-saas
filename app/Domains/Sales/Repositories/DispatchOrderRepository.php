@@ -5,6 +5,7 @@ namespace App\Domains\Sales\Repositories;
 use App\Domains\Sales\Models\DispatchOrder;
 use App\Domains\Sales\Models\DispatchOrderItem;
 use App\Domains\Sales\Models\MaterialRequirement;
+use App\Domains\Sales\Models\MaterialRequirementItem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -82,10 +83,39 @@ class DispatchOrderRepository
 
     public function getDispatchedQtyForMRItem(int $mrItemId): float
     {
+        $mrItem = MaterialRequirementItem::with('materialRequirement')->find($mrItemId);
+        if (!$mrItem) {
+            return (float) DispatchOrderItem::whereHas('dispatchOrder', function ($q) {
+                $q->where('status', '!=', 'Cancelled');
+            })
+            ->where('material_requirement_item_id', $mrItemId)
+            ->sum(DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
+        }
+
+        $soId = $mrItem->materialRequirement?->sales_order_id;
+        $productId = $mrItem->product_id;
+
+        return (float) DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($soId) {
+            $q->where('status', '!=', 'Cancelled');
+            if ($soId) {
+                $q->where('sales_order_id', $soId);
+            }
+        })
+        ->where(function($q) use ($mrItemId, $productId) {
+            $q->where('material_requirement_item_id', $mrItemId);
+            if ($productId) {
+                $q->orWhere('product_id', $productId);
+            }
+        })
+        ->sum(DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
+    }
+
+    public function getDispatchedQtyForInvoiceItem(int $invoiceItemId): float
+    {
         return (float) DispatchOrderItem::whereHas('dispatchOrder', function ($q) {
             $q->where('status', '!=', 'Cancelled');
         })
-        ->where('material_requirement_item_id', $mrItemId)
+        ->where('invoice_item_id', $invoiceItemId)
         ->sum('quantity_dispatched');
     }
 
@@ -105,12 +135,13 @@ class DispatchOrderRepository
                 DispatchOrderItem::create([
                     'dispatch_order_id' => $dispatch->id,
                     'material_requirement_item_id' => $item['material_requirement_item_id'] ?? null,
+                    'invoice_item_id' => $item['invoice_item_id'] ?? null,
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'],
                     'quantity_ordered' => $item['quantity'],
                     'quantity_dispatched' => $item['quantity'],
                     'serial_numbers' => $item['serial_numbers'] ?? null,
-                    'status' => 'Pending',
+                    'batch_number' => $item['batch_number'] ?? null,
                 ]);
             }
 

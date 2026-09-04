@@ -4,14 +4,21 @@ namespace Database\Seeders;
 
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
+use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionBomItem;
+use App\Domains\Production\Models\ProductionOrder;
+use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionQualityPlan;
+use App\Domains\Production\Models\ProductionQualityPlanParameter;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\RoutingOperationAlternateMachine;
 use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Services\ProductionOrderService;
+use App\Domains\Production\Services\SchedulingService;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -147,25 +154,37 @@ class TableManufacturingProductionSeeder extends Seeder
             $sfgTop,
             $rmPipe,
             $rmTopBoard,
-            $rmFastener
+            $rmFastener,
+            $adminUser
         ) {
+            // 0. Subcontracting Vendor
+            $vendor = Vendor::firstOrCreate(
+                ['tenant_id' => $tenantId, 'code' => 'VEND-APEX'],
+                [
+                    'name' => 'Apex Surface Coating & Electroplating Corp',
+                    'email' => 'sales@apexcoating.com',
+                    'phone' => '020-27489911',
+                    'status' => 'active',
+                ]
+            );
+
             // 1. Work Centers
             $workCenters = $this->seedWorkCenters($tenantId);
 
             // 2. Machines
             $machines = $this->seedMachines($tenantId, $workCenters);
 
-            // 3. Multi-Level BOM Tree
+            // 3. Quality Plans
+            $qualityPlan = $this->seedQualityPlans($tenantId, $userId, $fgTable, $sfgFrame, $sfgTop);
+
+            // 4. Multi-Level BOM Tree
             $boms = $this->seedBoms($tenantId, $userId, $pcs, $mtr, $fgTable, $sfgFrame, $sfgLeg, $sfgSupport, $sfgTop, $rmPipe, $rmTopBoard, $rmFastener);
 
-            // 4. Master Routing & Routing Operations
-            $this->seedRoutings($tenantId, $userId, $pcs, $fgTable, $sfgFrame, $sfgLeg, $sfgSupport, $sfgTop, $rmPipe, $rmTopBoard, $rmFastener, $workCenters, $machines, $boms);
+            // 5. Master Routing & Routing Operations
+            $routings = $this->seedRoutings($tenantId, $userId, $pcs, $fgTable, $sfgFrame, $sfgLeg, $sfgSupport, $sfgTop, $rmPipe, $rmTopBoard, $rmFastener, $workCenters, $machines, $boms, $vendor);
         });
     }
 
-    /**
-     * Seed Work Centers for Table Manufacturing.
-     */
     private function seedWorkCenters(int $tenantId): array
     {
         $wcs = [
@@ -227,9 +246,6 @@ class TableManufacturingProductionSeeder extends Seeder
         return $created;
     }
 
-    /**
-     * Seed Machines for Work Centers.
-     */
     private function seedMachines(int $tenantId, array $workCenters): array
     {
         $machines = [
@@ -281,9 +297,115 @@ class TableManufacturingProductionSeeder extends Seeder
         return $created;
     }
 
-    /**
-     * Seed Multi-Level BOM Tree.
-     */
+    private function seedQualityPlans(int $tenantId, int $userId, Product $fgTable, Product $sfgFrame, Product $sfgTop): ProductionQualityPlan
+    {
+        // 1. Master Assembly Quality Plan
+        $qp = ProductionQualityPlan::updateOrCreate(
+            ['tenant_id' => $tenantId, 'name' => 'Industrial Dining Table Master Quality Control Plan'],
+            [
+                'product_id' => $fgTable->id,
+                'type' => 'in_process',
+                'version' => '1.0',
+                'status' => 'approved',
+                'created_by' => $userId,
+            ]
+        );
+
+        ProductionQualityPlanParameter::updateOrCreate(
+            ['tenant_id' => $tenantId, 'quality_plan_id' => $qp->id, 'name' => 'Weld Seam Penetration & Alignment'],
+            [
+                'type' => 'visual',
+                'is_mandatory' => true,
+            ]
+        );
+
+        ProductionQualityPlanParameter::updateOrCreate(
+            ['tenant_id' => $tenantId, 'quality_plan_id' => $qp->id, 'name' => 'Frame Squareness & Diagonals'],
+            [
+                'type' => 'numeric',
+                'min_value' => 1798.0,
+                'max_value' => 1802.0,
+                'unit_of_measure' => 'mm',
+                'is_mandatory' => true,
+            ]
+        );
+
+        ProductionQualityPlanParameter::updateOrCreate(
+            ['tenant_id' => $tenantId, 'quality_plan_id' => $qp->id, 'name' => 'Powder Coating Thickness'],
+            [
+                'type' => 'numeric',
+                'min_value' => 70.0,
+                'max_value' => 95.0,
+                'unit_of_measure' => 'microns',
+                'is_mandatory' => true,
+            ]
+        );
+
+        // 2. Tube Cutting & Prep Quality Plan
+        $qpCut = ProductionQualityPlan::updateOrCreate(
+            ['tenant_id' => $tenantId, 'name' => 'Steel Tube Cutting & Dimension Inspection Plan'],
+            [
+                'product_id' => $sfgFrame->id,
+                'type' => 'in_process',
+                'version' => '1.0',
+                'status' => 'approved',
+                'created_by' => $userId,
+            ]
+        );
+
+        ProductionQualityPlanParameter::updateOrCreate(
+            ['tenant_id' => $tenantId, 'quality_plan_id' => $qpCut->id, 'name' => 'Cut Pipe Length Tolerance'],
+            [
+                'type' => 'numeric',
+                'min_value' => 748.0,
+                'max_value' => 752.0,
+                'unit_of_measure' => 'mm',
+                'is_mandatory' => true,
+            ]
+        );
+
+        ProductionQualityPlanParameter::updateOrCreate(
+            ['tenant_id' => $tenantId, 'quality_plan_id' => $qpCut->id, 'name' => 'Burr-Free Edge & Cut Squareness'],
+            [
+                'type' => 'visual',
+                'is_mandatory' => true,
+            ]
+        );
+
+        // 3. Final Assembly & Packaging Quality Plan
+        $qpAssy = ProductionQualityPlan::updateOrCreate(
+            ['tenant_id' => $tenantId, 'name' => 'Final Assembly & Stability Quality Plan'],
+            [
+                'product_id' => $fgTable->id,
+                'type' => 'final',
+                'version' => '1.0',
+                'status' => 'approved',
+                'created_by' => $userId,
+            ]
+        );
+
+        ProductionQualityPlanParameter::updateOrCreate(
+            ['tenant_id' => $tenantId, 'quality_plan_id' => $qpAssy->id, 'name' => 'Assembly Bolt Torque Specification'],
+            [
+                'type' => 'numeric',
+                'min_value' => 25.0,
+                'max_value' => 30.0,
+                'unit_of_measure' => 'Nm',
+                'is_mandatory' => true,
+            ]
+        );
+
+        ProductionQualityPlanParameter::updateOrCreate(
+            ['tenant_id' => $tenantId, 'quality_plan_id' => $qpAssy->id, 'name' => 'Leveling Foot Alignment & Table Stability'],
+            [
+                'type' => 'visual',
+                'is_mandatory' => true,
+            ]
+        );
+
+        return $qp;
+    }
+
     private function seedBoms(
         int $tenantId,
         int $userId,
@@ -298,7 +420,7 @@ class TableManufacturingProductionSeeder extends Seeder
         $rmTopBoard,
         $rmFastener
     ): array {
-        // 1. Table Leg BOM (Output: 1 Leg, Input: 0.75 Mtr Pipe)
+        // 1. Table Leg BOM
         $bomLeg = ProductionBom::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-LEG'],
             [
@@ -316,14 +438,10 @@ class TableManufacturingProductionSeeder extends Seeder
 
         ProductionBomItem::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_id' => $bomLeg->id, 'material_id' => $rmPipe->id],
-            [
-                'quantity' => 0.75, // 0.75 Mtr per Leg
-                'uom_id' => $mtr->id,
-                'sequence' => 1,
-            ]
+            ['quantity' => 0.75, 'uom_id' => $mtr->id, 'sequence' => 1]
         );
 
-        // 2. Horizontal Support BOM (Output: 1 Support, Input: 0.60 Mtr Pipe)
+        // 2. Horizontal Support BOM
         $bomSupport = ProductionBom::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-SUPPORT'],
             [
@@ -341,14 +459,10 @@ class TableManufacturingProductionSeeder extends Seeder
 
         ProductionBomItem::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_id' => $bomSupport->id, 'material_id' => $rmPipe->id],
-            [
-                'quantity' => 0.60, // 0.60 Mtr per Support
-                'uom_id' => $mtr->id,
-                'sequence' => 1,
-            ]
+            ['quantity' => 0.60, 'uom_id' => $mtr->id, 'sequence' => 1]
         );
 
-        // 3. Table Frame BOM (Output: 1 Frame, Inputs: 4 Legs, 2 Supports)
+        // 3. Table Frame BOM
         $bomFrame = ProductionBom::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-FRAME'],
             [
@@ -366,25 +480,15 @@ class TableManufacturingProductionSeeder extends Seeder
 
         ProductionBomItem::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_id' => $bomFrame->id, 'material_id' => $sfgLeg->id],
-            [
-                'child_bom_id' => $bomLeg->id,
-                'quantity' => 4.0, // 4 Legs per Frame
-                'uom_id' => $pcs->id,
-                'sequence' => 1,
-            ]
+            ['child_bom_id' => $bomLeg->id, 'quantity' => 4.0, 'uom_id' => $pcs->id, 'sequence' => 1]
         );
 
         ProductionBomItem::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_id' => $bomFrame->id, 'material_id' => $sfgSupport->id],
-            [
-                'child_bom_id' => $bomSupport->id,
-                'quantity' => 2.0, // 2 Supports per Frame
-                'uom_id' => $pcs->id,
-                'sequence' => 2,
-            ]
+            ['child_bom_id' => $bomSupport->id, 'quantity' => 2.0, 'uom_id' => $pcs->id, 'sequence' => 2]
         );
 
-        // 4. Table Top BOM (Output: 1 Top, Input: 1 Wood Board)
+        // 4. Table Top BOM
         $bomTop = ProductionBom::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-TOP'],
             [
@@ -402,14 +506,10 @@ class TableManufacturingProductionSeeder extends Seeder
 
         ProductionBomItem::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_id' => $bomTop->id, 'material_id' => $rmTopBoard->id],
-            [
-                'quantity' => 1.0, // 1 Wood Board per Top
-                'uom_id' => $pcs->id,
-                'sequence' => 1,
-            ]
+            ['quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 1]
         );
 
-        // 5. Industrial Dining Table FG BOM (Output: 1 Table, Inputs: 1 Frame, 1 Top, 1 Fastener)
+        // 5. Industrial Dining Table FG BOM
         $bomFg = ProductionBom::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-FG'],
             [
@@ -427,31 +527,17 @@ class TableManufacturingProductionSeeder extends Seeder
 
         ProductionBomItem::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_id' => $bomFg->id, 'material_id' => $sfgFrame->id],
-            [
-                'child_bom_id' => $bomFrame->id,
-                'quantity' => 1.0, // 1 Frame per Table
-                'uom_id' => $pcs->id,
-                'sequence' => 1,
-            ]
+            ['child_bom_id' => $bomFrame->id, 'quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 1]
         );
 
         ProductionBomItem::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_id' => $bomFg->id, 'material_id' => $sfgTop->id],
-            [
-                'child_bom_id' => $bomTop->id,
-                'quantity' => 1.0, // 1 Top per Table
-                'uom_id' => $pcs->id,
-                'sequence' => 2,
-            ]
+            ['child_bom_id' => $bomTop->id, 'quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 2]
         );
 
         ProductionBomItem::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_id' => $bomFg->id, 'material_id' => $rmFastener->id],
-            [
-                'quantity' => 1.0, // 1 Fastener Set per Table
-                'uom_id' => $pcs->id,
-                'sequence' => 3,
-            ]
+            ['quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 3]
         );
 
         return [
@@ -463,9 +549,6 @@ class TableManufacturingProductionSeeder extends Seeder
         ];
     }
 
-    /**
-     * Seed Child & Master Routings & Operations with accurate physical consumed material inputs.
-     */
     private function seedRoutings(
         int $tenantId,
         int $userId,
@@ -480,9 +563,10 @@ class TableManufacturingProductionSeeder extends Seeder
         $rmFastener,
         array $workCenters,
         array $machines,
-        array $boms
-    ): void {
-        // 1. Table Leg Routing (RT-TBL-LEG) -> SFG-TBL-LEG
+        array $boms,
+        Vendor $vendor
+    ): array {
+        // 1. Table Leg Routing
         $rtLeg = Routing::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_number' => 'RT-TBL-LEG'],
             [
@@ -502,11 +586,11 @@ class TableManufacturingProductionSeeder extends Seeder
                 'work_center_id' => $workCenters['cut']->id,
                 'machine_id' => $machines['cut_01']->id,
                 'setup_time_minutes' => 10.0,
-                'processing_time_minutes' => 2.0, // 2 min / Leg
+                'processing_time_minutes' => 2.0,
+                'quality_required' => false,
             ]
         );
 
-        // Consumes 0.75 Mtr Steel Square Pipe
         RoutingOperationMaterial::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_operation_id' => $op10->id, 'material_id' => $rmPipe->id],
             ['quantity' => 0.75, 'uom_id' => $rmPipe->uom_id]
@@ -519,7 +603,7 @@ class TableManufacturingProductionSeeder extends Seeder
 
         $boms['leg']->update(['routing_id' => $rtLeg->id]);
 
-        // 2. Horizontal Support Routing (RT-TBL-SUPPORT) -> SFG-TBL-SUPPORT
+        // 2. Horizontal Support Routing
         $rtSupport = Routing::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_number' => 'RT-TBL-SUPPORT'],
             [
@@ -539,11 +623,11 @@ class TableManufacturingProductionSeeder extends Seeder
                 'work_center_id' => $workCenters['cut']->id,
                 'machine_id' => $machines['cut_01']->id,
                 'setup_time_minutes' => 10.0,
-                'processing_time_minutes' => 2.0, // 2 min / Support
+                'processing_time_minutes' => 2.0,
+                'quality_required' => false,
             ]
         );
 
-        // Consumes 0.60 Mtr Steel Square Pipe
         RoutingOperationMaterial::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_operation_id' => $op20->id, 'material_id' => $rmPipe->id],
             ['quantity' => 0.60, 'uom_id' => $rmPipe->uom_id]
@@ -551,7 +635,7 @@ class TableManufacturingProductionSeeder extends Seeder
 
         $boms['support']->update(['routing_id' => $rtSupport->id]);
 
-        // 3. Table Frame Routing (RT-TBL-FRAME) -> SFG-TBL-FRAME
+        // 3. Table Frame Routing
         $rtFrame = Routing::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_number' => 'RT-TBL-FRAME'],
             [
@@ -571,11 +655,11 @@ class TableManufacturingProductionSeeder extends Seeder
                 'work_center_id' => $workCenters['weld']->id,
                 'machine_id' => $machines['weld_01']->id,
                 'setup_time_minutes' => 15.0,
-                'processing_time_minutes' => 12.0, // 12 min / Frame
+                'processing_time_minutes' => 12.0,
+                'quality_required' => false,
             ]
         );
 
-        // Consumes 4 Legs and 2 Supports per Frame
         RoutingOperationMaterial::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_operation_id' => $op30->id, 'material_id' => $sfgLeg->id],
             ['quantity' => 4.0, 'uom_id' => $pcs->id]
@@ -590,17 +674,19 @@ class TableManufacturingProductionSeeder extends Seeder
             ['tenant_id' => $tenantId, 'routing_id' => $rtFrame->id, 'sequence' => 50],
             [
                 'operation_number' => 'OP50',
-                'name' => 'Frame Surface Finishing',
+                'name' => 'Frame Surface Finishing & Powder Coating',
                 'work_center_id' => $workCenters['finish']->id,
                 'machine_id' => $machines['fin_01']->id,
                 'setup_time_minutes' => 10.0,
-                'processing_time_minutes' => 6.0, // 6 min / Frame
+                'processing_time_minutes' => 6.0,
+                'quality_required' => false,
+                'is_external' => false,
             ]
         );
 
         $boms['frame']->update(['routing_id' => $rtFrame->id]);
 
-        // 4. Table Top Routing (RT-TBL-TOP) -> SFG-TBL-TOP
+        // 4. Table Top Routing
         $rtTop = Routing::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_number' => 'RT-TBL-TOP'],
             [
@@ -620,11 +706,11 @@ class TableManufacturingProductionSeeder extends Seeder
                 'work_center_id' => $workCenters['top']->id,
                 'machine_id' => $machines['top_01']->id,
                 'setup_time_minutes' => 10.0,
-                'processing_time_minutes' => 8.0, // 8 min / Top
+                'processing_time_minutes' => 8.0,
+                'quality_required' => false,
             ]
         );
 
-        // Consumes 1 Wood Top Board per Top
         RoutingOperationMaterial::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_operation_id' => $op40->id, 'material_id' => $rmTopBoard->id],
             ['quantity' => 1.0, 'uom_id' => $pcs->id]
@@ -632,7 +718,7 @@ class TableManufacturingProductionSeeder extends Seeder
 
         $boms['top']->update(['routing_id' => $rtTop->id]);
 
-        // 5. Industrial Dining Table Master FG Routing (RT-TBL-FG) -> FG-TBL-001
+        // 5. Industrial Dining Table Master FG Routing
         $rtFg = Routing::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_number' => 'RT-TBL-FG'],
             [
@@ -652,11 +738,11 @@ class TableManufacturingProductionSeeder extends Seeder
                 'work_center_id' => $workCenters['assy']->id,
                 'machine_id' => $machines['assy_01']->id,
                 'setup_time_minutes' => 10.0,
-                'processing_time_minutes' => 15.0, // 15 min / Table
+                'processing_time_minutes' => 15.0,
+                'quality_required' => false,
             ]
         );
 
-        // Consumes 1 Frame, 1 Top, and 1 Fastener Set per Table
         RoutingOperationMaterial::updateOrCreate(
             ['tenant_id' => $tenantId, 'routing_operation_id' => $op60->id, 'material_id' => $sfgFrame->id],
             ['quantity' => 1.0, 'uom_id' => $pcs->id]
@@ -673,5 +759,13 @@ class TableManufacturingProductionSeeder extends Seeder
         );
 
         $boms['fg']->update(['routing_id' => $rtFg->id]);
+
+        return [
+            'leg' => $rtLeg,
+            'support' => $rtSupport,
+            'frame' => $rtFrame,
+            'top' => $rtTop,
+            'fg' => $rtFg,
+        ];
     }
 }
