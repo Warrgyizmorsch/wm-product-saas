@@ -9,17 +9,13 @@ use App\Domains\HRMS\Models\BiometricPunchLog;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Models\Employee;
-use App\Domains\HRMS\Models\Asset;
-use App\Domains\HRMS\Models\AssetItem;
-use App\Domains\HRMS\Models\AssetAllocation;
 use App\Domains\HRMS\Models\EmployeeExit;
+use App\Domains\HRMS\Models\EmployeePenalty;
 use App\Domains\HRMS\Models\ExpenseReport;
 use App\Domains\HRMS\Models\HolidayCalendar;
 use App\Domains\HRMS\Models\LeaveBalance;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\LeaveType;
-use App\Domains\HRMS\Models\PayrollRun;
-use App\Domains\HRMS\Models\ShiftChangeRequest;
 use App\Domains\HRMS\Models\WfhRequest;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
@@ -57,22 +53,20 @@ class HrmsDashboardController extends Controller
 
         // 2. Workforce Overview Metrics
         $totalEmployees = Employee::where('tenant_id', $tenantId)->count();
-        $activeEmployees = Employee::where('tenant_id', $tenantId)->where('status', 'Active')->count();
         $probationCount = Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Probation')->count();
         $confirmedCount = Employee::where('tenant_id', $tenantId)->where('employee_stage', 'Confirmed')->count();
         $noticeCount = Employee::where('tenant_id', $tenantId)->whereIn('employee_stage', ['Notice Period', 'Serving Notice'])->count();
-        $maleCount = Employee::where('tenant_id', $tenantId)->where('gender', 'Male')->count();
-        $femaleCount = Employee::where('tenant_id', $tenantId)->where('gender', 'Female')->count();
 
-        // New Joinees (Joined in current month or last 30 days)
-        $newHiresThisMonth = Employee::where('tenant_id', $tenantId)
-            ->whereDate('date_of_joining', '>=', $now->copy()->subDays(30))
-            ->count();
+        // New Joinees (Joined in last 30 days)
         $newHiresList = Employee::with(['department', 'designation'])
             ->where('tenant_id', $tenantId)
+            ->whereNotNull('date_of_joining')
+            ->whereDate('date_of_joining', '>=', $now->copy()->subDays(30))
+            ->whereDate('date_of_joining', '<=', $today)
             ->orderBy('date_of_joining', 'desc')
-            ->take(4)
+            ->take(6)
             ->get();
+        $newHiresThisMonth = $newHiresList->count();
 
         // 3. Today's Real-Time Attendance Pulse
         $todayAttendances = Attendance::where('tenant_id', $tenantId)
@@ -93,7 +87,6 @@ class HrmsDashboardController extends Controller
             ->whereDate('end_date', '>=', $today)
             ->count();
 
-        $absentCount = max(0, $totalEmployees - ($presentCount + $onLeaveCount + $wfhCount));
         $attendancePercent = $totalEmployees > 0 ? round(($presentCount / $totalEmployees) * 100, 1) : 0;
 
         // 4. Current Employee Self-Service (ESS) & Web Punch Data
@@ -101,11 +94,10 @@ class HrmsDashboardController extends Controller
         $recentPunches = [];
         $profileCompletion = 85;
         $myLeaveBalances = [
-            'casual' => ['allocated' => 12, 'used' => 3, 'remaining' => 9],
-            'sick' => ['allocated' => 8, 'used' => 2, 'remaining' => 6],
-            'earned' => ['allocated' => 15, 'used' => 4, 'remaining' => 11],
+            'casual' => ['allocated' => 12, 'used' => 0, 'remaining' => 12],
+            'sick' => ['allocated' => 8, 'used' => 0, 'remaining' => 8],
+            'earned' => ['allocated' => 15, 'used' => 0, 'remaining' => 15],
         ];
-        $myAllocatedAssets = [];
 
         if ($currentEmployee) {
             $myTodayAttendance = Attendance::with('breaks')
@@ -145,6 +137,34 @@ class HrmsDashboardController extends Controller
                 ];
             }
 
+            // Real Leave Balances from DB
+            $dbBalances = LeaveBalance::with('leaveType')
+                ->where('tenant_id', $tenantId)
+                ->where('employee_id', $currentEmployee->id)
+                ->get();
+
+            if ($dbBalances->isNotEmpty()) {
+                foreach ($dbBalances as $bal) {
+                    $typeName = strtolower($bal->leaveType->name ?? $bal->leaveType->code ?? '');
+                    $key = null;
+                    if (str_contains($typeName, 'casual') || str_contains($typeName, 'cl')) {
+                        $key = 'casual';
+                    } elseif (str_contains($typeName, 'sick') || str_contains($typeName, 'sl')) {
+                        $key = 'sick';
+                    } elseif (str_contains($typeName, 'earned') || str_contains($typeName, 'el') || str_contains($typeName, 'privilege')) {
+                        $key = 'earned';
+                    }
+
+                    if ($key) {
+                        $myLeaveBalances[$key] = [
+                            'allocated' => floatval($bal->allocated),
+                            'used' => floatval($bal->used),
+                            'remaining' => floatval($bal->remaining),
+                        ];
+                    }
+                }
+            }
+
             // Calculate Profile & KYC Completion %
             $fields = [
                 $currentEmployee->full_name,
@@ -159,16 +179,11 @@ class HrmsDashboardController extends Controller
                 $currentEmployee->emergency_contact_phone ?? $currentEmployee->phone_number,
             ];
             $filled = count(array_filter($fields));
-            $profileCompletion = round(($filled / count($fields)) * 100);
-
-            // Fetch Assigned Assets
-            $myAllocatedAssets = Asset::where('assigned_employee_id', $currentEmployee->id)
-                ->take(3)
-                ->get();
+            $profileCompletion = count($fields) > 0 ? round(($filled / count($fields)) * 100) : 100;
         }
 
         // 5. Unified Action Center / Pending Inboxes (Leaves, WFH, Regularizations, Expenses)
-        $pendingLeaves = LeaveRequest::with(['employee.department', 'employee.designation'])
+        $pendingLeaves = LeaveRequest::with(['employee.department', 'employee.designation', 'leaveType'])
             ->where('tenant_id', $tenantId)
             ->where('status', 'pending')
             ->latest()
@@ -198,124 +213,107 @@ class HrmsDashboardController extends Controller
 
         $totalPendingApprovals = $pendingLeaves->count() + $pendingWfh->count() + $pendingCorrections->count() + $pendingExpenses->count();
 
-        // 6. Probation & Lifecycle Watch (Probation ending within 30 days)
+        // 6. Probation Watch
         $upcomingProbationEmployees = Employee::with(['department', 'designation', 'reportingManager'])
             ->where('tenant_id', $tenantId)
             ->where('employee_stage', 'Probation')
             ->whereNotNull('probation_end_date')
             ->orderBy('probation_end_date', 'asc')
-            ->take(4)
+            ->take(15)
             ->get();
 
         // 7. Offboarding & Active Exits Pipeline
-        $activeExits = EmployeeExit::with(['employee.department', 'employee.designation', 'clearances', 'fnfSettlement'])
+        $activeExits = EmployeeExit::with(['employee.department', 'employee.designation', 'clearances'])
             ->where('tenant_id', $tenantId)
             ->whereIn('status', ['initiated', 'in_clearance', 'approved'])
             ->latest()
-            ->take(4)
+            ->take(15)
             ->get();
 
-        // 8. Holidays & Celebrations (Birthdays & Work Anniversaries)
-        $standardHolidays = [
-            ['name' => 'Gandhi Jayanti', 'holiday_date' => '2026-10-02'],
-            ['name' => 'Dussehra / Vijayadashami', 'holiday_date' => '2026-10-20'],
-            ['name' => 'Diwali (Deepavali)', 'holiday_date' => '2026-11-08'],
-            ['name' => 'Guru Nanak Jayanti', 'holiday_date' => '2026-11-24'],
-            ['name' => 'Christmas Day', 'holiday_date' => '2026-12-25'],
-            ['name' => 'New Year Day', 'holiday_date' => '2027-01-01'],
-            ['name' => 'Republic Day', 'holiday_date' => '2027-01-26'],
-        ];
-
-        foreach ($standardHolidays as $sh) {
-            HolidayCalendar::firstOrCreate(
-                ['tenant_id' => $tenantId, 'name' => $sh['name'], 'holiday_date' => $sh['holiday_date']],
-                ['company_id' => 1, 'status' => true]
-            );
-        }
-
+        // 8. Upcoming Holidays
         $upcomingHolidays = HolidayCalendar::where('tenant_id', $tenantId)
             ->where('status', true)
             ->whereDate('holiday_date', '>=', $today)
             ->orderBy('holiday_date', 'asc')
+            ->take(15)
             ->get();
 
+        // 9. Celebrations (Birthdays & Work Anniversaries from real active employees)
         $allActiveEmployees = Employee::with(['department', 'designation'])
             ->where('tenant_id', $tenantId)
             ->where('status', 'Active')
             ->get();
 
-        // Ensure demonstration data exists for celebrations
-        if ($allActiveEmployees->isNotEmpty()) {
-            $firstEmp = $allActiveEmployees->first();
-            if ($firstEmp && (!$firstEmp->date_of_birth || Carbon::parse($firstEmp->date_of_birth)->month != $now->month)) {
-                $firstEmp->update(['date_of_birth' => '1996-' . str_pad((string)$now->month, 2, '0', STR_PAD_LEFT) . '-12']);
-            }
-            if ($allActiveEmployees->count() > 1) {
-                $secondEmp = $allActiveEmployees->get(1);
-                if ($secondEmp && (!$secondEmp->date_of_joining || Carbon::parse($secondEmp->date_of_joining)->month != $now->month)) {
-                    $secondEmp->update(['date_of_joining' => '2024-' . str_pad((string)$now->month, 2, '0', STR_PAD_LEFT) . '-18']);
-                }
-            }
-            $allActiveEmployees = Employee::with(['department', 'designation'])
-                ->where('tenant_id', $tenantId)
-                ->where('status', 'Active')
-                ->get();
-        }
-
-        // Birthdays in current month
         $upcomingBirthdays = $allActiveEmployees->filter(function ($emp) use ($now) {
             if (!$emp->date_of_birth) return false;
             $bday = Carbon::parse($emp->date_of_birth);
             return $bday->month === $now->month && $bday->day >= $now->day;
-        })->take(3);
+        })->take(5);
 
-        // Work Anniversaries in current month
         $upcomingAnniversaries = $allActiveEmployees->filter(function ($emp) use ($now) {
             if (!$emp->date_of_joining) return false;
             $doj = Carbon::parse($emp->date_of_joining);
             return $doj->month === $now->month && $doj->year < $now->year;
-        })->take(3);
+        })->take(5);
 
-        // 9. Department Distribution Breakdown
+        // 10. Department Distribution Breakdown
         $departments = Department::where('tenant_id', $tenantId)
             ->withCount('employees')
             ->orderBy('employees_count', 'desc')
             ->take(6)
             ->get();
 
-        // 10. Latest Payroll Snapshot
-        $latestPayrollRun = PayrollRun::where('tenant_id', $tenantId)
-            ->latest()
-            ->first();
+        // 11. Late Arrivals (Last 7 Days) & Unprocessed Penalties
+        $recentLateArrivals = Attendance::with(['employee.department', 'employee.designation'])
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['late', 'half_day'])
+            ->whereDate('date', '>=', $now->copy()->subDays(7))
+            ->orderBy('date', 'desc')
+            ->take(15)
+            ->get();
 
-        // 11. Leave Types for Direct Apply Modal
+        $unprocessedPenalties = EmployeePenalty::with(['employee.department', 'employee.designation'])
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', 'pending')
+                  ->orWhere('status', 'unprocessed');
+            })
+            ->orderBy('date', 'desc')
+            ->take(15)
+            ->get();
+
+        // 12. Leave Types & Approved Leaves
         $leaveTypes = LeaveType::where('tenant_id', $tenantId)->where('status', true)->get();
         if ($leaveTypes->isEmpty()) {
             $leaveTypes = LeaveType::where('tenant_id', $tenantId)->get();
         }
 
+        $approvedLeaves = LeaveRequest::with(['employee.department', 'employee.designation', 'leaveType'])
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'approved')
+            ->whereDate('end_date', '>=', $today)
+            ->orderBy('start_date', 'asc')
+            ->take(15)
+            ->get();
+
         return view('modules.hrms.dashboard.index', compact(
             'currentEmployee',
             'totalEmployees',
-            'activeEmployees',
             'probationCount',
             'confirmedCount',
             'noticeCount',
-            'maleCount',
-            'femaleCount',
             'newHiresThisMonth',
             'newHiresList',
             'presentCount',
             'lateCount',
             'wfhCount',
             'onLeaveCount',
-            'absentCount',
             'attendancePercent',
             'myTodayAttendance',
             'recentPunches',
             'profileCompletion',
             'myLeaveBalances',
-            'myAllocatedAssets',
             'pendingLeaves',
             'pendingWfh',
             'pendingCorrections',
@@ -327,8 +325,10 @@ class HrmsDashboardController extends Controller
             'upcomingBirthdays',
             'upcomingAnniversaries',
             'departments',
-            'latestPayrollRun',
-            'leaveTypes'
+            'leaveTypes',
+            'recentLateArrivals',
+            'unprocessedPenalties',
+            'approvedLeaves'
         ));
     }
 
@@ -368,30 +368,34 @@ class HrmsDashboardController extends Controller
             return redirect()->back()->with('error', 'No active employee profile found to record attendance.');
         }
 
-        // Fetch or initialize today's Attendance
-        $attendance = Attendance::firstOrCreate(
-            [
-                'tenant_id' => $tenantId,
-                'employee_id' => $employee->id,
-                'date' => $today,
-            ],
-            [
-                'location_type' => $locationType,
-                'status' => 'present',
-            ]
-        );
+        // Fetch today's Attendance record
+        $attendance = Attendance::where('tenant_id', $tenantId)
+            ->where('employee_id', $employee->id)
+            ->whereDate('date', $today)
+            ->first();
 
         // 1. Clock In (Check-In)
         if ($action === 'in') {
-            if ($attendance->check_in) {
+            if ($attendance && $attendance->check_in) {
                 return redirect()->back()->with('error', 'You have already clocked in today at ' . Carbon::parse($attendance->check_in)->format('h:i A') . '.');
             }
 
-            $attendance->update([
-                'check_in' => $now,
-                'location_type' => $locationType,
-                'status' => $now->format('H:i') > '09:45' ? 'late' : 'present',
-            ]);
+            if (!$attendance) {
+                $attendance = Attendance::create([
+                    'tenant_id' => $tenantId,
+                    'employee_id' => $employee->id,
+                    'date' => $today,
+                    'check_in' => $now,
+                    'location_type' => $locationType,
+                    'status' => $now->format('H:i') > '09:45' ? 'late' : 'present',
+                ]);
+            } else {
+                $attendance->update([
+                    'check_in' => $now,
+                    'location_type' => $locationType,
+                    'status' => $now->format('H:i') > '09:45' ? 'late' : 'present',
+                ]);
+            }
 
             BiometricPunchLog::create([
                 'tenant_id' => $tenantId,
@@ -401,6 +405,10 @@ class HrmsDashboardController extends Controller
             ]);
 
             return redirect()->back()->with('success', 'Web Clock-In successful! Logged in at ' . $now->format('h:i A') . ' (' . ucfirst($locationType) . ').');
+        }
+
+        if (!$attendance || !$attendance->check_in) {
+            return redirect()->back()->with('error', 'Please clock-in first before performing this action.');
         }
 
         // 2. Start Break (Take Break)

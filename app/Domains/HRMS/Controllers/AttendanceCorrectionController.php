@@ -15,6 +15,168 @@ use Illuminate\Support\Facades\Log;
 class AttendanceCorrectionController extends Controller
 {
     /**
+     * Formats a LengthAwarePaginator into a clean, concise response structure.
+     */
+    private function formatPaginatedData(\Illuminate\Contracts\Pagination\LengthAwarePaginator $paginator, callable $transformItem): array
+    {
+        return [
+            'items' => collect($paginator->items())->map($transformItem)->values(),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+                'last_page'    => $paginator->lastPage(),
+                'has_more'     => $paginator->hasMorePages(),
+            ],
+        ];
+    }
+
+    /**
+     * Transforms an AttendanceCorrection model into a clean array structure.
+     */
+    private function transformCorrection(AttendanceCorrection $ac): array
+    {
+        $data = [
+            'id'                  => $ac->id,
+            'date'                => $ac->date ? $ac->date->format('Y-m-d') : null,
+            'requested_check_in'  => $ac->requested_check_in ? $ac->requested_check_in->format('H:i:s') : null,
+            'requested_check_out' => $ac->requested_check_out ? $ac->requested_check_out->format('H:i:s') : null,
+            'reason'              => $ac->reason,
+            'status'              => $ac->status,
+            'rejected_reason'     => $ac->rejected_reason,
+            'created_at'          => $ac->created_at?->toDateTimeString(),
+        ];
+
+        if ($ac->relationLoaded('employee') && $ac->employee) {
+            $data['employee'] = [
+                'id'            => $ac->employee->id,
+                'employee_code' => $ac->employee->employee_id,
+                'full_name'     => $ac->employee->full_name,
+                'photo'         => $ac->employee->photo,
+            ];
+        }
+
+        if ($ac->relationLoaded('attendance') && $ac->attendance) {
+            $att = $ac->attendance;
+            $data['attendance'] = [
+                'id'         => $att->id,
+                'check_in'   => $att->check_in ? $att->check_in->toDateTimeString() : null,
+                'check_out'  => $att->check_out ? $att->check_out->toDateTimeString() : null,
+                'status'     => $att->status,
+                'work_hours' => floatval($att->total_work_hours ?? 0),
+            ];
+        }
+
+        return $data;
+    }
+
+    /**
+     * GET /api/hrms/attendance-corrections
+     * List paginated attendance correction requests with filtering.
+     */
+    public function index(Request $request)
+    {
+        $user = auth()->user();
+        $employee = Employee::where('user_id', $user?->id)->first();
+        $isAdmin = $user && (method_exists($user, 'hasAnyRole') ? $user->hasAnyRole(['admin', 'hr', 'super-admin']) : true);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        $query = AttendanceCorrection::where('tenant_id', $tenantId)
+            ->with([
+                'employee:id,employee_id,full_name,photo',
+                'attendance:id,check_in,check_out,status,total_work_hours',
+            ]);
+
+        if ($request->filled('employee_id')) {
+            if ($isAdmin || ($employee && (int)$request->employee_id === (int)$employee->id)) {
+                $query->where('employee_id', $request->employee_id);
+            } else {
+                $query->where('employee_id', $employee?->id ?? 0);
+            }
+        } elseif (!$isAdmin && $employee) {
+            $query->where('employee_id', $employee->id);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('date', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('date', '<=', $request->to_date);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('reason', 'like', "%{$search}%")
+                  ->orWhereHas('employee', function ($sq) use ($search) {
+                      $sq->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_id', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $perPage = min($request->integer('per_page', 10), 100);
+        $corrections = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+        $formatted = $this->formatPaginatedData($corrections, fn($ac) => $this->transformCorrection($ac));
+
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Attendance correction requests retrieved successfully.',
+                'data'    => $formatted,
+            ]);
+        }
+
+        return $corrections;
+    }
+
+    /**
+     * GET /api/hrms/attendance-corrections/{id}
+     * Get single attendance correction request details.
+     */
+    public function show(mixed $id)
+    {
+        $user = auth()->user();
+        $employee = Employee::where('user_id', $user?->id)->first();
+        $isAdmin = $user && (method_exists($user, 'hasAnyRole') ? $user->hasAnyRole(['admin', 'hr', 'super-admin']) : true);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        $correction = AttendanceCorrection::where('tenant_id', $tenantId)
+            ->with([
+                'employee:id,employee_id,full_name,office_email,personal_email,photo',
+                'attendance:id,date,check_in,check_out,status,total_work_hours,total_break_hours',
+            ])
+            ->find($id);
+
+        if (!$correction) {
+            return response()->json([
+                'success' => false,
+                'message' => "Attendance correction request with ID '{$id}' not found."
+            ], 404);
+        }
+
+        if (!$isAdmin && $employee && (int)$correction->employee_id !== (int)$employee->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access to this attendance correction request.'
+            ], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Attendance correction request details loaded successfully.',
+            'data'    => $this->transformCorrection($correction)
+        ]);
+    }
+
+    /**
      * Store a newly created attendance correction request.
      */
     public function store(Request $request)

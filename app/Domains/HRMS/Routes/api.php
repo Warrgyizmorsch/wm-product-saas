@@ -410,6 +410,8 @@ Route::prefix('api/hrms/attendance-corrections')
     ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.attendance-corrections.')
     ->group(function () {
+        Route::get('/', [AttendanceCorrectionController::class, 'index'])->name('index');
+        Route::get('/{id}', [AttendanceCorrectionController::class, 'show'])->name('show');
         Route::post('/', [AttendanceCorrectionController::class, 'store'])->name('store');
         Route::post('/{correction}/approve', [AttendanceCorrectionController::class, 'approve'])->name('approve');
         Route::post('/{correction}/reject', [AttendanceCorrectionController::class, 'reject'])->name('reject');
