@@ -31,7 +31,11 @@ class VendorBillController extends Controller
             })
             ->count();
 
-        return view('modules.purchase.bills.index', compact('bills', 'pendingGrnsCount'));
+        $pendingFreightCount = \App\Domains\Sales\Models\DispatchOrder::where('tenant_id', $tenantId)
+            ->pendingFreightBill()
+            ->count();
+
+        return view('modules.purchase.bills.index', compact('bills', 'pendingGrnsCount', 'pendingFreightCount'));
     }
 
     public function pendingGrns(Request $request)
@@ -55,10 +59,50 @@ class VendorBillController extends Controller
         }
 
         $pendingGrns = $query->latest()->paginate(15);
-
         $pendingGrnsCount = $pendingGrns->total();
 
-        return view('modules.purchase.bills.pending', compact('pendingGrns', 'pendingGrnsCount'));
+        $pendingFreightCount = \App\Domains\Sales\Models\DispatchOrder::where('tenant_id', $tenantId)
+            ->pendingFreightBill()
+            ->count();
+
+        return view('modules.purchase.bills.pending', compact('pendingGrns', 'pendingGrnsCount', 'pendingFreightCount'));
+    }
+
+    public function pendingFreight(Request $request)
+    {
+        $tenantId = require_tenant_id();
+
+        $query = \App\Domains\Sales\Models\DispatchOrder::where('tenant_id', $tenantId)
+            ->pendingFreightBill()
+            ->with(['transporter', 'customer', 'invoice', 'salesOrder']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('dispatch_number', 'like', "%{$search}%")
+                  ->orWhere('lr_number', 'like', "%{$search}%")
+                  ->orWhereHas('transporter', fn($tq) => $tq->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('customer', fn($cq) => $cq->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('invoice', fn($iq) => $iq->where('invoice_number', 'like', "%{$search}%"))
+                  ->orWhereHas('salesOrder', fn($sq) => $sq->where('sales_order_number', 'like', "%{$search}%"));
+            });
+        }
+
+        $pendingFreightDispatches = $query->latest()->paginate(15);
+        $pendingFreightCount = $pendingFreightDispatches->total();
+
+        $pendingGrnsCount = GoodsReceiptNote::where('tenant_id', $tenantId)
+            ->whereIn('status', ['Approved', 'Completed'])
+            ->whereDoesntHave('vendorBills', function ($q) {
+                $q->where('status', '!=', 'Cancelled');
+            })
+            ->count();
+
+        return view('modules.purchase.bills.pending-freight', compact(
+            'pendingFreightDispatches',
+            'pendingFreightCount',
+            'pendingGrnsCount'
+        ));
     }
 
     public function create(Request $request)
@@ -125,7 +169,7 @@ class VendorBillController extends Controller
             'freight_amount'        => 'nullable|numeric|min:0',
             'freight_tax_percent'   => 'nullable|numeric|min:0',
             'freight_tax_method'    => 'nullable|string',
-            'freight_allocation_method' => 'nullable|string|in:by_amount,by_quantity',
+            'freight_allocation_method' => 'nullable|string|in:by_amount,by_quantity,none,direct_expense',
             'notes'                 => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|integer',
@@ -213,5 +257,217 @@ class VendorBillController extends Controller
     {
         $bill = $this->billRepo->findWithDetails($id);
         return view('modules.purchase.bills.detail-partial', compact('bill'));
+    }
+
+    public function createService(Request $request)
+    {
+        $tenantId = require_tenant_id();
+
+        $mode = $request->query('mode', $request->query('dispatch_order_id') ? 'outbound' : ($request->query('grn_id') ? 'inbound' : 'outbound'));
+
+        $grnId = $request->query('grn_id');
+        $selectedGrn = null;
+        if ($grnId) {
+            $selectedGrn = GoodsReceiptNote::where('tenant_id', $tenantId)
+                ->with(['purchaseOrder', 'vendor'])
+                ->find($grnId);
+        }
+
+        $dispatchId = $request->query('dispatch_order_id') ?? $request->query('dispatch_id');
+        $selectedDispatch = null;
+        if ($dispatchId) {
+            $selectedDispatch = \App\Domains\Sales\Models\DispatchOrder::where('tenant_id', $tenantId)
+                ->with('transporter')
+                ->find($dispatchId);
+        }
+
+        // Auto-extract form information from Dispatch / GRN payload
+        $prefilledVendorId    = $request->query('vendor_id');
+        $prefilledAmount      = $request->query('amount');
+        $prefilledInvoice     = $request->query('vendor_invoice_number');
+        $prefilledNotes       = $request->query('notes');
+        $prefilledServiceHead = $request->query('service_head');
+        $prefilledGstType     = $request->query('gst_type');
+        $prefilledTaxRate     = $request->query('tax_rate');
+
+        if ($selectedDispatch) {
+            $transporter = $selectedDispatch->transporter;
+            $prefilledVendorId = $prefilledVendorId ?: ($transporter?->vendor_id ?? null);
+            if (!$prefilledVendorId && $transporter) {
+                $matchedVendor = Vendor::where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($transporter) {
+                        $q->where('name', $transporter->name);
+                        if (!empty($transporter->gstin) && \Illuminate\Support\Facades\Schema::hasColumn('vendors', 'gstin')) {
+                            $q->orWhere('gstin', $transporter->gstin);
+                        }
+                    })->first();
+                if ($matchedVendor) {
+                    $prefilledVendorId = $matchedVendor->id;
+                }
+            }
+            if (!$prefilledVendorId) {
+                $prefilledVendorId = $selectedDispatch->transporter_id;
+            }
+
+            $prefilledAmount      = $prefilledAmount      ?: $selectedDispatch->freight_amount;
+            $prefilledInvoice     = $prefilledInvoice     ?: ('LR-' . ($selectedDispatch->lr_number ?: ($selectedDispatch->dispatch_number ?? $selectedDispatch->id)));
+            $prefilledNotes       = $prefilledNotes       ?: "Freight Obligation Bill for Dispatch #{$selectedDispatch->dispatch_number} | Customer: " . ($selectedDispatch->customer?->name ?? 'N/A') . " | Vehicle: " . ($selectedDispatch->vehicle_number ?: 'N/A');
+            $prefilledServiceHead = $prefilledServiceHead ?: 'Freight & Transport';
+            $prefilledGstType     = $prefilledGstType     ?: 'rcm';
+            $prefilledTaxRate     = $prefilledTaxRate     ?: 5;
+        } elseif ($selectedGrn) {
+            $prefilledVendorId    = $prefilledVendorId    ?: $selectedGrn->vendor_id;
+            $prefilledServiceHead = $prefilledServiceHead ?: 'Freight & Transport';
+        }
+
+        $grns = GoodsReceiptNote::where('tenant_id', $tenantId)
+            ->whereIn('status', ['Approved', 'Completed'])
+            ->with('vendor')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $dispatches = \App\Domains\Sales\Models\DispatchOrder::where('tenant_id', $tenantId)
+            ->where('freight_amount', '>', 0)
+            ->with('transporter')
+            ->latest('id')
+            ->get();
+
+        $vendors = Vendor::where('tenant_id', $tenantId)->get();
+        $transporterVendorIds = [];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('transporters', 'vendor_id')) {
+            $transporterVendorIds = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)
+                ->whereNotNull('vendor_id')
+                ->pluck('vendor_id')
+                ->toArray();
+        }
+
+        $vendors->each(function ($v) use ($transporterVendorIds) {
+            $nameLower = strtolower($v->name);
+            $v->is_transporter = in_array($v->id, $transporterVendorIds)
+                || str_contains($nameLower, 'logistics')
+                || str_contains($nameLower, 'transport')
+                || str_contains($nameLower, 'express')
+                || str_contains($nameLower, 'carrier');
+            $v->type_label = $v->is_transporter ? 'Transporter / Logistics' : 'Supplier / Vendor';
+        });
+
+        $prefilled = [
+            'vendor_id'             => $prefilledVendorId,
+            'amount'                => $prefilledAmount,
+            'vendor_invoice_number' => $prefilledInvoice,
+            'notes'                 => $prefilledNotes,
+            'service_head'          => $prefilledServiceHead,
+            'gst_type'              => $prefilledGstType,
+            'tax_rate'              => $prefilledTaxRate,
+        ];
+
+        return view('modules.purchase.bills.create-service', compact(
+            'mode',
+            'grns',
+            'selectedGrn',
+            'dispatches',
+            'selectedDispatch',
+            'vendors',
+            'prefilled'
+        ));
+    }
+
+    public function storeService(Request $request)
+    {
+        $tenantId = require_tenant_id();
+
+        $validated = $request->validate([
+            'vendor_id'             => 'required|integer|exists:vendors,id',
+            'goods_receipt_note_id' => 'nullable|integer|exists:goods_receipt_notes,id',
+            'dispatch_order_id'     => 'nullable|integer|exists:dispatch_orders,id',
+            'service_head'          => 'required|string',
+            'amount'                => 'required|numeric|min:0.01',
+            'tax_rate'              => 'required|numeric|min:0',
+            'gst_type'              => 'required|string|in:cgst_sgst,igst,rcm',
+            'bill_date'             => 'required|date',
+            'due_date'              => 'required|date|after_or_equal:bill_date',
+            'vendor_invoice_number' => 'nullable|string|max:255',
+            'notes'                 => 'nullable|string',
+        ]);
+
+        $subtotal  = (float) $validated['amount'];
+        $taxRate   = (float) $validated['tax_rate'];
+        $gstType   = $validated['gst_type'];
+        $isRcm     = $gstType === 'rcm';
+        $isIgst    = $gstType === 'igst';
+
+        $taxAmount  = ($subtotal * $taxRate) / 100;
+        $grandTotal = $isRcm ? $subtotal : ($subtotal + $taxAmount);
+
+        $cgstAmount = ($isIgst || $isRcm) ? 0 : round($taxAmount / 2, 2);
+        $sgstAmount = ($isIgst || $isRcm) ? 0 : round($taxAmount / 2, 2);
+        $igstAmount = $isIgst ? round($taxAmount, 2) : 0;
+
+        $billNumber = $this->billRepo->getNextBillNumber($tenantId);
+
+        $grn = !empty($validated['goods_receipt_note_id'])
+            ? GoodsReceiptNote::find($validated['goods_receipt_note_id'])
+            : null;
+
+        $dispatchOrder = !empty($validated['dispatch_order_id'])
+            ? \App\Domains\Sales\Models\DispatchOrder::find($validated['dispatch_order_id'])
+            : null;
+
+        $serviceHead = $validated['service_head'];
+        $notesParts = [];
+        if (!empty($validated['notes'])) {
+            $notesParts[] = $validated['notes'];
+        } else {
+            $notesParts[] = "{$serviceHead} Service Charge";
+        }
+        if ($dispatchOrder) {
+            $notesParts[] = "Dispatch #{$dispatchOrder->dispatch_number}";
+        }
+        if ($grn) {
+            $notesParts[] = "GRN #{$grn->grn_number}";
+        }
+        $notes = implode(' | ', array_filter($notesParts));
+
+        $bill = \App\Domains\Purchase\Models\VendorBill::create([
+            'tenant_id'             => $tenantId,
+            'company_id'            => require_company_id(),
+            'branch_id'             => require_branch_id(),
+            'bill_number'           => $billNumber,
+            'vendor_invoice_number' => $validated['vendor_invoice_number'] ?: "SRV-BILL-" . time(),
+            'vendor_id'             => (int) $validated['vendor_id'],
+            'goods_receipt_note_id' => $grn?->id,
+            'dispatch_order_id'     => $dispatchOrder?->id,
+            'purchase_order_id'     => $grn?->purchase_order_id,
+            'bill_date'             => $validated['bill_date'],
+            'due_date'              => $validated['due_date'],
+            'status'                => 'Unpaid',
+            'gst_type'              => $gstType,
+            'subtotal'              => $subtotal,
+            'tax_amount'            => $taxAmount,
+            'cgst_amount'           => $cgstAmount,
+            'sgst_amount'           => $sgstAmount,
+            'igst_amount'           => $igstAmount,
+            'grand_total'           => $grandTotal,
+            'paid_amount'           => 0,
+            'due_amount'            => round($grandTotal, 2),
+            'notes'                 => $notes,
+            'created_by'            => auth()->id() ?: 1,
+        ]);
+
+        \App\Domains\Purchase\Models\VendorBillItem::create([
+            'tenant_id'      => $tenantId,
+            'vendor_bill_id' => $bill->id,
+            'quantity'       => 1,
+            'unit_rate'      => $subtotal,
+            'tax_percentage' => $taxRate,
+            'total_amount'   => $grandTotal,
+        ]);
+
+        // Dispatch BillPosted event & trigger GL Journal Entry Posting
+        event(new \App\Domains\Purchase\Events\BillPosted($bill));
+        app(\App\Domains\Accounting\Listeners\PostPurchaseBillJournal::class)->handle(new \App\Domains\Purchase\Events\BillPosted($bill));
+
+        return redirect()->route('purchase.bills.show', $bill->id)
+            ->with('success', "Service Bill {$bill->bill_number} created successfully.");
     }
 }

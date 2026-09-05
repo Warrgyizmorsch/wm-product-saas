@@ -6,6 +6,21 @@
 
 @push('styles')
     <style>
+        #billsTable th {
+            white-space: nowrap !important;
+            font-size: 11px !important;
+            letter-spacing: 0.5px !important;
+        }
+        #billsTable td {
+            vertical-align: middle !important;
+            white-space: nowrap !important;
+        }
+        .vendor-inv-col {
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .action-icon-btn {
             display: inline-flex !important;
             align-items: center !important;
@@ -31,24 +46,27 @@
 @section('content')
 
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
-        <!-- Tab navigation for Vendor Bills & Pending GRNs -->
-        <ul class="nav nav-tabs nav-tabs-custom mb-4" id="billsTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <a class="nav-link active fw-bold position-relative py-2 px-3" href="{{ route('purchase.bills.index') }}">
-                    <i class="feather-file-text me-2 text-primary"></i>All Vendor Bills
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link text-muted fw-bold position-relative py-2 px-3" href="{{ route('purchase.bills.pending') }}">
-                    <i class="feather-clock text-warning me-2"></i>Pending Bills (Unbilled GRNs)
-                    @if(($pendingGrnsCount ?? 0) > 0)
-                        <x-ui.badge :soft="true" variant="danger" class="ms-2 fs-11 fw-bold">{{ $pendingGrnsCount }}</x-ui.badge>
-                    @else
-                        <x-ui.badge :soft="true" variant="secondary" class="ms-2 fs-11 fw-bold">0</x-ui.badge>
-                    @endif
-                </a>
-            </li>
-        </ul>
+        <!-- Tab navigation using Common UI Component -->
+        <x-ui.horizontal-tabs id="vendorBillsTabNav" class="mb-4" :tabs="[
+            [
+                'id' => 'tab-all-bills',
+                'label' => 'All Bills',
+                'active' => true,
+                'icon' => 'feather-file-text',
+            ],
+            [
+                'id' => 'tab-pending-bills',
+                'label' => 'Pending Goods Bills' . (($pendingGrnsCount ?? 0) > 0 ? ' (' . $pendingGrnsCount . ')' : ''),
+                'active' => false,
+                'icon' => 'feather-clock',
+            ],
+            [
+                'id' => 'tab-pending-freight',
+                'label' => 'Pending Freight Bills' . (($pendingFreightCount ?? 0) > 0 ? ' (' . $pendingFreightCount . ')' : ''),
+                'active' => false,
+                'icon' => 'feather-truck',
+            ]
+        ]" />
 
         <!-- Header Title & Common Filter -->
         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -59,9 +77,14 @@
                 <p class="text-muted fs-12 mb-0">{{ __('purchase.manage_vendor_invoices_help') }}</p>
             </div>
 
-            <!-- Common Filter Panel -->
-            <form method="GET" action="{{ route('purchase.bills.index') }}" class="d-inline">
-                <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
+            <!-- Actions & Common Filter Panel -->
+            <div class="d-flex align-items-center gap-2">
+                <a href="{{ route('purchase.bills.create-service') }}" class="btn btn-sm btn-soft-primary fw-bold text-primary px-3 shadow-sm border border-primary-subtle">
+                    <i class="feather-plus me-1"></i>Create Service Bill
+                </a>
+
+                <form method="GET" action="{{ route('purchase.bills.index') }}" class="d-inline">
+                    <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
 
                     <div class="mb-3">
@@ -90,17 +113,17 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="billsTable">
                 <thead>
-                    <tr>
-                        <th style="width: 12%">{{ __('purchase.bill_number') }}</th>
-                        <th style="width: 12%">{{ __('purchase.vendor_invoice_no') }}</th>
-                        <th style="width: 16%">{{ __('purchase.supplier_vendor') }}</th>
-                        <th style="width: 9%">{{ __('purchase.bill_date') }}</th>
-                        <th style="width: 9%">{{ __('purchase.due_date') }}</th>
-                        <th style="width: 10%" class="text-center">{{ __('purchase.status') }}</th>
-                        <th style="width: 10%" class="text-end">{{ __('purchase.grand_total') }}</th>
-                        <th style="width: 10%" class="text-end">{{ __('purchase.paid_amount') }}</th>
-                        <th style="width: 10%" class="text-end">{{ __('purchase.due_amount') }}</th>
-                        <th style="width: 12%" class="text-end">{{ __('purchase.actions') }}</th>
+                    <tr class="text-nowrap">
+                        <th style="min-width: 140px;">{{ __('purchase.bill_number') }}</th>
+                        <th style="min-width: 160px;">{{ __('purchase.vendor_invoice_no') }}</th>
+                        <th style="min-width: 160px;">{{ __('purchase.supplier_vendor') }}</th>
+                        <th style="min-width: 100px;">{{ __('purchase.bill_date') }}</th>
+                        <th style="min-width: 100px;">{{ __('purchase.due_date') }}</th>
+                        <th style="min-width: 90px;" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="min-width: 110px;" class="text-end">{{ __('purchase.grand_total') }}</th>
+                        <th style="min-width: 110px;" class="text-end">{{ __('purchase.paid_amount') }}</th>
+                        <th style="min-width: 110px;" class="text-end">{{ __('purchase.due_amount') }}</th>
+                        <th style="min-width: 80px;" class="text-end">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -157,7 +180,7 @@
                                     <small class="text-muted d-block fs-11">GRN: {{ $bill->goodsReceiptNote->grn_number }}</small>
                                 @endif
                             </td>
-                            <td class="font-monospace fw-semibold">{{ $bill->vendor_invoice_number ?: '—' }}</td>
+                            <td class="font-monospace fw-semibold vendor-inv-col" title="{{ $bill->vendor_invoice_number ?: '—' }}">{{ $bill->vendor_invoice_number ?: '—' }}</td>
                             <td class="fw-semibold text-dark">{{ $bill->vendor?->name ?: '—' }}</td>
                             <td>{{ $bill->bill_date ? $bill->bill_date->format('d-M-Y') : '—' }}</td>
                             <td>{{ $bill->due_date ? $bill->due_date->format('d-M-Y') : '—' }}</td>
@@ -289,6 +312,10 @@
 @push('scripts')
     <script>
         $(document).ready(function() {
+            $('#tab-pending-bills-tab').on('click', function() {
+                window.location.href = "{{ route('purchase.bills.pending') }}";
+            });
+
             $(document).on('click', '.btn-view-offcanvas', function(e) {
                 e.preventDefault();
                 const bill = $(this).data('bill');
@@ -343,6 +370,12 @@
                     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': '&quot;', "'": '&#39;' }[s];
                 });
             }
+            $('#tab-pending-bills-tab').on('click', function() {
+                window.location.href = "{{ route('purchase.bills.pending') }}";
+            });
+            $('#tab-pending-freight-tab').on('click', function() {
+                window.location.href = "{{ route('purchase.bills.pending-freight') }}";
+            });
         });
     </script>
 @endpush

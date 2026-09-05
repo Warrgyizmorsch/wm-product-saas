@@ -110,23 +110,75 @@
                     </div>
 
                     <div class="col-md-3 col-6">
-                        <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">Freight Terms & Amount</span>
+                        <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">Freight Terms & Obligation</span>
                         @php
                             $termClass = match($dispatch->freight_terms) {
-                                'To Be Billed' => 'bg-soft-success text-success',
-                                'Prepaid' => 'bg-soft-info text-info',
-                                'Customer Pickup' => 'bg-soft-warning text-warning',
-                                default => 'bg-soft-primary text-primary',
+                                'To Be Billed' => 'bg-soft-success text-success border-success-subtle',
+                                'FOR Site', 'Prepaid' => 'bg-soft-info text-info border-info-subtle',
+                                'Customer Pickup' => 'bg-soft-warning text-warning border-warning-subtle',
+                                default => 'bg-soft-primary text-primary border-primary-subtle',
                             };
+                            $linkedFreightBill = $dispatch->freightBill ?? $dispatch->vendorBills->first();
                         @endphp
-                        <div class="hstack gap-1.5">
-                            <span class="badge {{ $termClass }} fs-11 fw-semibold">{{ $dispatch->freight_terms ?: 'To Pay' }}</span>
+                        <div class="hstack gap-1.5 flex-wrap">
+                            <span class="badge {{ $termClass }} border fs-11 fw-semibold">{{ $dispatch->freight_terms ?: 'To Be Billed' }}</span>
                             @if($dispatch->freight_amount > 0)
                                 <span class="fw-bold text-dark fs-12">₹{{ number_format($dispatch->freight_amount, 2) }}</span>
                             @endif
                         </div>
                         @if($dispatch->lr_number)
-                            <small class="text-muted d-block mt-1">LR: {{ $dispatch->lr_number }} {{ $dispatch->lr_date ? '('.$dispatch->lr_date->format('d M Y').')' : '' }}</small>
+                            <small class="text-muted d-block mt-1"><i class="feather-file-text me-1"></i>LR: {{ $dispatch->lr_number }} {{ $dispatch->lr_date ? '('.$dispatch->lr_date->format('d M Y').')' : '' }}</small>
+                        @endif
+
+                        @if($linkedFreightBill && $linkedFreightBill->status !== 'Cancelled')
+                            @php
+                                $expectedAmt = (float) $dispatch->freight_amount;
+                                $actualAmt   = (float) $linkedFreightBill->grand_total;
+                                $variance    = round($actualAmt - $expectedAmt, 2);
+                            @endphp
+                            <div class="mt-2 pt-1.5 border-top">
+                                <span class="badge bg-soft-success text-success border border-success-subtle fs-11 fw-bold d-block mb-1 text-truncate" title="Freight Bill {{ $linkedFreightBill->bill_number }}">
+                                    <i class="feather-check-circle me-1"></i>Bill {{ $linkedFreightBill->bill_number }} Linked
+                                </span>
+                                <div class="fs-11 text-muted">
+                                    <div class="d-flex justify-content-between">
+                                        <span>Billed Amt:</span>
+                                        <strong class="text-dark">₹{{ number_format($actualAmt, 2) }}</strong>
+                                    </div>
+                                    @if(abs($variance) > 0.01)
+                                        <div class="d-flex justify-content-between {{ $variance > 0 ? 'text-danger' : 'text-success' }}">
+                                            <span>Variance:</span>
+                                            <strong>{{ $variance > 0 ? '+' : '' }}₹{{ number_format($variance, 2) }}</strong>
+                                        </div>
+                                    @endif
+                                </div>
+                                @if(Route::has('purchase.bills.show'))
+                                    <a href="{{ route('purchase.bills.show', $linkedFreightBill->id) }}" class="btn btn-xs btn-light text-primary border w-100 py-1 mt-1">
+                                        <i class="feather-eye me-1"></i>View Freight Bill
+                                    </a>
+                                @endif
+                            </div>
+                        @elseif(in_array($dispatch->freight_terms, ['To Pay', 'to_pay', 'Customer Pickup', 'customer_pickup']))
+                            <div class="mt-2 pt-1 border-top">
+                                <small class="text-muted fs-11 d-block"><i class="feather-info me-1"></i>No Obligation (Collect / Self Pickup)</small>
+                            </div>
+                        @else
+                            <div class="mt-2 pt-1 border-top">
+                                <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-11 fw-semibold d-block mb-1">
+                                    <i class="feather-clock me-1"></i>Pending Freight Bill
+                                </span>
+                                @if(Route::has('purchase.bills.create-service'))
+                                    @php
+                                        $createFreightUrl = route('purchase.bills.create-service', [
+                                            'mode'              => 'outbound',
+                                            'dispatch_order_id' => $dispatch->id,
+                                        ]);
+                                    @endphp
+                                    <a href="{{ $createFreightUrl }}" class="btn btn-xs btn-primary shadow-sm w-100 py-1 fw-bold">
+                                        <i class="feather-file-plus me-1"></i>Create Freight Bill
+                                    </a>
+                                @endif
+                            </div>
                         @endif
                     </div>
                 </div>

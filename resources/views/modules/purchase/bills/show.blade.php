@@ -101,6 +101,10 @@
             </div>
         @endif
 
+        @php
+            $isServiceBill = $bill->items->every(fn($i) => empty($i->product_id) && empty($i->goods_receipt_note_item_id));
+        @endphp
+
         <!-- Metadata Row -->
         <div class="row g-3 mb-4 fs-13 text-dark border-bottom pb-3">
             <div class="col-md-2">
@@ -111,25 +115,56 @@
                 <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.bill_date') }}</span>
                 <strong>{{ $bill->bill_date ? $bill->bill_date->format('d-M-Y') : '—' }}</strong>
             </div>
-            <div class="col-md-2">
-                <span class="text-muted d-block fs-11 text-uppercase fw-bold">Discount / Tax Options</span>
-                <strong class="text-capitalize d-block">{{ str_replace('_', ' ', $bill->discount_type ?: 'without_discount') }}</strong>
-                <small class="text-muted text-capitalize d-block">{{ str_replace('_', ' ', $bill->tax_type ?: 'order_wise_tax') }}</small>
-            </div>
-            <div class="col-md-2">
-                <span class="text-muted d-block fs-11 text-uppercase fw-bold">GST Type</span>
-                <strong class="text-capitalize">{{ $bill->gst_type === 'igst' ? 'Inter-State (IGST)' : 'Intra-State (CGST+SGST)' }}</strong>
-            </div>
-            <div class="col-md-2">
-                <span class="text-muted d-block fs-11 text-uppercase fw-bold">Freight Terms &amp; Method</span>
-                <strong class="text-capitalize d-block">{{ str_replace('_', ' ', $bill->freight_terms ?: 'To Pay') }}</strong>
-                @if($bill->freight_amount > 0)
-                    <span class="text-primary fw-bold font-monospace d-inline-block">₹{{ number_format($bill->freight_amount, 2) }}</span>
-                    <span class="badge bg-soft-primary text-primary fs-11 ms-1">
-                        {{ $bill->freight_tax_method === 'pro_rata' ? 'Pro-Rata Apportionment' : ($bill->freight_tax_method === 'manual' ? 'Custom Tax Rate' : 'Highest GST Rate') }}
-                    </span>
-                @endif
-            </div>
+
+            @if($isServiceBill)
+                <div class="col-md-2">
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold">Service Type</span>
+                    <strong class="text-primary fw-semibold">{{ $bill->items->first()?->description ?: 'Freight & Service Charge' }}</strong>
+                </div>
+                <div class="col-md-2">
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold">GST Mechanism</span>
+                    <strong class="text-capitalize">
+                        @if($bill->gst_type === 'rcm')
+                            <span class="badge bg-soft-warning text-warning border border-warning-subtle">RCM (Reverse Charge)</span>
+                        @elseif($bill->gst_type === 'igst')
+                            Inter-State (IGST)
+                        @else
+                            Intra-State (CGST+SGST)
+                        @endif
+                    </strong>
+                </div>
+                <div class="col-md-2">
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold">Source Reference</span>
+                    @if($bill->goodsReceiptNote)
+                        <a href="{{ route('grns.show', $bill->goods_receipt_note_id) }}" class="fw-bold text-primary font-monospace">
+                            <i class="feather-file-text me-1"></i>{{ $bill->goodsReceiptNote->grn_number }}
+                        </a>
+                    @else
+                        <span class="text-muted fs-12">Direct Service Bill</span>
+                    @endif
+                </div>
+            @else
+                <div class="col-md-2">
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold">Discount / Tax Options</span>
+                    <strong class="text-capitalize d-block">{{ str_replace('_', ' ', $bill->discount_type ?: 'without_discount') }}</strong>
+                    <small class="text-muted text-capitalize d-block">{{ str_replace('_', ' ', $bill->tax_type ?: 'order_wise_tax') }}</small>
+                </div>
+                <div class="col-md-2">
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold">GST Type</span>
+                    <strong class="text-capitalize">{{ $bill->gst_type === 'igst' ? 'Inter-State (IGST)' : 'Intra-State (CGST+SGST)' }}</strong>
+                </div>
+                <div class="col-md-2">
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold">Freight Terms &amp; Method</span>
+                    <strong class="text-capitalize d-block">{{ str_replace('_', ' ', $bill->freight_terms ?: 'To Pay') }}</strong>
+                    @if($bill->freight_amount > 0)
+                        <span class="text-primary fw-bold font-monospace d-inline-block">₹{{ number_format($bill->freight_amount, 2) }}</span>
+                        <span class="badge bg-soft-primary text-primary fs-11 ms-1">
+                            {{ $bill->freight_tax_method === 'pro_rata' ? 'Pro-Rata Apportionment' : ($bill->freight_tax_method === 'manual' ? 'Custom Tax Rate' : 'Highest GST Rate') }}
+                        </span>
+                    @endif
+                </div>
+            @endif
+
             <div class="col-md-2 text-md-end">
                 <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.grand_total') }}</span>
                 <strong class="fs-16 font-monospace text-primary">₹{{ number_format($bill->grand_total, 2) }}</strong>
@@ -194,22 +229,32 @@
                         @endphp
                         <tr>
                             <td class="ps-3 text-muted fw-semibold">{{ $idx + 1 }}</td>
-                            <td>
+                            <td style="max-width: 340px; white-space: normal; word-break: break-word;">
                                 @if($item->product)
                                     <strong class="text-dark">{{ $item->product->name }}</strong>
                                     @if($item->product->sku)
                                         <small class="text-muted d-block">{{ __('purchase.sku') }}: {{ $item->product->sku }}</small>
                                     @endif
                                 @elseif(!empty($item->description))
-                                    <strong class="text-dark">{{ $item->description }}</strong>
+                                    <strong class="text-dark d-block text-wrap" style="word-break: break-word;">{{ $item->description }}</strong>
                                 @elseif($item->grnItem?->product)
                                     <strong class="text-dark">{{ $item->grnItem->product->name }}</strong>
                                     @if($item->grnItem->product->sku)
                                         <small class="text-muted d-block">{{ __('purchase.sku') }}: {{ $item->grnItem->product->sku }}</small>
                                     @endif
                                 @else
-                                    <strong class="text-dark">{{ str_replace('Transporter Service Bill', 'Service Bill', $bill->notes ?: 'Freight Charges / Service Charge') }}</strong>
-                                    <small class="text-muted d-block">Freight &amp; Logistics Service Charge</small>
+                                    @php
+                                        $displayServiceTitle = 'Freight & Logistics Service Charge';
+                                        if ($bill->dispatchOrder) {
+                                            $displayServiceTitle = "Freight Service — Dispatch #{$bill->dispatchOrder->dispatch_number}";
+                                        } elseif ($bill->goodsReceiptNote) {
+                                            $displayServiceTitle = "Inbound Freight Service — GRN #{$bill->goodsReceiptNote->grn_number}";
+                                        }
+                                    @endphp
+                                    <strong class="text-dark d-block mb-1">{{ $displayServiceTitle }}</strong>
+                                    <small class="text-muted d-block text-wrap fs-11" style="max-width: 320px; word-break: break-word; white-space: normal;">
+                                        {{ $bill->notes ?: 'Freight & Logistics Service Charge' }}
+                                    </small>
                                 @endif
                             </td>
                             <td class="text-center font-monospace">{{ $isServiceBill ? '1 (Job)' : $qty }}</td>

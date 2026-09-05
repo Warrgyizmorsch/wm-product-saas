@@ -84,9 +84,10 @@ class PostPurchaseBillJournal
                 } else {
                     // Legacy fallback: no linked GRN line / no line_type recorded — preserve
                     // the original goods-vs-service split so pre-existing bills post unchanged.
-                    $isService = $item->product && $item->product->item_type === 'Service';
+                    $isService = ($item->product && $item->product->item_type === 'Service') || (empty($item->product_id) && empty($item->goods_receipt_note_item_id));
                     if ($isService) {
-                        $accountId = $purchaseExpense?->id;
+                        $serviceAccount = $this->resolveServiceHeadAccount($bill, $tenantId, $freightExpense, $purchaseExpense);
+                        $accountId = $serviceAccount?->id ?: ($freightExpense?->id ?: $purchaseExpense?->id);
                         if ($accountId) {
                             $expenseBuckets[$accountId] = ($expenseBuckets[$accountId] ?? 0) + $lineSubtotal;
                         }
@@ -107,8 +108,9 @@ class PostPurchaseBillJournal
 
             $lines = [];
 
-            // Freight Terms Logic: If Freight is billed on invoice (to_be_billed / prepaid), capitalize Freight directly into Inventory Asset!
-            $isFreightCapitalized = in_array($bill->freight_terms, ['to_be_billed', 'prepaid']);
+            // Freight Terms Logic: If Freight is billed on invoice (to_be_billed / prepaid) AND allocation rule is capitalize (by_amount / by_quantity), capitalize Freight directly into Inventory Asset!
+            $isFreightCapitalized = in_array($bill->freight_terms, ['to_be_billed', 'prepaid'])
+                && !in_array($bill->freight_allocation_method, ['none', 'direct_expense']);
             $freightAmt = (float)$bill->freight_amount;
 
             $totalInventoryDebit = $goodsSubtotal + ($isFreightCapitalized ? $freightAmt : 0);
@@ -242,5 +244,42 @@ class PostPurchaseBillJournal
             ]);
             $this->failures->record($bill->tenant_id, BillPosted::class, $bill, $e->getMessage());
         }
+    }
+
+    /**
+     * Resolves the specific Chart of Account based on the Service Head selected in bill notes / product type.
+     */
+    private function resolveServiceHeadAccount($bill, int $tenantId, ?ChartOfAccount $defaultFreight, ?ChartOfAccount $defaultExpense): ?ChartOfAccount
+    {
+        $notes = $bill->notes ?? '';
+
+        if (stripos($notes, 'Customs Duty') !== false) {
+            return $this->accounts->findByCode('5020', $tenantId)
+                ?? $this->accounts->findByCode('5030', $tenantId)
+                ?? $defaultExpense;
+        }
+
+        if (stripos($notes, 'Loading & Unloading') !== false) {
+            return $this->accounts->findByCode('5031', $tenantId)
+                ?? $this->accounts->findByCode('5030', $tenantId)
+                ?? $defaultExpense;
+        }
+
+        if (stripos($notes, 'Insurance') !== false) {
+            return $this->accounts->findByCode('5540', $tenantId)
+                ?? $defaultExpense;
+        }
+
+        if (stripos($notes, 'Other Service') !== false) {
+            return $this->accounts->findByCode('5900', $tenantId)
+                ?? $defaultExpense;
+        }
+
+        if (stripos($notes, 'Freight') !== false || stripos($notes, 'Transport') !== false || stripos($notes, 'Handling') !== false) {
+            return $this->accounts->findByCode('5030', $tenantId)
+                ?? $defaultExpense;
+        }
+
+        return $defaultFreight ?: $defaultExpense;
     }
 }

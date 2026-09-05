@@ -174,8 +174,9 @@
                                     </div>
                                     <div class="col-7" id="freightAllocationMethodCol">
                                         <x-ui.odoo-form-ui type="select" label="Allocation Rule" name="freight_allocation_method" id="freightAllocationMethodSelect">
-                                            <option value="by_amount" @selected(old('freight_allocation_method', 'by_amount') === 'by_amount')>By Amount Ratio</option>
-                                            <option value="by_quantity" @selected(old('freight_allocation_method') === 'by_quantity')>By Quantity</option>
+                                            <option value="by_amount" @selected(old('freight_allocation_method', 'by_amount') === 'by_amount')>Capitalize: By Amount Ratio (Add to Item Cost)</option>
+                                            <option value="by_quantity" @selected(old('freight_allocation_method') === 'by_quantity')>Capitalize: By Quantity (Add to Item Cost)</option>
+                                            <option value="none" @selected(old('freight_allocation_method') === 'none')>Direct Expense GL (Do NOT Add to Item Cost)</option>
                                         </x-ui.odoo-form-ui>
                                     </div>
                                     <div class="col-4 d-none" id="freightTaxMethodContainer">
@@ -448,7 +449,7 @@
                 var isOrderWiseTax = (taxType === 'order_wise_tax');
 
                 var isIgst = (gstType === 'igst');
-                var isFreightEligible = (freightTerms === 'to_be_billed' || freightTerms === 'prepaid');
+                var isFreightEligible = (freightTerms === 'to_be_billed');
 
                 if (freightTerms === 'to_pay') {
                     $('#toPayFreightNoticeBanner').removeClass('d-none').show();
