@@ -65,30 +65,47 @@ class TransporterController extends Controller
                 ->get();
         }
 
-        // Build Freight Bills Collection (Paid vs Pending Tracking)
+        $tenantId = require_tenant_id();
+
+        // Fetch actual Vendor Bills linked to this transporter / vendor / dispatches
+        $vendorId = $transporter->vendor_id ?? $transporter->id;
+        $dispatchIds = $allDispatches->pluck('id')->toArray();
+
+        $hasDispatchIdCol = \Illuminate\Support\Facades\Schema::hasColumn('vendor_bills', 'dispatch_order_id');
+
+        $actualBills = \App\Domains\Purchase\Models\VendorBill::where('tenant_id', $tenantId)
+            ->where(function ($q) use ($vendorId, $dispatchIds, $hasDispatchIdCol) {
+                $q->where('vendor_id', $vendorId);
+                if ($hasDispatchIdCol && !empty($dispatchIds)) {
+                    $q->orWhereIn('dispatch_order_id', $dispatchIds);
+                }
+            })
+            ->when($hasDispatchIdCol, function($q) {
+                return $q->with(['dispatchOrder']);
+            })
+            ->latest('bill_date')
+            ->get();
+
+        // Build Freight Bills Collection from Actual Posted Bills
         $freightBills = collect();
 
-        foreach ($landedCostExpenses as $expense) {
-            $bill = $expense->vendorBill;
-            $amt = (float) ($expense->total_with_tax > 0 ? $expense->total_with_tax : $expense->amount);
-            $paidAmt = $bill ? (float) $bill->paid_amount : 0.00;
-            $balanceDue = $bill ? (float) $bill->balance_due : $amt;
-            $status = $bill ? strtolower($bill->status) : ($balanceDue <= 0 ? 'paid' : 'unpaid');
+        foreach ($actualBills as $bill) {
+            $amt = (float) $bill->grand_total;
+            $paidAmt = (float) $bill->paid_amount;
+            $balanceDue = (float) $bill->balance_due;
+            $status = strtolower($bill->status);
 
-            $billUrl = '#';
-            if ($bill && \Illuminate\Support\Facades\Route::has('purchase.bills.show')) {
-                $billUrl = route('purchase.bills.show', $bill->id);
-            } elseif ($expense->landed_cost_voucher_id && \Illuminate\Support\Facades\Route::has('purchase.landed-costs.show')) {
-                $billUrl = route('purchase.landed-costs.show', $expense->landed_cost_voucher_id);
-            }
+            $billUrl = \Illuminate\Support\Facades\Route::has('purchase.bills.show')
+                ? route('purchase.bills.show', $bill->id)
+                : '#';
 
             $freightBills->push([
-                'id'           => 'lc_' . $expense->id,
-                'bill_number'  => $bill ? ($bill->bill_number ?? $bill->vendor_invoice_number) : ('BILL-' . date('Y', strtotime($expense->created_at)) . '-' . str_pad($expense->id, 6, '0', STR_PAD_LEFT)),
-                'reference'    => 'Landed Cost Head: ' . ($expense->cost_head ?: 'Freight'),
-                'type'         => 'Procurement Freight',
-                'date'         => $expense->created_at,
-                'due_date'     => $bill ? $bill->due_date : null,
+                'id'           => 'bill_' . $bill->id,
+                'bill_number'  => $bill->bill_number ?? $bill->vendor_invoice_number,
+                'reference'    => $bill->dispatchOrder ? ('Dispatch #' . ($bill->dispatchOrder->dispatch_number ?? $bill->dispatchOrder->id)) : ($bill->notes ?: 'Transporter Service Bill'),
+                'type'         => $bill->dispatch_order_id ? 'Dispatch Freight Bill' : 'Procurement/Service Bill',
+                'date'         => $bill->bill_date,
+                'due_date'     => $bill->due_date,
                 'total_amount' => $amt,
                 'paid_amount'  => $paidAmt,
                 'balance_due'  => $balanceDue,
@@ -97,25 +114,26 @@ class TransporterController extends Controller
             ]);
         }
 
+        // Unbilled Dispatches tracking (Dispatches with freight amount > 0 but NO VendorBill created yet)
+        $billedDispatchIds = $actualBills->pluck('dispatch_order_id')->filter()->toArray();
+        $unbilledDispatches = collect();
+
         foreach ($allDispatches as $dispatch) {
             $freight = (float) $dispatch->freight_amount;
-            if ($freight > 0) {
-                $status = ($dispatch->status === 'delivered' && !empty($dispatch->is_freight_paid)) ? 'paid' : 'unpaid';
-                $paidAmt = $status === 'paid' ? $freight : 0.00;
-                $balanceDue = $freight - $paidAmt;
+            if ($freight > 0 && !in_array($dispatch->id, $billedDispatchIds)) {
+                $createUrl = route('purchase.bills.create-service', [
+                    'mode'              => 'outbound',
+                    'dispatch_order_id' => $dispatch->id,
+                ]);
 
-                $freightBills->push([
-                    'id'           => 'do_' . $dispatch->id,
-                    'bill_number'  => 'FRT-' . ($dispatch->dispatch_number ?? $dispatch->id),
-                    'reference'    => 'Dispatch #' . ($dispatch->dispatch_number ?? $dispatch->id),
-                    'type'         => 'Dispatch Freight',
-                    'date'         => $dispatch->dispatch_date ?? $dispatch->created_at,
-                    'due_date'     => null,
-                    'total_amount' => $freight,
-                    'paid_amount'  => $paidAmt,
-                    'balance_due'  => $balanceDue,
-                    'status'       => $status,
-                    'url'          => \Illuminate\Support\Facades\Route::has('inventory.dispatches.show') ? route('inventory.dispatches.show', $dispatch->id) : '#',
+                $unbilledDispatches->push([
+                    'id'               => $dispatch->id,
+                    'dispatch_number'  => $dispatch->dispatch_number ?? ('DISP-' . $dispatch->id),
+                    'dispatch_date'    => $dispatch->dispatch_date ?? $dispatch->created_at,
+                    'lr_number'        => $dispatch->lr_number ?: 'N/A',
+                    'vehicle_number'   => $dispatch->vehicle_number ?: 'N/A',
+                    'freight_amount'   => $freight,
+                    'create_bill_url'  => $createUrl,
                 ]);
             }
         }
@@ -126,7 +144,7 @@ class TransporterController extends Controller
         $paidBillsCount    = $freightBills->where('status', 'paid')->count();
         $pendingBillsCount = $freightBills->whereIn('status', ['unpaid', 'partially_paid', 'pending', 'posted'])->count();
 
-        // Build Ledger Entries Array for Transporter Freight Payable Running Balance
+        // Build Ledger Entries Array ONLY from Actual Posted Vendor Bills
         $ledgerEntries = collect();
 
         foreach ($freightBills as $fb) {
@@ -155,6 +173,7 @@ class TransporterController extends Controller
         $totalFreightBilled = (float) $freightBills->sum('total_amount');
         $totalPaid          = (float) $freightBills->sum('paid_amount');
         $outstandingPayable = (float) $freightBills->sum('balance_due');
+        $unbilledFreightTotal = (float) $unbilledDispatches->sum('freight_amount');
 
         $stats = [
             'total_dispatches'     => $allDispatches->count(),
@@ -176,6 +195,8 @@ class TransporterController extends Controller
             'dispatches',
             'landedCostExpenses',
             'freightBills',
+            'unbilledDispatches',
+            'unbilledFreightTotal',
             'ledgerWithBalance',
             'stats'
         ));

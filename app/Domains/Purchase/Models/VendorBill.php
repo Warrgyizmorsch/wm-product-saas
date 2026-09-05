@@ -38,6 +38,7 @@ class VendorBill extends BaseModel
         'sgst_amount',
         'igst_amount',
         'goods_receipt_note_id',
+        'dispatch_order_id',
         'purchase_order_id',
         'vendor_id',
         'bill_date',
@@ -99,6 +100,11 @@ class VendorBill extends BaseModel
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id');
+    }
+
+    public function dispatchOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Sales\Models\DispatchOrder::class, 'dispatch_order_id');
     }
 
     public function creator(): BelongsTo

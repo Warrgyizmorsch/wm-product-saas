@@ -167,7 +167,8 @@ class VendorBillService
 
             // Calculate Landed Cost Revaluation Data for "to_be_billed" mode
             $revaluationData = null;
-            if ($isFreightBilledOnInvoice && $freightAmount > 0) {
+            $isCapitalizeAllocation = !in_array($freightAllocationMethod, ['none', 'direct_expense']);
+            if ($isFreightBilledOnInvoice && $freightAmount > 0 && $isCapitalizeAllocation) {
                 $revaluationItems = [];
                 foreach ($itemsData as $row) {
                     $item = $row['item'];
