@@ -29,20 +29,31 @@ class LandedCostService
                 throw new InvalidArgumentException('Please add at least one expense line.');
             }
 
-            // Generate Voucher Number
+            // Generate Unique Voucher Number (Collision-Proof across all companies/branches/trashed rows)
             $year = now()->format('Y');
             $prefix = "LCV-{$year}-";
-            $lastVoucher = LandedCostVoucher::where('tenant_id', $tenantId)
-                ->where('voucher_number', 'like', "{$prefix}%")
-                ->orderBy('id', 'desc')
-                ->first();
 
-            $nextNum = 1;
-            if ($lastVoucher) {
-                $lastNumStr = str_replace($prefix, '', $lastVoucher->voucher_number);
-                $nextNum = ((int) $lastNumStr) + 1;
+            $allNumbers = DB::table('landed_cost_vouchers')
+                ->where('voucher_number', 'like', "{$prefix}%")
+                ->pluck('voucher_number');
+
+            $maxNum = 0;
+            foreach ($allNumbers as $vNum) {
+                $numStr = str_replace($prefix, '', $vNum);
+                $n = (int) $numStr;
+                if ($n > $maxNum) {
+                    $maxNum = $n;
+                }
             }
-            $voucherNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+
+            $nextNum = $maxNum + 1;
+            do {
+                $voucherNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+                $exists = DB::table('landed_cost_vouchers')->where('voucher_number', $voucherNumber)->exists();
+                if ($exists) {
+                    $nextNum++;
+                }
+            } while ($exists);
 
             $voucher = LandedCostVoucher::create([
                 'tenant_id'       => $tenantId,
@@ -72,7 +83,7 @@ class LandedCostService
                 $taxRate = (float) ($exp['tax_rate'] ?? 0);
                 $gstType = $exp['gst_type'] ?? 'cgst_sgst';
                 $isRcm   = !empty($exp['is_rcm']) && ($exp['is_rcm'] === '1' || $exp['is_rcm'] === true || $exp['is_rcm'] === 'true');
-                if ($gstType === 'rcm') {
+                if (in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst'])) {
                     $isRcm = true;
                 }
 
@@ -213,11 +224,13 @@ class LandedCostService
 
                 $firstExp   = $expLines->first();
                 $gstType    = $firstExp?->gst_type ?? 'cgst_sgst';
-                $isIgst     = $gstType === 'igst';
+                $isRcm      = in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst']);
+                $isIgst     = in_array($gstType, ['igst', 'rcm_igst']);
 
                 $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
-                $sgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
+                $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 2);
                 $igstAmount = $isIgst ? round($taxAmount, 2) : 0;
+                $grandTotal = $isRcm ? $subtotal : ($subtotal + $taxAmount);
 
                 $bill = \App\Domains\Purchase\Models\VendorBill::create([
                     'tenant_id'             => $tenantId,
@@ -255,6 +268,10 @@ class LandedCostService
                         'total_amount'   => (float) $expLine->total_with_tax,
                     ]);
                 }
+
+                // Dispatch BillPosted event to auto-post GL Journal Entry for the Transporter Bill
+                event(new \App\Domains\Purchase\Events\BillPosted($bill));
+                app(\App\Domains\Accounting\Listeners\PostPurchaseBillJournal::class)->handle(new \App\Domains\Purchase\Events\BillPosted($bill));
             }
 
             $voucher->status       = 'Posted';
@@ -277,8 +294,19 @@ class LandedCostService
                 $inputIgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1630')->first()
                     ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1600')->first();
 
-                $rcmPayableAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2080')->first()
-                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2100')->first();
+                $rcmCgstPayableAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2086')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM CGST Payable%')->first();
+                $rcmSgstPayableAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2087')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM SGST Payable%')->first();
+                $rcmIgstPayableAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2085')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM IGST Payable%')->first();
+
+                $rcmInputCgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1631')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM Input CGST%')->first();
+                $rcmInputSgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1632')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM Input SGST%')->first();
+                $rcmInputIgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1633')->first()
+                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM Input IGST%')->first();
 
                 $journalLines = [];
 
@@ -298,48 +326,108 @@ class LandedCostService
 
                 foreach ($voucher->expenses as $exp) {
                     $taxAmt = (float) $exp->tax_amount;
-                    $isRcm  = (bool) $exp->is_rcm;
                     $gstType = $exp->gst_type;
+                    $isRcm  = (bool) $exp->is_rcm || in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst']);
+                    $isIgst = in_array($gstType, ['igst', 'rcm_igst']);
 
                     if ($taxAmt > 0) {
-                        if ($gstType === 'igst') {
-                            if ($inputIgstAcc) {
-                                $journalLines[] = [
-                                    'chart_of_account_id' => $inputIgstAcc->id,
-                                    'debit'               => round($taxAmt, 2),
-                                    'credit'              => 0,
-                                    'description'         => "Input IGST for {$exp->cost_head} ({$voucher->voucher_number})",
-                                ];
+                        if ($isRcm) {
+                            if ($isIgst) {
+                                // Debit: RCM Input IGST (1633)
+                                $rcmAsset = $rcmInputIgstAcc ?: ($inputIgstAcc ?: $inventoryAcc);
+                                if ($rcmAsset) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $rcmAsset->id,
+                                        'debit'               => round($taxAmt, 2),
+                                        'credit'              => 0,
+                                        'description'         => "RCM Input IGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                                // Credit: RCM IGST Payable (2085)
+                                $rcmLiab = $rcmIgstPayableAcc ?: $apAccount;
+                                if ($rcmLiab) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $rcmLiab->id,
+                                        'debit'               => 0,
+                                        'credit'              => round($taxAmt, 2),
+                                        'description'         => "RCM IGST Liability for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                            } else {
+                                // Intra-State RCM (CGST + SGST)
+                                $halfTax = round($taxAmt / 2, 2);
+                                $sgstTax = round($taxAmt - $halfTax, 2);
+
+                                // Debit: RCM Input CGST (1631) & RCM Input SGST (1632)
+                                $cgstAsset = $rcmInputCgstAcc ?: ($inputCgstAcc ?: $inventoryAcc);
+                                if ($cgstAsset) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $cgstAsset->id,
+                                        'debit'               => $halfTax,
+                                        'credit'              => 0,
+                                        'description'         => "RCM Input CGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                                $sgstAsset = $rcmInputSgstAcc ?: ($inputSgstAcc ?: $inventoryAcc);
+                                if ($sgstAsset) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $sgstAsset->id,
+                                        'debit'               => $sgstTax,
+                                        'credit'              => 0,
+                                        'description'         => "RCM Input SGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+
+                                // Credit: RCM CGST Payable (2086) & RCM SGST Payable (2087)
+                                $cgstLiab = $rcmCgstPayableAcc ?: $apAccount;
+                                if ($cgstLiab) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $cgstLiab->id,
+                                        'debit'               => 0,
+                                        'credit'              => $halfTax,
+                                        'description'         => "RCM CGST Liability for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                                $sgstLiab = $rcmSgstPayableAcc ?: $apAccount;
+                                if ($sgstLiab) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $sgstLiab->id,
+                                        'debit'               => 0,
+                                        'credit'              => $sgstTax,
+                                        'description'         => "RCM SGST Liability for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
                             }
                         } else {
-                            // cgst_sgst or rcm split
-                            $halfTax = round($taxAmt / 2, 2);
-                            if ($inputCgstAcc) {
-                                $journalLines[] = [
-                                    'chart_of_account_id' => $inputCgstAcc->id,
-                                    'debit'               => $halfTax,
-                                    'credit'              => 0,
-                                    'description'         => "Input CGST for {$exp->cost_head} ({$voucher->voucher_number})",
-                                ];
+                            // Forward Charge Mechanism (FCM)
+                            if ($isIgst) {
+                                if ($inputIgstAcc) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $inputIgstAcc->id,
+                                        'debit'               => round($taxAmt, 2),
+                                        'credit'              => 0,
+                                        'description'         => "Input IGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                            } else {
+                                $halfTax = round($taxAmt / 2, 2);
+                                if ($inputCgstAcc) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $inputCgstAcc->id,
+                                        'debit'               => $halfTax,
+                                        'credit'              => 0,
+                                        'description'         => "Input CGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                                if ($inputSgstAcc) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $inputSgstAcc->id,
+                                        'debit'               => round($taxAmt - $halfTax, 2),
+                                        'credit'              => 0,
+                                        'description'         => "Input SGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
                             }
-                            if ($inputSgstAcc) {
-                                $journalLines[] = [
-                                    'chart_of_account_id' => $inputSgstAcc->id,
-                                    'debit'               => round($taxAmt - $halfTax, 2),
-                                    'credit'              => 0,
-                                    'description'         => "Input SGST for {$exp->cost_head} ({$voucher->voucher_number})",
-                                ];
-                            }
-                        }
-
-                        // If RCM, credit RCM Tax Liability account
-                        if ($isRcm && $rcmPayableAcc) {
-                            $journalLines[] = [
-                                'chart_of_account_id' => $rcmPayableAcc->id,
-                                'debit'               => 0,
-                                'credit'              => round($taxAmt, 2),
-                                'description'         => "RCM Tax Liability for {$exp->cost_head} ({$voucher->voucher_number})",
-                            ];
                         }
                     }
 

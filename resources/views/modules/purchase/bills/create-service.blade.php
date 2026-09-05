@@ -146,7 +146,8 @@
                     <x-ui.odoo-form-ui type="select" label="GST Mechanism" name="gst_type" id="gstTypeSelect" required="true">
                         <option value="cgst_sgst" @selected(old('gst_type', $prefilled['gst_type'] ?? request('gst_type')) === 'cgst_sgst')>Intra-State CGST + SGST (FCM)</option>
                         <option value="igst" @selected(old('gst_type', $prefilled['gst_type'] ?? request('gst_type')) === 'igst')>Inter-State IGST (FCM)</option>
-                        <option value="rcm" @selected(old('gst_type', $prefilled['gst_type'] ?? request('gst_type', 'rcm')) === 'rcm')>RCM (Reverse Charge 5% Transporter RCM)</option>
+                        <option value="rcm_cgst_sgst" @selected(old('gst_type', $prefilled['gst_type'] ?? request('gst_type', 'rcm')) === 'rcm_cgst_sgst' || old('gst_type', $prefilled['gst_type'] ?? request('gst_type', 'rcm')) === 'rcm')>RCM Intra-State (CGST + SGST)</option>
+                        <option value="rcm_igst" @selected(old('gst_type', $prefilled['gst_type'] ?? request('gst_type')) === 'rcm_igst')>RCM Inter-State (IGST)</option>
                     </x-ui.odoo-form-ui>
 
                     <div class="row g-2">

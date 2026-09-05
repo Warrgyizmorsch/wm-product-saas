@@ -31,7 +31,7 @@ class PostPurchaseBillJournal
         try {
             $tenantId = $bill->tenant_id;
 
-            // Fetch Chart of Accounts by standard codes
+            // Fetch Chart of Accounts by standard codes & names
             $accountsPayable = $this->accounts->findByCode('2010', $tenantId);
             $inputGst        = $this->accounts->findByCode('1600', $tenantId);
             $inputCgst       = $this->accounts->findByCode('1610', $tenantId)
@@ -43,6 +43,30 @@ class PostPurchaseBillJournal
             $inputIgst       = $this->accounts->findByCode('1630', $tenantId)
                 ?? $this->accounts->findByCode('1603', $tenantId)
                 ?? (ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Input IGST%')->first() ?: $inputGst);
+            
+            // RCM Specific Accounts
+            $rcmCgstPayable  = $this->accounts->findByCode('2086', $tenantId)
+                ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM CGST Payable%')->first();
+            $rcmSgstPayable  = $this->accounts->findByCode('2087', $tenantId)
+                ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM SGST Payable%')->first();
+            $rcmIgstPayable  = $this->accounts->findByCode('2085', $tenantId)
+                ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM IGST Payable%')->first();
+
+            $rcmInputCgst    = $this->accounts->findByCode('1631', $tenantId)
+                ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM Input CGST%')->first();
+            $rcmInputSgst    = $this->accounts->findByCode('1632', $tenantId)
+                ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM Input SGST%')->first();
+            $rcmInputIgst    = $this->accounts->findByCode('1633', $tenantId)
+                ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%RCM Input IGST%')->first();
+
+            $dutiesOutput    = $this->accounts->findByCode('2100', $tenantId);
+            $outputCgst      = $this->accounts->findByCode('2110', $tenantId)
+                ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Output CGST%')->first();
+            $outputSgst      = $this->accounts->findByCode('2120', $tenantId)
+                ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Output SGST%')->first();
+            $outputIgst      = $this->accounts->findByCode('2130', $tenantId)
+                ?? ChartOfAccount::where('tenant_id', $tenantId)->where('name', 'like', '%Output IGST%')->first();
+
             $inventory       = $this->accounts->findByCode('1200', $tenantId);
             $purchaseExpense = $this->accounts->findByCode('5900', $tenantId);
             $freightExpense  = $this->accounts->findByCode('5030', $tenantId) ?: $purchaseExpense;
@@ -161,60 +185,143 @@ class PostPurchaseBillJournal
                 ];
             }
 
-            // 5. Input GST Tax Credits (Debit)
-            $hasTaxLines = false;
-            if ((float)$bill->igst_amount > 0 && $inputIgst) {
-                $lines[] = [
-                    'chart_of_account_id' => $inputIgst->id,
-                    'debit'               => round((float)$bill->igst_amount, 2),
-                    'credit'              => 0,
-                    'description'         => "Input IGST on Bill {$bill->bill_number}",
-                ];
-                $hasTaxLines = true;
-            } else {
-                if ((float)$bill->cgst_amount > 0 && $inputCgst) {
-                    $lines[] = [
-                        'chart_of_account_id' => $inputCgst->id,
-                        'debit'               => round((float)$bill->cgst_amount, 2),
-                        'credit'              => 0,
-                        'description'         => "Input CGST on Bill {$bill->bill_number}",
-                    ];
-                    $hasTaxLines = true;
-                }
-                if ((float)$bill->sgst_amount > 0 && $inputSgst) {
-                    $lines[] = [
-                        'chart_of_account_id' => $inputSgst->id,
-                        'debit'               => round((float)$bill->sgst_amount, 2),
-                        'credit'              => 0,
-                        'description'         => "Input SGST on Bill {$bill->bill_number}",
-                    ];
-                    $hasTaxLines = true;
-                }
-            }
+            // 5. GST Tax Credits & Liabilities (RCM vs Forward Charge)
+            $isRcm = in_array($bill->gst_type, ['rcm', 'rcm_cgst_sgst', 'rcm_igst']);
 
-            // Fallback for tax amount if cgst/igst fields were empty on bill model
-            if (!$hasTaxLines && (float)$bill->tax_amount > 0) {
-                if ($inputCgst && $inputSgst && $inputCgst->id !== $inputGst->id) {
-                    $halfTax = round((float)$bill->tax_amount / 2, 2);
+            if ($isRcm) {
+                $isRcmIgst = ($bill->gst_type === 'rcm_igst') || ((float)$bill->igst_amount > 0);
+
+                if ($isRcmIgst) {
+                    $taxAmt = (float)$bill->igst_amount > 0 ? (float)$bill->igst_amount : (float)$bill->tax_amount;
+                    if ($taxAmt > 0) {
+                        // Debit: RCM Input IGST (Asset 1633)
+                        $rcmAsset = $rcmInputIgst ?: ($inputIgst ?: $inputGst);
+                        if ($rcmAsset) {
+                            $lines[] = [
+                                'chart_of_account_id' => $rcmAsset->id,
+                                'debit'               => round($taxAmt, 2),
+                                'credit'              => 0,
+                                'description'         => "RCM Input IGST Credit on Bill {$bill->bill_number}",
+                            ];
+                        }
+                        // Credit: RCM IGST Payable (Liability 2085)
+                        $rcmLiab = $rcmIgstPayable ?: ($outputIgst ?: $dutiesOutput);
+                        if ($rcmLiab) {
+                            $lines[] = [
+                                'chart_of_account_id' => $rcmLiab->id,
+                                'debit'               => 0,
+                                'credit'              => round($taxAmt, 2),
+                                'description'         => "RCM IGST Payable on Bill {$bill->bill_number}",
+                            ];
+                        }
+                    }
+                } else {
+                    // Intra-State RCM (CGST + SGST)
+                    $cgstAmt = (float)$bill->cgst_amount > 0 ? (float)$bill->cgst_amount : round((float)$bill->tax_amount / 2, 2);
+                    $sgstAmt = (float)$bill->sgst_amount > 0 ? (float)$bill->sgst_amount : round((float)$bill->tax_amount - $cgstAmt, 2);
+
+                    if ($cgstAmt > 0) {
+                        // Debit: RCM Input CGST (Asset 1631)
+                        $cgstAsset = $rcmInputCgst ?: ($inputCgst ?: $inputGst);
+                        if ($cgstAsset) {
+                            $lines[] = [
+                                'chart_of_account_id' => $cgstAsset->id,
+                                'debit'               => round($cgstAmt, 2),
+                                'credit'              => 0,
+                                'description'         => "RCM Input CGST Credit on Bill {$bill->bill_number}",
+                            ];
+                        }
+                        // Credit: RCM CGST Payable (Liability 2086)
+                        $cgstLiab = $rcmCgstPayable ?: ($outputCgst ?: $dutiesOutput);
+                        if ($cgstLiab) {
+                            $lines[] = [
+                                'chart_of_account_id' => $cgstLiab->id,
+                                'debit'               => 0,
+                                'credit'              => round($cgstAmt, 2),
+                                'description'         => "RCM CGST Payable on Bill {$bill->bill_number}",
+                            ];
+                        }
+                    }
+
+                    if ($sgstAmt > 0) {
+                        // Debit: RCM Input SGST (Asset 1632)
+                        $sgstAsset = $rcmInputSgst ?: ($inputSgst ?: $inputGst);
+                        if ($sgstAsset) {
+                            $lines[] = [
+                                'chart_of_account_id' => $sgstAsset->id,
+                                'debit'               => round($sgstAmt, 2),
+                                'credit'              => 0,
+                                'description'         => "RCM Input SGST Credit on Bill {$bill->bill_number}",
+                            ];
+                        }
+                        // Credit: RCM SGST Payable (Liability 2087)
+                        $sgstLiab = $rcmSgstPayable ?: ($outputSgst ?: $dutiesOutput);
+                        if ($sgstLiab) {
+                            $lines[] = [
+                                'chart_of_account_id' => $sgstLiab->id,
+                                'debit'               => 0,
+                                'credit'              => round($sgstAmt, 2),
+                                'description'         => "RCM SGST Payable on Bill {$bill->bill_number}",
+                            ];
+                        }
+                    }
+                }
+            } else {
+                // Forward Charge Mechanism (FCM) Input GST Tax Credits (Debit)
+                $hasTaxLines = false;
+                if ((float)$bill->igst_amount > 0 && $inputIgst) {
                     $lines[] = [
-                        'chart_of_account_id' => $inputCgst->id,
-                        'debit'               => $halfTax,
+                        'chart_of_account_id' => $inputIgst->id,
+                        'debit'               => round((float)$bill->igst_amount, 2),
                         'credit'              => 0,
-                        'description'         => "Input CGST on Bill {$bill->bill_number}",
+                        'description'         => "Input IGST on Bill {$bill->bill_number}",
                     ];
-                    $lines[] = [
-                        'chart_of_account_id' => $inputSgst->id,
-                        'debit'               => round((float)$bill->tax_amount - $halfTax, 2),
-                        'credit'              => 0,
-                        'description'         => "Input SGST on Bill {$bill->bill_number}",
-                    ];
-                } else if ($inputGst) {
-                    $lines[] = [
-                        'chart_of_account_id' => $inputGst->id,
-                        'debit'               => round((float)$bill->tax_amount, 2),
-                        'credit'              => 0,
-                        'description'         => "Input GST Tax Credit on Bill {$bill->bill_number}",
-                    ];
+                    $hasTaxLines = true;
+                } else {
+                    if ((float)$bill->cgst_amount > 0 && $inputCgst) {
+                        $lines[] = [
+                            'chart_of_account_id' => $inputCgst->id,
+                            'debit'               => round((float)$bill->cgst_amount, 2),
+                            'credit'              => 0,
+                            'description'         => "Input CGST on Bill {$bill->bill_number}",
+                        ];
+                        $hasTaxLines = true;
+                    }
+                    if ((float)$bill->sgst_amount > 0 && $inputSgst) {
+                        $lines[] = [
+                            'chart_of_account_id' => $inputSgst->id,
+                            'debit'               => round((float)$bill->sgst_amount, 2),
+                            'credit'              => 0,
+                            'description'         => "Input SGST on Bill {$bill->bill_number}",
+                        ];
+                        $hasTaxLines = true;
+                    }
+                }
+
+                // Fallback for tax amount if cgst/igst fields were empty on bill model
+                if (!$hasTaxLines && (float)$bill->tax_amount > 0) {
+                    if ($inputCgst && $inputSgst && $inputCgst->id !== $inputGst->id) {
+                        $halfTax = round((float)$bill->tax_amount / 2, 2);
+                        $lines[] = [
+                            'chart_of_account_id' => $inputCgst->id,
+                            'debit'               => $halfTax,
+                            'credit'              => 0,
+                            'description'         => "Input CGST on Bill {$bill->bill_number}",
+                        ];
+                        $lines[] = [
+                            'chart_of_account_id' => $inputSgst->id,
+                            'debit'               => round((float)$bill->tax_amount - $halfTax, 2),
+                            'credit'              => 0,
+                            'description'         => "Input SGST on Bill {$bill->bill_number}",
+                        ];
+                    } else if ($inputGst) {
+                        $lines[] = [
+                            'chart_of_account_id' => $inputGst->id,
+                            'debit'               => round((float)$bill->tax_amount, 2),
+                            'credit'              => 0,
+                            'description'         => "Input GST Tax Credit on Bill {$bill->bill_number}",
+                        ];
+                    }
                 }
             }
 

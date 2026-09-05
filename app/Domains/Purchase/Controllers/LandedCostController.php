@@ -34,10 +34,13 @@ class LandedCostController extends Controller
             ->get();
 
         $vendors = Vendor::where('tenant_id', $tenantId)->get();
-        $transporterVendorIds = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)
-            ->whereNotNull('vendor_id')
-            ->pluck('vendor_id')
-            ->toArray();
+        $transporterVendorIds = [];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('transporters', 'vendor_id')) {
+            $transporterVendorIds = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)
+                ->whereNotNull('vendor_id')
+                ->pluck('vendor_id')
+                ->toArray();
+        }
 
         $vendors->each(function ($v) use ($transporterVendorIds) {
             $nameLower = strtolower($v->name);
@@ -63,7 +66,7 @@ class LandedCostController extends Controller
             'expenses.*.vendor_id' => 'nullable|integer',
             'expenses.*.amount' => 'required|numeric|min:0.0001',
             'expenses.*.tax_rate' => 'nullable|numeric|min:0',
-            'expenses.*.gst_type' => 'nullable|string|in:cgst_sgst,igst,rcm',
+            'expenses.*.gst_type' => 'nullable|string|in:cgst_sgst,igst,rcm,rcm_cgst_sgst,rcm_igst',
             'expenses.*.is_rcm' => 'nullable',
             'expenses.*.allocation_basis' => 'required|string|in:by_qty,by_amount,equal',
             'notes' => 'nullable|string',
