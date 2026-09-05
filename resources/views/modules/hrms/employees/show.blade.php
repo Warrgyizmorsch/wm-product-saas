@@ -9,6 +9,9 @@
         <x-ui.button href="{{ route('hrms.employees.index') }}" variant="light" icon="feather-arrow-left">
             {{ __('hrms.employees.back_to_registry') }}
         </x-ui.button>
+        <x-ui.button type="button" variant="primary" icon="feather-edit-3" data-bs-toggle="modal" data-bs-target="#editEmployeeModal">
+            Edit Employee
+        </x-ui.button>
     </div>
 @endsection
 
@@ -1057,6 +1060,37 @@
             @include('modules.hrms.employees.tabs.exit-clearance')
         </div>
     </div>
+
+    <!-- EDIT EMPLOYEE MODAL -->
+    <div class="modal fade" id="editEmployeeModal" tabindex="-1" aria-labelledby="editEmployeeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="editEmployeeModalLabel">
+                        <i class="feather-edit-3 me-2 text-primary"></i>{{ __('hrms.employees.lbl_edit_employee') }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form
+                    id="editEmployeeForm"
+                    action="{{ route('hrms.employees.update', ['employee' => $employee->id]) }}"
+                    method="POST"
+                    enctype="multipart/form-data"
+                >
+                    @csrf
+                    <input type="hidden" name="form_mode" value="edit">
+                    <input type="hidden" name="editing_employee_id" id="editing_employee_id" value="{{ $employee->id }}">
+                    <div class="modal-body p-4">
+                        @include('modules.hrms.employees.form-fields', ['mode' => 'edit', 'employee' => $employee])
+                    </div>
+                    <div class="modal-footer bg-light py-2">
+                        <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.employees.mdl_btn_update_employee') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
     @push('scripts')
 
@@ -1066,9 +1100,10 @@
 
             $(document).ready(function() {
                 // Move modals to body root to prevent Bootstrap backdrop overlay issues inside tabs
-                $('.tab-content .modal, #profileExitModal, #profileEvaluateModal').each(function() {
+                $('.tab-content .modal, #profileExitModal, #profileEvaluateModal, #editEmployeeModal').each(function() {
                     $(this).appendTo('body');
                 });
+                $('#editEmployeeModal').appendTo('body');
                 $('#addAdhocModal').appendTo('body');
                 $('#addPenaltyModal').appendTo('body');
                 $('[id^="leaveRulesModal"]').appendTo('body');
@@ -1091,16 +1126,16 @@
                 $('#empRejectOvertimeModal').appendTo('body');
 
                 // Initialize select2 inside modals with dropdownParent to fix Bootstrap focus/typing issue
-                $('#empApplyShiftChangeModal select.odoo-select2, #empApplyOvertimeModal select.odoo-select2').each(function() {
+                $('#editEmployeeModal select, #empApplyShiftChangeModal select.odoo-select2, #empApplyOvertimeModal select.odoo-select2').each(function() {
                     var $select = $(this);
                     if ($select.hasClass('select2-hidden-accessible')) {
                         $select.select2('destroy');
                     }
-                    $select.select2({
-                        theme: 'bootstrap-5',
-                        dropdownParent: $select.closest('.modal-content'),
-                        width: '100%'
-                    });
+                    if ($.fn.select2) {
+                        $select.select2({
+                            dropdownParent: $select.closest('.modal-content')
+                        });
+                    }
                 });
 
                 // Shift & Overtime Profile Event Listeners & Functions (Select2 compatible)
