@@ -56,13 +56,13 @@
             ],
             [
                 'id' => 'tab-pending-bills',
-                'label' => 'Pending Goods Bills' . (($pendingGrnsCount ?? 0) > 0 ? ' (' . $pendingGrnsCount . ')' : ''),
+                'label' => 'Pending Inbound Bills' . (($pendingGrnsCount ?? 0) > 0 ? ' (' . $pendingGrnsCount . ')' : ''),
                 'active' => false,
                 'icon' => 'feather-clock',
             ],
             [
                 'id' => 'tab-pending-freight',
-                'label' => 'Pending Freight Bills' . (($pendingFreightCount ?? 0) > 0 ? ' (' . $pendingFreightCount . ')' : ''),
+                'label' => 'Pending Outbound Freight Bills' . (($pendingFreightCount ?? 0) > 0 ? ' (' . $pendingFreightCount . ')' : ''),
                 'active' => false,
                 'icon' => 'feather-truck',
             ]

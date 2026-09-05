@@ -19,17 +19,42 @@ class VendorBillController extends Controller
         protected VendorBillService $billService
     ) {}
 
+    protected function getPendingGrnsQuery(int $tenantId)
+    {
+        return GoodsReceiptNote::where('tenant_id', $tenantId)
+            ->whereIn('status', ['Approved', 'Completed'])
+            ->where(function ($q) {
+                // Either missing Material Bill (vendorBill where vendor_id == grns.vendor_id)
+                $q->whereDoesntHave('vendorBills', function ($vbq) {
+                    $vbq->where('status', '!=', 'Cancelled')
+                        ->whereColumn('vendor_bills.vendor_id', 'goods_receipt_notes.vendor_id');
+                })
+                // OR has 'to_pay' PO AND missing Freight Bill (vendorBill where vendor_id != grns.vendor_id)
+                ->orWhere(function ($frq) {
+                    $frq->whereHas('purchaseOrder', function ($poq) {
+                        $poq->whereIn(\DB::raw('LOWER(freight_terms)'), ['to_pay', 'to pay']);
+                    })
+                    ->whereDoesntHave('vendorBills', function ($vbq) {
+                        $vbq->where('status', '!=', 'Cancelled')
+                            ->whereColumn('vendor_bills.vendor_id', '!=', 'goods_receipt_notes.vendor_id');
+                    });
+                });
+            })
+            ->with([
+                'purchaseOrder',
+                'vendor',
+                'warehouse',
+                'items',
+                'vendorBills' => fn($vbq) => $vbq->where('status', '!=', 'Cancelled')->with('items')
+            ]);
+    }
+
     public function index(Request $request)
     {
         $tenantId = require_tenant_id();
         $bills = $this->billRepo->getPaginatedBills($request->all(), 15);
 
-        $pendingGrnsCount = GoodsReceiptNote::where('tenant_id', $tenantId)
-            ->whereIn('status', ['Approved', 'Completed'])
-            ->whereDoesntHave('vendorBills', function ($q) {
-                $q->where('status', '!=', 'Cancelled');
-            })
-            ->count();
+        $pendingGrnsCount = $this->getPendingGrnsQuery($tenantId)->count();
 
         $pendingFreightCount = \App\Domains\Sales\Models\DispatchOrder::where('tenant_id', $tenantId)
             ->pendingFreightBill()
@@ -42,12 +67,7 @@ class VendorBillController extends Controller
     {
         $tenantId = require_tenant_id();
 
-        $query = GoodsReceiptNote::where('tenant_id', $tenantId)
-            ->whereIn('status', ['Approved', 'Completed'])
-            ->whereDoesntHave('vendorBills', function ($q) {
-                $q->where('status', '!=', 'Cancelled');
-            })
-            ->with(['purchaseOrder', 'vendor', 'warehouse', 'items']);
+        $query = $this->getPendingGrnsQuery($tenantId);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -91,12 +111,7 @@ class VendorBillController extends Controller
         $pendingFreightDispatches = $query->latest()->paginate(15);
         $pendingFreightCount = $pendingFreightDispatches->total();
 
-        $pendingGrnsCount = GoodsReceiptNote::where('tenant_id', $tenantId)
-            ->whereIn('status', ['Approved', 'Completed'])
-            ->whereDoesntHave('vendorBills', function ($q) {
-                $q->where('status', '!=', 'Cancelled');
-            })
-            ->count();
+        $pendingGrnsCount = $this->getPendingGrnsQuery($tenantId)->count();
 
         return view('modules.purchase.bills.pending-freight', compact(
             'pendingFreightDispatches',
