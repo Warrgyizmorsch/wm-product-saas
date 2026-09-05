@@ -73,13 +73,48 @@ class DocumentMasterRepository implements DocumentMasterRepositoryInterface
 
         $documents = $documentsQuery->paginate(10, ['*'], 'doc_page')->withQueryString();
 
+        // 4. Filtered Templates query (for Document Templates Tab)
+        $templatesQuery = \App\Domains\HRMS\Models\DocumentTemplate::query()->with('category');
+
+        if (!empty($inputs['template_search'])) {
+            $search = $inputs['template_search'];
+            $templatesQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        if (!empty($inputs['template_category_id'])) {
+            $templatesQuery->where('document_category_id', $inputs['template_category_id']);
+        }
+
+        if (!empty($inputs['template_status'])) {
+            $templatesQuery->where('status', $inputs['template_status']);
+        }
+
+        $templateSort = $inputs['template_sort'] ?? 'name_asc';
+        if ($templateSort === 'name_desc') {
+            $templatesQuery->orderBy('name', 'desc');
+        } elseif ($templateSort === 'newest') {
+            $templatesQuery->orderBy('created_at', 'desc');
+        } else {
+            $templatesQuery->orderBy('name', 'asc');
+        }
+
+        $templates = $templatesQuery->paginate(10, ['*'], 'template_page')->withQueryString();
+
         $companies = \App\Domains\HRMS\Models\Company::query()->orderBy('company_name')->get();
+        $allDocumentMasters = DocumentMaster::query()->where('status', 'active')->orderBy('name')->get();
+        $allEmployees = \App\Domains\HRMS\Models\Employee::query()->orderBy('full_name')->get();
 
         return [
             'categories' => $categories,
             'allCategories' => $allCategories,
             'documents' => $documents,
+            'allDocumentMasters' => $allDocumentMasters,
+            'templates' => $templates,
             'companies' => $companies,
+            'allEmployees' => $allEmployees,
             'filters' => $inputs,
         ];
     }

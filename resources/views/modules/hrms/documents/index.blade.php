@@ -443,17 +443,36 @@
         <input type="hidden" name="status" id="directStatusInput">
     </form>
 
-    <!-- Upload Document Modal -->
+    <!-- Upload / Generate Document Modal -->
     <div class="modal fade" id="uploadDocumentModal" tabindex="-1" aria-labelledby="uploadDocumentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold text-dark fs-15" id="uploadDocumentModalLabel">Upload Document File</h5>
+                    <h5 class="modal-title fw-bold text-dark fs-15" id="uploadDocumentModalLabel"><i class="feather-file-plus text-primary me-1"></i> Add / Generate Employee Document</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="{{ route('hrms.documents.bulk-upload') }}" method="POST" enctype="multipart/form-data" id="bulkUploadForm" novalidate onsubmit="return validateBulkUploadForm(event, this);">
+                <form action="{{ route('hrms.documents.bulk-upload') }}" method="POST" enctype="multipart/form-data" id="bulkUploadForm">
                     @csrf
-                    <div class="modal-body">
+                    <div class="modal-body p-4">
+                        <!-- Mode Switcher -->
+                        <div class="p-3 bg-light rounded border mb-3">
+                            <label class="form-label fw-bold text-dark fs-12 mb-2 d-block">Select Operation Mode:</label>
+                            <div class="d-flex gap-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="upload_mode" id="mode_file_upload" value="file" checked onchange="toggleUploadMode(this.value)">
+                                    <label class="form-check-label fw-bold text-dark fs-13" for="mode_file_upload">
+                                        <i class="feather-upload-cloud me-1 text-primary"></i> Upload Local File
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="upload_mode" id="mode_template_gen" value="generate" onchange="toggleUploadMode(this.value)">
+                                    <label class="form-check-label fw-bold text-primary fs-13" for="mode_template_gen">
+                                        <i class="feather-zap me-1 text-warning"></i> Generate From Document Template
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Select Employee (Dropdown) -->
                         <div class="mb-3">
                             <x-ui.odoo-form-ui type="select" label="Select Employee" name="employee_id" id="employee_id" :required="true" select2-selector="default">
@@ -462,46 +481,57 @@
                                     <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
-                            <div class="error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">Please select an employee.</div>
                         </div>
 
-                        <!-- Document Category Selection -->
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="select" label="Document Category" name="document_category_id" id="document_category_id" :required="true" select2-selector="default" onchange="filterTemplatesByCategory(this)">
-                                <option value="">Choose Category...</option>
-                                @foreach($categories as $cat)
-                                    <option value="{{ $cat->id }}">{{ $cat->name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                            <div class="error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">Please choose a document category.</div>
+                        <!-- Section for File Upload Mode -->
+                        <div id="section_file_upload_mode">
+                            <!-- Document Category Selection -->
+                            <div class="mb-3">
+                                <x-ui.odoo-form-ui type="select" label="Document Category" name="document_category_id" id="document_category_id" select2-selector="default" onchange="filterTemplatesByCategory(this)">
+                                    <option value="">Choose Category...</option>
+                                    @foreach($categories as $cat)
+                                        <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+
+                            <!-- Document Master Selection -->
+                            <div class="mb-3">
+                                <x-ui.odoo-form-ui type="select" label="Document Master" name="document_master_id" id="document_master_id" select2-selector="default" disabled="disabled">
+                                    <option value="">Choose Master...</option>
+                                    @foreach($templates as $tmpl)
+                                        <option value="{{ $tmpl->id }}" data-category-id="{{ $tmpl->document_category_id }}" data-expiry="{{ $tmpl->expiry_applicable ? '1' : '0' }}">{{ $tmpl->name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+
+                            <!-- File Upload -->
+                            <div class="mb-3">
+                                <x-ui.odoo-form-ui type="file" label="File Attachment" name="file" id="modal_upload_file" />
+                            </div>
+
+                            <!-- Expiry Date -->
+                            <div class="mb-3 d-none" id="expiry-date-container">
+                                <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" id="modal_expiry_date" inputType="date" />
+                            </div>
                         </div>
 
-                        <!-- Document Template Selection -->
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="select" label="Document Template" name="document_master_id" id="document_master_id" :required="true" select2-selector="default" disabled="disabled">
-                                <option value="">Choose Template...</option>
-                                @foreach($templates as $tmpl)
-                                    <option value="{{ $tmpl->id }}" data-category-id="{{ $tmpl->document_category_id }}" data-expiry="{{ $tmpl->expiry_applicable ? '1' : '0' }}">{{ $tmpl->name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                            <div class="error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">Please choose a document template.</div>
-                        </div>
-
-                        <!-- File Upload -->
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="file" label="File Attachment" name="file" id="modal_upload_file" :required="true" />
-                            <div class="error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">Please select a file.</div>
-                        </div>
-
-                        <!-- Expiry Date -->
-                        <div class="mb-3 d-none" id="expiry-date-container">
-                            <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" id="modal_expiry_date" inputType="date" />
-                            <div class="error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">Expiry date is required for this template.</div>
+                        <!-- Section for Generate Template Mode -->
+                        <div id="section_template_gen_mode" class="d-none">
+                            <div class="mb-3">
+                                <x-ui.odoo-form-ui type="select" label="Select Document Template" name="document_template_id" id="modal_document_template_id" select2-selector="default">
+                                    <option value="">Select Template...</option>
+                                    @foreach($documentTemplates as $dt)
+                                        <option value="{{ $dt->id }}">{{ $dt->name }} ({{ $dt->code }})</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                                <small class="text-muted mt-1 d-block">Selecting a template will auto-populate live profile details for the chosen employee.</small>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light border fw-bold text-uppercase fs-11" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary fw-bold text-uppercase fs-11">Submit Upload</button>
+                        <button type="submit" class="btn btn-primary fw-bold text-uppercase fs-11" id="btn_submit_modal_action">Submit & Save</button>
                     </div>
                 </form>
             </div>
@@ -512,6 +542,18 @@
 @push('scripts')
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script>
+        function toggleUploadMode(mode) {
+            if (mode === 'generate') {
+                $('#section_file_upload_mode').addClass('d-none');
+                $('#section_template_gen_mode').removeClass('d-none');
+                $('#btn_submit_modal_action').html('<i class="feather-zap me-1"></i> Generate & Save Document');
+            } else {
+                $('#section_file_upload_mode').removeClass('d-none');
+                $('#section_template_gen_mode').addClass('d-none');
+                $('#btn_submit_modal_action').html('Submit Upload');
+            }
+        }
+
         // Dropdown status submission handler
         function submitDocumentStatusDirect(url, status) {
             var form = document.getElementById('directStatusForm');
