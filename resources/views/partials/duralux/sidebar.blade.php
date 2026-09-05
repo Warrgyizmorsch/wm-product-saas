@@ -215,6 +215,89 @@
             ['label' => 'Audit & Settings', 'icon' => 'feather-settings', 'url' => '#', 'children' => ['Audit Logs', 'Localization', 'Currencies', 'System Settings']],
         ],
     ];
+
+    // Two independent filters, both must pass for a module to show:
+    // 1. tenant_allowed_modules() — is this module in the tenant's subscribed plan?
+    // 2. AccessService::allowedModulesFor() — does this user's role have any
+    //    permission grant in this module at all? A CRM-only plan with an
+    //    HR-role user viewing it would otherwise show CRM items that role
+    //    can't actually do anything with.
+    // Either returning null means "unrestricted" for that dimension.
+    $allowedModules = tenant_allowed_modules();
+    $allowedModulesForUser = auth()->user()
+        ? app(\App\Services\Access\AccessService::class)->allowedModulesFor(auth()->user())
+        : null;
+
+    if ($allowedModules !== null || $allowedModulesForUser !== null) {
+        $isRouteAllowed = function (?string $routeName) use ($allowedModules, $allowedModulesForUser) {
+            if ($routeName === null) {
+                return true;
+            }
+
+            $module = explode('.', $routeName)[0];
+
+            if (! in_array($module, \App\Http\Middleware\EnsureTenantModuleAccess::GATED_MODULES, true)) {
+                return true;
+            }
+
+            if ($allowedModules !== null && ! in_array($module, $allowedModules, true)) {
+                return false;
+            }
+
+            if ($allowedModulesForUser !== null && ! in_array($module, $allowedModulesForUser, true)) {
+                return false;
+            }
+
+            return true;
+        };
+
+        foreach ($modules as $caption => &$items) {
+            foreach ($items as $key => &$item) {
+                if (isset($item['children']) && !empty($item['children'])) {
+                    // A placeholder child with no 'route' (an unimplemented
+                    // link, e.g. 'Tasks') would otherwise always pass the
+                    // filter below regardless of module, keeping the whole
+                    // group visible even after every real route in it was
+                    // correctly hidden. Decide the group's module from the
+                    // first routed child instead, and drop the entire group
+                    // — placeholders included — if that module is disallowed.
+                    $firstRoute = null;
+
+                    foreach ($item['children'] as $child) {
+                        if (is_array($child) && isset($child['route'])) {
+                            $firstRoute = $child['route'];
+                            break;
+                        }
+                    }
+
+                    if ($firstRoute !== null && ! $isRouteAllowed($firstRoute)) {
+                        unset($items[$key]);
+                        continue;
+                    }
+
+                    $item['children'] = array_values(array_filter($item['children'], function ($child) use ($isRouteAllowed) {
+                        $childRoute = is_array($child) ? ($child['route'] ?? null) : null;
+
+                        return $isRouteAllowed($childRoute);
+                    }));
+
+                    if (empty($item['children'])) {
+                        unset($items[$key]);
+                    }
+                } elseif (isset($item['route']) && ! $isRouteAllowed($item['route'])) {
+                    unset($items[$key]);
+                }
+            }
+            unset($item);
+
+            $items = array_values($items);
+
+            if (empty($items)) {
+                unset($modules[$caption]);
+            }
+        }
+        unset($items);
+    }
 @endphp
 
 <nav class="nxl-navigation">

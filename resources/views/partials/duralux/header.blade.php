@@ -7,13 +7,32 @@
     $resolvedCompany = company();
     $resolvedBranch = branch();
 
+    // Switching tenants is a platform-admin capability — TenantSwitchController
+    // already enforces this on the action, but the dropdown itself had no
+    // visibility gate, so a plain tenant owner could see every other tenant's
+    // name in the list even though clicking one would 403. Company/Branch
+    // switching stays open to any authenticated user, since it's scoped to
+    // their own tenant's data, not a cross-tenant capability.
+    $isPlatformAdmin = auth()->user()
+        ? app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'platform.tenants.manage')
+        : false;
+
+    // Live current period, not a stored setting — same lookup the Accounting
+    // engine itself uses (FiscalPeriodService::periodForDate), so this label
+    // always matches whatever period journals actually post into. Naturally
+    // respects the request's tenant/company/branch scope since it queries
+    // AccountingPeriod through Eloquent, which carries those global scopes.
+    $currentPeriod = \Illuminate\Support\Facades\Schema::hasTable('accounting_periods')
+        ? app(\App\Domains\Accounting\Services\FiscalPeriodService::class)->periodForDate(now())
+        : null;
+
     $currentTenant = [
         'name' => $resolvedTenant?->name ?? 'Central Workspace',
         'code' => strtoupper(str_replace('-', ' ', $tenantSlug)),
         'plan' => $tenantPlan,
         'branch' => $resolvedBranch?->name ?? ($tenantSettings['branch'] ?? 'Main Office'),
         'currency' => $tenantSettings['currency'] ?? 'INR',
-        'year' => $tenantSettings['financial_year'] ?? 'FY ' . now()->format('Y'),
+        'year' => $currentPeriod?->fiscalYear?->name ?? ($tenantSettings['financial_year'] ?? 'FY ' . now()->format('Y')),
     ];
 
     $currentCompany = [
@@ -249,41 +268,57 @@
                             </div>
                     </x-ui.dropdown>
 
-                    <x-ui.dropdown class="nxl-h-item erp-tenant-switcher d-none d-xl-flex" menu-class="nxl-h-dropdown erp-tenant-dropdown">
-                        <x-slot name="trigger">
-                            <x-ui.button href="javascript:void(0);" variant="light-brand" class="erp-tenant-button dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
-                                <span class="avatar-text avatar-sm bg-soft-success text-success">
-                                    <i class="feather-briefcase"></i>
-                                </span>
-                                <span class="erp-tenant-copy">
-                                    <strong>{{ $currentTenant['name'] }}</strong>
-                                    <small>{{ $currentTenant['branch'] }} - {{ $currentTenant['year'] }}</small>
-                                </span>
-                                <i class="feather-chevron-down ms-2"></i>
-                            </x-ui.button>
-                        </x-slot>
-
-                            <div class="px-4 py-3 border-bottom">
-                                <h6 class="mb-1">{{ __('ui.switch_tenant') }}</h6>
-                                <p class="fs-11 text-muted mb-0">{{ $currentTenant['currency'] }} - {{ $currentTenant['plan'] }} Plan</p>
-                            </div>
-                            @foreach ($tenants as $tenant)
-                                <x-ui.dropdown-item href="{{ route('tenant.switch', $tenant['slug']) }}" :active="!empty($tenant['active'])">
-                                    <span class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($tenant['name'], 0, 1) }}</span>
-                                    <span>
-                                        <span class="d-block fw-semibold">{{ $tenant['name'] }}</span>
-                                        <span class="fs-11 text-muted">{{ $tenant['code'] }}</span>
+                    @if ($isPlatformAdmin)
+                        <x-ui.dropdown class="nxl-h-item erp-tenant-switcher d-none d-xl-flex" menu-class="nxl-h-dropdown erp-tenant-dropdown">
+                            <x-slot name="trigger">
+                                <x-ui.button href="javascript:void(0);" variant="light-brand" class="erp-tenant-button dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                                    <span class="avatar-text avatar-sm bg-soft-success text-success">
+                                        <i class="feather-briefcase"></i>
                                     </span>
-                                    @if (!empty($tenant['active']))
-                                        <i class="feather-check ms-auto me-0 text-success"></i>
-                                    @endif
+                                    <span class="erp-tenant-copy">
+                                        <strong>{{ $currentTenant['name'] }}</strong>
+                                        <small>{{ $currentTenant['branch'] }} - {{ $currentTenant['year'] }}</small>
+                                    </span>
+                                    <i class="feather-chevron-down ms-2"></i>
+                                </x-ui.button>
+                            </x-slot>
+
+                                <div class="px-4 py-3 border-bottom">
+                                    <h6 class="mb-1">{{ __('ui.switch_tenant') }}</h6>
+                                    <p class="fs-11 text-muted mb-0">{{ $currentTenant['currency'] }} - {{ $currentTenant['plan'] }} Plan</p>
+                                </div>
+                                @foreach ($tenants as $tenant)
+                                    <x-ui.dropdown-item href="{{ route('tenant.switch', $tenant['slug']) }}" :active="!empty($tenant['active'])">
+                                        <span class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($tenant['name'], 0, 1) }}</span>
+                                        <span>
+                                            <span class="d-block fw-semibold">{{ $tenant['name'] }}</span>
+                                            <span class="fs-11 text-muted">{{ $tenant['code'] }}</span>
+                                        </span>
+                                        @if (!empty($tenant['active']))
+                                            <i class="feather-check ms-auto me-0 text-success"></i>
+                                        @endif
+                                    </x-ui.dropdown-item>
+                                @endforeach
+                                <div class="dropdown-divider"></div>
+                                <x-ui.dropdown-item href="{{ route('platform.tenants.create') }}" icon="feather-plus">
+                                    <span>{{ __('ui.add_tenant') }}</span>
                                 </x-ui.dropdown-item>
-                            @endforeach
-                            <div class="dropdown-divider"></div>
-                            <x-ui.dropdown-item href="{{ route('platform.tenants.create') }}" icon="feather-plus">
-                                <span>{{ __('ui.add_tenant') }}</span>
-                            </x-ui.dropdown-item>
-                    </x-ui.dropdown>
+                        </x-ui.dropdown>
+                    @else
+                        {{-- Non-platform-admin users (tenant owners, staff) get the same info display
+                             but no switcher — switching tenants is a platform-admin-only capability,
+                             enforced server-side by TenantSwitchController; hiding the list here too
+                             avoids exposing every other tenant's name to a plain tenant owner. --}}
+                        <div class="nxl-h-item erp-tenant-switcher d-none d-xl-flex erp-tenant-button">
+                            <span class="avatar-text avatar-sm bg-soft-success text-success">
+                                <i class="feather-briefcase"></i>
+                            </span>
+                            <span class="erp-tenant-copy">
+                                <strong>{{ $currentTenant['name'] }}</strong>
+                                <small>{{ $currentTenant['branch'] }} - {{ $currentTenant['year'] }}</small>
+                            </span>
+                        </div>
+                    @endif
 
                     @if ($companies->count() > 1)
                         <x-ui.dropdown class="nxl-h-item erp-company-switcher d-none d-xl-flex" menu-class="nxl-h-dropdown erp-company-dropdown">

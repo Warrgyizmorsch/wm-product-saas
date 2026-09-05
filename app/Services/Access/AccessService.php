@@ -23,19 +23,28 @@ class AccessService
      */
     public function allows(User $user, string $permissionName, array $context = []): bool
     {
-        // ── Admin and Tenant Owner Override ──
-        if ($user->role === 'admin' || $user->role === 'super_admin' || $user->role === 'tenant_owner' || $user->role === 'company_admin') {
+        // ── Platform Admin Override ──
+        // Only truly platform-level roles bypass every check, including
+        // platform-only permissions (e.g. platform.tenants.manage). tenant_owner
+        // and company_admin are intentionally excluded here: RbacSeeder grants
+        // them every permission at SCOPE_TENANT (not SCOPE_PLATFORM), so they
+        // still get full access within their own tenant via the normal grant
+        // check below — this override must not let them additionally pass
+        // platform-wide checks that have no tenant_id in context, which would
+        // let a tenant owner browse or switch into another tenant entirely
+        // (see TenantPolicy's own comment on this exact risk).
+        if ($user->role === 'admin' || $user->role === 'super_admin') {
             return true;
         }
 
         $tenantId = $context['tenant_id'] ?? $user->tenant_id;
         $roleIds = $this->roleIdsFor($user, $tenantId);
         if ($roleIds->isNotEmpty()) {
-            $isAdminRole = Role::query()
+            $isPlatformAdminRole = Role::query()
                 ->whereIn('id', $roleIds)
-                ->whereIn('slug', ['super_admin', 'tenant_owner', 'company_admin', 'admin'])
+                ->whereIn('slug', ['super_admin', 'admin'])
                 ->exists();
-            if ($isAdminRole) {
+            if ($isPlatformAdminRole) {
                 return true;
             }
         }
@@ -86,6 +95,98 @@ class AccessService
     public function effectiveRoleIds(User $user, ?int $tenantId = null): Collection
     {
         return $this->roleIdsFor($user, $tenantId ?? $user->tenant_id);
+    }
+
+    /**
+     * Modules where permission-table naming actually lines up with the
+     * sidebar's route-based module prefixes, and coverage is broad enough to
+     * trust as a real signal (96-97 rows for production/sales/accounting, 53
+     * for crm, 36 for inventory, 11 for projects). HRMS and Purchase are
+     * deliberately excluded: HRMS has only 3 permission rows total, all
+     * prefixed 'hr.' (not 'hrms.', the route prefix), and Purchase has none
+     * at all (its only related rows are prefixed 'grns.' for the separate
+     * Goods Receipt Note workflow) — filtering on either would hide the
+     * entire module for users who legitimately have access through
+     * mechanisms other than the Permission table (legacy role checks,
+     * hasHrPermission's narrow gate, etc.), which is worse than not
+     * filtering at all. Revisit this list once those two modules get proper
+     * per-entity permissions seeded.
+     */
+    private const ROLE_FILTERABLE_MODULES = ['crm', 'sales', 'inventory', 'accounting', 'production', 'projects'];
+
+    /**
+     * Distinct module prefixes (the leading segment of each granted
+     * permission's `module.entity.action.scope` name — e.g. 'crm', 'sales')
+     * this user holds ANY permission for, used to filter the sidebar down to
+     * modules the user's role actually has access to. Only ever restricts
+     * modules listed in ROLE_FILTERABLE_MODULES — every other gated module
+     * (hrms, purchase) always passes this filter regardless of role, since
+     * there's no reliable per-role signal to check for them yet. Independent
+     * of, and layered on top of, tenant-level plan gating (see
+     * tenant_allowed_modules()) — a module can be in the tenant's plan but
+     * still hidden here if this user's role has no grants in it, and vice
+     * versa the plan filter still wins even if the role would otherwise
+     * allow it.
+     *
+     * @return list<string>|null null means unrestricted (platform admin — sees
+     *     every module regardless of role grants)
+     */
+    public function allowedModulesFor(User $user): ?array
+    {
+        if ($user->role === 'admin' || $user->role === 'super_admin') {
+            return null;
+        }
+
+        $roleIds = $this->roleIdsFor($user, $user->tenant_id);
+
+        if ($roleIds->isNotEmpty()) {
+            $isPlatformAdminRole = Role::query()
+                ->whereIn('id', $roleIds)
+                ->whereIn('slug', ['super_admin', 'admin'])
+                ->exists();
+
+            if ($isPlatformAdminRole) {
+                return null;
+            }
+        }
+
+        $modules = collect();
+
+        if ($roleIds->isNotEmpty()) {
+            $permissionNames = RolePermission::query()
+                ->whereIn('role_id', $roleIds)
+                ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+                ->pluck('permissions.name');
+
+            $modules = $modules->merge($permissionNames->map(fn (string $name) => explode('.', $name)[0]));
+        }
+
+        // Legacy Production permission map (config('production.permissions'),
+        // permission-name => [allowed legacy role slugs]) isn't expressed as
+        // Permission/RolePermission rows at all, so a user relying on it would
+        // otherwise show zero modules — check it the same way
+        // allowsLegacyProductionPermission() does, for the 'production' module only.
+        $legacyRole = $user->role ?: ($user->primaryRole->slug ?? null);
+
+        if ($legacyRole !== null) {
+            foreach (config('production.permissions', []) as $allowedRoles) {
+                if (in_array($legacyRole, $allowedRoles, true)) {
+                    $modules->push('production');
+                    break;
+                }
+            }
+        }
+
+        // Only actually restrict modules we trust the Permission table's
+        // coverage for; every other gated module (hrms, purchase today)
+        // is unioned in unconditionally so it never gets hidden by this filter.
+        $grantedFilterable = $modules->intersect(self::ROLE_FILTERABLE_MODULES);
+        $alwaysAllowed = array_diff(
+            \App\Http\Middleware\EnsureTenantModuleAccess::GATED_MODULES,
+            self::ROLE_FILTERABLE_MODULES,
+        );
+
+        return $grantedFilterable->merge($alwaysAllowed)->unique()->values()->all();
     }
 
     /**

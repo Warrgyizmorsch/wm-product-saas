@@ -48,6 +48,23 @@ if (! function_exists('tenant_context')) {
     }
 }
 
+if (! function_exists('tenant_allowed_modules')) {
+    /**
+     * @return list<string>|null null means unrestricted (no plan gating; tenant
+     *     has no plan_id linked, or that plan's features column is null)
+     */
+    function tenant_allowed_modules(): ?array
+    {
+        $plan = tenant()?->planCatalog;
+
+        if ($plan === null || $plan->features === null) {
+            return null;
+        }
+
+        return $plan->features;
+    }
+}
+
 if (! function_exists('company')) {
     function company(): ?Company
     {
