@@ -48,25 +48,42 @@ class GstSummaryController extends Controller
             $output['igst'] -= $split['igst'];
         }
 
+        // Purchases under reverse charge (gst_type prefixed 'rcm') are kept out of
+        // regular Input GST/ITC: the buyer self-assesses and pays this tax in cash
+        // (it can't net against output liability), so it's reported as its own
+        // liability line, with the matching ITC shown separately once paid —
+        // mirrors GSTR-3B tables 3.1(d) and 4(A)(3) rather than folding it into
+        // ordinary purchase ITC as the previous version silently did.
         $input = ['taxable' => 0.0, 'cgst' => 0.0, 'sgst' => 0.0, 'igst' => 0.0];
+        $rcm = ['taxable' => 0.0, 'cgst' => 0.0, 'sgst' => 0.0, 'igst' => 0.0];
         foreach ($bills as $bill) {
-            $input['taxable'] += (float) $bill->subtotal;
-            $input['cgst'] += (float) $bill->cgst_amount;
-            $input['sgst'] += (float) $bill->sgst_amount;
-            $input['igst'] += (float) $bill->igst_amount;
+            $bucket = str_starts_with((string) $bill->gst_type, 'rcm') ? 'rcm' : 'input';
+            $target = $bucket === 'rcm' ? $rcm : $input;
+            $target['taxable'] += (float) $bill->subtotal;
+            $target['cgst'] += (float) $bill->cgst_amount;
+            $target['sgst'] += (float) $bill->sgst_amount;
+            $target['igst'] += (float) $bill->igst_amount;
+            ${$bucket} = $target;
         }
         foreach ($purchaseReturns as $return) {
+            $bucket = str_starts_with((string) $return->vendorBill?->gst_type, 'rcm') ? 'rcm' : 'input';
+            $target = $bucket === 'rcm' ? $rcm : $input;
             $split = GstReportPeriod::splitReturnTax($return, $return->vendorBill);
-            $input['taxable'] -= $split['taxable'];
-            $input['cgst'] -= $split['cgst'];
-            $input['sgst'] -= $split['sgst'];
-            $input['igst'] -= $split['igst'];
+            $target['taxable'] -= $split['taxable'];
+            $target['cgst'] -= $split['cgst'];
+            $target['sgst'] -= $split['sgst'];
+            $target['igst'] -= $split['igst'];
+            ${$bucket} = $target;
         }
 
+        // RCM tax paid is itself claimable as ITC (same amounts) once deposited —
+        // shown as its own reconciling line rather than netted away silently.
+        $rcmItc = $rcm;
+
         $payable = [
-            'cgst' => $output['cgst'] - $input['cgst'],
-            'sgst' => $output['sgst'] - $input['sgst'],
-            'igst' => $output['igst'] - $input['igst'],
+            'cgst' => $output['cgst'] - $input['cgst'] + $rcm['cgst'] - $rcmItc['cgst'],
+            'sgst' => $output['sgst'] - $input['sgst'] + $rcm['sgst'] - $rcmItc['sgst'],
+            'igst' => $output['igst'] - $input['igst'] + $rcm['igst'] - $rcmItc['igst'],
         ];
         $payable['total'] = $payable['cgst'] + $payable['sgst'] + $payable['igst'];
 
@@ -75,6 +92,8 @@ class GstSummaryController extends Controller
             'to' => $to,
             'output' => $output,
             'input' => $input,
+            'rcm' => $rcm,
+            'rcmItc' => $rcmItc,
             'payable' => $payable,
             'filerGstin' => Company::first()?->gst_number,
         ]);

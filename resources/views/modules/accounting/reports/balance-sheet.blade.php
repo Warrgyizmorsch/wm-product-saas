@@ -28,36 +28,38 @@
             // Period (no drill-down — a single computed figure, not a list of
             // accounts), Capital Account, Non-Current Liabilities (only when
             // non-empty), Current Liabilities.
+            $mapRow = fn ($row) => ['id' => $row['account']->id, 'name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']];
+
             $liabilityGroups = [
                 [
                     'label' => 'Capital Account',
                     'total' => $totals['equity'],
-                    'rows' => $sections['equity']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+                    'rows' => $sections['equity']->map($mapRow)->all(),
                 ],
             ];
             if ($sections['liability']['non_current']->isNotEmpty()) {
                 $liabilityGroups[] = [
                     'label' => 'Non-Current Liabilities',
                     'total' => $totals['liability_non_current'],
-                    'rows' => $sections['liability']['non_current']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+                    'rows' => $sections['liability']['non_current']->map($mapRow)->all(),
                 ];
             }
             $liabilityGroups[] = [
                 'label' => 'Current Liabilities',
                 'total' => $totals['liability_current'],
-                'rows' => $sections['liability']['current']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+                'rows' => $sections['liability']['current']->map($mapRow)->all(),
             ];
 
             $assetGroups = [
                 [
                     'label' => 'Fixed Assets',
                     'total' => $totals['asset_non_current'],
-                    'rows' => $sections['asset']['non_current']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+                    'rows' => $sections['asset']['non_current']->map($mapRow)->all(),
                 ],
                 [
                     'label' => 'Current Assets',
                     'total' => $totals['asset_current'],
-                    'rows' => $sections['asset']['current']->map(fn ($row) => ['name' => $row['account']->name, 'code' => $row['account']->code, 'amount' => $row['balance']])->all(),
+                    'rows' => $sections['asset']['current']->map($mapRow)->all(),
                 ],
             ];
         @endphp
@@ -106,7 +108,10 @@
                                 </tr>
                                 @forelse ($group['rows'] as $row)
                                     <tr class="bs-detail-row d-none" data-group="liab-{{ $gi }}">
-                                        <td class="ps-5 font-monospace text-muted">{{ $row['code'] }} <span class="text-dark font-monospace-off">{{ $row['name'] }}</span></td>
+                                        <td class="ps-5 font-monospace text-muted">
+                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}">{{ $row['code'] }}</a>
+                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}" class="text-dark font-monospace-off">{{ $row['name'] }}</a>
+                                        </td>
                                         <td class="text-end pe-4">{{ number_format($row['amount'], 2) }}</td>
                                     </tr>
                                 @empty
@@ -143,7 +148,10 @@
                                 </tr>
                                 @forelse ($group['rows'] as $row)
                                     <tr class="bs-detail-row d-none" data-group="asset-{{ $gi }}">
-                                        <td class="ps-5 font-monospace text-muted">{{ $row['code'] }} <span class="text-dark font-monospace-off">{{ $row['name'] }}</span></td>
+                                        <td class="ps-5 font-monospace text-muted">
+                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}">{{ $row['code'] }}</a>
+                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}" class="text-dark font-monospace-off">{{ $row['name'] }}</a>
+                                        </td>
                                         <td class="text-end pe-4">{{ number_format($row['amount'], 2) }}</td>
                                     </tr>
                                 @empty

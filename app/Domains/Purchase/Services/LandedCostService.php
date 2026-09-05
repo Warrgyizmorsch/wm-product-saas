@@ -277,8 +277,22 @@ class LandedCostService
                 $inputIgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1630')->first()
                     ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1600')->first();
 
-                $rcmPayableAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2080')->first()
-                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2100')->first();
+                // RCM input tax credit accounts are distinct from regular Input
+                // GST — a reverse-charge purchase self-assesses tax it never paid
+                // the vendor, so it can't share the same ledger accounts as
+                // ordinary purchase ITC. Fall back to the regular Input accounts
+                // only if the tenant hasn't provisioned dedicated RCM accounts.
+                $rcmInputCgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1631')->first() ?: $inputCgstAcc;
+                $rcmInputSgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1632')->first() ?: $inputSgstAcc;
+                $rcmInputIgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1633')->first() ?: $inputIgstAcc;
+
+                // RCM payable accounts (2085/2086/2087) — the self-assessed
+                // liability paid in cash, NOT the same as Statutory Dues Payable
+                // (2080) or the generic Output Duties header (2100), which the
+                // previous lookup incorrectly fell back to.
+                $rcmPayableCgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2086')->first();
+                $rcmPayableSgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2087')->first();
+                $rcmPayableIgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2085')->first();
 
                 $journalLines = [];
 
@@ -298,48 +312,75 @@ class LandedCostService
 
                 foreach ($voucher->expenses as $exp) {
                     $taxAmt = (float) $exp->tax_amount;
-                    $isRcm  = (bool) $exp->is_rcm;
+                    $isRcm  = (bool) $exp->is_rcm || str_starts_with((string) $exp->gst_type, 'rcm');
                     $gstType = $exp->gst_type;
+                    $isIgstType = str_contains((string) $gstType, 'igst');
+
+                    $debitCgstAcc = $isRcm ? $rcmInputCgstAcc : $inputCgstAcc;
+                    $debitSgstAcc = $isRcm ? $rcmInputSgstAcc : $inputSgstAcc;
+                    $debitIgstAcc = $isRcm ? $rcmInputIgstAcc : $inputIgstAcc;
 
                     if ($taxAmt > 0) {
-                        if ($gstType === 'igst') {
-                            if ($inputIgstAcc) {
+                        if ($isIgstType) {
+                            if ($debitIgstAcc) {
                                 $journalLines[] = [
-                                    'chart_of_account_id' => $inputIgstAcc->id,
+                                    'chart_of_account_id' => $debitIgstAcc->id,
                                     'debit'               => round($taxAmt, 2),
                                     'credit'              => 0,
-                                    'description'         => "Input IGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    'description'         => ($isRcm ? "RCM Input IGST" : "Input IGST") . " for {$exp->cost_head} ({$voucher->voucher_number})",
                                 ];
                             }
                         } else {
-                            // cgst_sgst or rcm split
+                            // cgst_sgst (regular or RCM) split
                             $halfTax = round($taxAmt / 2, 2);
-                            if ($inputCgstAcc) {
+                            if ($debitCgstAcc) {
                                 $journalLines[] = [
-                                    'chart_of_account_id' => $inputCgstAcc->id,
+                                    'chart_of_account_id' => $debitCgstAcc->id,
                                     'debit'               => $halfTax,
                                     'credit'              => 0,
-                                    'description'         => "Input CGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    'description'         => ($isRcm ? "RCM Input CGST" : "Input CGST") . " for {$exp->cost_head} ({$voucher->voucher_number})",
                                 ];
                             }
-                            if ($inputSgstAcc) {
+                            if ($debitSgstAcc) {
                                 $journalLines[] = [
-                                    'chart_of_account_id' => $inputSgstAcc->id,
+                                    'chart_of_account_id' => $debitSgstAcc->id,
                                     'debit'               => round($taxAmt - $halfTax, 2),
                                     'credit'              => 0,
-                                    'description'         => "Input SGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    'description'         => ($isRcm ? "RCM Input SGST" : "Input SGST") . " for {$exp->cost_head} ({$voucher->voucher_number})",
                                 ];
                             }
                         }
 
-                        // If RCM, credit RCM Tax Liability account
-                        if ($isRcm && $rcmPayableAcc) {
-                            $journalLines[] = [
-                                'chart_of_account_id' => $rcmPayableAcc->id,
-                                'debit'               => 0,
-                                'credit'              => round($taxAmt, 2),
-                                'description'         => "RCM Tax Liability for {$exp->cost_head} ({$voucher->voucher_number})",
-                            ];
+                        // RCM: the buyer self-assesses this tax as a liability
+                        // (paid in cash, not to the vendor) rather than crediting
+                        // it toward Accounts Payable like normal purchase tax.
+                        if ($isRcm) {
+                            if ($isIgstType && $rcmPayableIgstAcc) {
+                                $journalLines[] = [
+                                    'chart_of_account_id' => $rcmPayableIgstAcc->id,
+                                    'debit'               => 0,
+                                    'credit'              => round($taxAmt, 2),
+                                    'description'         => "RCM IGST Payable for {$exp->cost_head} ({$voucher->voucher_number})",
+                                ];
+                            } elseif (!$isIgstType) {
+                                $halfTax = round($taxAmt / 2, 2);
+                                if ($rcmPayableCgstAcc) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $rcmPayableCgstAcc->id,
+                                        'debit'               => 0,
+                                        'credit'              => $halfTax,
+                                        'description'         => "RCM CGST Payable for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                                if ($rcmPayableSgstAcc) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $rcmPayableSgstAcc->id,
+                                        'debit'               => 0,
+                                        'credit'              => round($taxAmt - $halfTax, 2),
+                                        'description'         => "RCM SGST Payable for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                            }
                         }
                     }
 
