@@ -29,20 +29,31 @@ class LandedCostService
                 throw new InvalidArgumentException('Please add at least one expense line.');
             }
 
-            // Generate Voucher Number
+            // Generate Unique Voucher Number (Collision-Proof across all companies/branches/trashed rows)
             $year = now()->format('Y');
             $prefix = "LCV-{$year}-";
-            $lastVoucher = LandedCostVoucher::where('tenant_id', $tenantId)
-                ->where('voucher_number', 'like', "{$prefix}%")
-                ->orderBy('id', 'desc')
-                ->first();
 
-            $nextNum = 1;
-            if ($lastVoucher) {
-                $lastNumStr = str_replace($prefix, '', $lastVoucher->voucher_number);
-                $nextNum = ((int) $lastNumStr) + 1;
+            $allNumbers = DB::table('landed_cost_vouchers')
+                ->where('voucher_number', 'like', "{$prefix}%")
+                ->pluck('voucher_number');
+
+            $maxNum = 0;
+            foreach ($allNumbers as $vNum) {
+                $numStr = str_replace($prefix, '', $vNum);
+                $n = (int) $numStr;
+                if ($n > $maxNum) {
+                    $maxNum = $n;
+                }
             }
-            $voucherNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+
+            $nextNum = $maxNum + 1;
+            do {
+                $voucherNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+                $exists = DB::table('landed_cost_vouchers')->where('voucher_number', $voucherNumber)->exists();
+                if ($exists) {
+                    $nextNum++;
+                }
+            } while ($exists);
 
             $voucher = LandedCostVoucher::create([
                 'tenant_id'       => $tenantId,
@@ -72,7 +83,7 @@ class LandedCostService
                 $taxRate = (float) ($exp['tax_rate'] ?? 0);
                 $gstType = $exp['gst_type'] ?? 'cgst_sgst';
                 $isRcm   = !empty($exp['is_rcm']) && ($exp['is_rcm'] === '1' || $exp['is_rcm'] === true || $exp['is_rcm'] === 'true');
-                if ($gstType === 'rcm') {
+                if (in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst'])) {
                     $isRcm = true;
                 }
 
@@ -213,11 +224,13 @@ class LandedCostService
 
                 $firstExp   = $expLines->first();
                 $gstType    = $firstExp?->gst_type ?? 'cgst_sgst';
-                $isIgst     = $gstType === 'igst';
+                $isRcm      = in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst']);
+                $isIgst     = in_array($gstType, ['igst', 'rcm_igst']);
 
                 $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
-                $sgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
+                $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 2);
                 $igstAmount = $isIgst ? round($taxAmount, 2) : 0;
+                $grandTotal = $isRcm ? $subtotal : ($subtotal + $taxAmount);
 
                 $bill = \App\Domains\Purchase\Models\VendorBill::create([
                     'tenant_id'             => $tenantId,
@@ -255,6 +268,10 @@ class LandedCostService
                         'total_amount'   => (float) $expLine->total_with_tax,
                     ]);
                 }
+
+                // Dispatch BillPosted event to auto-post GL Journal Entry for the Transporter Bill
+                event(new \App\Domains\Purchase\Events\BillPosted($bill));
+                app(\App\Domains\Accounting\Listeners\PostPurchaseBillJournal::class)->handle(new \App\Domains\Purchase\Events\BillPosted($bill));
             }
 
             $voucher->status       = 'Posted';

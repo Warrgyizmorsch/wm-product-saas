@@ -398,24 +398,24 @@ class VendorBillController extends Controller
             'service_head'          => 'required|string',
             'amount'                => 'required|numeric|min:0.01',
             'tax_rate'              => 'required|numeric|min:0',
-            'gst_type'              => 'required|string|in:cgst_sgst,igst,rcm',
+            'gst_type'              => 'required|string|in:cgst_sgst,igst,rcm,rcm_cgst_sgst,rcm_igst',
             'bill_date'             => 'required|date',
             'due_date'              => 'required|date|after_or_equal:bill_date',
             'vendor_invoice_number' => 'nullable|string|max:255',
             'notes'                 => 'nullable|string',
         ]);
 
-        $subtotal  = (float) $validated['amount'];
-        $taxRate   = (float) $validated['tax_rate'];
-        $gstType   = $validated['gst_type'];
-        $isRcm     = $gstType === 'rcm';
-        $isIgst    = $gstType === 'igst';
+        $subtotal   = (float) $validated['amount'];
+        $taxRate    = (float) $validated['tax_rate'];
+        $gstType    = $validated['gst_type'];
+        $isRcm      = in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst']);
+        $isIgst     = in_array($gstType, ['igst', 'rcm_igst']);
 
         $taxAmount  = ($subtotal * $taxRate) / 100;
         $grandTotal = $isRcm ? $subtotal : ($subtotal + $taxAmount);
 
-        $cgstAmount = ($isIgst || $isRcm) ? 0 : round($taxAmount / 2, 2);
-        $sgstAmount = ($isIgst || $isRcm) ? 0 : round($taxAmount / 2, 2);
+        $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
+        $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 2);
         $igstAmount = $isIgst ? round($taxAmount, 2) : 0;
 
         $billNumber = $this->billRepo->getNextBillNumber($tenantId);
