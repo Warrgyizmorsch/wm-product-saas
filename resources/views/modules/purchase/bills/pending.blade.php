@@ -59,13 +59,13 @@
             ],
             [
                 'id' => 'tab-pending-bills',
-                'label' => 'Pending Goods Bills' . (($pendingGrnsCount ?? 0) > 0 ? ' (' . $pendingGrnsCount . ')' : ''),
+                'label' => 'Pending Inbound Bills' . (($pendingGrnsCount ?? 0) > 0 ? ' (' . $pendingGrnsCount . ')' : ''),
                 'active' => true,
                 'icon' => 'feather-clock',
             ],
             [
                 'id' => 'tab-pending-freight',
-                'label' => 'Pending Freight Bills' . (($pendingFreightCount ?? 0) > 0 ? ' (' . $pendingFreightCount . ')' : ''),
+                'label' => 'Pending Outbound Freight Bills' . (($pendingFreightCount ?? 0) > 0 ? ' (' . $pendingFreightCount . ')' : ''),
                 'active' => false,
                 'icon' => 'feather-truck',
             ]
@@ -122,6 +122,10 @@
                     @forelse($pendingGrns as $grn)
                         @php
                             $recQty = (float)$grn->items->sum('received_qty');
+                            $activeBills = $grn->vendorBills ? $grn->vendorBills->where('status', '!=', 'Cancelled') : collect();
+                            $hasMaterialBill = $activeBills->contains(fn($b) => (int)$b->vendor_id === (int)$grn->vendor_id);
+                            $hasFreightBill = $activeBills->contains(fn($b) => (int)$b->vendor_id !== (int)$grn->vendor_id);
+                            $requiresFreight = $grn->purchaseOrder && in_array(strtolower($grn->purchaseOrder->freight_terms ?? ''), ['to_pay', 'to pay']);
                         @endphp
                         <tr>
                             <td class="ps-4 fw-bold font-monospace">
@@ -152,13 +156,29 @@
                                 </span>
                             </td>
                             <td class="text-end">
-                                <div class="d-flex justify-content-end gap-1.5 align-items-center">
-                                    <a href="{{ route('purchase.bills.create', ['grn_id' => $grn->id]) }}" class="btn btn-sm btn-success text-white fw-bold shadow-sm py-1 px-2 fs-11 d-inline-flex align-items-center gap-1" title="Create Material Goods Bill" data-bs-toggle="tooltip">
-                                        <i class="feather-file-text"></i> Create Bill
-                                    </a>
-                                    <a href="{{ route('purchase.bills.create-service', ['grn_id' => $grn->id]) }}" class="btn btn-sm btn-outline-primary fw-bold shadow-sm py-1 px-2 fs-11 d-inline-flex align-items-center gap-1" title="Create Freight / Service Bill for this GRN" data-bs-toggle="tooltip">
-                                        <i class="feather-truck"></i> Freight Bill
-                                    </a>
+                                <div class="d-flex justify-content-end align-items-center" style="gap: 8px;">
+                                    @if($hasMaterialBill)
+                                        <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fw-bold fs-11 d-inline-flex align-items-center gap-1" title="Material Goods Bill Has Been Created">
+                                            <i class="feather-check"></i> Material Billed
+                                        </span>
+                                    @else
+                                        <a href="{{ route('purchase.bills.create', ['grn_id' => $grn->id]) }}" class="btn btn-sm btn-success text-white fw-bold shadow-sm py-1 px-2 fs-11 d-inline-flex align-items-center gap-1" title="Create Material Goods Bill" data-bs-toggle="tooltip">
+                                            <i class="feather-file-text"></i> Create Bill
+                                        </a>
+                                    @endif
+
+                                    @if($requiresFreight)
+                                        @if($hasFreightBill)
+                                            <span class="badge bg-soft-info text-info border border-info-subtle px-2 py-1 fw-bold fs-11 d-inline-flex align-items-center gap-1" title="Freight / Transporter Bill Has Been Created">
+                                                <i class="feather-check"></i> Freight Billed
+                                            </span>
+                                        @else
+                                            <a href="{{ route('purchase.bills.create-service', ['grn_id' => $grn->id]) }}" class="btn btn-sm btn-outline-primary fw-bold shadow-sm py-1 px-2 fs-11 d-inline-flex align-items-center gap-1" title="Create Freight / Service Bill for this GRN" data-bs-toggle="tooltip">
+                                                <i class="feather-truck"></i> Freight Bill
+                                            </a>
+                                        @endif
+                                    @endif
+
                                     <a href="{{ route('grns.show', $grn->id) }}" class="action-icon-btn view-btn" title="{{ __('ui.view') }}" data-bs-toggle="tooltip">
                                         <i class="feather-eye"></i>
                                     </a>
