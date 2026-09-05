@@ -377,12 +377,21 @@
                                                     @endif
                                                 @elseif($paidReport)
                                                     <span class="badge bg-soft-primary text-primary px-2 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>Claim Paid</span>
-                                                    <button type="button" 
-                                                            class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11 claim-travel-expense-btn"
-                                                            data-travel-id="{{ $req->id }}"
-                                                            data-cash-advance-id="">
-                                                        <i class="feather-plus me-1"></i>Supplementary Claim
-                                                    </button>
+                                                    @php
+                                                        $hasPaidSupplementaryReq = $req->expenseReports->where('status', 'paid')->filter(function($r) {
+                                                            return str_contains(strtolower($r->title), 'supplementary');
+                                                        })->isNotEmpty();
+                                                        $hasRejectedInMainReq = $paidReport->claims->where('status', 'rejected')->count() > 0;
+                                                        $showReqSupplementary = $hasRejectedInMainReq && !$hasPaidSupplementaryReq;
+                                                    @endphp
+                                                    @if($showReqSupplementary)
+                                                        <button type="button" 
+                                                                class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11 claim-travel-expense-btn"
+                                                                data-travel-id="{{ $req->id }}"
+                                                                data-cash-advance-id="">
+                                                            <i class="feather-plus me-1"></i>Supplementary Claim
+                                                        </button>
+                                                    @endif
                                                 @else
                                                     <button type="button" 
                                                             class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11 claim-travel-expense-btn"
@@ -675,9 +684,52 @@
                                     </td>
                                     <td>
                                         @php
-                                            $fullAdvance = $rep->cashAdvance ? ($rep->cashAdvance->approved_amount ?? $rep->cashAdvance->amount) : 0;
-                                            $currentExpense = ($rep->status === 'approved' || $rep->status === 'paid') ? ($rep->approved_amount ?? $rep->total_amount) : $rep->total_amount;
-                                            $surplus = $fullAdvance > $currentExpense ? ($fullAdvance - $currentExpense) : 0;
+                                            $trAdvances = $rep->travelRequest ? $rep->travelRequest->cashAdvances : collect();
+                                            $fullAdvance = $trAdvances->whereIn('status', ['approved', 'disbursed', 'settled', 'paid'])->sum(fn($ca) => floatval($ca->approved_amount ?? $ca->amount));
+                                            if ($fullAdvance <= 0 && $rep->cashAdvance) {
+                                                $fullAdvance = floatval($rep->cashAdvance->approved_amount ?? $rep->cashAdvance->amount);
+                                            }
+
+                                            $tripReports = $rep->travelRequest ? $rep->travelRequest->expenseReports->sortBy('id') : collect([$rep]);
+                                            
+                                            // Calculate cumulative advance adjusted before this report
+                                            $prevAdjusted = $tripReports->filter(function($r) use ($rep) {
+                                                return $r->id < $rep->id && in_array($r->status, ['approved', 'partially_approved', 'paid']);
+                                            })->sum(function($r) use ($fullAdvance) {
+                                                $rApprovedVal = in_array($r->status, ['approved', 'paid']) ? floatval($r->approved_amount ?? $r->total_amount) : floatval($r->total_amount);
+                                                $adv = floatval($r->advance_adjusted);
+                                                if ($adv <= 0 && $fullAdvance > 0) {
+                                                    $adv = min($fullAdvance, $rApprovedVal);
+                                                }
+                                                return $adv;
+                                            });
+
+                                            $repApprovedVal = in_array($rep->status, ['approved', 'paid']) ? floatval($rep->approved_amount ?? $rep->total_amount) : floatval($rep->total_amount);
+                                            
+                                            // Effective adjusted advance & reimbursement
+                                            $remAdv = max($fullAdvance - $prevAdjusted, 0.00);
+                                            $dispAdjusted = floatval($rep->advance_adjusted);
+                                            if ($dispAdjusted <= 0 && $remAdv > 0 && in_array($rep->status, ['approved', 'paid', 'submitted', 'partially_approved', 'draft'])) {
+                                                $dispAdjusted = min($remAdv, $repApprovedVal);
+                                            }
+                                            $dispReimbursement = max($repApprovedVal - $dispAdjusted, 0.00);
+
+                                            // Total adjusted across ALL reports for this trip
+                                            $totalTripAdjusted = $tripReports->whereIn('status', ['approved', 'partially_approved', 'paid', 'submitted'])->sum(function($r) use ($rep, $dispAdjusted, $fullAdvance) {
+                                                if ($r->id === $rep->id) {
+                                                    return $dispAdjusted;
+                                                }
+                                                $rApprovedVal = in_array($r->status, ['approved', 'paid']) ? floatval($r->approved_amount ?? $r->total_amount) : floatval($r->total_amount);
+                                                $adv = floatval($r->advance_adjusted);
+                                                if ($adv <= 0 && $fullAdvance > 0) {
+                                                    $adv = min($fullAdvance, $rApprovedVal);
+                                                }
+                                                return $adv;
+                                            });
+
+                                            $netUnadjustedAdvance = max($fullAdvance - $totalTripAdjusted, 0.00);
+                                            $surplus = $netUnadjustedAdvance;
+                                            $currentExpense = $repApprovedVal;
                                         @endphp
 
                                         @if(($rep->status === 'approved' || $rep->status === 'paid') && $rep->approved_amount)
@@ -687,12 +739,12 @@
                                             @else
                                                 <div class="fs-12 text-muted">Approved Expense: <span class="fw-bold text-dark">{{ $currencySymbol }}{{ number_format($rep->approved_amount, 2) }}</span></div>
                                             @endif
-                                            <div class="fs-12 text-muted">Advance Adjusted: <span class="text-dark">{{ $currencySymbol }}{{ number_format($rep->advance_adjusted, 2) }}</span></div>
-                                            <div class="fs-12 fw-bold text-primary mt-1">Reimbursement: {{ $currencySymbol }}{{ number_format($rep->approved_net_reimbursement ?? $rep->net_reimbursement, 2) }}</div>
+                                            <div class="fs-12 text-muted">Advance Adjusted: <span class="text-dark">{{ $currencySymbol }}{{ number_format($dispAdjusted, 2) }}</span></div>
+                                            <div class="fs-12 fw-bold text-primary mt-1">Reimbursement: {{ $currencySymbol }}{{ number_format($dispReimbursement, 2) }}</div>
                                         @else
                                             <div class="fs-12 text-muted">Total Expense: <span class="fw-bold text-dark">{{ $currencySymbol }}{{ number_format($rep->total_amount, 2) }}</span></div>
-                                            <div class="fs-12 text-muted">Advance Adjusted: <span class="text-dark">{{ $currencySymbol }}{{ number_format($rep->advance_adjusted, 2) }}</span></div>
-                                            <div class="fs-12 fw-bold text-primary mt-1">Reimbursement: {{ $currencySymbol }}{{ number_format($rep->net_reimbursement, 2) }}</div>
+                                            <div class="fs-12 text-muted">Advance Adjusted: <span class="text-dark">{{ $currencySymbol }}{{ number_format($dispAdjusted, 2) }}</span></div>
+                                            <div class="fs-12 fw-bold text-primary mt-1">Reimbursement: {{ $currencySymbol }}{{ number_format($dispReimbursement, 2) }}</div>
                                         @endif
 
                                         @if($surplus > 0)
@@ -733,15 +785,16 @@
                                                 data-title="{{ $rep->title }}"
                                                 data-employee="{{ $rep->employee->full_name }}"
                                                 data-travel="{{ $rep->travelRequest ? $rep->travelRequest->destination . ' (' . $rep->travelRequest->purpose . ')' : 'None' }}"
-                                                data-advance="{{ $rep->cashAdvance ? $currencySymbol . number_format($rep->cashAdvance->approved_amount ?? $rep->cashAdvance->amount, 2) . ' - ' . $rep->cashAdvance->purpose : 'None' }}"
+                                                data-advance="{{ $rep->cashAdvance ? $currencySymbol . number_format($rep->cashAdvance->approved_amount ?? $rep->cashAdvance->amount, 2) . ' - ' . $rep->cashAdvance->purpose : ($fullAdvance > 0 ? $currencySymbol . number_format($fullAdvance, 2) . ' - Travel Trip Advance' : 'None') }}"
                                                 data-total="{{ $currencySymbol }}{{ number_format($rep->total_amount, 2) }}"
-                                                data-adjusted="{{ $currencySymbol }}{{ number_format($rep->advance_adjusted, 2) }}"
-                                                data-net="{{ $currencySymbol }}{{ number_format($rep->net_reimbursement, 2) }}"
+                                                data-adjusted="{{ $currencySymbol }}{{ number_format($dispAdjusted, 2) }}"
+                                                data-net="{{ $currencySymbol }}{{ number_format($dispReimbursement, 2) }}"
                                                 data-status="{{ ucfirst(str_replace('_', ' ', $rep->status)) }}"
                                                 data-payout-channel="{{ $rep->payout_channel ?? 'accounting' }}"
                                                 data-claims="{{ $rep->claims->load('category') }}"
                                                 data-full-advance="{{ $fullAdvance }}"
                                                 data-current-expense="{{ $currentExpense }}"
+                                                data-surplus="{{ $surplus }}"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#viewReportModal"
                                             />
@@ -774,12 +827,22 @@
                                             @endif
 
                                             @php
+                                                $tripReports = $rep->travelRequest ? $rep->travelRequest->expenseReports : collect();
+                                                $hasUnpaidReportForTrip = $tripReports->whereIn('status', ['draft', 'submitted', 'partially_approved', 'approved'])->where('id', '!=', $rep->id)->isNotEmpty();
+                                                $hasPaidSupplementaryForTrip = $tripReports->where('id', '!=', $rep->id)->where('status', 'paid')->filter(function($r) {
+                                                    return str_contains(strtolower($r->title), 'supplementary');
+                                                })->isNotEmpty();
+                                                $isSupplementaryReport = str_contains(strtolower($rep->title), 'supplementary');
                                                 $hasRejectedItems = $rep->claims->where('status', 'rejected')->count() > 0;
-                                                $showSupplementary = $rep->travel_request_id && (
-                                                    $rep->status === 'rejected' ||
-                                                    $rep->status === 'partially_approved' ||
-                                                    ($rep->status === 'paid' && $hasRejectedItems)
-                                                );
+
+                                                $showSupplementary = $rep->travel_request_id 
+                                                    && !$isSupplementaryReport 
+                                                    && !$hasPaidSupplementaryForTrip 
+                                                    && !$hasUnpaidReportForTrip 
+                                                    && (
+                                                        $rep->status === 'rejected' ||
+                                                        ($rep->status === 'paid' && $hasRejectedItems)
+                                                    );
                                             @endphp
 
                                             @if($showSupplementary)
@@ -2023,6 +2086,9 @@
 
                     var rowHtml = `
                         <tr class="edit-claim-line-row">
+                            <input type="hidden" name="claims[${editLineIndex}][id]" value="${claim.id || ''}">
+                            <input type="hidden" name="claims[${editLineIndex}][status]" value="${claim.status || ''}">
+                            <input type="hidden" name="claims[${editLineIndex}][approved_amount]" value="${claim.approved_amount || ''}">
                             <td>
                                 <select name="claims[${editLineIndex}][category_id]" class="odoo-table-select odoo-select2 text-dark" required>
                                     <option value="" disabled>-- Category --</option>
@@ -2145,6 +2211,7 @@
                 var claims = JSON.parse(this.getAttribute('data-claims') || '[]');
                 var fullAdvance = parseFloat(this.getAttribute('data-full-advance')) || 0;
                 var currentExpense = parseFloat(this.getAttribute('data-current-expense')) || 0;
+                var surplusVal = parseFloat(this.getAttribute('data-surplus')) || 0;
 
                 var payoutChannel = this.getAttribute('data-payout-channel') || 'accounting';
                 
@@ -2157,12 +2224,11 @@
                 document.getElementById('view_report_adjusted').innerText = adjusted || (currSym + '0.00');
                 document.getElementById('view_report_net').innerText = net || (currSym + '0.00');
 
-                // Display Refund warning if employee has surplus advance funds
+                // Display Refund warning if employee has surplus advance funds across trip
                 var surplusWrapper = document.getElementById('view_report_surplus_wrapper');
                 var surplusValEl = document.getElementById('view_report_surplus');
-                if (fullAdvance > currentExpense) {
-                    var surplus = fullAdvance - currentExpense;
-                    surplusValEl.innerText = currSym + surplus.toFixed(2);
+                if (surplusVal > 0) {
+                    surplusValEl.innerText = currSym + surplusVal.toFixed(2);
                     surplusWrapper.classList.remove('d-none');
                 } else {
                     surplusWrapper.classList.add('d-none');
@@ -2231,9 +2297,11 @@
 
                     var itemStatusHtml = '';
                     var itemStatusStr = (claim.status || 'pending').toLowerCase();
-                    if (itemStatusStr === 'approved') {
+                    if (itemStatusStr === 'approved' || itemStatusStr === 'paid') {
                         var appAmt = (claim.approved_amount !== null && claim.approved_amount !== undefined) ? parseFloat(claim.approved_amount) : parseFloat(claim.amount);
-                        itemStatusHtml = `<span class="badge bg-soft-success text-success px-2 py-1 fs-10"><i class="feather-check-circle me-1"></i>Approved (${currSym}${appAmt.toFixed(2)})</span>`;
+                        var labelText = itemStatusStr === 'paid' ? 'Paid' : 'Approved';
+                        var badgeClass = itemStatusStr === 'paid' ? 'bg-soft-primary text-primary' : 'bg-soft-success text-success';
+                        itemStatusHtml = `<span class="badge ${badgeClass} px-2 py-1 fs-10"><i class="feather-check-circle me-1"></i>${labelText} (${currSym}${appAmt.toFixed(2)})</span>`;
                     } else if (itemStatusStr === 'rejected') {
                         itemStatusHtml = `<span class="badge bg-soft-danger text-danger px-2 py-1 fs-10" title="${claim.rejection_reason || ''}"><i class="feather-x-circle me-1"></i>Rejected</span>`;
                         if (claim.rejection_reason) {

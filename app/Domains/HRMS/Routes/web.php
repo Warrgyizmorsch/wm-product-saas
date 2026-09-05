@@ -318,6 +318,13 @@ Route::prefix('hrms')
             Route::match(['post', 'put'], '/documents/{document}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'updateDocument'])->name('documents-master.documents.update');
             Route::post('/documents/{document}/toggle-status', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'toggleStatus'])->name('documents-master.documents.toggle-status');
             Route::delete('/documents/{document}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'destroyDocument'])->name('documents-master.documents.destroy');
+
+            // Document Template Routes
+            Route::post('/templates', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'storeTemplate'])->name('documents-master.templates.store');
+            Route::match(['post', 'put'], '/templates/{template}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'updateTemplate'])->name('documents-master.templates.update');
+            Route::post('/templates/{template}/toggle-status', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'toggleTemplateStatus'])->name('documents-master.templates.toggle-status');
+            Route::delete('/templates/{template}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'destroyTemplate'])->name('documents-master.templates.destroy');
+            Route::get('/templates/{template}/preview', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'previewTemplate'])->name('documents-master.templates.preview');
         });
 
         // Documents Registry (All uploaded documents)
