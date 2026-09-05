@@ -63,10 +63,28 @@
                 </tr>
 
                 <tr class="table-light">
+                    <td class="ps-4 fw-bold" colspan="5">Purchases under Reverse Charge (RCM Liability)</td>
+                </tr>
+                <tr>
+                    <td class="ps-4">RCM Payable &mdash; self-assessed, paid in cash</td>
+                    <td class="text-end">{{ number_format($rcm['taxable'], 2) }}</td>
+                    <td class="text-end">{{ number_format($rcm['cgst'], 2) }}</td>
+                    <td class="text-end">{{ number_format($rcm['sgst'], 2) }}</td>
+                    <td class="text-end pe-4">{{ number_format($rcm['igst'], 2) }}</td>
+                </tr>
+                <tr>
+                    <td class="ps-4">RCM Input Tax Credit &mdash; claimable once paid</td>
+                    <td class="text-end">&mdash;</td>
+                    <td class="text-end">({{ number_format($rcmItc['cgst'], 2) }})</td>
+                    <td class="text-end">({{ number_format($rcmItc['sgst'], 2) }})</td>
+                    <td class="text-end pe-4">({{ number_format($rcmItc['igst'], 2) }})</td>
+                </tr>
+
+                <tr class="table-light">
                     <td class="ps-4 fw-bold" colspan="5">GST Payable</td>
                 </tr>
                 <tr>
-                    <td class="ps-4">GST Payable (Output &minus; Input)</td>
+                    <td class="ps-4">GST Payable (Output &minus; Input + RCM Liability &minus; RCM ITC)</td>
                     <td class="text-end">&mdash;</td>
                     <td class="text-end">{{ number_format($payable['cgst'], 2) }}</td>
                     <td class="text-end">{{ number_format($payable['sgst'], 2) }}</td>

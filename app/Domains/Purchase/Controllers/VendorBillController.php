@@ -478,9 +478,8 @@ class VendorBillController extends Controller
             'total_amount'   => $grandTotal,
         ]);
 
-        // Dispatch BillPosted event & trigger GL Journal Entry Posting
+        // Dispatch BillPosted event to trigger GL Journal Entry Posting
         event(new \App\Domains\Purchase\Events\BillPosted($bill));
-        app(\App\Domains\Accounting\Listeners\PostPurchaseBillJournal::class)->handle(new \App\Domains\Purchase\Events\BillPosted($bill));
 
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Service Bill {$bill->bill_number} created successfully.");
