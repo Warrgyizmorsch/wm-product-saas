@@ -46,6 +46,7 @@ class VendorBill extends BaseModel
         'status', // Draft, Posted, Partially Paid, Paid, Cancelled
         'subtotal',
         'tax_amount',
+        'adjustment',
         'grand_total',
         'total_amount',
         'paid_amount',

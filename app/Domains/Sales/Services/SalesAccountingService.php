@@ -5,14 +5,17 @@ namespace App\Domains\Sales\Services;
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
+use App\Domains\Sales\Events\InvoicePosted;
 use Illuminate\Support\Facades\Log;
 
 class SalesAccountingService
 {
     public function __construct(
-        private readonly JournalService $journalService
+        private readonly JournalService $journalService,
+        private readonly PostingFailureRecorder $failures,
     ) {}
 
     /**
@@ -75,8 +78,14 @@ class SalesAccountingService
                     $q->where('name', 'like', '%Freight%')->orWhere('name', 'like', '%Shipping%');
                 })->first() ?? ChartOfAccount::where('tenant_id', $tenantId)->where('code', '4900')->first());
 
+        // 7. Round Off (manual total adjustment, most commonly rounding to a
+        // whole currency unit) — without this line the AR debit (which already
+        // includes the adjustment) would never balance against the credit side.
+        $roundOff = ChartOfAccount::where('tenant_id', $tenantId)->where('code', '5730')->first();
+
         if (!$accountsReceivable || !$salesRevenue) {
             Log::warning("SalesAccountingService: Missing core Chart of Accounts for tenant {$tenantId}");
+            $this->failures->record($tenantId, InvoicePosted::class, $invoice, 'Missing Accounts Receivable or Sales Revenue account.');
             return null;
         }
 
@@ -142,6 +151,25 @@ class SalesAccountingService
             ];
         }
 
+        // Round Off / manual adjustment — rounding UP (customer pays more than
+        // taxable+tax+freight) is credited as other income; rounding DOWN is
+        // debited as a small expense. Without this, a non-zero adjustment
+        // leaves the journal unbalanced and posting fails outright.
+        $adjustment = round((float) $invoice->adjustment, 2);
+        if ($adjustment != 0) {
+            if (!$roundOff) {
+                Log::warning("SalesAccountingService: Missing Round Off (5730) account, cannot balance adjustment for invoice {$invoice->invoice_number}");
+                $this->failures->record($tenantId, InvoicePosted::class, $invoice, 'Missing Round Off (5730) account to post the invoice adjustment.');
+                return null;
+            }
+            $lines[] = [
+                'chart_of_account_id' => $roundOff->id,
+                'debit'               => $adjustment < 0 ? abs($adjustment) : 0,
+                'credit'              => $adjustment > 0 ? $adjustment : 0,
+                'description'         => "Round Off - Invoice {$invoice->invoice_number}",
+            ];
+        }
+
         try {
             $meta = [
                 'tenant_id'             => $tenantId,
@@ -156,6 +184,7 @@ class SalesAccountingService
             return $this->journalService->post($lines, $meta);
         } catch (\Exception $e) {
             Log::error("SalesAccountingService Exception posting invoice journal: " . $e->getMessage());
+            $this->failures->record($tenantId, InvoicePosted::class, $invoice, $e->getMessage());
             return null;
         }
     }

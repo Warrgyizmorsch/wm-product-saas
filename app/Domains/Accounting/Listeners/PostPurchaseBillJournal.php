@@ -92,6 +92,7 @@ class PostPurchaseBillJournal
             $rcmPayableCgst = $this->accounts->findByCode('2086', $tenantId);
             $rcmPayableSgst = $this->accounts->findByCode('2087', $tenantId);
             $rcmPayableIgst = $this->accounts->findByCode('2085', $tenantId);
+            $roundOff       = $this->accounts->findByCode('5730', $tenantId);
 
             if (!$accountsPayable) {
                 Log::warning('PostPurchaseBillJournal: missing Accounts Payable (2010) account, skipping auto-post', [
@@ -241,26 +242,8 @@ class PostPurchaseBillJournal
                         'description'         => ($isRcmBill ? "RCM Input SGST" : "Input SGST") . " on Bill {$bill->bill_number}",
                     ];
                     $hasTaxLines = true;
-                } else {
-                    if ((float)$bill->cgst_amount > 0 && $inputCgst) {
-                        $lines[] = [
-                            'chart_of_account_id' => $inputCgst->id,
-                            'debit'               => round((float)$bill->cgst_amount, 2),
-                            'credit'              => 0,
-                            'description'         => "Input CGST on Bill {$bill->bill_number}",
-                        ];
-                        $hasTaxLines = true;
-                    }
-                    if ((float)$bill->sgst_amount > 0 && $inputSgst) {
-                        $lines[] = [
-                            'chart_of_account_id' => $inputSgst->id,
-                            'debit'               => round((float)$bill->sgst_amount, 2),
-                            'credit'              => 0,
-                            'description'         => "Input SGST on Bill {$bill->bill_number}",
-                        ];
-                        $hasTaxLines = true;
-                    }
                 }
+            }
 
             // Fallback for tax amount if cgst/igst fields were empty on bill model
             if (!$hasTaxLines && (float)$bill->tax_amount > 0 && !$isRcmBill) {
@@ -326,6 +309,20 @@ class PostPurchaseBillJournal
                 'description'         => "Vendor Payable - Bill {$bill->bill_number}",
             ];
 
+            // 7. Round Off / manual adjustment — grand_total above already
+            // includes it, so a non-zero adjustment needs its own line or the
+            // journal won't balance. Owing more without added goods/tax value
+            // (adjustment > 0) is a small expense; owing less is a small gain.
+            $adjustment = round((float) ($bill->adjustment ?? 0), 2);
+            if ($adjustment != 0 && $roundOff) {
+                $lines[] = [
+                    'chart_of_account_id' => $roundOff->id,
+                    'debit'               => $adjustment > 0 ? $adjustment : 0,
+                    'credit'              => $adjustment < 0 ? abs($adjustment) : 0,
+                    'description'         => "Round Off - Bill {$bill->bill_number}",
+                ];
+            }
+
             // Post General Ledger Journal Entry
             $this->journals->post($lines, [
                 'tenant_id'      => $tenantId,
@@ -382,5 +379,4 @@ class PostPurchaseBillJournal
 
         return $defaultFreight ?: $defaultExpense;
     }
-}
 }

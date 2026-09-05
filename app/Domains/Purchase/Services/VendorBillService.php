@@ -163,7 +163,8 @@ class VendorBillService
                 }
             }
 
-            $grandTotal = max(0, $grossBeforeTax + $freightAmount + $taxAmount);
+            $adjustment = (float) ($validated['adjustment'] ?? 0);
+            $grandTotal = max(0, $grossBeforeTax + $freightAmount + $taxAmount + $adjustment);
 
             // Calculate Landed Cost Revaluation Data for "to_be_billed" mode
             $revaluationData = null;
@@ -245,6 +246,7 @@ class VendorBillService
                 'status'                       => 'Unpaid',
                 'subtotal'                     => $subtotal,
                 'tax_amount'                   => $taxAmount,
+                'adjustment'                   => $adjustment,
                 'grand_total'                  => $grandTotal,
                 'paid_amount'                  => 0,
                 'due_amount'                   => round($grandTotal, 2),

@@ -96,23 +96,23 @@
                         </thead>
                         <tbody class="fs-13 text-dark">
                             <tr>
-                                <td class="ps-4 fw-semibold">Profit for the Period</td>
-                                <td class="text-end pe-4 fw-semibold">{{ number_format($netIncome, 2) }}</td>
+                                <td class="ps-4 fw-bold text-dark">Profit for the Period</td>
+                                <td class="text-end pe-4 fw-bold text-dark">{{ number_format($netIncome, 2) }}</td>
                             </tr>
                             @foreach ($liabilityGroups as $gi => $group)
                                 <tr class="bs-group-row" role="button" data-target="liab-{{ $gi }}">
-                                    <td class="ps-4 fw-semibold">
+                                    <td class="ps-4 fw-bold text-dark">
                                         <i class="feather-chevron-right bs-chevron me-1"></i>{{ $group['label'] }}
                                     </td>
-                                    <td class="text-end pe-4 fw-semibold">{{ number_format($group['total'], 2) }}</td>
+                                    <td class="text-end pe-4 fw-bold text-dark">{{ number_format($group['total'], 2) }}</td>
                                 </tr>
                                 @forelse ($group['rows'] as $row)
                                     <tr class="bs-detail-row d-none" data-group="liab-{{ $gi }}">
-                                        <td class="ps-5 font-monospace text-muted">
-                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}">{{ $row['code'] }}</a>
-                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}" class="text-dark font-monospace-off">{{ $row['name'] }}</a>
+                                        <td class="ps-5 font-monospace text-muted fw-normal">
+                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}" class="text-muted">{{ $row['code'] }}</a>
+                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}" class="text-muted font-monospace-off">{{ $row['name'] }}</a>
                                         </td>
-                                        <td class="text-end pe-4">{{ number_format($row['amount'], 2) }}</td>
+                                        <td class="text-end pe-4 text-muted fw-normal">{{ number_format($row['amount'], 2) }}</td>
                                     </tr>
                                 @empty
                                     <tr class="bs-detail-row d-none" data-group="liab-{{ $gi }}">
@@ -141,18 +141,18 @@
                         <tbody class="fs-13 text-dark">
                             @foreach ($assetGroups as $gi => $group)
                                 <tr class="bs-group-row" role="button" data-target="asset-{{ $gi }}">
-                                    <td class="ps-4 fw-semibold">
+                                    <td class="ps-4 fw-bold text-dark">
                                         <i class="feather-chevron-right bs-chevron me-1"></i>{{ $group['label'] }}
                                     </td>
-                                    <td class="text-end pe-4 fw-semibold">{{ number_format($group['total'], 2) }}</td>
+                                    <td class="text-end pe-4 fw-bold text-dark">{{ number_format($group['total'], 2) }}</td>
                                 </tr>
                                 @forelse ($group['rows'] as $row)
                                     <tr class="bs-detail-row d-none" data-group="asset-{{ $gi }}">
-                                        <td class="ps-5 font-monospace text-muted">
-                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}">{{ $row['code'] }}</a>
-                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}" class="text-dark font-monospace-off">{{ $row['name'] }}</a>
+                                        <td class="ps-5 font-monospace text-muted fw-normal">
+                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}" class="text-muted">{{ $row['code'] }}</a>
+                                            <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['id'], 'period_id' => $period->id]) }}" class="text-muted font-monospace-off">{{ $row['name'] }}</a>
                                         </td>
-                                        <td class="text-end pe-4">{{ number_format($row['amount'], 2) }}</td>
+                                        <td class="text-end pe-4 text-muted fw-normal">{{ number_format($row['amount'], 2) }}</td>
                                     </tr>
                                 @empty
                                     <tr class="bs-detail-row d-none" data-group="asset-{{ $gi }}">
