@@ -64,10 +64,12 @@ class GoodsReceiptNoteService
                 $poItem = $poItemId ? PurchaseOrderItem::find($poItemId) : null;
 
                 $productId = $item['product_id'] ?? $poItem?->product_id;
-                if (!$productId) {
+                $isAssetOrExpense = $poItem && in_array($poItem->line_type, ['asset', 'expense'], true);
+
+                if (!$productId && !$isAssetOrExpense) {
                     throw new \InvalidArgumentException("Product ID is required for all receipt items.");
                 }
-                $product = \App\Domains\Inventory\Models\Product::find($productId);
+                $product = $productId ? \App\Domains\Inventory\Models\Product::find($productId) : null;
 
                 if ($poItem) {
                     $orderedQty = (float) $poItem->quantity;

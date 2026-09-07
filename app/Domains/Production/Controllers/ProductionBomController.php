@@ -135,7 +135,7 @@ class ProductionBomController extends Controller
                 'quantity' => $qty,
                 'scrap_percentage' => $item->material_scrap_percentage,
                 'gross_quantity' => $grossQty,
-                'uom_code' => $item->uom ? $item->uom->code : 'PCS',
+                'uom_code' => $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS',
                 'unit_cost' => $unitCost,
                 'total_cost' => $itemCost,
             ];

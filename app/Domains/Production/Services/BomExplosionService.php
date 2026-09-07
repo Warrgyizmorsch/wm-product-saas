@@ -11,7 +11,7 @@ class BomExplosionService
     /**
      * Explode a product BOM to compute multi-level material requirements.
      */
-    public function explode(int $productId, float $quantity, int $tenantId): array
+    public function explode(int $productId, float $quantity, int $tenantId, array $parameters = []): array
     {
         $product = Product::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
@@ -26,7 +26,7 @@ class BomExplosionService
         }
 
         $visited = [];
-        $tree = $this->calculate($product, $quantity, $tenantId, 1, $visited);
+        $tree = $this->calculate($product, $quantity, $tenantId, 1, $visited, null, $parameters);
         
         $flat = $this->generateRequirements($tree);
 
@@ -39,7 +39,7 @@ class BomExplosionService
     /**
      * Calculate explosion node for a given product at a specific level.
      */
-    protected function calculate(Product $product, float $quantity, int $tenantId, int $level, array $visited, ?int $forcedBomId = null): array
+    protected function calculate(Product $product, float $quantity, int $tenantId, int $level, array $visited, ?int $forcedBomId = null, array $parameters = []): array
     {
         if (isset($visited[$product->id])) {
             throw new InvalidArgumentException("Circular dependency loop detected: product '{$product->name}' (SKU: {$product->sku}) references itself.");
@@ -85,7 +85,7 @@ class BomExplosionService
             $node['is_phantom'] = ($bom->bom_type === 'phantom');
             $node['uom_code'] = $bom->baseUom ? $bom->baseUom->code : 'PCS';
 
-            $node['children'] = $this->resolveChildren($bom, $quantity, $tenantId, $level, $visited);
+            $node['children'] = $this->resolveChildren($bom, $quantity, $tenantId, $level, $visited, $parameters);
         }
 
         return $node;
@@ -94,14 +94,21 @@ class BomExplosionService
     /**
      * Resolve child items for a given BOM.
      */
-    protected function resolveChildren(ProductionBom $bom, float $parentQty, int $tenantId, int $level, array $visited): array
+    protected function resolveChildren(ProductionBom $bom, float $parentQty, int $tenantId, int $level, array $visited, array $parameters = []): array
     {
         $children = [];
         $baseQty = $bom->base_quantity > 0 ? $bom->base_quantity : 1.0;
         $multiplier = $parentQty / $baseQty;
+        $evaluator = app(BomFormulaEvaluatorService::class);
 
         foreach ($bom->items as $item) {
-            $netQty = $item->quantity * $multiplier;
+            if ($item->isFormula()) {
+                $unitQty = $evaluator->evaluate($item->formula, $parameters, $bom->product);
+            } else {
+                $unitQty = (float) $item->quantity;
+            }
+
+            $netQty = $unitQty * $multiplier;
             $grossQty = $this->applyScrap($netQty, $item->material_scrap_percentage);
 
             $childProduct = $item->material;
@@ -110,7 +117,7 @@ class BomExplosionService
             }
 
             // Recurse using calculate
-            $childTree = $this->calculate($childProduct, $grossQty, $tenantId, $level + 1, $visited, $item->child_bom_id);
+            $childTree = $this->calculate($childProduct, $grossQty, $tenantId, $level + 1, $visited, $item->child_bom_id, $parameters);
             
             $childTree['net_quantity'] = $netQty;
             $childTree['gross_quantity'] = $grossQty;
@@ -118,7 +125,7 @@ class BomExplosionService
             $childTree['is_alternative'] = $item->is_alternative;
             $childTree['alternative_group'] = $item->alternative_group;
             $childTree['priority'] = $item->priority;
-            $childTree['uom_code'] = $item->uom ? $item->uom->code : 'PCS';
+            $childTree['uom_code'] = $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS';
 
             $children[] = $childTree;
         }

@@ -53,6 +53,11 @@ Route::prefix('production')
         // ── Main Dashboard ────────────────────────────────────────────────────
         Route::get('dashboard', [ProductionDashboardController::class, 'index'])->name('dashboard');
 
+        // ── Planning Exceptions & Routing Variance ────────────────────────────
+        Route::get('variances', [\App\Domains\Production\Controllers\ProductionVarianceController::class, 'index'])->name('variances.index');
+        Route::get('orders/{order}/variance', [\App\Domains\Production\Controllers\ProductionVarianceController::class, 'show'])->name('orders.variance');
+        Route::post('variances/create-eco', [\App\Domains\Production\Controllers\ProductionVarianceController::class, 'createEco'])->name('variances.create-eco');
+
         // ── Tenant Subcontract Settings ───────────────────────────────────────
         Route::get('settings', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/subcontract', [\App\Domains\Production\Controllers\ProductionSettingsController::class, 'updateSubcontract'])->name('settings.subcontract.update');
@@ -87,6 +92,7 @@ Route::prefix('production')
         })->name('track-status');
 
         // ── BOM (Frozen) ──────────────────────────────────────────────────────
+        Route::post('boms/preview-formula', [\App\Domains\Production\Controllers\BomFormulaController::class, 'preview'])->name('boms.preview-formula');
         Route::get('boms/check-child/{productId}', [ProductionBomController::class, 'checkChildBom'])->name('boms.check-child');
         Route::post('boms/{bom}/create-revision', [ProductionBomController::class, 'createRevision'])->name('boms.create-revision');
         Route::post('boms/{bom}/submit', [ProductionBomController::class, 'submitApproval'])->name('boms.submit');
@@ -326,4 +332,21 @@ Route::prefix('production')
         Route::get('labels/batches/{id}', [LabelController::class, 'printBatch'])->name('labels.batches.print');
         Route::get('labels/serials/{id}', [LabelController::class, 'printSerial'])->name('labels.serials.print');
         Route::get('labels/products/{id}/sku', [LabelController::class, 'printProductSku'])->name('labels.products.sku');
+
+        // ── Engineering Change Management (ECO) ──────────────────────────────
+        Route::post('ecos/{id}/submit', [\App\Domains\Production\Controllers\ProductionEcoController::class, 'submit'])->name('ecos.submit');
+        Route::post('ecos/{id}/approve', [\App\Domains\Production\Controllers\ProductionEcoController::class, 'approve'])->name('ecos.approve');
+        Route::post('ecos/{id}/reject', [\App\Domains\Production\Controllers\ProductionEcoController::class, 'reject'])->name('ecos.reject');
+        Route::post('ecos/{id}/release', [\App\Domains\Production\Controllers\ProductionEcoController::class, 'release'])->name('ecos.release');
+        Route::post('ecos/{id}/close', [\App\Domains\Production\Controllers\ProductionEcoController::class, 'close'])->name('ecos.close');
+        Route::post('ecos/{id}/cancel', [\App\Domains\Production\Controllers\ProductionEcoController::class, 'cancel'])->name('ecos.cancel');
+        Route::resource('ecos', \App\Domains\Production\Controllers\ProductionEcoController::class);
+
+        // ── Parameterized BOM Formulas ────────────────────────────────────────
+        Route::post('boms/preview-formula', [\App\Domains\Production\Controllers\BomFormulaController::class, 'preview'])->name('boms.preview-formula');
+
+        // ── Planning Exceptions & At-Risk Orders ────────────────────────────────
+        Route::get('planning-exceptions', [\App\Domains\Production\Controllers\PlanningExceptionController::class, 'index'])->name('planning-exceptions.index');
+        Route::get('planning-exceptions/{order}', [\App\Domains\Production\Controllers\PlanningExceptionController::class, 'show'])->name('planning-exceptions.show');
+        Route::get('orders/{order}/risk-analysis', [\App\Domains\Production\Controllers\PlanningExceptionController::class, 'show'])->name('orders.risk-analysis');
     });

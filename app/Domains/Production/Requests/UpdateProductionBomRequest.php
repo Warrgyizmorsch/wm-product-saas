@@ -32,6 +32,8 @@ class UpdateProductionBomRequest extends FormRequest
             'items.*.material_id' => 'required|exists:products,id',
             'items.*.child_bom_id' => 'nullable|integer|exists:production_boms,id',
             'items.*.quantity' => 'required|numeric|gt:0',
+            'items.*.quantity_type' => 'nullable|string|in:fixed,formula',
+            'items.*.formula' => 'nullable|string|max:500',
             'items.*.uom_id' => 'required|exists:uoms,id',
             'items.*.material_scrap_percentage' => 'nullable|numeric|min:0|max:100',
             'items.*.is_alternative' => 'nullable',

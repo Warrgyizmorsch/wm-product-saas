@@ -203,7 +203,7 @@
                                     <span class="fw-bold {{ $product->total_stock <= $product->reorder_point ? 'text-danger' : 'text-success' }}">
                                         {{ number_format($product->total_stock, 0) }}
                                     </span>
-                                    <small class="text-muted">/ {{ $product->uom ? $product->uom->code : 'pcs' }}</small>
+                                    <small class="text-muted">/ {{ $product->uom?->code ?? 'pcs' }}</small>
                                     @if($product->total_stock <= $product->reorder_point)
                                         <i class="feather-alert-triangle text-danger ms-1" title="Below Reorder Point ({{ number_format($product->reorder_point, 0) }})"></i>
                                     @endif

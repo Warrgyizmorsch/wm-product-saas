@@ -113,7 +113,7 @@ class PlanningValidationService
                     $warnings[] = [
                         'type' => 'material_shortage',
                         'severity' => 'warning',
-                        'message' => "Material shortage for [{$req->product->sku} - {$req->product->name}]: Shortage of " . number_format($req->shortage_quantity, 2) . " " . ($req->uom ? $req->uom->code : 'PCS') . ".",
+                        'message' => "Material shortage for [{$req->product?->sku} - {$req->product?->name}]: Shortage of " . number_format($req->shortage_quantity, 2) . " " . ($req->uom?->code ?? $req->product?->uom?->code ?? 'PCS') . ".",
                     ];
                 }
             }

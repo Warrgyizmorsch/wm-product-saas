@@ -413,7 +413,7 @@ class ProductionBomService
                 'gross_quantity' => $grossQty,
                 'wastage_percentage' => $item->material_scrap_percentage, // compatibility fallback
                 'material_scrap_percentage' => $item->material_scrap_percentage,
-                'uom_code' => $item->uom ? $item->uom->code : 'PCS',
+                'uom_code' => $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS',
                 'is_alternative' => $item->is_alternative,
                 'alternative_group' => $item->alternative_group,
             ];

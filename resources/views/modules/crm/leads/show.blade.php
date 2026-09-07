@@ -893,7 +893,7 @@
                                                                     <a href="{{ route('inventory.products.show', $pObj) }}" class="text-dark hover-underline" target="_blank">{{ $pObj->name }}</a>
                                                                 </td>
                                                                 <td class="font-monospace text-muted">{{ $pObj->sku ?: '—' }}</td>
-                                                                <td class="text-center fw-bold text-primary">{{ number_format($pQty, 0) }} {{ $pObj->uom ? $pObj->uom->code : 'Pcs' }}</td>
+                                                                <td class="text-center fw-bold text-primary">{{ number_format($pQty, 0) }} {{ $pObj->uom?->code ?? 'Pcs' }}</td>
                                                                 <td class="text-end">₹{{ number_format($pPrice, 2) }}</td>
                                                                 <td class="text-end fw-bold text-success">₹{{ number_format($lineVal, 2) }}</td>
                                                             </tr>

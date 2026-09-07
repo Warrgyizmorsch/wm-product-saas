@@ -35,17 +35,12 @@
                 min-width: 0 !important;
             }
             .odoo-form-label {
-                width: 120px;
+                width: 130px;
                 flex-shrink: 0 !important;
                 font-size: 13px;
                 font-weight: 700;
                 color: #495057;
                 margin-bottom: 0;
-                padding-right: 6px;
-            }
-            .row .col-md-6 .odoo-form-label,
-            .row .col-6 .odoo-form-label {
-                width: 95px !important;
             }
             .odoo-form-control {
                 border: none;

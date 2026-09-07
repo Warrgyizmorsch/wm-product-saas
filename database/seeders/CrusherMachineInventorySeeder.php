@@ -25,14 +25,19 @@ class CrusherMachineInventorySeeder extends Seeder
         }
 
         // 1. Resolve or Create Warehouses
+        $company = DB::table('companies')->where('tenant_id', $tenant->id)->first();
+        $companyId = $company?->id;
+        $branch = DB::table('branches')->where('tenant_id', $tenant->id)->first();
+        $branchId = $branch?->id;
+
         $mainWh = Warehouse::firstOrCreate(
             ['tenant_id' => $tenant->id, 'code' => 'WH-MAIN'],
-            ['name' => 'Main Manufacturing Plant', 'address' => 'Plot 42, Heavy Industrial Area', 'is_default' => true, 'status' => 'active']
+            ['company_id' => $companyId, 'branch_id' => $branchId, 'name' => 'Main Manufacturing Plant', 'address' => 'Plot 42, Heavy Industrial Area', 'is_default' => true, 'status' => 'active']
         );
 
         $fgWh = Warehouse::firstOrCreate(
             ['tenant_id' => $tenant->id, 'code' => 'WH-FG'],
-            ['name' => 'Finished Machinery Yard', 'address' => 'Plot 45, Heavy Industrial Area', 'is_default' => false, 'status' => 'active']
+            ['company_id' => $companyId, 'branch_id' => $branchId, 'name' => 'Finished Machinery Yard', 'address' => 'Plot 45, Heavy Industrial Area', 'is_default' => false, 'status' => 'active']
         );
 
         // Remove extra FG if exists so only 1 main Finished Good remains
