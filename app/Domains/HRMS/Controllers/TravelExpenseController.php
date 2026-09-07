@@ -11,6 +11,7 @@ use App\Domains\HRMS\Models\CashAdvance;
 use App\Domains\HRMS\Models\ExpenseReport;
 use App\Domains\HRMS\Models\ExpenseClaim;
 use App\Http\Controllers\Controller;
+use App\Services\Access\AccessService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -230,6 +231,8 @@ class TravelExpenseController extends Controller
 
     public function approveTravelRequest(Request $request, TravelRequest $travelRequest): RedirectResponse
     {
+        $this->authorizeHrms('hrms.travel_expenses.approve');
+
         $approvedBudget = $request->input('approved_budget', $travelRequest->estimated_budget);
         
         $travelRequest->update([
@@ -255,6 +258,8 @@ class TravelExpenseController extends Controller
 
     public function rejectTravelRequest(TravelRequest $travelRequest): RedirectResponse
     {
+        $this->authorizeHrms('hrms.travel_expenses.approve');
+
         $travelRequest->update(['status' => 'rejected']);
         $travelRequest->cashAdvances()->where('status', 'pending')->update(['status' => 'rejected']);
         return redirect()->back()->with('success', 'Travel request and linked cash advance rejected.');
@@ -284,6 +289,8 @@ class TravelExpenseController extends Controller
 
     public function approveCashAdvance(Request $request, CashAdvance $cashAdvance): RedirectResponse
     {
+        $this->authorizeHrms('hrms.travel_expenses.approve');
+
         $approvedAmount = $request->input('approved_amount', $cashAdvance->amount);
         
         $cashAdvance->update([
@@ -296,6 +303,8 @@ class TravelExpenseController extends Controller
 
     public function disburseCashAdvance(CashAdvance $cashAdvance): RedirectResponse
     {
+        $this->authorizeHrms('hrms.travel_expenses.approve');
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $cashAdvance->update(['status' => 'disbursed']);
 
@@ -340,6 +349,8 @@ class TravelExpenseController extends Controller
 
     public function rejectCashAdvance(CashAdvance $cashAdvance): RedirectResponse
     {
+        $this->authorizeHrms('hrms.travel_expenses.approve');
+
         $cashAdvance->update(['status' => 'rejected']);
         return redirect()->back()->with('success', 'Cash advance request rejected.');
     }
@@ -711,6 +722,8 @@ class TravelExpenseController extends Controller
 
     public function approveExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
     {
+        $this->authorizeHrms('hrms.travel_expenses.approve');
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         // Check for itemized claim line decisions
@@ -926,12 +939,16 @@ class TravelExpenseController extends Controller
 
     public function rejectExpenseReport(ExpenseReport $expenseReport): RedirectResponse
     {
+        $this->authorizeHrms('hrms.travel_expenses.approve');
+
         $expenseReport->update(['status' => 'rejected']);
         return redirect()->back()->with('success', 'Expense report rejected.');
     }
 
     public function payExpenseReport(ExpenseReport $expenseReport): RedirectResponse
     {
+        $this->authorizeHrms('hrms.travel_expenses.approve');
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         DB::transaction(function () use ($expenseReport, $tenantId) {
@@ -1052,6 +1069,8 @@ class TravelExpenseController extends Controller
 
     public function saveExpensePolicy(Request $request): RedirectResponse
     {
+        $this->authorizeHrms('hrms.expense_policies.manage');
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -1088,6 +1107,8 @@ class TravelExpenseController extends Controller
 
     public function deleteExpensePolicy(ExpensePolicy $expensePolicy): RedirectResponse
     {
+        $this->authorizeHrms('hrms.expense_policies.manage');
+
         $expensePolicy->delete();
         return redirect()->route('hrms.penalization-policy.index', ['tab' => 'expense_rules'])
             ->with('success', 'Expense policy deleted successfully.');
@@ -1367,5 +1388,15 @@ class TravelExpenseController extends Controller
             'advance_adjusted'          => $adjusted,
             'net_reimbursement'         => $netReimbursement,
         ];
+    }
+
+    private function authorizeHrms(string $permission): void
+    {
+        abort_unless(
+            app(AccessService::class)->allows(auth()->user(), $permission, [
+                'tenant_id' => auth()->user()?->tenant_id,
+            ]),
+            403
+        );
     }
 }

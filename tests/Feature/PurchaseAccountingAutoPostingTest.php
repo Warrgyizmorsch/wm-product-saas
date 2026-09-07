@@ -64,6 +64,13 @@ class PurchaseAccountingAutoPostingTest extends TestCase
             'tenant_id' => $this->tenant->id,
         ]);
 
+        $purchaseManagerRole = Role::query()->whereNull('tenant_id')->where('slug', 'purchase_manager')->firstOrFail();
+        UserRole::create([
+            'user_id' => $this->user->id,
+            'role_id' => $purchaseManagerRole->id,
+            'tenant_id' => $this->tenant->id,
+        ]);
+
         $this->vendor = Vendor::create([
             'tenant_id' => $this->tenant->id,
             'name' => 'Acme Supplies',
@@ -433,6 +440,13 @@ class PurchaseAccountingAutoPostingTest extends TestCase
         UserRole::create([
             'user_id' => $otherUser->id,
             'role_id' => $inventoryManagerRole->id,
+            'tenant_id' => $otherTenant->id,
+        ]);
+
+        $purchaseManagerRole = Role::query()->whereNull('tenant_id')->where('slug', 'purchase_manager')->firstOrFail();
+        UserRole::create([
+            'user_id' => $otherUser->id,
+            'role_id' => $purchaseManagerRole->id,
             'tenant_id' => $otherTenant->id,
         ]);
 

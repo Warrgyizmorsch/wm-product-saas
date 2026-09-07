@@ -7,6 +7,7 @@ use App\Domains\Purchase\Repositories\VendorBillRepository;
 use App\Domains\Purchase\Services\VendorBillService;
 use App\Domains\Purchase\Models\GoodsReceiptNote;
 use App\Domains\Purchase\Models\PurchaseOrder;
+use App\Domains\Purchase\Models\VendorBill;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Purchase\Events\BillPosted;
@@ -51,6 +52,8 @@ class VendorBillController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', VendorBill::class);
+
         $tenantId = require_tenant_id();
         $bills = $this->billRepo->getPaginatedBills($request->all(), 15);
 
@@ -122,6 +125,8 @@ class VendorBillController extends Controller
 
     public function create(Request $request)
     {
+        $this->authorize('create', VendorBill::class);
+
         $tenantId = require_tenant_id();
 
         $grnId = $request->query('grn_id');
@@ -165,6 +170,8 @@ class VendorBillController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', VendorBill::class);
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
@@ -216,6 +223,9 @@ class VendorBillController extends Controller
     {
         $tenantId = require_tenant_id();
         $bill = $this->billRepo->findWithDetails($id);
+        if ($bill) {
+            $this->authorize('view', $bill);
+        }
         $availableAdvance = $bill ? $this->billService->getAvailableVendorAdvance($bill->vendor_id, $tenantId) : 0.0;
         return view('modules.purchase.bills.show', compact('bill', 'availableAdvance'));
     }
@@ -225,6 +235,7 @@ class VendorBillController extends Controller
         $tenantId = require_tenant_id();
         $bill = $this->billRepo->find($id);
         if (!$bill) abort(404);
+        $this->authorize('update', $bill);
 
         $res = $this->billService->applyAdvanceCredit($bill, $tenantId);
         if ($res) {
@@ -239,6 +250,9 @@ class VendorBillController extends Controller
     public function edit(int $id)
     {
         $bill = $this->billRepo->findWithDetails($id);
+        if ($bill) {
+            $this->authorize('update', $bill);
+        }
         return view('modules.purchase.bills.edit', compact('bill'));
     }
 
@@ -246,6 +260,7 @@ class VendorBillController extends Controller
     {
         $bill = $this->billRepo->find($id);
         if (!$bill) abort(404);
+        $this->authorize('update', $bill);
 
         $validated = $request->validate([
             'due_date' => 'required|date',
@@ -262,6 +277,7 @@ class VendorBillController extends Controller
     {
         $bill = $this->billRepo->find($id);
         if (!$bill) abort(404);
+        $this->authorize('update', $bill);
 
         $bill->delete();
 
@@ -390,6 +406,8 @@ class VendorBillController extends Controller
 
     public function storeService(Request $request)
     {
+        $this->authorize('create', VendorBill::class);
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([

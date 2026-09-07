@@ -22,12 +22,16 @@ class PurchaseOrderController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', PurchaseOrder::class);
+
         $orders = $this->orderRepo->getPaginatedOrders($request->all(), 10);
         return view('modules.purchase.orders.index', compact('orders'));
     }
 
     public function poApprovals(Request $request)
     {
+        $this->authorize('viewAny', PurchaseOrder::class);
+
         $orders = $this->orderRepo->getPaginatedOrders(array_merge($request->all(), ['status' => 'Draft']), 15);
         return view('modules.purchase.approvals.po-index', compact('orders'));
     }
@@ -40,6 +44,8 @@ class PurchaseOrderController extends Controller
 
     public function create(Request $request)
     {
+        $this->authorize('create', PurchaseOrder::class);
+
         $tenantId = require_tenant_id();
 
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
@@ -166,6 +172,8 @@ class PurchaseOrderController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', PurchaseOrder::class);
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
@@ -227,12 +235,14 @@ class PurchaseOrderController extends Controller
     public function show(int $id)
     {
         $order = $this->orderRepo->findWithDetails($id);
+        $this->authorize('view', $order);
         return view('modules.purchase.orders.show', compact('order'));
     }
 
     public function detailPartial(int $id)
     {
         $order = $this->orderRepo->findWithDetails($id);
+        $this->authorize('view', $order);
         return view('modules.purchase.orders.detail-partial', compact('order'));
     }
 
@@ -240,6 +250,7 @@ class PurchaseOrderController extends Controller
     {
         $tenantId = require_tenant_id();
         $order = $this->orderRepo->findWithDetails($id);
+        $this->authorize('update', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->route('purchase.orders.show', $id)
@@ -258,6 +269,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('update', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->route('purchase.orders.show', $id)
@@ -283,6 +295,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('approve', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->back()->with('error', 'Only Draft Purchase Orders can be confirmed.');
@@ -307,6 +320,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('reject', $order);
 
         if (in_array($order->status, ['Completed', 'Cancelled'])) {
             return redirect()->back()->with('error', 'This Purchase Order cannot be cancelled.');
@@ -327,6 +341,7 @@ class PurchaseOrderController extends Controller
     public function downloadPdf(int $id)
     {
         $order = $this->orderRepo->findWithDetails($id);
+        $this->authorize('view', $order);
         $pdf = Pdf::loadView('modules.purchase.orders.pdf', compact('order'));
         return $pdf->download("PO_{$order->po_number}.pdf");
     }
@@ -335,6 +350,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('delete', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->route('purchase.orders.show', $id)
@@ -381,6 +397,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('view', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->back()->with('error', 'Reminders can only be sent for pending Purchase Orders.');

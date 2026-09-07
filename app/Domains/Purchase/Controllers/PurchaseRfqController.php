@@ -27,6 +27,8 @@ class PurchaseRfqController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', PurchaseRfq::class);
+
         $data = $this->rfqRepo->getPaginatedRfqsData($request->all(), 10);
         return view('modules.purchase.rfqs.index', $data);
     }
@@ -60,6 +62,8 @@ class PurchaseRfqController extends Controller
 
     public function create(Request $request)
     {
+        $this->authorize('create', PurchaseRfq::class);
+
         $tenantId = require_tenant_id();
 
         $requisitions = PurchaseRequisition::where('tenant_id', $tenantId)
@@ -178,6 +182,8 @@ class PurchaseRfqController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', PurchaseRfq::class);
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
@@ -202,6 +208,7 @@ class PurchaseRfqController extends Controller
     {
         $tenantId = require_tenant_id();
         $rfq = $this->rfqRepo->findWithDetails($id);
+        $this->authorize('view', $rfq);
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
 
         return view('modules.purchase.rfqs.show', compact('rfq', 'warehouses'));
@@ -211,6 +218,7 @@ class PurchaseRfqController extends Controller
     {
         $tenantId = require_tenant_id();
         $rfq = $this->rfqRepo->findWithDetails($id);
+        $this->authorize('update', $rfq);
 
         if ($rfq->status !== 'Draft') {
             return redirect()->route('purchase.rfqs.show', $id)
@@ -229,6 +237,7 @@ class PurchaseRfqController extends Controller
         $tenantId = require_tenant_id();
         $rfq = $this->rfqRepo->find($id);
         if (!$rfq) abort(404);
+        $this->authorize('update', $rfq);
 
         if ($rfq->status !== 'Draft') {
             return redirect()->route('purchase.rfqs.show', $id)
@@ -264,6 +273,7 @@ class PurchaseRfqController extends Controller
         $tenantId = require_tenant_id();
         $rfq = $this->rfqRepo->find($id);
         if (!$rfq) abort(404);
+        $this->authorize('update', $rfq);
 
         $validated = $request->validate([
             'quotes' => 'required|array',
@@ -308,6 +318,7 @@ class PurchaseRfqController extends Controller
     {
         $rfq = $this->rfqRepo->find($id);
         if (!$rfq) abort(404);
+        $this->authorize('update', $rfq);
 
         $this->rfqRepo->update($rfq, ['status' => 'Sent']);
 
@@ -319,6 +330,7 @@ class PurchaseRfqController extends Controller
     {
         $rfq = $this->rfqRepo->find($id);
         if (!$rfq) abort(404);
+        $this->authorize('update', $rfq);
 
         $this->rfqRepo->update($rfq, ['status' => 'Confirmed']);
 
@@ -336,6 +348,7 @@ class PurchaseRfqController extends Controller
         $tenantId = require_tenant_id();
         $rfq = $this->rfqRepo->findWithDetails($id);
         if (!$rfq) abort(404);
+        $this->authorize('update', $rfq);
 
         $vendorsData = $request->input('vendors', []);
         $quotesData = $request->input('vendor_quotes', []);
@@ -448,6 +461,7 @@ class PurchaseRfqController extends Controller
         $tenantId = require_tenant_id();
         $rfq = $this->rfqRepo->find($id);
         if (!$rfq) abort(404);
+        $this->authorize('update', $rfq);
 
         $validated = $request->validate([
             'vendor_id' => 'required|integer|exists:vendors,id',
@@ -548,6 +562,7 @@ class PurchaseRfqController extends Controller
     {
         $rfq = $this->rfqRepo->find($id);
         if (!$rfq) abort(404);
+        $this->authorize('delete', $rfq);
 
         if ($rfq->status !== 'Draft') {
             return redirect()->route('purchase.rfqs.show', $id)

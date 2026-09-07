@@ -9,6 +9,9 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Purchase\Models\PurchaseRequisition;
 use App\Domains\Purchase\Models\PurchaseOrder;
+use App\Models\Access\Role;
+use App\Models\Access\UserRole;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,6 +41,14 @@ class PurchaseOrderTest extends TestCase
             'name' => 'Buyer',
             'email' => 'buyer@example.com',
             'password' => bcrypt('password'),
+        ]);
+
+        $this->seed(RbacSeeder::class);
+        $purchaseManagerRole = Role::query()->whereNull('tenant_id')->where('slug', 'purchase_manager')->firstOrFail();
+        UserRole::create([
+            'user_id' => $this->user->id,
+            'role_id' => $purchaseManagerRole->id,
+            'tenant_id' => $this->tenant->id,
         ]);
 
         $this->vendor = Vendor::create([

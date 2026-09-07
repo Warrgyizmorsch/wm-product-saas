@@ -58,12 +58,16 @@ class GoodsReceiptNoteController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', GoodsReceiptNote::class);
+
         $grns = $this->grnRepo->getPaginatedGrns($request->all(), 15);
         return view('modules.purchase.grns.index', compact('grns'));
     }
 
     public function create(Request $request)
     {
+        $this->authorize('create', GoodsReceiptNote::class);
+
         $tenantId = require_tenant_id();
 
         $approvedOrders = PurchaseOrder::where('tenant_id', $tenantId)
@@ -180,6 +184,8 @@ class GoodsReceiptNoteController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', GoodsReceiptNote::class);
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
@@ -221,6 +227,7 @@ class GoodsReceiptNoteController extends Controller
     public function show($id)
     {
         $grn = $this->grnRepo->findWithDetails($id);
+        $this->authorize('view', $grn);
         return view('modules.purchase.grns.show', compact('grn'));
     }
 
@@ -228,6 +235,7 @@ class GoodsReceiptNoteController extends Controller
     {
         $tenantId = require_tenant_id();
         $grn = $this->grnRepo->findWithDetails($id);
+        $this->authorize('view', $grn);
 
         if ($grn->status !== 'Draft') {
             return redirect()->route('purchase.grns.show', $grn->id)->with('error', 'Approved or Cancelled GRNs cannot be edited.');
@@ -250,6 +258,7 @@ class GoodsReceiptNoteController extends Controller
     {
         $grn = $this->grnRepo->find($id);
         if (!$grn) abort(404);
+        $this->authorize('update', $grn);
 
         if ($grn->status !== 'Draft') {
             return redirect()->route('purchase.grns.show', $grn->id)->with('error', 'Only Draft GRNs can be updated.');
@@ -272,6 +281,7 @@ class GoodsReceiptNoteController extends Controller
     {
         $grn = $this->grnRepo->find($id);
         if (!$grn) abort(404);
+        $this->authorize('approve', $grn);
 
         if ($grn->status !== 'Draft') {
             return redirect()->back()->with('error', 'Only Draft GRNs can be approved.');
@@ -296,6 +306,7 @@ class GoodsReceiptNoteController extends Controller
     {
         $grn = $this->grnRepo->find($id);
         if (!$grn) abort(404);
+        $this->authorize('delete', $grn);
 
         if ($grn->status !== 'Draft') {
             return redirect()->back()->with('error', 'Only Draft GRNs can be deleted.');

@@ -31,6 +31,8 @@ class EmployeeExitController extends Controller
 
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', EmployeeExit::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $activeTab = $request->input('tab', 'exits');
         $search = $request->input('search');
@@ -142,6 +144,8 @@ class EmployeeExitController extends Controller
 
     public function initiate(Request $request): RedirectResponse
     {
+        $this->authorize('create', EmployeeExit::class);
+
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'separation_type' => 'required|string|in:resignation,termination,retirement,layoff,contract_end,absconding',
@@ -201,6 +205,8 @@ class EmployeeExitController extends Controller
      */
     public function storeClearanceTemplate(Request $request): RedirectResponse
     {
+        $this->authorize('approve', EmployeeExit::class);
+
         $validated = $request->validate([
             'company_id' => 'nullable|exists:companies,id',
             'clearance_category' => 'required|string|max:100',
@@ -236,6 +242,8 @@ class EmployeeExitController extends Controller
      */
     public function updateClearanceTemplate(Request $request, ExitClearanceTemplate $template): RedirectResponse
     {
+        $this->authorize('approve', EmployeeExit::class);
+
         $validated = $request->validate([
             'company_id' => 'nullable|exists:companies,id',
             'clearance_category' => 'required|string|max:100',
@@ -268,6 +276,8 @@ class EmployeeExitController extends Controller
      */
     public function destroyClearanceTemplate(ExitClearanceTemplate $template): RedirectResponse
     {
+        $this->authorize('approve', EmployeeExit::class);
+
         $name = $template->item_name;
         $companyId = $template->company_id;
         $template->delete();
@@ -280,6 +290,8 @@ class EmployeeExitController extends Controller
      */
     public function resetClearanceTemplates(Request $request): RedirectResponse
     {
+        $this->authorize('approve', EmployeeExit::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $companyId = $request->input('company_id') ? (int) $request->input('company_id') : null;
 
@@ -293,6 +305,8 @@ class EmployeeExitController extends Controller
      */
     public function storeAdhocExitClearance(Request $request, EmployeeExit $exit): RedirectResponse
     {
+        $this->authorize('approve', $exit);
+
         $validated = $request->validate([
             'clearance_category' => 'required|string|max:100',
             'item_name' => 'required|string|max:255',
@@ -310,6 +324,8 @@ class EmployeeExitController extends Controller
      */
     public function destroyExitClearance(EmployeeExitClearance $clearance): RedirectResponse
     {
+        $this->authorize('approve', EmployeeExit::class);
+
         $exit = $clearance->exit;
         $itemName = $clearance->item_name;
         $clearance->delete();
@@ -325,6 +341,8 @@ class EmployeeExitController extends Controller
 
     public function approve(Request $request, EmployeeExit $exit): RedirectResponse
     {
+        $this->authorize('approve', $exit);
+
         $validated = $request->validate([
             'approved_lwd' => 'required|date',
             'notice_action' => 'required|string|in:serve,recover,waive',
@@ -349,6 +367,8 @@ class EmployeeExitController extends Controller
 
     public function updateClearance(Request $request, EmployeeExitClearance $clearance): RedirectResponse
     {
+        $this->authorize('approve', EmployeeExit::class);
+
         $validated = $request->validate([
             'status' => 'required|string|in:pending,cleared,waived,rejected,issues_found',
             'remarks' => 'nullable|string|max:500',
@@ -375,6 +395,8 @@ class EmployeeExitController extends Controller
 
     public function updateDepartmentClearances(Request $request, EmployeeExit $exit, string $department): RedirectResponse
     {
+        $this->authorize('approve', $exit);
+
         $validated = $request->validate([
             'clearances' => 'required|array',
             'clearances.*.status' => 'required|string|in:pending,cleared,waived,rejected,issues_found',
@@ -404,6 +426,8 @@ class EmployeeExitController extends Controller
 
     public function returnAssetDirect(Request $request, EmployeeExit $exit, Asset $asset): RedirectResponse
     {
+        $this->authorize('approve', $exit);
+
         $validated = $request->validate([
             'condition' => 'required|string|in:good,damaged,lost',
             'damage_deduction' => 'nullable|numeric|min:0',
@@ -483,6 +507,8 @@ class EmployeeExitController extends Controller
 
     public function recalculateFnF(Request $request, EmployeeExit $exit): RedirectResponse
     {
+        $this->authorize('approve', $exit);
+
         $computedFnF = $this->fnfService->calculateFnF($exit);
         $this->fnfService->saveSettlement($exit, $computedFnF);
 
@@ -491,6 +517,8 @@ class EmployeeExitController extends Controller
 
     public function finalizeFnF(Request $request, EmployeeExit $exit): RedirectResponse
     {
+        $this->authorize('approve', $exit);
+
         $clearanceProgress = $exit->getClearanceProgressPercentage();
         $isClearanceIncomplete = $clearanceProgress < 100;
 

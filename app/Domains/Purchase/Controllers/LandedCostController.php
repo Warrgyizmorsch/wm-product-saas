@@ -7,6 +7,7 @@ use App\Domains\Purchase\Models\GoodsReceiptNote;
 use App\Domains\Purchase\Repositories\LandedCostRepository;
 use App\Domains\Purchase\Services\LandedCostService;
 use App\Http\Controllers\Controller;
+use App\Services\Access\AccessService;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 
@@ -19,6 +20,8 @@ class LandedCostController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorizePurchase('purchase.landed_costs.view');
+
         $tenantId = require_tenant_id();
         $landedCosts = $this->landedCostRepo->getPaginatedVouchers($tenantId, $request->all(), 15);
 
@@ -27,6 +30,8 @@ class LandedCostController extends Controller
 
     public function create()
     {
+        $this->authorizePurchase('purchase.landed_costs.create');
+
         $tenantId = require_tenant_id();
         $grns = GoodsReceiptNote::where('tenant_id', $tenantId)
             ->where('status', 'Approved')
@@ -57,6 +62,8 @@ class LandedCostController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizePurchase('purchase.landed_costs.create');
+
         $request->validate([
             'voucher_date' => 'required|date',
             'grn_ids' => 'required|array|min:1',
@@ -87,6 +94,8 @@ class LandedCostController extends Controller
 
     public function show(int $id)
     {
+        $this->authorizePurchase('purchase.landed_costs.view');
+
         $tenantId = require_tenant_id();
         $voucher = $this->landedCostRepo->findById($tenantId, $id);
 
@@ -99,6 +108,8 @@ class LandedCostController extends Controller
 
     public function post(int $id)
     {
+        $this->authorizePurchase('purchase.landed_costs.post');
+
         $tenantId = require_tenant_id();
 
         try {
@@ -113,6 +124,8 @@ class LandedCostController extends Controller
 
     public function destroy(int $id)
     {
+        $this->authorizePurchase('purchase.landed_costs.delete');
+
         $tenantId = require_tenant_id();
 
         try {
@@ -135,5 +148,15 @@ class LandedCostController extends Controller
 
         $items = $this->landedCostService->previewGrnItems($tenantId, array_map('intval', (array) $grnIds));
         return response()->json(['items' => $items]);
+    }
+
+    private function authorizePurchase(string $permission): void
+    {
+        abort_unless(
+            app(AccessService::class)->allows(auth()->user(), $permission, [
+                'tenant_id' => auth()->user()?->tenant_id,
+            ]),
+            403
+        );
     }
 }

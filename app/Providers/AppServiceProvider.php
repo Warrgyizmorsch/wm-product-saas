@@ -495,6 +495,32 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Inventory\Policies\UomPolicy::class
         );
 
+        // ── Purchase Policies ─────────────────────────────────────────────────
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Purchase\Models\PurchaseOrder::class,
+            \App\Domains\Purchase\Policies\PurchaseOrderPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Purchase\Models\PurchaseRequisition::class,
+            \App\Domains\Purchase\Policies\PurchaseRequisitionPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Purchase\Models\PurchaseRfq::class,
+            \App\Domains\Purchase\Policies\PurchaseRfqPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Purchase\Models\GoodsReceiptNote::class,
+            \App\Domains\Purchase\Policies\GoodsReceiptNotePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Purchase\Models\VendorBill::class,
+            \App\Domains\Purchase\Policies\VendorBillPolicy::class
+        );
+
         // ── Sales Policies ─────────────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Sales\Models\SalesOrder::class,
@@ -586,6 +612,27 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Accounting\Models\TaxRate::class,
             \App\Domains\Accounting\Policies\TaxRatePolicy::class
+        );
+
+        // ── HRMS Policies ────────────────────────────────────────────────────
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\PayrollRun::class,
+            \App\Domains\HRMS\Policies\PayrollRunPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\SalaryStructure::class,
+            \App\Domains\HRMS\Policies\SalaryStructurePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\EmployeeExit::class,
+            \App\Domains\HRMS\Policies\EmployeeExitPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Asset::class,
+            \App\Domains\HRMS\Policies\AssetPolicy::class
         );
 
         // ── Access (RBAC admin) Policies ──────────────────────────────────────

@@ -4,33 +4,39 @@ namespace App\Domains\Purchase\Policies;
 
 use App\Domains\Purchase\Models\VendorBill;
 use App\Models\User;
-use Illuminate\Auth\Access\HandlesAuthorization;
+use App\Services\Access\AccessService;
 
 class VendorBillPolicy
 {
-    use HandlesAuthorization;
+    public function __construct(private readonly AccessService $access)
+    {
+    }
 
     public function viewAny(User $user): bool
     {
-        return $user->hasPermission('purchase.bills.view')
-            || $user->hasPermission('accounting.bills.view');
+        return $this->access->allows($user, 'purchase.bills.view', [
+            'tenant_id' => $user->tenant_id,
+        ]);
     }
 
     public function view(User $user, VendorBill $bill): bool
     {
-        return $user->hasPermission('purchase.bills.view')
-            || $user->hasPermission('accounting.bills.view');
+        return $this->access->allows($user, 'purchase.bills.view', [
+            'tenant_id' => $bill->tenant_id,
+        ]);
     }
 
     public function create(User $user): bool
     {
-        return $user->hasPermission('purchase.bills.create')
-            || $user->hasPermission('accounting.bills.create');
+        return $this->access->allows($user, 'purchase.bills.create', [
+            'tenant_id' => $user->tenant_id,
+        ]);
     }
 
     public function update(User $user, VendorBill $bill): bool
     {
-        return $user->hasPermission('purchase.bills.edit')
-            || $user->hasPermission('accounting.bills.edit');
+        return $this->access->allows($user, 'purchase.bills.edit', [
+            'tenant_id' => $bill->tenant_id,
+        ]);
     }
 }

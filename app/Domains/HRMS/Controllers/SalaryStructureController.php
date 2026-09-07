@@ -17,6 +17,8 @@ class SalaryStructureController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', SalaryStructure::class);
+
         $data = $this->salaryStructureRepository->getIndexData($request->all());
 
         return view('modules.hrms.salary-structure.index', $data);
@@ -24,6 +26,8 @@ class SalaryStructureController extends Controller
 
     public function storeStructure(Request $request)
     {
+        $this->authorize('create', SalaryStructure::class);
+
         $rules = [
             'pay_group_id' => 'nullable|exists:pay_groups,id',
             'name' => 'required|string|max:255',
@@ -54,6 +58,8 @@ class SalaryStructureController extends Controller
 
     public function updateStructure(Request $request, SalaryStructure $salaryStructure)
     {
+        $this->authorize('update', $salaryStructure);
+
         $rules = [
             'name' => 'required|string|max:255',
             'min_ctc' => 'required|numeric|min:0',
@@ -75,6 +81,8 @@ class SalaryStructureController extends Controller
 
     public function destroyStructure(SalaryStructure $salaryStructure)
     {
+        $this->authorize('delete', $salaryStructure);
+
         $payGroupId = $salaryStructure->pay_group_id;
         $this->salaryStructureRepository->destroyStructure($salaryStructure);
 
@@ -88,6 +96,8 @@ class SalaryStructureController extends Controller
 
     public function storeComponent(Request $request)
     {
+        $this->authorize('create', SalaryStructure::class);
+
         $rules = [
             'pay_group_id' => 'nullable|exists:pay_groups,id',
             'name' => 'required|string|max:255',
@@ -125,6 +135,8 @@ class SalaryStructureController extends Controller
 
     public function updateComponent(Request $request, SalaryComponent $salaryComponent)
     {
+        $this->authorize('update', SalaryStructure::class);
+
         $rules = [
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50',
@@ -154,6 +166,8 @@ class SalaryStructureController extends Controller
 
     public function destroyComponent(SalaryComponent $salaryComponent)
     {
+        $this->authorize('delete', SalaryStructure::class);
+
         $payGroupId = $salaryComponent->pay_group_id;
         $isAdhoc = $salaryComponent->is_adhoc;
 
@@ -174,6 +188,8 @@ class SalaryStructureController extends Controller
 
     public function storePayGroup(Request $request)
     {
+        $this->authorize('create', SalaryStructure::class);
+
         $validated = $request->validate([
             'name'        => 'required|max:255',
             'company_id'  => 'nullable|integer|exists:companies,id',
@@ -195,6 +211,8 @@ class SalaryStructureController extends Controller
 
     public function updatePayGroup(Request $request, PayGroup $payGroup)
     {
+        $this->authorize('update', SalaryStructure::class);
+
         $validated = $request->validate([
             'name'        => 'required|max:255',
             'company_id'  => 'nullable|integer|exists:companies,id',
@@ -216,6 +234,8 @@ class SalaryStructureController extends Controller
 
     public function updatePayGroupRules(Request $request, PayGroup $payGroup)
     {
+        $this->authorize('update', SalaryStructure::class);
+
         // Checkboxes return nothing if unchecked, so we merge explicit booleans
         $request->merge([
             'enable_pf'              => $request->has('enable_pf'),
@@ -247,6 +267,8 @@ class SalaryStructureController extends Controller
 
     public function destroyPayGroup(PayGroup $payGroup)
     {
+        $this->authorize('delete', SalaryStructure::class);
+
         $payGroup->delete();
 
         return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay group deleted successfully.');

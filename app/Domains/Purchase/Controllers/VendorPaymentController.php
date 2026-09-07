@@ -7,6 +7,7 @@ use App\Domains\Purchase\Repositories\VendorPaymentRepository;
 use App\Domains\Purchase\Repositories\VendorBillRepository;
 use App\Domains\Purchase\Services\VendorPaymentService;
 use App\Domains\Inventory\Models\Vendor;
+use App\Services\Access\AccessService;
 use Illuminate\Http\Request;
 
 class VendorPaymentController extends Controller
@@ -19,12 +20,16 @@ class VendorPaymentController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorizePurchase('purchase.payments.view');
+
         $payments = $this->paymentRepo->getPaginatedPayments($request->all(), 10);
         return view('modules.purchase.payments.index', compact('payments'));
     }
 
     public function create(Request $request)
     {
+        $this->authorizePurchase('purchase.payments.create');
+
         $tenantId = require_tenant_id();
 
         $billId = $request->query('bill_id') ?? $request->query('vendor_bill_id');
@@ -55,6 +60,8 @@ class VendorPaymentController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizePurchase('purchase.payments.create');
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
@@ -82,6 +89,8 @@ class VendorPaymentController extends Controller
 
     public function show(int $id)
     {
+        $this->authorizePurchase('purchase.payments.view');
+
         $payment = $this->paymentRepo->find($id);
         if (!$payment) abort(404);
 
@@ -91,6 +100,8 @@ class VendorPaymentController extends Controller
 
     public function edit(int $id)
     {
+        $this->authorizePurchase('purchase.payments.edit');
+
         $payment = $this->paymentRepo->find($id);
         if (!$payment) abort(404);
         return view('modules.purchase.payments.edit', compact('payment'));
@@ -98,6 +109,8 @@ class VendorPaymentController extends Controller
 
     public function update(Request $request, int $id)
     {
+        $this->authorizePurchase('purchase.payments.edit');
+
         $payment = $this->paymentRepo->find($id);
         if (!$payment) abort(404);
 
@@ -113,6 +126,8 @@ class VendorPaymentController extends Controller
 
     public function destroy(int $id)
     {
+        $this->authorizePurchase('purchase.payments.delete');
+
         $payment = $this->paymentRepo->find($id);
         if (!$payment) abort(404);
 
@@ -120,5 +135,15 @@ class VendorPaymentController extends Controller
 
         return redirect()->route('purchase.payments.index')
             ->with('success', 'Payment deleted successfully.');
+    }
+
+    private function authorizePurchase(string $permission): void
+    {
+        abort_unless(
+            app(AccessService::class)->allows(auth()->user(), $permission, [
+                'tenant_id' => auth()->user()?->tenant_id,
+            ]),
+            403
+        );
     }
 }

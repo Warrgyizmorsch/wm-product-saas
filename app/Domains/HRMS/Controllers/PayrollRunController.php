@@ -23,6 +23,8 @@ class PayrollRunController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', PayrollRun::class);
+
         // Automatically run migrations to ensure schema is up-to-date
         \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
 
@@ -211,6 +213,8 @@ class PayrollRunController extends Controller
 
     public function storeRun(Request $request)
     {
+        $this->authorize('create', PayrollRun::class);
+
         $validated = $request->validate([
             'payroll_month' => 'required|string|regex:/^\d{4}-\d{2}$/',
             'pay_group_id'  => 'nullable|exists:pay_groups,id',
@@ -287,6 +291,8 @@ class PayrollRunController extends Controller
 
     public function lockRun(PayrollRun $run)
     {
+        $this->authorize('approve', $run);
+
         $pending = $this->getPendingIssues($run);
         if ($pending['total'] > 0) {
             return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
@@ -299,6 +305,8 @@ class PayrollRunController extends Controller
 
     public function resolvePending(Request $request, PayrollRun $run)
     {
+        $this->authorize('approve', $run);
+
         $validated = $request->validate([
             'resolution_action' => 'required|string|in:approve_all,reject_all',
         ]);
@@ -446,6 +454,8 @@ class PayrollRunController extends Controller
 
     public function releasePayouts(PayrollRun $run)
     {
+        $this->authorize('process', $run);
+
         $run->update(['status' => 'paid']);
         
         // Also update any pending retro adjustments inside this month to 'processed'
@@ -605,6 +615,8 @@ class PayrollRunController extends Controller
 
     public function toggleHold(Request $request, Employee $employee, string $month)
     {
+        $this->authorize('approve', PayrollRun::class);
+
         $hold = PayrollHold::where('employee_id', $employee->id)
             ->where('payroll_month', $month)
             ->first();
@@ -713,6 +725,8 @@ class PayrollRunController extends Controller
 
     public function storeBulkAdhoc(Request $request)
     {
+        $this->authorize('create', PayrollRun::class);
+
         $validated = $request->validate([
             'salary_component_id' => 'required|exists:salary_components,id',
             'payroll_month'       => 'required|string',
@@ -757,6 +771,8 @@ class PayrollRunController extends Controller
 
     public function exportBankFile(PayrollRun $run)
     {
+        $this->authorize('viewAny', PayrollRun::class);
+
         $fileName = 'bank_transfer_' . $run->payroll_month . '.xlsx';
         return Excel::download(new PayrollBankExport($run), $fileName);
     }
