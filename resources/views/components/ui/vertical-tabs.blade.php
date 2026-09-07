@@ -53,18 +53,24 @@
 
 <div class="nav flex-column nav-pills erp-vertical-tabs" id="{{ $id }}" role="tablist" aria-orientation="vertical" {{ $attributes }}>
     @foreach($tabs as $tab)
-        <button class="nav-link {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
-                id="{{ $tab['id'] }}-tab" 
-                data-bs-toggle="pill" 
-                data-bs-target="#{{ $tab['id'] }}" 
-                type="button" 
-                role="tab" 
-                aria-controls="{{ $tab['id'] }}" 
-                aria-selected="{{ ($tab['active'] ?? false) ? 'true' : 'false' }}">
-            @if(!empty($tab['icon']))
-                <i class="{{ $tab['icon'] }} me-2"></i>
-            @endif
-            <span>{{ $tab['label'] }}</span>
-        </button>
+        @if(!empty($tab['is_header']) || !empty($tab['header']))
+            <div class="px-2 pt-3 pb-1 fw-extrabold mb-2 mt-1" style="letter-spacing: 0.08em; font-size: 9px; font-weight: 800; color: #475569; border-bottom: 1.5px solid #cbd5e1 !important;">
+                {{ $tab['header'] ?? $tab['label'] }}
+            </div>
+        @else
+            <button class="nav-link {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
+                    id="{{ $tab['id'] }}-tab" 
+                    data-bs-toggle="pill" 
+                    data-bs-target="#{{ $tab['id'] }}" 
+                    type="button" 
+                    role="tab" 
+                    aria-controls="{{ $tab['id'] }}" 
+                    aria-selected="{{ ($tab['active'] ?? false) ? 'true' : 'false' }}">
+                @if(!empty($tab['icon']))
+                    <i class="{{ $tab['icon'] }} me-2"></i>
+                @endif
+                <span>{{ $tab['label'] }}</span>
+            </button>
+        @endif
     @endforeach
 </div>

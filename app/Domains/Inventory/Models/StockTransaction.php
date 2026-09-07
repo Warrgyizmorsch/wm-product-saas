@@ -45,7 +45,7 @@ class StockTransaction extends BaseModel
 
     public function warehouse(): BelongsTo
     {
-        return $this->belongsTo(Warehouse::class, 'warehouse_id');
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withoutGlobalScopes();
     }
 
     public function batch(): BelongsTo

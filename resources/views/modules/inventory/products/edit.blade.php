@@ -294,6 +294,10 @@
 
                                 <x-ui.odoo-form-ui type="input" label="Reorder Point" name="reorder_point" value="{{ $product->reorder_point }}" inputType="number" placeholder="Alert limit when stock falls below" />
 
+                                <x-ui.odoo-form-ui type="input" label="Minimum Order Quantity (MOQ)" name="minimum_order_qty" value="{{ old('minimum_order_qty', $product->minimum_order_qty ?? 1) }}" inputType="number" step="0.0001" placeholder="Minimum lot size for procurement/MRP" />
+
+                                <x-ui.odoo-form-ui type="input" label="Order Multiple" name="order_multiple" value="{{ old('order_multiple', $product->order_multiple ?? 1) }}" inputType="number" step="0.0001" placeholder="Pack size / Order increment multiple" />
+
                                 <x-ui.odoo-form-ui type="select" label="Inventory Valuation Method" name="inventory_valuation_method" required="true">
                                     <option value="FIFO" {{ ($product->inventory_valuation_method ?? 'FIFO') === 'FIFO' ? 'selected' : '' }}>FIFO (First-In, First-Out)</option>
                                     <option value="Weighted Average" {{ ($product->inventory_valuation_method ?? '') === 'Weighted Average' ? 'selected' : '' }}>Weighted Average</option>

@@ -183,6 +183,11 @@ class ProductionOrderOperation extends BaseModel
         return $this->belongsTo(WorkCenter::class, 'work_center_id');
     }
 
+    public function reworks(): HasMany
+    {
+        return $this->hasMany(ProductionOrderRework::class, 'production_order_operation_id');
+    }
+
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');

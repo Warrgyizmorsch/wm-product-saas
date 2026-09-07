@@ -145,6 +145,11 @@ class TableManufacturingProductSeeder extends Seeder
     {
         $warehouses = [];
 
+        $company = DB::table('companies')->where('tenant_id', $tenantId)->first();
+        $companyId = $company?->id;
+        $branch = DB::table('branches')->where('tenant_id', $tenantId)->first();
+        $branchId = $branch?->id;
+
         $whList = [
             [
                 'name' => 'Central Raw Material Store',
@@ -167,6 +172,8 @@ class TableManufacturingProductSeeder extends Seeder
             $wh = Warehouse::firstOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $w['code']],
                 [
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'name' => $w['name'],
                     'type' => $w['type'],
                     'status' => 'active',

@@ -39,6 +39,6 @@ class ProductWarehouseStock extends BaseModel
 
     public function warehouse(): BelongsTo
     {
-        return $this->belongsTo(Warehouse::class);
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withoutGlobalScopes();
     }
 }

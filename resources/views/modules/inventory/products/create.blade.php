@@ -275,6 +275,10 @@
 
                                 <x-ui.odoo-form-ui type="input" label="Reorder Point" name="reorder_point" :value="old('reorder_point')" inputType="number" placeholder="Alert limit when stock falls below" :errorText="$errors->first('reorder_point')" />
 
+                                <x-ui.odoo-form-ui type="input" label="Minimum Order Quantity (MOQ)" name="minimum_order_qty" :value="old('minimum_order_qty')" inputType="number" placeholder="Min qty per purchase/manufacturing lot" :errorText="$errors->first('minimum_order_qty')" />
+
+                                <x-ui.odoo-form-ui type="input" label="Order Multiple" name="order_multiple" :value="old('order_multiple')" inputType="number" placeholder="Order batch increment multiple" :errorText="$errors->first('order_multiple')" />
+
                                 <x-ui.odoo-form-ui type="select" label="Inventory Valuation Method" name="inventory_valuation_method" required="true">
                                     <option value="FIFO" selected>FIFO (First-In, First-Out)</option>
                                     <option value="Weighted Average">Weighted Average</option>

@@ -58,7 +58,7 @@
                                 <span class="text-muted fs-11 text-uppercase d-block">{{ __('inventory.stock_on_hand') }}</span>
                                 <h4 class="fw-bold text-dark mb-0">
                                     {{ number_format($product->total_stock, 0) }}
-                                    <span class="fs-12 fw-normal text-muted">{{ $product->uom ? $product->uom->code : 'pcs' }}</span>
+                                    <span class="fs-12 fw-normal text-muted">{{ $product->uom?->code ?? 'pcs' }}</span>
                                 </h4>
                             </div>
                             <div class="border-start ps-4">
@@ -146,7 +146,7 @@
                                     <tbody>
                                         <tr>
                                             <td class="text-muted" style="width: 160px;">{{ __('inventory.unit_of_measure') }}</td>
-                                            <td class="fw-semibold">{{ $product->uom ? $product->uom->name . ' (' . $product->uom->code . ')' : '—' }}</td>
+                                            <td class="fw-semibold">{{ $product->uom ? ($product->uom->name . ' (' . $product->uom->code . ')') : '—' }}</td>
                                         </tr>
                                         @php
                                             $typeMap = [
@@ -205,17 +205,29 @@
                                             <td class="text-muted">Reorder Point</td>
                                             <td class="fw-semibold">
                                                 @if($product->reorder_point)
-                                                    {{ number_format($product->reorder_point, 0) }} {{ $product->uom ? $product->uom->code : 'pcs' }}
+                                                    {{ number_format($product->reorder_point, 0) }} {{ $product->uom?->code ?? 'pcs' }}
                                                 @else
                                                     —
                                                 @endif
                                             </td>
                                         </tr>
                                         <tr>
+                                            <td class="text-muted">Minimum Order Qty (MOQ)</td>
+                                            <td class="fw-semibold">
+                                                {{ number_format($product->minimum_order_qty ?? 1, 2) }} {{ $product->uom?->code ?? 'pcs' }}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Order Multiple</td>
+                                            <td class="fw-semibold">
+                                                {{ number_format($product->order_multiple ?? 1, 2) }} {{ $product->uom?->code ?? 'pcs' }}
+                                            </td>
+                                        </tr>
+                                        <tr>
                                             <td class="text-muted">Opening Stock</td>
                                             <td class="fw-semibold">
                                                 @if($product->opening_stock)
-                                                    {{ number_format($product->opening_stock, 0) }} {{ $product->uom ? $product->uom->code : 'pcs' }} 
+                                                    {{ number_format($product->opening_stock, 0) }} {{ $product->uom?->code ?? 'pcs' }} 
                                                     <span class="text-muted font-monospace fs-11">(@ ₹{{ number_format($product->opening_stock_rate, 2) }}/unit)</span>
                                                 @else
                                                     —
@@ -382,8 +394,8 @@
                                         @else
                                             @forelse($product->warehouseStocks as $ws)
                                                 <tr>
-                                                    <td class="fw-semibold">{{ $ws->warehouse->code }}</td>
-                                                    <td>{{ $ws->warehouse->name }}</td>
+                                                    <td class="fw-semibold">{{ $ws->warehouse?->code ?? 'N/A' }}</td>
+                                                    <td>{{ $ws->warehouse?->name ?? 'N/A' }}</td>
                                                     <td class="text-end fw-bold text-dark">{{ number_format($ws->quantity, 0) }}</td>
                                                     <td class="text-end text-warning fw-semibold">{{ number_format($ws->reserved_qty, 0) }}</td>
                                                     <td class="text-end text-success fw-bold">{{ number_format($ws->available_qty, 0) }}</td>
@@ -440,7 +452,7 @@
                                                 <td class="fw-semibold text-primary">₹{{ number_format($variantAvgCost, 2) }}</td>
                                                 <td class="fw-bold">
                                                     {{ number_format($variant->total_stock, 0) }}
-                                                    <span class="text-muted fs-11">/ {{ $product->uom ? $product->uom->code : 'pcs' }}</span>
+                                                    <span class="text-muted fs-11">/ {{ $product->uom?->code ?? 'pcs' }}</span>
                                                 </td>
                                                 <td class="text-end pe-4">
                                                     <div class="d-inline-flex gap-1 justify-content-end align-items-center">

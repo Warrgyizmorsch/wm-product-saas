@@ -612,7 +612,7 @@ class LandedCostService
                 'product_id'   => $item->product_id,
                 'product_name' => $item->product->name,
                 'sku'          => $item->product->sku ?: 'No SKU',
-                'uom'          => $item->product->uom->code ?? 'PCS',
+                'uom'          => $item->product?->uom?->code ?? 'PCS',
                 'received_qty' => (float) $item->received_qty,
                 'unit_rate'    => (float) $item->unit_rate,
                 'total_amount' => (float) $item->total_amount,

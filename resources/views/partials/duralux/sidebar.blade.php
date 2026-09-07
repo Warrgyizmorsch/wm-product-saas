@@ -91,33 +91,11 @@
         ],
         __('ui.production') => [
             ['label' => 'Production Dashboard', 'icon' => 'feather-grid', 'route' => 'production.dashboard'],
-            ['label' => 'Production Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
-                ['label' => __('production.bom'),          'route' => 'production.boms.index'],
-                ['label' => __('production.routing'),       'route' => 'production.routing.index'],
-                ['label' => __('production.work_centers'),  'route' => 'production.work-centers.index'],
-                ['label' => __('production.machines'),      'route' => 'production.machines.index'],
-                ['label' => 'Operator Skills',              'route' => 'production.operator-skills.index'],
-                ['label' => 'Quality Plans',                'route' => 'production.quality-plans.index'],
-                ['label' => __('production.shifts_sidebar'),    'route' => 'production.shifts.index'],
-                ['label' => __('production.calendars_sidebar'), 'route' => 'production.calendars.index'],
-            ]],
-            ['label' => 'Production Orders', 'icon' => 'feather-play-circle', 'route' => 'production.orders.index'],
-            ['label' => 'Scheduling', 'icon' => 'feather-calendar', 'url' => '#', 'children' => [
-                ['label' => 'Production Schedules', 'route' => 'production.schedules.index'],
-                ['label' => 'Calendar View',         'route' => 'production.schedules.calendar'],
-            ]],
-            ['label' => 'Work-in-Progress (WIP)', 'icon' => 'feather-layers', 'route' => 'production.wip.index'],
-            ['label' => 'Shop Floor (MES)', 'icon' => 'feather-activity', 'url' => '#', 'children' => [
-                ['label' => 'Shop Floor Dashboard',   'route' => 'production.mes.dashboard'],
-                ['label' => 'MES Operator Console',   'route' => 'production.mes.operator.dashboard'],
-                ['label' => 'Work Center Monitor',    'route' => 'production.mes.work-centers.index'],
-                ['label' => 'Machine Monitor',        'route' => 'production.mes.machines.index'],
-                ['label' => 'Barcode Scanner',        'route' => 'production.mes.scanner.index'],
-            ]],
-            ['label' => 'Subcontracting', 'icon' => 'feather-truck', 'url' => '#', 'children' => [
-                ['label' => 'Delivery Challans / Gate Passes', 'route' => 'production.subcontract.delivery-challans.index'],
-                ['label' => 'Vendor SLA & Analytics',          'route' => 'production.subcontract.analytics'],
-                ['label' => 'Subcontract Settings',            'route' => 'production.settings.index'],
+            ['label' => 'Execution', 'icon' => 'feather-play-circle', 'url' => '#', 'children' => [
+                ['label' => 'Production Orders',     'route' => 'production.orders.index'],
+                ['label' => 'Shop Floor (MES)',       'route' => 'production.mes.dashboard'],
+                ['label' => 'Work-in-Progress (WIP)', 'route' => 'production.wip.index'],
+                ['label' => 'Job Cards / Operations', 'route' => 'production.mes.operator.my-operations'],
             ]],
             ['label' => 'Quality Management', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quality Dashboard',    'route' => 'production.quality.dashboard'],
@@ -127,16 +105,39 @@
                 ['label' => 'Rework Orders',        'route' => 'production.rework.index'],
                 ['label' => 'Scrap Disposals',      'route' => 'production.scrap.index'],
             ]],
+            ['label' => 'Subcontracting', 'icon' => 'feather-truck', 'url' => '#', 'children' => [
+                ['label' => 'Delivery Challans / Gate Passes', 'route' => 'production.subcontract.delivery-challans.index'],
+                ['label' => 'Vendor SLA & Analytics',          'route' => 'production.subcontract.analytics'],
+                ['label' => 'Subcontract Settings',            'route' => 'production.settings.index'],
+            ]],
+            ['label' => 'Engineering', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
+                ['label' => __('production.bom'),                 'route' => 'production.boms.index'],
+                ['label' => __('production.routing'),              'route' => 'production.routing.index'],
+                ['label' => 'ECO / Engineering Changes',           'route' => 'production.ecos.index'],
+                ['label' => __('production.work_centers'),         'route' => 'production.work-centers.index'],
+                ['label' => __('production.machines'),             'route' => 'production.machines.index'],
+                ['label' => 'Operator Skills',                     'route' => 'production.operator-skills.index'],
+                ['label' => __('production.shifts_sidebar'),       'route' => 'production.shifts.index'],
+                ['label' => __('production.calendars_sidebar'),    'route' => 'production.calendars.index'],
+            ]],
+            ['label' => 'Performance', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => [
+                ['label' => 'Variance & Performance',  'route' => 'production.variances.index'],
+                ['label' => 'Executive Dashboard',     'route' => 'production.intelligence.dashboard'],
+                ['label' => 'Live Andon Board',        'route' => 'production.intelligence.andon'],
+                ['label' => 'Manufacturing Reports',   'route' => 'production.intelligence.reports.index'],
+            ]],
             ['label' => 'Machine Maintenance', 'icon' => 'feather-tool', 'url' => '#', 'children' => [
                 ['label' => 'Maintenance Dashboard', 'route' => 'production.maintenance.dashboard'],
                 ['label' => 'Work Orders',           'route' => 'production.maintenance.work-orders.index'],
                 ['label' => 'PM Schedules',          'route' => 'production.maintenance.schedules.index'],
             ]],
-            ['label' => 'Manufacturing Intelligence', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => [
-                ['label' => 'Executive Dashboard',    'route' => 'production.intelligence.dashboard'],
-                ['label' => 'Live Andon Board',       'route' => 'production.intelligence.andon'],
-                ['label' => 'Historical Analytics',   'route' => 'production.intelligence.analytics'],
-                ['label' => 'Manufacturing Reports',  'route' => 'production.intelligence.reports.index'],
+            ['label' => 'Advanced Planning', 'icon' => 'feather-cpu', 'url' => '#', 'children' => [
+                ['label' => 'Production Plans',                'route' => 'production.plans.index'],
+                ['label' => 'Production Schedules',            'route' => 'production.schedules.index'],
+                ['label' => 'Calendar Schedule View',            'route' => 'production.schedules.calendar'],
+                ['label' => 'Capacity Planning',               'route' => 'production.capacity.index'],
+                ['label' => 'Planning Scenarios / What-if',    'route' => 'production.schedules.scenarios.index'],
+                ['label' => 'Planning Exceptions / At-Risk',   'route' => 'production.planning-exceptions.index'],
             ]],
         ],
         'HRMS' => [

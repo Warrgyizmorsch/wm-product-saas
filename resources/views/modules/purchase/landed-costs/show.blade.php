@@ -170,11 +170,11 @@
                                     <div class="fw-bold text-dark">{{ $item->product->name ?? '—' }}</div>
                                     <small class="text-muted font-monospace">SKU: {{ $item->product->sku ?? '—' }}</small>
                                 </td>
-                                <td class="text-center fw-semibold">{{ (float)$item->quantity }} {{ $item->product->uom->code ?? 'PCS' }}</td>
+                                <td class="text-center fw-semibold">{{ (float)$item->quantity }} {{ $item->product?->uom?->code ?? 'PCS' }}</td>
                                 <td class="text-end font-monospace">₹{{ number_format($item->base_unit_rate, 2) }}</td>
                                 <td class="text-end font-monospace text-primary fw-bold">+ ₹{{ number_format($item->allocated_cost, 2) }}</td>
                                 <td class="text-end font-monospace text-success fw-bold">
-                                    ₹{{ number_format($item->new_landed_unit_cost, 2) }} / {{ $item->product->uom->code ?? 'PCS' }}
+                                    ₹{{ number_format($item->new_landed_unit_cost, 2) }} / {{ $item->product?->uom?->code ?? 'PCS' }}
                                 </td>
                             </tr>
                         @endforeach
