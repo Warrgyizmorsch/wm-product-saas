@@ -354,7 +354,7 @@
 </div>
 
 <!-- Schedule Activity Modal (Matching Image 2 UI Aesthetic & Unified Fields) -->
-<x-ui.modal id="scheduleActivityModal" title="Schedule Google Calendar Event / Meeting" size="lg">
+<x-ui.modal id="scheduleActivityModal" title="Schedule Google Calendar Event / Meeting" size="lg" :showFooter="false">
     <form action="" method="POST" id="quickScheduleForm">
         @csrf
         <input type="hidden" name="action_mode" value="schedule">
@@ -380,11 +380,11 @@
             </div>
         @endif
 
-        <div class="row g-3">
+        <div class="row g-2">
             <div class="col-md-6">
-                <x-ui.odoo-form-ui 
+                <x-ui.modal-form-ui 
                     type="select" 
-                    label="Select CRM Lead *" 
+                    label="Select CRM Lead" 
                     name="lead_id" 
                     id="modal_lead_id" 
                     :required="true" 
@@ -395,41 +395,43 @@
                     @foreach($leads as $lead)
                         <option value="{{ $lead->id }}">{{ $lead->company_name ?: $lead->contact_person }} ({{ $lead->lead_number }})</option>
                     @endforeach
-                </x-ui.odoo-form-ui>
+                </x-ui.modal-form-ui>
             </div>
 
             <div class="col-md-6">
-                <x-ui.odoo-form-ui 
+                <x-ui.modal-form-ui 
                     type="input" 
-                    label="Event / Meeting Title *" 
+                    label="Event / Meeting Title" 
                     name="title" 
                     id="modal_event_title"
+                    :required="true"
                     placeholder="e.g. CRM Followup Call / Client Demo" 
                     value="CRM Followup Call" 
                 />
             </div>
 
             <div class="col-md-4">
-                <x-ui.odoo-form-ui 
+                <x-ui.modal-form-ui 
                     type="select" 
-                    label="Activity Type *" 
+                    label="Activity Type" 
                     name="type" 
                     id="modal_activity_type"
                     :required="true"
+                    :searchable="true"
                     :errorText="$errors->first('type')"
                 >
                     <option value="Call">Scheduled Call</option>
                     <option value="Meeting">Meeting / Demo</option>
                     <option value="Email">Send Email / Proposal</option>
                     <option value="Task">General Task</option>
-                </x-ui.odoo-form-ui>
+                </x-ui.modal-form-ui>
             </div>
 
             <div class="col-md-4">
-                <x-ui.odoo-form-ui 
+                <x-ui.modal-form-ui 
                     type="input" 
                     inputType="datetime-local" 
-                    label="Meeting Date & Time *" 
+                    label="Meeting Date & Time" 
                     name="followup_date" 
                     :value="now()->addDay()->format('Y-m-d\TH:i')" 
                     :required="true"
@@ -438,11 +440,12 @@
             </div>
 
             <div class="col-md-4">
-                <x-ui.odoo-form-ui 
+                <x-ui.modal-form-ui 
                     type="select" 
                     label="Duration (Minutes)" 
                     name="duration_minutes" 
                     id="modal_duration"
+                    :searchable="true"
                 >
                     <option value="15">15 Minutes</option>
                     <option value="30" selected>30 Minutes</option>
@@ -450,11 +453,11 @@
                     <option value="60">60 Minutes (1 Hour)</option>
                     <option value="90">90 Minutes (1.5 Hours)</option>
                     <option value="120">120 Minutes (2 Hours)</option>
-                </x-ui.odoo-form-ui>
+                </x-ui.modal-form-ui>
             </div>
 
             <div class="col-12">
-                <div class="p-3 bg-light rounded-3 border">
+                <div class="p-3 bg-light rounded-3 border mb-2">
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                         <div class="form-check form-switch mb-0">
                             <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="syncGoogleSwitch" checked>
@@ -477,7 +480,7 @@
             </div>
 
             <div class="col-md-6">
-                <x-ui.odoo-form-ui 
+                <x-ui.modal-form-ui 
                     type="input" 
                     label="Guest / Attendee Email Addresses" 
                     name="guest_emails" 
@@ -486,7 +489,7 @@
             </div>
 
             <div class="col-md-6">
-                <x-ui.odoo-form-ui 
+                <x-ui.modal-form-ui 
                     type="select" 
                     label="Tag Persons (Internal Staff)" 
                     name="tagged_user_ids[]" 
@@ -496,11 +499,11 @@
                     @foreach($users as $u)
                         <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
                     @endforeach
-                </x-ui.odoo-form-ui>
+                </x-ui.modal-form-ui>
             </div>
 
             <div class="col-12">
-                <x-ui.odoo-form-ui 
+                <x-ui.modal-form-ui 
                     type="textarea" 
                     label="Agenda / Discussion Notes" 
                     name="notes" 
