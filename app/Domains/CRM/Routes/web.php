@@ -10,6 +10,7 @@ use App\Domains\CRM\Controllers\LeadStatusController;
 use App\Domains\CRM\Controllers\DealStatusController;
 use App\Domains\CRM\Controllers\QuotationController;
 use App\Domains\CRM\Controllers\CrmSettingsController;
+use App\Domains\CRM\Controllers\GoogleCalendarController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('crm')
@@ -68,6 +69,12 @@ Route::prefix('crm')
             ->name('leads.kanban');
         Route::get('activities', [LeadActivityController::class, 'index'])
             ->name('activities.index');
+        Route::post('google-calendar/schedule-event', [GoogleCalendarController::class, 'scheduleEvent'])
+            ->name('google-calendar.schedule-event');
+        Route::get('google-calendar/events', [GoogleCalendarController::class, 'fetchEvents'])
+            ->name('google-calendar.fetch-events');
+        Route::get('google-calendar/connect', [GoogleCalendarController::class, 'connectGoogleAccount'])
+            ->name('google-calendar.connect');
         Route::get('leads/track-status', [LeadController::class, 'trackStatus'])
             ->name('leads.trackStatus');
         Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])

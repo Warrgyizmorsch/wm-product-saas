@@ -104,6 +104,15 @@
 @endpush
 
 @section('page-actions')
+    @if(!empty($isGoogleConnected))
+        <span class="badge bg-success-subtle text-success border border-success-subtle py-1.5 px-3 fs-12 fw-bold me-2 align-middle" title="Google Account is Synced & Linked">
+            <i class="feather-check-circle me-1"></i>Google Calendar Synced
+        </span>
+    @else
+        <a href="{{ route('crm.google-calendar.connect') }}" target="_blank" class="btn btn-outline-danger btn-sm fw-semibold me-2">
+            <i class="feather-calendar me-1"></i>Connect Google Account
+        </a>
+    @endif
     <button type="button" class="btn btn-primary btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#scheduleActivityModal">
         <i class="feather-plus me-1"></i>Log Activity / Follow-up
     </button>
@@ -344,79 +353,166 @@
     </div>
 </div>
 
-<!-- Schedule Activity Modal (Using Common x-ui.modal & x-ui.odoo-form-ui Components) -->
-<x-ui.modal 
-    id="scheduleActivityModal" 
-    title="SCHEDULE NEXT ACTIVITY" 
-    :centered="true"
-    :showFooter="false"
->
-    <form action="#" method="POST" id="quickScheduleForm">
+<!-- Schedule Activity Modal (Matching Image 2 UI Aesthetic & Unified Fields) -->
+<x-ui.modal id="scheduleActivityModal" title="Schedule Google Calendar Event / Meeting" size="lg">
+    <form action="" method="POST" id="quickScheduleForm">
         @csrf
-        <input type="hidden" name="status" value="Pending">
         <input type="hidden" name="action_mode" value="schedule">
 
-        <x-ui.odoo-form-ui 
-            type="select" 
-            label="Select Lead" 
-            name="lead_id" 
-            id="modal_lead_id" 
-            :required="true" 
-            :searchable="true" 
-            :errorText="$errors->first('lead_id')"
-        >
-            <option value="">— Select Lead —</option>
-            @foreach($leads as $lead)
-                <option value="{{ $lead->id }}">{{ $lead->company_name }} ({{ $lead->contact_name ?: 'No Contact' }})</option>
-            @endforeach
-        </x-ui.odoo-form-ui>
+        <!-- Google Calendar Integration Banner -->
+        @if(!empty($isGoogleConnected))
+            <div class="alert alert-success border-0 bg-success-subtle text-success-emphasis d-flex align-items-center justify-content-between flex-wrap gap-2 rounded-3 py-2 px-3 mb-3 fs-12 fw-medium">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-check-circle fs-15 text-success"></i> 
+                    <span><strong>Google Calendar Connected:</strong> Events & Google Meet links automatically sync with live push notifications.</span>
+                </div>
+                <span class="badge bg-success text-white fw-bold px-2 py-1"><i class="feather-zap me-1"></i>Active Sync</span>
+            </div>
+        @else
+            <div class="alert alert-info border-0 bg-info-subtle text-info-emphasis d-flex align-items-center justify-content-between flex-wrap gap-2 rounded-3 py-2 px-3 mb-3 fs-12 fw-medium">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-info fs-15 text-info"></i> 
+                    <span><strong>Google Calendar Integration:</strong> Schedule Google events, calls, and meetings directly into Google Calendar & CRM activities.</span>
+                </div>
+                <a href="{{ route('crm.google-calendar.connect') }}" target="_blank" class="btn btn-xs btn-primary fw-bold px-2 py-1" title="Click to grant Google Calendar & Gmail permissions">
+                    <i class="feather-external-link me-1"></i> Connect Google Account
+                </a>
+            </div>
+        @endif
 
-        <x-ui.odoo-form-ui 
-            type="select" 
-            label="Activity Type" 
-            name="type" 
-            :required="true"
-            :errorText="$errors->first('type')"
-        >
-            <option value="Call">Scheduled Call</option>
-            <option value="Meeting">Meeting / Demo</option>
-            <option value="Email">Send Email / Proposal</option>
-            <option value="Task">General Task</option>
-        </x-ui.odoo-form-ui>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui 
+                    type="select" 
+                    label="Select CRM Lead *" 
+                    name="lead_id" 
+                    id="modal_lead_id" 
+                    :required="true" 
+                    :searchable="true" 
+                    :errorText="$errors->first('lead_id')"
+                >
+                    <option value="">— Select CRM Lead —</option>
+                    @foreach($leads as $lead)
+                        <option value="{{ $lead->id }}">{{ $lead->company_name ?: $lead->contact_person }} ({{ $lead->lead_number }})</option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            </div>
 
-        <x-ui.odoo-form-ui 
-            type="input" 
-            inputType="datetime-local" 
-            label="Due Date & Time" 
-            name="followup_date" 
-            :value="now()->addDay()->format('Y-m-d\TH:i')" 
-            :required="true"
-            :errorText="$errors->first('followup_date')"
-        />
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui 
+                    type="input" 
+                    label="Event / Meeting Title *" 
+                    name="title" 
+                    id="modal_event_title"
+                    placeholder="e.g. CRM Followup Call / Client Demo" 
+                    value="CRM Followup Call" 
+                />
+            </div>
 
-        <x-ui.odoo-form-ui 
-            type="select" 
-            label="Tag Persons" 
-            name="tagged_user_ids[]" 
-            :multiple="true" 
-            :searchable="true"
-        >
-            @foreach($users as $u)
-                <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
-            @endforeach
-        </x-ui.odoo-form-ui>
+            <div class="col-md-4">
+                <x-ui.odoo-form-ui 
+                    type="select" 
+                    label="Activity Type *" 
+                    name="type" 
+                    id="modal_activity_type"
+                    :required="true"
+                    :errorText="$errors->first('type')"
+                >
+                    <option value="Call">Scheduled Call</option>
+                    <option value="Meeting">Meeting / Demo</option>
+                    <option value="Email">Send Email / Proposal</option>
+                    <option value="Task">General Task</option>
+                </x-ui.odoo-form-ui>
+            </div>
 
-        <x-ui.odoo-form-ui 
-            type="textarea" 
-            label="Description / Plan" 
-            name="notes" 
-            placeholder="Enter activity description or discussion plan..." 
-            rows="4" 
-        />
+            <div class="col-md-4">
+                <x-ui.odoo-form-ui 
+                    type="input" 
+                    inputType="datetime-local" 
+                    label="Meeting Date & Time *" 
+                    name="followup_date" 
+                    :value="now()->addDay()->format('Y-m-d\TH:i')" 
+                    :required="true"
+                    :errorText="$errors->first('followup_date')"
+                />
+            </div>
+
+            <div class="col-md-4">
+                <x-ui.odoo-form-ui 
+                    type="select" 
+                    label="Duration (Minutes)" 
+                    name="duration_minutes" 
+                    id="modal_duration"
+                >
+                    <option value="15">15 Minutes</option>
+                    <option value="30" selected>30 Minutes</option>
+                    <option value="45">45 Minutes</option>
+                    <option value="60">60 Minutes (1 Hour)</option>
+                    <option value="90">90 Minutes (1.5 Hours)</option>
+                    <option value="120">120 Minutes (2 Hours)</option>
+                </x-ui.odoo-form-ui>
+            </div>
+
+            <div class="col-12">
+                <div class="p-3 bg-light rounded-3 border">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="syncGoogleSwitch" checked>
+                            <label class="form-check-label fw-bold fs-12 text-dark" for="syncGoogleSwitch">
+                                <i class="feather-calendar text-danger me-1"></i> Sync to Google Calendar
+                            </label>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="createMeetSwitchUnified">
+                            <label class="form-check-label fw-bold fs-12 text-dark" for="createMeetSwitchUnified">
+                                <i class="feather-video text-primary me-1"></i> Generate Google Meet Video Room Link
+                            </label>
+                        </div>
+                    </div>
+                    <small class="text-muted fs-11 d-block mt-2">
+                        <strong>Checked:</strong> Generates an instant Google Meet video conference link.<br>
+                        <strong>Unchecked:</strong> Schedules a Google Calendar Call / Reminder (No Video Link). Google sends push notification reminders on the event date!
+                    </small>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui 
+                    type="input" 
+                    label="Guest / Attendee Email Addresses" 
+                    name="guest_emails" 
+                    placeholder="e.g. client@company.com, rep@mycompany.com (comma separated)" 
+                />
+            </div>
+
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui 
+                    type="select" 
+                    label="Tag Persons (Internal Staff)" 
+                    name="tagged_user_ids[]" 
+                    :multiple="true" 
+                    :searchable="true"
+                >
+                    @foreach($users as $u)
+                        <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            </div>
+
+            <div class="col-12">
+                <x-ui.odoo-form-ui 
+                    type="textarea" 
+                    label="Agenda / Discussion Notes" 
+                    name="notes" 
+                    placeholder="Enter meeting agenda or discussion points..." 
+                    rows="3" 
+                />
+            </div>
+        </div>
 
         <div class="d-flex gap-2 justify-content-end mt-4 pt-3 border-top">
             <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">CANCEL</button>
-            <button type="submit" class="btn btn-primary px-4 fw-bold">SCHEDULE</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold">SCHEDULE ACTIVITY</button>
         </div>
     </form>
 </x-ui.modal>
@@ -500,6 +596,19 @@
     document.getElementById('modal_lead_id')?.addEventListener('change', function() {
         if (this.value) {
             this.classList.remove('is-invalid');
+        }
+    });
+
+    document.getElementById('modal_activity_type')?.addEventListener('change', function() {
+        const meetSwitch = document.getElementById('createMeetSwitchUnified');
+        const syncSwitch = document.getElementById('syncGoogleSwitch');
+        if (meetSwitch && syncSwitch) {
+            if (this.value === 'Meeting') {
+                meetSwitch.checked = true;
+                syncSwitch.checked = true;
+            } else {
+                meetSwitch.checked = false;
+            }
         }
     });
 </script>

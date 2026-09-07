@@ -111,6 +111,12 @@
                 @endif
 
                 <!-- Log / Schedule Followup Offcanvas Button -->
+                <button type="button" class="btn btn-xs btn-outline-danger fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center me-1" 
+                        data-bs-toggle="modal" 
+                        data-bs-target="#googleCalendarModal" 
+                        style="font-size: 11px;">
+                    <i class="feather-calendar me-1"></i> + Google Event
+                </button>
                 <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-followup-offcanvas" 
                         data-bs-toggle="offcanvas" 
                         data-bs-target="#leadFollowupOffcanvas" 
@@ -1243,9 +1249,6 @@
                                     <div class="tab-pane fade" id="subtab-interactions" role="tabpanel" aria-labelledby="subtab-interactions-tab">
                                         <div class="d-flex align-items-center justify-content-between mb-3 mt-1 flex-wrap gap-2">
                                             <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.interactions_scheduled_activities') }}</h5>
-                                            <x-ui.button variant="primary" size="sm" icon="feather-calendar" data-bs-toggle="modal" data-bs-target="#modalScheduleActivity">
-                                                {{ __('crm.schedule_activity') }}
-                                            </x-ui.button>
                                         </div>
 
                                         @php
@@ -2035,28 +2038,6 @@
         </x-ui.odoo-form-ui>
 
         <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_summary')" name="notes" rows="4" :required="true" :placeholder="__('crm.notes_summary_placeholder')" />
-    </x-ui.modal>
-
-    <!-- Schedule Activity Modal -->
-    <x-ui.modal id="modalScheduleActivity" :title="__('crm.schedule_next_activity')" :centered="true" :formAction="route('crm.leads.followups.store', $lead->id)" formMethod="POST" :submitText="__('crm.schedule')" :closeText="__('crm.cancel')">
-        <input type="hidden" name="status" value="Pending">
-        
-        <x-ui.odoo-form-ui type="select" :label="__('crm.activity_type')" name="type" :required="true">
-            <option value="Call">{{ __('crm.activity_types.Call') }}</option>
-            <option value="Email">{{ __('crm.activity_types.Email') }}</option>
-            <option value="Meeting">{{ __('crm.activity_types.Meeting') }}</option>
-            <option value="Demo">{{ __('crm.activity_types.Demo') }}</option>
-        </x-ui.odoo-form-ui>
-
-        <x-ui.odoo-form-ui type="input" inputType="datetime-local" :label="__('crm.due_date_time')" name="followup_date" id="inline_activity_datepicker" :required="true" />
-
-        <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-            @foreach($users as $u)
-                <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
-            @endforeach
-        </x-ui.odoo-form-ui>
-
-        <x-ui.odoo-form-ui type="textarea" :label="__('crm.description_plan')" name="notes" rows="4" :placeholder="__('crm.activity_plan_placeholder')" />
     </x-ui.modal>
 @endsection
 
@@ -3457,25 +3438,74 @@
                     </div>
 
                     <!-- Next Follow-up Section inside Log Mode -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type (Optional)</label>
-                        <select name="next_activity_type" id="offcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
-                            <option value="Call">Call</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
-                            <option value="Email">Email</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                        </select>
-                    </div>
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <h6 class="fw-bold text-primary fs-12 mb-2"><i class="feather-calendar me-1"></i> Schedule Next Activity / Google Event</h6>
+                        
+                        <div class="mb-2">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Next Event Title</label>
+                            <input type="text" name="next_title" id="offcanvasNextTitle" class="form-control form-control-sm shadow-2xs" placeholder="e.g. Followup Call / Next Meeting" value="Followup Call">
+                        </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
-                        <input type="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}">
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type</label>
+                                <select name="next_activity_type" id="offcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
+                                    <option value="Call">Call</option>
+                                    <option value="Meeting">Meeting</option>
+                                    <option value="Demo">Demo</option>
+                                    <option value="Email">Email</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">Next Duration (Mins)</label>
+                                <select name="next_duration_minutes" id="offcanvasNextDuration" class="form-select form-select-sm shadow-2xs">
+                                    <option value="15">15 Mins</option>
+                                    <option value="30" selected>30 Mins</option>
+                                    <option value="45">45 Mins</option>
+                                    <option value="60">60 Mins (1 Hr)</option>
+                                    <option value="90">90 Mins</option>
+                                    <option value="120">120 Mins</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
+                            <input type="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}">
+                        </div>
+
+                        <div class="p-3 bg-white rounded-3 border mb-3 shadow-2xs">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" checked>
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasNextSyncGoogle">
+                                        <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet">
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasNextCreateMeet">
+                                        <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-0">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Guest / Attendee Emails</label>
+                            <input type="text" name="next_guest_emails" id="offcanvasNextGuestEmails" class="form-control form-control-sm shadow-2xs" placeholder="e.g. client@company.com (comma separated)">
+                        </div>
                     </div>
                 </div>
 
                 <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
                 <div id="sectionDirectSchedule" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Event / Meeting Title</label>
+                        <input type="text" name="title" id="offcanvasEventTitle" class="form-control form-control-sm shadow-2xs" placeholder="e.g. CRM Followup Call / Client Demo" value="CRM Followup Call">
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
                         <select name="schedule_type" id="offcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#offcanvasFollowupType').val(this.value)">
@@ -3487,9 +3517,44 @@
                         </select>
                     </div>
 
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" name="followup_date" id="offcanvasFollowupDate" class="form-control form-control-sm shadow-2xs" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Duration (Minutes)</label>
+                            <select name="duration_minutes" id="offcanvasDuration" class="form-select form-select-sm shadow-2xs">
+                                <option value="15">15 Mins</option>
+                                <option value="30" selected>30 Mins</option>
+                                <option value="45">45 Mins</option>
+                                <option value="60">60 Mins (1 Hr)</option>
+                                <option value="90">90 Mins</option>
+                                <option value="120">120 Mins</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" checked>
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasSyncGoogle">
+                                    <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                </label>
+                            </div>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet">
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasCreateMeet">
+                                    <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
-                        <input type="datetime-local" name="followup_date" id="offcanvasFollowupDate" class="form-control form-control-sm shadow-2xs" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Guest / Attendee Emails</label>
+                        <input type="text" name="guest_emails" id="offcanvasGuestEmails" class="form-control form-control-sm shadow-2xs" placeholder="e.g. client@company.com (comma separated)">
                     </div>
 
                     <div class="mb-3">
@@ -3545,6 +3610,75 @@
             </div>
         </div>
     </div>
+
+    <x-ui.modal id="googleCalendarModal" title="Schedule Google Calendar Event / Meeting" size="lg">
+        <form action="{{ route('crm.google-calendar.schedule-event') }}" method="POST">
+            @csrf
+            <input type="hidden" name="lead_id" value="{{ $lead->id }}">
+            
+            <div class="alert alert-info py-2 px-3 fs-12 mb-3 d-flex align-items-center">
+                <i class="feather-info me-2 fs-16 text-danger"></i>
+                <div>
+                    <strong>Google Calendar Integration</strong>: Schedule Google events, calls, and meetings directly for lead <strong>{{ $lead->company_name ?: $lead->contact_person }}</strong>.
+                </div>
+            </div>
+
+            <div class="row g-3 text-start">
+                <div class="col-md-12">
+                    <label class="form-label fw-bold fs-12">Event / Meeting Title *</label>
+                    <input type="text" name="summary" class="form-control fs-12" required placeholder="e.g. Product Demo / Followup Call" value="Call with {{ $lead->company_name ?: $lead->contact_person }}">
+                </div>
+                
+                <div class="col-md-4">
+                    <label class="form-label fw-bold fs-12">Meeting Date *</label>
+                    <input type="date" name="start_date" class="form-control fs-12" required value="{{ date('Y-m-d') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold fs-12">Start Time *</label>
+                    <input type="time" name="start_time" class="form-control fs-12" required value="10:00">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold fs-12">Duration (Minutes)</label>
+                    <select name="duration_minutes" class="form-select fs-12">
+                        <option value="15">15 Minutes</option>
+                        <option value="30" selected>30 Minutes</option>
+                        <option value="45">45 Minutes</option>
+                        <option value="60">1 Hour</option>
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <div class="p-3 bg-light rounded-3 border">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="createMeetSwitchShow">
+                            <label class="form-check-label fw-bold fs-12 text-dark" for="createMeetSwitchShow">
+                                <i class="feather-video text-danger me-1"></i> Generate Google Meet Video Room Link
+                            </label>
+                        </div>
+                        <small class="text-muted fs-11 d-block">
+                            <strong>Checked:</strong> Generates an instant Google Meet video conference link.<br>
+                            <strong>Unchecked:</strong> Schedules a Google Calendar Call / Reminder (No Video Link). Google sends push notification reminders on the event date!
+                        </small>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-bold fs-12">Guest / Attendee Email Addresses</label>
+                    <input type="text" name="attendees_text" class="form-control fs-12" value="{{ array_filter([$lead->email, $lead->company_email])[0] ?? '' }}" placeholder="e.g. client@company.com, rep@mycompany.com">
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-bold fs-12">Agenda / Discussion Notes</label>
+                    <textarea name="description" class="form-control fs-12" rows="3" placeholder="Enter meeting agenda or discussion points..."></textarea>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 justify-content-end mt-4 pt-3 border-top">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger px-4 fw-bold"><i class="feather-calendar me-1"></i>Schedule Google Event</button>
+            </div>
+        </form>
+    </x-ui.modal>
 
     {{-- Product quick-create modal --}}
     <x-ui.master-modals :masters="['product']" />

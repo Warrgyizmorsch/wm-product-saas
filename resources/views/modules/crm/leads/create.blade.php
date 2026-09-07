@@ -34,16 +34,8 @@
                             </div>
                             <div>
                                 <h4 class="fw-bold text-dark mb-0">{{ $lead->exists ? __('crm.edit_call_lead') : __('crm.new_call_lead') }}</h4>
-                                <span class="text-muted fs-12">Fill in the details below to {{ $lead->exists ? 'update the' : 'create a new' }} CRM Call Lead.</span>
+                                <span class="text-muted fs-12">{{ $lead->exists ? __('crm.fill_details_update') : __('crm.fill_details_create') }}</span>
                             </div>
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <a href="{{ route('crm.leads.index') }}" class="btn btn-light border px-4 py-2 fs-13">
-                                {{ __('crm.cancel') }}
-                            </a>
-                            <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold shadow-sm">
-                                <i class="feather-check-circle me-1.5"></i>{{ $lead->exists ? __('crm.update_lead') : 'SAVE LEAD' }}
-                            </button>
                         </div>
                     </div>
 
@@ -52,18 +44,18 @@
                         <div class="col-lg-6 border-end">
                             <!-- B2B vs B2C Segment Toggle -->
                             <div class="mb-4 p-3 bg-soft-primary rounded-3 border border-primary-subtle shadow-2xs">
-                                <label class="fw-bold text-dark mb-2 d-block fs-13"><i class="feather-layers me-1 text-primary"></i> Customer Type (Lead Segment):</label>
+                                <label class="fw-bold text-dark mb-2 d-block fs-13"><i class="feather-layers me-1 text-primary"></i> {{ __('crm.customer_type_lead_segment') }}</label>
                                 <div class="d-flex gap-4">
                                     <div class="form-check form-check-inline">
                                         <input class="form-check-input" type="radio" name="lead_type" id="lead_type_b2b" value="b2b" {{ old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b' ? 'checked' : '' }} onchange="toggleLeadType('b2b')">
                                         <label class="form-check-label fw-bold text-dark cursor-pointer" for="lead_type_b2b">
-                                            🏢 B2B (Business Client)
+                                            {{ __('crm.b2b_business_client') }}
                                         </label>
                                     </div>
                                     <div class="form-check form-check-inline">
                                         <input class="form-check-input" type="radio" name="lead_type" id="lead_type_b2c" value="b2c" {{ old('lead_type', $lead->lead_type) === 'b2c' ? 'checked' : '' }} onchange="toggleLeadType('b2c')">
                                         <label class="form-check-label fw-bold text-dark cursor-pointer" for="lead_type_b2c">
-                                            👤 B2C (Individual Customer)
+                                            {{ __('crm.b2c_individual_customer') }}
                                         </label>
                                     </div>
                                 </div>
@@ -75,17 +67,17 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" id="company_name_input" :value="old('company_name', $lead->company_name)" :placeholder="__('crm.company_name')" :required="old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b'" :errorText="$errors->first('company_name')" />
 
-                            <x-ui.odoo-form-ui type="input" label="GSTIN / Tax No." name="gstin" id="gstin_input" :value="old('gstin', $lead->gstin ?? '')" placeholder="e.g. 27AAAAA0000A1Z5" :errorText="$errors->first('gstin')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_tax_no')" name="gstin" id="gstin_input" :value="old('gstin', $lead->gstin ?? '')" :placeholder="__('crm.gstin_placeholder')" :errorText="$errors->first('gstin')" />
 
-                            <x-ui.odoo-form-ui type="input" label="Company Email" name="company_email" id="company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" placeholder="company@office.com" :required="old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b'" :errorText="$errors->first('company_email')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.company_email')" name="company_email" id="company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" :placeholder="__('crm.company_email_placeholder')" :required="old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b'" :errorText="$errors->first('company_email')" />
 
-                            <x-ui.odoo-form-ui type="input" label="Company Phone" name="company_phone" id="company_phone_input" :value="old('company_phone', $lead->company_phone ?? '')" placeholder="Company Landline / Phone" oninput="this.value = this.value.replace(/[^0-9]/g, '')" :errorText="$errors->first('company_phone')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.company_phone')" name="company_phone" id="company_phone_input" :value="old('company_phone', $lead->company_phone ?? '')" :placeholder="__('crm.company_phone_placeholder')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" :errorText="$errors->first('company_phone')" />
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.contact_person')" name="contact_person" id="contact_person_input" :value="old('contact_person', $lead->contact_person)" :placeholder="__('crm.contact_person')" :required="old('lead_type', $lead->lead_type) === 'b2c'" :errorText="$errors->first('contact_person')" />
 
-                            <x-ui.odoo-form-ui type="input" label="Designation / Role" name="designation" id="designation_input" :value="old('designation', $lead->designation)" placeholder="e.g. Purchase Manager / Doctor" :errorText="$errors->first('designation')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.designation_role')" name="designation" id="designation_input" :value="old('designation', $lead->designation)" :placeholder="__('crm.designation_placeholder')" :errorText="$errors->first('designation')" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" id="email_input" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" :required="old('lead_type', $lead->lead_type) === 'b2c'" :errorText="$errors->first('email')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" id="email_input" inputType="email" :value="old('email', $lead->email)" :placeholder="__('crm.email_placeholder')" :required="old('lead_type', $lead->lead_type) === 'b2c'" :errorText="$errors->first('email')" />
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" id="phone_input" :value="old('phone', $lead->phone)" :placeholder="__('crm.contact_phone')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
 
@@ -117,11 +109,11 @@
                             <div class="my-3 border-top pt-3">
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <div class="d-flex align-items-center gap-2">
-                                        <h6 class="fw-bold text-dark mb-0 fs-13">Additional Contacts</h6>
+                                        <h6 class="fw-bold text-dark mb-0 fs-13">{{ __('crm.additional_contacts') }}</h6>
                                         <span class="badge bg-soft-primary text-primary rounded-circle px-2 py-0.5 font-monospace fs-11" id="addlContactCountBadge">{{ count($savedAddlContacts) }}</span>
                                     </div>
                                     <button type="button" class="btn btn-xs btn-primary fw-bold px-2.5 py-1 text-uppercase text-white d-inline-flex align-items-center" id="cloneContactMainBtn" style="border-radius: 4px; font-size: 11px;">
-                                        <i class="feather-plus me-1 fs-12"></i> CLONE CONTACT
+                                        <i class="feather-plus me-1 fs-12"></i> {{ __('crm.clone_contact') }}
                                     </button>
                                 </div>
 
@@ -129,23 +121,23 @@
                                     @forelse($savedAddlContacts as $idx => $ac)
                                         <div class="addl-contact-card p-2 px-3 mb-1 bg-white position-relative shadow-2xs" style="border: 1.5px solid var(--bs-primary) !important; border-radius: 8px !important;">
                                             <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom">
-                                                <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> Contact Person #<span class="contact-num">{{ $loop->iteration }}</span></span>
-                                                <button type="button" class="btn btn-xs btn-soft-danger rounded-circle remove-contact-btn p-0 d-inline-flex align-items-center justify-content-center" title="Delete Contact" style="width: 22px; height: 22px; border-radius: 50%;">
+                                                <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> {{ __('crm.contact_person_num') }}<span class="contact-num">{{ $loop->iteration }}</span></span>
+                                                <button type="button" class="btn btn-xs btn-soft-danger rounded-circle remove-contact-btn p-0 d-inline-flex align-items-center justify-content-center" title="{{ __('crm.delete_contact') }}" style="width: 22px; height: 22px; border-radius: 50%;">
                                                     <i class="feather-trash-2 text-danger fs-11"></i>
                                                 </button>
                                             </div>
                                             <div class="row g-2">
                                                 <div class="col-md-6">
-                                                    <x-ui.odoo-form-ui type="input" label="Name" name="additional_contacts[{{ $idx }}][name]" :value="$ac['name'] ?? ''" placeholder="Contact Name" class="contact-name-input" />
+                                                    <x-ui.odoo-form-ui type="input" :label="__('crm.name')" name="additional_contacts[{{ $idx }}][name]" :value="$ac['name'] ?? ''" :placeholder="__('crm.contact_name_placeholder')" class="contact-name-input" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <x-ui.odoo-form-ui type="input" label="Designation" name="additional_contacts[{{ $idx }}][designation]" :value="$ac['designation'] ?? ''" placeholder="Designation / Role" class="contact-designation-input" />
+                                                    <x-ui.odoo-form-ui type="input" :label="__('crm.designation')" name="additional_contacts[{{ $idx }}][designation]" :value="$ac['designation'] ?? ''" :placeholder="__('crm.designation_placeholder')" class="contact-designation-input" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <x-ui.odoo-form-ui type="input" label="Phone No." name="additional_contacts[{{ $idx }}][phone]" :value="$ac['phone'] ?? ''" placeholder="Phone Number" class="contact-phone-input" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                                                    <x-ui.odoo-form-ui type="input" :label="__('crm.phone_no')" name="additional_contacts[{{ $idx }}][phone]" :value="$ac['phone'] ?? ''" :placeholder="__('crm.phone_number_placeholder')" class="contact-phone-input" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <x-ui.odoo-form-ui type="input" label="Email" name="additional_contacts[{{ $idx }}][email]" inputType="email" :value="$ac['email'] ?? ''" placeholder="Email" class="contact-email-input" />
+                                                    <x-ui.odoo-form-ui type="input" :label="__('crm.email')" name="additional_contacts[{{ $idx }}][email]" inputType="email" :value="$ac['email'] ?? ''" :placeholder="__('crm.email_placeholder')" class="contact-email-input" />
                                                 </div>
                                             </div>
                                         </div>
@@ -177,10 +169,15 @@
 
                             <x-ui.odoo-form-ui type="select" :label="__('crm.source')" name="source">
                                 <option value="">{{ __('crm.select_option') }}</option>
+                                <option value="Direct Inquiry" @selected(old('source', $lead->source) === 'Direct Inquiry')>{{ __('crm.sources.Direct Inquiry') }}</option>
+                                <option value="Website Form" @selected(old('source', $lead->source) === 'Website Form')>{{ __('crm.sources.Website Form') }}</option>
+                                <option value="Web Search" @selected(old('source', $lead->source) === 'Web Search')>{{ __('crm.sources.Web Search') }}</option>
+                                <option value="Meta Ads" @selected(old('source', $lead->source) === 'Meta Ads')>{{ __('crm.sources.Meta Ads') }}</option>
+                                <option value="IndiaMART" @selected(old('source', $lead->source) === 'IndiaMART')>{{ __('crm.sources.IndiaMART') }}</option>
                                 <option value="Cold Call" @selected(old('source', $lead->source) === 'Cold Call')>{{ __('crm.sources.Cold Call') }}</option>
+                                <option value="Referral" @selected(old('source', $lead->source) === 'Referral')>{{ __('crm.sources.Referral') }}</option>
                                 <option value="Employee Referral" @selected(old('source', $lead->source) === 'Employee Referral')>{{ __('crm.sources.Employee Referral') }}</option>
                                 <option value="Partner" @selected(old('source', $lead->source) === 'Partner')>{{ __('crm.sources.Partner') }}</option>
-                                <option value="Web Search" @selected(old('source', $lead->source) === 'Web Search')>{{ __('crm.sources.Web Search') }}</option>
                                 <option value="Advertisement" @selected(old('source', $lead->source) === 'Advertisement')>{{ __('crm.sources.Advertisement') }}</option>
                                 <option value="Trade Show" @selected(old('source', $lead->source) === 'Trade Show')>{{ __('crm.sources.Trade Show') }}</option>
                             </x-ui.odoo-form-ui>
@@ -245,10 +242,10 @@
                             <div class="mb-3 mt-4" id="productItemsContainer">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <label class="form-label fw-bold text-dark fs-12 mb-0">
-                                        <i class="feather-package me-1 text-primary"></i>{{ __('crm.product') }} & Quantity
+                                        <i class="feather-package me-1 text-primary"></i>{{ __('crm.product_and_quantity') }}
                                     </label>
                                     <button type="button" class="btn btn-xs btn-outline-primary fw-semibold px-2 py-1 fs-11" id="addProductRowBtn" style="border-radius: 6px;">
-                                        <i class="feather-plus me-1"></i>Add Product
+                                        <i class="feather-plus me-1"></i>{{ __('crm.add_product_btn') }}
                                     </button>
                                 </div>
                                 
@@ -256,8 +253,8 @@
                                     <table class="table table-sm table-borderless align-middle mb-0" id="productItemsTable">
                                         <thead>
                                             <tr class="border-bottom text-muted fs-11" style="background-color: #f8fafc;">
-                                                <th style="width: 65%; font-weight: 600;" class="py-1 ps-2">Product</th>
-                                                <th style="width: 23%; font-weight: 600;" class="py-1 text-center">Qty</th>
+                                                <th style="width: 65%; font-weight: 600;" class="py-1 ps-2">{{ __('crm.product') }}</th>
+                                                <th style="width: 23%; font-weight: 600;" class="py-1 text-center">{{ __('crm.qty') }}</th>
                                                 <th style="width: 12%; font-weight: 600;" class="py-1 text-center"></th>
                                             </tr>
                                         </thead>
@@ -282,11 +279,11 @@
                                                 <tr class="lead-item-row border-bottom">
                                                     <td class="py-1 ps-1 pe-1 align-top">
                                                         <select name="items[{{ $idx }}][product_id]" class="form-select form-select-sm odoo-select2 product-row-select" searchable="true" data-master="product">
-                                                            <option value="">Select Product...</option>
+                                                            <option value="">{{ __('crm.select_product') }}</option>
                                                             <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ {{ __('crm.add_new_product') }}</option>
                                                             
                                                             @if($finished->count())
-                                                                <optgroup label="📦 Finished Goods">
+                                                                <optgroup label="{{ __('crm.optgroup_finished_goods') }}">
                                                                     @foreach($finished as $p)
                                                                         @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
@@ -297,7 +294,7 @@
                                                             @endif
 
                                                             @if($semiFinished->count())
-                                                                <optgroup label="⚙️ Semi-Finished Goods">
+                                                                <optgroup label="{{ __('crm.optgroup_semi_finished') }}">
                                                                     @foreach($semiFinished as $p)
                                                                         @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
@@ -308,7 +305,7 @@
                                                             @endif
 
                                                             @if($services->count())
-                                                                <optgroup label="🛠️ Services">
+                                                                <optgroup label="{{ __('crm.optgroup_services') }}">
                                                                     @foreach($services as $p)
                                                                         @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
@@ -319,7 +316,7 @@
                                                             @endif
 
                                                             @if($others->count())
-                                                                <optgroup label="🧱 Raw Materials & Components">
+                                                                <optgroup label="{{ __('crm.optgroup_raw_materials') }}">
                                                                     @foreach($others as $p)
                                                                         @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
@@ -337,7 +334,7 @@
                                                         @enderror
                                                     </td>
                                                     <td class="py-1 text-center align-top pt-2">
-                                                        <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="Remove Product">
+                                                        <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="{{ __('crm.remove_product') }}">
                                                             <i class="feather-trash-2 fs-13"></i>
                                                         </button>
                                                     </td>
@@ -350,11 +347,11 @@
 
                             <template id="productRowSelectTemplate">
                                 <select class="form-select form-select-sm product-row-select" searchable="true" data-master="product">
-                                    <option value="">Select Product...</option>
+                                    <option value="">{{ __('crm.select_product') }}</option>
                                     <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ {{ __('crm.add_new_product') }}</option>
                                     
                                     @if($finished->count())
-                                        <optgroup label="📦 Finished Goods">
+                                        <optgroup label="{{ __('crm.optgroup_finished_goods') }}">
                                             @foreach($finished as $p)
                                                 @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
@@ -363,7 +360,7 @@
                                     @endif
 
                                     @if($semiFinished->count())
-                                        <optgroup label="⚙️ Semi-Finished Goods">
+                                        <optgroup label="{{ __('crm.optgroup_semi_finished') }}">
                                             @foreach($semiFinished as $p)
                                                 @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
@@ -372,7 +369,7 @@
                                     @endif
 
                                     @if($services->count())
-                                        <optgroup label="🛠️ Services">
+                                        <optgroup label="{{ __('crm.optgroup_services') }}">
                                             @foreach($services as $p)
                                                 @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
@@ -381,7 +378,7 @@
                                     @endif
 
                                     @if($others->count())
-                                        <optgroup label="🧱 Raw Materials & Components">
+                                        <optgroup label="{{ __('crm.optgroup_raw_materials') }}">
                                             @foreach($others as $p)
                                                 @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
@@ -395,6 +392,15 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.expected_sale')" name="expected_sale_date" inputType="date" :value="old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '')" />
                         </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <a href="{{ route('crm.leads.index') }}" class="btn btn-light border px-4 py-2 fs-13">
+                            {{ __('crm.cancel') }}
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold shadow-sm">
+                            <i class="feather-check-circle me-1.5"></i>{{ $lead->exists ? __('crm.update_lead') : __('crm.save_lead') }}
+                        </button>
                     </div>
                 </form>
             </div>
@@ -600,41 +606,41 @@
                 var html = `
                     <div class="addl-contact-card p-2 px-3 mb-1 bg-white position-relative shadow-2xs" style="border: 1.5px solid var(--bs-primary) !important; border-radius: 8px !important;">
                         <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom">
-                            <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> Contact Person #<span class="contact-num">${count + 1}</span></span>
-                            <button type="button" class="btn btn-xs btn-soft-danger rounded-circle remove-contact-btn p-0 d-inline-flex align-items-center justify-content-center" title="Delete Contact" style="width: 22px; height: 22px; border-radius: 50%;">
+                            <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> {{ __('crm.contact_person_num') }}<span class="contact-num">${count + 1}</span></span>
+                            <button type="button" class="btn btn-xs btn-soft-danger rounded-circle remove-contact-btn p-0 d-inline-flex align-items-center justify-content-center" title="{{ __('crm.delete_contact') }}" style="width: 22px; height: 22px; border-radius: 50%;">
                                 <i class="feather-trash-2 text-danger fs-11"></i>
                             </button>
                         </div>
                         <div class="row g-2">
                             <div class="col-md-6">
                                 <div class="odoo-form-group">
-                                    <label class="odoo-form-label">Name</label>
+                                    <label class="odoo-form-label">{{ __('crm.name') }}</label>
                                     <div class="flex-grow-1">
-                                        <input type="text" name="additional_contacts[${count}][name]" class="odoo-form-control contact-name-input" value="${nameVal}" placeholder="Contact Name">
+                                        <input type="text" name="additional_contacts[${count}][name]" class="odoo-form-control contact-name-input" value="${nameVal}" placeholder="{{ __('crm.contact_name_placeholder') }}">
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="odoo-form-group">
-                                    <label class="odoo-form-label">Designation</label>
+                                    <label class="odoo-form-label">{{ __('crm.designation') }}</label>
                                     <div class="flex-grow-1">
-                                        <input type="text" name="additional_contacts[${count}][designation]" class="odoo-form-control contact-designation-input" value="${desigVal}" placeholder="Designation / Role">
+                                        <input type="text" name="additional_contacts[${count}][designation]" class="odoo-form-control contact-designation-input" value="${desigVal}" placeholder="{{ __('crm.designation_placeholder') }}">
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="odoo-form-group">
-                                    <label class="odoo-form-label">Phone No.</label>
+                                    <label class="odoo-form-label">{{ __('crm.phone_no') }}</label>
                                     <div class="flex-grow-1">
-                                        <input type="text" name="additional_contacts[${count}][phone]" class="odoo-form-control contact-phone-input" value="${phoneVal}" placeholder="Phone Number" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                        <input type="text" name="additional_contacts[${count}][phone]" class="odoo-form-control contact-phone-input" value="${phoneVal}" placeholder="{{ __('crm.phone_number_placeholder') }}" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="odoo-form-group">
-                                    <label class="odoo-form-label">Email</label>
+                                    <label class="odoo-form-label">{{ __('crm.email') }}</label>
                                     <div class="flex-grow-1">
-                                        <input type="email" name="additional_contacts[${count}][email]" class="odoo-form-control contact-email-input" value="${emailVal}" placeholder="Email">
+                                        <input type="email" name="additional_contacts[${count}][email]" class="odoo-form-control contact-email-input" value="${emailVal}" placeholder="{{ __('crm.email_placeholder') }}">
                                     </div>
                                 </div>
                             </div>
@@ -913,9 +919,9 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-top">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Ignore & Continue</button>
-                    <a href="#" id="dupViewAccountBtn" class="btn btn-soft-primary" target="_blank"><i class="feather-external-link me-1"></i>View Record</a>
-                    <a href="#" id="dupCreateDealBtn" class="btn btn-warning fw-bold px-3"><i class="feather-plus me-1"></i>Create New Deal</a>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('crm.ignore_and_continue') }}</button>
+                    <a href="#" id="dupViewAccountBtn" class="btn btn-soft-primary" target="_blank"><i class="feather-external-link me-1"></i>{{ __('crm.view_record') }}</a>
+                    <a href="#" id="dupCreateDealBtn" class="btn btn-warning fw-bold px-3"><i class="feather-plus me-1"></i>{{ __('crm.create_new_deal') }}</a>
                 </div>
             </div>
         </div>

@@ -40,6 +40,13 @@ class LeadActivityController extends Controller
         $leads = Lead::where('tenant_id', $tenantId)->orderBy('company_name')->get();
         $users = \App\Models\User::orderBy('name')->get();
 
-        return view('modules.crm.activities.index', compact('followups', 'leads', 'users', 'view', 'startDate', 'monthStart', 'monthEnd'));
+        if ($request->has('google_connected') || $request->has('connected') || $request->has('user_id')) {
+            session(['google_calendar_connected' => true]);
+        }
+
+        $calService = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class);
+        $isGoogleConnected = session('google_calendar_connected', false) || $calService->isAccountConnected(auth()->id());
+
+        return view('modules.crm.activities.index', compact('followups', 'leads', 'users', 'view', 'startDate', 'monthStart', 'monthEnd', 'isGoogleConnected'));
     }
 }

@@ -92,14 +92,19 @@
 
                     <x-ui.odoo-form-ui type="input" inputType="date" label="Expected Closing Date" name="closing_date" :value="old('closing_date')" />
 
-                    <x-ui.odoo-form-ui type="select" label="Lead Source" name="lead_source">
-                        <option value="">Select Lead Source...</option>
-                        <option value="Direct Inquiry" {{ old('lead_source') === 'Direct Inquiry' ? 'selected' : '' }}>Direct Inquiry</option>
-                        <option value="Website Form" {{ old('lead_source') === 'Website Form' ? 'selected' : '' }}>Website Form</option>
-                        <option value="Meta Ads" {{ old('lead_source') === 'Meta Ads' ? 'selected' : '' }}>Meta (Facebook/Instagram) Ads</option>
-                        <option value="IndiaMART" {{ old('lead_source') === 'IndiaMART' ? 'selected' : '' }}>IndiaMART</option>
-                        <option value="Referral" {{ old('lead_source') === 'Referral' ? 'selected' : '' }}>Client Referral</option>
-                        <option value="Cold Call" {{ old('lead_source') === 'Cold Call' ? 'selected' : '' }}>Cold Calling</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('crm.source')" name="lead_source">
+                        <option value="">{{ __('crm.select_option') }}</option>
+                        <option value="Direct Inquiry" @selected(old('lead_source') === 'Direct Inquiry')>{{ __('crm.sources.Direct Inquiry') }}</option>
+                        <option value="Website Form" @selected(old('lead_source') === 'Website Form')>{{ __('crm.sources.Website Form') }}</option>
+                        <option value="Web Search" @selected(old('lead_source') === 'Web Search')>{{ __('crm.sources.Web Search') }}</option>
+                        <option value="Meta Ads" @selected(old('lead_source') === 'Meta Ads')>{{ __('crm.sources.Meta Ads') }}</option>
+                        <option value="IndiaMART" @selected(old('lead_source') === 'IndiaMART')>{{ __('crm.sources.IndiaMART') }}</option>
+                        <option value="Cold Call" @selected(old('lead_source') === 'Cold Call')>{{ __('crm.sources.Cold Call') }}</option>
+                        <option value="Referral" @selected(old('lead_source') === 'Referral')>{{ __('crm.sources.Referral') }}</option>
+                        <option value="Employee Referral" @selected(old('lead_source') === 'Employee Referral')>{{ __('crm.sources.Employee Referral') }}</option>
+                        <option value="Partner" @selected(old('lead_source') === 'Partner')>{{ __('crm.sources.Partner') }}</option>
+                        <option value="Advertisement" @selected(old('lead_source') === 'Advertisement')>{{ __('crm.sources.Advertisement') }}</option>
+                        <option value="Trade Show" @selected(old('lead_source') === 'Trade Show')>{{ __('crm.sources.Trade Show') }}</option>
                     </x-ui.odoo-form-ui>
 
                     <h6 class="fw-bold text-primary mb-3 mt-4"><i class="feather-file-minus me-2"></i>Requirements & Summary</h6>

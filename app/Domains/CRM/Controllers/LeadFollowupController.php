@@ -61,11 +61,16 @@ class LeadFollowupController extends Controller
             $notes = $request->input('schedule_notes') ?: $validated['notes'];
 
             $this->followupService->storeFollowup($lead, [
-                'type'            => $scheduleType,
-                'status'          => 'Pending',
-                'followup_date'   => $dueDate,
-                'notes'           => $notes,
-                'tagged_user_ids' => $validated['tagged_user_ids'] ?? null,
+                'type'                 => $scheduleType,
+                'title'                => $request->input('title'),
+                'duration_minutes'     => $request->input('duration_minutes'),
+                'guest_emails'         => $request->input('guest_emails'),
+                'status'               => 'Pending',
+                'followup_date'        => $dueDate,
+                'notes'                => $notes,
+                'tagged_user_ids'      => $validated['tagged_user_ids'] ?? null,
+                'sync_google_calendar' => $request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : true,
+                'create_meet_link'     => $request->boolean('create_meet_link'),
             ]);
 
             try {
@@ -93,11 +98,16 @@ class LeadFollowupController extends Controller
                 $nextNotes = !empty($pastNotes) ? ($pastNotes . " | " . $contextSuffix) : $contextSuffix;
 
                 $this->followupService->storeFollowup($lead, [
-                    'type'            => $nextType,
-                    'status'          => 'Pending',
-                    'followup_date'   => $nextDate,
-                    'notes'           => $nextNotes,
-                    'tagged_user_ids' => $validated['tagged_user_ids'] ?? null,
+                    'type'                 => $nextType,
+                    'title'                => $request->input('next_title') ?: ($request->input('title') ?: ("Next " . $nextType . " with " . ($lead->company_name ?: $lead->contact_person))),
+                    'duration_minutes'     => $request->input('next_duration_minutes') ?: ($request->input('duration_minutes') ?: 30),
+                    'guest_emails'         => $request->input('next_guest_emails') ?: $request->input('guest_emails'),
+                    'status'               => 'Pending',
+                    'followup_date'        => $nextDate,
+                    'notes'                => $nextNotes,
+                    'tagged_user_ids'      => $validated['tagged_user_ids'] ?? null,
+                    'sync_google_calendar' => $request->has('next_sync_google_calendar') ? $request->boolean('next_sync_google_calendar') : ($request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : true),
+                    'create_meet_link'     => $request->has('next_create_meet_link') ? $request->boolean('next_create_meet_link') : $request->boolean('create_meet_link'),
                 ]);
 
                 try {
