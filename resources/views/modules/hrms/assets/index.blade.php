@@ -308,6 +308,7 @@
                 var companyId = button.data('company-id');
                 var name = button.data('name');
                 var description = button.data('description');
+                var isProductionMachinery = button.data('is-production-machinery') == '1';
 
                 var modal = $(this);
                 // Set form action URL dynamically
@@ -317,6 +318,7 @@
                 modal.find('#edit_category_company_id').val(companyId).trigger('change');
                 modal.find('#edit_category_name').val(name);
                 modal.find('#edit_category_description').val(description);
+                modal.find('#edit_category_is_production_machinery').prop('checked', isProductionMachinery);
             });
 
             // Handle edit item details binding

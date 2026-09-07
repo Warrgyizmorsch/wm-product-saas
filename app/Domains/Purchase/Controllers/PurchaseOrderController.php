@@ -7,6 +7,8 @@ use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\PurchaseRequisition;
 use App\Domains\Purchase\Repositories\PurchaseOrderRepository;
 use App\Domains\Purchase\Services\PurchaseOrderService;
+use App\Domains\Accounting\Models\ChartOfAccount;
+use App\Domains\HRMS\Models\AssetCategory;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
@@ -158,6 +160,13 @@ class PurchaseOrderController extends Controller
             $prefilledExpectedDate = $selectedReq?->expected_date ? $selectedReq->expected_date->format('Y-m-d') : null;
         }
 
+        $assetCategories = AssetCategory::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $expenseAccounts = ChartOfAccount::where('tenant_id', $tenantId)
+            ->where('type', ChartOfAccount::TYPE_EXPENSE)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get();
+
         return view('modules.purchase.orders.create', compact(
             'vendors',
             'products',
@@ -166,7 +175,9 @@ class PurchaseOrderController extends Controller
             'selectedRequisitionId',
             'requisitionItemIds',
             'prefilledItems',
-            'prefilledExpectedDate'
+            'prefilledExpectedDate',
+            'assetCategories',
+            'expenseAccounts'
         ));
     }
 
@@ -204,6 +215,7 @@ class PurchaseOrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.line_type' => 'nullable|string|in:stock,asset,expense',
             'items.*.product_id' => 'required_unless:items.*.line_type,asset,expense|nullable|integer|exists:products,id',
+            'items.*.description' => 'nullable|string|max:255',
             'items.*.asset_category_id' => 'required_if:items.*.line_type,asset|nullable|integer|exists:asset_categories,id',
             'items.*.chart_of_account_id' => 'required_if:items.*.line_type,expense|nullable|integer|exists:chart_of_accounts,id',
             'items.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
@@ -225,6 +237,20 @@ class PurchaseOrderController extends Controller
             'items.*.tax_amount' => 'nullable|numeric|min:0',
             'items.*.total_amount' => 'nullable|numeric|min:0',
         ]);
+
+        // Asset/Expense lines need a product OR a description to identify what's
+        // being purchased — but not both, so a reused stocked/traded product can
+        // still be picked for a capital/expense line without retyping its name.
+        foreach ($validated['items'] as $idx => $item) {
+            $lineType = $item['line_type'] ?? 'stock';
+            if (in_array($lineType, ['asset', 'expense'], true)
+                && empty($item['product_id'])
+                && trim((string) ($item['description'] ?? '')) === '') {
+                return back()->withInput()->withErrors([
+                    "items.{$idx}.description" => 'Select a product or enter a description for this line.',
+                ]);
+            }
+        }
 
         $po = $this->orderService->storeOrder($validated, $tenantId);
 

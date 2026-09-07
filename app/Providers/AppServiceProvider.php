@@ -635,6 +635,32 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Policies\AssetPolicy::class
         );
 
+        // ── Fixed Asset Policies ────────────────────────────────────────────
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\AssetCategory::class,
+            \App\Domains\Accounting\FixedAssets\Policies\AssetCategoryPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule::class,
+            \App\Domains\Accounting\FixedAssets\Policies\AssetDepreciationPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\FixedAssets\Models\AssetDisposal::class,
+            \App\Domains\Accounting\FixedAssets\Policies\AssetDisposalPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\FixedAssets\Models\AssetWriteOff::class,
+            \App\Domains\Accounting\FixedAssets\Policies\AssetWriteOffPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\FixedAssets\Models\AssetRevaluation::class,
+            \App\Domains\Accounting\FixedAssets\Policies\AssetRevaluationPolicy::class
+        );
+
         // ── Access (RBAC admin) Policies ──────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Models\User::class,

@@ -21,10 +21,59 @@
             <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') ?? 'Validation Failed' }}: {{ $errors->first() }}" />
         @endif
 
+        <div class="card border mb-4">
+            <div class="card-body py-3">
+                @if($machine->isLinkedToAsset())
+                    @php $linkedAsset = $machine->asset; @endphp
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                        <div>
+                            <div class="fs-11 text-uppercase fw-bold text-muted mb-1">Linked Fixed Asset</div>
+                            <a href="{{ route('accounting.fixed-assets.show', $linkedAsset->id) }}" class="fw-bold text-primary font-monospace text-decoration-none">
+                                {{ $linkedAsset->asset_code }}
+                            </a>
+                            <span class="text-dark ms-1">{{ $linkedAsset->name }}</span>
+                            <div class="fs-12 text-muted mt-1">
+                                {{ $linkedAsset->category->name ?? '—' }} &middot;
+                                Cost {{ number_format($linkedAsset->purchase_cost, 2) }} &middot;
+                                <x-ui.status-badge :status="$linkedAsset->status" size="sm" />
+                            </div>
+                        </div>
+                        <form action="{{ route('production.machines.unlink-asset', $machine->id) }}" method="POST"
+                              onsubmit="return confirm('Unlink this fixed asset from the machine? The asset itself will not be affected.');">
+                            @csrf
+                            <button type="submit" class="btn btn-sm btn-light border text-danger">
+                                <i class="feather-link-2 me-1"></i>Unlink
+                            </button>
+                        </form>
+                    </div>
+                @else
+                    <div class="fs-11 text-uppercase fw-bold text-muted mb-2">Linked Fixed Asset</div>
+                    @if($linkableAssets->isEmpty())
+                        <div class="fs-12 text-muted">No unregistered machinery assets available to link.</div>
+                    @else
+                        <form action="{{ route('production.machines.link-asset', $machine->id) }}" method="POST" class="d-flex gap-2 align-items-end">
+                            @csrf
+                            <div class="flex-grow-1" style="max-width: 420px;">
+                                <x-ui.odoo-form-ui type="select" name="asset_id" select2-selector="default">
+                                    <option value="">Select a purchased asset...</option>
+                                    @foreach($linkableAssets as $asset)
+                                        <option value="{{ $asset->id }}">{{ $asset->asset_code }} — {{ $asset->name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="feather-link me-1"></i>Link
+                            </button>
+                        </form>
+                    @endif
+                @endif
+            </div>
+        </div>
+
         <form method="POST" action="{{ route('production.machines.update', $machine->id) }}">
             @csrf
             @method('PUT')
-            
+
             <x-ui.odoo-form-ui type="sheet">
                 <!-- Header with Close Button -->
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">

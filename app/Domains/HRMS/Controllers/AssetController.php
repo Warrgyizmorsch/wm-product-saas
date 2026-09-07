@@ -165,7 +165,9 @@ class AssetController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'fixed_asset_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
+            'is_production_machinery' => 'boolean',
         ]);
+        $validated['is_production_machinery'] = $request->boolean('is_production_machinery');
 
         $this->assetRepository->storeCategory($validated);
 
@@ -181,7 +183,9 @@ class AssetController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'fixed_asset_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
+            'is_production_machinery' => 'boolean',
         ]);
+        $validated['is_production_machinery'] = $request->boolean('is_production_machinery');
 
         $this->assetRepository->updateCategory($assetCategory, $validated);
 

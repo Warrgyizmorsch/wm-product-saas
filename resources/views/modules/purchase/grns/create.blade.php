@@ -606,8 +606,8 @@
                                     <i class="${isAutoExpanded ? 'feather-minus' : 'feather-plus'} me-1 fs-11"></i><span class="btn-lbl">${isAutoExpanded ? '{{ __('purchase.hide_lbl') }}' : '{{ __('purchase.note_lbl') }}'}</span>
                                 </button>
                             </div>
-                            <input type="hidden" name="items[${idx}][purchase_order_item_id]" value="${item.purchase_order_item_id}">
-                            <input type="hidden" name="items[${idx}][product_id]" value="${item.product_id}">
+                            <input type="hidden" name="items[${idx}][purchase_order_item_id]" value="${item.purchase_order_item_id ?? ''}">
+                            <input type="hidden" name="items[${idx}][product_id]" value="${item.product_id ?? ''}">
                         </td>
                         <td class="text-center font-monospace font-semibold po-col">${item.ordered_qty.toFixed(2)}</td>
                         <td class="text-center font-monospace text-muted po-col">${item.previous_received_qty.toFixed(2)}</td>

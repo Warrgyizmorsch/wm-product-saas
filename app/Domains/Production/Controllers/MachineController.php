@@ -2,6 +2,7 @@
 
 namespace App\Domains\Production\Controllers;
 
+use App\Domains\HRMS\Models\Asset;
 use App\Domains\Production\DTO\MachineDTO;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Repositories\MachineRepositoryInterface;
@@ -32,8 +33,9 @@ class MachineController extends Controller
         $machines     = $this->repository->paginateAll($filters, 15)->withQueryString();
         $workCenters  = $this->workCenterRepository->getActiveWorkCenters();
         $statuses     = config('production.machine_statuses', []);
+        $unregisteredMachineryAssets = $this->unregisteredMachineryAssetsQuery(require_tenant_id())->get();
 
-        return view('modules.production.machines.index', compact('machines', 'workCenters', 'filters', 'statuses'));
+        return view('modules.production.machines.index', compact('machines', 'workCenters', 'filters', 'statuses', 'unregisteredMachineryAssets'));
     }
 
     public function create(Request $request): View
@@ -44,7 +46,14 @@ class MachineController extends Controller
         $statuses    = config('production.machine_statuses', []);
         $selectedWorkCenterId = $request->query('work_center_id');
 
-        return view('modules.production.machines.create', compact('workCenters', 'statuses', 'selectedWorkCenterId'));
+        $linkedAsset = null;
+        $assetId = $request->query('asset_id');
+        if ($assetId) {
+            $linkedAsset = $this->unregisteredMachineryAssetsQuery(require_tenant_id())
+                ->find((int) $assetId);
+        }
+
+        return view('modules.production.machines.create', compact('workCenters', 'statuses', 'selectedWorkCenterId', 'linkedAsset'));
     }
 
     public function store(StoreMachineRequest $request): RedirectResponse
@@ -54,7 +63,8 @@ class MachineController extends Controller
         try {
             $tenantId = require_tenant_id();
             $dto      = MachineDTO::fromArray($request->validated());
-            $machine  = $this->service->create($dto, $tenantId);
+            $assetId  = $request->validated('asset_id') ? (int) $request->validated('asset_id') : null;
+            $machine  = $this->service->create($dto, $tenantId, $assetId);
 
             return redirect()
                 ->route('production.machines.index')
@@ -64,6 +74,56 @@ class MachineController extends Controller
         }
     }
 
+    public function linkAsset(Request $request, int $id): RedirectResponse
+    {
+        $machine = $this->repository->find($id);
+        abort_if(!$machine, 404, 'Machine not found.');
+
+        Gate::authorize('update', $machine);
+
+        $validated = $request->validate([
+            'asset_id' => 'required|integer|exists:assets,id',
+        ]);
+
+        try {
+            $this->service->linkAsset($id, (int) $validated['asset_id'], require_tenant_id());
+
+            return redirect()->back()->with('success', 'Fixed asset linked to this machine.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function unlinkAsset(int $id): RedirectResponse
+    {
+        $machine = $this->repository->find($id);
+        abort_if(!$machine, 404, 'Machine not found.');
+
+        Gate::authorize('update', $machine);
+
+        try {
+            $this->service->unlinkAsset($id, require_tenant_id());
+
+            return redirect()->back()->with('success', 'Fixed asset unlinked from this machine.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Purchased assets (from a category flagged as production machinery,
+     * typically arriving via a PO/GRN line_type=asset receipt) that have not
+     * yet been registered as — or linked to — a Machine.
+     */
+    private function unregisteredMachineryAssetsQuery(int $tenantId)
+    {
+        return Asset::where('tenant_id', $tenantId)
+            ->whereHas('category', fn ($q) => $q->where('is_production_machinery', true))
+            ->whereDoesntHave('productionMachine')
+            ->with('category')
+            ->orderBy('asset_code');
+    }
+
     public function edit(int $id): View
     {
         $machine = $this->repository->find($id);
@@ -71,10 +131,14 @@ class MachineController extends Controller
 
         Gate::authorize('update', $machine);
 
+        $machine->loadMissing('asset.category');
         $workCenters = $this->workCenterRepository->getActiveWorkCenters();
         $statuses    = config('production.machine_statuses', []);
+        $linkableAssets = $machine->isLinkedToAsset()
+            ? collect()
+            : $this->unregisteredMachineryAssetsQuery(require_tenant_id())->get();
 
-        return view('modules.production.machines.edit', compact('machine', 'workCenters', 'statuses'));
+        return view('modules.production.machines.edit', compact('machine', 'workCenters', 'statuses', 'linkableAssets'));
     }
 
     public function update(UpdateMachineRequest $request, int $id): RedirectResponse

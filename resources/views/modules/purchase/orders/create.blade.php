@@ -163,7 +163,8 @@
                             <x-ui.odoo-form-ui type="table" id="poItemsTable">
                                 <thead>
                                     <tr>
-                                        <th style="width: 32%">{{ __('purchase.product') }} <span class="text-danger">*</span></th>
+                                        <th style="width: 9%">Type</th>
+                                        <th style="width: 34%">{{ __('purchase.product') }} <span class="text-danger">*</span></th>
                                         <th class="text-end" style="width: 8%">{{ __('purchase.qty') }} <span class="text-danger">*</span></th>
                                         <th class="text-end" style="width: 8%">{{ __('purchase.rate') }} <span class="text-danger">*</span></th>
                                         <th class="text-end" style="width: 8%">{{ __('purchase.amount') }}</th>
@@ -186,6 +187,13 @@
                                         @foreach(old('items') as $idx => $item)
                                             <tr class="item-row" data-index="{{ $idx }}">
                                                 <td>
+                                                    <select name="items[{{ $idx }}][line_type]" class="odoo-table-select line-type-select" data-row="{{ $idx }}">
+                                                        <option value="stock" @selected(($item['line_type'] ?? 'stock') === 'stock')>Stock</option>
+                                                        <option value="asset" @selected(($item['line_type'] ?? 'stock') === 'asset')>Asset</option>
+                                                        <option value="expense" @selected(($item['line_type'] ?? 'stock') === 'expense')>Expense</option>
+                                                    </select>
+                                                </td>
+                                                <td>
                                                     <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][product_id]" class="product-select" required="true">
                                                         <option value="">{{ __('purchase.select_product') }}</option>
                                                         @foreach($products as $p)
@@ -194,6 +202,19 @@
                                                             </option>
                                                         @endforeach
                                                     </x-ui.odoo-form-ui>
+                                                    <input type="text" name="items[{{ $idx }}][description]" class="odoo-table-input item-description-input d-none mt-1" placeholder="Describe what's being purchased..." value="{{ $item['description'] ?? '' }}">
+                                                    <select name="items[{{ $idx }}][asset_category_id]" class="odoo-table-select asset-category-select d-none mt-1" data-row="{{ $idx }}">
+                                                        <option value="">Select category...</option>
+                                                        @foreach($assetCategories as $cat)
+                                                            <option value="{{ $cat->id }}" @selected(($item['asset_category_id'] ?? null) == $cat->id)>{{ $cat->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <select name="items[{{ $idx }}][chart_of_account_id]" class="odoo-table-select expense-account-select d-none mt-1" data-row="{{ $idx }}">
+                                                        <option value="">Select account...</option>
+                                                        @foreach($expenseAccounts as $acc)
+                                                            <option value="{{ $acc->id }}" @selected(($item['chart_of_account_id'] ?? null) == $acc->id)>{{ $acc->code }} - {{ $acc->name }}</option>
+                                                        @endforeach
+                                                    </select>
                                                 </td>
                                                 <td>
                                                     <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][quantity]" class="text-end qty-input" step="0.0001" min="0.0001" required="true" :value="$item['quantity']" />
@@ -237,6 +258,13 @@
                                         @foreach($prefilledItems as $idx => $item)
                                             <tr class="item-row" data-index="{{ $idx }}">
                                                 <td>
+                                                    <select name="items[{{ $idx }}][line_type]" class="odoo-table-select line-type-select" data-row="{{ $idx }}">
+                                                        <option value="stock" selected>Stock</option>
+                                                        <option value="asset">Asset</option>
+                                                        <option value="expense">Expense</option>
+                                                    </select>
+                                                </td>
+                                                <td>
                                                     <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][product_id]" class="product-select" required="true">
                                                         <option value="">{{ __('purchase.select_product') }}</option>
                                                         @foreach($products as $p)
@@ -245,6 +273,19 @@
                                                             </option>
                                                         @endforeach
                                                     </x-ui.odoo-form-ui>
+                                                    <input type="text" name="items[{{ $idx }}][description]" class="odoo-table-input item-description-input d-none mt-1" placeholder="Describe what's being purchased..." value="{{ $item['description'] ?? '' }}">
+                                                    <select name="items[{{ $idx }}][asset_category_id]" class="odoo-table-select asset-category-select d-none mt-1" data-row="{{ $idx }}">
+                                                        <option value="">Select category...</option>
+                                                        @foreach($assetCategories as $cat)
+                                                            <option value="{{ $cat->id }}" @selected(($item['asset_category_id'] ?? null) == $cat->id)>{{ $cat->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <select name="items[{{ $idx }}][chart_of_account_id]" class="odoo-table-select expense-account-select d-none mt-1" data-row="{{ $idx }}">
+                                                        <option value="">Select account...</option>
+                                                        @foreach($expenseAccounts as $acc)
+                                                            <option value="{{ $acc->id }}" @selected(($item['chart_of_account_id'] ?? null) == $acc->id)>{{ $acc->code }} - {{ $acc->name }}</option>
+                                                        @endforeach
+                                                    </select>
                                                 </td>
                                                 <td>
                                                     <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][quantity]" class="text-end qty-input" step="0.0001" min="0.0001" required="true" :value="$item['quantity']" />
@@ -288,12 +329,32 @@
                                         <!-- One blank row template -->
                                         <tr class="item-row" data-index="0">
                                             <td>
+                                                <select name="items[0][line_type]" class="odoo-table-select line-type-select" data-row="0">
+                                                    <option value="stock" selected>Stock</option>
+                                                    <option value="asset">Asset</option>
+                                                    <option value="expense">Expense</option>
+                                                </select>
+                                            </td>
+                                            <td>
                                                 <x-ui.odoo-form-ui type="select" name="items[0][product_id]" class="product-select" required="true">
                                                     <option value="">{{ __('purchase.select_product') }}</option>
                                                     @foreach($products as $p)
                                                         <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
+                                                <input type="text" name="items[0][description]" class="odoo-table-input item-description-input d-none mt-1" placeholder="Describe what's being purchased...">
+                                                <select name="items[0][asset_category_id]" class="odoo-table-select asset-category-select d-none mt-1" data-row="0">
+                                                    <option value="">Select category...</option>
+                                                    @foreach($assetCategories as $cat)
+                                                        <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <select name="items[0][chart_of_account_id]" class="odoo-table-select expense-account-select d-none mt-1" data-row="0">
+                                                    <option value="">Select account...</option>
+                                                    @foreach($expenseAccounts as $acc)
+                                                        <option value="{{ $acc->id }}">{{ $acc->code }} - {{ $acc->name }}</option>
+                                                    @endforeach
+                                                </select>
                                             </td>
                                             <td>
                                                 <x-ui.odoo-form-ui type="input" inputType="number" name="items[0][quantity]" class="text-end qty-input" step="0.0001" min="0.0001" required="true" placeholder="0" />
@@ -683,6 +744,50 @@
             $(document).on('input change', '.qty-input, .rate-input, .disc-percent-input, .tax-percent-input, #freightAmountInput, #summaryDiscount, #orderTaxPercent', calculateAll);
             $('#summaryDiscount, #orderTaxPercent').on('input', calculateAll);
 
+            // Toggle Asset Category / Expense Account selects based on line Type,
+            // and relax the Product requirement to match backend validation
+            // (product_id is required_unless line_type is asset/expense).
+            function applyLineTypeVisibility($row) {
+                const type = $row.find('.line-type-select').val();
+                const $productSelect = $row.find('.product-select');
+                const $descriptionInput = $row.find('.item-description-input');
+                const $categorySelect = $row.find('.asset-category-select');
+                const $accountSelect = $row.find('.expense-account-select');
+                const isNonStock = (type === 'asset' || type === 'expense');
+
+                $categorySelect.toggleClass('d-none', type !== 'asset');
+                $accountSelect.toggleClass('d-none', type !== 'expense');
+                // Product stays selectable for Asset/Expense too (e.g. capitalizing units
+                // of a product you already stock/trade) — Description is an alternative
+                // for one-off purchases that aren't in the product catalog, not a
+                // replacement. Only Stock strictly requires picking a product.
+                $descriptionInput.toggleClass('d-none', !isNonStock);
+
+                if (isNonStock) {
+                    $productSelect.prop('required', false);
+                    $descriptionInput.prop('placeholder', "Describe it here if it's not a catalog product...");
+                } else {
+                    $productSelect.prop('required', true);
+                    $descriptionInput.val('');
+                    $categorySelect.val('');
+                    $accountSelect.val('');
+                }
+
+                if (type !== 'asset') {
+                    $categorySelect.val('');
+                }
+                if (type !== 'expense') {
+                    $accountSelect.val('');
+                }
+            }
+
+            $(document).on('change', '.line-type-select', function() {
+                applyLineTypeVisibility($(this).closest('tr'));
+            });
+            $('#poItemsTable tbody tr.item-row').each(function() {
+                applyLineTypeVisibility($(this));
+            });
+
             // Handle Product Selection - prefill rate
             $(document).on('change', '.product-select', function() {
                 const opt = this.options[this.selectedIndex];
@@ -698,10 +803,30 @@
                 const newRow = `
                     <tr class="item-row" data-index="${rowIdx}">
                         <td>
+                            <select name="items[${rowIdx}][line_type]" class="odoo-table-select line-type-select" data-row="${rowIdx}">
+                                <option value="stock" selected>Stock</option>
+                                <option value="asset">Asset</option>
+                                <option value="expense">Expense</option>
+                            </select>
+                        </td>
+                        <td>
                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
                                 <option value="">{{ __('purchase.select_product') }}</option>
                                 @foreach($products as $p)
                                     <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                @endforeach
+                            </select>
+                            <input type="text" name="items[${rowIdx}][description]" class="odoo-table-input item-description-input d-none mt-1" placeholder="Describe what's being purchased...">
+                            <select name="items[${rowIdx}][asset_category_id]" class="odoo-table-select asset-category-select d-none mt-1" data-row="${rowIdx}">
+                                <option value="">Select category...</option>
+                                @foreach($assetCategories as $cat)
+                                    <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                @endforeach
+                            </select>
+                            <select name="items[${rowIdx}][chart_of_account_id]" class="odoo-table-select expense-account-select d-none mt-1" data-row="${rowIdx}">
+                                <option value="">Select account...</option>
+                                @foreach($expenseAccounts as $acc)
+                                    <option value="{{ $acc->id }}">{{ $acc->code }} - {{ $acc->name }}</option>
                                 @endforeach
                             </select>
                         </td>
@@ -746,6 +871,7 @@
                 const $tr = $(newRow);
                 $('#poItemsTable tbody').append($tr);
                 initSelect2($tr);
+                applyLineTypeVisibility($tr);
                 updateRemoveRowButtons();
                 adjustLayout();
             });
@@ -795,10 +921,30 @@
                                 const trMarkup = `
                                     <tr class="item-row" data-index="${rowIdx}">
                                         <td>
+                                            <select name="items[${rowIdx}][line_type]" class="odoo-table-select line-type-select" data-row="${rowIdx}">
+                                                <option value="stock" selected>Stock</option>
+                                                <option value="asset">Asset</option>
+                                                <option value="expense">Expense</option>
+                                            </select>
+                                        </td>
+                                        <td>
                                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
                                                 <option value="">{{ __('purchase.select_product') }}</option>
                                                 @foreach($products as $p)
                                                     <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">${item.product_name}</option>
+                                                @endforeach
+                                            </select>
+                                            <input type="text" name="items[${rowIdx}][description]" class="odoo-table-input item-description-input d-none mt-1" placeholder="Describe what's being purchased...">
+                                            <select name="items[${rowIdx}][asset_category_id]" class="odoo-table-select asset-category-select d-none mt-1" data-row="${rowIdx}">
+                                                <option value="">Select category...</option>
+                                                @foreach($assetCategories as $cat)
+                                                    <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <select name="items[${rowIdx}][chart_of_account_id]" class="odoo-table-select expense-account-select d-none mt-1" data-row="${rowIdx}">
+                                                <option value="">Select account...</option>
+                                                @foreach($expenseAccounts as $acc)
+                                                    <option value="{{ $acc->id }}">{{ $acc->code }} - {{ $acc->name }}</option>
                                                 @endforeach
                                             </select>
                                         </td>
@@ -843,8 +989,9 @@
                                 const $tr = $(trMarkup);
                                 $('#poItemsTable tbody').append($tr);
                                 $tr.find('.product-select').val(item.product_id);
+                                applyLineTypeVisibility($tr);
                             });
-                            
+
                             initSelect2($('#poItemsTable tbody'));
                             updateRemoveRowButtons();
                             adjustLayout();

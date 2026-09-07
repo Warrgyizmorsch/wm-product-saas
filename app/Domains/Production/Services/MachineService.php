@@ -2,6 +2,7 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\HRMS\Models\Asset;
 use App\Domains\Production\DTO\MachineDTO;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\WorkCenter;
@@ -14,7 +15,7 @@ class MachineService
         private readonly MachineRepositoryInterface $repository
     ) {}
 
-    public function create(MachineDTO $dto, int $tenantId): Machine
+    public function create(MachineDTO $dto, int $tenantId, ?int $assetId = null): Machine
     {
         // Validate work center belongs to tenant
         $workCenter = WorkCenter::find($dto->work_center_id);
@@ -29,9 +30,65 @@ class MachineService
             );
         }
 
-        return $this->repository->create(
-            array_merge($dto->toArray(), ['tenant_id' => $tenantId])
-        );
+        $data = array_merge($dto->toArray(), ['tenant_id' => $tenantId]);
+
+        if ($assetId !== null) {
+            $data['asset_id'] = $this->validateAssetForLinking($assetId, $tenantId);
+        }
+
+        return $this->repository->create($data);
+    }
+
+    /**
+     * Link an existing Fixed Asset accounting record to an already-created
+     * machine — the retroactive/manual path (historical data, or a category
+     * flagged as production machinery after the asset was already purchased).
+     */
+    public function linkAsset(int $machineId, int $assetId, int $tenantId): Machine
+    {
+        $machine = $this->repository->find($machineId);
+        if (!$machine || $machine->tenant_id !== $tenantId) {
+            throw new InvalidArgumentException('Machine not found.');
+        }
+
+        $this->validateAssetForLinking($assetId, $tenantId, $machineId);
+
+        return $this->repository->update($machineId, ['asset_id' => $assetId]);
+    }
+
+    public function unlinkAsset(int $machineId, int $tenantId): Machine
+    {
+        $machine = $this->repository->find($machineId);
+        if (!$machine || $machine->tenant_id !== $tenantId) {
+            throw new InvalidArgumentException('Machine not found.');
+        }
+
+        return $this->repository->update($machineId, ['asset_id' => null]);
+    }
+
+    /**
+     * Shared guard for both create-with-asset and link-asset: the asset must
+     * belong to the same tenant and not already be linked to a different
+     * machine (one-directional, at-most-one-machine-per-asset invariant
+     * enforced here rather than via a DB unique index, so a violation
+     * surfaces as a clear validation message instead of a constraint error).
+     */
+    private function validateAssetForLinking(int $assetId, int $tenantId, ?int $excludeMachineId = null): int
+    {
+        $asset = Asset::find($assetId);
+        if (!$asset || $asset->tenant_id !== $tenantId) {
+            throw new InvalidArgumentException('Invalid asset selected.');
+        }
+
+        $alreadyLinked = Machine::where('asset_id', $assetId)
+            ->when($excludeMachineId !== null, fn ($q) => $q->where('id', '!=', $excludeMachineId))
+            ->exists();
+
+        if ($alreadyLinked) {
+            throw new InvalidArgumentException('This asset is already linked to another machine.');
+        }
+
+        return $assetId;
     }
 
     public function update(int $id, MachineDTO $dto): Machine

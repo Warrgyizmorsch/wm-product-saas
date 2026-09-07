@@ -182,6 +182,12 @@
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
                 ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
                 ['label' => 'Cost Centers', 'route' => 'accounting.cost-centers.index'],
+                ['label' => 'Fixed Asset Register', 'route' => 'accounting.fixed-assets.index'],
+                ['label' => 'Asset Categories', 'route' => 'accounting.fixed-assets.categories.index'],
+                ['label' => 'Depreciation', 'route' => 'accounting.fixed-assets.depreciation.index'],
+                ['label' => 'Asset Disposals', 'route' => 'accounting.fixed-assets.disposals.index'],
+                ['label' => 'Asset Write-offs', 'route' => 'accounting.fixed-assets.write-offs.index'],
+                ['label' => 'Asset Revaluations', 'route' => 'accounting.fixed-assets.revaluations.index'],
                 ['label' => 'Journals', 'route' => 'accounting.journals.index'],
                 ['label' => 'Payment Vouchers', 'route' => 'accounting.vouchers.payment.index'],
                 ['label' => 'Receipt Vouchers', 'route' => 'accounting.vouchers.receipt.index'],

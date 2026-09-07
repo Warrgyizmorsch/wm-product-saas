@@ -22,6 +22,7 @@ class PurchaseOrderItem extends Model
         'company_id',
         'branch_id',
         'product_id',
+        'description',
         'line_type',
         'chart_of_account_id',
         'asset_category_id',

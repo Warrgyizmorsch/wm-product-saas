@@ -52,4 +52,18 @@ class AssetPolicy
             'tenant_id' => $tenantId,
         ]);
     }
+
+    /**
+     * Fixed-asset financial capitalization — distinct from hrms.assets.*
+     * (physical custody/allocation), gated by the fixed_assets.* permission
+     * namespace instead.
+     */
+    public function capitalize(User $user, mixed $asset = null): bool
+    {
+        $tenantId = $asset instanceof Asset ? $asset->tenant_id : $user->tenant_id;
+
+        return $this->access->allows($user, 'fixed_assets.assets.capitalize', [
+            'tenant_id' => $tenantId,
+        ]);
+    }
 }

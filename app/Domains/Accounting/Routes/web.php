@@ -8,6 +8,12 @@ use App\Domains\Accounting\Controllers\BalanceSheetController;
 use App\Domains\Accounting\Controllers\CashFlowController;
 use App\Domains\Accounting\Controllers\ChartOfAccountController;
 use App\Domains\Accounting\Controllers\CostCenterController;
+use App\Domains\Accounting\Controllers\FixedAssets\AssetCategoryController;
+use App\Domains\Accounting\Controllers\FixedAssets\AssetDepreciationController;
+use App\Domains\Accounting\Controllers\FixedAssets\AssetDisposalController;
+use App\Domains\Accounting\Controllers\FixedAssets\AssetRegisterController;
+use App\Domains\Accounting\Controllers\FixedAssets\AssetRevaluationController;
+use App\Domains\Accounting\Controllers\FixedAssets\AssetWriteOffController;
 use App\Domains\Accounting\Controllers\DayBookController;
 use App\Domains\Accounting\Controllers\FiscalYearController;
 use App\Domains\Accounting\Controllers\GeneralLedgerController;
@@ -70,6 +76,75 @@ Route::prefix('accounting')
         Route::get('posting-failures', [AccountingPostingFailureController::class, 'index'])->name('posting-failures.index');
         Route::post('posting-failures/{failure}/retry', [AccountingPostingFailureController::class, 'retry'])->name('posting-failures.retry');
         Route::post('posting-failures/{failure}/dismiss', [AccountingPostingFailureController::class, 'dismiss'])->name('posting-failures.dismiss');
+
+        Route::prefix('fixed-assets')
+            ->as('fixed-assets.')
+            ->group(function (): void {
+                // Sub-resource groups (depreciation/disposals/write-offs/revaluations)
+                // must be registered before the /{asset} show route below — otherwise
+                // that wildcard greedily matches segments like "depreciation" first,
+                // attempts to resolve them as an Asset id, and 404s before the more
+                // specific routes are ever reached.
+                Route::get('/', [AssetRegisterController::class, 'index'])->name('index');
+
+                Route::prefix('depreciation')
+                    ->as('depreciation.')
+                    ->group(function (): void {
+                        Route::get('/', [AssetDepreciationController::class, 'index'])->name('index');
+                        Route::post('/generate', [AssetDepreciationController::class, 'generate'])->name('generate');
+                        Route::post('/{schedule}/review', [AssetDepreciationController::class, 'review'])->name('review');
+                        Route::post('/{schedule}/approve', [AssetDepreciationController::class, 'approve'])->name('approve');
+                        Route::post('/{schedule}/post', [AssetDepreciationController::class, 'post'])->name('post');
+                    });
+
+                Route::prefix('disposals')
+                    ->as('disposals.')
+                    ->group(function (): void {
+                        Route::get('/', [AssetDisposalController::class, 'index'])->name('index');
+                        Route::get('/create', [AssetDisposalController::class, 'create'])->name('create');
+                        Route::post('/', [AssetDisposalController::class, 'store'])->name('store');
+                        Route::post('/{disposal}/approve', [AssetDisposalController::class, 'approve'])->name('approve');
+                        Route::post('/{disposal}/reject', [AssetDisposalController::class, 'reject'])->name('reject');
+                        Route::post('/{disposal}/post', [AssetDisposalController::class, 'post'])->name('post');
+                    });
+
+                Route::prefix('write-offs')
+                    ->as('write-offs.')
+                    ->group(function (): void {
+                        Route::get('/', [AssetWriteOffController::class, 'index'])->name('index');
+                        Route::get('/create', [AssetWriteOffController::class, 'create'])->name('create');
+                        Route::post('/', [AssetWriteOffController::class, 'store'])->name('store');
+                        Route::post('/{writeOff}/approve', [AssetWriteOffController::class, 'approve'])->name('approve');
+                        Route::post('/{writeOff}/reject', [AssetWriteOffController::class, 'reject'])->name('reject');
+                        Route::post('/{writeOff}/post', [AssetWriteOffController::class, 'post'])->name('post');
+                    });
+
+                Route::prefix('revaluations')
+                    ->as('revaluations.')
+                    ->group(function (): void {
+                        Route::get('/', [AssetRevaluationController::class, 'index'])->name('index');
+                        Route::get('/create', [AssetRevaluationController::class, 'create'])->name('create');
+                        Route::post('/', [AssetRevaluationController::class, 'store'])->name('store');
+                        Route::post('/{revaluation}/approve', [AssetRevaluationController::class, 'approve'])->name('approve');
+                        Route::post('/{revaluation}/reject', [AssetRevaluationController::class, 'reject'])->name('reject');
+                        Route::post('/{revaluation}/post', [AssetRevaluationController::class, 'post'])->name('post');
+                    });
+
+                Route::prefix('categories')
+                    ->as('categories.')
+                    ->group(function (): void {
+                        Route::get('/', [AssetCategoryController::class, 'index'])->name('index');
+                        Route::post('/', [AssetCategoryController::class, 'store'])->name('store');
+                        Route::put('/{category}', [AssetCategoryController::class, 'update'])->name('update');
+                        Route::delete('/{category}', [AssetCategoryController::class, 'destroy'])->name('destroy');
+                    });
+
+                Route::get('/register', [AssetRegisterController::class, 'create'])->name('register');
+                Route::post('/register', [AssetRegisterController::class, 'store'])->name('register.store');
+
+                Route::get('/{asset}', [AssetRegisterController::class, 'show'])->name('show');
+                Route::post('/{asset}/capitalize', [AssetRegisterController::class, 'capitalize'])->name('capitalize');
+            });
 
         foreach (VoucherType::ALL as $voucherType) {
             Route::prefix("vouchers/{$voucherType}")

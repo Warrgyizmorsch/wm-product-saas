@@ -35,7 +35,7 @@ class CreateAssetFromGrnLine
                 return;
             }
 
-            $name = $item->product?->name ?? $item->remarks ?? "GRN Line #{$item->id}";
+            $name = $item->product?->name ?? $item->purchaseOrderItem?->description ?? $item->remarks ?? "GRN Line #{$item->id}";
             $unitCount = max(1, (int) round($item->accepted_qty));
             $unitCost = $unitCount > 0 ? round($item->total_amount / $unitCount, 2) : $item->total_amount;
 

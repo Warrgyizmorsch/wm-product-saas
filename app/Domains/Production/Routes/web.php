@@ -111,6 +111,8 @@ Route::prefix('production')
         Route::get('machines/by-work-center/{workCenter}', [MachineController::class, 'byWorkCenter'])
             ->name('machines.by-work-center');
         Route::post('machines/bulk-action', [MachineController::class, 'bulkAction'])->name('machines.bulk-action');
+        Route::post('machines/{machine}/link-asset', [MachineController::class, 'linkAsset'])->name('machines.link-asset');
+        Route::post('machines/{machine}/unlink-asset', [MachineController::class, 'unlinkAsset'])->name('machines.unlink-asset');
         Route::resource('machines', MachineController::class)->except(['show']);
 
         // ── Plant Maintenance ──────────────────────────────────────────────────
