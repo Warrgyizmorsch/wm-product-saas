@@ -59,6 +59,7 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
         return DB::transaction(function () use ($tenantId, $attributes, $items) {
             $challanNumber = $this->getNextChallanNumber($tenantId);
             $firstWarehouseId = $attributes['warehouse_id'] ?? ($items[0]['warehouse_id'] ?? null);
+            $dispatchedWipQty = (float) collect($items)->sum('quantity');
 
             $challan = DeliveryChallan::create([
                 'tenant_id' => $tenantId,
@@ -71,6 +72,7 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
                 'challan_date' => $attributes['challan_date'],
                 'expected_return_date' => $attributes['expected_return_date'] ?? null,
                 'status' => $attributes['status'],
+                'dispatched_wip_qty' => $dispatchedWipQty,
                 'vehicle_number' => $attributes['vehicle_number'] ?? null,
                 'transporter_name' => $attributes['transporter_name'] ?? null,
                 'lr_number' => $attributes['lr_number'] ?? null,
@@ -79,11 +81,56 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
                 'created_by' => $attributes['created_by'] ?? (auth()->id() ?: 1),
             ]);
 
+            $op = !empty($attributes['production_order_operation_id'])
+                ? \App\Domains\Production\Models\ProductionOrderOperation::find($attributes['production_order_operation_id'])
+                : null;
+
             foreach ($items as $item) {
+                $batchId = $item['production_batch_id'] ?? null;
+                $wipId = $item['production_wip_id'] ?? null;
+                $orderId = $attributes['production_order_id'] ?? null;
+
+                if ($orderId && (!$wipId || !$batchId)) {
+                    if (!$batchId) {
+                        $batch = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $tenantId)
+                            ->where('production_order_id', $orderId)
+                            ->first();
+                        $batchId = $batch?->id;
+                    }
+
+                    if (!$wipId) {
+                        $wip = \App\Domains\Production\Models\ProductionWip::where('tenant_id', $tenantId)
+                            ->where('production_order_id', $orderId)
+                            ->first();
+
+                        if (!$wip) {
+                            $order = \App\Domains\Production\Models\ProductionOrder::find($orderId);
+                            $wip = \App\Domains\Production\Models\ProductionWip::create([
+                                'tenant_id' => $tenantId,
+                                'production_order_id' => $orderId,
+                                'production_batch_id' => $batchId,
+                                'product_id' => $item['product_id'] ?? $order?->product_id,
+                                'current_routing_operation_id' => $op?->routing_operation_id,
+                                'current_work_center_id' => $op?->work_center_id,
+                                'quantity' => $order?->quantity_ordered ?? 0,
+                                'available_quantity' => 0,
+                                'completed_quantity' => 0,
+                                'rejected_quantity' => 0,
+                                'scrap_quantity' => 0,
+                                'rework_quantity' => 0,
+                                'status' => 'active',
+                            ]);
+                        }
+                        $wipId = $wip?->id;
+                    }
+                }
+
                 DeliveryChallanItem::create([
                     'tenant_id' => $tenantId,
                     'delivery_challan_id' => $challan->id,
                     'product_id' => $item['product_id'],
+                    'production_batch_id' => $batchId,
+                    'production_wip_id' => $wipId,
                     'warehouse_id' => $item['warehouse_id'],
                     'quantity' => $item['quantity'],
                     'unit_of_measure' => $item['unit_of_measure'] ?? 'PCS',
@@ -105,7 +152,11 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
     public function getNextChallanNumber(int $tenantId): string
     {
         $lastChallan = DeliveryChallan::where('tenant_id', $tenantId)->latest('id')->first();
-        $nextNum = $lastChallan ? ((int) preg_replace('/[^0-9]/', '', $lastChallan->challan_number)) + 1 : 1;
+        $nextNum = 1;
+
+        if ($lastChallan && preg_match('/DC-\d{4}-(\d+)/', $lastChallan->challan_number, $matches)) {
+            $nextNum = ((int) $matches[1]) + 1;
+        }
 
         return 'DC-' . date('Y') . '-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
     }

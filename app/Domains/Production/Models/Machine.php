@@ -3,6 +3,7 @@
 namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
+use App\Domains\HRMS\Models\Asset;
 use App\Models\Concerns\Loggable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -32,6 +33,7 @@ class Machine extends BaseModel
     protected $fillable = [
         'tenant_id',
         'work_center_id',
+        'asset_id',
         'name',
         'code',
         'machine_type',
@@ -59,6 +61,21 @@ class Machine extends BaseModel
     public function workCenter(): BelongsTo
     {
         return $this->belongsTo(WorkCenter::class, 'work_center_id');
+    }
+
+    /**
+     * The Fixed Asset accounting record this machine was capitalized from
+     * (nullable — most machines are commissioned before/without a linked
+     * asset, or the link is added retroactively via link-asset).
+     */
+    public function asset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class, 'asset_id');
+    }
+
+    public function isLinkedToAsset(): bool
+    {
+        return $this->asset_id !== null;
     }
 
     public function operations(): HasMany

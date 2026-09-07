@@ -32,6 +32,81 @@ class ProductionOrderService
     ) {}
 
     /**
+     * Create a Production Order directly, evaluating any BOM item formulas using provided parameters.
+     */
+    public function create(array $data, ?int $userId = null): ProductionOrder
+    {
+        return DB::transaction(function () use ($data, $userId) {
+            $productId = $data['product_id'];
+            $product = Product::withoutGlobalScopes()->findOrFail($productId);
+            $tenantId = $data['tenant_id'] ?? $product->tenant_id;
+
+            $bomId = $data['bom_id'] ?? null;
+            $bom = null;
+            if ($bomId) {
+                $bom = ProductionBom::withoutGlobalScopes()->with(['items.material', 'product'])->find($bomId);
+            } else {
+                $bom = ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_id', $productId)
+                    ->where('status', 'approved')
+                    ->with(['items.material', 'product'])
+                    ->first();
+                $bomId = $bom?->id;
+            }
+
+            $order = ProductionOrder::create([
+                'tenant_id' => $tenantId,
+                'order_number' => $data['order_number'] ?? $this->numberService->generateNextNumber($tenantId),
+                'product_id' => $productId,
+                'bom_id' => $bomId,
+                'quantity_ordered' => $data['quantity_ordered'] ?? 1,
+                'start_date' => $data['start_date'] ?? now()->toDateString(),
+                'end_date' => $data['end_date'] ?? now()->addDays(7)->toDateString(),
+                'status' => $data['status'] ?? ProductionOrder::STATUS_RELEASED,
+                'parameters' => $data['parameters'] ?? [],
+                'created_by' => $userId,
+            ]);
+
+            if ($bom) {
+                $evaluator = app(BomFormulaEvaluatorService::class);
+                $parameters = $order->parameters ?? [];
+                $orderQty = (float) $order->quantity_ordered;
+                $baseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
+                $multiplier = $orderQty / $baseQty;
+
+                foreach ($bom->items as $item) {
+                    if (!$item->material_id) continue;
+
+                    if ($item->isFormula()) {
+                        $unitQty = $evaluator->evaluate($item->formula, $parameters, $bom->product);
+                    } else {
+                        $unitQty = (float) $item->quantity;
+                    }
+
+                    $scrapPct = (float) ($item->material_scrap_percentage ?? 0);
+                    $scrapFactor = 1.0 + ($scrapPct / 100.0);
+                    $plannedQty = max(0.0, $unitQty * $multiplier * $scrapFactor);
+
+                    ProductionOrderReservation::create([
+                        'tenant_id' => $tenantId,
+                        'production_order_id' => $order->id,
+                        'bom_item_id' => $item->id,
+                        'product_id' => $item->material_id,
+                        'warehouse_id' => $this->resolveReservationWarehouseId($tenantId, $item->material_id),
+                        'quantity_planned' => round($plannedQty, 4),
+                        'quantity_reserved' => 0.0,
+                        'quantity_issued' => 0.0,
+                        'uom_id' => $item->uom_id ?? ($item->material?->uom_id ?? 1),
+                    ]);
+                }
+            }
+
+            return $order;
+        });
+    }
+
+    /**
      * Convert an approved Production Plan into a Production Order with frozen snapshots.
      */
     public function createFromPlan(int $planId, ?int $userId = null): ProductionOrder
@@ -78,13 +153,13 @@ class ProductionOrderService
                     $req->bom_item_id,
                     $req->product_id,
                     (float) $req->required_quantity,
-                    $req->uom_id
+                    $req->uom_id ?? $req->product?->uom_id ?? 1
                 );
 
                 $itemsToResolve[] = [
                     'product_id' => $req->product_id,
                     'planned_qty' => (float) $req->required_quantity,
-                    'uom_id' => $req->uom_id,
+                    'uom_id' => $req->uom_id ?? $req->product?->uom_id ?? 1,
                     'child_bom_id' => null,
                 ];
             }
@@ -95,7 +170,12 @@ class ProductionOrderService
             $bom = $order->bom ?? ProductionBom::withoutGlobalScopes()->find($order->bom_id);
             $routing = $order->routing ?? ($order->routing_id ? Routing::withoutGlobalScopes()->find($order->routing_id) : null);
 
-            foreach ($plan->operations as $idx => $planOp) {
+            $hasChildBoms = $bom && $bom->items()->whereNotNull('child_bom_id')->exists();
+
+            if ($hasChildBoms && $routing) {
+                $this->snapshotMultiLevelRoutings($order, $bom, $routing, (float) $order->quantity_ordered, $order->tenant_id, $userId);
+            } else {
+                foreach ($plan->operations as $idx => $planOp) {
                 $status = ($idx === 0) ? ProductionOrderOperation::STATUS_READY : ProductionOrderOperation::STATUS_WAITING;
                 $routingOp = $planOp->routingOperation;
 
@@ -161,10 +241,12 @@ class ProductionOrderService
                     'quantity_rejected' => 0.0000,
                     'quantity_scrapped' => 0.0000,
                     'is_external' => (bool) (($planOp->is_external ?? $routingOp?->is_external ?? false) || in_array($order->production_model, ['complete_subcontracting', 'subcontract_company_material'])),
+                    'vendor_id' => $planOp->vendor_id ?? $routingOp?->vendor_id,
                     'subcontract_lead_time_days' => (int) ($routingOp?->subcontract_lead_time_days ?? 0),
                     'subcontract_cost_per_unit' => (float) ($routingOp?->subcontract_cost_per_unit ?? 0.0),
                     'subcontract_service_product_id' => $routingOp?->subcontract_service_product_id,
                     'material_supply_type' => $routingOp?->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
+                    'subcontract_input_type' => $routingOp?->subcontract_input_type ?? 'bom_raw_materials',
                     'dispatch_buffer_days' => (int) ($routingOp?->dispatch_buffer_days ?? 0),
                     'return_buffer_days' => (int) ($routingOp?->return_buffer_days ?? 0),
                     'queue_threshold_enabled' => (bool) ($routingOp?->queue_threshold_enabled ?? $routingOp?->overlap_enabled ?? false),
@@ -179,6 +261,7 @@ class ProductionOrderService
             for ($i = 1; $i < count($createdOps); $i++) {
                 $createdOps[$i]->previous_operation_id = $createdOps[$i - 1]->id;
                 $createdOps[$i]->save();
+            }
             }
 
             // Auto-orchestrate Subcontract Procurement according to tenant settings (Manual PR/PO, Auto Draft PO, Auto Approved PO)
@@ -340,20 +423,28 @@ class ProductionOrderService
 
             // 1. Resolve & Snapshot reservations directly from BOM items
             $itemsToResolve = [];
+            $evaluator = app(BomFormulaEvaluatorService::class);
             foreach ($bom->items as $item) {
-                $plannedQty = $item->quantity * ($quantity / ($bom->base_quantity ?: 1.0));
+                if ($item->isFormula()) {
+                    $unitQty = $evaluator->evaluate($item->formula, $order->parameters ?? [], $order->product);
+                } else {
+                    $unitQty = (float) $item->quantity;
+                }
+
+                $plannedQty = $unitQty * ($quantity / ($bom->base_quantity ?: 1.0));
 
                 // Add scrap factor if defined
                 if ($item->material_scrap_percentage > 0) {
                     $plannedQty *= (1 + ($item->material_scrap_percentage / 100));
                 }
 
-                $this->createMaterialReservation($order, $item->id, $item->material_id, $plannedQty, $item->uom_id, $item->child_bom_id);
+                $resolvedUom = $item->uom_id ?? $item->material?->uom_id ?? 1;
+                $this->createMaterialReservation($order, $item->id, $item->material_id, $plannedQty, $resolvedUom, $item->child_bom_id);
 
                 $itemsToResolve[] = [
                     'product_id' => $item->material_id,
                     'planned_qty' => $plannedQty,
-                    'uom_id' => $item->uom_id,
+                    'uom_id' => $resolvedUom,
                     'child_bom_id' => $item->child_bom_id,
                 ];
             }
@@ -1032,7 +1123,7 @@ class ProductionOrderService
         ProductionRequisitionSlip $slip,
         int $productId,
         float $plannedQty,
-        int $uomId,
+        ?int $uomId,
         ?int $warehouseId
     ): ProductionRequisitionSlipItem {
         $existingItem = ProductionRequisitionSlipItem::where('tenant_id', $slip->tenant_id)
@@ -1046,6 +1137,10 @@ class ProductionOrderService
             return $existingItem;
         }
 
+        $resolvedUomId = ($uomId && $uomId > 0)
+            ? $uomId
+            : (\App\Domains\Inventory\Models\Product::withoutGlobalScopes()->where('tenant_id', $slip->tenant_id)->where('id', $productId)->value('uom_id') ?? 1);
+
         return ProductionRequisitionSlipItem::create([
             'tenant_id' => $slip->tenant_id,
             'production_requisition_slip_id' => $slip->id,
@@ -1054,7 +1149,7 @@ class ProductionOrderService
             'quantity_planned' => $plannedQty,
             'quantity_reserved' => 0.0000,
             'quantity_issued' => 0.0000,
-            'uom_id' => $uomId,
+            'uom_id' => $resolvedUomId,
         ]);
     }
 
@@ -1180,6 +1275,7 @@ class ProductionOrderService
                 'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
                 'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
                 'material_supply_type' => $routingOp->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
+                'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
                 'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
                 'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),
                 'queue_threshold_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
@@ -1379,8 +1475,7 @@ class ProductionOrderService
             return;
         }
 
-        $isMultiRouting = $ops->contains(fn($o) => !empty($o->source_product_id) && (int) $o->source_product_id !== (int) $order->product_id)
-            || \App\Domains\Production\Models\ProductionOrderOperationDependency::where('production_order_id', $order->id)->exists();
+        $readinessService = app(ProductionReadinessService::class);
 
         foreach ($ops as $op) {
             // Do not override terminal or active progress states
@@ -1394,42 +1489,10 @@ class ProductionOrderService
                 continue;
             }
 
-            // Gather all predecessor operation IDs
-            $predIds = [];
-            if ($op->previous_operation_id) {
-                $predIds[] = (int) $op->previous_operation_id;
-            }
-            foreach ($op->predecessorDependencies as $pred) {
-                $predIds[] = (int) $pred->id;
-            }
-
-            // Single-routing fallback if no explicit dependencies exist
-            if (empty($predIds) && !$isMultiRouting && $op->sequence > $ops->min('sequence')) {
-                $prevSeqOp = $ops->where('sequence', '<', $op->sequence)->sortByDesc('sequence')->first();
-                if ($prevSeqOp) {
-                    $predIds[] = (int) $prevSeqOp->id;
-                }
-            }
-
-            if (empty($predIds)) {
-                // No predecessors -> Initial ready operation
-                $newStatus = ProductionOrderOperation::STATUS_READY;
-            } else {
-                // Check if all predecessors are completed, skipped, or have transferred output
-                $incompletePreds = $ops->whereIn('id', $predIds)->reject(function ($predOp) {
-                    $freshPred = $predOp->fresh() ?? $predOp;
-                    return in_array($freshPred->status, [
-                        ProductionOrderOperation::STATUS_COMPLETED,
-                        ProductionOrderOperation::STATUS_SKIPPED,
-                        ProductionOrderOperation::STATUS_CANCELLED,
-                    ], true) || (float) $freshPred->quantity_transferred_out > 0
-                             || ($freshPred->target_produced_qty > 0 && (float) $freshPred->quantity_produced >= (float) $freshPred->target_produced_qty);
-                });
-
-                $newStatus = $incompletePreds->isEmpty()
-                    ? ProductionOrderOperation::STATUS_READY
-                    : ProductionOrderOperation::STATUS_WAITING;
-            }
+            $eval = $readinessService->evaluateOperationReadiness($op);
+            $newStatus = ($eval['overall_status'] !== ProductionReadinessService::STATUS_BLOCKED)
+                ? ProductionOrderOperation::STATUS_READY
+                : ProductionOrderOperation::STATUS_WAITING;
 
             if ($op->status !== $newStatus) {
                 $op->status = $newStatus;

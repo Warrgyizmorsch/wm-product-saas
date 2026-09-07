@@ -129,6 +129,7 @@ class ProductionOrder extends BaseModel
         'qr_code',
         'sales_order_id',
         'sales_order_item_id',
+        'parameters',
     ];
 
     protected $casts = [
@@ -143,6 +144,7 @@ class ProductionOrder extends BaseModel
         'released_at' => 'datetime',
         'completed_at' => 'datetime',
         'closed_at' => 'datetime',
+        'parameters' => 'array',
     ];
 
     public function plan(): BelongsTo

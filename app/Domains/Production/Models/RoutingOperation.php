@@ -53,6 +53,7 @@ class RoutingOperation extends BaseModel
         'subcontract_cost_per_unit',
         'subcontract_service_product_id',
         'material_supply_type',
+        'subcontract_input_type',
         'dispatch_buffer_days',
         'return_buffer_days',
         'parallel_group',
@@ -150,6 +151,11 @@ class RoutingOperation extends BaseModel
     public function isOutsourced(): bool
     {
         return $this->operation_type === self::TYPE_OUTSOURCING || $this->is_external;
+    }
+
+    public function isWipJobWork(): bool
+    {
+        return $this->isOutsourced() && $this->subcontract_input_type === 'previous_operation_wip';
     }
 
     // ─── Computed Helpers ─────────────────────────────────────────────────────

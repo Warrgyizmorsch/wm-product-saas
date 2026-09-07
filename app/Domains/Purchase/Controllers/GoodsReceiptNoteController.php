@@ -58,12 +58,16 @@ class GoodsReceiptNoteController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', GoodsReceiptNote::class);
+
         $grns = $this->grnRepo->getPaginatedGrns($request->all(), 15);
         return view('modules.purchase.grns.index', compact('grns'));
     }
 
     public function create(Request $request)
     {
+        $this->authorize('create', GoodsReceiptNote::class);
+
         $tenantId = require_tenant_id();
 
         $approvedOrders = PurchaseOrder::where('tenant_id', $tenantId)
@@ -132,7 +136,10 @@ class GoodsReceiptNoteController extends Controller
             ->with(['vendor', 'warehouse', 'items.product.uom'])
             ->findOrFail($poId);
 
-        $items = $order->items->groupBy('product_id')->map(function ($productItems) use ($order) {
+        // Group by product_id + line_type, not product_id alone — otherwise a split
+        // purchase of the same product (e.g. 8 units to Stock, 2 to Asset) would
+        // incorrectly merge into a single GRN receiving line.
+        $items = $order->items->groupBy(fn ($item) => $item->product_id . '|' . $item->line_type)->map(function ($productItems) use ($order) {
             $first = $productItems->first();
             $orderedQty = (float)$productItems->sum('quantity');
             $prevReceived = (float)$productItems->sum('received_qty');
@@ -153,7 +160,8 @@ class GoodsReceiptNoteController extends Controller
             return [
                 'purchase_order_item_id' => $first->id,
                 'product_id' => $first->product_id,
-                'product_name' => $first->product?->name ?? 'Product #' . $first->product_id,
+                'line_type' => $first->line_type,
+                'product_name' => $first->product?->name ?? $first->description ?? 'Product #' . $first->product_id,
                 'product_code' => $first->product?->sku ?? $first->product?->code ?? '',
                 'hsn_sac' => $first->product?->hsn_sac ?? $first->product?->hsn_code ?? '',
                 'uom_name' => $first->product?->uom?->name ?? 'Pcs',
@@ -180,6 +188,8 @@ class GoodsReceiptNoteController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', GoodsReceiptNote::class);
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
@@ -196,7 +206,9 @@ class GoodsReceiptNoteController extends Controller
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.purchase_order_item_id' => 'nullable|exists:purchase_order_items,id',
-            'items.*.product_id' => 'required|exists:products,id',
+            // Nullable: asset/expense PO lines (line_type != stock) have no product —
+            // the GRN line inherits its type from the linked purchase_order_item.
+            'items.*.product_id' => 'nullable|exists:products,id',
             'items.*.received_qty' => 'required|numeric|min:0.0001',
             'items.*.rejected_qty' => 'nullable|numeric|min:0',
             'items.*.unit_rate' => 'nullable|numeric|min:0',
@@ -221,6 +233,7 @@ class GoodsReceiptNoteController extends Controller
     public function show($id)
     {
         $grn = $this->grnRepo->findWithDetails($id);
+        $this->authorize('view', $grn);
         return view('modules.purchase.grns.show', compact('grn'));
     }
 
@@ -228,6 +241,7 @@ class GoodsReceiptNoteController extends Controller
     {
         $tenantId = require_tenant_id();
         $grn = $this->grnRepo->findWithDetails($id);
+        $this->authorize('view', $grn);
 
         if ($grn->status !== 'Draft') {
             return redirect()->route('purchase.grns.show', $grn->id)->with('error', 'Approved or Cancelled GRNs cannot be edited.');
@@ -250,6 +264,7 @@ class GoodsReceiptNoteController extends Controller
     {
         $grn = $this->grnRepo->find($id);
         if (!$grn) abort(404);
+        $this->authorize('update', $grn);
 
         if ($grn->status !== 'Draft') {
             return redirect()->route('purchase.grns.show', $grn->id)->with('error', 'Only Draft GRNs can be updated.');
@@ -272,6 +287,7 @@ class GoodsReceiptNoteController extends Controller
     {
         $grn = $this->grnRepo->find($id);
         if (!$grn) abort(404);
+        $this->authorize('approve', $grn);
 
         if ($grn->status !== 'Draft') {
             return redirect()->back()->with('error', 'Only Draft GRNs can be approved.');
@@ -296,6 +312,7 @@ class GoodsReceiptNoteController extends Controller
     {
         $grn = $this->grnRepo->find($id);
         if (!$grn) abort(404);
+        $this->authorize('delete', $grn);
 
         if ($grn->status !== 'Draft') {
             return redirect()->back()->with('error', 'Only Draft GRNs can be deleted.');

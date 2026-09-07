@@ -395,7 +395,7 @@ class QualityInspectionService
             if ($acceptedQty > 0) {
                 $effectiveBatchId = $batchId ?? $inspection->batch_id;
                 $batch = $effectiveBatchId ? \App\Domains\Production\Models\ProductionBatch::find($effectiveBatchId) : null;
-                $wip = $effectiveBatchId ? app(ProductionWipService::class)->getOrCreateWipForBatchOperation(
+                $wip = ($effectiveBatchId && $orderOp->routing_operation_id) ? app(ProductionWipService::class)->getOrCreateWipForBatchOperation(
                     $orderId,
                     $effectiveBatchId,
                     $orderOp->routing_operation_id,

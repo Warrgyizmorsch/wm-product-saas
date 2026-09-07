@@ -43,6 +43,37 @@
 
     <div class="erp-single-panel">
 
+        @if(($unregisteredMachineryAssets ?? collect())->isNotEmpty())
+            <div class="card border-warning mb-3">
+                <div class="card-body py-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="feather-alert-circle text-warning"></i>
+                        <span class="fw-bold text-dark fs-13">Purchased machinery awaiting registration</span>
+                        <span class="badge bg-soft-warning text-warning rounded-pill">{{ $unregisteredMachineryAssets->count() }}</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                @foreach($unregisteredMachineryAssets as $asset)
+                                    <tr>
+                                        <td class="font-monospace fw-bold text-dark" style="width: 12%;">{{ $asset->asset_code }}</td>
+                                        <td>{{ $asset->name }}</td>
+                                        <td class="text-muted" style="width: 18%;">{{ $asset->category->name ?? '—' }}</td>
+                                        <td class="text-end text-muted" style="width: 14%;">{{ number_format($asset->purchase_cost, 2) }}</td>
+                                        <td class="text-end" style="width: 14%;">
+                                            <a href="{{ route('production.machines.create', ['asset_id' => $asset->id]) }}" class="btn btn-xs btn-primary">
+                                                <i class="feather-tool me-1"></i>Register as Machine
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Toolbar: Title + Sort + Filter --}}
         <div class="d-flex align-items-center mb-3">
             <h5 class="fw-bold text-dark mb-0">{{ __('production.machine_list') }}</h5>

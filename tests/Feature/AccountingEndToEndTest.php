@@ -82,6 +82,7 @@ class AccountingEndToEndTest extends TestCase
         $this->accountant = $this->userWithRole('accountant');
         $this->salesManager = $this->userWithRole('sales_manager');
         $this->inventoryManager = $this->userWithRole('inventory_manager');
+        $this->assignRole($this->inventoryManager, 'purchase_manager');
 
         $this->customer = Customer::create([
             'tenant_id' => $this->tenant->id,
@@ -147,6 +148,12 @@ class AccountingEndToEndTest extends TestCase
         $user->forceFill(['role_id' => $role->id])->save();
 
         return $user;
+    }
+
+    private function assignRole(User $user, string $slug): void
+    {
+        $role = Role::query()->whereNull('tenant_id')->where('slug', $slug)->firstOrFail();
+        UserRole::create(['user_id' => $user->id, 'role_id' => $role->id, 'tenant_id' => $this->tenant->id]);
     }
 
     private function accountByCode(string $code): ChartOfAccount

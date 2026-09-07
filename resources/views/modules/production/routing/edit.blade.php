@@ -223,10 +223,22 @@
                                                          @endforeach
                                                      </x-ui.odoo-form-ui>
                                                  </div>
-                                                 <div class="col-md-2">
+                                                 <div class="col-md-2" x-show="operation.subcontract_input_type !== 'previous_operation_wip'">
                                                      <x-ui.odoo-form-ui type="select" label="Supply Type" x-bind:name="'operations['+index+'][material_supply_type]'" class="form-select form-select-sm fs-11" x-model="operation.material_supply_type">
                                                          <option value="company_supplied">Company Supplied</option>
                                                          <option value="vendor_supplied">Vendor Supplied</option>
+                                                     </x-ui.odoo-form-ui>
+                                                 </div>
+                                                 <div class="col-md-2" x-show="operation.subcontract_input_type === 'previous_operation_wip'">
+                                                     <label class="form-label text-muted fs-11 mb-1">Supply Type</label>
+                                                     <div class="form-control form-control-sm fs-11 bg-light text-primary fw-semibold d-flex align-items-center" style="height: 31px;">
+                                                         <i class="feather-layers me-1"></i>Previous Op WIP
+                                                     </div>
+                                                 </div>
+                                                 <div class="col-md-3">
+                                                     <x-ui.odoo-form-ui type="select" label="Subcontract Processing Mode" x-bind:name="'operations['+index+'][subcontract_input_type]'" class="form-select form-select-sm fs-11" x-model="operation.subcontract_input_type">
+                                                         <option value="bom_raw_materials">BOM Raw Materials (From Stock)</option>
+                                                         <option value="previous_operation_wip">Previous Operation WIP (Job Work)</option>
                                                      </x-ui.odoo-form-ui>
                                                  </div>
                                                  <div class="col-md-2">
@@ -303,6 +315,7 @@
                                 is_external: {{ $op->is_external ? 'true' : 'false' }},
                                 vendor_id: "{{ $op->vendor_id ?? '' }}",
                                 material_supply_type: "{{ $op->material_supply_type ?? 'company_supplied' }}",
+                                subcontract_input_type: "{{ $op->subcontract_input_type ?? 'bom_raw_materials' }}",
                                 subcontract_lead_time_days: {{ (int) ($op->subcontract_lead_time_days ?? 0) }},
                                 subcontract_cost_per_unit: "{{ number_format($op->subcontract_cost_per_unit ?? 0, 2, '.', '') }}",
                                 subcontract_service_product_id: "{{ $op->subcontract_service_product_id ?? '' }}",
@@ -351,6 +364,7 @@
                             is_external: false,
                             vendor_id: '',
                             material_supply_type: 'company_supplied',
+                            subcontract_input_type: 'bom_raw_materials',
                             subcontract_lead_time_days: 0,
                             subcontract_cost_per_unit: '0.00',
                             subcontract_service_product_id: '',

@@ -34,8 +34,17 @@
             <tbody class="fs-13 text-dark">
                 @forelse ($rows as $row)
                     <tr>
-                        <td class="ps-4 fw-bold font-monospace">{{ $row['account']?->code }}</td>
-                        <td>{{ $row['account']?->name }}</td>
+                        @if ($row['account'])
+                            <td class="ps-4 fw-bold font-monospace">
+                                <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['account']->id, 'period_id' => $period->id]) }}">{{ $row['account']->code }}</a>
+                            </td>
+                            <td>
+                                <a href="{{ route('accounting.reports.general-ledger', ['chart_of_account_id' => $row['account']->id, 'period_id' => $period->id]) }}" class="text-dark">{{ $row['account']->name }}</a>
+                            </td>
+                        @else
+                            <td class="ps-4 fw-bold font-monospace"></td>
+                            <td></td>
+                        @endif
                         <td class="text-capitalize text-muted">{{ $row['account']?->type }}</td>
                         <td class="text-end">{{ $row['debit'] > 0 ? number_format($row['debit'], 2) : '—' }}</td>
                         <td class="text-end pe-4">{{ $row['credit'] > 0 ? number_format($row['credit'], 2) : '—' }}</td>

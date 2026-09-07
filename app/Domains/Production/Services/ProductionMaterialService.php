@@ -450,7 +450,7 @@ class ProductionMaterialService
             foreach ($itemsToRequest as $reqItem) {
                 $reqPid = $reqItem['product_id'];
                 $reqQty = $reqItem['quantity'];
-                $reqUom = $reqItem['uom_id'];
+                $reqUom = $reqItem['uom_id'] ?? \App\Domains\Inventory\Models\Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', $reqPid)->value('uom_id') ?? 1;
 
                 $res = ProductionOrderReservation::where('tenant_id', $tenantId)
                     ->where('production_order_id', $productionOrderId)

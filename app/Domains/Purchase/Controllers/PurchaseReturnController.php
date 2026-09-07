@@ -10,6 +10,7 @@ use App\Domains\Purchase\Models\PurchaseReturn;
 use App\Domains\Purchase\Models\PurchaseReturnItem;
 use App\Domains\Purchase\Repositories\PurchaseReturnRepository;
 use App\Http\Controllers\Controller;
+use App\Services\Access\AccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,8 @@ class PurchaseReturnController extends Controller
 
     public function index(Request $request): View
     {
+        $this->authorizePurchase('purchase.returns.view');
+
         $returns = $this->returnRepo->getPaginated($request->all(), 15);
 
         return view('modules.purchase.returns.index', compact('returns'));
@@ -30,6 +33,8 @@ class PurchaseReturnController extends Controller
 
     public function create(Request $request): View
     {
+        $this->authorizePurchase('purchase.returns.create');
+
         $tenantId = require_tenant_id();
         $purchaseOrderId = $request->input('purchase_order_id');
         $goodsReceiptNoteId = $request->input('goods_receipt_note_id');
@@ -115,6 +120,8 @@ class PurchaseReturnController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizePurchase('purchase.returns.create');
+
         if (!$request->filled('vendor_id') && $request->filled('purchase_order_id')) {
             $po = PurchaseOrder::find($request->input('purchase_order_id'));
             if ($po) {
@@ -151,7 +158,7 @@ class PurchaseReturnController extends Controller
             }
 
             $purchaseReturn = PurchaseReturn::create([
-                'tenant_id'             => tenant_id() ?? 1,
+                'tenant_id'             => require_tenant_id(),
                 'vendor_id'             => $validated['vendor_id'],
                 'purchase_order_id'     => $validated['purchase_order_id'] ?? null,
                 'goods_receipt_note_id' => $validated['goods_receipt_note_id'] ?? null,
@@ -185,6 +192,8 @@ class PurchaseReturnController extends Controller
 
     public function show(int $id): View
     {
+        $this->authorizePurchase('purchase.returns.view');
+
         $return = $this->returnRepo->find($id);
         if (!$return) abort(404);
 
@@ -193,6 +202,8 @@ class PurchaseReturnController extends Controller
 
     public function approve(int $id): RedirectResponse
     {
+        $this->authorizePurchase('purchase.returns.approve');
+
         $purchaseReturn = $this->returnRepo->find($id);
         if (!$purchaseReturn) abort(404);
 
@@ -201,7 +212,7 @@ class PurchaseReturnController extends Controller
         }
 
         DB::transaction(function () use ($purchaseReturn) {
-            $tenantId = $purchaseReturn->tenant_id ?: (tenant_id() ?? 1);
+            $tenantId = $purchaseReturn->tenant_id ?: require_tenant_id();
 
             foreach ($purchaseReturn->items as $item) {
                 $serials = [];
@@ -238,5 +249,15 @@ class PurchaseReturnController extends Controller
 
         return redirect()->route('purchase.returns.show', $purchaseReturn->id)
             ->with('success', "Purchase Return {$purchaseReturn->return_number} approved and stock removed from inventory successfully.");
+    }
+
+    private function authorizePurchase(string $permission): void
+    {
+        abort_unless(
+            app(AccessService::class)->allows(auth()->user(), $permission, [
+                'tenant_id' => auth()->user()?->tenant_id,
+            ]),
+            403
+        );
     }
 }

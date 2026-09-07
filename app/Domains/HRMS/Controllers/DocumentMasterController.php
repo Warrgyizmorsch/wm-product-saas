@@ -192,4 +192,144 @@ class DocumentMasterController extends Controller
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'documents'])
             ->with('success', 'Document status updated successfully.');
     }
+
+    /**
+     * Store a new document template.
+     */
+    public function storeTemplate(Request $request): RedirectResponse
+    {
+        $tenantId = auth()->user()->tenant_id;
+
+        $validated = $request->validate([
+            'company_id'           => 'nullable|exists:companies,id',
+            'document_category_id' => 'nullable|exists:document_categories,id',
+            'name'                 => 'required|string|max:255',
+            'code'                 => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('document_templates', 'code')->where('tenant_id', $tenantId),
+            ],
+            'template_file'        => 'nullable|file|mimes:html,htm,txt,docx|max:10240',
+            'header_content'       => 'nullable|string',
+            'body_content'         => 'nullable|string',
+            'footer_content'       => 'nullable|string',
+            'css_styles'           => 'nullable|string',
+            'status'               => 'required|string|in:active,inactive',
+        ]);
+
+        $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+
+        // If file is uploaded, extract content to populate body_content
+        if ($request->hasFile('template_file')) {
+            $file = $request->file('template_file');
+            $extractedContent = $templateService->importTemplateFromFile($file);
+            if (!empty($extractedContent)) {
+                $validated['body_content'] = $extractedContent;
+            }
+            $validated['template_file_path'] = $file->store('document_templates', 'public');
+        }
+
+        \App\Domains\HRMS\Models\DocumentTemplate::create($validated);
+
+        return redirect()->route('hrms.documents-master.index', ['active_tab' => 'templates'])
+            ->with('success', 'Document template created successfully.');
+    }
+
+    /**
+     * Update an existing document template.
+     */
+    public function updateTemplate(Request $request, \App\Domains\HRMS\Models\DocumentTemplate $template): RedirectResponse
+    {
+        $tenantId = $template->tenant_id ?? auth()->user()->tenant_id;
+
+        $validated = $request->validate([
+            'company_id'           => 'nullable|exists:companies,id',
+            'document_category_id' => 'nullable|exists:document_categories,id',
+            'name'                 => 'required|string|max:255',
+            'code'                 => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('document_templates', 'code')->where('tenant_id', $tenantId)->ignore($template->id),
+            ],
+            'template_file'        => 'nullable|file|mimes:html,htm,txt,docx|max:10240',
+            'header_content'       => 'nullable|string',
+            'body_content'         => 'nullable|string',
+            'footer_content'       => 'nullable|string',
+            'css_styles'           => 'nullable|string',
+            'status'               => 'required|string|in:active,inactive',
+        ]);
+
+        $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+
+        if ($request->hasFile('template_file')) {
+            $file = $request->file('template_file');
+            $extractedContent = $templateService->importTemplateFromFile($file);
+            if (!empty($extractedContent)) {
+                $validated['body_content'] = $extractedContent;
+            }
+            $validated['template_file_path'] = $file->store('document_templates', 'public');
+        }
+
+        $template->update($validated);
+
+        return redirect()->route('hrms.documents-master.index', ['active_tab' => 'templates'])
+            ->with('success', 'Document template updated successfully.');
+    }
+
+    /**
+     * Delete an existing document template.
+     */
+    public function destroyTemplate(\App\Domains\HRMS\Models\DocumentTemplate $template): RedirectResponse
+    {
+        $template->delete();
+
+        return redirect()->route('hrms.documents-master.index', ['active_tab' => 'templates'])
+            ->with('success', 'Document template deleted successfully.');
+    }
+
+    /**
+     * Toggle status of an existing document template.
+     */
+    public function toggleTemplateStatus(\App\Domains\HRMS\Models\DocumentTemplate $template): RedirectResponse
+    {
+        $template->update([
+            'status' => $template->status === 'active' ? 'inactive' : 'active'
+        ]);
+
+        return redirect()->route('hrms.documents-master.index', ['active_tab' => 'templates'])
+            ->with('success', 'Template status updated successfully.');
+    }
+
+    /**
+     * Return live JSON preview of template rendered for an employee.
+     */
+    public function previewTemplate(Request $request, \App\Domains\HRMS\Models\DocumentTemplate $template): \Illuminate\Http\JsonResponse
+    {
+        try {
+            $employeeId = $request->query('employee_id');
+            $employee = $employeeId ? \App\Domains\HRMS\Models\Employee::find($employeeId) : \App\Domains\HRMS\Models\Employee::first();
+
+            if (!$employee) {
+                return response()->json(['error' => 'No employee records found for preview.'], 404);
+            }
+
+            $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+            $renderedHtml = $templateService->renderTemplate($template, $employee);
+
+            return response()->json([
+                'success' => true,
+                'template_name' => $template->name,
+                'employee_name' => $employee->full_name,
+                'html' => $renderedHtml,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Template Preview Exception: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error rendering document: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

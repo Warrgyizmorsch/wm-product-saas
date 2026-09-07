@@ -70,20 +70,27 @@
 
 <ul class="nav nav-tabs erp-horizontal-tabs" id="{{ $id }}" role="tablist" {{ $attributes }}>
     @foreach($tabs as $tab)
-        <li class="nav-item" role="presentation">
-            <button class="nav-link {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
-                    id="{{ $tab['id'] }}-tab" 
-                    data-bs-toggle="tab" 
-                    data-bs-target="#{{ $tab['id'] }}" 
-                    type="button" 
-                    role="tab" 
-                    aria-controls="{{ $tab['id'] }}" 
-                    aria-selected="{{ ($tab['active'] ?? false) ? 'true' : 'false' }}">
-                @if(!empty($tab['icon']))
-                    <i class="{{ $tab['icon'] }} me-2"></i>
-                @endif
-                {{ $tab['label'] }}
-            </button>
-        </li>
+        @if(!empty($tab['is_header']) || !empty($tab['header']))
+            <li class="nav-item d-flex align-items-center px-2 py-1 text-uppercase fw-extrabold me-1 ms-1" style="letter-spacing: 0.08em; font-size: 9px; font-weight: 800; color: #475569; background-color: #f1f5f9; border-radius: 4px; flex-shrink: 0; border: 1px solid #cbd5e1;">
+                <i class="feather-grid me-1 text-primary" style="font-size: 9px;"></i>
+                {{ $tab['header'] ?? $tab['label'] }}
+            </li>
+        @else
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {{ ($tab['active'] ?? false) ? 'active' : '' }}" 
+                        id="{{ $tab['id'] }}-tab" 
+                        data-bs-toggle="tab" 
+                        data-bs-target="#{{ $tab['id'] }}" 
+                        type="button" 
+                        role="tab" 
+                        aria-controls="{{ $tab['id'] }}" 
+                        aria-selected="{{ ($tab['active'] ?? false) ? 'true' : 'false' }}">
+                    @if(!empty($tab['icon']))
+                        <i class="{{ $tab['icon'] }} me-2"></i>
+                    @endif
+                    {{ $tab['label'] }}
+                </button>
+            </li>
+        @endif
     @endforeach
 </ul>

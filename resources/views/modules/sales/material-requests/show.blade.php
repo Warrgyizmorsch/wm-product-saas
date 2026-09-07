@@ -187,11 +187,11 @@
                                     <div class="fw-bold">{{ $item->product->name }}</div>
                                     <div class="text-muted fs-11">SKU: {{ $item->product->sku }} | Type: {{ ucfirst(str_replace('_', ' ', $item->product->type)) }}</div>
                                 </td>
-                                <td class="text-center fw-semibold">{{ (float) $item->quantity_planned }} {{ $item->uom->code }}</td>
-                                <td class="text-center text-primary fw-semibold">{{ (float) $item->quantity_reserved }} {{ $item->uom->code }}</td>
-                                <td class="text-center text-success fw-bold">{{ (float) $item->quantity_issued }} {{ $item->uom->code }}</td>
+                                <td class="text-center fw-semibold">{{ (float) $item->quantity_planned }} {{ $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS' }}</td>
+                                <td class="text-center text-primary fw-semibold">{{ (float) $item->quantity_reserved }} {{ $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS' }}</td>
+                                <td class="text-center text-success fw-bold">{{ (float) $item->quantity_issued }} {{ $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS' }}</td>
                                 <td class="text-center text-muted fw-semibold">
-                                    <span id="avail-stock-label-{{ $item->id }}">{{ (float) $totalAvailableStock }}</span> {{ $item->uom->code }}
+                                    <span id="avail-stock-label-{{ $item->id }}">{{ (float) $totalAvailableStock }}</span> {{ $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS' }}
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column gap-1">
@@ -349,7 +349,7 @@
                         </div>
                     </div>
 
-                    <p class="mb-3">This will generate a Draft Purchase Requisition for the shortage quantity of <strong><span class="shortage-text-val-{{ $item->id }}">{{ $shortageQty }}</span> {{ $item->uom->code }}</strong>.</p>
+                    <p class="mb-3">This will generate a Draft Purchase Requisition for the shortage quantity of <strong><span class="shortage-text-val-{{ $item->id }}">{{ $shortageQty }}</span> {{ $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS' }}</strong>.</p>
 
                     <div class="mb-3">
                         <label class="form-label fs-11 fw-bold mb-1 text-muted">Destination Warehouse <span class="text-danger">*</span></label>

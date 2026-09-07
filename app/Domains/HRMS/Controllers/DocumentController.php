@@ -87,10 +87,13 @@ class DocumentController extends Controller
 
         $documents = $query->paginate(10)->withQueryString();
 
-        // Fetch all active employees, templates and categories for the upload modal selection
+        // Fetch all active employees, document masters, templates and categories for the upload modal selection
         $employees = Employee::orderBy('full_name')->get();
         $categories = DocumentCategory::orderBy('name')->get();
         $templates = DocumentMaster::where('status', 'active')
+            ->orderBy('name')
+            ->get();
+        $documentTemplates = \App\Domains\HRMS\Models\DocumentTemplate::where('status', 'active')
             ->orderBy('name')
             ->get();
 
@@ -101,21 +104,28 @@ class DocumentController extends Controller
             'expiry' => $tmpl->expiry_applicable ? '1' : '0'
         ]);
 
-        return view('modules.hrms.documents.index', compact('documents', 'employees', 'templates', 'categories', 'activeTab', 'templatesJson'));
+        return view('modules.hrms.documents.index', compact('documents', 'employees', 'templates', 'documentTemplates', 'categories', 'activeTab', 'templatesJson'));
     }
 
     public function bulkUpload(Request $request): RedirectResponse
     {
-        $request->validate([
-            'employee_id'        => 'required|string',
-            'document_master_id' => 'required|exists:document_masters,id',
-            'file'               => 'required|file|max:10240', // Max 10MB
-            'expiry_date'        => 'nullable|date',
-        ]);
+        $uploadMode = $request->input('upload_mode', 'file');
+
+        if (in_array($uploadMode, ['generate', 'generate_template'])) {
+            $request->validate([
+                'employee_id'          => 'required|string',
+                'document_template_id' => 'required|exists:document_templates,id',
+            ]);
+        } else {
+            $request->validate([
+                'employee_id'        => 'required|string',
+                'document_master_id' => 'required|exists:document_masters,id',
+                'file'               => 'required|file|max:10240', // Max 10MB
+                'expiry_date'        => 'nullable|date',
+            ]);
+        }
 
         $tenantId = auth()->user()->tenant_id;
-        $file = $request->file('file');
-        $documentMaster = DocumentMaster::findOrFail($request->integer('document_master_id'));
 
         // Resolve target employee IDs
         $employeeId = $request->input('employee_id');
@@ -130,6 +140,87 @@ class DocumentController extends Controller
             return redirect()->back()->with('error', 'No employees found for this upload target.');
         }
 
+        if (in_array($uploadMode, ['generate', 'generate_template'])) {
+            $docTemplate = \App\Domains\HRMS\Models\DocumentTemplate::findOrFail($request->integer('document_template_id'));
+            $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+
+            foreach ($targetEmployeeIds as $empId) {
+                $employee = Employee::find($empId);
+                if (!$employee) {
+                    continue;
+                }
+
+                $customRef = $request->input('reference_number');
+                $customTitle = $request->input('document_title');
+                $refNo = $customRef ?: ('DOC/' . date('Y') . '/' . str_pad((string)$employee->id, 4, '0', STR_PAD_LEFT));
+                $renderedContent = $templateService->renderTemplate($docTemplate, $employee, $refNo);
+                $title = $customTitle ?: ($docTemplate->name . ' - ' . $employee->full_name);
+
+                // Save rendered HTML file to storage
+                $fileName = \Str::slug($docTemplate->name . '-' . $employee->full_name) . '-' . time() . '.html';
+                $path = "documents/tenant_{$tenantId}/employee_{$employee->id}/{$fileName}";
+                \Storage::disk('public')->put($path, $renderedContent);
+
+                // Resolve or associate DocumentMaster for category tracking
+                $masterId = null;
+                if ($docTemplate->document_category_id) {
+                    $master = DocumentMaster::where('tenant_id', $tenantId)
+                        ->where(function ($q) use ($docTemplate) {
+                            $q->where('code', $docTemplate->code)
+                              ->orWhere('name', $docTemplate->name);
+                        })->first();
+
+                    if (!$master) {
+                        $master = DocumentMaster::create([
+                            'tenant_id'             => $tenantId,
+                            'document_category_id'  => $docTemplate->document_category_id,
+                            'name'                  => $docTemplate->name,
+                            'code'                  => $docTemplate->code,
+                            'upload_responsibility' => 'hr',
+                            'status'                => 'active',
+                        ]);
+                    }
+                    $masterId = $master?->id;
+                }
+
+                // 1. Create GeneratedDocument record
+                $genDoc = \App\Domains\HRMS\Models\GeneratedDocument::create([
+                    'tenant_id'            => $tenantId,
+                    'employee_id'          => $employee->id,
+                    'document_template_id' => $docTemplate->id,
+                    'document_master_id'   => $masterId,
+                    'reference_number'     => $refNo,
+                    'title'                => $title,
+                    'rendered_content'     => $renderedContent,
+                    'file_path'            => $path,
+                    'issue_date'           => $request->input('issue_date', now()->format('Y-m-d')),
+                    'generated_by'         => auth()->id(),
+                    'status'               => 'issued',
+                ]);
+
+                // 2. Create main Document registry entry for employee locker
+                Document::create([
+                    'tenant_id'          => $tenantId,
+                    'documentable_id'    => $employee->id,
+                    'documentable_type'  => Employee::class,
+                    'document_master_id' => $masterId,
+                    'name'               => $title,
+                    'description'        => "Generated from template: " . $docTemplate->name,
+                    'file_name'          => $fileName,
+                    'file_path'          => $path,
+                    'file_type'          => 'text/html',
+                    'file_size'          => strlen($renderedContent),
+                    'status'             => 'approved',
+                    'requested_by_id'    => auth()->id(),
+                ]);
+            }
+
+            return redirect()->route('hrms.documents.index')->with('success', 'Documents generated from template successfully.');
+        }
+
+        // Standard File Upload Mode
+        $file = $request->file('file');
+        $documentMaster = DocumentMaster::findOrFail($request->integer('document_master_id'));
         $approvalRequired = (bool) $documentMaster->approval_required;
         $status = $approvalRequired ? 'uploaded' : 'approved';
 
@@ -139,10 +230,8 @@ class DocumentController extends Controller
                 continue;
             }
 
-            // Store file
             $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
-            // Find or create document record for this employee and master
             $document = Document::where('documentable_type', Employee::class)
                 ->where('documentable_id', $employee->id)
                 ->where('document_master_id', $documentMaster->id)

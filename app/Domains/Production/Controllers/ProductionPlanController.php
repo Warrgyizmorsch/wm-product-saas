@@ -460,7 +460,7 @@ class ProductionPlanController extends Controller
                 'quantity_required' => $reqQty,
                 'available_quantity' => $availQty,
                 'for_production_qty' => $forProdQty,
-                'uom' => $item->uom ? $item->uom->code : 'PCS',
+                'uom' => $item->uom?->code ?? $item->product?->uom?->code ?? 'PCS',
                 'rate' => $rate,
                 'amount' => $amount,
                 'notes' => $item->remarks ?? '',

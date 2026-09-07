@@ -29,6 +29,21 @@
         'cancelled' => ['bg' => 'bg-soft-dark', 'text' => 'text-dark', 'dot' => 'bg-dark', 'default_label' => 'Cancelled'],
         'out_of_stock' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Out of Stock'],
         'low_stock' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Low Stock Alert'],
+
+        // Fixed Asset lifecycle statuses
+        'idle' => ['bg' => 'bg-soft-secondary', 'text' => 'text-secondary', 'dot' => 'bg-secondary', 'default_label' => 'Idle'],
+        'under_maintenance' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Under Maintenance'],
+        'fully_depreciated' => ['bg' => 'bg-soft-info', 'text' => 'text-info', 'dot' => 'bg-info', 'default_label' => 'Fully Depreciated'],
+        'disposed' => ['bg' => 'bg-soft-dark', 'text' => 'text-dark', 'dot' => 'bg-dark', 'default_label' => 'Disposed'],
+        'written_off' => ['bg' => 'bg-soft-dark', 'text' => 'text-dark', 'dot' => 'bg-dark', 'default_label' => 'Written Off'],
+        'lost' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Lost'],
+        'pending_capitalization' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Pending Capitalization'],
+
+        // Depreciation / disposal / write-off / revaluation workflow statuses
+        'reviewed' => ['bg' => 'bg-soft-info', 'text' => 'text-info', 'dot' => 'bg-info', 'default_label' => 'Reviewed'],
+        'posted' => ['bg' => 'bg-soft-success', 'text' => 'text-success', 'dot' => 'bg-success', 'default_label' => 'Posted'],
+        'pending_approval' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Pending Approval'],
+        'rejected' => ['bg' => 'bg-soft-danger', 'text' => 'text-danger', 'dot' => 'bg-danger', 'default_label' => 'Rejected'],
     ];
 
     $normalized = strtolower(str_replace(' ', '_', $status));

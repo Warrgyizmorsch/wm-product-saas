@@ -7,6 +7,8 @@ use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\PurchaseRequisition;
 use App\Domains\Purchase\Repositories\PurchaseOrderRepository;
 use App\Domains\Purchase\Services\PurchaseOrderService;
+use App\Domains\Accounting\Models\ChartOfAccount;
+use App\Domains\HRMS\Models\AssetCategory;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
@@ -22,12 +24,16 @@ class PurchaseOrderController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', PurchaseOrder::class);
+
         $orders = $this->orderRepo->getPaginatedOrders($request->all(), 10);
         return view('modules.purchase.orders.index', compact('orders'));
     }
 
     public function poApprovals(Request $request)
     {
+        $this->authorize('viewAny', PurchaseOrder::class);
+
         $orders = $this->orderRepo->getPaginatedOrders(array_merge($request->all(), ['status' => 'Draft']), 15);
         return view('modules.purchase.approvals.po-index', compact('orders'));
     }
@@ -40,6 +46,8 @@ class PurchaseOrderController extends Controller
 
     public function create(Request $request)
     {
+        $this->authorize('create', PurchaseOrder::class);
+
         $tenantId = require_tenant_id();
 
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
@@ -152,6 +160,13 @@ class PurchaseOrderController extends Controller
             $prefilledExpectedDate = $selectedReq?->expected_date ? $selectedReq->expected_date->format('Y-m-d') : null;
         }
 
+        $assetCategories = AssetCategory::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $expenseAccounts = ChartOfAccount::where('tenant_id', $tenantId)
+            ->where('type', ChartOfAccount::TYPE_EXPENSE)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get();
+
         return view('modules.purchase.orders.create', compact(
             'vendors',
             'products',
@@ -160,12 +175,16 @@ class PurchaseOrderController extends Controller
             'selectedRequisitionId',
             'requisitionItemIds',
             'prefilledItems',
-            'prefilledExpectedDate'
+            'prefilledExpectedDate',
+            'assetCategories',
+            'expenseAccounts'
         ));
     }
 
     public function store(Request $request)
     {
+        $this->authorize('create', PurchaseOrder::class);
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
@@ -196,6 +215,7 @@ class PurchaseOrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.line_type' => 'nullable|string|in:stock,asset,expense',
             'items.*.product_id' => 'required_unless:items.*.line_type,asset,expense|nullable|integer|exists:products,id',
+            'items.*.description' => 'nullable|string|max:255',
             'items.*.asset_category_id' => 'required_if:items.*.line_type,asset|nullable|integer|exists:asset_categories,id',
             'items.*.chart_of_account_id' => 'required_if:items.*.line_type,expense|nullable|integer|exists:chart_of_accounts,id',
             'items.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
@@ -218,6 +238,20 @@ class PurchaseOrderController extends Controller
             'items.*.total_amount' => 'nullable|numeric|min:0',
         ]);
 
+        // Asset/Expense lines need a product OR a description to identify what's
+        // being purchased — but not both, so a reused stocked/traded product can
+        // still be picked for a capital/expense line without retyping its name.
+        foreach ($validated['items'] as $idx => $item) {
+            $lineType = $item['line_type'] ?? 'stock';
+            if (in_array($lineType, ['asset', 'expense'], true)
+                && empty($item['product_id'])
+                && trim((string) ($item['description'] ?? '')) === '') {
+                return back()->withInput()->withErrors([
+                    "items.{$idx}.description" => 'Select a product or enter a description for this line.',
+                ]);
+            }
+        }
+
         $po = $this->orderService->storeOrder($validated, $tenantId);
 
         return redirect()->route('purchase.orders.show', $po->id)
@@ -227,12 +261,14 @@ class PurchaseOrderController extends Controller
     public function show(int $id)
     {
         $order = $this->orderRepo->findWithDetails($id);
+        $this->authorize('view', $order);
         return view('modules.purchase.orders.show', compact('order'));
     }
 
     public function detailPartial(int $id)
     {
         $order = $this->orderRepo->findWithDetails($id);
+        $this->authorize('view', $order);
         return view('modules.purchase.orders.detail-partial', compact('order'));
     }
 
@@ -240,6 +276,7 @@ class PurchaseOrderController extends Controller
     {
         $tenantId = require_tenant_id();
         $order = $this->orderRepo->findWithDetails($id);
+        $this->authorize('update', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->route('purchase.orders.show', $id)
@@ -258,6 +295,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('update', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->route('purchase.orders.show', $id)
@@ -283,6 +321,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('approve', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->back()->with('error', 'Only Draft Purchase Orders can be confirmed.');
@@ -307,6 +346,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('reject', $order);
 
         if (in_array($order->status, ['Completed', 'Cancelled'])) {
             return redirect()->back()->with('error', 'This Purchase Order cannot be cancelled.');
@@ -327,6 +367,7 @@ class PurchaseOrderController extends Controller
     public function downloadPdf(int $id)
     {
         $order = $this->orderRepo->findWithDetails($id);
+        $this->authorize('view', $order);
         $pdf = Pdf::loadView('modules.purchase.orders.pdf', compact('order'));
         return $pdf->download("PO_{$order->po_number}.pdf");
     }
@@ -335,6 +376,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('delete', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->route('purchase.orders.show', $id)
@@ -381,6 +423,7 @@ class PurchaseOrderController extends Controller
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
+        $this->authorize('view', $order);
 
         if ($order->status !== 'Draft') {
             return redirect()->back()->with('error', 'Reminders can only be sent for pending Purchase Orders.');

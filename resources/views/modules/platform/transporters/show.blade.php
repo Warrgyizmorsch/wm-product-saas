@@ -327,11 +327,69 @@
                 </div>
             </div>
 
-            {{-- TAB 2: FREIGHT BILLS WITH EXPLICIT VIEW BUTTON --}}
+            {{-- TAB 2: FREIGHT BILLS WITH UNBILLED DISPATCHES & POSTED BILLS --}}
             <div class="tab-pane fade" id="bills-pane" role="tabpanel">
+
+                {{-- Unbilled Dispatches Section --}}
+                @if(isset($unbilledDispatches) && $unbilledDispatches->isNotEmpty())
+                    <div class="card border border-warning shadow-none mb-4">
+                        <div class="card-header bg-soft-warning d-flex align-items-center justify-content-between py-2.5">
+                            <h6 class="fw-bold text-dark mb-0"><i class="feather-alert-circle me-1.5 text-warning"></i>Unbilled Sales Dispatches (Action Required: Create Freight Bill)</h6>
+                            <span class="badge bg-warning text-dark font-monospace px-2.5 py-1">
+                                Total Pending Freight: {{ active_currency_symbol() }}{{ number_format($unbilledFreightTotal, 2) }}
+                            </span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 fs-12">
+                                <thead class="table-light fs-11 text-uppercase fw-bold text-muted">
+                                    <tr>
+                                        <th class="ps-3">Dispatch No.</th>
+                                        <th>Date</th>
+                                        <th>LR Number</th>
+                                        <th>Vehicle No.</th>
+                                        <th class="text-end">Agreed Freight</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-end pe-3">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($unbilledDispatches as $ud)
+                                        <tr>
+                                            <td class="ps-3 font-monospace fw-bold text-dark">
+                                                {{ $ud['dispatch_number'] }}
+                                            </td>
+                                            <td class="text-muted font-monospace">
+                                                {{ \Carbon\Carbon::parse($ud['dispatch_date'])->format('d M Y') }}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-light text-dark border font-monospace px-2 py-1">{{ $ud['lr_number'] }}</span>
+                                            </td>
+                                            <td>{{ $ud['vehicle_number'] }}</td>
+                                            <td class="text-end fw-bold text-dark font-monospace fs-13">
+                                                {{ active_currency_symbol() }}{{ number_format($ud['freight_amount'], 2) }}
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-soft-warning text-warning border px-2.5 py-1 fs-11">
+                                                    <i class="feather-clock me-1"></i>Unbilled
+                                                </span>
+                                            </td>
+                                            <td class="text-end pe-3">
+                                                <a href="{{ $ud['create_bill_url'] }}" class="btn btn-xs btn-primary shadow-sm" title="Create Vendor Service Bill">
+                                                    <i class="feather-file-plus me-1"></i>Create Freight Bill
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Posted Bills Table --}}
                 <div class="card border shadow-none">
                     <div class="card-header bg-light d-flex align-items-center justify-content-between py-2.5">
-                        <h6 class="fw-bold text-dark mb-0"><i class="feather-file-text me-1 text-primary"></i>Transporter Freight Bills (Paid vs Pending)</h6>
+                        <h6 class="fw-bold text-dark mb-0"><i class="feather-file-text me-1 text-primary"></i>Posted Transporter Freight Bills (Paid vs Pending)</h6>
                         <div class="d-flex align-items-center gap-2">
                             <span class="badge bg-soft-success text-success border fs-11 px-2.5 py-1">
                                 <i class="feather-check-circle me-1"></i>{{ $stats['paid_bills_count'] }} Paid
@@ -417,7 +475,7 @@
                                     <tr>
                                         <td colspan="9" class="text-center py-5 text-muted">
                                             <i class="feather-file-text fs-32 d-block mb-2 text-muted"></i>
-                                            No freight bills or invoices recorded yet for this transporter.
+                                            No posted freight bills or invoices recorded yet for this transporter.
                                         </td>
                                     </tr>
                                 @endforelse
@@ -582,11 +640,8 @@
             {{-- TAB 5: TRANSPORTER LEDGER STATEMENT --}}
             <div class="tab-pane fade" id="ledger-pane" role="tabpanel">
                 <div class="card border shadow-none">
-                    <div class="card-header bg-light d-flex align-items-center justify-content-between py-2.5">
+                    <div class="card-header bg-light py-2.5">
                         <h6 class="fw-bold text-primary mb-0"><i class="feather-book me-1"></i>Account Payable Transporter Ledger Statement</h6>
-                        <button type="button" onclick="window.print()" class="btn btn-xs btn-light border">
-                            <i class="feather-printer me-1"></i>Print Statement
-                        </button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0 fs-12">

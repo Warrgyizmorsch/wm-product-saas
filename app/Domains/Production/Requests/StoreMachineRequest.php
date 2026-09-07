@@ -19,6 +19,7 @@ class StoreMachineRequest extends FormRequest
 
         return [
             'work_center_id'     => 'required|exists:production_work_centers,id',
+            'asset_id'           => 'nullable|integer|exists:assets,id',
             'name'               => 'required|string|max:255',
             'code'               => [
                 'required', 'string', 'max:50',

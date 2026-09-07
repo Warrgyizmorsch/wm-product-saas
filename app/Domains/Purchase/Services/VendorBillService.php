@@ -163,11 +163,13 @@ class VendorBillService
                 }
             }
 
-            $grandTotal = max(0, $grossBeforeTax + $freightAmount + $taxAmount);
+            $adjustment = (float) ($validated['adjustment'] ?? 0);
+            $grandTotal = max(0, $grossBeforeTax + $freightAmount + $taxAmount + $adjustment);
 
             // Calculate Landed Cost Revaluation Data for "to_be_billed" mode
             $revaluationData = null;
-            if ($isFreightBilledOnInvoice && $freightAmount > 0) {
+            $isCapitalizeAllocation = !in_array($freightAllocationMethod, ['none', 'direct_expense']);
+            if ($isFreightBilledOnInvoice && $freightAmount > 0 && $isCapitalizeAllocation) {
                 $revaluationItems = [];
                 foreach ($itemsData as $row) {
                     $item = $row['item'];
@@ -244,6 +246,7 @@ class VendorBillService
                 'status'                       => 'Unpaid',
                 'subtotal'                     => $subtotal,
                 'tax_amount'                   => $taxAmount,
+                'adjustment'                   => $adjustment,
                 'grand_total'                  => $grandTotal,
                 'paid_amount'                  => 0,
                 'due_amount'                   => round($grandTotal, 2),

@@ -4,39 +4,46 @@ namespace App\Domains\Purchase\Policies;
 
 use App\Domains\Purchase\Models\PurchaseRfq;
 use App\Models\User;
-use Illuminate\Auth\Access\HandlesAuthorization;
+use App\Services\Access\AccessService;
 
 class PurchaseRfqPolicy
 {
-    use HandlesAuthorization;
+    public function __construct(private readonly AccessService $access)
+    {
+    }
 
     public function viewAny(User $user): bool
     {
-        return $user->hasPermission('purchase.rfqs.view')
-            || $user->hasPermission('purchase.rfqs.manage');
+        return $this->access->allows($user, 'purchase.rfqs.view', [
+            'tenant_id' => $user->tenant_id,
+        ]);
     }
 
     public function view(User $user, PurchaseRfq $rfq): bool
     {
-        return $user->hasPermission('purchase.rfqs.view')
-            || $user->hasPermission('purchase.rfqs.manage');
+        return $this->access->allows($user, 'purchase.rfqs.view', [
+            'tenant_id' => $rfq->tenant_id,
+        ]);
     }
 
     public function create(User $user): bool
     {
-        return $user->hasPermission('purchase.rfqs.create')
-            || $user->hasPermission('purchase.rfqs.manage');
+        return $this->access->allows($user, 'purchase.rfqs.create', [
+            'tenant_id' => $user->tenant_id,
+        ]);
     }
 
     public function update(User $user, PurchaseRfq $rfq): bool
     {
-        return $user->hasPermission('purchase.rfqs.edit')
-            || $user->hasPermission('purchase.rfqs.manage');
+        return $this->access->allows($user, 'purchase.rfqs.edit', [
+            'tenant_id' => $rfq->tenant_id,
+        ]);
     }
 
     public function delete(User $user, PurchaseRfq $rfq): bool
     {
-        return $user->hasPermission('purchase.rfqs.delete')
-            || $user->hasPermission('purchase.rfqs.manage');
+        return $this->access->allows($user, 'purchase.rfqs.delete', [
+            'tenant_id' => $rfq->tenant_id,
+        ]);
     }
 }

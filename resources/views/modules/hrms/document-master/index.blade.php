@@ -15,6 +15,11 @@
             Add Category
         </x-ui.button>
     </div>
+    <div id="hdr-btn-add-template" class="d-none d-flex align-items-center gap-2">
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addTemplateModal" class="fw-bold text-uppercase">
+            Add Document Template
+        </x-ui.button>
+    </div>
 @endsection
 
 @push('styles')
@@ -221,11 +226,17 @@
                         <i class="feather-sliders me-2"></i>Document Categories
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {{ $activeTab === 'templates' ? 'active' : '' }}" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates-pane" type="button" role="tab" aria-controls="templates-pane" aria-selected="{{ $activeTab === 'templates' ? 'true' : 'false' }}">
+                        <i class="feather-layout me-2"></i>Document Templates
+                    </button>
+                </li>
             </ul>
 
             <div class="tab-content" id="docMasterTabsContent">
                 @include('modules.hrms.document-master.tabs.documents')
                 @include('modules.hrms.document-master.tabs.categories')
+                @include('modules.hrms.document-master.tabs.templates')
             </div>
         </div>
     </div>
@@ -234,12 +245,16 @@
 @push('scripts')
     <script>
         function switchTab(tabId) {
+            $('#hdr-btn-add-document').addClass('d-none');
+            $('#hdr-btn-add-category').addClass('d-none');
+            $('#hdr-btn-add-template').addClass('d-none');
+
             if (tabId === 'categories') {
-                $('#hdr-btn-add-document').addClass('d-none');
                 $('#hdr-btn-add-category').removeClass('d-none');
+            } else if (tabId === 'templates') {
+                $('#hdr-btn-add-template').removeClass('d-none');
             } else {
                 $('#hdr-btn-add-document').removeClass('d-none');
-                $('#hdr-btn-add-category').addClass('d-none');
             }
         }
 
@@ -249,11 +264,19 @@
             $('#editCategoryModal').appendTo('body');
             $('#addDocumentModal').appendTo('body');
             $('#editDocumentModal').appendTo('body');
+            $('#addTemplateModal').appendTo('body');
+            $('#editTemplateModal').appendTo('body');
+            $('#previewTemplateModal').appendTo('body');
 
             // Handle bootstrap tab switch shown event
             $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
                 var targetId = $(e.target).attr('id');
-                var tabName = targetId === 'categories-tab' ? 'categories' : 'documents';
+                var tabName = 'documents';
+                if (targetId === 'categories-tab') {
+                    tabName = 'categories';
+                } else if (targetId === 'templates-tab') {
+                    tabName = 'templates';
+                }
                 
                 // Update URL search parameters
                 var url = new URL(window.location.href);

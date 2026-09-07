@@ -4,33 +4,53 @@ namespace App\Domains\Purchase\Policies;
 
 use App\Domains\Purchase\Models\GoodsReceiptNote;
 use App\Models\User;
-use Illuminate\Auth\Access\HandlesAuthorization;
+use App\Services\Access\AccessService;
 
 class GoodsReceiptNotePolicy
 {
-    use HandlesAuthorization;
+    public function __construct(private readonly AccessService $access)
+    {
+    }
 
     public function viewAny(User $user): bool
     {
-        return $user->hasPermission('purchase.grns.view')
-            || $user->hasPermission('inventory.receipts.view');
+        return $this->access->allows($user, 'grns.view', [
+            'tenant_id' => $user->tenant_id,
+        ]);
     }
 
     public function view(User $user, GoodsReceiptNote $grn): bool
     {
-        return $user->hasPermission('purchase.grns.view')
-            || $user->hasPermission('inventory.receipts.view');
+        return $this->access->allows($user, 'grns.view', [
+            'tenant_id' => $grn->tenant_id,
+        ]);
     }
 
     public function create(User $user): bool
     {
-        return $user->hasPermission('purchase.grns.create')
-            || $user->hasPermission('inventory.receipts.create');
+        return $this->access->allows($user, 'grns.create', [
+            'tenant_id' => $user->tenant_id,
+        ]);
+    }
+
+    public function update(User $user, GoodsReceiptNote $grn): bool
+    {
+        return $this->access->allows($user, 'grns.update', [
+            'tenant_id' => $grn->tenant_id,
+        ]);
+    }
+
+    public function delete(User $user, GoodsReceiptNote $grn): bool
+    {
+        return $this->access->allows($user, 'grns.delete', [
+            'tenant_id' => $grn->tenant_id,
+        ]);
     }
 
     public function approve(User $user, GoodsReceiptNote $grn): bool
     {
-        return $user->hasPermission('purchase.grns.approve')
-            || $user->hasPermission('inventory.receipts.manage');
+        return $this->access->allows($user, 'grns.approve', [
+            'tenant_id' => $grn->tenant_id,
+        ]);
     }
 }

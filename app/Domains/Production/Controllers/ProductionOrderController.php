@@ -203,9 +203,15 @@ class ProductionOrderController extends Controller
         $operators = \App\Models\User::where('tenant_id', $order->tenant_id)->orderBy('name')->get();
         $wipWorkCenterSummaries = app(\App\Domains\Production\Services\ProductionWipService::class)
             ->getWorkCenterWipSummaries($order->tenant_id, $order->id);
+        $readiness = app(\App\Domains\Production\Services\ProductionReadinessService::class)->evaluateOrderReadiness($order);
+        $varianceAnalysis = app(\App\Domains\Production\Services\ProductionVarianceAnalysisService::class)->analyzeProductionOrder($order);
+        $riskAnalysis = app(\App\Domains\Production\Services\PlanningExceptionService::class)->evaluateOrderRisk($order);
 
         return view('modules.production.orders.show', compact(
             'order',
+            'readiness',
+            'varianceAnalysis',
+            'riskAnalysis',
             'costs',
             'costAdjustments',
             'dailyHistory',

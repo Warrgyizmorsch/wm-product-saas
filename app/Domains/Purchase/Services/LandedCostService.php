@@ -29,20 +29,31 @@ class LandedCostService
                 throw new InvalidArgumentException('Please add at least one expense line.');
             }
 
-            // Generate Voucher Number
+            // Generate Unique Voucher Number (Collision-Proof across all companies/branches/trashed rows)
             $year = now()->format('Y');
             $prefix = "LCV-{$year}-";
-            $lastVoucher = LandedCostVoucher::where('tenant_id', $tenantId)
-                ->where('voucher_number', 'like', "{$prefix}%")
-                ->orderBy('id', 'desc')
-                ->first();
 
-            $nextNum = 1;
-            if ($lastVoucher) {
-                $lastNumStr = str_replace($prefix, '', $lastVoucher->voucher_number);
-                $nextNum = ((int) $lastNumStr) + 1;
+            $allNumbers = DB::table('landed_cost_vouchers')
+                ->where('voucher_number', 'like', "{$prefix}%")
+                ->pluck('voucher_number');
+
+            $maxNum = 0;
+            foreach ($allNumbers as $vNum) {
+                $numStr = str_replace($prefix, '', $vNum);
+                $n = (int) $numStr;
+                if ($n > $maxNum) {
+                    $maxNum = $n;
+                }
             }
-            $voucherNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+
+            $nextNum = $maxNum + 1;
+            do {
+                $voucherNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+                $exists = DB::table('landed_cost_vouchers')->where('voucher_number', $voucherNumber)->exists();
+                if ($exists) {
+                    $nextNum++;
+                }
+            } while ($exists);
 
             $voucher = LandedCostVoucher::create([
                 'tenant_id'       => $tenantId,
@@ -72,7 +83,7 @@ class LandedCostService
                 $taxRate = (float) ($exp['tax_rate'] ?? 0);
                 $gstType = $exp['gst_type'] ?? 'cgst_sgst';
                 $isRcm   = !empty($exp['is_rcm']) && ($exp['is_rcm'] === '1' || $exp['is_rcm'] === true || $exp['is_rcm'] === 'true');
-                if ($gstType === 'rcm') {
+                if (in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst'])) {
                     $isRcm = true;
                 }
 
@@ -213,11 +224,13 @@ class LandedCostService
 
                 $firstExp   = $expLines->first();
                 $gstType    = $firstExp?->gst_type ?? 'cgst_sgst';
-                $isIgst     = $gstType === 'igst';
+                $isRcm      = in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst']);
+                $isIgst     = in_array($gstType, ['igst', 'rcm_igst']);
 
                 $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
-                $sgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
+                $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 2);
                 $igstAmount = $isIgst ? round($taxAmount, 2) : 0;
+                $grandTotal = $isRcm ? $subtotal : ($subtotal + $taxAmount);
 
                 $bill = \App\Domains\Purchase\Models\VendorBill::create([
                     'tenant_id'             => $tenantId,
@@ -255,6 +268,10 @@ class LandedCostService
                         'total_amount'   => (float) $expLine->total_with_tax,
                     ]);
                 }
+
+                // Dispatch BillPosted event to auto-post GL Journal Entry for the Transporter Bill
+                event(new \App\Domains\Purchase\Events\BillPosted($bill));
+                app(\App\Domains\Accounting\Listeners\PostPurchaseBillJournal::class)->handle(new \App\Domains\Purchase\Events\BillPosted($bill));
             }
 
             $voucher->status       = 'Posted';
@@ -277,8 +294,22 @@ class LandedCostService
                 $inputIgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1630')->first()
                     ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1600')->first();
 
-                $rcmPayableAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2080')->first()
-                    ?: \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2100')->first();
+                // RCM input tax credit accounts are distinct from regular Input
+                // GST — a reverse-charge purchase self-assesses tax it never paid
+                // the vendor, so it can't share the same ledger accounts as
+                // ordinary purchase ITC. Fall back to the regular Input accounts
+                // only if the tenant hasn't provisioned dedicated RCM accounts.
+                $rcmInputCgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1631')->first() ?: $inputCgstAcc;
+                $rcmInputSgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1632')->first() ?: $inputSgstAcc;
+                $rcmInputIgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1633')->first() ?: $inputIgstAcc;
+
+                // RCM payable accounts (2085/2086/2087) — the self-assessed
+                // liability paid in cash, NOT the same as Statutory Dues Payable
+                // (2080) or the generic Output Duties header (2100), which the
+                // previous lookup incorrectly fell back to.
+                $rcmPayableCgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2086')->first();
+                $rcmPayableSgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2087')->first();
+                $rcmPayableIgstAcc = \App\Domains\Accounting\Models\ChartOfAccount::where('tenant_id', $tenantId)->where('code', '2085')->first();
 
                 $journalLines = [];
 
@@ -298,48 +329,75 @@ class LandedCostService
 
                 foreach ($voucher->expenses as $exp) {
                     $taxAmt = (float) $exp->tax_amount;
-                    $isRcm  = (bool) $exp->is_rcm;
+                    $isRcm  = (bool) $exp->is_rcm || str_starts_with((string) $exp->gst_type, 'rcm');
                     $gstType = $exp->gst_type;
+                    $isIgstType = str_contains((string) $gstType, 'igst');
+
+                    $debitCgstAcc = $isRcm ? $rcmInputCgstAcc : $inputCgstAcc;
+                    $debitSgstAcc = $isRcm ? $rcmInputSgstAcc : $inputSgstAcc;
+                    $debitIgstAcc = $isRcm ? $rcmInputIgstAcc : $inputIgstAcc;
 
                     if ($taxAmt > 0) {
-                        if ($gstType === 'igst') {
-                            if ($inputIgstAcc) {
+                        if ($isIgstType) {
+                            if ($debitIgstAcc) {
                                 $journalLines[] = [
-                                    'chart_of_account_id' => $inputIgstAcc->id,
+                                    'chart_of_account_id' => $debitIgstAcc->id,
                                     'debit'               => round($taxAmt, 2),
                                     'credit'              => 0,
-                                    'description'         => "Input IGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    'description'         => ($isRcm ? "RCM Input IGST" : "Input IGST") . " for {$exp->cost_head} ({$voucher->voucher_number})",
                                 ];
                             }
                         } else {
-                            // cgst_sgst or rcm split
+                            // cgst_sgst (regular or RCM) split
                             $halfTax = round($taxAmt / 2, 2);
-                            if ($inputCgstAcc) {
+                            if ($debitCgstAcc) {
                                 $journalLines[] = [
-                                    'chart_of_account_id' => $inputCgstAcc->id,
+                                    'chart_of_account_id' => $debitCgstAcc->id,
                                     'debit'               => $halfTax,
                                     'credit'              => 0,
-                                    'description'         => "Input CGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    'description'         => ($isRcm ? "RCM Input CGST" : "Input CGST") . " for {$exp->cost_head} ({$voucher->voucher_number})",
                                 ];
                             }
-                            if ($inputSgstAcc) {
+                            if ($debitSgstAcc) {
                                 $journalLines[] = [
-                                    'chart_of_account_id' => $inputSgstAcc->id,
+                                    'chart_of_account_id' => $debitSgstAcc->id,
                                     'debit'               => round($taxAmt - $halfTax, 2),
                                     'credit'              => 0,
-                                    'description'         => "Input SGST for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    'description'         => ($isRcm ? "RCM Input SGST" : "Input SGST") . " for {$exp->cost_head} ({$voucher->voucher_number})",
                                 ];
                             }
                         }
 
-                        // If RCM, credit RCM Tax Liability account
-                        if ($isRcm && $rcmPayableAcc) {
-                            $journalLines[] = [
-                                'chart_of_account_id' => $rcmPayableAcc->id,
-                                'debit'               => 0,
-                                'credit'              => round($taxAmt, 2),
-                                'description'         => "RCM Tax Liability for {$exp->cost_head} ({$voucher->voucher_number})",
-                            ];
+                        // RCM: the buyer self-assesses this tax as a liability
+                        // (paid in cash, not to the vendor) rather than crediting
+                        // it toward Accounts Payable like normal purchase tax.
+                        if ($isRcm) {
+                            if ($isIgstType && $rcmPayableIgstAcc) {
+                                $journalLines[] = [
+                                    'chart_of_account_id' => $rcmPayableIgstAcc->id,
+                                    'debit'               => 0,
+                                    'credit'              => round($taxAmt, 2),
+                                    'description'         => "RCM IGST Payable for {$exp->cost_head} ({$voucher->voucher_number})",
+                                ];
+                            } elseif (!$isIgstType) {
+                                $halfTax = round($taxAmt / 2, 2);
+                                if ($rcmPayableCgstAcc) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $rcmPayableCgstAcc->id,
+                                        'debit'               => 0,
+                                        'credit'              => $halfTax,
+                                        'description'         => "RCM CGST Payable for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                                if ($rcmPayableSgstAcc) {
+                                    $journalLines[] = [
+                                        'chart_of_account_id' => $rcmPayableSgstAcc->id,
+                                        'debit'               => 0,
+                                        'credit'              => round($taxAmt - $halfTax, 2),
+                                        'description'         => "RCM SGST Payable for {$exp->cost_head} ({$voucher->voucher_number})",
+                                    ];
+                                }
+                            }
                         }
                     }
 
@@ -554,7 +612,7 @@ class LandedCostService
                 'product_id'   => $item->product_id,
                 'product_name' => $item->product->name,
                 'sku'          => $item->product->sku ?: 'No SKU',
-                'uom'          => $item->product->uom->code ?? 'PCS',
+                'uom'          => $item->product?->uom?->code ?? 'PCS',
                 'received_qty' => (float) $item->received_qty,
                 'unit_rate'    => (float) $item->unit_rate,
                 'total_amount' => (float) $item->total_amount,

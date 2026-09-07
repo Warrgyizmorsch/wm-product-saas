@@ -56,6 +56,7 @@ class UpdateRoutingRequest extends FormRequest
             'operations.*.subcontract_cost_per_unit'          => 'nullable|numeric|min:0',
             'operations.*.subcontract_service_product_id'     => 'nullable|exists:products,id',
             'operations.*.material_supply_type'               => 'nullable|in:company_supplied,vendor_supplied,none',
+            'operations.*.subcontract_input_type'            => 'nullable|in:bom_raw_materials,previous_operation_wip',
             'operations.*.dispatch_buffer_days'               => 'nullable|numeric|min:0',
             'operations.*.return_buffer_days'                 => 'nullable|numeric|min:0',
             'operations.*.queue_threshold_enabled'            => 'nullable|boolean',

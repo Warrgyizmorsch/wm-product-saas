@@ -158,6 +158,11 @@ class FurnitureProductSeeder extends Seeder
     {
         $warehouses = [];
 
+        $company = DB::table('companies')->where('tenant_id', $tenantId)->first();
+        $companyId = $company?->id;
+        $branch = DB::table('branches')->where('tenant_id', $tenantId)->first();
+        $branchId = $branch?->id;
+
         $whList = [
             ['name' => 'Main Raw Material Store', 'code' => 'WH-RM-01', 'is_default' => true],
             ['name' => 'Production WIP Store', 'code' => 'WH-WIP-01', 'is_default' => false],
@@ -168,6 +173,8 @@ class FurnitureProductSeeder extends Seeder
             $wh = Warehouse::firstOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $w['code']],
                 [
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'name' => $w['name'],
                     'status' => 'active',
                     'address' => 'Furniture Park Sector 18, MIDC Industrial Area, Pune, Maharashtra - 411018',

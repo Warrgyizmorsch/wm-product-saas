@@ -397,7 +397,10 @@
                         </thead>
                         <tbody>
                             @php
-                                $groupedItems = $order->items->groupBy('product_id')->map(function($items) {
+                                // Group by product_id + line_type, not product_id alone — otherwise a
+                                // split purchase of the same product (e.g. 8 units to Stock, 2 to Asset)
+                                // would incorrectly merge into a single line.
+                                $groupedItems = $order->items->groupBy(fn ($item) => $item->product_id . '|' . $item->line_type)->map(function($items) {
                                     $first = $items->first();
                                     $qty = $items->sum('quantity');
                                     $rate = $first->rate;
@@ -410,6 +413,10 @@
                                         'id' => $first->id,
                                         'product' => $first->product,
                                         'product_id' => $first->product_id,
+                                        'description' => $first->description,
+                                        'line_type' => $first->line_type,
+                                        'asset_category' => $first->assetCategory ?? null,
+                                        'chart_of_account' => $first->chartOfAccount ?? null,
                                         'quantity' => $qty,
                                         'rate' => $rate,
                                         'gross_amount' => $grossAmt,
@@ -432,13 +439,23 @@
                                     <td>
                                         <div class="d-flex align-items-center gap-2">
                                             <div class="avatar-sm bg-soft-primary text-primary rounded-2 d-flex align-items-center justify-content-center fw-bold fs-13" style="width:30px; height:30px; flex-shrink:0;">
-                                                <i class="feather-box"></i>
+                                                <i class="feather-{{ $item->line_type === 'asset' ? 'archive' : ($item->line_type === 'expense' ? 'file-text' : 'box') }}"></i>
                                             </div>
                                             <div>
-                                                <a href="{{ route('inventory.products.show', $item->product_id) }}" class="fw-bold text-dark text-decoration-none hover-underline">
-                                                    {{ $item->product->name ?? '—' }}
-                                                </a>
-                                                <div class="text-muted fs-11 font-monospace">SKU: {{ $item->product->sku ?: '—' }}</div>
+                                                @if($item->product_id)
+                                                    <a href="{{ route('inventory.products.show', $item->product_id) }}" class="fw-bold text-dark text-decoration-none hover-underline">
+                                                        {{ $item->product->name ?? '—' }}
+                                                    </a>
+                                                    <div class="text-muted fs-11 font-monospace">SKU: {{ $item->product->sku ?: '—' }}</div>
+                                                @elseif($item->line_type === 'asset')
+                                                    <span class="fw-bold text-dark">{{ $item->description ?: ($item->asset_category->name ?? 'Fixed Asset') }}</span>
+                                                    <div class="text-muted fs-11">{{ $item->asset_category->name ?? 'Asset purchase' }} — no stock item</div>
+                                                @elseif($item->line_type === 'expense')
+                                                    <span class="fw-bold text-dark">{{ $item->description ?: ($item->chart_of_account ? $item->chart_of_account->code . ' - ' . $item->chart_of_account->name : 'Expense') }}</span>
+                                                    <div class="text-muted fs-11">{{ $item->chart_of_account ? $item->chart_of_account->code . ' - ' . $item->chart_of_account->name : 'Direct expense' }} — no stock item</div>
+                                                @else
+                                                    <span class="text-muted">—</span>
+                                                @endif
                                             </div>
                                         </div>
                                     </td>

@@ -20,6 +20,8 @@ class ProductionBomItem extends BaseModel
         'material_id',
         'child_bom_id',
         'quantity',
+        'quantity_type', // fixed, formula
+        'formula',
         'uom_id',
         'material_scrap_percentage',
         'is_alternative',
@@ -42,6 +44,16 @@ class ProductionBomItem extends BaseModel
         'child_bom_id' => 'integer',
     ];
 
+    public function isFormula(): bool
+    {
+        return $this->quantity_type === 'formula' && !empty($this->formula);
+    }
+
+    public function isFixed(): bool
+    {
+        return !$this->isFormula();
+    }
+
     public function bom(): BelongsTo
     {
         return $this->belongsTo(ProductionBom::class, 'bom_id');
@@ -53,6 +65,11 @@ class ProductionBomItem extends BaseModel
     }
 
     public function material(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'material_id');
+    }
+
+    public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'material_id');
     }

@@ -3,6 +3,7 @@
 namespace App\Domains\Purchase\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Domains\Purchase\Models\PurchaseRequisition;
 use App\Domains\Purchase\Repositories\PurchaseRequisitionRepository;
 use App\Domains\Purchase\Services\PurchaseRequisitionService;
 use App\Domains\Inventory\Models\Product;
@@ -22,18 +23,24 @@ class PurchaseRequisitionController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', PurchaseRequisition::class);
+
         $requisitions = $this->requisitionRepo->getPaginatedRequisitions($request->all(), 10);
         return view('modules.purchase.requisitions.index', compact('requisitions'));
     }
 
     public function prApprovals(Request $request)
     {
+        $this->authorize('viewAny', PurchaseRequisition::class);
+
         $requisitions = $this->requisitionRepo->getPendingApprovals($request->all(), 15);
         return view('modules.purchase.approvals.index', compact('requisitions'));
     }
 
     public function create()
     {
+        $this->authorize('create', PurchaseRequisition::class);
+
         $tenantId = require_tenant_id();
 
         $products = Product::where('tenant_id', $tenantId)->get();
@@ -55,6 +62,8 @@ class PurchaseRequisitionController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', PurchaseRequisition::class);
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
@@ -83,6 +92,7 @@ class PurchaseRequisitionController extends Controller
     public function show(int $id)
     {
         $requisition = $this->requisitionRepo->findWithDetails($id);
+        $this->authorize('view', $requisition);
         return view('modules.purchase.requisitions.show', compact('requisition'));
     }
 
@@ -90,6 +100,7 @@ class PurchaseRequisitionController extends Controller
     {
         $requisition = $this->requisitionRepo->findWithDetails($id);
         if ($requisition) {
+            $this->authorize('view', $requisition);
             $requisition->load('reminders.user');
         }
         return view('modules.purchase.requisitions.detail-partial', compact('requisition'));
@@ -101,6 +112,7 @@ class PurchaseRequisitionController extends Controller
 
         $requisition = $this->requisitionRepo->find($id);
         if (!$requisition) abort(404);
+        $this->authorize('update', $requisition);
 
         if ($requisition->status !== 'Draft') {
             return redirect()->route('purchase.requisitions.show', $id)
@@ -130,6 +142,7 @@ class PurchaseRequisitionController extends Controller
     {
         $requisition = $this->requisitionRepo->find($id);
         if (!$requisition) abort(404);
+        $this->authorize('update', $requisition);
 
         if ($requisition->status !== 'Draft') {
             return redirect()->route('purchase.requisitions.show', $id)
@@ -163,6 +176,7 @@ class PurchaseRequisitionController extends Controller
     {
         $requisition = $this->requisitionRepo->find($id);
         if (!$requisition) abort(404);
+        $this->authorize('delete', $requisition);
 
         if ($requisition->status !== 'Draft') {
             return redirect()->route('purchase.requisitions.show', $id)
@@ -179,6 +193,7 @@ class PurchaseRequisitionController extends Controller
     {
         $requisition = $this->requisitionRepo->find($id);
         if (!$requisition) abort(404);
+        $this->authorize('approve', $requisition);
 
         if ($requisition->status !== 'Draft') {
             return redirect()->back()->with('error', 'Only Draft Purchase Requisitions can be approved.');
@@ -193,6 +208,7 @@ class PurchaseRequisitionController extends Controller
     {
         $requisition = $this->requisitionRepo->find($id);
         if (!$requisition) abort(404);
+        $this->authorize('approve', $requisition);
 
         if ($requisition->status !== 'Draft') {
             return redirect()->back()->with('error', 'Only Draft Purchase Requisitions can be rejected.');
@@ -244,6 +260,7 @@ class PurchaseRequisitionController extends Controller
     {
         $requisition = $this->requisitionRepo->find($id);
         if (!$requisition) abort(404);
+        $this->authorize('view', $requisition);
 
         if ($requisition->status !== 'Draft') {
             return redirect()->back()->with('error', 'Reminders can only be sent for pending Purchase Requisitions.');

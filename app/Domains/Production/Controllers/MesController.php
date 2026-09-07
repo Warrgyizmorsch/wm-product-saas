@@ -35,9 +35,14 @@ class MesController extends Controller
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
         $userId = auth()->id();
+        $search = $request->input('search');
+        $orderId = $request->input('order_id');
+        $productId = $request->input('product_id');
+        $workCenterId = $request->input('work_center_id');
+        $status = $request->input('status');
 
         // Retrieve active schedules in this tenant with operations
-        $activeSchedules = ProductionSchedule::with([
+        $activeSchedulesQuery = ProductionSchedule::with([
             'order.product',
             'operations.workCenter',
             'operations.machine',
@@ -47,8 +52,44 @@ class MesController extends Controller
             'operations.orderOperation.deliveryChallans',
             'operations.orderOperation.operatorAssignments.user',
         ])
-            ->where('tenant_id', $tenantId)
-            ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS])
+            ->where('tenant_id', $tenantId);
+
+        if ($status) {
+            $activeSchedulesQuery->where('status', $status);
+        } else {
+            $activeSchedulesQuery->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]);
+        }
+
+        if ($orderId) {
+            $activeSchedulesQuery->where('production_order_id', $orderId);
+        }
+
+        if ($productId) {
+            $activeSchedulesQuery->whereHas('order', function ($q) use ($productId) {
+                $q->where('product_id', $productId);
+            });
+        }
+
+        if ($workCenterId) {
+            $activeSchedulesQuery->whereHas('operations', function ($q) use ($workCenterId) {
+                $q->where('work_center_id', $workCenterId);
+            });
+        }
+
+        if ($search) {
+            $activeSchedulesQuery->where(function ($q) use ($search) {
+                $q->where('schedule_number', 'like', "%{$search}%")
+                  ->orWhereHas('order', function ($oq) use ($search) {
+                      $oq->where('order_number', 'like', "%{$search}%")
+                        ->orWhereHas('product', function ($pq) use ($search) {
+                            $pq->where('name', 'like', "%{$search}%")
+                              ->orWhere('sku', 'like', "%{$search}%");
+                        });
+                  });
+            });
+        }
+
+        $activeSchedules = $activeSchedulesQuery
             ->orderBy('scheduled_at', 'asc')
             ->orderBy('id', 'asc')
             ->get();
@@ -105,6 +146,21 @@ class MesController extends Controller
             ->limit(5)
             ->get();
 
+        // Orders list for filtering active shopfloor orders
+        $orders = \App\Domains\Production\Models\ProductionOrder::where('tenant_id', $tenantId)
+            ->whereIn('status', [
+                \App\Domains\Production\Models\ProductionOrder::STATUS_RELEASED,
+                \App\Domains\Production\Models\ProductionOrder::STATUS_IN_PROGRESS
+            ])
+            ->with('product')
+            ->orderBy('order_number')
+            ->get();
+
+        // Products list for filtering
+        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)
+            ->orderBy('name')
+            ->get();
+
         // Shifts assigned/active
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->get();
 
@@ -128,7 +184,9 @@ class MesController extends Controller
             'operators',
             'qualityPlans',
             'workCenters',
-            'machines'
+            'machines',
+            'orders',
+            'products'
         ));
     }
 
@@ -343,6 +401,7 @@ class MesController extends Controller
             'machine_id' => 'nullable|integer',
             'instructions' => 'nullable|string|max:500',
             'batch_id' => 'nullable|integer',
+            'rework_location' => 'nullable|string|in:vendor_rework,internal_repair',
         ]);
 
         try {
@@ -353,8 +412,10 @@ class MesController extends Controller
             $qty = (float) $request->input('quantity');
             $reason = $request->input('reason', 'Quality Inspection Rejection');
             $batchId = $request->input('batch_id');
+            $reworkLoc = $request->input('rework_location');
+            $isVendorRework = ($dispType === 'rework') && ($reworkLoc === 'vendor_rework' || ($orderOp->is_external && $reworkLoc !== 'internal_repair'));
 
-            DB::transaction(function () use ($tenantId, $orderOp, $dispType, $qty, $reason, $batchId, $userId, $request) {
+            DB::transaction(function () use ($tenantId, $orderOp, $dispType, $qty, $reason, $batchId, $userId, $request, $isVendorRework) {
                 $ncr = ProductionNcr::where('tenant_id', $tenantId)
                     ->where('production_order_operation_id', $orderOp->id)
                     ->where('status', 'open')
@@ -365,7 +426,7 @@ class MesController extends Controller
                     $ncr = ProductionNcr::create([
                         'tenant_id' => $tenantId,
                         'ncr_number' => 'NCR-SF-' . strtoupper(uniqid()),
-                        'category' => 'process',
+                        'category' => $orderOp->is_external ? 'subcontract' : 'process',
                         'status' => 'open',
                         'disposition_type' => 'pending',
                         'production_order_id' => $orderOp->production_order_id,
@@ -382,7 +443,7 @@ class MesController extends Controller
                         'original_production_order_id' => $orderOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'batch_id' => $batchId,
-                        'rework_type' => $request->input('rework_type', 'reprocess'),
+                        'rework_type' => $request->input('rework_type', $isVendorRework ? 'vendor_rework' : 'reprocess'),
                         'quantity' => $qty,
                         'work_center_id' => $request->input('work_center_id') ?? $orderOp->work_center_id,
                         'machine_id' => $request->input('machine_id') ?? $orderOp->machine_id,
@@ -391,10 +452,31 @@ class MesController extends Controller
                         'cost_estimate' => (float) ($request->input('cost_estimate') ?? 150.00),
                     ]);
 
+                    \App\Domains\Production\Models\ProductionOrderRework::create([
+                        'tenant_id' => $tenantId,
+                        'production_order_id' => $orderOp->production_order_id,
+                        'production_order_operation_id' => $orderOp->id,
+                        'production_batch_id' => $batchId,
+                        'quantity' => $qty,
+                        'reason' => $reason,
+                        'status' => 'in_progress',
+                        'recorded_by' => $userId,
+                        'recorded_at' => now(),
+                    ]);
+
+                    if ($isVendorRework) {
+                        app(\App\Domains\Production\Services\SubcontractMaterialBalanceService::class)
+                            ->createReworkChallan($tenantId, $orderOp, $qty, [
+                                'reason' => $reason,
+                                'instructions' => $request->input('instructions'),
+                                'batch_id' => $batchId,
+                            ], $userId);
+                    }
+
                     $orderOp->quantity_rejected = max(0, $orderOp->quantity_rejected - $qty);
                     $orderOp->save();
 
-                    $ncr->update(['disposition_type' => 'rework']);
+                    $ncr->update(['disposition_type' => $isVendorRework ? 'vendor_rework' : 'rework']);
                 } else { // scrap
                     ProductionOrderScrap::create([
                         'tenant_id' => $tenantId,
@@ -423,7 +505,9 @@ class MesController extends Controller
             });
 
             $msg = ($dispType === 'rework')
-                ? "Rework recorded for {$qty} units. Ready for Re-QC upon completion."
+                ? ($isVendorRework
+                    ? "Subcontract Rework Gate Pass created. {$qty} rejected unit(s) ready for dispatch back to vendor."
+                    : "Rework recorded for {$qty} units. Ready for Re-QC upon completion.")
                 : "Scrap recorded and material replacement evaluated for {$qty} units.";
 
             return redirect()->back()->with('success', $msg);

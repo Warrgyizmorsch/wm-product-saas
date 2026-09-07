@@ -43,9 +43,11 @@ Route::middleware(['tenant'])->group(function (): void {
             return view('dashboard');
         })->name('dashboard');
 
-        foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/web.php'))) as $moduleRoutes) {
-            require $moduleRoutes;
-        }
+        Route::middleware(['module.access'])->group(function (): void {
+            foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/web.php'))) as $moduleRoutes) {
+                require $moduleRoutes;
+            }
+        });
     });
 
     Route::middleware(['company', 'branch'])->group(function (): void {

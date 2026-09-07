@@ -4,6 +4,7 @@ namespace App\Domains\Purchase\Repositories;
 
 use App\Domains\Purchase\Models\VendorBill;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class VendorBillRepository
 {
@@ -59,16 +60,30 @@ class VendorBillRepository
     {
         $year = now()->format('Y');
         $prefix = "BILL-{$year}-";
-        $lastBill = VendorBill::where('tenant_id', $tenantId)
+
+        $allNumbers = DB::table('vendor_bills')
             ->where('bill_number', 'like', "{$prefix}%")
-            ->orderBy('id', 'desc')
-            ->first();
-        $nextNum = 1;
-        if ($lastBill) {
-            $lastNumStr = str_replace($prefix, '', $lastBill->bill_number);
-            $nextNum = ((int) $lastNumStr) + 1;
+            ->pluck('bill_number');
+
+        $maxNum = 0;
+        foreach ($allNumbers as $bNum) {
+            $numStr = str_replace($prefix, '', $bNum);
+            $n = (int) $numStr;
+            if ($n > $maxNum) {
+                $maxNum = $n;
+            }
         }
-        return $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+
+        $nextNum = $maxNum + 1;
+        do {
+            $billNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            $exists = DB::table('vendor_bills')->where('bill_number', $billNumber)->exists();
+            if ($exists) {
+                $nextNum++;
+            }
+        } while ($exists);
+
+        return $billNumber;
     }
 
     public function create(array $data): VendorBill

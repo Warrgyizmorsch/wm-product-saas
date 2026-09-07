@@ -149,8 +149,10 @@
 
                             <div id="gstTypeContainer">
                                 <x-ui.odoo-form-ui type="select" label="GST Type" name="gst_type" id="gstTypeSelect" required="true">
-                                    <option value="cgst_sgst" @selected(old('gst_type', $po?->gst_type ?? 'cgst_sgst') === 'cgst_sgst')>Intra-State (CGST + SGST)</option>
-                                    <option value="igst" @selected(old('gst_type', $po?->gst_type ?? '') === 'igst')>Inter-State (IGST)</option>
+                                    <option value="cgst_sgst" @selected(old('gst_type', $po?->gst_type ?? 'cgst_sgst') === 'cgst_sgst')>Intra-State (CGST + SGST - FCM)</option>
+                                    <option value="igst" @selected(old('gst_type', $po?->gst_type ?? '') === 'igst')>Inter-State (IGST - FCM)</option>
+                                    <option value="rcm_cgst_sgst" @selected(old('gst_type', $po?->gst_type ?? '') === 'rcm_cgst_sgst' || old('gst_type', $po?->gst_type ?? '') === 'rcm')>RCM Intra-State (CGST + SGST)</option>
+                                    <option value="rcm_igst" @selected(old('gst_type', $po?->gst_type ?? '') === 'rcm_igst')>RCM Inter-State (IGST)</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
@@ -174,8 +176,9 @@
                                     </div>
                                     <div class="col-7" id="freightAllocationMethodCol">
                                         <x-ui.odoo-form-ui type="select" label="Allocation Rule" name="freight_allocation_method" id="freightAllocationMethodSelect">
-                                            <option value="by_amount" @selected(old('freight_allocation_method', 'by_amount') === 'by_amount')>By Amount Ratio</option>
-                                            <option value="by_quantity" @selected(old('freight_allocation_method') === 'by_quantity')>By Quantity</option>
+                                            <option value="by_amount" @selected(old('freight_allocation_method', 'by_amount') === 'by_amount')>Capitalize: By Amount Ratio (Add to Item Cost)</option>
+                                            <option value="by_quantity" @selected(old('freight_allocation_method') === 'by_quantity')>Capitalize: By Quantity (Add to Item Cost)</option>
+                                            <option value="none" @selected(old('freight_allocation_method') === 'none')>Direct Expense GL (Do NOT Add to Item Cost)</option>
                                         </x-ui.odoo-form-ui>
                                     </div>
                                     <div class="col-4 d-none" id="freightTaxMethodContainer">
@@ -448,7 +451,7 @@
                 var isOrderWiseTax = (taxType === 'order_wise_tax');
 
                 var isIgst = (gstType === 'igst');
-                var isFreightEligible = (freightTerms === 'to_be_billed' || freightTerms === 'prepaid');
+                var isFreightEligible = (freightTerms === 'to_be_billed');
 
                 if (freightTerms === 'to_pay') {
                     $('#toPayFreightNoticeBanner').removeClass('d-none').show();

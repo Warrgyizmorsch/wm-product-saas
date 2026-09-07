@@ -293,13 +293,44 @@
                                                 </template>
                                             </td>
 
-                                            <!-- Quantity -->
-                                            <td class="align-middle">
-                                                <x-ui.odoo-form-ui type="input" inputType="number" step="any"
-                                                    name="items[][quantity]" x-bind:name="'items['+index+'][quantity]'"
-                                                    class="odoo-table-input text-end" x-model="item.quantity"
-                                                    placeholder="0.00" required min="0.0001"
-                                                    alpineError="errors['items.' + index + '.quantity']" />
+                                            <!-- Quantity & Type -->
+                                            <td class="align-middle" style="min-width: 220px;">
+                                                <div class="d-flex flex-column gap-1">
+                                                    <div class="d-flex gap-1">
+                                                        <x-ui.odoo-form-ui type="input" inputType="number" step="any"
+                                                            name="items[][quantity]" x-bind:name="'items['+index+'][quantity]'"
+                                                            class="odoo-table-input text-end" x-model="item.quantity"
+                                                            placeholder="0.00" required min="0.0001"
+                                                            alpineError="errors['items.' + index + '.quantity']" />
+
+                                                        <x-ui.odoo-form-ui type="select"
+                                                            name="items[][quantity_type]"
+                                                            x-bind:name="'items['+index+'][quantity_type]'"
+                                                            class="odoo-table-select fs-11"
+                                                            style="width: 100px;"
+                                                            select2Selector="default"
+                                                            x-model="item.quantity_type">
+                                                            <option value="fixed">Fixed</option>
+                                                            <option value="formula">Formula</option>
+                                                        </x-ui.odoo-form-ui>
+                                                    </div>
+
+                                                    <div x-show="item.quantity_type === 'formula'" class="mt-1">
+                                                        <x-ui.odoo-form-ui type="input" inputType="text"
+                                                            name="items[][formula]"
+                                                            x-bind:name="'items['+index+'][formula]'"
+                                                            class="odoo-table-input font-monospace fs-11"
+                                                            x-model="item.formula"
+                                                            placeholder="e.g. length * width * quantity" />
+                                                        <div class="d-flex justify-content-between align-items-center mt-1">
+                                                            <small class="text-muted fs-10">Vars: length, width, height, quantity</small>
+                                                            <button type="button" class="btn btn-xs btn-outline-primary py-0 fs-10"
+                                                                @click="previewFormula(item.formula)">
+                                                                <i class="feather-play me-1"></i>Preview
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </td>
 
                                             <!-- UOM -->
@@ -677,12 +708,96 @@
                         });
                 },
 
+                previewFormula(formula) {
+                    if (!formula || !formula.trim()) {
+                        if (typeof window.confirmAction === 'function') {
+                            window.confirmAction({
+                                title: 'Formula Required',
+                                message: 'Please enter a valid formula expression first (e.g. length * width).',
+                                variant: 'warning',
+                                confirmText: 'OK',
+                                cancelButtonText: ''
+                            });
+                        } else if (typeof Swal !== 'undefined') {
+                            Swal.fire({ icon: 'warning', title: 'Formula Required', text: 'Please enter a valid formula expression first (e.g. length * width).' });
+                        } else {
+                            alert('Please enter a valid formula expression first (e.g. length * width)');
+                        }
+                        return;
+                    }
+                    var sampleParams = { length: 2.5, width: 1.2, height: 1.0, quantity: 1 };
+                    fetch('{{ route("production.boms.preview-formula") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            formula: formula,
+                            sample_parameters: sampleParams
+                        })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            var resultMsg = 'Formula: ' + formula + '\nInputs: length=2.5, width=1.2, height=1.0, quantity=1\nCalculated Result: ' + data.result;
+                            if (typeof window.confirmAction === 'function') {
+                                window.confirmAction({
+                                    title: 'Formula Preview Success',
+                                    message: resultMsg,
+                                    variant: 'success',
+                                    confirmText: 'Great!',
+                                    cancelButtonText: 'Close'
+                                });
+                            } else if (typeof Swal !== 'undefined') {
+                                Swal.fire({ icon: 'success', title: 'Formula Preview Success', text: resultMsg });
+                            } else {
+                                alert('Formula Preview Success!\n' + resultMsg);
+                            }
+                        } else {
+                            var errorMsg = data.error || 'Invalid expression syntax.';
+                            if (typeof window.confirmAction === 'function') {
+                                window.confirmAction({
+                                    title: 'Formula Syntax Error',
+                                    message: errorMsg,
+                                    variant: 'danger',
+                                    confirmText: 'Close',
+                                    cancelButtonText: ''
+                                });
+                            } else if (typeof Swal !== 'undefined') {
+                                Swal.fire({ icon: 'error', title: 'Formula Syntax Error', text: errorMsg });
+                            } else {
+                                alert('Formula Error: ' + errorMsg);
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        var failMsg = err.message || 'Server error while evaluating formula.';
+                        if (typeof window.confirmAction === 'function') {
+                            window.confirmAction({
+                                title: 'Evaluation Failed',
+                                message: failMsg,
+                                variant: 'danger',
+                                confirmText: 'Close',
+                                cancelButtonText: ''
+                            });
+                        } else if (typeof Swal !== 'undefined') {
+                            Swal.fire({ icon: 'error', title: 'Evaluation Failed', text: failMsg });
+                        } else {
+                            alert('Formula evaluation failed: ' + failMsg);
+                        }
+                    });
+                },
+
                 addItem() {
                     this.items.push({
                         uid: 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                         material_id: '',
                         child_bom_id: null,
                         quantity: '',
+                        quantity_type: 'fixed',
+                        formula: '',
                         uom_id: '',
                         material_scrap_percentage: 0,
                         is_alternative: false,
@@ -754,6 +869,11 @@
                                     self.fetchChildBomStatus(item);
                                 }
                             }
+                        } else if (nameAttr.indexOf('quantity_type') !== -1) {
+                            var val = $select.val();
+                            if (val) {
+                                item.quantity_type = val;
+                            }
                         }
 
                         // Sync select2 changes to Alpine.js
@@ -770,6 +890,8 @@
                                 item.uom_id = val;
                             } else if (nameAttr.indexOf('child_bom_id') !== -1) {
                                 item.child_bom_id = val;
+                            } else if (nameAttr.indexOf('quantity_type') !== -1) {
+                                item.quantity_type = val;
                             }
 
                             // Trigger native events to propagate up to Alpine
@@ -817,6 +939,9 @@
             });
         });
     </script>
+
+    {{-- Global confirmation modal --}}
+    <x-ui.confirmation-modal />
 
     {{-- Global master quick-create modals --}}
     <x-ui.master-modals :masters="['product', 'uom']" />

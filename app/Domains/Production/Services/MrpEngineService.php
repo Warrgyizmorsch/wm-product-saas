@@ -89,10 +89,20 @@ class MrpEngineService
             $scrapFactor = 1.0 + ($item->material_scrap_percentage / 100);
             $requiredQty = $parentQty * $item->quantity * $scrapFactor;
 
+            $requiredDate = $plan->start_date ?? $plan->end_date;
+
+            // Fetch inventory availability
             $stockSnapshot = $this->getInventorySnapshot($plan->tenant_id, $item->material_id);
-            $available = $stockSnapshot['available'];
+            $availableStock = $stockSnapshot['available'];
             $reserved = $stockSnapshot['reserved'];
-            $shortage = max(0.0, $requiredQty - $available);
+
+            // Fetch open PO and open WO supply pipeline
+            $mrpShortageService = app(MrpShortageService::class);
+            $openPoSupply = $mrpShortageService->getOpenPoSupplySnapshot($plan->tenant_id, $item->material_id, null, $requiredDate)['usable_qty'] ?? 0.0;
+            $openWoSupply = $mrpShortageService->getOpenProductionOrderSupplySnapshot($plan->tenant_id, $item->material_id, null, $requiredDate)['usable_qty'] ?? 0.0;
+
+            $totalUsableSupply = $availableStock + $openPoSupply + $openWoSupply;
+            $shortage = max(0.0, $requiredQty - $totalUsableSupply);
 
             // Save snapshot requirement
             ProductionPlanRequirement::create([
@@ -102,7 +112,7 @@ class MrpEngineService
                 'product_id' => $item->material_id,
                 'bom_level' => $level,
                 'required_quantity' => $requiredQty,
-                'available_quantity' => $available,
+                'available_quantity' => $totalUsableSupply,
                 'reserved_quantity' => $reserved,
                 'shortage_quantity' => $shortage,
                 'uom_id' => $item->uom_id,

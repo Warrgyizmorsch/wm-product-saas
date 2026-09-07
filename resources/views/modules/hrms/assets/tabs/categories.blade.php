@@ -62,10 +62,11 @@
                 <table class="table table-hover align-middle mb-0 text-center" style="table-layout: fixed; width: 100%;">
                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                         <tr>
-                            <th class="text-start px-4" style="width: 40%;">{{ __('hrms.assets.category_name') }} & {{ __('hrms.assets.tbl_description') }}</th>
-                            <th style="width: 15%;">{{ __('hrms.assets.total_assets') }}</th>
-                            <th style="width: 25%;">{{ __('hrms.assets.org_entity') }}</th>
-                            <th style="width: 20%;">{{ __('hrms.assets.created_at') }}</th>
+                            <th class="text-start px-4" style="width: 35%;">{{ __('hrms.assets.category_name') }} & {{ __('hrms.assets.tbl_description') }}</th>
+                            <th style="width: 12%;">{{ __('hrms.assets.total_assets') }}</th>
+                            <th style="width: 20%;">{{ __('hrms.assets.org_entity') }}</th>
+                            <th style="width: 13%;">Type</th>
+                            <th style="width: 15%;">{{ __('hrms.assets.created_at') }}</th>
                             <th class="text-end px-4" style="width: 110px; white-space: nowrap;">{{ __('hrms.assets.actions') }}</th>
                         </tr>
                     </thead>
@@ -84,6 +85,13 @@
                                     <span class="badge bg-soft-primary text-primary px-3 py-1 rounded-pill">{{ $category->assets()->count() }}</span>
                                 </td>
                                 <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">{{ $category->company->company_name }}</td>
+                                <td>
+                                    @if($category->is_production_machinery)
+                                        <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1"><i class="feather-tool fs-10 me-1"></i>Machinery</span>
+                                    @else
+                                        <span class="text-muted fs-11">—</span>
+                                    @endif
+                                </td>
                                 <td class="text-muted fs-12">{{ $category->created_at->format('d M, Y') }}</td>
                                 <td class="text-end px-4">
                                      <x-ui.action-dropdown>
@@ -92,7 +100,8 @@
                                                  data-category-id="{{ $category->id }}"
                                                  data-company-id="{{ $category->company_id }}"
                                                  data-name="{{ $category->name }}"
-                                                 data-description="{{ $category->description }}">
+                                                 data-description="{{ $category->description }}"
+                                                 data-is-production-machinery="{{ $category->is_production_machinery ? '1' : '0' }}">
                                                  <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.assets.edit') }}
                                              </a>
                                          </li>
@@ -110,7 +119,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center py-5 text-muted fs-12">
+                                <td colspan="6" class="text-center py-5 text-muted fs-12">
                                     <i class="feather-sliders fs-32 d-block mb-3 text-secondary"></i>
                                     <div class="fw-bold mb-1">{{ __('hrms.assets.empty_categories_title') }}</div>
                                     <div>{{ __('hrms.assets.empty_categories_desc') }}</div>
@@ -173,6 +182,14 @@
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" placeholder="Brief details about what items go into this category..." />
                         </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_production_machinery" value="1" id="add_category_is_production_machinery">
+                                <label class="form-check-label fs-12" for="add_category_is_production_machinery">
+                                    Production machinery — purchases in this category will be surfaced in Production for machine registration
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
@@ -211,6 +228,14 @@
                         </div>
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" id="edit_category_description" placeholder="Brief details about what items go into this category..." />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_production_machinery" value="1" id="edit_category_is_production_machinery">
+                                <label class="form-check-label fs-12" for="edit_category_is_production_machinery">
+                                    Production machinery — purchases in this category will be surfaced in Production for machine registration
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>

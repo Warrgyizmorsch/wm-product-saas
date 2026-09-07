@@ -8,6 +8,7 @@ use App\Domains\Purchase\Models\VendorBill;
 use App\Domains\Purchase\Models\VendorPayment;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Http\Controllers\Controller;
+use App\Services\Access\AccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,8 @@ class VendorController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorizePurchase('purchase.vendors.view');
+
         $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
 
         $totalCount = Vendor::where('tenant_id', $tenantId)->count();
@@ -64,6 +67,8 @@ class VendorController extends Controller
 
     public function create(): View
     {
+        $this->authorizePurchase('purchase.vendors.create');
+
         $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
         $nextCount = Vendor::where('tenant_id', $tenantId)->count() + 1;
         $autoCode = 'VEND-' . str_pad((string)$nextCount, 4, '0', STR_PAD_LEFT);
@@ -77,6 +82,8 @@ class VendorController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizePurchase('purchase.vendors.create');
+
         $tenantId = tenant_id() ?? app(TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -151,6 +158,8 @@ class VendorController extends Controller
 
     public function show(Vendor $vendor): View
     {
+        $this->authorizePurchase('purchase.vendors.view');
+
         $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
 
         $bills = VendorBill::where('tenant_id', $tenantId)
@@ -239,6 +248,8 @@ class VendorController extends Controller
 
     public function edit(Vendor $vendor): View
     {
+        $this->authorizePurchase('purchase.vendors.edit');
+
         $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
         $paymentTerms = \App\Domains\Platform\Models\PaymentTerm::where('tenant_id', $tenantId)
             ->where('is_active', true)
@@ -250,6 +261,8 @@ class VendorController extends Controller
 
     public function update(Request $request, Vendor $vendor): RedirectResponse
     {
+        $this->authorizePurchase('purchase.vendors.edit');
+
         $tenantId = tenant_id() ?? app(TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -286,6 +299,8 @@ class VendorController extends Controller
 
     public function toggleStatus(Request $request, Vendor $vendor): RedirectResponse
     {
+        $this->authorizePurchase('purchase.vendors.edit');
+
         $newStatus = strtolower($vendor->status) === 'active' ? 'inactive' : 'active';
         $vendor->update(['status' => $newStatus]);
 
@@ -294,5 +309,15 @@ class VendorController extends Controller
         return redirect()
             ->back()
             ->with('success', "Vendor '{$vendor->name}' marked as {$statusLabel} successfully.");
+    }
+
+    private function authorizePurchase(string $permission): void
+    {
+        abort_unless(
+            app(AccessService::class)->allows(auth()->user(), $permission, [
+                'tenant_id' => auth()->user()?->tenant_id,
+            ]),
+            403
+        );
     }
 }

@@ -273,10 +273,11 @@
                                         @endif
                                         @if($op->orderOperation && $op->orderOperation->is_external)
                                             @php
+                                                $isWipJobWork = $op->orderOperation->isWipJobWork();
                                                 $supplyType = $op->orderOperation->material_supply_type ?? 'company_supplied';
                                                 $isVendorSupplied = ($supplyType === 'vendor_supplied');
                                             @endphp
-                                            <br><span class="badge {{ $isVendorSupplied ? 'bg-soft-info text-info border border-info-subtle' : 'bg-soft-warning text-dark border border-warning' }} font-monospace mt-1"><i class="feather-external-link me-1"></i>SUBCONTRACT ({{ $isVendorSupplied ? 'Vendor Supplied' : 'Company Supplied' }}) — {{ $op->orderOperation->vendor->name ?? 'Vendor' }}</span>
+                                            <br><span class="badge {{ $isWipJobWork ? 'bg-soft-primary text-primary border border-primary-subtle' : ($isVendorSupplied ? 'bg-soft-info text-info border border-info-subtle' : 'bg-soft-warning text-dark border border-warning') }} font-monospace mt-1"><i class="feather-external-link me-1"></i>SUBCONTRACT ({{ $isWipJobWork ? 'Previous Op WIP Job Work' : ($isVendorSupplied ? 'Vendor Supplied' : 'Company Supplied') }}) — {{ $op->orderOperation->vendor->name ?? 'Vendor' }}</span>
                                             <br><small class="text-warning font-monospace fs-11">Lead: {{ $op->orderOperation->subcontract_lead_time_days ?? 0 }}d | Buffer: {{ $op->orderOperation->dispatch_buffer_days ?? 0 }}d / {{ $op->orderOperation->return_buffer_days ?? 0 }}d</small>
                                         @endif
                                     </td>

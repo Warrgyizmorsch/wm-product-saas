@@ -215,7 +215,7 @@ class PurchaseRequisitionRepository
                         'product_id' => $item->product_id,
                         'product_name' => $product->name,
                         'sku' => $product->sku ?: 'No SKU',
-                        'uom' => $item->uom->code ?? $product->uom->code ?? 'PCS',
+                        'uom' => $item->uom?->code ?? $product?->uom?->code ?? 'PCS',
                         'requisition_number' => $pr->requisition_number,
                         'requisition_id' => $pr->id,
                         'requisition_date' => $pr->requisition_date,

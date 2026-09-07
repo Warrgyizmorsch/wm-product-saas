@@ -235,4 +235,29 @@ class ProductionCostService
             'total_cost'       => $this->calculateTotalManufacturingCost($bom),
         ];
     }
+
+    /**
+     * Estimate costs for a specific ProductionOrder using its reservations and routing snapshot.
+     */
+    public function estimateOrderCost(\App\Domains\Production\Models\ProductionOrder $order): array
+    {
+        $materialCost = 0.0;
+        $order->loadMissing('reservations.product');
+
+        foreach ($order->reservations as $res) {
+            $unitCost = (float) ($res->product?->unit_cost ?? $res->product?->cost_price ?? 0.0);
+            $materialCost += (float) $res->quantity_planned * $unitCost;
+        }
+
+        $routingCost = 0.0;
+        if ($order->bom) {
+            $routingCost = $this->calculateRoutingCost($order->bom);
+        }
+
+        return [
+            'material_cost' => $materialCost,
+            'routing_cost' => $routingCost,
+            'total_cost' => $materialCost + $routingCost,
+        ];
+    }
 }

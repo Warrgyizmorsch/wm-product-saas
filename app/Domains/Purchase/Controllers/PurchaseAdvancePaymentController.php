@@ -7,6 +7,7 @@ use App\Domains\Purchase\Repositories\PurchaseAdvancePaymentRepository;
 use App\Domains\Purchase\Repositories\PurchaseOrderRepository;
 use App\Domains\Purchase\Services\PurchaseAdvancePaymentService;
 use App\Domains\Inventory\Models\Vendor;
+use App\Services\Access\AccessService;
 use Illuminate\Http\Request;
 
 class PurchaseAdvancePaymentController extends Controller
@@ -19,12 +20,16 @@ class PurchaseAdvancePaymentController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorizePurchase('purchase.advances.view');
+
         $advances = $this->advanceRepo->getPaginatedAdvances($request->all(), 10);
         return view('modules.purchase.advances.index', compact('advances'));
     }
 
     public function create(Request $request)
     {
+        $this->authorizePurchase('purchase.advances.create');
+
         $tenantId = require_tenant_id();
 
         $poId = $request->query('purchase_order_id');
@@ -41,6 +46,8 @@ class PurchaseAdvancePaymentController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizePurchase('purchase.advances.create');
+
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
@@ -66,6 +73,8 @@ class PurchaseAdvancePaymentController extends Controller
 
     public function show(int $id)
     {
+        $this->authorizePurchase('purchase.advances.view');
+
         $advance = $this->advanceRepo->find($id);
         if (!$advance) abort(404);
 
@@ -86,5 +95,15 @@ class PurchaseAdvancePaymentController extends Controller
     public function destroy(int $id)
     {
         return redirect()->route('purchase.advances.index');
+    }
+
+    private function authorizePurchase(string $permission): void
+    {
+        abort_unless(
+            app(AccessService::class)->allows(auth()->user(), $permission, [
+                'tenant_id' => auth()->user()?->tenant_id,
+            ]),
+            403
+        );
     }
 }

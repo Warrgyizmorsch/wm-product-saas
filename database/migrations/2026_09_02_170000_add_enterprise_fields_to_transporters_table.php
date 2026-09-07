@@ -9,6 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('transporters', function (Blueprint $table) {
+            if (!Schema::hasColumn('transporters', 'vendor_id')) {
+                $table->unsignedBigInteger('vendor_id')->nullable()->after('name')->index();
+            }
             if (!Schema::hasColumn('transporters', 'code')) {
                 $table->string('code', 50)->nullable()->after('name');
             }

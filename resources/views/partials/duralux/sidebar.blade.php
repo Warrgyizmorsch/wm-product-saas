@@ -91,33 +91,11 @@
         ],
         __('ui.production') => [
             ['label' => 'Production Dashboard', 'icon' => 'feather-grid', 'route' => 'production.dashboard'],
-            ['label' => 'Production Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
-                ['label' => __('production.bom'),          'route' => 'production.boms.index'],
-                ['label' => __('production.routing'),       'route' => 'production.routing.index'],
-                ['label' => __('production.work_centers'),  'route' => 'production.work-centers.index'],
-                ['label' => __('production.machines'),      'route' => 'production.machines.index'],
-                ['label' => 'Operator Skills',              'route' => 'production.operator-skills.index'],
-                ['label' => 'Quality Plans',                'route' => 'production.quality-plans.index'],
-                ['label' => __('production.shifts_sidebar'),    'route' => 'production.shifts.index'],
-                ['label' => __('production.calendars_sidebar'), 'route' => 'production.calendars.index'],
-            ]],
-            ['label' => 'Production Orders', 'icon' => 'feather-play-circle', 'route' => 'production.orders.index'],
-            ['label' => 'Scheduling', 'icon' => 'feather-calendar', 'url' => '#', 'children' => [
-                ['label' => 'Production Schedules', 'route' => 'production.schedules.index'],
-                ['label' => 'Calendar View',         'route' => 'production.schedules.calendar'],
-            ]],
-            ['label' => 'Work-in-Progress (WIP)', 'icon' => 'feather-layers', 'route' => 'production.wip.index'],
-            ['label' => 'Shop Floor (MES)', 'icon' => 'feather-activity', 'url' => '#', 'children' => [
-                ['label' => 'Shop Floor Dashboard',   'route' => 'production.mes.dashboard'],
-                ['label' => 'MES Operator Console',   'route' => 'production.mes.operator.dashboard'],
-                ['label' => 'Work Center Monitor',    'route' => 'production.mes.work-centers.index'],
-                ['label' => 'Machine Monitor',        'route' => 'production.mes.machines.index'],
-                ['label' => 'Barcode Scanner',        'route' => 'production.mes.scanner.index'],
-            ]],
-            ['label' => 'Subcontracting', 'icon' => 'feather-truck', 'url' => '#', 'children' => [
-                ['label' => 'Delivery Challans / Gate Passes', 'route' => 'production.subcontract.delivery-challans.index'],
-                ['label' => 'Vendor SLA & Analytics',          'route' => 'production.subcontract.analytics'],
-                ['label' => 'Subcontract Settings',            'route' => 'production.settings.index'],
+            ['label' => 'Execution', 'icon' => 'feather-play-circle', 'url' => '#', 'children' => [
+                ['label' => 'Production Orders',     'route' => 'production.orders.index'],
+                ['label' => 'Shop Floor (MES)',       'route' => 'production.mes.dashboard'],
+                ['label' => 'Work-in-Progress (WIP)', 'route' => 'production.wip.index'],
+                ['label' => 'Job Cards / Operations', 'route' => 'production.mes.operator.my-operations'],
             ]],
             ['label' => 'Quality Management', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quality Dashboard',    'route' => 'production.quality.dashboard'],
@@ -127,16 +105,39 @@
                 ['label' => 'Rework Orders',        'route' => 'production.rework.index'],
                 ['label' => 'Scrap Disposals',      'route' => 'production.scrap.index'],
             ]],
+            ['label' => 'Subcontracting', 'icon' => 'feather-truck', 'url' => '#', 'children' => [
+                ['label' => 'Delivery Challans / Gate Passes', 'route' => 'production.subcontract.delivery-challans.index'],
+                ['label' => 'Vendor SLA & Analytics',          'route' => 'production.subcontract.analytics'],
+                ['label' => 'Subcontract Settings',            'route' => 'production.settings.index'],
+            ]],
+            ['label' => 'Engineering', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
+                ['label' => __('production.bom'),                 'route' => 'production.boms.index'],
+                ['label' => __('production.routing'),              'route' => 'production.routing.index'],
+                ['label' => 'ECO / Engineering Changes',           'route' => 'production.ecos.index'],
+                ['label' => __('production.work_centers'),         'route' => 'production.work-centers.index'],
+                ['label' => __('production.machines'),             'route' => 'production.machines.index'],
+                ['label' => 'Operator Skills',                     'route' => 'production.operator-skills.index'],
+                ['label' => __('production.shifts_sidebar'),       'route' => 'production.shifts.index'],
+                ['label' => __('production.calendars_sidebar'),    'route' => 'production.calendars.index'],
+            ]],
+            ['label' => 'Performance', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => [
+                ['label' => 'Variance & Performance',  'route' => 'production.variances.index'],
+                ['label' => 'Executive Dashboard',     'route' => 'production.intelligence.dashboard'],
+                ['label' => 'Live Andon Board',        'route' => 'production.intelligence.andon'],
+                ['label' => 'Manufacturing Reports',   'route' => 'production.intelligence.reports.index'],
+            ]],
             ['label' => 'Machine Maintenance', 'icon' => 'feather-tool', 'url' => '#', 'children' => [
                 ['label' => 'Maintenance Dashboard', 'route' => 'production.maintenance.dashboard'],
                 ['label' => 'Work Orders',           'route' => 'production.maintenance.work-orders.index'],
                 ['label' => 'PM Schedules',          'route' => 'production.maintenance.schedules.index'],
             ]],
-            ['label' => 'Manufacturing Intelligence', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => [
-                ['label' => 'Executive Dashboard',    'route' => 'production.intelligence.dashboard'],
-                ['label' => 'Live Andon Board',       'route' => 'production.intelligence.andon'],
-                ['label' => 'Historical Analytics',   'route' => 'production.intelligence.analytics'],
-                ['label' => 'Manufacturing Reports',  'route' => 'production.intelligence.reports.index'],
+            ['label' => 'Advanced Planning', 'icon' => 'feather-cpu', 'url' => '#', 'children' => [
+                ['label' => 'Production Plans',                'route' => 'production.plans.index'],
+                ['label' => 'Production Schedules',            'route' => 'production.schedules.index'],
+                ['label' => 'Calendar Schedule View',            'route' => 'production.schedules.calendar'],
+                ['label' => 'Capacity Planning',               'route' => 'production.capacity.index'],
+                ['label' => 'Planning Scenarios / What-if',    'route' => 'production.schedules.scenarios.index'],
+                ['label' => 'Planning Exceptions / At-Risk',   'route' => 'production.planning-exceptions.index'],
             ]],
         ],
         'HRMS' => [
@@ -181,6 +182,12 @@
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
                 ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
                 ['label' => 'Cost Centers', 'route' => 'accounting.cost-centers.index'],
+                ['label' => 'Fixed Asset Register', 'route' => 'accounting.fixed-assets.index'],
+                ['label' => 'Asset Categories', 'route' => 'accounting.fixed-assets.categories.index'],
+                ['label' => 'Depreciation', 'route' => 'accounting.fixed-assets.depreciation.index'],
+                ['label' => 'Asset Disposals', 'route' => 'accounting.fixed-assets.disposals.index'],
+                ['label' => 'Asset Write-offs', 'route' => 'accounting.fixed-assets.write-offs.index'],
+                ['label' => 'Asset Revaluations', 'route' => 'accounting.fixed-assets.revaluations.index'],
                 ['label' => 'Journals', 'route' => 'accounting.journals.index'],
                 ['label' => 'Payment Vouchers', 'route' => 'accounting.vouchers.payment.index'],
                 ['label' => 'Receipt Vouchers', 'route' => 'accounting.vouchers.receipt.index'],
@@ -215,6 +222,89 @@
             ['label' => 'Audit & Settings', 'icon' => 'feather-settings', 'url' => '#', 'children' => ['Audit Logs', 'Localization', 'Currencies', 'System Settings']],
         ],
     ];
+
+    // Two independent filters, both must pass for a module to show:
+    // 1. tenant_allowed_modules() — is this module in the tenant's subscribed plan?
+    // 2. AccessService::allowedModulesFor() — does this user's role have any
+    //    permission grant in this module at all? A CRM-only plan with an
+    //    HR-role user viewing it would otherwise show CRM items that role
+    //    can't actually do anything with.
+    // Either returning null means "unrestricted" for that dimension.
+    $allowedModules = tenant_allowed_modules();
+    $allowedModulesForUser = auth()->user()
+        ? app(\App\Services\Access\AccessService::class)->allowedModulesFor(auth()->user())
+        : null;
+
+    if ($allowedModules !== null || $allowedModulesForUser !== null) {
+        $isRouteAllowed = function (?string $routeName) use ($allowedModules, $allowedModulesForUser) {
+            if ($routeName === null) {
+                return true;
+            }
+
+            $module = explode('.', $routeName)[0];
+
+            if (! in_array($module, \App\Http\Middleware\EnsureTenantModuleAccess::GATED_MODULES, true)) {
+                return true;
+            }
+
+            if ($allowedModules !== null && ! in_array($module, $allowedModules, true)) {
+                return false;
+            }
+
+            if ($allowedModulesForUser !== null && ! in_array($module, $allowedModulesForUser, true)) {
+                return false;
+            }
+
+            return true;
+        };
+
+        foreach ($modules as $caption => &$items) {
+            foreach ($items as $key => &$item) {
+                if (isset($item['children']) && !empty($item['children'])) {
+                    // A placeholder child with no 'route' (an unimplemented
+                    // link, e.g. 'Tasks') would otherwise always pass the
+                    // filter below regardless of module, keeping the whole
+                    // group visible even after every real route in it was
+                    // correctly hidden. Decide the group's module from the
+                    // first routed child instead, and drop the entire group
+                    // — placeholders included — if that module is disallowed.
+                    $firstRoute = null;
+
+                    foreach ($item['children'] as $child) {
+                        if (is_array($child) && isset($child['route'])) {
+                            $firstRoute = $child['route'];
+                            break;
+                        }
+                    }
+
+                    if ($firstRoute !== null && ! $isRouteAllowed($firstRoute)) {
+                        unset($items[$key]);
+                        continue;
+                    }
+
+                    $item['children'] = array_values(array_filter($item['children'], function ($child) use ($isRouteAllowed) {
+                        $childRoute = is_array($child) ? ($child['route'] ?? null) : null;
+
+                        return $isRouteAllowed($childRoute);
+                    }));
+
+                    if (empty($item['children'])) {
+                        unset($items[$key]);
+                    }
+                } elseif (isset($item['route']) && ! $isRouteAllowed($item['route'])) {
+                    unset($items[$key]);
+                }
+            }
+            unset($item);
+
+            $items = array_values($items);
+
+            if (empty($items)) {
+                unset($modules[$caption]);
+            }
+        }
+        unset($items);
+    }
 @endphp
 
 <nav class="nxl-navigation">

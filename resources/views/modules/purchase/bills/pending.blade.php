@@ -6,6 +6,15 @@
 
 @push('styles')
     <style>
+        #pendingBillsTable th {
+            white-space: nowrap !important;
+            font-size: 11px !important;
+            letter-spacing: 0.5px !important;
+        }
+        #pendingBillsTable td {
+            vertical-align: middle !important;
+            white-space: nowrap !important;
+        }
         .action-icon-btn {
             display: inline-flex !important;
             align-items: center !important;
@@ -40,70 +49,83 @@
 
 @section('content')
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
-        <!-- Tab navigation for Vendor Bills & Pending GRNs -->
-        <ul class="nav nav-tabs nav-tabs-custom mb-4" id="billsPendingTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <a class="nav-link text-muted fw-bold position-relative py-2 px-3" href="{{ route('purchase.bills.index') }}">
-                    <i class="feather-file-text me-2 text-primary"></i>All Vendor Bills
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link active fw-bold position-relative py-2 px-3" href="{{ route('purchase.bills.pending') }}">
-                    <i class="feather-clock text-warning me-2"></i>Pending Bills (Unbilled GRNs)
-                    @if(($pendingGrnsCount ?? 0) > 0)
-                        <x-ui.badge :soft="true" variant="danger" class="ms-2 fs-11 fw-bold">{{ $pendingGrnsCount }}</x-ui.badge>
-                    @else
-                        <x-ui.badge :soft="true" variant="secondary" class="ms-2 fs-11 fw-bold">0</x-ui.badge>
-                    @endif
-                </a>
-            </li>
-        </ul>
+        <!-- Tab navigation using Common UI Component -->
+        <x-ui.horizontal-tabs id="vendorBillsPendingTabNav" class="mb-4" :tabs="[
+            [
+                'id' => 'tab-all-bills',
+                'label' => 'All Bills',
+                'active' => false,
+                'icon' => 'feather-file-text',
+            ],
+            [
+                'id' => 'tab-pending-bills',
+                'label' => 'Pending Inbound Bills' . (($pendingGrnsCount ?? 0) > 0 ? ' (' . $pendingGrnsCount . ')' : ''),
+                'active' => true,
+                'icon' => 'feather-clock',
+            ],
+            [
+                'id' => 'tab-pending-freight',
+                'label' => 'Pending Outbound Freight Bills' . (($pendingFreightCount ?? 0) > 0 ? ' (' . $pendingFreightCount . ')' : ''),
+                'active' => false,
+                'icon' => 'feather-truck',
+            ]
+        ]" />
 
         <!-- Header Title & Common Filter -->
-        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div class="d-flex align-items-center justify-content-between mb-3.5 flex-wrap gap-2">
             <div>
                 <h5 class="fw-bold text-dark mb-0">
-                    <i class="feather-clock me-2 text-warning"></i>Approved GRNs Pending Bill Creation
+                    <i class="feather-clock me-2 text-warning"></i>Pending Goods Receipts
                 </h5>
-                <p class="text-muted fs-12 mb-0">Approved store material receipts ready for 3-way matching and vendor invoice posting.</p>
+                <p class="text-muted fs-12 mb-0">Approved store material receipts ready for vendor billing.</p>
             </div>
 
-            <!-- Common Filter Panel -->
-            <form method="GET" action="{{ route('purchase.bills.pending') }}" class="d-inline">
-                <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
+            <!-- Actions & Common Filter Panel -->
+            <div class="d-flex align-items-center gap-2">
+                <a href="{{ route('purchase.bills.create-service') }}" class="btn btn-sm btn-soft-primary fw-bold text-primary px-3 shadow-sm border border-primary-subtle">
+                    <i class="feather-plus me-1"></i>Create Service Bill
+                </a>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.search_keyword') }}</label>
-                        <x-ui.odoo-form-ui type="input" name="search" placeholder="GRN / PO / Vendor Name..." value="{{ request('search') }}" />
-                    </div>
+                <form method="GET" action="{{ route('purchase.bills.pending') }}" class="d-inline">
+                    <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
 
-                    <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('purchase.bills.pending') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
-                        <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
-                    </div>
-                </x-ui.filter>
-            </form>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.search_keyword') }}</label>
+                            <x-ui.odoo-form-ui type="input" name="search" placeholder="GRN / PO / Vendor Name..." value="{{ request('search') }}" />
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <a href="{{ route('purchase.bills.pending') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
+                        </div>
+                    </x-ui.filter>
+                </form>
+            </div>
         </div>
 
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="pendingBillsTable">
                 <thead>
-                    <tr>
-                        <th style="width: 13%">GRN NUMBER</th>
-                        <th style="width: 13%">PO NUMBER</th>
-                        <th style="width: 18%">SUPPLIER / VENDOR</th>
-                        <th style="width: 14%">WAREHOUSE</th>
-                        <th style="width: 11%">RECEIPT DATE</th>
-                        <th style="width: 8%" class="text-center">REC. QTY</th>
-                        <th style="width: 10%" class="text-center">BILLING STATUS</th>
-                        <th style="width: 13%" class="text-end">ACTION</th>
+                    <tr class="text-nowrap">
+                        <th style="min-width: 140px;">GRN NUMBER</th>
+                        <th style="min-width: 140px;">PO NUMBER</th>
+                        <th style="min-width: 170px;">SUPPLIER / VENDOR</th>
+                        <th style="min-width: 140px;">WAREHOUSE</th>
+                        <th style="min-width: 110px;">RECEIPT DATE</th>
+                        <th style="min-width: 90px;" class="text-center">REC. QTY</th>
+                        <th style="min-width: 110px;" class="text-center">BILLING STATUS</th>
+                        <th style="min-width: 160px;" class="text-end">ACTION</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($pendingGrns as $grn)
                         @php
                             $recQty = (float)$grn->items->sum('received_qty');
+                            $activeBills = $grn->vendorBills ? $grn->vendorBills->where('status', '!=', 'Cancelled') : collect();
+                            $hasMaterialBill = $activeBills->contains(fn($b) => (int)$b->vendor_id === (int)$grn->vendor_id);
+                            $hasFreightBill = $activeBills->contains(fn($b) => (int)$b->vendor_id !== (int)$grn->vendor_id);
+                            $requiresFreight = $grn->purchaseOrder && in_array(strtolower($grn->purchaseOrder->freight_terms ?? ''), ['to_pay', 'to pay']);
                         @endphp
                         <tr>
                             <td class="ps-4 fw-bold font-monospace">
@@ -134,12 +156,31 @@
                                 </span>
                             </td>
                             <td class="text-end">
-                                <div class="d-flex justify-content-end gap-2 align-items-center">
-                                    <a href="{{ route('purchase.bills.create', ['grn_id' => $grn->id]) }}" class="btn btn-sm btn-success text-white fw-bold shadow-sm py-1 px-2.5 fs-11 d-inline-flex align-items-center gap-1" title="Create Vendor Bill" data-bs-toggle="tooltip">
-                                        <i class="feather-file-text"></i> Create Bill
-                                    </a>
-                                    <a href="{{ route('grns.show', $grn->id) }}" class="action-icon-btn view-btn" title="{{ __('purchase.view_details') }}" data-bs-toggle="tooltip">
-                                        <i class="feather feather-eye"></i>
+                                <div class="d-flex justify-content-end align-items-center" style="gap: 8px;">
+                                    @if($hasMaterialBill)
+                                        <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fw-bold fs-11 d-inline-flex align-items-center gap-1" title="Material Goods Bill Has Been Created">
+                                            <i class="feather-check"></i> Material Billed
+                                        </span>
+                                    @else
+                                        <a href="{{ route('purchase.bills.create', ['grn_id' => $grn->id]) }}" class="btn btn-sm btn-success text-white fw-bold shadow-sm py-1 px-2 fs-11 d-inline-flex align-items-center gap-1" title="Create Material Goods Bill" data-bs-toggle="tooltip">
+                                            <i class="feather-file-text"></i> Create Bill
+                                        </a>
+                                    @endif
+
+                                    @if($requiresFreight)
+                                        @if($hasFreightBill)
+                                            <span class="badge bg-soft-info text-info border border-info-subtle px-2 py-1 fw-bold fs-11 d-inline-flex align-items-center gap-1" title="Freight / Transporter Bill Has Been Created">
+                                                <i class="feather-check"></i> Freight Billed
+                                            </span>
+                                        @else
+                                            <a href="{{ route('purchase.bills.create-service', ['grn_id' => $grn->id]) }}" class="btn btn-sm btn-outline-primary fw-bold shadow-sm py-1 px-2 fs-11 d-inline-flex align-items-center gap-1" title="Create Freight / Service Bill for this GRN" data-bs-toggle="tooltip">
+                                                <i class="feather-truck"></i> Freight Bill
+                                            </a>
+                                        @endif
+                                    @endif
+
+                                    <a href="{{ route('grns.show', $grn->id) }}" class="action-icon-btn view-btn" title="{{ __('ui.view') }}" data-bs-toggle="tooltip">
+                                        <i class="feather-eye"></i>
                                     </a>
                                 </div>
                             </td>
@@ -164,3 +205,16 @@
         @endif
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        $(document).ready(function() {
+            $('#tab-all-bills-tab').on('click', function() {
+                window.location.href = "{{ route('purchase.bills.index') }}";
+            });
+            $('#tab-pending-freight-tab').on('click', function() {
+                window.location.href = "{{ route('purchase.bills.pending-freight') }}";
+            });
+        });
+    </script>
+@endpush

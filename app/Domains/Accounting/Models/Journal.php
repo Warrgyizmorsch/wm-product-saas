@@ -27,6 +27,7 @@ class Journal extends BaseModel
     public const SOURCE_INVENTORY = 'inventory';
     public const SOURCE_PRODUCTION = 'production';
     public const SOURCE_PAYROLL = 'payroll';
+    public const SOURCE_FIXED_ASSETS = 'fixed_assets';
 
     // What kind of accounting document this journal represents — orthogonal to
     // `source` (which module triggered it). Null means a plain manual journal.

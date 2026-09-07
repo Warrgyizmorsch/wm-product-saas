@@ -215,13 +215,89 @@
             <div class="col-12">
 
                 {{-- SECTION 1: Active Manufacturing Projects --}}
-                <div class="d-flex align-items-center mb-3">
-                    <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
-                        <i class="feather-grid me-2 text-primary"></i>{{ __('production.active_manufacturing_projects') }}
-                    </h5>
-                    <span
-                        class="badge bg-soft-primary text-primary rounded-pill ms-2 fw-bold font-monospace">{{ $activeSchedules->count() }}</span>
+                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                    <div class="d-flex align-items-center">
+                        <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
+                            <i class="feather-grid me-2 text-primary"></i>{{ __('production.active_manufacturing_projects') }}
+                        </h5>
+                        <span
+                            class="badge bg-soft-primary text-primary rounded-pill ms-2 fw-bold font-monospace">{{ $activeSchedules->count() }}</span>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- Custom Filter Component matching BOM module -->
+                        <form method="GET" action="{{ route('production.mes.dashboard') }}" class="d-inline">
+                            <x-ui.filter :label="__('ui.filter') ?? 'Filter'" offset="0, 5">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('production.filter_options') ?? 'Filter Options' }}</h6>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') ?? 'Search Keywords' }}</label>
+                                    <x-ui.odoo-form-ui type="input" name="search" placeholder="Search Order #, Schedule #, Product..." value="{{ request('search') }}" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Production Order</label>
+                                    <x-ui.odoo-form-ui type="select" name="order_id">
+                                        <option value="">All Production Orders</option>
+                                        @foreach($orders as $po)
+                                            <option value="{{ $po->id }}" {{ request('order_id') == $po->id ? 'selected' : '' }}>
+                                                {{ $po->order_number }} - {{ $po->product->name ?? '' }}
+                                            </option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.item_to_produce') ?? 'Product' }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="product_id">
+                                        <option value="">{{ __('production.all_products') ?? 'All Products' }}</option>
+                                        @foreach($products as $product)
+                                            <option value="{{ $product->id }}" {{ request('product_id') == $product->id ? 'selected' : '' }}>
+                                                {{ $product->name }}
+                                            </option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Workstation / Center</label>
+                                    <x-ui.odoo-form-ui type="select" name="work_center_id">
+                                        <option value="">All Work Centers</option>
+                                        @foreach($workCenters as $wc)
+                                            <option value="{{ $wc->id }}" {{ request('work_center_id') == $wc->id ? 'selected' : '' }}>
+                                                {{ $wc->name }}
+                                            </option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="d-flex gap-2 justify-content-end mt-4">
+                                    <a href="{{ route('production.mes.dashboard') }}" class="btn btn-sm btn-light text-muted fw-bold">
+                                        {{ __('production.reset') }}
+                                    </a>
+                                    <button type="submit" class="btn btn-sm btn-primary fw-bold">
+                                        <i class="feather-filter me-1"></i>{{ __('production.apply_filters') }}
+                                    </button>
+                                </div>
+                            </x-ui.filter>
+                        </form>
+                    </div>
                 </div>
+
+                @if(request('search') || request('order_id') || request('product_id') || request('work_center_id') || request('status'))
+                    <div class="alert alert-soft-info d-flex align-items-center justify-content-between p-2 px-3 mb-3 fs-11 rounded border border-info-subtle">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="feather-filter text-info fs-14"></i>
+                            <span><strong>Active Filters:</strong>
+                                @if(request('search')) Search: "{{ request('search') }}" &bull; @endif
+                                @if(request('order_id') && ($matchedPo = $orders->firstWhere('id', request('order_id')))) PO: {{ $matchedPo->order_number }} &bull; @endif
+                                @if(request('product_id') && ($matchedProd = $products->firstWhere('id', request('product_id')))) Product: {{ $matchedProd->name }} &bull; @endif
+                                @if(request('work_center_id') && ($matchedWc = $workCenters->firstWhere('id', request('work_center_id')))) Workstation: {{ $matchedWc->name }} &bull; @endif
+                            </span>
+                        </div>
+                        <a href="{{ route('production.mes.dashboard') }}" class="btn btn-xs btn-outline-info fw-bold py-0">Clear Filters</a>
+                    </div>
+                @endif
 
                 @forelse($activeSchedules as $schedule)
                     @php
@@ -284,24 +360,24 @@
                         </div>
 
                         {{-- Card Body: Odoo Form Component Table Grid --}}
-                        <div class="card-body p-0 bg-white">
-                            <x-ui.odoo-form-ui type="table" class="align-middle mb-0 fs-11" style="width: 100%;">
+                        <div class="card-body p-0 bg-white table-responsive" style="overflow-x: auto;">
+                            <x-ui.odoo-form-ui type="table" class="align-middle mb-0 fs-11" style="min-width: 1650px; width: 100%;">
                                 <thead class="bg-soft-primary text-primary fw-bold text-uppercase border-bottom">
                                     <tr>
-                                        <th class="ps-3 text-center" style="width: 4%;">S.No.</th>
-                                        <th style="width: 10%;">Action</th>
-                                        <th style="width: 15%;">Item Details</th>
-                                        <th style="width: 14%;">Process</th>
-                                        <th style="width: 12%;">Workstation</th>
-                                        <th style="width: 7%;">Shifts</th>
-                                        <th style="width: 9%;">Schedule Start</th>
-                                        <th style="width: 9%;">Schedule Finish</th>
-                                        <th class="text-center" style="width: 5%;">Target Qty</th>
-                                        <th style="width: 8%;">Actual Start</th>
-                                        <th style="width: 8%;">Actual Finish</th>
-                                        <th class="text-center" style="width: 5%;">Done Qty</th>
-                                        <th class="text-center" style="width: 5%;">Pending Qty</th>
-                                        <th class="pe-3" style="width: 8%;">Assign To</th>
+                                        <th class="ps-3 text-center" style="min-width: 55px; width: 55px;">S.No.</th>
+                                        <th style="min-width: 150px; width: 150px;">Action</th>
+                                        <th style="min-width: 220px; width: 220px;">Item Details</th>
+                                        <th style="min-width: 190px; width: 190px;">Process</th>
+                                        <th style="min-width: 190px; width: 190px;">Workstation</th>
+                                        <th style="min-width: 100px; width: 100px;">Shifts</th>
+                                        <th style="min-width: 110px; width: 110px;">Schedule Start</th>
+                                        <th style="min-width: 110px; width: 110px;">Schedule Finish</th>
+                                        <th class="text-center" style="min-width: 90px; width: 90px;">Target Qty</th>
+                                        <th style="min-width: 110px; width: 110px;">Actual Start</th>
+                                        <th style="min-width: 110px; width: 110px;">Actual Finish</th>
+                                        <th class="text-center" style="min-width: 90px; width: 90px;">Done Qty</th>
+                                        <th class="text-center" style="min-width: 90px; width: 90px;">Pending Qty</th>
+                                        <th class="pe-3" style="min-width: 110px; width: 110px;">Assign To</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -437,6 +513,44 @@
                                                                     <i class="feather-check-circle me-1"></i>Received
                                                                 </a>
                                                             @endif
+                                                        @endif
+
+                                                        {{-- QC & Disposition Context Actions for Outsourced Operations --}}
+                                                        @if($isQcRequired || $rejectedQty > 0)
+                                                            <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
+                                                                @if($isQcRequired)
+                                                                    @if($pendingQcQty > 0)
+                                                                        <button type="button"
+                                                                            class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
+                                                                            data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
+                                                                            title="Run Quality Inspection on Received Subcontract Goods">
+                                                                            <i class="feather-shield-check fs-11"></i>Run QC
+                                                                            ({{ number_format($pendingQcQty, 0) }})
+                                                                        </button>
+                                                                    @elseif($isCompleted)
+                                                                        <span
+                                                                            class="badge bg-soft-success text-success border border-success-subtle p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 text-nowrap">
+                                                                            <i class="feather-check-circle fs-11"></i>QC Passed
+                                                                        </span>
+                                                                    @else
+                                                                        <button type="button"
+                                                                            class="btn btn-xs btn-outline-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
+                                                                            data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
+                                                                            title="Run Quality Inspection on Received Subcontract Goods">
+                                                                            <i class="feather-shield-check fs-11"></i>Run QC
+                                                                        </button>
+                                                                    @endif
+                                                                @endif
+                                                                @if($rejectedQty > 0)
+                                                                    <button type="button"
+                                                                        class="btn btn-xs btn-danger text-white fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
+                                                                        data-bs-toggle="modal" data-bs-target="#dispositionModal{{ $op->id }}"
+                                                                        title="Disposition Rejected Qty">
+                                                                        <i class="feather-alert-triangle fs-11"></i>Rework / Scrap
+                                                                        ({{ number_format($rejectedQty, 0) }})
+                                                                    </button>
+                                                                @endif
+                                                            </div>
                                                         @endif
                                                     </div>
                                                 @else
@@ -784,8 +898,7 @@
                                     class="d-flex justify-content-between align-items-center bg-soft-purple p-3 rounded mb-3 border border-purple-subtle">
                                     <div>
                                         <h6 class="fw-bold text-purple mb-1">
-                                            <i class="feather-truck me-2"></i>Outsourced Subcontract Operation (Company Supplied
-                                            Material)
+                                            <i class="feather-truck me-2"></i>Outsourced Subcontract Operation ({{ ($activeOrderOp?->isWipJobWork() ?? false) ? 'Previous Op WIP Job Work' : 'Company Supplied Material' }})
                                         </h6>
                                         <span class="text-muted fs-11">Supplier / Vendor: <strong>{{ $activeVendorName }}</strong> |
                                             Production Order: <strong>{{ $activeOrder->order_number ?? '' }}</strong></span>
@@ -995,6 +1108,7 @@
                                     </button>
                                 </x-slot>
                             </x-ui.modal>
+                        @endif
 
                             {{-- Assign Operator Modal (Shopfloor Assignment) --}}
                             @if(!$isActiveOutsourced && $activeOp->status !== 'completed')
@@ -1226,6 +1340,11 @@
                                             {{ number_format($activeRejectedQty, 0) }}</span>
                                     </div>
 
+                                    @php
+                                        $isOutsourcedOp = (bool) ($activeOrderOp->is_external || $activeOrderOp->isOutsourced() || $activeOp->work_center_id === null);
+                                        $vendorName = $activeOrderOp->vendor->name ?? 'Subcontract Vendor';
+                                    @endphp
+
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <x-ui.odoo-form-ui type="select" label="Disposition Choice" name="disposition_type"
@@ -1239,37 +1358,59 @@
                                                 inputType="number" step="any" value="{{ $activeRejectedQty }}" :required="true" />
                                         </div>
 
-                                        <div class="col-md-6">
-                                            <x-ui.odoo-form-ui type="select" label="Target Workstation / Process (For Rework)"
-                                                name="work_center_id">
-                                                @foreach($workCenters as $wc)
-                                                    <option value="{{ $wc->id }}" {{ ($activeOrderOp->work_center_id == $wc->id) ? 'selected' : '' }}>
-                                                        {{ $wc->name }} ({{ $wc->code }})
-                                                    </option>
-                                                @endforeach
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <x-ui.odoo-form-ui type="select" label="Target Machine / Equipment" name="machine_id">
-                                                <option value="">-- Default Workstation Machine --</option>
-                                                @foreach($machines as $m)
-                                                    <option value="{{ $m->id }}" {{ ($activeOrderOp->machine_id == $m->id) ? 'selected' : '' }}>
-                                                        {{ $m->name }} ({{ $m->code ?? 'MACH' }})
-                                                    </option>
-                                                @endforeach
-                                            </x-ui.odoo-form-ui>
+                                        @if($isOutsourcedOp)
+                                            <div class="col-md-12">
+                                                <label class="form-label fw-bold text-dark fs-11">Rework Location / Pathway <span class="text-danger">*</span></label>
+                                                <select class="form-select form-select-sm" name="rework_location" id="reworkLocation_{{ $activeOp->id }}" onchange="toggleReworkFields{{ $activeOp->id }}(this.value)">
+                                                    <option value="vendor_rework" selected>Return to Subcontract Vendor (Generate Return Gate Pass / DC)</option>
+                                                    <option value="internal_repair">Perform In-House Repair (Internal Workstation)</option>
+                                                </select>
+                                            </div>
+
+                                            <div id="vendorReworkBanner_{{ $activeOp->id }}" class="col-md-12">
+                                                <div class="alert alert-info border border-info-subtle p-2.5 rounded fs-11 mb-0">
+                                                    <i class="feather-truck me-1"></i>
+                                                    <strong>Subcontract Vendor Rework</strong>: A Rework Delivery Challan (Return Gate Pass) will be created to dispatch <strong>{{ number_format($activeRejectedQty, 0) }} unit(s)</strong> back to <strong>{{ $vendorName }}</strong> for rework/rectification.
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        <div class="col-md-12 p-0 m-0">
+                                            <div id="internalReworkFields_{{ $activeOp->id }}" class="row g-3 m-0" style="{{ $isOutsourcedOp ? 'display: none;' : '' }}">
+                                                <div class="col-md-6">
+                                                    <x-ui.odoo-form-ui type="select" label="Target Workstation / Process (For Rework)"
+                                                        name="work_center_id">
+                                                        @foreach($workCenters as $wc)
+                                                            <option value="{{ $wc->id }}" {{ ($activeOrderOp->work_center_id == $wc->id) ? 'selected' : '' }}>
+                                                                {{ $wc->name }} ({{ $wc->code }})
+                                                            </option>
+                                                        @endforeach
+                                                    </x-ui.odoo-form-ui>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <x-ui.odoo-form-ui type="select" label="Target Machine / Equipment" name="machine_id">
+                                                        <option value="">-- Default Workstation Machine --</option>
+                                                        @foreach($machines as $m)
+                                                            <option value="{{ $m->id }}" {{ ($activeOrderOp->machine_id == $m->id) ? 'selected' : '' }}>
+                                                                {{ $m->name }} ({{ $m->code ?? 'MACH' }})
+                                                            </option>
+                                                        @endforeach
+                                                    </x-ui.odoo-form-ui>
+                                                </div>
+
+                                                <div class="col-md-6">
+                                                    <x-ui.odoo-form-ui type="select" label="Assigned Repair Technician" name="assigned_to">
+                                                        @foreach($operators as $tech)
+                                                            <option value="{{ $tech->id }}" {{ (auth()->id() == $tech->id) ? 'selected' : '' }}>
+                                                                {{ $tech->name }} ({{ ucfirst($tech->role ?? 'Technician') }})
+                                                            </option>
+                                                        @endforeach
+                                                    </x-ui.odoo-form-ui>
+                                                </div>
+                                            </div>
                                         </div>
 
-                                        <div class="col-md-4">
-                                            <x-ui.odoo-form-ui type="select" label="Assigned Repair Technician" name="assigned_to">
-                                                @foreach($operators as $tech)
-                                                    <option value="{{ $tech->id }}" {{ (auth()->id() == $tech->id) ? 'selected' : '' }}>
-                                                        {{ $tech->name }} ({{ ucfirst($tech->role ?? 'Technician') }})
-                                                    </option>
-                                                @endforeach
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-6">
                                             <x-ui.odoo-form-ui type="select" label="Rework Strategy" name="rework_type">
                                                 <option value="reprocess" selected>Reprocess / Re-run Machine</option>
                                                 <option value="repair">Manual Touch-up / Spot Repair</option>
@@ -1277,7 +1418,7 @@
                                                 <option value="re_coating">Strip & Re-surface / Re-paint</option>
                                             </x-ui.odoo-form-ui>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-6">
                                             <x-ui.odoo-form-ui type="input" label="Estimated Repair Cost ($)" name="cost_estimate"
                                                 inputType="number" step="0.01" value="50.00" />
                                         </div>
@@ -1288,12 +1429,27 @@
                                                 rows="2" />
                                         </div>
                                         <div class="col-md-12">
-                                            <x-ui.odoo-form-ui type="textarea" label="Detailed Rework Instructions for Technician"
+                                            <x-ui.odoo-form-ui type="textarea" label="Detailed Rework Instructions for Vendor / Technician"
                                                 name="instructions"
-                                                placeholder="Provide step-by-step repair instructions for the rework operator..."
+                                                placeholder="Provide step-by-step repair instructions..."
                                                 rows="2" />
                                         </div>
                                     </div>
+                                    @if($isOutsourcedOp)
+                                        <script>
+                                            function toggleReworkFields{{ $activeOp->id }}(val) {
+                                                const internalDiv = document.getElementById('internalReworkFields_{{ $activeOp->id }}');
+                                                const vendorBanner = document.getElementById('vendorReworkBanner_{{ $activeOp->id }}');
+                                                if (val === 'internal_repair') {
+                                                    if (internalDiv) internalDiv.style.display = 'flex';
+                                                    if (vendorBanner) vendorBanner.style.display = 'none';
+                                                } else {
+                                                    if (internalDiv) internalDiv.style.display = 'none';
+                                                    if (vendorBanner) vendorBanner.style.display = 'block';
+                                                }
+                                            }
+                                        </script>
+                                    @endif
                                 </form>
                                 <x-slot name="footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1303,7 +1459,6 @@
                                     </button>
                                 </x-slot>
                             </x-ui.modal>
-                        @endif
                     @endforeach
                 @empty
                     <div class="card p-5 text-center border bg-white rounded-3 shadow-sm mb-4">

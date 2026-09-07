@@ -150,10 +150,18 @@ class SchedulingService
      * @param  Carbon          $startDate  Scheduling starts no earlier than this date.
      * @return ProductionSchedule          The persisted schedule with all operations attached.
      */
+    public function clearCaches(): void
+    {
+        $this->workCentersCache = [];
+        $this->calendarsCache = [];
+        $this->shiftsCache = [];
+    }
+
     public function generateForwardSchedule(ProductionOrder $order, Carbon $startDate): ProductionSchedule
     {
         return DB::transaction(function () use ($order, $startDate) {
-            $rawOperations = $order->operations()->with(['workCenter', 'predecessorDependencies'])->get();
+            $this->clearCaches();
+            $rawOperations = $order->operations()->with(['workCenter', 'routingOperation', 'predecessorDependencies'])->get();
             if ($rawOperations->isEmpty()) {
                 throw new \LogicException("Cannot generate schedule: Production Order has no operations configured.");
             }
@@ -208,7 +216,7 @@ class SchedulingService
             $parallelGroupOpIds = []; // ['GROUP-A' => [scheduleOpId1, ...]]
 
             foreach ($operations as $op) {
-                if ($op->is_external) {
+                if ($op->is_external || $op->isOutsourced()) {
                     $totalDays = (int) ($op->dispatch_buffer_days ?? 0) + (int) ($op->subcontract_lead_time_days ?? 0) + (int) ($op->return_buffer_days ?? 0);
                     $duration = $totalDays * 1440.0;
 
@@ -356,7 +364,8 @@ class SchedulingService
     public function generateBackwardSchedule(ProductionOrder $order, Carbon $dueDate): ProductionSchedule
     {
         return DB::transaction(function () use ($order, $dueDate) {
-            $rawOperations = $order->operations()->with(['workCenter', 'predecessorDependencies', 'successorDependencies'])->get();
+            $this->clearCaches();
+            $rawOperations = $order->operations()->with(['workCenter', 'routingOperation', 'predecessorDependencies', 'successorDependencies'])->get();
             if ($rawOperations->isEmpty()) {
                 throw new \LogicException("Cannot generate schedule: Production Order has no operations configured.");
             }
@@ -1437,6 +1446,12 @@ class SchedulingService
         Carbon $plannedStart,
         float $orderQuantity
     ): Carbon {
+        if ((bool) ($orderOp->is_external || $orderOp->isOutsourced())) {
+            $totalDays = (int) ($orderOp->dispatch_buffer_days ?? 0) + (int) ($orderOp->subcontract_lead_time_days ?? 0) + (int) ($orderOp->return_buffer_days ?? 0);
+            $durationMinutes = $totalDays * 1440.0;
+            return $plannedStart->copy()->addMinutes((int) ceil($durationMinutes));
+        }
+
         if (!(bool) $orderOp->overlap_enabled) {
             $times = $this->calculateOperationTimes($orderOp, $orderQuantity);
             return $this->addWorkingMinutes($orderOp->work_center_id, $plannedStart, $times['total_minutes']);
@@ -1478,7 +1493,8 @@ class SchedulingService
                 ->with('predecessorDependencies')
                 ->get();
             foreach ($allOps as $aOp) {
-                if ($aOp->previous_operation_id === $currentOp->id || $aOp->predecessorDependencies->contains($currentOp->id)) {
+                $predIds = $aOp->predecessorDependencies->pluck('id')->toArray();
+                if ($aOp->previous_operation_id === $currentOp->id || in_array($currentOp->id, $predIds)) {
                     $successorOpIds[] = $aOp->id;
                 }
             }
@@ -1574,8 +1590,15 @@ class SchedulingService
                 foreach ($currentOp->predecessorDependencies as $pred) {
                     $predecessorOpIds[] = $pred->id;
                 }
+            } else {
+                $predIds = \App\Domains\Production\Models\ProductionOrderOperationDependency::where('tenant_id', $currentOp->tenant_id)
+                    ->where('operation_id', $currentOp->id)
+                    ->pluck('predecessor_operation_id')
+                    ->toArray();
+                $predecessorOpIds = array_merge($predecessorOpIds, $predIds);
             }
         }
+        $predecessorOpIds = array_values(array_unique(array_filter($predecessorOpIds)));
 
         $predecessors = collect($scheduledData)->filter(function ($prev) use ($opSequence, $parallelGroup, $isParallel, $predecessorOpIds) {
             if (!empty($predecessorOpIds)) {
@@ -1601,7 +1624,7 @@ class SchedulingService
         $earliestStartTimestamps = $predecessors->map(function ($prev) use ($orderQuantity) {
             $prevOrderOp = $prev['order_op'] ?? null;
 
-            if ($prevOrderOp && (bool) $prevOrderOp->is_external) {
+            if ($prevOrderOp && (bool) ($prevOrderOp->is_external || $prevOrderOp->isOutsourced())) {
                 return $prev['planned_finish']->copy();
             }
 

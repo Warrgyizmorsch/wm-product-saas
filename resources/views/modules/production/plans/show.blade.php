@@ -227,46 +227,90 @@
                     @endcan
                 </div>
             @else
-                <h5 class="fw-bold text-dark mb-3">{{ __('production.material_requirements_snapshot') }}</h5>
+                <h5 class="fw-bold text-dark mb-3">{{ __('production.material_requirements_snapshot') }} (Time-Phased & Lot Sized)</h5>
+                @php
+                    $mrpShortageService = app(\App\Domains\Production\Services\MrpShortageService::class);
+                    $mrpLotSizingService = app(\App\Domains\Production\Services\MrpLotSizingService::class);
+                @endphp
                 <div class="table-responsive">
-                    <table class="erp-thin-table fs-12">
+                    <table class="erp-thin-table fs-12 align-middle">
                         <thead>
                             <tr>
-                                <th style="width:4%">{{ __('production.lv') }}</th>
-                                <th style="width:26%">{{ __('production.component_item') }}</th>
-                                <th style="width:12%" class="text-end">{{ __('production.required_qty') }}</th>
-                                <th style="width:12%" class="text-end">{{ __('production.available_qty') }}</th>
-                                <th style="width:12%" class="text-end">{{ __('production.reserved_qty') }}</th>
-                                <th style="width:12%" class="text-end text-danger">{{ __('production.shortage_qty') }}</th>
-                                <th style="width:8%">{{ __('production.uom') ?? 'UOM' }}</th>
-                                <th>{{ __('production.source_item') }}</th>
+                                <th style="width:3%">{{ __('production.lv') }}</th>
+                                <th style="width:20%">Component / Required Date</th>
+                                <th style="width:10%" class="text-end">Gross Requirement</th>
+                                <th style="width:20%">Usable Supply Breakdown</th>
+                                <th style="width:10%" class="text-end text-danger">Net Requirement</th>
+                                <th style="width:12%">Lot Sizing (MOQ/Mult)</th>
+                                <th style="width:12%" class="text-end text-primary">Planned Supply</th>
+                                <th style="width:13%" class="text-center">Coverage Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($plan->requirements as $req)
                                 @php
                                     $level = (int) $req->bom_level;
-                                    $padding = max(0, ($level - 1) * 24);
                                     $hasShortage = (float) $req->shortage_quantity > 0;
                                     $isChild = $level > 1;
-                                    $rowClass = $hasShortage ? 'bg-soft-danger' : ($isChild ? 'table-light-soft text-muted' : '');
-                                    $componentClass = $hasShortage ? 'fw-bold text-danger' : ($isChild ? 'fw-normal text-dark' : 'fw-bold text-dark');
-                                    $skuClass = $hasShortage ? 'text-danger opacity-75 font-monospace fs-10' : 'text-muted font-monospace fs-10';
+                                    $rowClass = $hasShortage ? 'bg-soft-danger' : ($isChild ? 'table-light-soft' : '');
+                                    $componentClass = $hasShortage ? 'fw-bold text-danger' : 'fw-bold text-dark';
+                                    $skuClass = 'text-muted font-monospace fs-10';
+
+                                    $moq = (float) ($req->product->minimum_order_qty ?? 1.0);
+                                    $orderMult = (float) ($req->product->order_multiple ?? 1.0);
+                                    $lotSizing = $mrpLotSizingService->calculatePlannedSupply((float) $req->shortage_quantity, $moq, $orderMult);
+
+                                    $poSnapshot = $mrpShortageService->getOpenPoSupplySnapshot($plan->tenant_id, $req->product_id, null, $plan->start_date);
+                                    $woSnapshot = $mrpShortageService->getOpenProductionOrderSupplySnapshot($plan->tenant_id, $req->product_id, null, $plan->start_date);
+                                    $openPoQty = (float) ($poSnapshot['usable_qty'] ?? 0);
+                                    $openWoQty = (float) ($woSnapshot['usable_qty'] ?? 0);
+                                    $onHandQty = max(0, (float) $req->available_quantity - $openPoQty - $openWoQty);
+                                    $uomCode = $req->uom?->code ?? $req->product?->uom?->code ?? 'PCS';
                                 @endphp
                                 <tr class="{{ $rowClass }}">
-                                    <td class="fw-bold {{ $hasShortage ? 'text-danger' : '' }}">{{ $loop->iteration }}</td>
+                                    <td class="fw-bold {{ $hasShortage ? 'text-danger' : 'text-muted' }}">{{ $level }}</td>
                                     <td>
                                         <div class="d-flex flex-column">
                                             <span class="{{ $componentClass }}">{{ $req->product->name }}</span>
-                                            <small class="{{ $skuClass }}">{{ $req->product->sku }}</small>
+                                            <small class="{{ $skuClass }}">{{ $req->product->sku }} | Due: {{ $plan->start_date->format('d M Y') }}</small>
                                         </div>
                                     </td>
-                                    <td class="text-end fw-semibold {{ $hasShortage ? 'text-danger' : 'text-dark' }}">{{ number_format($req->required_quantity, 2) }}</td>
-                                    <td class="text-end {{ $hasShortage ? 'text-danger' : 'text-muted' }}">{{ number_format($req->available_quantity, 2) }}</td>
-                                    <td class="text-end {{ $hasShortage ? 'text-danger' : 'text-muted' }}">{{ number_format($req->reserved_quantity, 2) }}</td>
-                                    <td class="text-end text-danger fw-bold">{{ number_format($req->shortage_quantity, 2) }}</td>
-                                    <td class="{{ $hasShortage ? 'text-danger' : '' }}">{{ $req->uom ? $req->uom->code : 'PCS' }}</td>
-                                    <td class="{{ $hasShortage ? 'text-danger' : 'text-muted' }}">{{ $req->sourceItem ? $req->sourceItem->name : '—' }}</td>
+                                    <td class="text-end fw-bold {{ $hasShortage ? 'text-danger' : 'text-dark' }}">
+                                        {{ number_format($req->required_quantity, 2) }} {{ $uomCode }}
+                                    </td>
+                                    <td>
+                                        <div class="fs-11">
+                                            <span class="d-block text-dark">Stock: <strong>{{ number_format($onHandQty, 2) }}</strong> {{ $uomCode }}</span>
+                                            @if($openPoQty > 0)
+                                                <span class="d-block text-info"><i class="feather-truck me-1"></i>Open PO Supply: <strong>{{ number_format($openPoQty, 2) }}</strong></span>
+                                            @endif
+                                            @if($openWoQty > 0)
+                                                <span class="d-block text-primary"><i class="feather-settings me-1"></i>Open WO Supply: <strong>{{ number_format($openWoQty, 2) }}</strong></span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="text-end text-danger fw-bold fs-13">
+                                        {{ number_format($req->shortage_quantity, 2) }} {{ $uomCode }}
+                                    </td>
+                                    <td class="fs-11">
+                                        <div><span class="text-muted">MOQ:</span> <strong>{{ number_format($moq, 2) }}</strong></div>
+                                        <div><span class="text-muted">Multiple:</span> <strong>{{ number_format($orderMult, 2) }}</strong></div>
+                                    </td>
+                                    <td class="text-end fw-bold text-primary fs-13">
+                                        {{ number_format($lotSizing['planned_supply_qty'], 2) }} {{ $uomCode }}
+                                        <small class="d-block text-muted font-monospace fs-10">({{ $lotSizing['rule'] }})</small>
+                                    </td>
+                                    <td class="text-center">
+                                        @if($hasShortage)
+                                            <span class="badge bg-soft-danger text-danger border border-danger-subtle px-2 py-1">
+                                                <i class="feather-alert-triangle me-1"></i>SHORTAGE
+                                            </span>
+                                        @else
+                                            <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-1">
+                                                <i class="feather-check-circle me-1"></i>COVERED
+                                            </span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>

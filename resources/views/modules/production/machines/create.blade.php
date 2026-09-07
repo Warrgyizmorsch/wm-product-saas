@@ -23,13 +23,31 @@
 
         <form method="POST" action="{{ route('production.machines.store') }}">
             @csrf
-            
+
+            @if($linkedAsset ?? null)
+                <input type="hidden" name="asset_id" value="{{ $linkedAsset->id }}">
+            @endif
+
             <x-ui.odoo-form-ui type="sheet">
                 <!-- Header with Close Button -->
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
                     <h4 class="fw-bold text-dark mb-0">{{ __('production.new_machine_asset') }}</h4>
                     <a href="{{ route('production.machines.index') }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
                 </div>
+
+                @if($linkedAsset ?? null)
+                    <div class="alert alert-info d-flex align-items-start gap-2 mb-4">
+                        <i class="feather-link fs-16 mt-1"></i>
+                        <div>
+                            <div class="fw-bold">Registering purchased asset {{ $linkedAsset->asset_code }}</div>
+                            <div class="fs-12 text-muted">
+                                {{ $linkedAsset->name }} &middot; {{ $linkedAsset->category->name ?? '—' }} &middot;
+                                Cost: {{ number_format($linkedAsset->purchase_cost, 2) }}
+                            </div>
+                            <div class="fs-11 text-muted mt-1">Assign a work center and code below to finish commissioning this machine.</div>
+                        </div>
+                    </div>
+                @endif
 
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
@@ -42,8 +60,8 @@
                                 </option>
                             @endforeach
                         </x-ui.odoo-form-ui>
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.machine_name')" name="name" placeholder="{{ __('production.machine_name_placeholder') }}" :value="old('name')" :required="true" />
+
+                        <x-ui.odoo-form-ui type="input" :label="__('production.machine_name')" name="name" placeholder="{{ __('production.machine_name_placeholder') }}" :value="old('name', $linkedAsset->name ?? '')" :required="true" />
                         
                         <x-ui.odoo-form-ui type="input" :label="__('production.machine_asset_code')" name="code" placeholder="{{ __('production.machine_code_placeholder') }}" :value="old('code')" :required="true" />
                         

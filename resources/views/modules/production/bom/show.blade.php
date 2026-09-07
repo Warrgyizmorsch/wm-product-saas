@@ -275,11 +275,20 @@
                                             echo '</div>';
                                             echo '</td>';
                                             
-                                            // Quantity
-                                            echo '<td class="text-end fw-bold align-middle">' . number_format($item->quantity, 2) . '</td>';
+                                            // Quantity & Type
+                                            echo '<td class="text-end fw-bold align-middle">';
+                                            if ($item->quantity_type === 'formula' && !empty($item->formula)) {
+                                                echo '<span class="badge bg-soft-primary text-primary fs-10 mb-1 d-inline-block"><i class="feather-cpu me-1"></i>Formula</span>';
+                                                echo '<span class="fw-bold text-dark d-block">' . number_format($item->quantity, 2) . '</span>';
+                                                echo '<small class="text-muted font-monospace fs-10 d-block" title="Formula Expression">Fx: ' . e($item->formula) . '</small>';
+                                            } else {
+                                                echo '<span class="fw-bold text-dark d-block">' . number_format($item->quantity, 2) . '</span>';
+                                                echo '<small class="text-muted fs-10 d-block">Fixed</small>';
+                                            }
+                                            echo '</td>';
                                             
                                             // Unit
-                                            echo '<td class="align-middle text-muted">' . e($item->uom ? $item->uom->code : 'PCS') . '</td>';
+                                            echo '<td class="align-middle text-muted">' . e($item->uom?->code ?? $item->material?->uom?->code ?? 'PCS') . '</td>';
                                             
                                             // Scrap %
                                             echo '<td class="text-end text-danger fw-semibold align-middle">' . number_format($item->material_scrap_percentage, 2) . '%</td>';
@@ -287,7 +296,7 @@
                                             // Cost (Line Total & Unit Cost)
                                             echo '<td class="text-end align-middle">';
                                             echo '<span class="fw-bold text-dark d-block">' . format_currency($itemTotalCost) . '</span>';
-                                            echo '<small class="text-muted font-monospace fs-10">@ ' . format_currency($unitCost) . ' / ' . e($item->uom ? $item->uom->code : 'PCS') . '</small>';
+                                            echo '<small class="text-muted font-monospace fs-10">@ ' . format_currency($unitCost) . ' / ' . e($item->uom?->code ?? $item->material?->uom?->code ?? 'PCS') . '</small>';
                                             echo '</td>';
 
                                             echo '</tr>';

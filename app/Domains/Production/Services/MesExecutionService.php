@@ -1046,93 +1046,32 @@ class MesExecutionService
      */
     public function calculateOperationReadiness(ProductionOrderOperation $op): array
     {
-        $op->loadMissing(['previousOperation', 'predecessorDependencies']);
-        $order = $op->order;
-        $tenantId = $op->tenant_id;
-        $blockers = [];
-        $warnings = [];
+        $readinessService = app(ProductionReadinessService::class);
+        $eval = $readinessService->evaluateOperationReadiness($op);
 
-        // 1. Intra-routing predecessor check
-        $intraAvailableQty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1));
-        if ($op->previousOperation) {
-            $intraAvailableQty = (float) $op->previousOperation->quantity_produced;
-            if ($op->previousOperation->status !== ProductionOrderOperation::STATUS_COMPLETED && $intraAvailableQty <= 0) {
-                $blockers[] = "Intra-routing predecessor operation {$op->previousOperation->operation_number} is not completed.";
-            }
+        $blockerMsgs = [];
+        foreach ($eval['blocking_reasons'] as $b) {
+            $blockerMsgs[] = is_array($b) ? ($b['message'] ?? $b['code']) : (string)$b;
         }
 
-        // 2. Cross-assembly predecessor check (Executable parent quantity formula - Rule 5 & Rule 11)
-        $crossExecutableLimits = [];
-        $crossPreds = $op->predecessorDependencies()->wherePivot('dependency_type', 'cross_assembly')->get();
-        foreach ($crossPreds as $predOp) {
-            $childProductId = $predOp->source_product_id;
-            if (!$childProductId) {
-                continue;
-            }
-
-            // BOM ratio: how many units of SFG per 1 unit of parent
-            $bomItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $tenantId)
-                ->where('bom_id', $op->source_bom_id ?? $order->bom_id)
-                ->where('material_id', $childProductId)
-                ->first();
-            $bomRatio = ($bomItem && (float) $bomItem->quantity > 0) ? (float) $bomItem->quantity : 1.0;
-
-            // Issued material stock directly for this order
-            $issuedToOrder = (float) \App\Domains\Production\Models\ProductionOrderReservation::where('tenant_id', $tenantId)
-                ->where('production_order_id', $order->id)
-                ->where('product_id', $childProductId)
-                ->sum('quantity_issued');
-
-            // Warehouse Reserved stock & Available stock for order (Rule 2)
-            $reservedWarehouseStock = (float) \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                ->where('product_id', $childProductId)
-                ->sum('reserved_qty');
-            $availableWarehouseStock = (float) \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
-                ->where('product_id', $childProductId)
-                ->sum('quantity');
-
-            $warehouseStock = max($reservedWarehouseStock, $availableWarehouseStock);
-
-            // Usable Intermediate Manufactured SFG = Produced - (QC Hold + Rework) - Consumed (Rule 11)
-            $predOpFresh = ProductionOrderOperation::find($predOp->id) ?? $predOp;
-            $produced = (float) $predOpFresh->quantity_produced;
-            $qcHold = (float) ($predOpFresh->active_qc_hold ?? 0.0);
-            $rework = (float) ($predOpFresh->active_rework ?? 0.0);
-            $consumed = (float) ($predOpFresh->quantity_consumed ?? 0.0);
-
-            $usableIntermediateSfg = max(0.0, $produced - ($qcHold + $rework) - $consumed);
-            $totalUsableSfg = $issuedToOrder + $warehouseStock + $usableIntermediateSfg;
-
-            if ($issuedToOrder <= 0 && $warehouseStock > 0 && $usableIntermediateSfg <= 0) {
-                $childProduct = \App\Domains\Inventory\Models\Product::find($childProductId);
-                $childName = $childProduct->name ?? "Product #{$childProductId}";
-                $warnings[] = "Stock available in Warehouse ({$warehouseStock} units of {$childName}), but Material Issue to Order from Store is pending (0.00 issued).";
-            }
-
-            $maxExecutableParentQtyForThisComponent = $totalUsableSfg / $bomRatio;
-            $crossExecutableLimits[] = $maxExecutableParentQtyForThisComponent;
-
-            if ($totalUsableSfg <= 0 && $predOp->status !== ProductionOrderOperation::STATUS_COMPLETED) {
-                $blockers[] = "Cross-assembly predecessor operation {$predOp->operation_number} for product ID {$childProductId} has insufficient usable SFG (Available: {$totalUsableSfg}, Required BOM Ratio: {$bomRatio}).";
-            }
+        $warningMsgs = [];
+        foreach ($eval['warnings'] as $w) {
+            $warningMsgs[] = is_array($w) ? ($w['message'] ?? $w['code']) : (string)$w;
         }
 
-        $minCrossExecutable = !empty($crossExecutableLimits) ? min($crossExecutableLimits) : (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 1));
-        $executableQty = min($intraAvailableQty, $minCrossExecutable);
-
-        // Subtract already claimed quantity
-        $claimedQty = (float) ($op->quantity_claimed ?? 0.0);
-        $remainingExecutableQty = max(0.0, $executableQty - $claimedQty);
-
-        $isReady = empty($blockers) && $remainingExecutableQty > 0;
+        $executableQty = (float) $eval['ready_qty'];
+        $claimedQty = (float) $eval['claimed_qty'];
+        $remainingExecutableQty = (float) $eval['remaining_executable_qty'];
+        $isReady = ($eval['overall_status'] !== ProductionReadinessService::STATUS_BLOCKED) && $remainingExecutableQty > 0;
 
         return [
             'is_ready' => $isReady,
             'executable_qty' => $executableQty,
             'remaining_executable_qty' => $remainingExecutableQty,
             'claimed_qty' => $claimedQty,
-            'blockers' => $blockers,
-            'warnings' => $warnings,
+            'blockers' => $blockerMsgs,
+            'warnings' => $warningMsgs,
+            'readiness_evaluation' => $eval,
         ];
     }
 

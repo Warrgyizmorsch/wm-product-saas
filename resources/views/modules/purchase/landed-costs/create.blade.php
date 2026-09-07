@@ -153,7 +153,8 @@
                                     <x-ui.odoo-form-ui type="select" name="expenses[0][gst_type]" class="gst-type-select">
                                         <option value="cgst_sgst" selected>CGST + SGST (FCM)</option>
                                         <option value="igst">IGST (FCM Inter-state)</option>
-                                        <option value="rcm">RCM (Reverse Charge 5%)</option>
+                                        <option value="rcm_cgst_sgst">RCM Intra-State (CGST + SGST)</option>
+                                        <option value="rcm_igst">RCM Inter-State (IGST)</option>
                                     </x-ui.odoo-form-ui>
                                 </td>
                                 <td>
@@ -288,7 +289,8 @@
                             <x-ui.odoo-form-ui type="select" name="expenses[${expenseRowIndex}][gst_type]" class="gst-type-select">
                                 <option value="cgst_sgst" selected>CGST + SGST (FCM)</option>
                                 <option value="igst">IGST (FCM Inter-state)</option>
-                                <option value="rcm">RCM (Reverse Charge 5%)</option>
+                                <option value="rcm_cgst_sgst">RCM Intra-State (CGST + SGST)</option>
+                                <option value="rcm_igst">RCM Inter-State (IGST)</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
@@ -364,7 +366,7 @@
                     const amt = parseFloat($(this).find('.expense-amount').val()) || 0.0;
                     const taxRate = parseFloat($(this).find('.tax-rate-select').val()) || 0.0;
                     const gstType = $(this).find('.gst-type-select').val() || 'cgst_sgst';
-                    const isRcm = gstType === 'rcm';
+                    const isRcm = gstType === 'rcm_cgst_sgst' || gstType === 'rcm_igst';
 
                     let taxAmt = 0.0;
                     if (taxRate > 0) {

@@ -41,11 +41,18 @@
             </thead>
             <tbody class="fs-13 text-dark">
                 <tr>
-                    <td class="ps-4">Outward taxable supplies (other than zero rated, nil rated and exempted)</td>
+                    <td class="ps-4">(a) Outward taxable supplies (other than zero rated, nil rated and exempted)</td>
                     <td class="text-end">{{ number_format($outward['taxable'], 2) }}</td>
                     <td class="text-end">{{ number_format($outward['igst'], 2) }}</td>
                     <td class="text-end">{{ number_format($outward['cgst'], 2) }}</td>
                     <td class="text-end pe-4">{{ number_format($outward['sgst'], 2) }}</td>
+                </tr>
+                <tr>
+                    <td class="ps-4">(d) Inward supplies liable to reverse charge</td>
+                    <td class="text-end">{{ number_format($inwardRcm['taxable'], 2) }}</td>
+                    <td class="text-end">{{ number_format($inwardRcm['igst'], 2) }}</td>
+                    <td class="text-end">{{ number_format($inwardRcm['cgst'], 2) }}</td>
+                    <td class="text-end pe-4">{{ number_format($inwardRcm['sgst'], 2) }}</td>
                 </tr>
             </tbody>
         </x-ui.table>
@@ -64,11 +71,18 @@
             </thead>
             <tbody class="fs-13 text-dark">
                 <tr>
-                    <td class="ps-4">ITC available on inward supplies</td>
+                    <td class="ps-4">(5) All other ITC (regular inward supplies)</td>
                     <td class="text-end">{{ number_format($itc['taxable'], 2) }}</td>
                     <td class="text-end">{{ number_format($itc['igst'], 2) }}</td>
                     <td class="text-end">{{ number_format($itc['cgst'], 2) }}</td>
                     <td class="text-end pe-4">{{ number_format($itc['sgst'], 2) }}</td>
+                </tr>
+                <tr>
+                    <td class="ps-4">(3) Inward supplies liable to reverse charge</td>
+                    <td class="text-end">{{ number_format($rcmItc['taxable'], 2) }}</td>
+                    <td class="text-end">{{ number_format($rcmItc['igst'], 2) }}</td>
+                    <td class="text-end">{{ number_format($rcmItc['cgst'], 2) }}</td>
+                    <td class="text-end pe-4">{{ number_format($rcmItc['sgst'], 2) }}</td>
                 </tr>
             </tbody>
         </x-ui.table>

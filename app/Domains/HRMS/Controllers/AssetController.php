@@ -24,6 +24,8 @@ class AssetController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', Asset::class);
+
         // Self-healing 1: Ensure all currently allocated assets have an active AssetAllocation record
         $allocatedAssetsWithoutActiveAlloc = Asset::where('status', 'allocated')
             ->whereNotNull('assigned_employee_id')
@@ -65,6 +67,8 @@ class AssetController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Asset::class);
+
         $rules = [
             'asset_category_id' => 'required|exists:asset_categories,id',
             'name' => 'required|string|max:255',
@@ -107,6 +111,8 @@ class AssetController extends Controller
 
     public function update(Request $request, Asset $asset): RedirectResponse
     {
+        $this->authorize('update', $asset);
+
         $rules = [
             'asset_code' => [
                 'required', 'string', 'max:255',
@@ -139,6 +145,8 @@ class AssetController extends Controller
 
     public function destroy(Asset $asset): RedirectResponse
     {
+        $this->authorize('delete', $asset);
+
         if ($asset->status === 'allocated' || $asset->assigned_employee_id !== null) {
             return redirect()->back()->with('error', "Cannot delete asset '{$asset->asset_code}' because it is currently allocated to an employee. Please return or deallocate it first.");
         }
@@ -150,12 +158,16 @@ class AssetController extends Controller
 
     public function storeCategory(Request $request): RedirectResponse
     {
+        $this->authorize('create', Asset::class);
+
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'fixed_asset_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
+            'is_production_machinery' => 'boolean',
         ]);
+        $validated['is_production_machinery'] = $request->boolean('is_production_machinery');
 
         $this->assetRepository->storeCategory($validated);
 
@@ -164,12 +176,16 @@ class AssetController extends Controller
 
     public function updateCategory(Request $request, AssetCategory $assetCategory): RedirectResponse
     {
+        $this->authorize('update', Asset::class);
+
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'fixed_asset_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
+            'is_production_machinery' => 'boolean',
         ]);
+        $validated['is_production_machinery'] = $request->boolean('is_production_machinery');
 
         $this->assetRepository->updateCategory($assetCategory, $validated);
 
@@ -178,6 +194,8 @@ class AssetController extends Controller
 
     public function destroyCategory(AssetCategory $assetCategory): RedirectResponse
     {
+        $this->authorize('delete', Asset::class);
+
         $assetCount = $assetCategory->assets()->count();
         if ($assetCount > 0) {
             return redirect()->back()->with('error', __('hrms.assets.error_cat_has_assets', ['name' => $assetCategory->name, 'count' => $assetCount]));
@@ -195,6 +213,8 @@ class AssetController extends Controller
 
     public function allocate(Request $request, Asset $asset): RedirectResponse
     {
+        $this->authorize('approve', $asset);
+
         $validated = $request->validate([
             'assigned_employee_id' => 'required|exists:employees,id',
             'allocated_at' => 'required|date',
@@ -209,6 +229,8 @@ class AssetController extends Controller
 
     public function returnAsset(Request $request, Asset $asset): RedirectResponse
     {
+        $this->authorize('approve', $asset);
+
         $validated = $request->validate([
             'condition_on_return' => 'required|string|in:new,good,fair,damaged,scrapped',
         ]);
@@ -220,6 +242,8 @@ class AssetController extends Controller
 
     public function allocateItem(Request $request, AssetItem $assetItem): RedirectResponse
     {
+        $this->authorize('approve', Asset::class);
+
         $validated = $request->validate([
             'assigned_employee_id' => 'required|exists:employees,id',
             'quantity' => 'required|integer|min:1',
@@ -238,6 +262,8 @@ class AssetController extends Controller
 
     public function returnItem(Request $request, AssetItem $assetItem): RedirectResponse
     {
+        $this->authorize('approve', Asset::class);
+
         if (!$request->has('quantity') && $request->has('allocated_asset_ids')) {
             $request->merge([
                 'quantity' => count($request->input('allocated_asset_ids', []))
@@ -262,6 +288,8 @@ class AssetController extends Controller
 
     public function updateItem(Request $request, AssetItem $assetItem): RedirectResponse
     {
+        $this->authorize('update', Asset::class);
+
         $validated = $request->validate([
             'asset_category_id' => 'required|exists:asset_categories,id',
             'name' => 'required|string|max:255',
@@ -275,6 +303,8 @@ class AssetController extends Controller
 
     public function destroyItem(AssetItem $assetItem): RedirectResponse
     {
+        $this->authorize('delete', Asset::class);
+
         $allocatedCount = $assetItem->assets()->where('status', 'allocated')->count();
         if ($allocatedCount > 0) {
             return redirect()->back()->with('error', "Cannot delete item '{$assetItem->name}' because {$allocatedCount} unit(s) are currently allocated.");
@@ -288,6 +318,8 @@ class AssetController extends Controller
 
     public function storeItem(Request $request): RedirectResponse
     {
+        $this->authorize('create', Asset::class);
+
         $validated = $request->validate([
             'asset_category_id' => 'required|exists:asset_categories,id',
             'name'              => 'required|string|max:255',
@@ -301,11 +333,15 @@ class AssetController extends Controller
 
     public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
+        $this->authorize('viewAny', Asset::class);
+
         return $this->assetRepository->export();
     }
 
     public function import(Request $request): RedirectResponse
     {
+        $this->authorize('create', Asset::class);
+
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
         ]);
@@ -317,16 +353,22 @@ class AssetController extends Controller
 
     public function downloadTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
+        $this->authorize('viewAny', Asset::class);
+
         return $this->assetRepository->downloadTemplate();
     }
 
     public function exportCategories(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
+        $this->authorize('viewAny', Asset::class);
+
         return $this->assetRepository->exportCategories();
     }
 
     public function importCategories(Request $request): RedirectResponse
     {
+        $this->authorize('create', Asset::class);
+
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
         ]);
@@ -338,6 +380,8 @@ class AssetController extends Controller
 
     public function downloadCategoriesTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
+        $this->authorize('viewAny', Asset::class);
+
         return $this->assetRepository->downloadCategoriesTemplate();
     }
 
@@ -384,6 +428,8 @@ class AssetController extends Controller
 
     public function rejectRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
     {
+        $this->authorize('approve', Asset::class);
+
         $validated = $request->validate([
             'admin_notes' => 'nullable|string|max:1000',
         ]);
@@ -398,6 +444,8 @@ class AssetController extends Controller
 
     public function allocateDirect(AssetRequest $assetRequest): RedirectResponse
     {
+        $this->authorize('approve', Asset::class);
+
         if ($assetRequest->status !== 'pending') {
             return redirect()->back()->with('error', 'Only pending asset requests can be allocated.');
         }
@@ -445,6 +493,8 @@ class AssetController extends Controller
 
     public function allocateRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
     {
+        $this->authorize('approve', Asset::class);
+
         if ($request->has('allocated_asset_ids') && !$request->has('asset_ids')) {
             $request->merge([
                 'asset_ids' => $request->input('allocated_asset_ids')
@@ -499,6 +549,8 @@ class AssetController extends Controller
 
     public function bulkAllocate(Request $request): RedirectResponse
     {
+        $this->authorize('approve', Asset::class);
+
         $validated = $request->validate([
             'allocations'          => 'required|array',
             'allocations.*'        => 'nullable|exists:assets,id',
@@ -548,6 +600,8 @@ class AssetController extends Controller
 
     public function bulkReject(Request $request): RedirectResponse
     {
+        $this->authorize('approve', Asset::class);
+
         $validated = $request->validate([
             'request_ids'   => 'required|array',
             'request_ids.*' => 'exists:asset_requests,id',
