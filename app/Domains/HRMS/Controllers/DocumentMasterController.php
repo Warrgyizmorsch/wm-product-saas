@@ -99,6 +99,7 @@ class DocumentMasterController extends Controller
             'is_required' => 'nullable|boolean',
             'upload_responsibility' => 'required|string|in:employee,hr,both',
             'approval_required' => 'nullable|boolean',
+            'requires_signature' => 'nullable|boolean',
             'expiry_applicable' => 'nullable|boolean',
             'reminder_days_before' => 'nullable|required_if:expiry_applicable,1|integer|min:1',
             'employee_can_view' => 'nullable|boolean',
@@ -109,6 +110,7 @@ class DocumentMasterController extends Controller
         // Normalize checkboxes
         $validated['is_required'] = $request->boolean('is_required');
         $validated['approval_required'] = $request->boolean('approval_required');
+        $validated['requires_signature'] = $request->boolean('requires_signature');
         $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
         $validated['employee_can_view'] = $request->boolean('employee_can_view');
         $validated['employee_can_download'] = $request->boolean('employee_can_download');
@@ -143,6 +145,7 @@ class DocumentMasterController extends Controller
             'is_required' => 'nullable|boolean',
             'upload_responsibility' => 'required|string|in:employee,hr,both',
             'approval_required' => 'nullable|boolean',
+            'requires_signature' => 'nullable|boolean',
             'expiry_applicable' => 'nullable|boolean',
             'reminder_days_before' => 'nullable|required_if:expiry_applicable,1|integer|min:1',
             'employee_can_view' => 'nullable|boolean',
@@ -153,6 +156,7 @@ class DocumentMasterController extends Controller
         // Normalize checkboxes
         $validated['is_required'] = $request->boolean('is_required');
         $validated['approval_required'] = $request->boolean('approval_required');
+        $validated['requires_signature'] = $request->boolean('requires_signature');
         $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
         $validated['employee_can_view'] = $request->boolean('employee_can_view');
         $validated['employee_can_download'] = $request->boolean('employee_can_download');
@@ -215,8 +219,11 @@ class DocumentMasterController extends Controller
             'body_content'         => 'nullable|string',
             'footer_content'       => 'nullable|string',
             'css_styles'           => 'nullable|string',
+            'requires_signature'   => 'nullable|boolean',
             'status'               => 'required|string|in:active,inactive',
         ]);
+
+        $validated['requires_signature'] = $request->boolean('requires_signature');
 
         $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
 
@@ -258,8 +265,11 @@ class DocumentMasterController extends Controller
             'body_content'         => 'nullable|string',
             'footer_content'       => 'nullable|string',
             'css_styles'           => 'nullable|string',
+            'requires_signature'   => 'nullable|boolean',
             'status'               => 'required|string|in:active,inactive',
         ]);
+
+        $validated['requires_signature'] = $request->boolean('requires_signature');
 
         $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
 
@@ -276,6 +286,32 @@ class DocumentMasterController extends Controller
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'templates'])
             ->with('success', 'Document template updated successfully.');
+    }
+
+    /**
+     * Parse an uploaded template file (.html, .txt, .docx) and return extracted content for Quill editor.
+     */
+    public function parseTemplateFile(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'template_file' => 'required|file|mimes:html,htm,txt,docx|max:10240',
+        ]);
+
+        try {
+            $file = $request->file('template_file');
+            $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
+            $extractedContent = $templateService->importTemplateFromFile($file);
+
+            return response()->json([
+                'success' => true,
+                'content' => $extractedContent,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error'   => 'Failed to parse template file: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

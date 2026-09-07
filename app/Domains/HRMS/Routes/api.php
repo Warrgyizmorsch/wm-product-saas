@@ -559,6 +559,30 @@ Route::prefix('api/hrms/exits')
         Route::get('/{exit}', [EmployeeExitApiController::class, 'show'])->name('show');
     });
 
+// ==========================================
+// 18. DOCUMENT MANAGEMENT & DIGITAL SIGNATURE API ROUTES
+// ==========================================
+Route::prefix('api/hrms/documents')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.documents.')
+    ->group(function () {
+        Route::get('/', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'index'])->name('index');
+        Route::post('/upload', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'upload'])->name('upload');
+        Route::post('/{document}/approve', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'approve'])->name('approve');
+        Route::post('/{document}/reject', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'reject'])->name('reject');
+        Route::put('/{document}/status', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'updateStatus'])->name('status.update');
+        Route::post('/{document}/sign', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'sign'])->name('sign');
+        Route::post('/generate-signed-template', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'generateSignedTemplate'])->name('generate-signed-template');
+    });
+
+Route::prefix('api/hrms/user')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.user.')
+    ->group(function () {
+        Route::post('/signature', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'updateUserSignature'])->name('signature.update');
+    });
+
+
 
 
 

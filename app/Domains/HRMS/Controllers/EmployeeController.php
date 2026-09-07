@@ -467,22 +467,25 @@ class EmployeeController extends Controller
             $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = true;
+            $requiresSignature = false;
             if ($document->document_master_id) {
                 $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::find($document->document_master_id);
                 if ($documentMaster) {
                     $approvalRequired = (bool) $documentMaster->approval_required;
+                    $requiresSignature = (bool) $documentMaster->requires_signature;
                 }
             }
-            $status = $approvalRequired ? 'uploaded' : 'approved';
+            $status = $requiresSignature ? 'pending_signature' : ($approvalRequired ? 'uploaded' : 'approved');
 
             $document->update([
-                'file_name'       => $file->getClientOriginalName(),
-                'file_path'       => $path,
-                'file_type'       => $file->getClientMimeType(),
-                'file_size'       => $file->getSize(),
-                'expiry_date'     => $expiryApplicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                'status'          => $status,
-                'requested_by_id' => auth()->id(),
+                'file_name'          => $file->getClientOriginalName(),
+                'file_path'          => $path,
+                'file_type'          => $file->getClientMimeType(),
+                'file_size'          => $file->getSize(),
+                'expiry_date'        => $expiryApplicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'requires_signature' => $requiresSignature,
+                'status'             => $status,
+                'requested_by_id'    => auth()->id(),
             ]);
         } else {
             $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::findOrFail($request->integer('document_master_id'));
@@ -494,7 +497,8 @@ class EmployeeController extends Controller
             $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = (bool) $documentMaster->approval_required;
-            $status = $approvalRequired ? 'uploaded' : 'approved';
+            $requiresSignature = (bool) $documentMaster->requires_signature;
+            $status = $requiresSignature ? 'pending_signature' : ($approvalRequired ? 'uploaded' : 'approved');
 
             \App\Domains\HRMS\Models\Document::create([
                 'tenant_id'          => $tenantId,
@@ -507,6 +511,7 @@ class EmployeeController extends Controller
                 'file_path'          => $path,
                 'file_type'          => $file->getClientMimeType(),
                 'file_size'          => $file->getSize(),
+                'requires_signature' => $requiresSignature,
                 'status'             => $status,
                 'has_expiry'         => $documentMaster->expiry_applicable,
                 'expiry_date'        => $documentMaster->expiry_applicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
@@ -557,16 +562,44 @@ class EmployeeController extends Controller
         $this->authorizeHrms('hrms.employees.update');
 
         $validated = $request->validate([
-            'status' => 'required|in:approved,rejected',
+            'status' => 'required|in:approved,rejected,pending_signature',
         ]);
 
         $document->update([
             'status' => $validated['status'],
         ]);
 
-        $msg = $validated['status'] === 'approved' ? 'Document approved successfully.' : 'Document marked as rejected.';
+        return redirect()->back()->with('success', 'Document status updated successfully.');
+    }
 
-        return redirect()->back()->with('success', $msg);
+    public function signDocument(Request $request, \App\Domains\HRMS\Models\Document $document): RedirectResponse
+    {
+        $validated = $request->validate([
+            'signature_image'    => 'required|string',
+            'signature_position' => 'nullable|string',
+            'pos_x'              => 'nullable|numeric',
+            'pos_y'              => 'nullable|numeric',
+        ]);
+
+        $signatureService = app(\App\Domains\HRMS\Services\DocumentSignatureService::class);
+        $signatureService->signUploadedDocument(
+            $document,
+            $validated['signature_image'],
+            [
+                'position' => $validated['signature_position'] ?? 'bottom_right',
+                'pos_x'    => $request->input('pos_x'),
+                'pos_y'    => $request->input('pos_y'),
+            ]
+        );
+
+        return redirect()->back()->with('success', 'Document digitally signed successfully.');
+    }
+
+    public function viewSignedDocument(Request $request, \App\Domains\HRMS\Models\Document $document): View
+    {
+        return view('modules.hrms.employees.documents.view_signed', [
+            'document' => $document,
+        ]);
     }
 
     public function updateStatus(Request $request, Employee $employee)

@@ -5,12 +5,16 @@ namespace App\Domains\HRMS\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\Document;
-use App\Domains\HRMS\Models\DocumentMaster;
+use App\Domains\HRMS\Models\DocumentTemplate;
+use App\Domains\HRMS\Services\DocumentSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class DocumentApiController extends Controller
 {
+    public function __construct(
+        private readonly DocumentSignatureService $documentSignatureService
+    ) {}
     /**
      * Helper for standardized success JSON response.
      */
@@ -176,8 +180,9 @@ class DocumentApiController extends Controller
             return $this->sendError('No employees found for this upload target.', 422);
         }
 
+        $requiresSignature = (bool) $documentMaster->requires_signature;
         $approvalRequired = (bool) $documentMaster->approval_required;
-        $status = $approvalRequired ? 'uploaded' : 'approved';
+        $status = $requiresSignature ? 'pending_signature' : ($approvalRequired ? 'uploaded' : 'approved');
         $uploadedDocs = [];
 
         foreach ($targetEmployeeIds as $empId) {
@@ -197,12 +202,13 @@ class DocumentApiController extends Controller
 
             if ($document) {
                 $document->update([
-                    'file_name'   => $file->getClientOriginalName(),
-                    'file_path'   => $path,
-                    'file_type'   => $file->getClientMimeType(),
-                    'file_size'   => $file->getSize(),
-                    'expiry_date' => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                    'status'      => $status,
+                    'file_name'          => $file->getClientOriginalName(),
+                    'file_path'          => $path,
+                    'file_type'          => $file->getClientMimeType(),
+                    'file_size'          => $file->getSize(),
+                    'expiry_date'        => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                    'requires_signature' => $requiresSignature,
+                    'status'             => $status,
                 ]);
             } else {
                 $document = Document::create([
@@ -218,6 +224,7 @@ class DocumentApiController extends Controller
                     'file_type'          => $file->getClientMimeType(),
                     'file_size'          => $file->getSize(),
                     'expiry_date'        => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                    'requires_signature' => $requiresSignature,
                     'status'             => $status,
                     'requested_by_id'    => auth()->id(),
                 ]);
@@ -293,5 +300,115 @@ class DocumentApiController extends Controller
         ]);
 
         return $this->sendSuccess($document, "Document status updated to '{$validated['status']}' successfully.");
+    }
+
+    /**
+     * POST /api/hrms/documents/{document}/sign
+     * Sign an existing uploaded document.
+     */
+    public function sign(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $document = Document::find($id);
+        if (!$document) {
+            return $this->sendError("Document with ID '{$id}' not found.", 404);
+        }
+
+        $validated = $request->validate([
+            'signature_image' => 'required|string',
+            'coordinates'     => 'nullable|array',
+        ]);
+
+        $signedDoc = $this->documentSignatureService->signUploadedDocument(
+            $document,
+            $validated['signature_image'],
+            $validated['coordinates'] ?? null
+        );
+
+        return $this->sendSuccess([
+            'id'               => $signedDoc->id,
+            'name'             => $signedDoc->name,
+            'is_signed'        => $signedDoc->is_signed,
+            'status'           => $signedDoc->status,
+            'signed_at'        => $signedDoc->signed_at?->toIso8601String(),
+            'signed_by'        => $signedDoc->signedBy?->name,
+            'signature_ip'     => $signedDoc->signature_ip,
+            'file_url'         => asset('storage/' . $signedDoc->file_path),
+            'signed_file_url'  => $signedDoc->signed_file_path ? asset('storage/' . $signedDoc->signed_file_path) : null,
+        ], 'Document digitally signed successfully.');
+    }
+
+    /**
+     * POST /api/hrms/documents/generate-signed-template
+     * Generate document from template with Option A on-the-fly HR signature.
+     */
+    public function generateSignedTemplate(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'document_template_id' => 'required|exists:document_templates,id',
+            'employee_id'          => 'required|exists:employees,id',
+            'signature_image'      => 'nullable|string',
+            'reference_number'     => 'nullable|string',
+        ]);
+
+        $template = DocumentTemplate::findOrFail($validated['document_template_id']);
+        $employee = Employee::findOrFail($validated['employee_id']);
+
+        $result = $this->documentSignatureService->generateSignedDocumentFromTemplate(
+            $template,
+            $employee,
+            $validated['signature_image'] ?? null,
+            $validated['reference_number'] ?? null
+        );
+
+        $doc = $result['document'];
+
+        return $this->sendSuccess([
+            'id'              => $doc->id,
+            'name'            => $doc->name,
+            'employee_id'     => $employee->id,
+            'employee_name'   => $employee->full_name,
+            'is_signed'       => $doc->is_signed,
+            'status'          => $doc->status,
+            'signed_at'       => $doc->signed_at?->toIso8601String(),
+            'pdf_url'         => $result['pdf_url'],
+            'signature_path'  => $result['signature_path'] ? asset('storage/' . $result['signature_path']) : null,
+        ], 'Document generated and signed successfully from template.', 201);
+    }
+
+    /**
+     * POST /api/hrms/user/signature
+     * Upload or update logged-in user default digital signature.
+     */
+    public function updateUserSignature(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'signature_image' => 'required|string',
+        ]);
+
+        $user = auth()->user();
+        if (!$user) {
+            return $this->sendError('Authenticated user not found.', 404);
+        }
+
+        $savedPath = $this->documentSignatureService->saveSignatureImage($validated['signature_image'], $user, true);
+
+        return $this->sendSuccess([
+            'user_id'        => $user->id,
+            'name'           => $user->name,
+            'signature_path' => $savedPath,
+            'signature_url'  => asset('storage/' . $savedPath),
+        ], 'User digital signature saved successfully.');
     }
 }

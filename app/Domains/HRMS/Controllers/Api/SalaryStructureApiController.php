@@ -10,6 +10,8 @@ use App\Domains\HRMS\Models\SalaryStructure;
 use App\Domains\HRMS\Models\SalaryStructureItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Validator;
+use Throwable;
 
 class SalaryStructureApiController extends Controller
 {
@@ -43,6 +45,21 @@ class SalaryStructureApiController extends Controller
     }
 
     /**
+     * Parse flexible boolean input ('1', 1, true, 'true', 'active', 'success', 'yes', 'on').
+     */
+    private function parseBoolean(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+        if (is_numeric($value)) {
+            return (int)$value === 1;
+        }
+        $str = strtolower(trim((string)$value));
+        return in_array($str, ['1', 'true', 'active', 'success', 'yes', 'on'], true);
+    }
+
+    /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
     private function authorizeUser(): ?JsonResponse
@@ -63,28 +80,144 @@ class SalaryStructureApiController extends Controller
         return null;
     }
 
-    /**
-     * GET /api/hrms/salary-structure/summary
-     * Get summary metrics & pay group lists.
-     */
-    public function summary(Request $request): JsonResponse
+    // ==========================================
+    // DATA TRANSFORMERS (CONCISE API PAYLOADS)
+    // ==========================================
+
+    private function formatPayGroup(PayGroup $payGroup, bool $detailed = false): array
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
+        $data = [
+            'id'           => $payGroup->id,
+            'company_id'   => $payGroup->company_id,
+            'company_name' => $payGroup->company?->company_name ?? 'Default Company',
+            'name'         => $payGroup->name,
+            'description'  => $payGroup->description,
+            'status'       => $payGroup->status ? 'active' : 'inactive',
+            'is_active'    => (bool) $payGroup->status,
+        ];
+
+        if ($detailed) {
+            $data['payroll_rules'] = $payGroup->payroll_rules ?? [
+                'proration_rule'         => 'calendar_days',
+                'lop_splicing_rule'      => 'proportionate_gross',
+                'attendance_lock_day'    => 25,
+                'variable_lock_day'      => 25,
+                'enable_pf'              => true,
+                'restrict_pf_ceiling'    => true,
+                'enable_esi'             => true,
+                'restrict_esi_threshold' => true,
+            ];
+
+            if ($payGroup->relationLoaded('components')) {
+                $data['components'] = $payGroup->components->map(fn($c) => $this->formatComponent($c))->values();
+            }
+
+            if ($payGroup->relationLoaded('structures')) {
+                $data['structures'] = $payGroup->structures->map(fn($s) => $this->formatStructure($s, false))->values();
+            }
         }
 
-        $payGroups = PayGroup::with(['company'])->get();
-        $selectedPayGroupId = $request->get('pay_group_id');
-        $selectedPayGroup = $selectedPayGroupId ? PayGroup::with(['company'])->find($selectedPayGroupId) : $payGroups->first();
+        return $data;
+    }
 
-        return $this->sendSuccess([
-            'pay_groups_count'       => PayGroup::count(),
-            'components_count'       => SalaryComponent::count(),
-            'structures_count'       => SalaryStructure::count(),
-            'companies'              => Company::orderBy('company_name')->get(),
-            'pay_groups'             => $payGroups,
-            'selected_pay_group'     => $selectedPayGroup,
-        ], 'Salary structure summary loaded successfully');
+    private function formatComponent(SalaryComponent $component): array
+    {
+        return [
+            'id'               => $component->id,
+            'company_id'       => $component->company_id,
+            'company_name'     => $component->company?->company_name ?? 'Default Company',
+            'pay_group_id'     => $component->pay_group_id,
+            'pay_group_name'   => $component->payGroup?->name ?? 'All Pay Groups',
+            'name'             => $component->name,
+            'code'             => $component->code,
+            'type'             => $component->type,
+            'calculation_type' => $component->calculation_type ?? 'fixed',
+            'default_value'    => $component->default_value,
+            'description'      => $component->description,
+            'is_adhoc'         => (bool) $component->is_adhoc,
+            'status'           => $component->status ? 'active' : 'inactive',
+            'is_active'        => (bool) $component->status,
+        ];
+    }
+
+    private function formatStructure(SalaryStructure $structure, bool $includeItems = true): array
+    {
+        $data = [
+            'id'             => $structure->id,
+            'company_id'     => $structure->company_id,
+            'company_name'   => $structure->company?->company_name ?? 'Default Company',
+            'pay_group_id'   => $structure->pay_group_id,
+            'pay_group_name' => $structure->payGroup?->name ?? 'All Pay Groups',
+            'name'           => $structure->name,
+            'min_ctc'        => (float) $structure->min_ctc,
+            'max_ctc'        => (float) $structure->max_ctc,
+            'status'         => $structure->status ? 'active' : 'inactive',
+            'is_active'      => (bool) $structure->status,
+        ];
+
+        if ($includeItems && $structure->relationLoaded('items')) {
+            $data['items_count'] = $structure->items->count();
+            $data['items']       = $structure->items->map(function ($item) {
+                return [
+                    'id'                  => $item->id,
+                    'salary_component_id' => $item->salary_component_id,
+                    'component_name'      => $item->component?->name,
+                    'component_code'      => $item->component?->code,
+                    'component_type'      => $item->component?->type,
+                    'calculation_type'    => $item->calculation_type,
+                    'value'               => (float) $item->value,
+                    'sort_order'          => (int) $item->sort_order,
+                ];
+            })->values();
+        }
+
+        return $data;
+    }
+
+    private function formatPaginated($paginator, callable $transformCallback): array
+    {
+        return [
+            'items' => collect($paginator->items())->map($transformCallback)->values(),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+                'last_page'    => $paginator->lastPage(),
+                'has_more'     => $paginator->hasMorePages(),
+            ],
+        ];
+    }
+
+    // ==========================================
+    // SUMMARY DASHBOARD API
+    // ==========================================
+
+    public function summary(Request $request): JsonResponse
+    {
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
+
+            $payGroups = PayGroup::with(['company'])->orderBy('name', 'asc')->get();
+            $selectedPayGroupId = $request->get('pay_group_id');
+            $selectedPayGroup = $selectedPayGroupId
+                ? PayGroup::with(['company', 'components', 'structures.items.component'])->find($selectedPayGroupId)
+                : ($payGroups->first() ? PayGroup::with(['company', 'components', 'structures.items.component'])->find($payGroups->first()->id) : null);
+
+            return $this->sendSuccess([
+                'metrics' => [
+                    'pay_groups_count' => PayGroup::count(),
+                    'components_count' => SalaryComponent::count(),
+                    'structures_count' => SalaryStructure::count(),
+                ],
+                'companies' => Company::orderBy('company_name')->get(['id', 'company_name as name']),
+                'pay_groups' => $payGroups->map(fn($pg) => $this->formatPayGroup($pg)),
+                'selected_pay_group' => $selectedPayGroup ? $this->formatPayGroup($selectedPayGroup, true) : null,
+            ], 'Salary structure summary loaded successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to load summary: ' . $e->getMessage(), 500);
+        }
     }
 
     // ==========================================
@@ -93,128 +226,199 @@ class SalaryStructureApiController extends Controller
 
     public function indexPayGroups(Request $request): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
 
-        $query = PayGroup::with(['company']);
+            $query = PayGroup::with(['company']);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->get('status') === '1' || $request->get('status') === 'true');
-        }
-        if ($request->filled('company_id')) {
-            $query->where('company_id', $request->get('company_id'));
-        }
-        if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where('name', 'like', "%{$search}%");
-        }
+            if ($request->filled('status')) {
+                $query->where('status', $this->parseBoolean($request->get('status')));
+            }
+            if ($request->filled('company_id')) {
+                $query->where('company_id', $request->get('company_id'));
+            }
+            if ($request->filled('search')) {
+                $search = $request->get('search');
+                $query->where('name', 'like', "%{$search}%");
+            }
 
-        $payGroups = $query->orderBy('name', 'asc')->get();
+            $payGroups = $query->orderBy('name', 'asc')->get();
+            $formatted = $payGroups->map(fn($pg) => $this->formatPayGroup($pg));
 
-        return $this->sendSuccess($payGroups, 'Pay groups retrieved successfully');
+            return $this->sendSuccess($formatted, 'Pay groups retrieved successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to fetch pay groups: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function showPayGroup(PayGroup $payGroup): JsonResponse
+    public function showPayGroup(mixed $payGroup): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
 
-        return $this->sendSuccess($payGroup->load(['company', 'components', 'structures']), 'Pay group details loaded');
+            $model = $payGroup instanceof PayGroup ? $payGroup : PayGroup::find($payGroup);
+            if (!$model) {
+                return $this->sendError('Pay group not found', 404);
+            }
+
+            $model->load(['company', 'components', 'structures.items.component']);
+
+            return $this->sendSuccess($this->formatPayGroup($model, true), 'Pay group details loaded');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to fetch pay group: ' . $e->getMessage(), 500);
+        }
     }
 
     public function storePayGroup(Request $request): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
+
+            if ($request->has('company_id') && (empty($request->company_id) || $request->company_id === 'null' || $request->company_id === 0 || $request->company_id === '0')) {
+                $request->merge(['company_id' => null]);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'name'        => 'required|string|max:255',
+                'company_id'  => 'nullable|integer|exists:companies,id',
+                'description' => 'nullable|string',
+                'status'      => 'required',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation failed.', 422, $validator->errors());
+            }
+
+            $status = $this->parseBoolean($request->input('status'));
+
+            $payGroup = PayGroup::create([
+                'company_id'  => $request->input('company_id') ?: null,
+                'name'        => $request->input('name'),
+                'description' => $request->input('description') ?: null,
+                'status'      => $status,
+            ]);
+
+            $payGroup->load(['company']);
+
+            return $this->sendSuccess($this->formatPayGroup($payGroup, true), 'Pay group created successfully', 201);
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to create pay group: ' . $e->getMessage(), 500);
         }
-
-        $validated = $request->validate([
-            'name'        => 'required|max:255',
-            'company_id'  => 'nullable|integer|exists:companies,id',
-            'description' => 'nullable',
-            'status'      => 'required',
-        ]);
-
-        $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
-
-        $payGroup = PayGroup::create([
-            'company_id'  => $validated['company_id'] ?? null,
-            'name'        => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'status'      => $status,
-        ]);
-
-        return $this->sendSuccess($payGroup, 'Pay group created successfully', 201);
     }
 
-    public function updatePayGroup(Request $request, PayGroup $payGroup): JsonResponse
+    public function updatePayGroup(Request $request, mixed $payGroup): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
+
+            $model = $payGroup instanceof PayGroup ? $payGroup : PayGroup::find($payGroup);
+            if (!$model) {
+                return $this->sendError('Pay group not found', 404);
+            }
+
+            if ($request->has('company_id') && (empty($request->company_id) || $request->company_id === 'null' || $request->company_id === 0 || $request->company_id === '0')) {
+                $request->merge(['company_id' => null]);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'name'        => 'required|string|max:255',
+                'company_id'  => 'nullable|integer|exists:companies,id',
+                'description' => 'nullable|string',
+                'status'      => 'required',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation failed.', 422, $validator->errors());
+            }
+
+            $status = $this->parseBoolean($request->input('status'));
+
+            $model->update([
+                'company_id'  => $request->input('company_id') ?: null,
+                'name'        => $request->input('name'),
+                'description' => $request->input('description') ?: null,
+                'status'      => $status,
+            ]);
+
+            $model->load(['company']);
+
+            return $this->sendSuccess($this->formatPayGroup($model, true), 'Pay group updated successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to update pay group: ' . $e->getMessage(), 500);
         }
-
-        $validated = $request->validate([
-            'name'        => 'required|max:255',
-            'company_id'  => 'nullable|integer|exists:companies,id',
-            'description' => 'nullable',
-            'status'      => 'required',
-        ]);
-
-        $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
-
-        $payGroup->update([
-            'company_id'  => $validated['company_id'] ?? null,
-            'name'        => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'status'      => $status,
-        ]);
-
-        return $this->sendSuccess($payGroup, 'Pay group updated successfully');
     }
 
-    public function destroyPayGroup(PayGroup $payGroup): JsonResponse
+    public function destroyPayGroup(mixed $payGroup): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
+
+            $model = $payGroup instanceof PayGroup ? $payGroup : PayGroup::find($payGroup);
+            if (!$model) {
+                return $this->sendError('Pay group not found', 404);
+            }
+
+            $model->delete();
+
+            return $this->sendSuccess(['id' => (int)$model->id], 'Pay group deleted successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to delete pay group: ' . $e->getMessage(), 500);
         }
-
-        $payGroup->delete();
-
-        return $this->sendSuccess(null, 'Pay group deleted successfully');
     }
 
-    public function updatePayGroupRules(Request $request, PayGroup $payGroup): JsonResponse
+    public function updatePayGroupRules(Request $request, mixed $payGroup): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
+
+            $model = $payGroup instanceof PayGroup ? $payGroup : PayGroup::find($payGroup);
+            if (!$model) {
+                return $this->sendError('Pay group not found', 404);
+            }
+
+            $rules = $model->payroll_rules ?? [];
+            $request->merge([
+                'enable_pf'              => $request->exists('enable_pf') ? filter_var($request->input('enable_pf'), FILTER_VALIDATE_BOOLEAN) : ($rules['enable_pf'] ?? true),
+                'restrict_pf_ceiling'    => $request->exists('restrict_pf_ceiling') ? filter_var($request->input('restrict_pf_ceiling'), FILTER_VALIDATE_BOOLEAN) : ($rules['restrict_pf_ceiling'] ?? true),
+                'enable_esi'             => $request->exists('enable_esi') ? filter_var($request->input('enable_esi'), FILTER_VALIDATE_BOOLEAN) : ($rules['enable_esi'] ?? true),
+                'restrict_esi_threshold' => $request->exists('restrict_esi_threshold') ? filter_var($request->input('restrict_esi_threshold'), FILTER_VALIDATE_BOOLEAN) : ($rules['restrict_esi_threshold'] ?? true),
+            ]);
+
+            $validator = Validator::make($request->all(), [
+                'proration_rule'         => 'required|in:calendar_days,fixed_30_days,working_days',
+                'lop_splicing_rule'      => 'required|in:proportionate_gross,basic_hra_only',
+                'attendance_lock_day'    => 'required|integer|min:1|max:31',
+                'variable_lock_day'      => 'required|integer|min:1|max:31',
+                'enable_pf'              => 'required|boolean',
+                'restrict_pf_ceiling'    => 'required|boolean',
+                'enable_esi'             => 'required|boolean',
+                'restrict_esi_threshold' => 'required|boolean',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation failed.', 422, $validator->errors());
+            }
+
+            $model->update([
+                'payroll_rules' => $validator->validated(),
+            ]);
+
+            return $this->sendSuccess($this->formatPayGroup($model, true), 'Pay group rules updated successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to update rules: ' . $e->getMessage(), 500);
         }
-
-        $rules = $payGroup->payroll_rules ?? [];
-        $request->merge([
-            'enable_pf'              => $request->exists('enable_pf') ? filter_var($request->input('enable_pf'), FILTER_VALIDATE_BOOLEAN) : ($rules['enable_pf'] ?? true),
-            'restrict_pf_ceiling'    => $request->exists('restrict_pf_ceiling') ? filter_var($request->input('restrict_pf_ceiling'), FILTER_VALIDATE_BOOLEAN) : ($rules['restrict_pf_ceiling'] ?? true),
-            'enable_esi'             => $request->exists('enable_esi') ? filter_var($request->input('enable_esi'), FILTER_VALIDATE_BOOLEAN) : ($rules['enable_esi'] ?? true),
-            'restrict_esi_threshold' => $request->exists('restrict_esi_threshold') ? filter_var($request->input('restrict_esi_threshold'), FILTER_VALIDATE_BOOLEAN) : ($rules['restrict_esi_threshold'] ?? true),
-        ]);
-
-        $validated = $request->validate([
-            'proration_rule'         => 'required|in:calendar_days,fixed_30_days,working_days',
-            'lop_splicing_rule'      => 'required|in:proportionate_gross,basic_hra_only',
-            'attendance_lock_day'    => 'required|integer|min:1|max:31',
-            'variable_lock_day'      => 'required|integer|min:1|max:31',
-            'enable_pf'              => 'required|boolean',
-            'restrict_pf_ceiling'    => 'required|boolean',
-            'enable_esi'             => 'required|boolean',
-            'restrict_esi_threshold' => 'required|boolean',
-        ]);
-
-        $payGroup->update([
-            'payroll_rules' => $validated,
-        ]);
-
-        return $this->sendSuccess($payGroup, 'Pay group rules updated successfully');
     }
 
     // ==========================================
@@ -223,156 +427,215 @@ class SalaryStructureApiController extends Controller
 
     public function indexComponents(Request $request): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
 
-        $query = SalaryComponent::with(['company', 'payGroup']);
+            $query = SalaryComponent::with(['company', 'payGroup']);
 
-        if ($request->filled('pay_group_id')) {
-            $query->where('pay_group_id', $request->get('pay_group_id'));
-        }
-        if ($request->filled('is_adhoc')) {
-            $query->where('is_adhoc', $request->get('is_adhoc') === '1' || $request->get('is_adhoc') === 'true');
-        }
-        if ($request->filled('status')) {
-            $query->where('status', $request->get('status') === '1' || $request->get('status') === 'true');
-        }
-        if ($request->filled('type')) {
-            $query->where('type', $request->get('type'));
-        }
-        if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
+            if ($request->filled('pay_group_id')) {
+                $query->where('pay_group_id', $request->get('pay_group_id'));
+            }
+            if ($request->filled('is_adhoc')) {
+                $query->where('is_adhoc', $this->parseBoolean($request->get('is_adhoc')));
+            }
+            if ($request->filled('status')) {
+                $query->where('status', $this->parseBoolean($request->get('status')));
+            }
+            if ($request->filled('type')) {
+                $query->where('type', $request->get('type'));
+            }
+            if ($request->filled('search')) {
+                $search = $request->get('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('code', 'like', "%{$search}%");
+                });
+            }
 
-        $sort = $request->get('sort', 'name_asc');
-        switch ($sort) {
-            case 'name_desc': $query->orderBy('name', 'desc'); break;
-            case 'code_asc':  $query->orderBy('code', 'asc'); break;
-            case 'code_desc': $query->orderBy('code', 'desc'); break;
-            case 'name_asc':
-            default: $query->orderBy('name', 'asc'); break;
+            $sort = $request->get('sort', 'name_asc');
+            switch ($sort) {
+                case 'name_desc': $query->orderBy('name', 'desc'); break;
+                case 'code_asc':  $query->orderBy('code', 'asc'); break;
+                case 'code_desc': $query->orderBy('code', 'desc'); break;
+                case 'name_asc':
+                default: $query->orderBy('name', 'asc'); break;
+            }
+
+            $perPage = max(1, min(100, $request->integer('per_page', 10)));
+            $components = $query->paginate($perPage);
+            $result = $this->formatPaginated($components, fn($c) => $this->formatComponent($c));
+
+            return $this->sendSuccess($result, 'Salary components retrieved successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to fetch components: ' . $e->getMessage(), 500);
         }
-
-        $components = $query->paginate($request->integer('per_page', 10));
-
-        return $this->sendSuccess($components, 'Salary components retrieved successfully');
     }
 
-    public function showComponent(SalaryComponent $salaryComponent): JsonResponse
+    public function showComponent(mixed $salaryComponent): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
 
-        return $this->sendSuccess($salaryComponent->load(['company', 'payGroup']), 'Salary component details loaded');
+            $model = $salaryComponent instanceof SalaryComponent ? $salaryComponent : SalaryComponent::find($salaryComponent);
+            if (!$model) {
+                return $this->sendError('Salary component not found', 404);
+            }
+
+            $model->load(['company', 'payGroup']);
+
+            return $this->sendSuccess($this->formatComponent($model), 'Salary component details loaded');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to fetch component: ' . $e->getMessage(), 500);
+        }
     }
 
     public function storeComponent(Request $request): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
-
-        $validated = $request->validate([
-            'pay_group_id'     => 'nullable|integer|exists:pay_groups,id',
-            'name'             => 'required|string|max:255',
-            'code'             => 'required|string|max:50',
-            'type'             => 'required|in:earning,deduction',
-            'calculation_type' => 'nullable|string|max:50',
-            'is_adhoc'         => 'required|boolean',
-            'status'           => 'required|boolean',
-            'description'      => 'nullable|string',
-            'default_value'    => 'nullable|max:255',
-        ]);
-
-        $calculationType = $validated['calculation_type'] ?? 'fixed';
-        $status          = $validated['status'];
-        $isAdhoc         = $validated['is_adhoc'];
-
-        $companyId = null;
-        if (!empty($validated['pay_group_id'])) {
-            $payGroup = PayGroup::find($validated['pay_group_id']);
-            if ($payGroup) {
-                $companyId = $payGroup->company_id;
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
             }
+
+            if ($request->has('pay_group_id') && (empty($request->pay_group_id) || $request->pay_group_id === 'null' || $request->pay_group_id === 0 || $request->pay_group_id === '0')) {
+                $request->merge(['pay_group_id' => null]);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'pay_group_id'     => 'nullable|integer|exists:pay_groups,id',
+                'name'             => 'required|string|max:255',
+                'code'             => 'required|string|max:50',
+                'type'             => 'required|in:earning,deduction',
+                'calculation_type' => 'nullable|string|max:50',
+                'is_adhoc'         => 'required',
+                'status'           => 'required',
+                'description'      => 'nullable|string',
+                'default_value'    => 'nullable|max:255',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation failed.', 422, $validator->errors());
+            }
+
+            $calculationType = $request->input('calculation_type') ?: 'fixed';
+            $status          = $this->parseBoolean($request->input('status'));
+            $isAdhoc         = $this->parseBoolean($request->input('is_adhoc'));
+
+            $companyId = null;
+            if (!empty($request->input('pay_group_id'))) {
+                $payGroup = PayGroup::find($request->input('pay_group_id'));
+                if ($payGroup) {
+                    $companyId = $payGroup->company_id;
+                }
+            }
+
+            $component = SalaryComponent::create([
+                'company_id'       => $companyId,
+                'pay_group_id'     => $request->input('pay_group_id') ?: null,
+                'name'             => $request->input('name'),
+                'code'             => strtoupper($request->input('code')),
+                'type'             => $request->input('type'),
+                'calculation_type' => $calculationType,
+                'default_value'    => $request->input('default_value') ?: null,
+                'description'      => $request->input('description') ?: null,
+                'status'           => $status,
+                'is_adhoc'         => $isAdhoc,
+            ]);
+
+            $component->load(['company', 'payGroup']);
+
+            return $this->sendSuccess($this->formatComponent($component), 'Salary component created successfully', 201);
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to create component: ' . $e->getMessage(), 500);
         }
-
-        $component = SalaryComponent::create([
-            'company_id'       => $companyId,
-            'pay_group_id'     => $validated['pay_group_id'] ?? null,
-            'name'             => $validated['name'],
-            'code'             => $validated['code'],
-            'type'             => $validated['type'],
-            'calculation_type' => $calculationType,
-            'default_value'    => $validated['default_value'] ?? null,
-            'description'      => $validated['description'] ?? null,
-            'status'           => $status,
-            'is_adhoc'         => $isAdhoc,
-        ]);
-
-        return $this->sendSuccess($component, 'Salary component created successfully', 201);
     }
 
-    public function updateComponent(Request $request, SalaryComponent $salaryComponent): JsonResponse
+    public function updateComponent(Request $request, mixed $salaryComponent): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
-
-        $validated = $request->validate([
-            'pay_group_id'     => 'nullable|integer|exists:pay_groups,id',
-            'name'             => 'required|string|max:255',
-            'code'             => 'required|string|max:50',
-            'type'             => 'required|in:earning,deduction',
-            'calculation_type' => 'nullable|string|max:50',
-            'is_adhoc'         => 'required|boolean',
-            'status'           => 'required|boolean',
-            'description'      => 'nullable|string',
-            'default_value'    => 'nullable|max:255',
-        ]);
-
-        $calculationType = $validated['calculation_type'] ?? 'fixed';
-        $status          = $validated['status'];
-        $isAdhoc         = $validated['is_adhoc'];
-
-        $companyId = null;
-        if (!empty($validated['pay_group_id'])) {
-            $payGroup = PayGroup::find($validated['pay_group_id']);
-            if ($payGroup) {
-                $companyId = $payGroup->company_id;
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
             }
+
+            $model = $salaryComponent instanceof SalaryComponent ? $salaryComponent : SalaryComponent::find($salaryComponent);
+            if (!$model) {
+                return $this->sendError('Salary component not found', 404);
+            }
+
+            if ($request->has('pay_group_id') && (empty($request->pay_group_id) || $request->pay_group_id === 'null' || $request->pay_group_id === 0 || $request->pay_group_id === '0')) {
+                $request->merge(['pay_group_id' => null]);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'pay_group_id'     => 'nullable|integer|exists:pay_groups,id',
+                'name'             => 'required|string|max:255',
+                'code'             => 'required|string|max:50',
+                'type'             => 'required|in:earning,deduction',
+                'calculation_type' => 'nullable|string|max:50',
+                'is_adhoc'         => 'required',
+                'status'           => 'required',
+                'description'      => 'nullable|string',
+                'default_value'    => 'nullable|max:255',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation failed.', 422, $validator->errors());
+            }
+
+            $calculationType = $request->input('calculation_type') ?: 'fixed';
+            $status          = $this->parseBoolean($request->input('status'));
+            $isAdhoc         = $this->parseBoolean($request->input('is_adhoc'));
+
+            $companyId = null;
+            if (!empty($request->input('pay_group_id'))) {
+                $payGroup = PayGroup::find($request->input('pay_group_id'));
+                if ($payGroup) {
+                    $companyId = $payGroup->company_id;
+                }
+            }
+
+            $model->update([
+                'company_id'       => $companyId,
+                'pay_group_id'     => $request->input('pay_group_id') ?: null,
+                'name'             => $request->input('name'),
+                'code'             => strtoupper($request->input('code')),
+                'type'             => $request->input('type'),
+                'calculation_type' => $calculationType,
+                'default_value'    => $request->input('default_value') ?: null,
+                'description'      => $request->input('description') ?: null,
+                'status'           => $status,
+                'is_adhoc'         => $isAdhoc,
+            ]);
+
+            $model->load(['company', 'payGroup']);
+
+            return $this->sendSuccess($this->formatComponent($model), 'Salary component updated successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to update component: ' . $e->getMessage(), 500);
         }
-
-        $salaryComponent->update([
-            'company_id'       => $companyId,
-            'pay_group_id'     => $validated['pay_group_id'] ?? null,
-            'name'             => $validated['name'],
-            'code'             => $validated['code'],
-            'type'             => $validated['type'],
-            'calculation_type' => $calculationType,
-            'default_value'    => $validated['default_value'] ?? null,
-            'description'      => $validated['description'] ?? null,
-            'status'           => $status,
-            'is_adhoc'         => $isAdhoc,
-        ]);
-
-        return $this->sendSuccess($salaryComponent, 'Salary component updated successfully');
     }
 
-    public function destroyComponent(SalaryComponent $salaryComponent): JsonResponse
+    public function destroyComponent(mixed $salaryComponent): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
+
+            $model = $salaryComponent instanceof SalaryComponent ? $salaryComponent : SalaryComponent::find($salaryComponent);
+            if (!$model) {
+                return $this->sendError('Salary component not found', 404);
+            }
+
+            $model->delete();
+
+            return $this->sendSuccess(['id' => (int)$model->id], 'Salary component deleted successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to delete component: ' . $e->getMessage(), 500);
         }
-
-        $salaryComponent->delete();
-
-        return $this->sendSuccess(null, 'Salary component deleted successfully');
     }
 
     // ==========================================
@@ -381,253 +644,316 @@ class SalaryStructureApiController extends Controller
 
     public function indexStructures(Request $request): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
 
-        $query = SalaryStructure::with(['company', 'payGroup', 'items.component']);
+            $query = SalaryStructure::with(['company', 'payGroup', 'items.component']);
 
-        if ($request->filled('pay_group_id')) {
-            $query->where('pay_group_id', $request->get('pay_group_id'));
-        }
-        if ($request->filled('status')) {
-            $query->where('status', $request->get('status') === '1' || $request->get('status') === 'true');
-        }
-        if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where('name', 'like', "%{$search}%");
-        }
+            if ($request->filled('pay_group_id')) {
+                $query->where('pay_group_id', $request->get('pay_group_id'));
+            }
+            if ($request->filled('status')) {
+                $query->where('status', $this->parseBoolean($request->get('status')));
+            }
+            if ($request->filled('search')) {
+                $search = $request->get('search');
+                $query->where('name', 'like', "%{$search}%");
+            }
 
-        $sort = $request->get('sort', 'name_asc');
-        switch ($sort) {
-            case 'name_desc':    $query->orderBy('name', 'desc'); break;
-            case 'min_ctc_asc':  $query->orderBy('min_ctc', 'asc'); break;
-            case 'min_ctc_desc': $query->orderBy('min_ctc', 'desc'); break;
-            case 'max_ctc_asc':  $query->orderBy('max_ctc', 'asc'); break;
-            case 'max_ctc_desc': $query->orderBy('max_ctc', 'desc'); break;
-            case 'name_asc':
-            default: $query->orderBy('name', 'asc'); break;
+            $sort = $request->get('sort', 'name_asc');
+            switch ($sort) {
+                case 'name_desc':    $query->orderBy('name', 'desc'); break;
+                case 'min_ctc_asc':  $query->orderBy('min_ctc', 'asc'); break;
+                case 'min_ctc_desc': $query->orderBy('min_ctc', 'desc'); break;
+                case 'max_ctc_asc':  $query->orderBy('max_ctc', 'asc'); break;
+                case 'max_ctc_desc': $query->orderBy('max_ctc', 'desc'); break;
+                case 'name_asc':
+                default: $query->orderBy('name', 'asc'); break;
+            }
+
+            $perPage = max(1, min(100, $request->integer('per_page', 10)));
+            $structures = $query->paginate($perPage);
+            $result = $this->formatPaginated($structures, fn($s) => $this->formatStructure($s, true));
+
+            return $this->sendSuccess($result, 'Salary structures retrieved successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to fetch structures: ' . $e->getMessage(), 500);
         }
-
-        $structures = $query->paginate($request->integer('per_page', 10));
-
-        return $this->sendSuccess($structures, 'Salary structures retrieved successfully');
     }
 
-    public function showStructure(SalaryStructure $salaryStructure): JsonResponse
+    public function showStructure(mixed $salaryStructure): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
 
-        return $this->sendSuccess($salaryStructure->load(['company', 'payGroup', 'items.component']), 'Salary structure details loaded');
+            $model = $salaryStructure instanceof SalaryStructure ? $salaryStructure : SalaryStructure::find($salaryStructure);
+            if (!$model) {
+                return $this->sendError('Salary structure not found', 404);
+            }
+
+            $model->load(['company', 'payGroup', 'items.component']);
+
+            return $this->sendSuccess($this->formatStructure($model, true), 'Salary structure details loaded');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to fetch structure: ' . $e->getMessage(), 500);
+        }
     }
 
     public function storeStructure(Request $request): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
-
-        $validated = $request->validate([
-            'name'         => 'required|max:255',
-            'pay_group_id' => 'nullable|integer|exists:pay_groups,id',
-            'min_ctc'      => 'required|numeric|min:0',
-            'max_ctc'      => 'required|numeric|gte:min_ctc',
-            'status'       => 'required',
-            'components'   => 'nullable|array',
-        ]);
-
-        $status     = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
-        $payGroupId = $validated['pay_group_id'] ?? null;
-        $companyId  = null;
-
-        if ($payGroupId) {
-            $payGroup = PayGroup::find($payGroupId);
-            if ($payGroup) {
-                $companyId = $payGroup->company_id;
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
             }
-        }
-        if (!$companyId) {
-            $companyId = Company::first()?->id ?? 1;
-        }
 
-        // Validation for overlapping slabs within the same Pay Group
-        $overlapQuery = SalaryStructure::where('company_id', $companyId);
-        if ($payGroupId) {
-            $overlapQuery->where('pay_group_id', $payGroupId);
-        } else {
-            $overlapQuery->whereNull('pay_group_id');
-        }
+            if ($request->has('pay_group_id') && (empty($request->pay_group_id) || $request->pay_group_id === 'null' || $request->pay_group_id === 0 || $request->pay_group_id === '0')) {
+                $request->merge(['pay_group_id' => null]);
+            }
 
-        $overlap = $overlapQuery->where(function ($query) use ($validated) {
-                $query->whereBetween('min_ctc', [$validated['min_ctc'], $validated['max_ctc']])
-                    ->orWhereBetween('max_ctc', [$validated['min_ctc'], $validated['max_ctc']])
-                    ->orWhere(function ($q) use ($validated) {
-                        $q->where('min_ctc', '<=', $validated['min_ctc'])
-                            ->where('max_ctc', '>=', $validated['max_ctc']);
-                    });
-            })
-            ->exists();
+            $validator = Validator::make($request->all(), [
+                'name'         => 'required|string|max:255',
+                'pay_group_id' => 'nullable|integer|exists:pay_groups,id',
+                'min_ctc'      => 'required|numeric|min:0',
+                'max_ctc'      => 'required|numeric|gte:min_ctc',
+                'status'       => 'required',
+                'components'   => 'nullable|array',
+            ]);
 
-        if ($overlap) {
-            return $this->sendError('Salary Structure ranges cannot overlap with existing slabs.', 422);
-        }
+            if ($validator->fails()) {
+                return $this->sendError('Validation failed.', 422, $validator->errors());
+            }
 
-        $structure = SalaryStructure::create([
-            'company_id'   => $companyId,
-            'pay_group_id' => $payGroupId,
-            'name'         => $validated['name'],
-            'min_ctc'      => $validated['min_ctc'],
-            'max_ctc'      => $validated['max_ctc'],
-            'status'       => $status,
-        ]);
+            $status     = $this->parseBoolean($request->input('status'));
+            $payGroupId = $request->input('pay_group_id') ?: null;
+            $companyId  = null;
 
-        // Process component items
-        if ($request->has('components') && is_array($request->components)) {
-            foreach ($request->components as $componentId => $componentData) {
-                $calcType = $componentData['calculation_type'] ?? null;
-                if ($calcType && $calcType !== 'not_included') {
-                    $value = $componentData['value'] ?? 0.00;
-                    if ($calcType === 'balancing') {
-                        $value = 0.00;
-                    }
-
-                    $sortOrder = 2;
-                    $comp = SalaryComponent::find($componentId);
-                    if ($comp) {
-                        if (strtolower($comp->code) === 'basic') {
-                            $sortOrder = 1;
-                        } elseif ($calcType === 'percentage_of_basic') {
-                            $sortOrder = 3;
-                        } elseif ($calcType === 'balancing') {
-                            $sortOrder = 5;
-                        }
-                    }
-
-                    SalaryStructureItem::create([
-                        'salary_structure_id' => $structure->id,
-                        'salary_component_id' => $componentId,
-                        'calculation_type'   => $calcType,
-                        'value'              => $value,
-                        'sort_order'         => $sortOrder,
-                    ]);
+            if ($payGroupId) {
+                $payGroup = PayGroup::find($payGroupId);
+                if ($payGroup) {
+                    $companyId = $payGroup->company_id;
                 }
             }
-        }
-
-        return $this->sendSuccess($structure->load('items.component'), 'Salary structure slab created successfully', 201);
-    }
-
-    public function updateStructure(Request $request, SalaryStructure $salaryStructure): JsonResponse
-    {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
-
-        $validated = $request->validate([
-            'name'         => 'required|max:255',
-            'pay_group_id' => 'nullable|integer|exists:pay_groups,id',
-            'min_ctc'      => 'required|numeric|min:0',
-            'max_ctc'      => 'required|numeric|gte:min_ctc',
-            'status'       => 'required',
-            'components'   => 'nullable|array',
-        ]);
-
-        $status     = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
-        $payGroupId = $validated['pay_group_id'] ?? null;
-        $companyId  = null;
-
-        if ($payGroupId) {
-            $payGroup = PayGroup::find($payGroupId);
-            if ($payGroup) {
-                $companyId = $payGroup->company_id;
+            if (!$companyId) {
+                $companyId = Company::first()?->id ?? 1;
             }
-        }
-        if (!$companyId) {
-            $companyId = Company::first()?->id ?? 1;
-        }
 
-        // Validation for overlapping slabs (exclude self)
-        $overlapQuery = SalaryStructure::where('company_id', $companyId)
-            ->where('id', '!=', $salaryStructure->id);
+            // Validation for overlapping slabs within the same Pay Group
+            $overlapQuery = SalaryStructure::where('company_id', $companyId);
+            if ($payGroupId) {
+                $overlapQuery->where('pay_group_id', $payGroupId);
+            } else {
+                $overlapQuery->whereNull('pay_group_id');
+            }
 
-        if ($payGroupId) {
-            $overlapQuery->where('pay_group_id', $payGroupId);
-        } else {
-            $overlapQuery->whereNull('pay_group_id');
-        }
+            $minCtc = (float)$request->input('min_ctc');
+            $maxCtc = (float)$request->input('max_ctc');
 
-        $overlap = $overlapQuery->where(function ($query) use ($validated) {
-                $query->whereBetween('min_ctc', [$validated['min_ctc'], $validated['max_ctc']])
-                    ->orWhereBetween('max_ctc', [$validated['min_ctc'], $validated['max_ctc']])
-                    ->orWhere(function ($q) use ($validated) {
-                        $q->where('min_ctc', '<=', $validated['min_ctc'])
-                            ->where('max_ctc', '>=', $validated['max_ctc']);
+            $overlap = $overlapQuery->where(function ($query) use ($minCtc, $maxCtc) {
+                $query->whereBetween('min_ctc', [$minCtc, $maxCtc])
+                    ->orWhereBetween('max_ctc', [$minCtc, $maxCtc])
+                    ->orWhere(function ($q) use ($minCtc, $maxCtc) {
+                        $q->where('min_ctc', '<=', $minCtc)
+                          ->where('max_ctc', '>=', $maxCtc);
                     });
-            })
-            ->exists();
+            })->exists();
 
-        if ($overlap) {
-            return $this->sendError('Salary Structure ranges cannot overlap with existing slabs.', 422);
-        }
+            if ($overlap) {
+                return $this->sendError('Salary Structure ranges cannot overlap with existing slabs.', 422);
+            }
 
-        $salaryStructure->update([
-            'company_id'   => $companyId,
-            'pay_group_id' => $payGroupId,
-            'name'         => $validated['name'],
-            'min_ctc'      => $validated['min_ctc'],
-            'max_ctc'      => $validated['max_ctc'],
-            'status'       => $status,
-        ]);
+            $structure = SalaryStructure::create([
+                'company_id'   => $companyId,
+                'pay_group_id' => $payGroupId,
+                'name'         => $request->input('name'),
+                'min_ctc'      => $minCtc,
+                'max_ctc'      => $maxCtc,
+                'status'       => $status,
+            ]);
 
-        // Recreate component items
-        $salaryStructure->items()->delete();
-
-        if ($request->has('components') && is_array($request->components)) {
-            foreach ($request->components as $componentId => $componentData) {
-                $calcType = $componentData['calculation_type'] ?? null;
-                if ($calcType && $calcType !== 'not_included') {
-                    $value = $componentData['value'] ?? 0.00;
-                    if ($calcType === 'balancing') {
-                        $value = 0.00;
-                    }
-
-                    $sortOrder = 2;
-                    $comp = SalaryComponent::find($componentId);
-                    if ($comp) {
-                        if (strtolower($comp->code) === 'basic') {
-                            $sortOrder = 1;
-                        } elseif ($calcType === 'percentage_of_basic') {
-                            $sortOrder = 3;
-                        } elseif ($calcType === 'balancing') {
-                            $sortOrder = 5;
+            // Process component items
+            if ($request->has('components') && is_array($request->components)) {
+                foreach ($request->components as $componentId => $componentData) {
+                    $calcType = $componentData['calculation_type'] ?? null;
+                    if ($calcType && $calcType !== 'not_included') {
+                        $value = $componentData['value'] ?? 0.00;
+                        if ($calcType === 'balancing') {
+                            $value = 0.00;
                         }
-                    }
 
-                    SalaryStructureItem::create([
-                        'salary_structure_id' => $salaryStructure->id,
-                        'salary_component_id' => $componentId,
-                        'calculation_type'   => $calcType,
-                        'value'              => $value,
-                        'sort_order'         => $sortOrder,
-                    ]);
+                        $sortOrder = 2;
+                        $comp = SalaryComponent::find($componentId);
+                        if ($comp) {
+                            if (strtolower($comp->code) === 'basic') {
+                                $sortOrder = 1;
+                            } elseif ($calcType === 'percentage_of_basic') {
+                                $sortOrder = 3;
+                            } elseif ($calcType === 'balancing') {
+                                $sortOrder = 5;
+                            }
+                        }
+
+                        SalaryStructureItem::create([
+                            'salary_structure_id' => $structure->id,
+                            'salary_component_id' => $componentId,
+                            'calculation_type'   => $calcType,
+                            'value'              => $value,
+                            'sort_order'         => $sortOrder,
+                        ]);
+                    }
                 }
             }
-        }
 
-        return $this->sendSuccess($salaryStructure->load('items.component'), 'Salary structure slab updated successfully');
+            $structure->load(['company', 'payGroup', 'items.component']);
+
+            return $this->sendSuccess($this->formatStructure($structure, true), 'Salary structure slab created successfully', 201);
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to create structure: ' . $e->getMessage(), 500);
+        }
     }
 
-    public function destroyStructure(SalaryStructure $salaryStructure): JsonResponse
+    public function updateStructure(Request $request, mixed $salaryStructure): JsonResponse
     {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
+
+            $model = $salaryStructure instanceof SalaryStructure ? $salaryStructure : SalaryStructure::find($salaryStructure);
+            if (!$model) {
+                return $this->sendError('Salary structure not found', 404);
+            }
+
+            if ($request->has('pay_group_id') && (empty($request->pay_group_id) || $request->pay_group_id === 'null' || $request->pay_group_id === 0 || $request->pay_group_id === '0')) {
+                $request->merge(['pay_group_id' => null]);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'name'         => 'required|string|max:255',
+                'pay_group_id' => 'nullable|integer|exists:pay_groups,id',
+                'min_ctc'      => 'required|numeric|min:0',
+                'max_ctc'      => 'required|numeric|gte:min_ctc',
+                'status'       => 'required',
+                'components'   => 'nullable|array',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation failed.', 422, $validator->errors());
+            }
+
+            $status     = $this->parseBoolean($request->input('status'));
+            $payGroupId = $request->input('pay_group_id') ?: null;
+            $companyId  = null;
+
+            if ($payGroupId) {
+                $payGroup = PayGroup::find($payGroupId);
+                if ($payGroup) {
+                    $companyId = $payGroup->company_id;
+                }
+            }
+            if (!$companyId) {
+                $companyId = Company::first()?->id ?? 1;
+            }
+
+            $minCtc = (float)$request->input('min_ctc');
+            $maxCtc = (float)$request->input('max_ctc');
+
+            // Validation for overlapping slabs (exclude self)
+            $overlapQuery = SalaryStructure::where('company_id', $companyId)
+                ->where('id', '!=', $model->id);
+
+            if ($payGroupId) {
+                $overlapQuery->where('pay_group_id', $payGroupId);
+            } else {
+                $overlapQuery->whereNull('pay_group_id');
+            }
+
+            $overlap = $overlapQuery->where(function ($query) use ($minCtc, $maxCtc) {
+                $query->whereBetween('min_ctc', [$minCtc, $maxCtc])
+                    ->orWhereBetween('max_ctc', [$minCtc, $maxCtc])
+                    ->orWhere(function ($q) use ($minCtc, $maxCtc) {
+                        $q->where('min_ctc', '<=', $minCtc)
+                          ->where('max_ctc', '>=', $maxCtc);
+                    });
+            })->exists();
+
+            if ($overlap) {
+                return $this->sendError('Salary Structure ranges cannot overlap with existing slabs.', 422);
+            }
+
+            $model->update([
+                'company_id'   => $companyId,
+                'pay_group_id' => $payGroupId,
+                'name'         => $request->input('name'),
+                'min_ctc'      => $minCtc,
+                'max_ctc'      => $maxCtc,
+                'status'       => $status,
+            ]);
+
+            // Recreate component items
+            $model->items()->delete();
+
+            if ($request->has('components') && is_array($request->components)) {
+                foreach ($request->components as $componentId => $componentData) {
+                    $calcType = $componentData['calculation_type'] ?? null;
+                    if ($calcType && $calcType !== 'not_included') {
+                        $value = $componentData['value'] ?? 0.00;
+                        if ($calcType === 'balancing') {
+                            $value = 0.00;
+                        }
+
+                        $sortOrder = 2;
+                        $comp = SalaryComponent::find($componentId);
+                        if ($comp) {
+                            if (strtolower($comp->code) === 'basic') {
+                                $sortOrder = 1;
+                            } elseif ($calcType === 'percentage_of_basic') {
+                                $sortOrder = 3;
+                            } elseif ($calcType === 'balancing') {
+                                $sortOrder = 5;
+                            }
+                        }
+
+                        SalaryStructureItem::create([
+                            'salary_structure_id' => $model->id,
+                            'salary_component_id' => $componentId,
+                            'calculation_type'   => $calcType,
+                            'value'              => $value,
+                            'sort_order'         => $sortOrder,
+                        ]);
+                    }
+                }
+            }
+
+            $model->load(['company', 'payGroup', 'items.component']);
+
+            return $this->sendSuccess($this->formatStructure($model, true), 'Salary structure slab updated successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to update structure: ' . $e->getMessage(), 500);
         }
+    }
 
-        $salaryStructure->items()->delete();
-        $salaryStructure->delete();
+    public function destroyStructure(mixed $salaryStructure): JsonResponse
+    {
+        try {
+            if ($authError = $this->authorizeUser()) {
+                return $authError;
+            }
 
-        return $this->sendSuccess(null, 'Salary structure slab deleted successfully');
+            $model = $salaryStructure instanceof SalaryStructure ? $salaryStructure : SalaryStructure::find($salaryStructure);
+            if (!$model) {
+                return $this->sendError('Salary structure not found', 404);
+            }
+
+            $model->items()->delete();
+            $model->delete();
+
+            return $this->sendSuccess(['id' => (int)$model->id], 'Salary structure slab deleted successfully');
+        } catch (Throwable $e) {
+            return $this->sendError('Failed to delete structure: ' . $e->getMessage(), 500);
+        }
     }
 }
