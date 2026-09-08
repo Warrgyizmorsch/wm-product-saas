@@ -3,12 +3,12 @@
 namespace App\Domains\CRM\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\LeadFollowup;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
-class LeadActivityController extends Controller
+class DealActivityController extends Controller
 {
     public function index(Request $request)
     {
@@ -32,12 +32,13 @@ class LeadActivityController extends Controller
 
         $followups = LeadFollowup::query()
             ->where('tenant_id', $tenantId)
+            ->whereNotNull('crm_deal_id')
             ->whereBetween('followup_date', [$monthStart->copy()->subDays(7), $monthEnd->copy()->addDays(7)])
-            ->with(['lead', 'deal'])
+            ->with(['deal.account', 'deal.contact'])
             ->orderBy('followup_date', 'asc')
             ->get();
 
-        $leads = Lead::where('tenant_id', $tenantId)->orderBy('company_name')->get();
+        $deals = CrmDeal::where('tenant_id', $tenantId)->with(['account', 'contact'])->orderBy('title')->get();
         $users = \App\Models\User::orderBy('name')->get();
 
         if ($request->has('google_connected') || $request->has('connected') || $request->has('user_id')) {
@@ -47,6 +48,6 @@ class LeadActivityController extends Controller
         $calService = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class);
         $isGoogleConnected = session('google_calendar_connected', false) || $calService->isAccountConnected(auth()->id());
 
-        return view('modules.crm.activities.index', compact('followups', 'leads', 'users', 'view', 'startDate', 'monthStart', 'monthEnd', 'isGoogleConnected'));
+        return view('modules.crm.deals.activities', compact('followups', 'deals', 'users', 'view', 'startDate', 'monthStart', 'monthEnd', 'isGoogleConnected'));
     }
 }

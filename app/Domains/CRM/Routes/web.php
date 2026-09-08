@@ -3,6 +3,7 @@
 use App\Domains\CRM\Controllers\CustomerController;
 use App\Domains\CRM\Controllers\CrmAccountController;
 use App\Domains\CRM\Controllers\CrmDealController;
+use App\Domains\CRM\Controllers\DealActivityController;
 use App\Domains\CRM\Controllers\LeadController;
 use App\Domains\CRM\Controllers\LeadFollowupController;
 use App\Domains\CRM\Controllers\LeadActivityController;
@@ -51,6 +52,7 @@ Route::prefix('crm')
         // CRM Deals Routes
         Route::get('deals', [CrmDealController::class, 'index'])->name('deals.index');
         Route::get('deals/kanban', [CrmDealController::class, 'kanban'])->name('deals.kanban');
+        Route::get('deals/activities', [DealActivityController::class, 'index'])->name('deals.activities');
         Route::get('deals/create', [CrmDealController::class, 'create'])->name('deals.create');
         Route::post('deals', [CrmDealController::class, 'store'])->name('deals.store');
         Route::get('deals/{deal}', [CrmDealController::class, 'show'])->name('deals.show');
