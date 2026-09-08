@@ -320,18 +320,29 @@ class ProductionWipService
             $wip->total_value += $totalCostAdded;
 
             // Determine if this is the final operation of the Finished Good (FG) routing
-            $nextOpExists = ProductionOrderOperation::where('production_order_id', $wip->production_order_id)
-                ->where(function ($q) use ($orderOp) {
-                    if ($orderOp->routing_id) {
-                        $q->where('routing_id', $orderOp->routing_id);
-                    } else {
-                        $q->where('source_product_id', $orderOp->source_product_id);
-                    }
+            $finalFgOp = ProductionOrderOperation::where('tenant_id', $wip->tenant_id)
+                ->where('production_order_id', $wip->production_order_id)
+                ->where(function ($q) use ($wip) {
+                    $q->where('source_product_id', $wip->order?->product_id)
+                      ->orWhereNull('source_product_id');
                 })
-                ->where('sequence', '>', $orderOp->sequence)
-                ->exists();
+                ->where('is_intermediate', false)
+                ->orderBy('sequence', 'desc')
+                ->first()
+                ?? ProductionOrderOperation::where('tenant_id', $wip->tenant_id)
+                ->where('production_order_id', $wip->production_order_id)
+                ->where(function ($q) use ($wip) {
+                    $q->where('source_product_id', $wip->order?->product_id)
+                      ->orWhereNull('source_product_id');
+                })
+                ->orderBy('sequence', 'desc')
+                ->first()
+                ?? ProductionOrderOperation::where('tenant_id', $wip->tenant_id)
+                ->where('production_order_id', $wip->production_order_id)
+                ->orderBy('sequence', 'desc')
+                ->first();
 
-            $isFinalFgOperation = !$nextOpExists && (!$orderOp->is_intermediate && ($orderOp->source_product_id === null || (int) $orderOp->source_product_id === (int) $wip->order->product_id));
+            $isFinalFgOperation = $finalFgOp && ((int) $orderOp->id === (int) $finalFgOp->id);
 
             // Update quantity states: only final FG operations increment FG completed_quantity
             if ($isFinalFgOperation) {
@@ -351,10 +362,10 @@ class ProductionWipService
 
             $isCompleted = $isOperationCompleted || $orderOp->status === ProductionOrderOperation::STATUS_COMPLETED;
 
-            if (!$nextOpExists && $isCompleted) {
+            if ($isFinalFgOperation && $isCompleted) {
                 $wip->status = 'completed';
                 $wip->completed_at = now();
-                if ($isFinalFgOperation && $wip->completed_quantity <= 0 && $wip->available_quantity > 0) {
+                if ($wip->completed_quantity <= 0 && $wip->available_quantity > 0) {
                     $wip->completed_quantity = $wip->available_quantity;
                 }
             }
@@ -661,16 +672,33 @@ class ProductionWipService
                 ->first();
 
             if (!$nextOp) {
+                // Check if any operation has an explicit dependency on this source operation (e.g. cross_assembly)
+                $nextOp = $sourceOp->successorDependencies()
+                    ->where('production_order_operations.production_order_id', $sourceOp->production_order_id)
+                    ->orderBy('production_order_operations.sequence', 'asc')
+                    ->lockForUpdate()
+                    ->first();
+            }
+
+            if (!$nextOp) {
                 $nextOp = ProductionOrderOperation::where('tenant_id', $sourceOp->tenant_id)
                     ->where('production_order_id', $sourceOp->production_order_id)
                     ->where(function ($q) use ($sourceOp) {
                         if ($sourceOp->source_product_id) {
-                            $q->where('source_product_id', $sourceOp->source_product_id)
-                              ->orWhere('source_product_id', $sourceOp->order?->product_id);
+                            $q->where('source_product_id', $sourceOp->source_product_id);
                         } elseif ($sourceOp->routing_id) {
                             $q->where('routing_id', $sourceOp->routing_id);
                         }
                     })
+                    ->where('sequence', '>', $sourceOp->sequence)
+                    ->orderBy('sequence', 'asc')
+                    ->lockForUpdate()
+                    ->first();
+            }
+
+            if (!$nextOp) {
+                $nextOp = ProductionOrderOperation::where('tenant_id', $sourceOp->tenant_id)
+                    ->where('production_order_id', $sourceOp->production_order_id)
                     ->where('sequence', '>', $sourceOp->sequence)
                     ->orderBy('sequence', 'asc')
                     ->lockForUpdate()
@@ -764,7 +792,21 @@ class ProductionWipService
                     ? max($logQty, $txQty, $wipCompletedQty)
                     : ($batchId ? 0.0 : (float) ($sourceOp->quantity_produced ?? 0));
 
-                $goodOutput = round(max(0.0, $rawGoodOutput - $reworkPendingQty - $scrapQty), 4);
+                $progressScrap = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
+                    ->where('production_order_id', $sourceOp->production_order_id)
+                    ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
+                    ->whereIn('operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                    ->sum('quantity_scrapped');
+
+                $progressRework = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $tenantId)
+                    ->where('production_order_id', $sourceOp->production_order_id)
+                    ->when($batchId, fn($q) => $q->where('production_batch_id', $batchId))
+                    ->whereIn('operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
+                    ->sum('quantity_rejected');
+
+                $standaloneScrap = max(0.0, $scrapQty - $progressScrap);
+                $standaloneRework = max(0.0, $reworkPendingQty - $progressRework);
+                $goodOutput = round(max(0.0, $rawGoodOutput - $standaloneRework - $standaloneScrap), 4);
 
                 $latestInspection = \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $tenantId)
                     ->whereIn('production_order_operation_id', array_filter([$sourceOp->routing_operation_id, $sourceOp->id]))
@@ -1440,35 +1482,84 @@ class ProductionWipService
                         }
                     }
 
+                    $isFgWip = ($wip->product_id === null || (int) $wip->product_id === (int) $order->product_id)
+                        && ($wip->batch === null || (int) $wip->batch->product_id === (int) $order->product_id);
+
+                    if (!$isFgWip) {
+                        $wip->update([
+                            'completed_quantity' => 0.0000,
+                        ]);
+                        return;
+                    }
+
                     $opSeq = $wip->currentRoutingOperation?->sequence ?? 0;
                     $isAtFinalStage = ($wip->current_routing_operation_id == $finalFgOp->routing_operation_id)
                         || ($opSeq >= $finalFgOp->sequence);
 
-                    $isWipCompleted = ($isOrderOrFinalOpCompleted && $isAtFinalStage) || $wip->status === 'completed';
+                    $isWipCompleted = ($isOrderOrFinalOpCompleted && $isAtFinalStage);
 
                     $batchPlanned = $wip->batch ? (float) $wip->batch->planned_quantity : (float) $order->quantity_ordered;
                     $finalFgProduced = (float) ($finalFgOp->quantity_produced ?? 0);
-                    $alreadyReceived = (float) $order->quantity_produced;
 
-                    if ($isWipCompleted) {
-                        $completedProduced = ($finalFgProduced > 0) ? $finalFgProduced : $batchPlanned;
+                    $alreadyReceivedThisWip = (float) ProductionWipTransaction::where('tenant_id', $order->tenant_id)
+                        ->where('wip_id', $wip->id)
+                        ->where('transaction_type', 'converted_to_finished_goods')
+                        ->sum('quantity');
+
+                    $totalOrderReceipts = (float) \App\Domains\Production\Models\ProductionOrderReceipt::where('tenant_id', $order->tenant_id)
+                        ->where('production_order_id', $order->id)
+                        ->sum('quantity_received');
+
+                    $totalTxConverted = (float) ProductionWipTransaction::where('tenant_id', $order->tenant_id)
+                        ->where('production_order_id', $order->id)
+                        ->where('transaction_type', 'converted_to_finished_goods')
+                        ->sum('quantity');
+
+                    $untrackedOrderReceipts = max(0.0000, $totalOrderReceipts - $totalTxConverted);
+                    $alreadyReceived = $alreadyReceivedThisWip + ($wip->production_batch_id === null ? $untrackedOrderReceipts : 0.0000);
+
+                    if ($isAtFinalStage) {
+                        if ($wip->production_batch_id) {
+                            $batchLogQty = (float) \App\Domains\Production\Models\ProductionOrderProgressLog::where('tenant_id', $order->tenant_id)
+                                ->where('production_order_id', $order->id)
+                                ->where('production_batch_id', $wip->production_batch_id)
+                                ->where('operation_id', $finalFgOp->id)
+                                ->sum('quantity_produced');
+
+                            if ($batchLogQty > 0) {
+                                $completedProduced = min($batchPlanned, $batchLogQty);
+                            } elseif ($wip->batch && $wip->batch->status === \App\Domains\Production\Models\ProductionBatch::STATUS_COMPLETED) {
+                                $completedProduced = min($batchPlanned, (float) ($wip->batch->actual_quantity > 0 ? $wip->batch->actual_quantity : $batchPlanned));
+                            } else {
+                                $completedProduced = 0.0000;
+                            }
+                        } else {
+                            $completedProduced = ($finalFgProduced > 0) ? min($batchPlanned, $finalFgProduced) : ($isOrderOrFinalOpCompleted ? $batchPlanned : 0.0000);
+                        }
+
                         $unreceivedQty = max(0.0000, $completedProduced - $alreadyReceived);
 
-                        $wip->update([
-                            'product_id' => $order->product_id,
-                            'current_routing_operation_id' => $finalFgOp->routing_operation_id ?? $wip->current_routing_operation_id,
-                            'current_work_center_id' => $finalFgOp->work_center_id ?? $wip->current_work_center_id,
-                            'completed_quantity' => $unreceivedQty,
-                            'available_quantity' => $unreceivedQty,
-                            'status' => 'completed',
-                        ]);
-                    } else {
-                        $unreceivedQty = max(0.0000, $finalFgProduced - $alreadyReceived);
-                        if ((float) $wip->completed_quantity !== $unreceivedQty) {
+                        if ($isWipCompleted) {
+                            $wip->update([
+                                'product_id' => $order->product_id,
+                                'current_routing_operation_id' => $finalFgOp->routing_operation_id ?? $wip->current_routing_operation_id,
+                                'current_work_center_id' => $finalFgOp->work_center_id ?? $wip->current_work_center_id,
+                                'completed_quantity' => $unreceivedQty,
+                                'available_quantity' => $unreceivedQty,
+                                'status' => 'completed',
+                            ]);
+                        } else {
+                            $newStatus = ($wip->status === 'completed') ? 'active' : $wip->status;
                             $wip->update([
                                 'completed_quantity' => $unreceivedQty,
+                                'status' => $newStatus,
                             ]);
                         }
+                    } else {
+                        // Intermediate stages never produce Finished Goods for warehouse receipt
+                        $wip->update([
+                            'completed_quantity' => 0.0000,
+                        ]);
                     }
                 });
         }
@@ -1479,7 +1570,7 @@ class ProductionWipService
             ->whereNull('production_batch_id')
             ->first();
 
-        if ($mainWip) {
+        if (empty($isOrderOrFinalOpCompleted) && $mainWip) {
             $sumBatchPlanned = \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $order->tenant_id)
                 ->where('production_order_id', $orderId)
                 ->where('product_id', $order->product_id)
@@ -1691,8 +1782,23 @@ class ProductionWipService
         $order = ProductionOrder::find($orderId);
         $finalFgOp = \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
             ->where('production_order_id', $orderId)
-            ->where('source_product_id', $order?->product_id)
+            ->where(function ($q) use ($order) {
+                $q->where('source_product_id', $order?->product_id)
+                  ->orWhereNull('source_product_id');
+            })
             ->where('is_intermediate', false)
+            ->orderBy('sequence', 'desc')
+            ->first()
+            ?? \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
+            ->where(function ($q) use ($order) {
+                $q->where('source_product_id', $order?->product_id)
+                  ->orWhereNull('source_product_id');
+            })
+            ->orderBy('sequence', 'desc')
+            ->first()
+            ?? \App\Domains\Production\Models\ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('production_order_id', $orderId)
             ->orderBy('sequence', 'desc')
             ->first();
 
@@ -1719,6 +1825,17 @@ class ProductionWipService
             ', [$order?->product_id ?? 0, $finalFgRoutingOpId ?? 0])
             ->groupBy('current_work_center_id')
             ->get();
+
+        $isFgDone = ($finalFgOp?->status === ProductionOrderOperation::STATUS_COMPLETED)
+            || ((float) ($finalFgOp?->quantity_produced ?? 0) > 0)
+            || ((float) ($order?->quantity_produced ?? 0) > 0);
+
+        if (!$isFgDone) {
+            $rawSummaries->transform(function ($summary) {
+                $summary->total_completed = 0.0;
+                return $summary;
+            });
+        }
 
         $workCenterIds = $rawSummaries->pluck('current_work_center_id')->filter()->toArray();
         $workCenters = WorkCenter::where('tenant_id', $tenantId)

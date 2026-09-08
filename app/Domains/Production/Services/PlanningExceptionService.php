@@ -77,6 +77,7 @@ class PlanningExceptionService
                 'operations.machine',
                 'operations.reworks',
                 'operations.predecessorDependencies',
+                'operations.routingOperation',
                 'scraps',
             ]);
 

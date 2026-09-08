@@ -69,37 +69,7 @@ class ProductionOrderService
             ]);
 
             if ($bom) {
-                $evaluator = app(BomFormulaEvaluatorService::class);
-                $parameters = $order->parameters ?? [];
-                $orderQty = (float) $order->quantity_ordered;
-                $baseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
-                $multiplier = $orderQty / $baseQty;
-
-                foreach ($bom->items as $item) {
-                    if (!$item->material_id) continue;
-
-                    if ($item->isFormula()) {
-                        $unitQty = $evaluator->evaluate($item->formula, $parameters, $bom->product);
-                    } else {
-                        $unitQty = (float) $item->quantity;
-                    }
-
-                    $scrapPct = (float) ($item->material_scrap_percentage ?? 0);
-                    $scrapFactor = 1.0 + ($scrapPct / 100.0);
-                    $plannedQty = max(0.0, $unitQty * $multiplier * $scrapFactor);
-
-                    ProductionOrderReservation::create([
-                        'tenant_id' => $tenantId,
-                        'production_order_id' => $order->id,
-                        'bom_item_id' => $item->id,
-                        'product_id' => $item->material_id,
-                        'warehouse_id' => $this->resolveReservationWarehouseId($tenantId, $item->material_id),
-                        'quantity_planned' => round($plannedQty, 4),
-                        'quantity_reserved' => 0.0,
-                        'quantity_issued' => 0.0,
-                        'uom_id' => $item->uom_id ?? ($item->material?->uom_id ?? 1),
-                    ]);
-                }
+                $this->createOrderReservationsForBom($order, $bom, (float) $order->quantity_ordered, $tenantId, $order->parameters ?? []);
             }
 
             return $order;
@@ -225,7 +195,7 @@ class ProductionOrderService
                     'source_routing_id' => $order->routing_id,
                     'bom_level' => 1,
                     'target_produced_qty' => $opTargetQty,
-                    'is_intermediate' => ($opSourceProductId !== $order->product_id),
+                    'is_intermediate' => ((int) $opSourceProductId !== (int) $order->product_id),
                     'sequence' => $planOp->sequence,
                     'operation_number' => $planOp->operation_number,
                     'name' => $planOp->name,
@@ -1231,9 +1201,7 @@ class ProductionOrderService
                             $calculatedTarget = round($targetQty * $ratio, 4);
                             if ($calculatedTarget > 0) {
                                 $opTargetQty = $calculatedTarget;
-                                if ($idx < count($routing->operations) - 1 || (int) $productId !== (int) $order->product_id) {
-                                    $opSourceProductId = $mat->material_id;
-                                }
+                                // opSourceProductId remains $productId for the routing being snapshotted
                                 break;
                             }
                         }
@@ -1253,7 +1221,7 @@ class ProductionOrderService
                 'source_routing_id' => $routing->id,
                 'bom_level' => $level,
                 'target_produced_qty' => $opTargetQty,
-                'is_intermediate' => ($opSourceProductId !== $order->product_id) || $isIntermediate,
+                'is_intermediate' => ((int) $opSourceProductId !== (int) $order->product_id) || $isIntermediate,
                 'quantity_claimed' => 0.0000,
                 'sequence' => $routingOp->sequence,
                 'operation_number' => $routingOp->operation_number,
@@ -1421,6 +1389,66 @@ class ProductionOrderService
         return $createdOps;
     }
 
+    private function createOrderReservationsForBom(
+        ProductionOrder $order,
+        ProductionBom $bom,
+        float $targetQty,
+        int $tenantId,
+        array $parameters = [],
+        array &$visitedBoms = []
+    ): void {
+        if (in_array($bom->id, $visitedBoms, true)) {
+            return;
+        }
+        $visitedBoms[] = $bom->id;
+
+        $evaluator = app(BomFormulaEvaluatorService::class);
+        $baseQty = $bom->base_quantity > 0 ? (float) $bom->base_quantity : 1.0;
+        $multiplier = $targetQty / $baseQty;
+
+        foreach ($bom->items as $item) {
+            if (!$item->material_id) continue;
+
+            if ($item->isFormula()) {
+                $unitQty = $evaluator->evaluate($item->formula, $parameters, $bom->product);
+            } else {
+                $unitQty = (float) $item->quantity;
+            }
+
+            $scrapPct = (float) ($item->material_scrap_percentage ?? 0);
+            $scrapFactor = 1.0 + ($scrapPct / 100.0);
+            $plannedQty = max(0.0, $unitQty * $multiplier * $scrapFactor);
+
+            ProductionOrderReservation::firstOrCreate(
+                [
+                    'production_order_id' => $order->id,
+                    'bom_item_id' => $item->id,
+                    'product_id' => $item->material_id,
+                ],
+                [
+                    'tenant_id' => $tenantId,
+                    'warehouse_id' => $this->resolveReservationWarehouseId($tenantId, $item->material_id),
+                    'quantity_planned' => round($plannedQty, 4),
+                    'quantity_reserved' => 0.0,
+                    'quantity_issued' => 0.0,
+                    'uom_id' => $item->uom_id ?? ($item->material?->uom_id ?? 1),
+                ]
+            );
+
+            // Recurse for child SFG BOMs
+            $childBom = ProductionBom::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('product_id', $item->material_id)
+                ->where('status', 'approved')
+                ->whereIn('bom_type', ['manufacturing', 'subcontracting'])
+                ->first();
+
+            if ($childBom) {
+                $this->createOrderReservationsForBom($order, $childBom, $plannedQty, $tenantId, $parameters, $visitedBoms);
+            }
+        }
+    }
+
     /**
      * Recursively calculate component requirement ratio across multi-level BOM tree.
      */
@@ -1485,12 +1513,24 @@ class ProductionOrderService
                 ProductionOrderOperation::STATUS_CANCELLED,
                 ProductionOrderOperation::STATUS_RUNNING,
                 ProductionOrderOperation::STATUS_PAUSED,
+                'subcontract_qc_pending',
             ], true)) {
                 continue;
             }
 
             $eval = $readinessService->evaluateOperationReadiness($op);
-            $newStatus = ($eval['overall_status'] !== ProductionReadinessService::STATUS_BLOCKED)
+
+            // An operation with quality_required on its own output cannot be blocked from
+            // STARTING merely because its post-production quality inspection has not yet occurred.
+            // Only genuine execution blockers (materials, machines, predecessor WIP, open NCRs, or failed QC) prevent starting.
+            $blockingReasons = collect($eval['blocking_reasons'] ?? []);
+            $hardExecutionBlockers = $blockingReasons->reject(function ($b) use ($op) {
+                return ($b['code'] ?? '') === ProductionReadinessService::REASON_QC_PENDING
+                    && (float) $op->quantity_produced <= 0
+                    && (float) ($op->active_qc_hold ?? 0) <= 0;
+            });
+
+            $newStatus = ($hardExecutionBlockers->isEmpty() && ($eval['dependency']['status'] ?? '') !== ProductionReadinessService::STATUS_BLOCKED)
                 ? ProductionOrderOperation::STATUS_READY
                 : ProductionOrderOperation::STATUS_WAITING;
 

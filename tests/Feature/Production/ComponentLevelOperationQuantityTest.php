@@ -264,18 +264,18 @@ class ComponentLevelOperationQuantityTest extends TestCase
 
         // OP10 Pipe Cutting Table Legs: Target = 10 Tables * 4 Legs/Table = 40 Legs
         $this->assertEquals(40.0, $ops[0]->target_produced_qty);
-        $this->assertEquals($this->sfgLeg->id, $ops[0]->source_product_id);
-        $this->assertTrue($ops[0]->is_intermediate);
+        $this->assertEquals($this->fgTable->id, $ops[0]->source_product_id);
+        $this->assertFalse($ops[0]->is_intermediate);
 
         // OP20 Pipe Cutting Supports: Target = 10 Tables * 2 Supports/Table = 20 Supports
         $this->assertEquals(20.0, $ops[1]->target_produced_qty);
-        $this->assertEquals($this->sfgSupport->id, $ops[1]->source_product_id);
-        $this->assertTrue($ops[1]->is_intermediate);
+        $this->assertEquals($this->fgTable->id, $ops[1]->source_product_id);
+        $this->assertFalse($ops[1]->is_intermediate);
 
         // OP30 Welding Frame: Target = 10 Tables * 1 Frame/Table = 10 Frames
         $this->assertEquals(10.0, $ops[2]->target_produced_qty);
-        $this->assertEquals($this->sfgFrame->id, $ops[2]->source_product_id);
-        $this->assertTrue($ops[2]->is_intermediate);
+        $this->assertEquals($this->fgTable->id, $ops[2]->source_product_id);
+        $this->assertFalse($ops[2]->is_intermediate);
 
         // OP40 Final Assembly Table: Target = 10 Tables
         $this->assertEquals(10.0, $ops[3]->target_produced_qty);
