@@ -65,11 +65,14 @@ Route::prefix('inventory')
 
         // Stock Ledger / Transactions
         Route::get('transactions', [StockTransactionController::class, 'index'])->name('transactions.index');
+        Route::get('transactions/export', [StockTransactionController::class, 'export'])->name('transactions.export');
 
         // Reports
         Route::get('reports/low-stock', [InventoryReportController::class, 'lowStockReport'])->name('reports.low-stock');
+        Route::post('reports/low-stock/create-pr', [InventoryReportController::class, 'createPrFromLowStock'])->name('reports.low-stock.create-pr');
         Route::get('reports/expiry', fn() => redirect()->route('inventory.batches.index'))->name('reports.expiry');
         Route::get('reports/valuation', [InventoryReportController::class, 'valuationReport'])->name('reports.valuation');
+        Route::get('reports/valuation/export', [InventoryReportController::class, 'exportValuationReport'])->name('reports.valuation.export');
 
         // Barcode Generator
         Route::get('barcodes', [BarcodeController::class, 'index'])->name('barcodes.index');

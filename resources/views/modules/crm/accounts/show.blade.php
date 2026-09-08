@@ -448,54 +448,58 @@
         </div>
     </div>
 
-    <!-- Modal: Add Contact -->
-    <div class="modal fade" id="addContactModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form action="{{ route('crm.accounts.contacts.store', $account) }}" method="POST">
-                    @csrf
-                    <div class="modal-header">
-                        <h5 class="modal-title fw-bold">Add Contact Person to {{ $account->name }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Contact Name *</label>
-                            <input type="text" name="name" class="form-control" placeholder="e.g. Amit Patel" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Designation</label>
-                            <input type="text" name="designation" class="form-control" placeholder="e.g. Director">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Buying Center Role</label>
-                            <select name="role" class="form-select">
-                                <option value="Purchase Decision Maker">Purchase Decision Maker</option>
-                                <option value="Technical Evaluator">Technical Evaluator</option>
-                                <option value="Finance">Finance / Accounts</option>
-                                <option value="Influencer">Influencer</option>
-                                <option value="End User">End User</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Email</label>
-                            <input type="email" name="email" class="form-control" placeholder="amit@company.com">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Mobile Number</label>
-                            <input type="text" name="mobile" class="form-control" placeholder="9876543210">
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="is_primary" value="1" id="isPrimaryCheck">
-                            <label class="form-check-label" for="isPrimaryCheck">Set as Primary Contact</label>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary" style="background-color: #1e40af; border-color: #1e40af;">Save Contact</button>
-                    </div>
-                </form>
-            </div>
+    {{-- Modal: Add Contact (using x-ui.modal common component) --}}
+    <x-ui.modal
+        id="addContactModal"
+        :title="'<i class=\'feather-user-plus text-primary me-2\'></i>Add Contact Person to <strong>' . e($account->name) . '</strong>'"
+        formAction="{{ route('crm.accounts.contacts.store', $account) }}"
+        formMethod="POST"
+        submitText="Save Contact"
+        closeText="Cancel"
+        centered="true"
+        size="md">
+
+        {{-- Contact Name --}}
+        <div class="mb-3">
+            <label class="form-label fw-semibold fs-13">Contact Name <span class="text-danger">*</span></label>
+            <x-ui.odoo-form-ui type="input" name="name" placeholder="e.g. Amit Patel" required />
         </div>
-    </div>
+
+        {{-- Designation --}}
+        <div class="mb-3">
+            <label class="form-label fw-semibold fs-13">Designation</label>
+            <x-ui.odoo-form-ui type="input" name="designation" placeholder="e.g. Director" />
+        </div>
+
+        {{-- Buying Center Role --}}
+        <div class="mb-3">
+            <label class="form-label fw-semibold fs-13">Buying Center Role</label>
+            <x-ui.odoo-form-ui type="select" name="role">
+                <option value="Purchase Decision Maker">Purchase Decision Maker</option>
+                <option value="Technical Evaluator">Technical Evaluator</option>
+                <option value="Finance">Finance / Accounts</option>
+                <option value="Influencer">Influencer</option>
+                <option value="End User">End User</option>
+            </x-ui.odoo-form-ui>
+        </div>
+
+        {{-- Email --}}
+        <div class="mb-3">
+            <label class="form-label fw-semibold fs-13">Email</label>
+            <x-ui.odoo-form-ui type="input" inputType="email" name="email" placeholder="amit@company.com" />
+        </div>
+
+        {{-- Mobile Number --}}
+        <div class="mb-3">
+            <label class="form-label fw-semibold fs-13">Mobile Number</label>
+            <x-ui.odoo-form-ui type="input" name="mobile" placeholder="9876543210" />
+        </div>
+
+        {{-- Primary Contact Checkbox --}}
+        <div class="form-check mt-1">
+            <input class="form-check-input" type="checkbox" name="is_primary" value="1" id="isPrimaryCheck">
+            <label class="form-check-label fs-13" for="isPrimaryCheck">Set as Primary Contact</label>
+        </div>
+
+    </x-ui.modal>
 @endsection
