@@ -23,6 +23,13 @@ class SchedulingService
     private array $calendarsCache = [];
     private array $shiftsCache = [];
 
+    public function clearCache(): void
+    {
+        $this->workCentersCache = [];
+        $this->calendarsCache = [];
+        $this->shiftsCache = [];
+    }
+
     public function __construct(
         private readonly ProductionScheduleNumberService $numberService
     ) {
@@ -1267,18 +1274,32 @@ class SchedulingService
 
     public function calculateOperationTimes(ProductionOrderOperation $op, float $quantity = 1.0): array
     {
-        $setup = (float) $op->setup_time_planned;
+        $setup = (float) ($op->setup_time_planned ?? 0.0);
         $targetQty = (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($op->order?->quantity_ordered ?? 1.0));
+        if ($targetQty <= 0) {
+            $targetQty = 1.0;
+        }
 
-        if ((float) $op->processing_time_planned > 0) {
-            $proc = (float) $op->processing_time_planned;
-            if ($quantity > 0 && $targetQty > 0 && $quantity < $targetQty) {
-                $proc = ($proc / $targetQty) * $quantity;
+        $totalTimePlanned = (float) ($op->total_time_planned ?? 0.0);
+        $procTimePlanned = (float) ($op->processing_time_planned ?? 0.0);
+        $unitProcFromRouting = (float) ($op->routingOperation?->processing_time_minutes ?? 0.0);
+
+        if ($totalTimePlanned > 0 && $totalTimePlanned >= $setup && $targetQty > 0) {
+            $unitProc = ($totalTimePlanned - $setup) / $targetQty;
+            $proc = $unitProc * $quantity;
+        } elseif ($procTimePlanned > 0) {
+            if ($unitProcFromRouting > 0) {
+                $unitProc = $unitProcFromRouting;
+            } elseif ($procTimePlanned > 10.0 && $targetQty > 1.0 && ($procTimePlanned / $targetQty) > 0.0001) {
+                // Total processing time stored in processing_time_planned
+                $unitProc = $procTimePlanned / $targetQty;
+            } else {
+                // Per-unit processing time stored in processing_time_planned
+                $unitProc = $procTimePlanned;
             }
+            $proc = $unitProc * $quantity;
         } else {
-            $routingOp = $op->routingOperation;
-            $unitProc = (float) ($routingOp?->processing_time_minutes ?? 0.0);
-            $proc = $unitProc * ($quantity > 0 ? $quantity : $targetQty);
+            $proc = $unitProcFromRouting * $quantity;
         }
 
         return [

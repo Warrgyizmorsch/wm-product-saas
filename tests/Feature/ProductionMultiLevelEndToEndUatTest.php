@@ -120,13 +120,25 @@ class ProductionMultiLevelEndToEndUatTest extends TestCase
         $bearingRouting = Routing::create(['tenant_id' => $this->tenant->id, 'product_id' => $sfgBearing->id, 'name' => 'Bearing Routing', 'code' => 'RT-BEARING', 'status' => 'active']);
         $bearingOp10 = RoutingOperation::create(['tenant_id' => $this->tenant->id, 'routing_id' => $bearingRouting->id, 'work_center_id' => $this->workCenter->id, 'sequence' => 10, 'operation_number' => 'BRG-10', 'name' => 'Machining', 'setup_time_minutes' => 10, 'processing_time_minutes' => 15]);
 
-        // ── 3. Partial Warehouse Stock Setup (6 Bearings Reserved in Warehouse) ──
+        // ── 3. Partial Warehouse Stock Setup (6 Bearings Reserved in Warehouse + Raw Materials) ──
         ProductWarehouseStock::create([
             'tenant_id' => $this->tenant->id,
             'warehouse_id' => $this->warehouse->id,
             'product_id' => $sfgBearing->id,
             'quantity' => 6.0,
             'reserved_qty' => 6.0,
+        ]);
+        ProductWarehouseStock::create([
+            'tenant_id' => $this->tenant->id,
+            'warehouse_id' => $this->warehouse->id,
+            'product_id' => $rmSteel->id,
+            'quantity' => 50.0,
+        ]);
+        ProductWarehouseStock::create([
+            'tenant_id' => $this->tenant->id,
+            'warehouse_id' => $this->warehouse->id,
+            'product_id' => $rmBearing->id,
+            'quantity' => 50.0,
         ]);
 
         // ── 4. Create Production Order (Quantity 10) ──────────────────────────

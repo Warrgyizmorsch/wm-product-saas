@@ -552,13 +552,12 @@ class SchedulingCalendarService
             if ($otherOp->sequence < $op->sequence) {
                 $predOrderOp = $otherOp->orderOperation;
                 if ($predOrderOp && (bool) ($predOrderOp->queue_threshold_enabled ?? $predOrderOp->overlap_enabled)) {
-                    $setupMinutes = (float) ($predOrderOp->setup_time_planned ?? 0);
                     $batchQty = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
                     $lagMinutes = (float) ($predOrderOp->transfer_lag_minutes ?? 0);
                     $orderQty = (float) ($op->order?->quantity_ordered ?? 1);
                     $effectiveBatchQty = min($batchQty, $orderQty);
-                    $firstBatchRunDuration = (float) $predOrderOp->processing_time_planned * $effectiveBatchQty;
-                    $totalOffsetMinutes = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+                    $batchTimes = app(SchedulingService::class)->calculateOperationTimes($predOrderOp, $effectiveBatchQty);
+                    $totalOffsetMinutes = $batchTimes['total_minutes'] + $lagMinutes;
 
                     $earliestAllowedStart = $otherOp->planned_start
                         ? app(SchedulingService::class)->addWorkingMinutes(

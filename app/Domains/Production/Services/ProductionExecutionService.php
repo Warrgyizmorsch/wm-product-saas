@@ -221,7 +221,13 @@ class ProductionExecutionService
             $op->processing_time_actual += $runMinutes;
             $op->quantity_produced += $produced;
             $op->quantity_rejected += $rejected;
+            if ($completeOperation) {
+                $op->status = ProductionOrderOperation::STATUS_COMPLETED;
+                $op->actual_end_time = now();
+            }
             $op->save();
+
+            app(ProductionOrderService::class)->reconcileOperationReadiness($op->production_order_id);
 
             // Record physical SFG consumption for cross-assembly dependencies (Rule 7 & Rule 8, F-03)
             if ($produced > 0) {
@@ -744,7 +750,10 @@ class ProductionExecutionService
 
             // ── Step 3: Increment order-level quantity_produced ───────────────
             // quantity_produced represents total finished goods accepted from this order.
-            $order->quantity_produced += $quantity;
+            $orderReceiptsTotal = (float) ProductionOrderReceipt::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->sum('quantity_received') + $quantity;
+            $order->quantity_produced = max((float) $order->quantity_produced, $orderReceiptsTotal);
             $order->save();
 
             // ── Step 4: Post inventory inflow (authoritative step) ────────────

@@ -538,8 +538,7 @@
                                     </x-ui.table>
                                 @else
                                     <div class="alert alert-warning py-2 px-3 fs-12 mb-0">
-                                        <i class="feather-alert-triangle me-1"></i> No schedule has been generated for this
-                                        production order yet.
+                                        <i class="feather-alert-triangle me-1"></i> No schedule has been generated for this production order yet.
                                     </div>
                                 @endif
                             </div>
@@ -1044,8 +1043,7 @@
                             @if($hasCompanyMaterialOps || $order->production_model === 'subcontract_company_material' || $order->production_model === 'hybrid')
                                 <div class="card border shadow-sm mb-4">
                                     <div class="card-header bg-light py-2">
-                                        <h6 class="fw-bold text-dark mb-0"><i class="feather-box me-1 text-warning"></i>Company
-                                            Material Balance at Subcontractor</h6>
+                                        <h6 class="fw-bold text-dark mb-0"><i class="feather-box me-1 text-warning"></i>Company Material Balance at Subcontractor</h6>
                                     </div>
                                     <div class="table-responsive">
                                         <table class="table table-sm align-middle mb-0 fs-12">
