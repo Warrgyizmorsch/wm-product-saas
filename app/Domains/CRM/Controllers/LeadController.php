@@ -444,7 +444,7 @@ class LeadController extends Controller
         $validated = $request->validate($this->getLeadValidationRules($request), $this->getLeadValidationMessages());
 
         $this->leadService->updateLead($lead, $validated, $request->input('items', []), $request->input('product_ids', []));
-        return redirect()->route('crm.leads.index')->with('success', 'Lead successfully updated in Database!');
+        return redirect()->route('crm.leads.show', $lead)->with('success', 'Lead successfully updated in Database!');
     }
 
     public function updateStatus(Request $request, Lead $lead)
