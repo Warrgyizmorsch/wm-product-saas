@@ -143,6 +143,7 @@
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.unit')" name="uom_id" required="true">
                                 <option value="">{{ __('inventory.select_unit') }}</option>
+                                <option value="__add_unit__" class="fw-bold text-primary">+ Add New Unit...</option>
                                 @foreach($uoms as $uom)
                                     <option value="{{ $uom->id }}" data-uom-category="{{ strtolower($uom->category ?? 'goods') }}" {{ $product->uom_id == $uom->id ? 'selected' : '' }}>
                                         {{ $uom->name }} ({{ $uom->code }})
@@ -697,14 +698,25 @@
             const originalUomOptions = $uomSelect.find('option').clone();
 
             function filterUomOptions() {
-                const targetCategory = itemType === 'Service' ? 'service' : 'goods';
+                const isService = itemType === 'Service';
                 const currentVal = $uomSelect.val();
 
                 $uomSelect.empty();
 
                 originalUomOptions.each(function() {
-                    const uomCategory = $(this).attr('data-uom-category');
-                    if (!uomCategory || uomCategory === targetCategory || uomCategory === 'both') {
+                    const uomCat = ($(this).attr('data-uom-category') || '').toLowerCase();
+                    let showOption = true;
+                    if (isService) {
+                        if (uomCat && !['service', 'hours', 'unit', 'both', ''].includes(uomCat)) {
+                            showOption = false;
+                        }
+                    } else {
+                        if (uomCat === 'service') {
+                            showOption = false;
+                        }
+                    }
+
+                    if (showOption) {
                         $uomSelect.append($(this).clone());
                     }
                 });
@@ -748,6 +760,161 @@
                 const hsnLabel = $('input[name="hsn_sac"]').closest('.odoo-form-group').find('.odoo-form-label');
                 hsnLabel.html('SAC Code');
             }
+
+            function clearQuickUnitErrors() {
+                $('#quickAddUnitForm .is-invalid').removeClass('is-invalid');
+                $('#quickAddUnitForm .quick-field-error').remove();
+                $('#quickUnitAlert').addClass('d-none').text('');
+            }
+
+            $(document).on('change', 'select[name="uom_id"]', function() {
+                if ($(this).val() === '__add_unit__') {
+                    $(this).val('').trigger('change.select2');
+                    clearQuickUnitErrors();
+                    const modalEl = document.getElementById('quickAddUnitModal');
+                    if (modalEl) {
+                        const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                        bsModal.show();
+                    }
+                }
+            });
+
+            $('#quick_uom_name, #quick_uom_code').on('input change', function() {
+                $(this).removeClass('is-invalid');
+                $(this).closest('.form-ui-group').find('.quick-field-error').remove();
+            });
+
+            $('#quick_uom_name').on('input', function() {
+                if (!$('#quick_uom_code').data('manually-edited')) {
+                    const code = $(this).val().trim().toUpperCase().substring(0, 5);
+                    $('#quick_uom_code').val(code);
+                }
+            });
+
+            $('#quick_uom_code').on('input', function() {
+                $(this).data('manually-edited', true);
+            });
+
+            $('#quickAddUnitForm').on('submit', function(e) {
+                e.preventDefault();
+                clearQuickUnitErrors();
+
+                const $nameInput = $('#quick_uom_name');
+                const $codeInput = $('#quick_uom_code');
+                let hasError = false;
+
+                if (!$.trim($nameInput.val())) {
+                    $nameInput.addClass('is-invalid');
+                    $nameInput.closest('.form-ui-group').append('<div class="invalid-feedback d-block fs-11 mt-1 quick-field-error">Please enter Unit Name</div>');
+                    hasError = true;
+                }
+
+                if (!$.trim($codeInput.val())) {
+                    $codeInput.addClass('is-invalid');
+                    $codeInput.closest('.form-ui-group').append('<div class="invalid-feedback d-block fs-11 mt-1 quick-field-error">Please enter Unit Code / Symbol</div>');
+                    hasError = true;
+                }
+
+                if (hasError) {
+                    return false;
+                }
+
+                const $form = $(this);
+                const $btn = $('#saveQuickUnitBtn');
+                const $alert = $('#quickUnitAlert');
+
+                $btn.prop('disabled', true).html('<i class="feather-loader spinner-border spinner-border-sm me-1"></i> Saving...');
+
+                $.ajax({
+                    url: $form.attr('action'),
+                    method: 'POST',
+                    data: $form.serialize(),
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    success: function(response) {
+                        $btn.prop('disabled', false).html('<i class="feather-check me-1"></i>Save & Select Unit');
+                        
+                        if (response && response.id) {
+                            const optionText = response.name + (response.code ? ' (' + response.code + ')' : '');
+                            const newOptHtml = `<option value="${response.id}" data-uom-category="both">${optionText}</option>`;
+                            
+                            const $select = $('select[name="uom_id"]');
+                            $select.find('option[value="__add_unit__"]').after(newOptHtml);
+                            
+                            if (typeof originalUomOptions !== 'undefined') {
+                                originalUomOptions = $select.find('option').clone();
+                            }
+
+                            $select.val(response.id).trigger('change');
+
+                            $form[0].reset();
+                            clearQuickUnitErrors();
+                            $('#quick_uom_code').data('manually-edited', false);
+
+                            const modalEl = document.getElementById('quickAddUnitModal');
+                            if (modalEl) {
+                                const bsModal = bootstrap.Modal.getInstance(modalEl);
+                                if (bsModal) bsModal.hide();
+                            }
+                        }
+                    },
+                    error: function(xhr) {
+                        $btn.prop('disabled', false).html('<i class="feather-check me-1"></i>Save & Select Unit');
+                        
+                        if (xhr.responseJSON && xhr.responseJSON.errors) {
+                            const errors = xhr.responseJSON.errors;
+                            if (errors.name) {
+                                $nameInput.addClass('is-invalid');
+                                $nameInput.closest('.form-ui-group').append(`<div class="invalid-feedback d-block fs-11 mt-1 quick-field-error">${errors.name[0]}</div>`);
+                            }
+                            if (errors.code) {
+                                $codeInput.addClass('is-invalid');
+                                $codeInput.closest('.form-ui-group').append(`<div class="invalid-feedback d-block fs-11 mt-1 quick-field-error">${errors.code[0]}</div>`);
+                            }
+                        } else {
+                            let msg = 'Failed to create Unit of Measure.';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                msg = xhr.responseJSON.message;
+                            }
+                            $alert.removeClass('d-none').html(msg);
+                        }
+                    }
+                });
+            });
         });
     </script>
+
+    <!-- Quick Add Unit Modal (Common Component Modal) -->
+    <x-ui.modal id="quickAddUnitModal" title="<i class='feather-package text-primary me-2'></i>Add New Unit of Measure" centered="true" :showFooter="false">
+        <form id="quickAddUnitForm" method="POST" action="{{ route('uoms.quick-create') }}" novalidate>
+            @csrf
+            <x-ui.modal-form-ui 
+                type="input" 
+                label="Unit Name" 
+                name="name" 
+                id="quick_uom_name" 
+                required="true" 
+                placeholder="e.g. Kilogram, Box, Meter, Pair" 
+            />
+
+            <x-ui.modal-form-ui 
+                type="input" 
+                label="Unit Code / Symbol" 
+                name="code" 
+                id="quick_uom_code" 
+                required="true" 
+                placeholder="e.g. KG, BOX, MTR, PR" 
+            />
+
+            <div id="quickUnitAlert" class="alert alert-danger d-none fs-12 py-2 my-2"></div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" id="saveQuickUnitBtn" class="btn btn-sm btn-primary">
+                    <i class="feather-check me-1"></i>Save & Select Unit
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
 @endpush
