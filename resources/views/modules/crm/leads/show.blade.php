@@ -110,7 +110,7 @@
                     </form>
                 @endif
 
-                <!-- Log / Schedule Followup Offcanvas Button -->
+
                 <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-followup-offcanvas" 
                         data-bs-toggle="offcanvas" 
                         data-bs-target="#leadFollowupOffcanvas" 
@@ -1243,9 +1243,6 @@
                                     <div class="tab-pane fade" id="subtab-interactions" role="tabpanel" aria-labelledby="subtab-interactions-tab">
                                         <div class="d-flex align-items-center justify-content-between mb-3 mt-1 flex-wrap gap-2">
                                             <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.interactions_scheduled_activities') }}</h5>
-                                            <x-ui.button variant="primary" size="sm" icon="feather-calendar" data-bs-toggle="modal" data-bs-target="#modalScheduleActivity">
-                                                {{ __('crm.schedule_activity') }}
-                                            </x-ui.button>
                                         </div>
 
                                         @php
@@ -2035,28 +2032,6 @@
         </x-ui.odoo-form-ui>
 
         <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_summary')" name="notes" rows="4" :required="true" :placeholder="__('crm.notes_summary_placeholder')" />
-    </x-ui.modal>
-
-    <!-- Schedule Activity Modal -->
-    <x-ui.modal id="modalScheduleActivity" :title="__('crm.schedule_next_activity')" :centered="true" :formAction="route('crm.leads.followups.store', $lead->id)" formMethod="POST" :submitText="__('crm.schedule')" :closeText="__('crm.cancel')">
-        <input type="hidden" name="status" value="Pending">
-        
-        <x-ui.odoo-form-ui type="select" :label="__('crm.activity_type')" name="type" :required="true">
-            <option value="Call">{{ __('crm.activity_types.Call') }}</option>
-            <option value="Email">{{ __('crm.activity_types.Email') }}</option>
-            <option value="Meeting">{{ __('crm.activity_types.Meeting') }}</option>
-            <option value="Demo">{{ __('crm.activity_types.Demo') }}</option>
-        </x-ui.odoo-form-ui>
-
-        <x-ui.odoo-form-ui type="input" inputType="datetime-local" :label="__('crm.due_date_time')" name="followup_date" id="inline_activity_datepicker" :required="true" />
-
-        <x-ui.odoo-form-ui type="select" label="Tag / Assign Persons" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-            @foreach($users as $u)
-                <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
-            @endforeach
-        </x-ui.odoo-form-ui>
-
-        <x-ui.odoo-form-ui type="textarea" :label="__('crm.description_plan')" name="notes" rows="4" :placeholder="__('crm.activity_plan_placeholder')" />
     </x-ui.modal>
 @endsection
 
@@ -3239,11 +3214,11 @@
                 $('#offcanvasActionMode').val(mode);
 
                 if (mode === 'log_note') {
-                    $('#sectionPastInteraction').show();
+                    $('#sectionPastInteraction, #sectionLogInteraction').show();
                     $('#sectionDirectSchedule').hide();
                     $('#offcanvasFollowupDate').removeAttr('required');
                 } else {
-                    $('#sectionPastInteraction').hide();
+                    $('#sectionPastInteraction, #sectionLogInteraction').hide();
                     $('#sectionDirectSchedule').show();
                     $('#offcanvasFollowupDate').attr('required', 'required');
                 }
@@ -3362,7 +3337,8 @@
 
                 $('#offcanvasLeadStatus').val(leadStatus || 'New');
                 $('#offcanvasLeadPriority').val(leadPriority || 'Medium');
-                $('#offcanvasFollowupDate, #offcanvasNextFollowupDate').val(nextFollowup || '');
+                $('#offcanvasFollowupDate').val(nextFollowup || '');
+                $('#offcanvasNextFollowupDate').val('');
                 $('#offcanvasNotes, #offcanvasScheduleNotes').val('');
 
                 if ($('#offcanvasTagUser').length && $.fn.select2) {
@@ -3431,81 +3407,128 @@
 
                 <!-- Past Interaction Section (Tab 1: Log Activity) -->
                 <div id="sectionPastInteraction">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up / Interaction Type</label>
-                        <select name="type" id="offcanvasFollowupType" class="form-select form-select-sm shadow-2xs">
-                            <option value="Call">Call</option>
-                            <option value="Email">Email</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                        </select>
-                    </div>
+                    <x-ui.modal-form-ui type="select" name="type" id="offcanvasFollowupType" label="Follow Up / Interaction Type" :searchable="true">
+                        <option value="Call">Call</option>
+                        <option value="Email">Email</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Demo">Demo</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                    </x-ui.modal-form-ui>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up Status / Outcome</label>
-                        <select name="status" id="offcanvasFollowupStatus" class="form-select form-select-sm shadow-2xs">
-                            <option value="Connected">Connected</option>
-                            <option value="Not Connected">Not Connected</option>
-                            <option value="Not Answering">Not Answering</option>
-                        </select>
-                    </div>
+                    <x-ui.modal-form-ui type="select" name="status" id="offcanvasFollowupStatus" label="Follow Up Status / Outcome" :searchable="true">
+                        <option value="Connected">Connected</option>
+                        <option value="Not Connected">Not Connected</option>
+                        <option value="Not Answering">Not Answering</option>
+                    </x-ui.modal-form-ui>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Discussion Notes / Summary</label>
-                        <textarea name="notes" id="offcanvasNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Write discussion notes..."></textarea>
-                    </div>
+                    <x-ui.modal-form-ui type="textarea" name="notes" id="offcanvasNotes" label="Discussion Notes / Summary" rows="3" placeholder="Write discussion notes..." />
 
                     <!-- Next Follow-up Section inside Log Mode -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type (Optional)</label>
-                        <select name="next_activity_type" id="offcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
-                            <option value="Call">Call</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
-                            <option value="Email">Email</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                        </select>
-                    </div>
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <h6 class="fw-bold text-primary fs-12 mb-2"><i class="feather-calendar me-1"></i> Schedule Next Activity / Google Event</h6>
+                        
+                        <x-ui.modal-form-ui type="input" name="next_title" id="offcanvasNextTitle" label="Next Event Title" placeholder="e.g. Followup Call / Next Meeting" value="Followup Call" />
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
-                        <input type="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <x-ui.modal-form-ui type="select" name="next_activity_type" id="offcanvasNextActivityType" label="Next Activity Type" :searchable="true">
+                                    <option value="Call">Call</option>
+                                    <option value="Meeting">Meeting</option>
+                                    <option value="Demo">Demo</option>
+                                    <option value="Email">Email</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                </x-ui.modal-form-ui>
+                            </div>
+                            <div class="col-6">
+                                <x-ui.modal-form-ui type="select" name="next_duration_minutes" id="offcanvasNextDuration" label="Next Duration (Mins)" :searchable="true">
+                                    <option value="15">15 Mins</option>
+                                    <option value="30" selected>30 Mins</option>
+                                    <option value="45">45 Mins</option>
+                                    <option value="60">60 Mins (1 Hr)</option>
+                                    <option value="90">90 Mins</option>
+                                    <option value="120">120 Mins</option>
+                                </x-ui.modal-form-ui>
+                            </div>
+                        </div>
+
+                        <x-ui.modal-form-ui type="input" inputType="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" label="Next Follow-up Date & Time (Optional)" />
+
+                        <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" checked>
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasNextSyncGoogle">
+                                        <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet">
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasNextCreateMeet">
+                                        <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <x-ui.modal-form-ui type="input" name="next_guest_emails" id="offcanvasNextGuestEmails" label="Guest / Attendee Emails" placeholder="e.g. client@company.com (comma separated)" />
                     </div>
                 </div>
 
                 <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
                 <div id="sectionDirectSchedule" style="display: none;">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
-                        <select name="schedule_type" id="offcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#offcanvasFollowupType').val(this.value)">
-                            <option value="Call">Call</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
-                            <option value="Email">Email</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                        </select>
+                    <x-ui.modal-form-ui type="input" name="title" id="offcanvasEventTitle" label="Event / Meeting Title" placeholder="e.g. CRM Followup Call / Client Demo" value="CRM Followup Call" />
+
+                    <x-ui.modal-form-ui type="select" name="schedule_type" id="offcanvasScheduleType" label="Activity Type *" :searchable="true" onchange="$('#offcanvasFollowupType').val(this.value)">
+                        <option value="Call">Call</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Demo">Demo</option>
+                        <option value="Email">Email</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                    </x-ui.modal-form-ui>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <x-ui.modal-form-ui type="input" inputType="datetime-local" name="followup_date" id="offcanvasFollowupDate" label="Due Date & Time *" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}" />
+                        </div>
+                        <div class="col-6">
+                            <x-ui.modal-form-ui type="select" name="duration_minutes" id="offcanvasDuration" label="Duration (Minutes)" :searchable="true">
+                                <option value="15">15 Mins</option>
+                                <option value="30" selected>30 Mins</option>
+                                <option value="45">45 Mins</option>
+                                <option value="60">60 Mins (1 Hr)</option>
+                                <option value="90">90 Mins</option>
+                                <option value="120">120 Mins</option>
+                            </x-ui.modal-form-ui>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
-                        <input type="datetime-local" name="followup_date" id="offcanvasFollowupDate" class="form-control form-control-sm shadow-2xs" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}">
+                    <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" checked>
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasSyncGoogle">
+                                    <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                </label>
+                            </div>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet">
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasCreateMeet">
+                                    <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Description / Plan</label>
-                        <textarea name="schedule_notes" id="offcanvasScheduleNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Agenda / plan for upcoming activity..." oninput="$('#offcanvasNotes').val(this.value)"></textarea>
-                    </div>
+                    <x-ui.modal-form-ui type="input" name="guest_emails" id="offcanvasGuestEmails" label="Guest / Attendee Emails" placeholder="e.g. client@company.com (comma separated)" />
+
+                    <x-ui.modal-form-ui type="textarea" name="schedule_notes" id="offcanvasScheduleNotes" label="Description / Plan" rows="3" placeholder="Agenda / plan for upcoming activity..." oninput="$('#offcanvasNotes').val(this.value)" />
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold text-dark fs-12 mb-1">Tag / Assign Persons</label>
-                    <select name="tagged_user_ids[]" id="offcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="Select persons to tag...">
-                        @foreach($users as $u)
-                            <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-ui.modal-form-ui type="select" name="tagged_user_ids[]" id="offcanvasTagUser" label="Tag / Assign Persons" multiple="true" :searchable="true">
+                    @foreach($users as $u)
+                        <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                    @endforeach
+                </x-ui.modal-form-ui>
 
                 <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
                     <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
@@ -3530,10 +3553,7 @@
                     <div class="modal-body p-4">
                         <p class="text-muted fs-12 mb-3">Please specify the reason for rejecting this quotation. This reason will be saved in audit history and displayed on the quotation detail screen.</p>
                         
-                        <div class="mb-3 text-start">
-                            <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">Rejection Reason / Remarks <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="Enter reason for rejection (e.g., Price too high, Scope changed, Customer declined, etc.)..." required></textarea>
-                        </div>
+                        <x-ui.modal-form-ui type="textarea" name="rejection_reason" id="rejectionReasonInput" label="Rejection Reason / Remarks *" rows="4" placeholder="Enter reason for rejection (e.g., Price too high, Scope changed, Customer declined, etc.)..." required />
                     </div>
                     <div class="modal-footer bg-light border-top-0 px-4 py-3">
                         <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">Cancel</button>
@@ -3545,6 +3565,8 @@
             </div>
         </div>
     </div>
+
+
 
     {{-- Product quick-create modal --}}
     <x-ui.master-modals :masters="['product']" />

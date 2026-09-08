@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Activity Calendar & Scheduler | CRM | SaaS ERP')
-@section('page-title', 'Activity Calendar & Scheduler')
-@section('breadcrumb', 'CRM > Activity Calendar')
+@section('title', 'Deal Activity Calendar & Scheduler | CRM | SaaS ERP')
+@section('page-title', 'Deal Activity Calendar & Scheduler')
+@section('breadcrumb', 'CRM > Deal Activity Calendar')
 
 @push('styles')
 <style>
@@ -113,8 +113,8 @@
             <i class="feather-calendar me-1"></i>Connect Google Account
         </a>
     @endif
-    <button type="button" class="btn btn-primary btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#scheduleActivityModal">
-        <i class="feather-plus me-1"></i>Log Activity / Follow-up
+    <button type="button" class="btn btn-primary btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#scheduleDealActivityModal">
+        <i class="feather-plus me-1"></i>Log Deal Activity / Follow-up
     </button>
 @endsection
 
@@ -134,11 +134,11 @@
         };
     @endphp
 
-    <!-- 1. Calendar Header Controls & View Switcher (100% Mobile Responsive) -->
+    <!-- 1. Calendar Header Controls & View Switcher -->
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-3 border-bottom">
         <!-- Left Section: Title & Date Navigation Controls -->
         <div class="d-flex align-items-center flex-wrap gap-2">
-            <h5 class="fw-bold text-dark mb-0 me-2">Activity Calendar</h5>
+            <h5 class="fw-bold text-dark mb-0 me-2">Deal Activity Calendar</h5>
 
             <!-- Date Prev / Next / Today Controls -->
             <div class="d-flex align-items-center gap-1 me-2">
@@ -162,52 +162,31 @@
             </h5>
         </div>
 
-        <!-- Right Section: Day/Week/Month Switcher, View Switcher (List/Kanban/Cal), Filter Drawer, Schedule Activity Modal -->
+        <!-- Right Section: Day/Week/Month Switcher, View Switcher (List/Kanban/Cal), Filter Drawer -->
         <div class="d-flex align-items-center flex-wrap gap-2">
-            <!-- Day / Week / Month Selector (Matching system tab buttons) -->
+            <!-- Day / Week / Month Selector -->
             <div class="d-flex align-items-center me-2" style="gap: 4px;">
                 <a href="{{ request()->fullUrlWithQuery(['view' => 'day']) }}" class="btn btn-xs {{ $view === 'day' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">Day</a>
                 <a href="{{ request()->fullUrlWithQuery(['view' => 'week']) }}" class="btn btn-xs {{ $view === 'week' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">Week</a>
                 <a href="{{ request()->fullUrlWithQuery(['view' => 'month']) }}" class="btn btn-xs {{ $view === 'month' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">Month</a>
             </div>
 
-            <!-- Icon View Switcher (Common System Component) -->
+            <!-- Icon View Switcher -->
             <x-ui.view-switcher />
 
-            <!-- Custom Filter Component (Identical to Lead Listing) -->
-            <form method="GET" action="{{ route('crm.activities.index') }}" class="d-inline">
+            <!-- Custom Filter Component -->
+            <form method="GET" action="{{ route('crm.deals.activities') }}" class="d-inline">
                 <x-ui.filter :label="__('ui.filter')" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
-                        <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_leads')" value="{{ request('search') }}" />
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.priority') }}</label>
-                        <x-ui.odoo-form-ui type="select" name="priority">
-                            <option value="">{{ __('crm.all_priorities') }}</option>
-                            <option value="Low" {{ request('priority') === 'Low' ? 'selected' : '' }}>{{ __('crm.priorities.Low') }}</option>
-                            <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>{{ __('crm.priorities.Medium') }}</option>
-                            <option value="High" {{ request('priority') === 'High' ? 'selected' : '' }}>{{ __('crm.priorities.High') }}</option>
-                            <option value="Urgent" {{ request('priority') === 'Urgent' ? 'selected' : '' }}>{{ __('crm.priorities.Urgent') }}</option>
-                        </x-ui.odoo-form-ui>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.segment') }}</label>
-                        <x-ui.odoo-form-ui type="select" name="segment">
-                            <option value="">{{ __('crm.all_segments') }}</option>
-                            <option value="SME" {{ request('segment') === 'SME' ? 'selected' : '' }}>{{ __('crm.segments.SME') }}</option>
-                            <option value="Mid-Market" {{ request('segment') === 'Mid-Market' ? 'selected' : '' }}>{{ __('crm.segments.Mid-Market') }}</option>
-                            <option value="Enterprise" {{ request('segment') === 'Enterprise' ? 'selected' : '' }}>{{ __('crm.segments.Enterprise') }}</option>
-                        </x-ui.odoo-form-ui>
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                        <x-ui.odoo-form-ui type="input" name="search" placeholder="Search deal title, account..." value="{{ request('search') }}" />
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('crm.activities.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
-                        <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
+                        <a href="{{ route('crm.deals.activities') }}" class="btn btn-sm btn-light border">Reset</a>
+                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
                     </div>
                 </x-ui.filter>
             </form>
@@ -244,7 +223,6 @@
             </div>
         </div>
     </div>
-
 
     <!-- 3. Calendar Grid -->
     @php
@@ -335,13 +313,14 @@
                                         default   => 'bg-secondary text-white',
                                     };
                                 }
-                                $activityUrl = $f->lead_id ? route('crm.leads.show', $f->lead_id) : ($f->crm_deal_id ? route('crm.deals.show', $f->crm_deal_id) : '#');
-                                $activityLabel = $f->lead?->company_name ?: ($f->deal?->title ?: ($f->lead_id ? 'Lead #'.$f->lead_id : ($f->crm_deal_id ? 'Deal #'.$f->crm_deal_id : 'Activity')));
+
+                                $dealUrl = $f->crm_deal_id ? route('crm.deals.show', $f->crm_deal_id) : ($f->lead_id ? route('crm.leads.show', $f->lead_id) : '#');
+                                $dealLabel = $f->deal?->title ?: ($f->deal?->account?->name ?: ($f->crm_deal_id ? 'Deal #'.$f->crm_deal_id : 'Activity'));
                             @endphp
-                            <a href="{{ $activityUrl }}" class="activity-pill {{ $badgeClass }}" title="{{ $f->type }}: {{ $activityLabel }} — {{ $f->notes ?: 'Scheduled Follow-up' }} [Status: {{ $f->status ?: 'Pending' }}]" onclick="event.stopPropagation();">
+                            <a href="{{ $dealUrl }}" class="activity-pill {{ $badgeClass }}" title="{{ $f->type }}: {{ $dealLabel }} — {{ $f->notes ?: 'Scheduled Follow-up' }} [Status: {{ $f->status ?: 'Pending' }}]" onclick="event.stopPropagation();">
                                 <span class="d-flex align-items-center text-truncate">
                                     <i class="{{ $iconClass }} me-1 opacity-85"></i>
-                                    <span class="text-truncate">{{ $activityLabel }}</span>
+                                    <span class="text-truncate">{{ $dealLabel }}</span>
                                 </span>
                                 <span class="font-monospace fs-10 opacity-90 ms-1">{{ $f->followup_date->format('h:i A') }}</span>
                             </a>
@@ -355,9 +334,9 @@
     </div>
 </div>
 
-<!-- Schedule Activity Modal (Matching Image 2 UI Aesthetic & Unified Fields) -->
-<x-ui.modal id="scheduleActivityModal" title="Schedule Google Calendar Event / Meeting" size="lg" :showFooter="false">
-    <form action="" method="POST" id="quickScheduleForm">
+<!-- Schedule Deal Activity Modal -->
+<x-ui.modal id="scheduleDealActivityModal" title="Schedule Google Calendar Event / Meeting for Deal" size="lg" :showFooter="false">
+    <form action="" method="POST" id="quickDealScheduleForm">
         @csrf
         <input type="hidden" name="action_mode" value="schedule">
 
@@ -374,7 +353,7 @@
             <div class="alert alert-info border-0 bg-info-subtle text-info-emphasis d-flex align-items-center justify-content-between flex-wrap gap-2 rounded-3 py-2 px-3 mb-3 fs-12 fw-medium">
                 <div class="d-flex align-items-center gap-2">
                     <i class="feather-info fs-15 text-info"></i> 
-                    <span><strong>Google Calendar Integration:</strong> Schedule Google events, calls, and meetings directly into Google Calendar & CRM activities.</span>
+                    <span><strong>Google Calendar Integration:</strong> Schedule Google events, calls, and meetings directly into Google Calendar & Deal activities.</span>
                 </div>
                 <a href="{{ route('crm.google-calendar.connect') }}" target="_blank" class="btn btn-xs btn-primary fw-bold px-2 py-1" title="Click to grant Google Calendar & Gmail permissions">
                     <i class="feather-external-link me-1"></i> Connect Google Account
@@ -386,16 +365,16 @@
             <div class="col-md-6">
                 <x-ui.modal-form-ui 
                     type="select" 
-                    label="Select CRM Lead" 
-                    name="lead_id" 
-                    id="modal_lead_id" 
+                    label="Select CRM Deal" 
+                    name="deal_id" 
+                    id="modal_deal_id" 
                     :required="true" 
                     :searchable="true" 
-                    :errorText="$errors->first('lead_id')"
+                    :errorText="$errors->first('deal_id')"
                 >
-                    <option value="">— Select CRM Lead —</option>
-                    @foreach($leads as $lead)
-                        <option value="{{ $lead->id }}">{{ $lead->company_name ?: $lead->contact_person }} ({{ $lead->lead_number }})</option>
+                    <option value="">— Select CRM Deal —</option>
+                    @foreach($deals as $deal)
+                        <option value="{{ $deal->id }}">{{ $deal->title }} — {{ $deal->account?->name ?: 'N/A' }} ({{ $deal->deal_number }})</option>
                     @endforeach
                 </x-ui.modal-form-ui>
             </div>
@@ -407,8 +386,8 @@
                     name="title" 
                     id="modal_event_title"
                     :required="true"
-                    placeholder="e.g. CRM Followup Call / Client Demo" 
-                    value="CRM Followup Call" 
+                    placeholder="e.g. Deal Followup Call / Client Demo" 
+                    value="Deal Followup Call" 
                 />
             </div>
 
@@ -532,7 +511,7 @@
             event.stopPropagation();
         }
         lockedCalendarDate = dateStr;
-        const dateInput = document.querySelector('#scheduleActivityModal input[name="followup_date"]');
+        const dateInput = document.querySelector('#scheduleDealActivityModal input[name="followup_date"]');
         if (dateInput) {
             const currentTimeVal = dateInput.value && dateInput.value.includes('T') ? dateInput.value.split('T')[1] : '09:00';
             dateInput.value = dateStr + 'T' + currentTimeVal;
@@ -540,7 +519,7 @@
             dateInput.setAttribute('max', dateStr + 'T23:59');
         }
 
-        const modalEl = document.getElementById('scheduleActivityModal');
+        const modalEl = document.getElementById('scheduleDealActivityModal');
         if (modalEl) {
             const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
             bsModal.show();
@@ -548,8 +527,8 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        const modalEl = document.getElementById('scheduleActivityModal');
-        const dateInput = document.querySelector('#scheduleActivityModal input[name="followup_date"]');
+        const modalEl = document.getElementById('scheduleDealActivityModal');
+        const dateInput = document.querySelector('#scheduleDealActivityModal input[name="followup_date"]');
 
         if (modalEl) {
             modalEl.addEventListener('show.bs.modal', function() {
@@ -575,7 +554,6 @@
                     const timePart = currentVal.includes('T') ? currentVal.split('T')[1] : '09:00';
                     const newDatePart = currentVal.split('T')[0];
                     if (newDatePart !== lockedCalendarDate) {
-                        // Lock date to clicked calendar date, allowing user to only modify time!
                         this.value = lockedCalendarDate + 'T' + timePart;
                     }
                 }
@@ -583,22 +561,22 @@
         }
     });
 
-    document.getElementById('quickScheduleForm')?.addEventListener('submit', function(e) {
-        const leadSelect = document.getElementById('modal_lead_id');
-        const leadId = leadSelect ? leadSelect.value : '';
+    document.getElementById('quickDealScheduleForm')?.addEventListener('submit', function(e) {
+        const dealSelect = document.getElementById('modal_deal_id');
+        const dealId = dealSelect ? dealSelect.value : '';
 
-        if (!leadId) {
+        if (!dealId) {
             e.preventDefault();
-            leadSelect.classList.add('is-invalid');
-            leadSelect.focus();
+            dealSelect.classList.add('is-invalid');
+            dealSelect.focus();
             return false;
         }
 
-        leadSelect.classList.remove('is-invalid');
-        this.action = `{{ url('crm/leads') }}/${leadId}/followups`;
+        dealSelect.classList.remove('is-invalid');
+        this.action = `{{ url('crm/deals') }}/${dealId}/followups`;
     });
 
-    document.getElementById('modal_lead_id')?.addEventListener('change', function() {
+    document.getElementById('modal_deal_id')?.addEventListener('change', function() {
         if (this.value) {
             this.classList.remove('is-invalid');
         }
