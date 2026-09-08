@@ -203,6 +203,7 @@
                                         <x-ui.odoo-form-ui type="select" name="status">
                                             <option value="">All Statuses</option>
                                             <option value="uploaded" {{ request('status') === 'uploaded' ? 'selected' : '' }}>Pending Verification</option>
+                                            <option value="pending_signature" {{ request('status') === 'pending_signature' ? 'selected' : '' }}>Pending Signature</option>
                                             <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
                                             <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
                                             <option value="requested" {{ request('status') === 'requested' ? 'selected' : '' }}>Pending Upload</option>
@@ -329,6 +330,10 @@
                                                         <i class="feather-clock fs-11"></i>
                                                         Pending Upload
                                                     </span>
+                                                @elseif($doc->status === 'pending_signature')
+                                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #d97706 !important; border: 1px solid rgba(245, 158, 11, 0.2); font-weight: 600;">
+                                                        <i class="feather-edit-3 fs-11"></i> Pending Signature
+                                                    </span>
                                                 @else
                                                     @if($requiresApproval)
                                                         <div class="dropdown d-inline-block">
@@ -372,6 +377,13 @@
                                                         <span class="fw-bold fs-13" style="color: #10b981; font-weight: 700; text-transform: uppercase;">
                                                             Approved
                                                         </span>
+                                                    @endif
+                                                    @if($doc->is_signed)
+                                                        <div class="mt-0.5">
+                                                            <span class="badge bg-soft-success text-success px-1.5 py-0.5 rounded fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
+                                                                <i class="feather-check-circle fs-9 me-0.5"></i> Signed
+                                                            </span>
+                                                        </div>
                                                     @endif
                                                 @endif
                                             </div>
@@ -527,6 +539,64 @@
                                 </x-ui.odoo-form-ui>
                                 <small class="text-muted mt-1 d-block">Selecting a template will auto-populate live profile details for the chosen employee.</small>
                             </div>
+
+                            <!-- HR DIGITAL SIGNATURE SECTION -->
+                            <div class="p-3 bg-white border rounded mb-3">
+                                <h6 class="fw-bold text-dark fs-13 mb-2"><i class="feather-edit-3 text-warning me-1"></i> HR / Authoriser Signature Stamp</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <x-ui.odoo-form-ui type="input" label="HR Signer Name" name="hr_name" value="{{ auth()->user()->name }}" placeholder="e.g. {{ auth()->user()->name }}" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <x-ui.odoo-form-ui type="input" label="HR Designation / Title" name="hr_designation" value="HR Manager" placeholder="e.g. HR Manager / Director" />
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <label class="form-label fw-bold fs-12 text-dark mb-0">HR Signature Image (Draw or Upload)</label>
+                                            <ul class="nav nav-pills bg-light p-1 rounded-pill border gap-1" id="docHrSigInputTabs" role="tablist">
+                                                <li class="nav-item">
+                                                    <button type="button" id="btn_doc_hr_sig_draw" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary" style="background-color: var(--bs-primary) !important; color: #ffffff !important;" onclick="switchDocHrSigMode('draw')">
+                                                        <i class="feather-edit-2 me-1"></i> Draw Signature
+                                                    </button>
+                                                </li>
+                                                <li class="nav-item">
+                                                    <button type="button" id="btn_doc_hr_sig_upload" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0" onclick="switchDocHrSigMode('upload')">
+                                                        <i class="feather-upload-cloud me-1"></i> Upload Image
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <input type="hidden" name="hr_signature_data" id="doc_hr_sig_input_data">
+
+                                        <!-- DRAW HR SIGNATURE TAB -->
+                                        <div id="doc_hr_sig_draw_container">
+                                            <div class="d-flex justify-content-end mb-1">
+                                                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="clearDocHrSigCanvas()">
+                                                    <i class="feather-rotate-ccw me-1"></i>Clear Canvas
+                                                </button>
+                                            </div>
+                                            <div class="border rounded bg-white p-1 text-center position-relative" style="border-color: #cbd5e1 !important;">
+                                                <canvas id="docHrSignatureCanvas" width="400" height="100" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 100px;"></canvas>
+                                            </div>
+                                            <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Draw HR signature using mouse or touch.</small>
+                                        </div>
+
+                                        <!-- UPLOAD HR SIGNATURE IMAGE TAB -->
+                                        <div id="doc_hr_sig_upload_container" class="d-none">
+                                            <div class="position-relative w-100">
+                                                <input type="file" name="hr_signature_file" id="doc_hr_sig_file_input" accept="image/png, image/jpeg, image/jpg, image/webp" class="position-absolute opacity-0 w-100 h-100" style="left:0; top:0; cursor:pointer; z-index:5;" onchange="handleDocHrSigUpload(this)">
+                                                <div class="form-control d-flex flex-column align-items-center justify-content-center gap-1.5 p-3 text-center" style="border: 2px dashed rgba(var(--bs-primary-rgb, 59, 130, 246), 0.3); background-color: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.02); border-radius: 8px; min-height: 110px;">
+                                                    <div id="doc_hr_sig_upload_preview_box" class="d-flex flex-column align-items-center justify-content-center">
+                                                        <i class="feather-upload-cloud mb-1" style="font-size: 24px; color: var(--bs-primary);"></i>
+                                                        <span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop HR signature image</span>
+                                                        <small class="text-muted fs-10 mt-0.5">PNG or JPG transparent signature images recommended</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -551,6 +621,103 @@
                 $('#section_file_upload_mode').removeClass('d-none');
                 $('#section_template_gen_mode').addClass('d-none');
                 $('#btn_submit_modal_action').html('Submit Upload');
+            }
+        }
+
+        // HR Signature Canvas & Upload Handlers for Document Generation Modal
+        var docHrCanvas = document.getElementById('docHrSignatureCanvas');
+        var docHrCtx = docHrCanvas ? docHrCanvas.getContext('2d') : null;
+        var docHrIsDrawing = false;
+
+        if (docHrCanvas && docHrCtx) {
+            docHrCtx.lineWidth = 2.5;
+            docHrCtx.lineCap = 'round';
+            docHrCtx.strokeStyle = '#0f172a';
+
+            function getDocHrCanvasPos(e) {
+                var rect = docHrCanvas.getBoundingClientRect();
+                var clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+                var clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+                return {
+                    x: (clientX - rect.left) * (docHrCanvas.width / rect.width),
+                    y: (clientY - rect.top) * (docHrCanvas.height / rect.height)
+                };
+            }
+
+            docHrCanvas.addEventListener('mousedown', function(e) {
+                docHrIsDrawing = true;
+                var pos = getDocHrCanvasPos(e);
+                docHrCtx.beginPath();
+                docHrCtx.moveTo(pos.x, pos.y);
+            });
+
+            docHrCanvas.addEventListener('mousemove', function(e) {
+                if (!docHrIsDrawing) return;
+                var pos = getDocHrCanvasPos(e);
+                docHrCtx.lineTo(pos.x, pos.y);
+                docHrCtx.stroke();
+                $('#doc_hr_sig_input_data').val(docHrCanvas.toDataURL('image/png'));
+            });
+
+            docHrCanvas.addEventListener('mouseup', function() { docHrIsDrawing = false; });
+            docHrCanvas.addEventListener('mouseleave', function() { docHrIsDrawing = false; });
+
+            docHrCanvas.addEventListener('touchstart', function(e) {
+                docHrIsDrawing = true;
+                var pos = getDocHrCanvasPos(e);
+                docHrCtx.beginPath();
+                docHrCtx.moveTo(pos.x, pos.y);
+                e.preventDefault();
+            }, { passive: false });
+
+            docHrCanvas.addEventListener('touchmove', function(e) {
+                if (!docHrIsDrawing) return;
+                var pos = getDocHrCanvasPos(e);
+                docHrCtx.lineTo(pos.x, pos.y);
+                docHrCtx.stroke();
+                $('#doc_hr_sig_input_data').val(docHrCanvas.toDataURL('image/png'));
+                e.preventDefault();
+            }, { passive: false });
+
+            docHrCanvas.addEventListener('touchend', function() { docHrIsDrawing = false; });
+        }
+
+        function clearDocHrSigCanvas() {
+            if (docHrCtx && docHrCanvas) {
+                docHrCtx.clearRect(0, 0, docHrCanvas.width, docHrCanvas.height);
+                $('#doc_hr_sig_input_data').val('');
+            }
+        }
+
+        function switchDocHrSigMode(mode) {
+            if (mode === 'upload') {
+                $('#btn_doc_hr_sig_upload').attr('style', 'background-color: var(--bs-primary) !important; color: #ffffff !important;').addClass('active btn-primary').removeClass('text-secondary');
+                $('#btn_doc_hr_sig_draw').removeAttr('style').removeClass('active btn-primary').addClass('text-secondary');
+                $('#doc_hr_sig_draw_container').addClass('d-none');
+                $('#doc_hr_sig_upload_container').removeClass('d-none');
+                $('#doc_hr_sig_input_data').val('');
+            } else {
+                $('#btn_doc_hr_sig_draw').attr('style', 'background-color: var(--bs-primary) !important; color: #ffffff !important;').addClass('active btn-primary').removeClass('text-secondary');
+                $('#btn_doc_hr_sig_upload').removeAttr('style').removeClass('active btn-primary').addClass('text-secondary');
+                $('#doc_hr_sig_upload_container').addClass('d-none');
+                $('#doc_hr_sig_draw_container').removeClass('d-none');
+            }
+        }
+
+        function handleDocHrSigUpload(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var dataUrl = e.target.result;
+                    $('#doc_hr_sig_input_data').val(dataUrl);
+                    $('#doc_hr_sig_upload_preview_box').html(
+                        '<div class="d-flex flex-column align-items-center gap-1">' +
+                        '<img src="' + dataUrl + '" style="max-height: 55px; max-width: 100%; object-fit: contain;" class="rounded border p-1 bg-white" alt="HR Signature Preview" />' +
+                        '<span class="text-success fw-bold fs-11"><i class="feather-check-circle me-1"></i> ' + input.files[0].name + '</span>' +
+                        '</div>'
+                    );
+                };
+                reader.readAsDataURL(input.files[0]);
             }
         }
 

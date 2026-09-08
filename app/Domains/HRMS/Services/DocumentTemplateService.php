@@ -51,12 +51,26 @@ class DocumentTemplateService
     /**
      * Render complete template HTML for an employee by substituting dynamic tags.
      */
-    public function renderTemplate(DocumentTemplate $template, Employee $employee, ?string $refNumber = null): string
+    public function renderTemplate(DocumentTemplate $template, Employee $employee, ?string $refNumber = null, array $extraData = []): string
     {
         $employee->loadMissing(['company', 'department', 'designation', 'branch', 'reportingManager']);
         
         $company = $employee->company ?: Company::first();
         $refNo = $refNumber ?: ('DOC/' . ($company?->code ?? 'ORG') . '/' . date('Y') . '/' . str_pad((string)$employee->id, 4, '0', STR_PAD_LEFT));
+
+        // Resolve HR Signature Data
+        $hrName = $extraData['hr_name'] ?? auth()->user()?->name ?? 'Authorized HR Signatory';
+        $hrDesignation = $extraData['hr_designation'] ?? 'HR Manager';
+        $issueDateStr = !empty($extraData['issue_date']) ? Carbon::parse($extraData['issue_date'])->format('d M, Y') : Carbon::today()->format('d M, Y');
+        $hrSigUrl = $extraData['hr_signature_url'] ?? $extraData['hr_signature_data'] ?? null;
+
+        if ($hrSigUrl) {
+            $hrSigHtml = '<div style="display:inline-block; text-align:left; margin:5px 0;">' .
+                         '<img src="' . $hrSigUrl . '" style="max-height:55px; max-width:200px; object-fit:contain; display:block;" alt="HR Signature" />' .
+                         '</div>';
+        } else {
+            $hrSigHtml = '<div style="display:inline-block; border-bottom:1.5px solid #0f172a; width:180px; height:35px; text-align:center; color:#94a3b8; font-size:11px; line-height:45px;">[ Signature Line ]</div>';
+        }
 
         // 1. Build Single Value Dictionary
         $dictionary = [
@@ -82,8 +96,13 @@ class DocumentTemplateService
             '{{company_phone}}'      => e($company?->phone ?? 'N/A'),
             
             '{{current_date}}'       => Carbon::today()->format('d M, Y'),
-            '{{issue_date}}'         => Carbon::today()->format('d M, Y'),
+            '{{issue_date}}'         => $issueDateStr,
             '{{reference_number}}'   => e($refNo),
+
+            '{{hr_signature}}'       => $hrSigHtml,
+            '{{hr_name}}'            => e($hrName),
+            '{{hr_designation}}'     => e($hrDesignation),
+            '{{signature_date}}'     => $issueDateStr,
         ];
 
         // 2. Render Relational Tables

@@ -126,6 +126,9 @@
                                         @if($doc->approval_required)
                                             <span class="badge bg-soft-success text-success fs-9 px-1.5 py-0.5">Requires Approval</span>
                                         @endif
+                                        @if($doc->requires_signature)
+                                            <span class="badge bg-soft-info text-info fs-9 px-1.5 py-0.5" title="Requires Employee Signature"><i class="feather-edit-3 me-0.5"></i> Signature Required</span>
+                                        @endif
                                         @if($doc->expiry_applicable)
                                             <span class="badge bg-soft-warning text-warning fs-9 px-1.5 py-0.5" title="Reminder: {{ $doc->reminder_days_before }} days before expiry">Expiry ({{ $doc->reminder_days_before }}d)</span>
                                         @endif
@@ -193,6 +196,7 @@
                                            data-is-required="{{ $doc->is_required ? 1 : 0 }}"
                                            data-upload-responsibility="{{ $doc->upload_responsibility }}"
                                            data-approval-required="{{ $doc->approval_required ? 1 : 0 }}"
+                                           data-requires-signature="{{ $doc->requires_signature ? 1 : 0 }}"
                                            data-expiry-applicable="{{ $doc->expiry_applicable ? 1 : 0 }}"
                                            data-reminder-days="{{ $doc->reminder_days_before }}"
                                            data-employee-can-view="{{ $doc->employee_can_view ? 1 : 0 }}"
@@ -304,6 +308,11 @@
                                     <div class="col-12">
                                         <x-ui.odoo-form-ui type="checkbox" label="Approval Required" name="approval_required">
                                             Requires approval
+                                        </x-ui.odoo-form-ui>
+                                    </div>
+                                    <div class="col-12">
+                                        <x-ui.odoo-form-ui type="checkbox" label="Signature Required" name="requires_signature">
+                                            Requires Employee Signature (when uploaded by HR)
                                         </x-ui.odoo-form-ui>
                                     </div>
                                 </div>
@@ -420,6 +429,11 @@
                                     <div class="col-12">
                                         <x-ui.odoo-form-ui type="checkbox" label="Approval Required" name="approval_required" id="edit_doc_approval_required">
                                             Requires approval
+                                        </x-ui.odoo-form-ui>
+                                    </div>
+                                    <div class="col-12">
+                                        <x-ui.odoo-form-ui type="checkbox" label="Signature Required" name="requires_signature" id="edit_doc_requires_signature">
+                                            Requires Employee Signature (when uploaded by HR)
                                         </x-ui.odoo-form-ui>
                                     </div>
                                 </div>

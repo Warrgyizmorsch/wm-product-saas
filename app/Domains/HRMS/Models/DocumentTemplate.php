@@ -22,11 +22,13 @@ class DocumentTemplate extends BaseModel
         'footer_content',
         'css_styles',
         'is_default',
+        'requires_signature',
         'status',
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
+        'requires_signature' => 'boolean',
     ];
 
     public function category(): BelongsTo

@@ -129,6 +129,8 @@ Route::prefix('hrms')
             Route::patch('/documents/{document}/approve', [EmployeeController::class, 'approveDocument'])->name('employees.documents.approve');
             Route::patch('/documents/{document}/reject', [EmployeeController::class, 'rejectDocument'])->name('employees.documents.reject');
             Route::patch('/documents/{document}/status', [EmployeeController::class, 'updateDocumentStatus'])->name('employees.documents.status');
+            Route::post('/documents/{document}/sign', [EmployeeController::class, 'signDocument'])->name('employees.documents.sign');
+            Route::get('/documents/{document}/view-signed', [EmployeeController::class, 'viewSignedDocument'])->name('employees.documents.view-signed');
             Route::delete('/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
 
             Route::post('/{employee}/adhoc-components', [EmployeeController::class, 'storeAdhocComponent'])->name('employees.adhoc-components.store');
@@ -321,6 +323,7 @@ Route::prefix('hrms')
 
             // Document Template Routes
             Route::post('/templates', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'storeTemplate'])->name('documents-master.templates.store');
+            Route::post('/templates/parse-file', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'parseTemplateFile'])->name('documents-master.templates.parse-file');
             Route::match(['post', 'put'], '/templates/{template}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'updateTemplate'])->name('documents-master.templates.update');
             Route::post('/templates/{template}/toggle-status', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'toggleTemplateStatus'])->name('documents-master.templates.toggle-status');
             Route::delete('/templates/{template}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'destroyTemplate'])->name('documents-master.templates.destroy');

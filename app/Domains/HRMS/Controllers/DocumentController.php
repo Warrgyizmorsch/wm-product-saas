@@ -144,6 +144,35 @@ class DocumentController extends Controller
             $docTemplate = \App\Domains\HRMS\Models\DocumentTemplate::findOrFail($request->integer('document_template_id'));
             $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
 
+            $hrName = $request->input('hr_name', auth()->user()?->name ?? 'Authorized Signatory');
+            $hrDesignation = $request->input('hr_designation', 'HR Manager');
+            $issueDate = $request->input('issue_date', date('Y-m-d'));
+            
+            $hrSigUrl = null;
+            if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
+                $file = $request->file('hr_signature_file');
+                $hrSigPath = $file->store("signatures/hr_tenant_{$tenantId}", 'public');
+                $hrSigUrl = asset('storage/' . $hrSigPath);
+            } elseif ($request->input('hr_signature_data')) {
+                $hrSigData = $request->input('hr_signature_data');
+                if (str_starts_with($hrSigData, 'data:image')) {
+                    $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
+                    $imageName = 'hr_sig_' . time() . '_' . \Str::random(6) . '.png';
+                    $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
+                    \Storage::disk('public')->put($hrSigPath, base64_decode($image));
+                    $hrSigUrl = asset('storage/' . $hrSigPath);
+                } else {
+                    $hrSigUrl = $hrSigData;
+                }
+            }
+
+            $extraData = [
+                'hr_name'          => $hrName,
+                'hr_designation'   => $hrDesignation,
+                'issue_date'       => $issueDate,
+                'hr_signature_url' => $hrSigUrl,
+            ];
+
             foreach ($targetEmployeeIds as $empId) {
                 $employee = Employee::find($empId);
                 if (!$employee) {
@@ -153,7 +182,7 @@ class DocumentController extends Controller
                 $customRef = $request->input('reference_number');
                 $customTitle = $request->input('document_title');
                 $refNo = $customRef ?: ('DOC/' . date('Y') . '/' . str_pad((string)$employee->id, 4, '0', STR_PAD_LEFT));
-                $renderedContent = $templateService->renderTemplate($docTemplate, $employee, $refNo);
+                $renderedContent = $templateService->renderTemplate($docTemplate, $employee, $refNo, $extraData);
                 $title = $customTitle ?: ($docTemplate->name . ' - ' . $employee->full_name);
 
                 // Save rendered HTML file to storage
@@ -177,11 +206,20 @@ class DocumentController extends Controller
                             'name'                  => $docTemplate->name,
                             'code'                  => $docTemplate->code,
                             'upload_responsibility' => 'hr',
+                            'employee_can_view'     => true,
+                            'employee_can_download' => true,
                             'status'                => 'active',
+                        ]);
+                    } else {
+                        $master->update([
+                            'employee_can_view'     => true,
+                            'employee_can_download' => true,
                         ]);
                     }
                     $masterId = $master?->id;
                 }
+
+                $docStatus = $docTemplate->requires_signature ? 'pending_signature' : 'approved';
 
                 // 1. Create GeneratedDocument record
                 $genDoc = \App\Domains\HRMS\Models\GeneratedDocument::create([
@@ -210,7 +248,7 @@ class DocumentController extends Controller
                     'file_path'          => $path,
                     'file_type'          => 'text/html',
                     'file_size'          => strlen($renderedContent),
-                    'status'             => 'approved',
+                    'status'             => $docStatus,
                     'requested_by_id'    => auth()->id(),
                 ]);
             }
@@ -221,8 +259,9 @@ class DocumentController extends Controller
         // Standard File Upload Mode
         $file = $request->file('file');
         $documentMaster = DocumentMaster::findOrFail($request->integer('document_master_id'));
+        $requiresSignature = (bool) $documentMaster->requires_signature;
         $approvalRequired = (bool) $documentMaster->approval_required;
-        $status = $approvalRequired ? 'uploaded' : 'approved';
+        $status = $requiresSignature ? 'pending_signature' : ($approvalRequired ? 'uploaded' : 'approved');
 
         foreach ($targetEmployeeIds as $empId) {
             $employee = Employee::find($empId);
@@ -239,12 +278,13 @@ class DocumentController extends Controller
 
             if ($document) {
                 $document->update([
-                    'file_name'   => $file->getClientOriginalName(),
-                    'file_path'   => $path,
-                    'file_type'   => $file->getClientMimeType(),
-                    'file_size'   => $file->getSize(),
-                    'expiry_date' => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                    'status'      => $status,
+                    'file_name'          => $file->getClientOriginalName(),
+                    'file_path'          => $path,
+                    'file_type'          => $file->getClientMimeType(),
+                    'file_size'          => $file->getSize(),
+                    'expiry_date'        => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                    'requires_signature' => $requiresSignature,
+                    'status'             => $status,
                 ]);
             } else {
                 Document::create([
@@ -260,6 +300,7 @@ class DocumentController extends Controller
                     'file_type'          => $file->getClientMimeType(),
                     'file_size'          => $file->getSize(),
                     'expiry_date'        => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                    'requires_signature' => $requiresSignature,
                     'status'             => $status,
                     'requested_by_id'    => auth()->id(),
                 ]);
@@ -267,5 +308,38 @@ class DocumentController extends Controller
         }
 
         return redirect()->route('hrms.documents.index')->with('success', 'Documents uploaded successfully.');
+    }
+
+    public function updateDocumentStatus(Request $request, Document $document): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => 'required|string|in:approved,rejected,uploaded,expired,pending_signature',
+        ]);
+
+        $document->update([
+            'status' => $validated['status'],
+        ]);
+
+        return redirect()->back()->with('success', 'Document status updated successfully.');
+    }
+
+    /**
+     * Web endpoint for signing uploaded documents.
+     */
+    public function signDocument(Request $request, Document $document): RedirectResponse
+    {
+        $validated = $request->validate([
+            'signature_image' => 'required|string',
+            'save_as_default' => 'nullable|boolean',
+        ]);
+
+        $signatureService = app(\App\Domains\HRMS\Services\DocumentSignatureService::class);
+        $signatureService->signUploadedDocument(
+            $document,
+            $validated['signature_image'],
+            (bool)($validated['save_as_default'] ?? false)
+        );
+
+        return redirect()->back()->with('success', 'Document digitally signed successfully.');
     }
 }
