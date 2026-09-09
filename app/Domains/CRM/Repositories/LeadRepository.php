@@ -141,147 +141,25 @@ class LeadRepository
     {
         $oldStatus = $lead->status;
         $tenantId = $lead->tenant_id ?? (tenant_id() ?? 1);
-        $isB2B = $lead->lead_type === 'b2b' || !empty($lead->company_name) || !empty($lead->gstin) || !empty($lead->company_email) || !empty($lead->company_phone);
 
-        // 1. Find or Create CrmAccount
-        $account = null;
-        if ($lead->crm_account_id) {
-            $account = CrmAccount::find($lead->crm_account_id);
-        }
-
-        if ($isB2B) {
-            // B2B Account Matching: Match strictly by Company Fields (GSTIN, Company Email, Company Phone, Company Name)
-            $companyName = $lead->company_name ?: ($lead->contact_person ?: 'B2B Client Account');
-            $compEmail = $lead->company_email ?: null;
-            $compPhone = $lead->company_phone ?: null;
-            $gstin = $lead->gstin ?: null;
-
-            if (!$account && $gstin) {
-                $account = CrmAccount::where('tenant_id', $tenantId)->where('gstin', $gstin)->first();
-            }
-            if (!$account && $compEmail) {
-                $account = CrmAccount::where('tenant_id', $tenantId)->where('email', $compEmail)->first();
-            }
-            if (!$account && $compPhone) {
-                $account = CrmAccount::where('tenant_id', $tenantId)->where('phone', $compPhone)->first();
-            }
-            if (!$account && $companyName) {
-                $account = CrmAccount::where('tenant_id', $tenantId)->where('name', 'like', "%{$companyName}%")->first();
-            }
-
-            if (!$account) {
-                $account = CrmAccount::create([
-                    'tenant_id'     => $tenantId,
-                    'name'          => $companyName,
-                    'gstin'         => $gstin,
-                    'email'         => $compEmail ?: $lead->email,
-                    'phone'         => $compPhone ?: $lead->phone,
-                    'industry_type' => $lead->industry_type,
-                    'city'          => $lead->city,
-                    'state'         => $lead->state,
-                    'country'       => $lead->country,
-                    'street'        => $lead->address,
-                    'status'        => 'active',
-                    'owner_id'      => $lead->lead_owner_id ?: (auth()->id() ?: 1),
-                ]);
-            }
-        } else {
-            // B2C Account Matching: Match by Contact Person details
-            $personName = $lead->contact_person ?: ($lead->company_name ?: 'Individual Customer');
-            $personEmail = $lead->email ?: null;
-            $personPhone = $lead->phone ?: null;
-
-            if (!$account && $personEmail) {
-                $account = CrmAccount::where('tenant_id', $tenantId)->where('email', $personEmail)->first();
-            }
-            if (!$account && $personPhone) {
-                $account = CrmAccount::where('tenant_id', $tenantId)->where('phone', $personPhone)->first();
-            }
-            if (!$account && $personName) {
-                $account = CrmAccount::where('tenant_id', $tenantId)->where('name', 'like', "%{$personName}%")->first();
-            }
-
-            if (!$account) {
-                $account = CrmAccount::create([
-                    'tenant_id'     => $tenantId,
-                    'name'          => $personName,
-                    'email'         => $personEmail,
-                    'phone'         => $personPhone,
-                    'industry_type' => $lead->industry_type,
-                    'city'          => $lead->city,
-                    'state'         => $lead->state,
-                    'country'       => $lead->country,
-                    'street'        => $lead->address,
-                    'status'        => 'active',
-                    'owner_id'      => $lead->lead_owner_id ?: (auth()->id() ?: 1),
-                ]);
-            }
-        }
-
-        // 2. Find or Create CrmContact
-        $contact = null;
-        $contactName = $lead->contact_person ?: ($lead->company_name ?: 'Primary Contact');
-        $contactEmail = $lead->email;
-        $contactPhone = $lead->phone;
-
-        if ($contactName) {
-            $contact = CrmContact::where('crm_account_id', $account->id)->where('name', $contactName)->first();
-            if (!$contact && $contactEmail) {
-                $contact = CrmContact::where('crm_account_id', $account->id)->where('email', $contactEmail)->first();
-            }
-            if (!$contact) {
-                $contact = CrmContact::create([
-                    'tenant_id'      => $tenantId,
-                    'crm_account_id' => $account->id,
-                    'name'           => $contactName,
-                    'designation'    => $lead->designation,
-                    'role'           => 'Primary Contact',
-                    'email'          => $contactEmail,
-                    'phone'          => $contactPhone,
-                    'mobile'         => $contactPhone,
-                    'is_primary'     => $account->contacts()->count() === 0,
-                    'status'         => 'active',
-                ]);
-            }
-        }
-
-        // 2b. Create CrmContact records for Lead's Additional Contacts
-        if (!empty($lead->additional_contacts) && is_array($lead->additional_contacts)) {
-            foreach ($lead->additional_contacts as $addContact) {
-                if (empty($addContact['name'])) continue;
-                $existingAdd = CrmContact::where('crm_account_id', $account->id)->where('name', $addContact['name'])->first();
-                if (!$existingAdd) {
-                    CrmContact::create([
-                        'tenant_id'      => $tenantId,
-                        'crm_account_id' => $account->id,
-                        'name'           => $addContact['name'],
-                        'designation'    => $addContact['designation'] ?? null,
-                        'role'           => 'Additional Contact',
-                        'email'          => $addContact['email'] ?? null,
-                        'phone'          => $addContact['phone'] ?? null,
-                        'mobile'         => $addContact['phone'] ?? null,
-                        'is_primary'     => false,
-                        'status'         => 'active',
-                    ]);
-                }
-            }
-        }
-
-        // 3. Find or Create CrmDeal
+        // 1. Find or Create CrmDeal
         $deal = null;
         if ($lead->crm_deal_id) {
             $deal = CrmDeal::find($lead->crm_deal_id);
         }
+
         if (!$deal) {
-            $companyDisplayName = $isB2B ? ($lead->company_name ?: $account->name) : $account->name;
+            $companyDisplayName = $lead->company_name ?: ($lead->contact_person ?: 'New Lead');
             $dealTitle = $lead->requirement 
                 ? (strlen($lead->requirement) > 40 ? substr($lead->requirement, 0, 40) . '...' : $lead->requirement) 
                 : ($companyDisplayName . ' - Opportunity');
 
             $deal = CrmDeal::create([
                 'tenant_id'       => $tenantId,
-                'crm_account_id'  => $account->id,
-                'crm_contact_id'  => $contact ? $contact->id : null,
+                'company_id'      => $lead->company_id,
+                'branch_id'       => $lead->branch_id,
+                'crm_account_id'  => $lead->crm_account_id ?: null,
+                'lead_id'         => $lead->id,
                 'title'           => $dealTitle,
                 'estimated_value' => $lead->expected_amount ?: 0.00,
                 'stage'           => 'Qualification',
@@ -292,29 +170,20 @@ class LeadRepository
                 'product_ids'     => $lead->product_ids,
                 'product_items'   => $lead->product_items,
             ]);
-        } else {
-            $deal->update([
-                'crm_account_id' => $account->id,
-                'crm_contact_id' => $contact ? $contact->id : null,
-            ]);
         }
 
-        // 4. Update Lead Record with Account, Contact, Deal references & Status
+        // 2. Update Lead Record with Deal reference & Status to 'Qualified'
         $updated = $lead->update([
-            'status'         => 'Won',
-            'is_customer'    => true,
-            'crm_account_id' => $account->id,
-            'crm_contact_id' => $contact ? $contact->id : null,
-            'crm_deal_id'    => $deal->id,
-            'converted_at'   => now(),
+            'status'      => 'Qualified',
+            'crm_deal_id' => $deal->id,
         ]);
 
         LeadHistory::logEvent(
             $lead,
             'status_updated',
             $oldStatus,
-            'Won',
-            "Lead verified & converted into Account #{$account->account_number} and Deal #{$deal->deal_number}"
+            'Qualified',
+            "Lead qualified & converted into Deal #{$deal->deal_number}"
         );
 
         return $updated;

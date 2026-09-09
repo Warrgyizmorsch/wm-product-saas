@@ -18,11 +18,11 @@
         ],
         'Revenue Cycle' => [
             ['label' => __('ui.crm'), 'icon' => 'feather-users', 'url' => '#', 'children' => [
-                ['label' => __('crm.accounts_sidebar') ?: 'Accounts (Companies)', 'route' => 'crm.accounts.index'],
-                ['label' => __('crm.deals_sidebar') ?: 'Deals (Pipeline)', 'route' => 'crm.deals.index'],
                 ['label' => __('crm.leads') ?: 'Leads', 'route' => 'crm.leads.index'],
-                ['label' => __('crm.track_status_sidebar') ?: 'Track Status', 'route' => 'crm.leads.trackStatus'],
+                ['label' => __('crm.deals_sidebar') ?: 'Deals (Pipeline)', 'route' => 'crm.deals.index'],
+                ['label' => __('crm.accounts_sidebar') ?: 'Accounts (Companies)', 'route' => 'crm.accounts.index'],
                 ['label' => __('crm.customers_sidebar') ?: 'Customers', 'route' => 'crm.customers.index'],
+                ['label' => __('crm.track_status_sidebar') ?: 'Track Status', 'route' => 'crm.leads.trackStatus'],
             ]],
             ['label' => __('crm.crm_masters_sidebar') ?: 'CRM Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
                 ['label' => __('crm.lead_status_master') ?: 'Lead Status Master', 'route' => 'crm.masters.lead-statuses.index'],

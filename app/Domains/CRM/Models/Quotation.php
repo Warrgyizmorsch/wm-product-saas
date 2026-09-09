@@ -71,31 +71,22 @@ class Quotation extends BaseModel
         }
 
         if ($account) {
+            // If the account already has a linked customer, use it directly
             if ($account->customer_id && $account->customer) {
                 return $account->customer;
             }
 
+            // READ-ONLY lookup — never create here; creation happens in QuotationService
+            $tenantId = $account->tenant_id;
             $customer = null;
             if ($account->email) {
-                $customer = Customer::where('email', $account->email)->first();
+                $customer = Customer::where('tenant_id', $tenantId)->where('email', $account->email)->first();
             }
             if (!$customer && $account->phone) {
-                $customer = Customer::where('phone', $account->phone)->first();
+                $customer = Customer::where('tenant_id', $tenantId)->where('phone', $account->phone)->first();
             }
             if (!$customer && $account->name) {
-                $customer = Customer::where('name', $account->name)->first();
-            }
-
-            if (!$customer && $account->name) {
-                $customer = Customer::create([
-                    'tenant_id' => $account->tenant_id ?? (auth()->check() ? auth()->user()->tenant_id : null),
-                    'name'      => $account->name,
-                    'email'     => $account->email,
-                    'phone'     => $account->phone,
-                    'gstin'     => $account->gstin,
-                    'status'    => 'active',
-                ]);
-                $account->update(['customer_id' => $customer->id]);
+                $customer = Customer::where('tenant_id', $tenantId)->where('name', $account->name)->first();
             }
 
             return $customer;
@@ -104,56 +95,40 @@ class Quotation extends BaseModel
         // 2. Deal Contact link (if Deal has contact instead of account)
         if ($this->crmDeal && $this->crmDeal->contact) {
             $contact = $this->crmDeal->contact;
+            $tenantId = $contact->tenant_id;
             $customer = null;
             if ($contact->email) {
-                $customer = Customer::where('email', $contact->email)->first();
+                $customer = Customer::where('tenant_id', $tenantId)->where('email', $contact->email)->first();
             }
             if (!$customer && $contact->phone) {
-                $customer = Customer::where('phone', $contact->phone)->first();
+                $customer = Customer::where('tenant_id', $tenantId)->where('phone', $contact->phone)->first();
             }
             if (!$customer && $contact->name) {
-                $customer = Customer::where('name', $contact->name)->first();
-            }
-
-            if (!$customer && $contact->name) {
-                $customer = Customer::create([
-                    'tenant_id' => $contact->tenant_id ?? (auth()->check() ? auth()->user()->tenant_id : null),
-                    'name'      => $contact->name,
-                    'email'     => $contact->email,
-                    'phone'     => $contact->phone,
-                    'status'    => 'active',
-                ]);
+                $customer = Customer::where('tenant_id', $tenantId)->where('name', $contact->name)->first();
             }
 
             return $customer;
         }
 
-        // 3. Lead link
+        // 3. Lead link — read-only lookup only
         $lead = $this->lead;
         if ($lead) {
+            $tenantId = $lead->tenant_id;
             $customer = null;
-            if ($lead->email) {
-                $customer = Customer::where('email', $lead->email)->first();
+            if ($lead->company_email) {
+                $customer = Customer::where('tenant_id', $tenantId)->where('email', $lead->company_email)->first();
+            }
+            if (!$customer && $lead->email) {
+                $customer = Customer::where('tenant_id', $tenantId)->where('email', $lead->email)->first();
+            }
+            if (!$customer && $lead->company_phone) {
+                $customer = Customer::where('tenant_id', $tenantId)->where('phone', $lead->company_phone)->first();
             }
             if (!$customer && $lead->phone) {
-                $customer = Customer::where('phone', $lead->phone)->first();
+                $customer = Customer::where('tenant_id', $tenantId)->where('phone', $lead->phone)->first();
             }
             if (!$customer && $lead->company_name) {
-                $customer = Customer::where('name', $lead->company_name)->first();
-            }
-            if (!$customer && $lead->name) {
-                $customer = Customer::where('name', $lead->name)->first();
-            }
-
-            if (!$customer && ($lead->company_name || $lead->name)) {
-                $custName = $lead->company_name ?: $lead->name;
-                $customer = Customer::create([
-                    'tenant_id' => $lead->tenant_id ?? (auth()->check() ? auth()->user()->tenant_id : null),
-                    'name'      => $custName,
-                    'email'     => $lead->email,
-                    'phone'     => $lead->phone,
-                    'status'    => 'active',
-                ]);
+                $customer = Customer::where('tenant_id', $tenantId)->where('name', $lead->company_name)->first();
             }
 
             return $customer;
@@ -184,13 +159,19 @@ class Quotation extends BaseModel
             if ($this->crmDeal->contact && $this->crmDeal->contact->name) {
                 return $this->crmDeal->contact->name;
             }
+            if ($this->crmDeal->lead) {
+                if ($this->crmDeal->lead->company_name) return $this->crmDeal->lead->company_name;
+                if ($this->crmDeal->lead->contact_person) return $this->crmDeal->lead->contact_person;
+            }
         }
         if ($this->crmAccount && $this->crmAccount->name) {
             return $this->crmAccount->name;
         }
-        if ($this->lead) {
-            if ($this->lead->company_name) return $this->lead->company_name;
-            if ($this->lead->name) return $this->lead->name;
+        $leadObj = $this->lead ?: $this->crmDeal?->lead;
+        if ($leadObj) {
+            if ($leadObj->company_name) return $leadObj->company_name;
+            if ($leadObj->contact_person) return $leadObj->contact_person;
+            if ($leadObj->name) return $leadObj->name;
         }
         return '—';
     }
@@ -207,12 +188,16 @@ class Quotation extends BaseModel
             if ($this->crmDeal->account && $this->crmDeal->account->email) {
                 return $this->crmDeal->account->email;
             }
+            if ($this->crmDeal->lead && ($this->crmDeal->lead->company_email || $this->crmDeal->lead->email)) {
+                return $this->crmDeal->lead->company_email ?: $this->crmDeal->lead->email;
+            }
         }
         if ($this->crmAccount && $this->crmAccount->email) {
             return $this->crmAccount->email;
         }
-        if ($this->lead && $this->lead->email) {
-            return $this->lead->email;
+        $leadObj = $this->lead ?: $this->crmDeal?->lead;
+        if ($leadObj && ($leadObj->company_email || $leadObj->email)) {
+            return $leadObj->company_email ?: $leadObj->email;
         }
         return '—';
     }
@@ -229,12 +214,16 @@ class Quotation extends BaseModel
             if ($this->crmDeal->account && $this->crmDeal->account->phone) {
                 return $this->crmDeal->account->phone;
             }
+            if ($this->crmDeal->lead && ($this->crmDeal->lead->company_phone || $this->crmDeal->lead->phone)) {
+                return $this->crmDeal->lead->company_phone ?: $this->crmDeal->lead->phone;
+            }
         }
         if ($this->crmAccount && $this->crmAccount->phone) {
             return $this->crmAccount->phone;
         }
-        if ($this->lead && $this->lead->phone) {
-            return $this->lead->phone;
+        $leadObj = $this->lead ?: $this->crmDeal?->lead;
+        if ($leadObj && ($leadObj->company_phone || $leadObj->phone)) {
+            return $leadObj->company_phone ?: $leadObj->phone;
         }
         return '—';
     }
@@ -253,8 +242,9 @@ class Quotation extends BaseModel
             }
         }
 
-        if ($this->lead) {
-            $parts = array_filter([$this->lead->address, $this->lead->city, $this->lead->state, $this->lead->country]);
+        $leadObj = $this->lead ?: $this->crmDeal?->lead;
+        if ($leadObj) {
+            $parts = array_filter([$leadObj->address, $leadObj->city, $leadObj->state, $leadObj->country]);
             if (!empty($parts)) {
                 return implode(', ', $parts);
             }

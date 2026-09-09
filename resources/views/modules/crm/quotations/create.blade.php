@@ -126,9 +126,9 @@
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-2"></i>Customer & Contact Details</h6>
                             
                             @php
-                                $clientName = $selectedDeal ? ($selectedDeal->account ? $selectedDeal->account->name : ($selectedDeal->contact ? $selectedDeal->contact->name : 'N/A')) : ($selectedAccount ? $selectedAccount->name : ($selectedLead ? ($selectedLead->company_name ?: $selectedLead->contact_person) : ''));
-                                $clientEmail = $selectedDeal ? ($selectedDeal->account ? $selectedDeal->account->email : ($selectedDeal->contact ? $selectedDeal->contact->email : '')) : ($selectedAccount ? $selectedAccount->email : ($selectedLead ? $selectedLead->email : ''));
-                                $clientPhone = $selectedDeal ? ($selectedDeal->account ? $selectedDeal->account->phone : ($selectedDeal->contact ? $selectedDeal->contact->phone : '')) : ($selectedAccount ? $selectedAccount->phone : ($selectedLead ? $selectedLead->phone : ''));
+                                $clientName = $selectedDeal ? ($selectedDeal->account ? $selectedDeal->account->name : ($selectedDeal->contact ? $selectedDeal->contact->name : ($selectedDeal->lead ? ($selectedDeal->lead->company_name ?: $selectedDeal->lead->contact_person) : 'N/A'))) : ($selectedAccount ? $selectedAccount->name : ($selectedLead ? ($selectedLead->company_name ?: $selectedLead->contact_person) : ''));
+                                $clientEmail = $selectedDeal ? ($selectedDeal->account ? $selectedDeal->account->email : ($selectedDeal->contact ? $selectedDeal->contact->email : ($selectedDeal->lead ? ($selectedDeal->lead->company_email ?: $selectedDeal->lead->email) : ''))) : ($selectedAccount ? $selectedAccount->email : ($selectedLead ? ($selectedLead->company_email ?: $selectedLead->email) : ''));
+                                $clientPhone = $selectedDeal ? ($selectedDeal->account ? $selectedDeal->account->phone : ($selectedDeal->contact ? $selectedDeal->contact->phone : ($selectedDeal->lead ? ($selectedDeal->lead->company_phone ?: $selectedDeal->lead->phone) : ''))) : ($selectedAccount ? $selectedAccount->phone : ($selectedLead ? ($selectedLead->company_phone ?: $selectedLead->phone) : ''));
                             @endphp
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.customer')" name="_customer_display"

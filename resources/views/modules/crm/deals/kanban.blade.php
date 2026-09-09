@@ -193,17 +193,22 @@
                             </div>
 
                             <!-- Subhead Info -->
+                            @php
+                                $kbLead = $deal->lead;
+                                $kbCompany = $deal->account ? $deal->account->name : ($kbLead ? ($kbLead->company_name ?: $kbLead->contact_person) : null);
+                                $kbContact = $deal->contact ? $deal->contact->name : ($kbLead ? ($kbLead->contact_person ?: $kbLead->company_name) : null);
+                            @endphp
                             <div class="fs-11 text-muted mb-2">
                                 <div class="text-truncate mb-0.5">
                                     <span class="font-monospace text-primary fw-bold">{{ $deal->deal_number }}</span>
                                 </div>
-                                @if($deal->account)
+                                @if($kbCompany)
                                     <div class="text-truncate mb-0.5">
-                                        <i class="feather-briefcase me-1 text-secondary"></i><strong class="text-dark">{{ $deal->account->name }}</strong>
+                                        <i class="feather-briefcase me-1 text-secondary"></i><strong class="text-dark">{{ $kbCompany }}</strong>
                                     </div>
                                 @endif
-                                @if($deal->contact)
-                                    <div class="text-truncate"><i class="feather-user me-1 text-secondary"></i>{{ $deal->contact->name }}</div>
+                                @if($kbContact && $kbContact !== $kbCompany)
+                                    <div class="text-truncate"><i class="feather-user me-1 text-secondary"></i>{{ $kbContact }}</div>
                                 @endif
                             </div>
 
