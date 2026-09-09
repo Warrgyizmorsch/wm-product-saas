@@ -605,17 +605,9 @@
                         </div>
                     </div>
                     
+                    <input type="hidden" name="signature_position" value="bottom_right">
                     <div class="row g-3 align-items-end">
-                        <div class="col-md-5">
-                            <label class="form-label fw-bold fs-12 text-dark mb-1">Signature Placement Line <span class="text-danger">*</span></label>
-                            <select name="signature_position" id="modal_signature_position_select" class="form-select fs-13 py-2 rounded-3">
-                                <option value="bottom_left">Employee Signature Line (Bottom Left)</option>
-                                <option value="bottom_right" selected>Authorized Signatory Line (Bottom Right)</option>
-                                <option value="bottom_center">Bottom Center Signature Line</option>
-                            </select>
-                            <small class="text-muted fs-11 mt-1 d-block"><i class="feather-layout me-1"></i> Signature will be stamped on this line.</small>
-                        </div>
-                        <div class="col-md-7">
+                        <div class="col-12">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <label class="form-label fw-bold fs-12 text-dark mb-0">Signature Input <span class="text-danger">*</span></label>
                                 <ul class="nav nav-pills bg-light p-1 rounded-pill border gap-1" id="signatureInputTabs" role="tablist">

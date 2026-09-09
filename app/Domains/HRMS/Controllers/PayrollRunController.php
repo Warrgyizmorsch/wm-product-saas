@@ -54,24 +54,24 @@ class PayrollRunController extends Controller
                         $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
                         $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
                     } else {
-                        $allEmpIds = Employee::pluck('id')->toArray();
-                        $excludeEmployeeIds = array_merge($excludeEmployeeIds, $allEmpIds);
+                        $genEmpIds = Employee::where('status', true)->whereNotNull('pay_group_id')->pluck('id')->toArray();
+                        $excludeEmployeeIds = array_merge($excludeEmployeeIds, $genEmpIds);
                     }
                 }
                 $excludeEmployeeIds = array_unique($excludeEmployeeIds);
             }
 
             // Get active employees mapped to pay groups & structures
+            // Note: salary_structure_id may be null if structure is resolved via pay_group CTC range in PayrollCalculationService
             if ($selectedRun->employee_ids && count($selectedRun->employee_ids) > 0) {
                 $employees = Employee::whereIn('id', $selectedRun->employee_ids)
                     ->whereNotIn('id', $excludeEmployeeIds)
                     ->where('status', true)
-                    ->whereNotNull('salary_structure_id')
+                    ->whereNotNull('pay_group_id')
                     ->get();
             } else {
                 $employeesQuery = Employee::where('status', true)
                     ->whereNotNull('pay_group_id')
-                    ->whereNotNull('salary_structure_id')
                     ->whereNotIn('id', $excludeEmployeeIds);
 
                 // 1. If the current run is a specific pay group, filter by it
@@ -263,8 +263,8 @@ class PayrollRunController extends Controller
                     $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
                     $alreadyProcessed = array_merge($alreadyProcessed, $pgEmpIds);
                 } else {
-                    $allEmpIds = Employee::pluck('id')->toArray();
-                    $alreadyProcessed = array_merge($alreadyProcessed, $allEmpIds);
+                    $genEmpIds = Employee::where('status', true)->whereNotNull('pay_group_id')->pluck('id')->toArray();
+                    $alreadyProcessed = array_merge($alreadyProcessed, $genEmpIds);
                 }
             }
             $alreadyProcessed = array_unique($alreadyProcessed);
@@ -496,12 +496,11 @@ class PayrollRunController extends Controller
             $employees = Employee::whereIn('id', $run->employee_ids)
                 ->whereNotIn('id', $excludeEmployeeIds)
                 ->where('status', true)
-                ->whereNotNull('salary_structure_id')
+                ->whereNotNull('pay_group_id')
                 ->get();
         } else {
             $employeesQuery = Employee::where('status', true)
                 ->whereNotNull('pay_group_id')
-                ->whereNotNull('salary_structure_id')
                 ->whereNotIn('id', $excludeEmployeeIds);
 
             if ($run->pay_group_id) {

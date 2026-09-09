@@ -235,6 +235,6 @@ class OvertimeRequestApiController extends Controller
 
         $overtimeRequest->delete();
 
-        return $this->sendSuccess(null, 'Overtime request deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Overtime request deleted successfully.');
     }
 }

@@ -165,7 +165,10 @@ class DocumentApiController extends Controller
 
         $tenantId = auth()->user()->tenant_id;
         $file = $request->file('file');
-        $documentMaster = DocumentMaster::findOrFail($request->integer('document_master_id'));
+        $documentMaster = DocumentMaster::find($request->integer('document_master_id'));
+        if (!$documentMaster) {
+            return $this->sendError("Document template with ID '{$request->input('document_master_id')}' not found.", 404);
+        }
 
         // Resolve target employee IDs
         $employeeId = $request->input('employee_id');
@@ -358,8 +361,15 @@ class DocumentApiController extends Controller
             'reference_number'     => 'nullable|string',
         ]);
 
-        $template = DocumentTemplate::findOrFail($validated['document_template_id']);
-        $employee = Employee::findOrFail($validated['employee_id']);
+        $template = DocumentTemplate::find($validated['document_template_id']);
+        if (!$template) {
+            return $this->sendError("Document template with ID '{$validated['document_template_id']}' not found.", 404);
+        }
+
+        $employee = Employee::find($validated['employee_id']);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$validated['employee_id']}' not found.", 404);
+        }
 
         $result = $this->documentSignatureService->generateSignedDocumentFromTemplate(
             $template,

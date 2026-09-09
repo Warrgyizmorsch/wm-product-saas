@@ -428,11 +428,11 @@ class PayrollRunApiController extends Controller
                 if ($or->employee_ids && count($or->employee_ids) > 0) {
                     $alreadyProcessed = array_merge($alreadyProcessed, $or->employee_ids);
                 } elseif ($or->pay_group_id) {
-                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
+                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->whereNotNull('salary_structure_id')->pluck('id')->toArray();
                     $alreadyProcessed = array_merge($alreadyProcessed, $pgEmpIds);
                 } else {
-                    $allEmpIds = Employee::pluck('id')->toArray();
-                    $alreadyProcessed = array_merge($alreadyProcessed, $allEmpIds);
+                    $genEmpIds = Employee::where('status', true)->whereNotNull('pay_group_id')->whereNotNull('salary_structure_id')->pluck('id')->toArray();
+                    $alreadyProcessed = array_merge($alreadyProcessed, $genEmpIds);
                 }
             }
             $alreadyProcessed = array_unique($alreadyProcessed);

@@ -26,6 +26,7 @@ use App\Domains\HRMS\Controllers\EmployeeExitController;
 use App\Domains\HRMS\Controllers\ExitClearancePolicyController;
 use App\Domains\HRMS\Controllers\OrgStructureController;
 use App\Domains\HRMS\Controllers\HrmsDashboardController;
+use App\Domains\HRMS\Controllers\PipController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -336,6 +337,7 @@ Route::prefix('hrms')
             Route::post('/bulk-upload', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkUpload'])->name('documents.bulk-upload');
         });
 
+
         Route::view('/track-status', 'modules.hrms.track-status')->name('track-status');
 
         // Holiday Calendar Management
@@ -449,5 +451,22 @@ Route::prefix('hrms')
             Route::get('/{exit}/relieving-letter', [EmployeeExitController::class, 'viewRelievingLetter'])->name('exits.relieving-letter.view');
             Route::get('/{exit}/experience-certificate', [EmployeeExitController::class, 'viewExperienceCertificate'])->name('exits.experience-certificate.view');
             Route::get('/{exit}/noc-certificate', [EmployeeExitController::class, 'viewNocCertificate'])->name('exits.noc-certificate.view');
+        });
+
+        // PIP (Performance Improvement Plan) Module
+        Route::prefix('pip')->name('pip.')->group(function (): void {
+            Route::get('/', [PipController::class, 'index'])->name('index');
+            Route::post('/store', [PipController::class, 'store'])->name('store');
+            Route::get('/{pip}', [PipController::class, 'show'])->name('show');
+            Route::post('/{pip}/checkin/store', [PipController::class, 'storeCheckin'])->name('checkin.store');
+            Route::post('/{pip}/objective/store', [PipController::class, 'storeObjective'])->name('objective.store');
+            Route::post('/{pip}/objective/{objective}/status', [PipController::class, 'updateObjectiveStatus'])->name('objective.status');
+            Route::post('/{pip}/evaluate', [PipController::class, 'evaluate'])->name('evaluate');
+
+            // Masters (Categories & Templates)
+            Route::post('/category/store', [PipController::class, 'storeCategory'])->name('category.store');
+            Route::delete('/category/{category}', [PipController::class, 'destroyCategory'])->name('category.destroy');
+            Route::post('/template/store', [PipController::class, 'storeTemplate'])->name('template.store');
+            Route::delete('/template/{template}', [PipController::class, 'destroyTemplate'])->name('template.destroy');
         });
     });

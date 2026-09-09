@@ -165,10 +165,15 @@ class EmployeeApiController extends Controller
         return $this->sendSuccess($employees, 'Employees list retrieved successfully');
     }
 
-    public function showEmployee(Employee $employee): JsonResponse
+    public function showEmployee(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
 
         // Dynamically resolve Salary Structure slab based on current_salary and pay_group_id
@@ -293,10 +298,15 @@ class EmployeeApiController extends Controller
         }
     }
 
-    public function updateEmployee(Request $request, Employee $employee): JsonResponse
+    public function updateEmployee(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
 
         try {
@@ -348,25 +358,35 @@ class EmployeeApiController extends Controller
         }
     }
 
-    public function destroyEmployee(Employee $employee): JsonResponse
+    public function destroyEmployee(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$id}' not found.", 404);
+        }
+
         $employee->delete();
 
-        return $this->sendSuccess(null, 'Employee deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Employee deleted successfully');
     }
 
     // ==========================================
     // 2. ADHOC SALARY COMPONENTS APIs
     // ==========================================
 
-    public function storeAdhocComponent(Request $request, Employee $employee): JsonResponse
+    public function storeAdhocComponent(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -384,25 +404,35 @@ class EmployeeApiController extends Controller
         return $this->sendSuccess($adhoc->load('component'), 'Ad-hoc salary component added successfully', 201);
     }
 
-    public function destroyAdhocComponent(EmployeeAdhocComponent $adhocComponent): JsonResponse
+    public function destroyAdhocComponent(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $adhocComponent = EmployeeAdhocComponent::find($id);
+        if (!$adhocComponent) {
+            return $this->sendError("Ad-hoc salary component with ID '{$id}' not found.", 404);
+        }
+
         $adhocComponent->delete();
 
-        return $this->sendSuccess(null, 'Ad-hoc salary component deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Ad-hoc salary component deleted successfully');
     }
 
     // ==========================================
     // 3. ATTENDANCE PENALTIES APIs
     // ==========================================
 
-    public function storePenalty(Request $request, Employee $employee): JsonResponse
+    public function storePenalty(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -421,25 +451,35 @@ class EmployeeApiController extends Controller
         return $this->sendSuccess($penalty, 'Attendance penalty instance logged successfully', 201);
     }
 
-    public function destroyPenalty(EmployeePenalty $penalty): JsonResponse
+    public function destroyPenalty(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $penalty = EmployeePenalty::find($id);
+        if (!$penalty) {
+            return $this->sendError("Penalty instance with ID '{$id}' not found.", 404);
+        }
+
         $penalty->delete();
 
-        return $this->sendSuccess(null, 'Attendance penalty instance deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Attendance penalty instance deleted successfully');
     }
 
     // ==========================================
     // 4. EMPLOYMENT HISTORIES APIs
     // ==========================================
 
-    public function storeEmploymentHistory(Request $request, Employee $employee): JsonResponse
+    public function storeEmploymentHistory(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -455,25 +495,35 @@ class EmployeeApiController extends Controller
         return $this->sendSuccess($history, 'Employment history record added successfully', 201);
     }
 
-    public function destroyEmploymentHistory(Employee $employee, EmployeeEmploymentHistory $history): JsonResponse
+    public function destroyEmploymentHistory(mixed $employeeId, mixed $historyId): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $history = EmployeeEmploymentHistory::find($historyId);
+        if (!$history) {
+            return $this->sendError("Employment history record with ID '{$historyId}' not found.", 404);
+        }
+
         $history->delete();
 
-        return $this->sendSuccess(null, 'Employment history record deleted successfully');
+        return $this->sendSuccess(['id' => (int)$historyId], 'Employment history record deleted successfully');
     }
 
     // ==========================================
     // 4b. EMPLOYEE DOCUMENTS APIs
     // ==========================================
 
-    public function uploadDocument(Request $request, Employee $employee): JsonResponse
+    public function uploadDocument(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
 
         $request->validate([
@@ -483,11 +533,14 @@ class EmployeeApiController extends Controller
             'expiry_date'        => 'nullable|date',
         ]);
 
-        $tenantId = auth()->user()->tenant_id;
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $file = $request->file('file');
 
         if ($request->filled('document_id')) {
-            $document = \App\Domains\HRMS\Models\Document::findOrFail($request->integer('document_id'));
+            $document = \App\Domains\HRMS\Models\Document::find($request->integer('document_id'));
+            if (!$document) {
+                return $this->sendError("Document with ID '{$request->document_id}' not found.", 404);
+            }
             
             $expiryApplicable = $document->has_expiry;
             if ($document->document_master_id) {
@@ -524,7 +577,10 @@ class EmployeeApiController extends Controller
                 'requested_by_id' => auth()->id(),
             ]);
         } else {
-            $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::findOrFail($request->integer('document_master_id'));
+            $documentMaster = \App\Domains\HRMS\Models\DocumentMaster::find($request->integer('document_master_id'));
+            if (!$documentMaster) {
+                return $this->sendError("Document template with ID '{$request->document_master_id}' not found.", 404);
+            }
             
             if ($documentMaster->expiry_applicable && !$request->filled('expiry_date')) {
                 return $this->sendError('Expiry date is required for this document template.', 422, [
@@ -558,10 +614,15 @@ class EmployeeApiController extends Controller
         return $this->sendSuccess($document, 'Document uploaded successfully', 201);
     }
 
-    public function destroyDocument(Document $document): JsonResponse
+    public function destroyDocument(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $document = Document::find($id);
+        if (!$document) {
+            return $this->sendError("Document record with ID '{$id}' not found.", 404);
         }
 
         if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
@@ -570,13 +631,18 @@ class EmployeeApiController extends Controller
 
         $document->delete();
 
-        return $this->sendSuccess(null, 'Document record deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Document record deleted successfully');
     }
 
-    public function approveDocument(Document $document): JsonResponse
+    public function approveDocument(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $document = Document::find($id);
+        if (!$document) {
+            return $this->sendError("Document record with ID '{$id}' not found.", 404);
         }
 
         $document->update([
@@ -586,10 +652,15 @@ class EmployeeApiController extends Controller
         return $this->sendSuccess($document, 'Document approved successfully');
     }
 
-    public function rejectDocument(Document $document): JsonResponse
+    public function rejectDocument(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $document = Document::find($id);
+        if (!$document) {
+            return $this->sendError("Document record with ID '{$id}' not found.", 404);
         }
 
         $document->update([
@@ -599,10 +670,15 @@ class EmployeeApiController extends Controller
         return $this->sendSuccess($document, 'Document rejected successfully');
     }
 
-    public function updateDocumentStatus(Request $request, Document $document): JsonResponse
+    public function updateDocumentStatus(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $document = Document::find($id);
+        if (!$document) {
+            return $this->sendError("Document record with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -872,13 +948,40 @@ class EmployeeApiController extends Controller
 
     private function normalizeHierarchy(array $validated): array
     {
-        $company      = Company::findOrFail($validated['company_id']);
-        $businessUnit = !empty($validated['business_unit_id']) ? BusinessUnit::findOrFail($validated['business_unit_id']) : null;
-        $branch       = !empty($validated['branch_id']) ? Branch::findOrFail($validated['branch_id']) : null;
-        $department   = Department::findOrFail($validated['department_id']);
-        $designation  = Designation::findOrFail($validated['designation_id']);
-        $payGroup     = !empty($validated['pay_group_id']) ? PayGroup::findOrFail($validated['pay_group_id']) : null;
-        $leavePlan    = !empty($validated['leave_plan_id']) ? LeavePlan::findOrFail($validated['leave_plan_id']) : null;
+        $company      = Company::find($validated['company_id']);
+        if (!$company) {
+            $this->failHierarchy('company_id', 'The selected company does not exist.');
+        }
+
+        $businessUnit = !empty($validated['business_unit_id']) ? BusinessUnit::find($validated['business_unit_id']) : null;
+        if (!empty($validated['business_unit_id']) && !$businessUnit) {
+            $this->failHierarchy('business_unit_id', 'The selected business unit does not exist.');
+        }
+
+        $branch       = !empty($validated['branch_id']) ? Branch::find($validated['branch_id']) : null;
+        if (!empty($validated['branch_id']) && !$branch) {
+            $this->failHierarchy('branch_id', 'The selected branch does not exist.');
+        }
+
+        $department   = Department::find($validated['department_id']);
+        if (!$department) {
+            $this->failHierarchy('department_id', 'The selected department does not exist.');
+        }
+
+        $designation  = Designation::find($validated['designation_id']);
+        if (!$designation) {
+            $this->failHierarchy('designation_id', 'The selected designation does not exist.');
+        }
+
+        $payGroup     = !empty($validated['pay_group_id']) ? PayGroup::find($validated['pay_group_id']) : null;
+        if (!empty($validated['pay_group_id']) && !$payGroup) {
+            $this->failHierarchy('pay_group_id', 'The selected pay group does not exist.');
+        }
+
+        $leavePlan    = !empty($validated['leave_plan_id']) ? LeavePlan::find($validated['leave_plan_id']) : null;
+        if (!empty($validated['leave_plan_id']) && !$leavePlan) {
+            $this->failHierarchy('leave_plan_id', 'The selected leave plan does not exist.');
+        }
 
         $departmentCompanyId = $this->resolveDepartmentCompanyId($department);
 
@@ -940,10 +1043,15 @@ class EmployeeApiController extends Controller
         return $validated;
     }
 
-    public function updateStatus(Request $request, Employee $employee): JsonResponse
+    public function updateStatus(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([

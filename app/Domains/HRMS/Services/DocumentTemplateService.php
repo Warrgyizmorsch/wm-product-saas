@@ -132,7 +132,8 @@ class DocumentTemplateService
 
         // Wrap with CSS styling container
         $customCss = $template->css_styles ?? '';
-        $wrapper = '<div class="generated-doc-container" style="font-family: Arial, Helvetica, sans-serif; color: #1e293b; line-height: 1.6; padding: 30px; background: #ffffff;">';
+        $wrapper = '<div class="generated-doc-container" style="font-family: Arial, Helvetica, sans-serif; color: #1e293b; line-height: 1.5; padding: 30px; background: #ffffff;">';
+        $wrapper .= '<style>.generated-doc-container p { margin-top: 0; margin-bottom: 0.35em; line-height: 1.5; } .generated-doc-container { line-height: 1.5; font-family: Arial, Helvetica, sans-serif; color: #1e293b; }</style>';
         if ($customCss) {
             $wrapper .= '<style>' . $customCss . '</style>';
         }

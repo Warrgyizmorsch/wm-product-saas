@@ -220,6 +220,6 @@ class ShiftChangeRequestApiController extends Controller
 
         $shiftChangeRequest->delete();
 
-        return $this->sendSuccess(null, 'Shift Change request deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Shift Change request deleted successfully.');
     }
 }

@@ -1042,6 +1042,11 @@
                     <i class="feather-log-out"></i> Exit & NOC
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {{ $activeTabName === 'pip' ? 'active' : '' }}" id="pip-tab" data-bs-toggle="tab" data-bs-target="#pip-pane" type="button" role="tab" aria-controls="pip-pane" aria-selected="{{ $activeTabName === 'pip' ? 'true' : 'false' }}">
+                    <i class="feather-trending-up"></i> PIP Plans
+                </button>
+            </li>
         </ul>
 
         <!-- Tab Content -->
@@ -1058,6 +1063,7 @@
             @include('modules.hrms.employees.tabs.attendance')
             @include('modules.hrms.employees.tabs.probation')
             @include('modules.hrms.employees.tabs.exit-clearance')
+            @include('modules.hrms.employees.tabs.pip')
         </div>
     </div>
 
