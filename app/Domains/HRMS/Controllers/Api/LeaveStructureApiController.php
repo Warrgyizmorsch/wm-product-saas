@@ -12,6 +12,7 @@ use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\LeaveEncashment;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Carbon\Carbon;
 
 class LeaveStructureApiController extends Controller
 {
@@ -55,10 +56,10 @@ class LeaveStructureApiController extends Controller
 
             if ($authUser && $authPass) {
                 if (!auth()->attempt(['email' => $authUser, 'password' => $authPass])) {
-                    return $this->sendError('Invalid HTTP Basic Auth username or password.', 401);
+                    return $this->sendError('Invalid HTTP Basic Auth credentials.', 401);
                 }
             } else {
-                return $this->sendError('Unauthenticated access. Please log in or provide HTTP Basic Auth credentials.', 401);
+                return $this->sendError('Unauthenticated access. Please provide valid credentials.', 401);
             }
         }
 
@@ -66,8 +67,71 @@ class LeaveStructureApiController extends Controller
     }
 
     /**
+     * Transforms a LeavePlan model into a concise, essential-only array.
+     */
+    private function transformLeavePlan(LeavePlan $plan, bool $detailed = false): array
+    {
+        $data = [
+            'id'              => $plan->id,
+            'name'            => $plan->name,
+            'company_id'      => $plan->company_id,
+            'company_name'    => $plan->company?->company_name ?? $plan->company?->name,
+            'effective_from'  => $plan->effective_from ? Carbon::parse($plan->effective_from)->format('Y-m-d') : null,
+            'description'     => $plan->description,
+            'status'          => (bool)$plan->status,
+            'last_renewed_at' => $plan->last_renewed_at ? Carbon::parse($plan->last_renewed_at)->format('Y-m-d') : null,
+        ];
+
+        if ($plan->relationLoaded('types')) {
+            $data['types_count'] = $plan->types->count();
+            if ($detailed) {
+                $data['types'] = $plan->types->map(fn($t) => $this->transformLeaveType($t))->values();
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Transforms a LeaveType model into a concise, essential-only array.
+     */
+    private function transformLeaveType(LeaveType $type): array
+    {
+        return [
+            'id'            => $type->id,
+            'leave_plan_id' => $type->leave_plan_id,
+            'plan_name'     => $type->plan?->name,
+            'name'          => $type->name,
+            'code'          => $type->code,
+            'type'          => $type->type,
+            'color'         => $type->color ?? '#3b82f6',
+            'quota'         => floatval($type->quota),
+            'description'   => $type->description,
+            'rules'         => $type->rules ?? [],
+            'status'        => (bool)$type->status,
+        ];
+    }
+
+    /**
+     * Formats a LengthAwarePaginator into a clean, essential structure.
+     */
+    private function formatPaginatedData(\Illuminate\Contracts\Pagination\LengthAwarePaginator $paginator, callable $transformItem): array
+    {
+        return [
+            'items' => collect($paginator->items())->map($transformItem)->values(),
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+                'last_page'    => $paginator->lastPage(),
+                'has_more'     => $paginator->hasMorePages(),
+            ],
+        ];
+    }
+
+    /**
      * GET /api/hrms/leave-structure/summary
-     * Get overall summary metrics & leave plan lists.
+     * Concise summary metrics & active leave plan overview.
      */
     public function summary(Request $request): JsonResponse
     {
@@ -79,19 +143,28 @@ class LeaveStructureApiController extends Controller
         $selectedPlanId = $request->query('plan_id');
         $selectedPlan = $selectedPlanId ? $leavePlans->firstWhere('id', $selectedPlanId) : $leavePlans->first();
 
+        $companies = Company::orderBy('company_name')->get()->map(fn($c) => [
+            'id'   => $c->id,
+            'name' => $c->company_name ?? $c->name,
+        ])->values();
+
         return $this->sendSuccess([
-            'plans_count'     => LeavePlan::count(),
-            'types_count'     => LeaveType::count(),
-            'companies'       => Company::orderBy('company_name')->get(),
-            'leave_plans'     => $leavePlans,
-            'selected_plan'   => $selectedPlan,
-        ], 'Leave structure summary loaded successfully');
+            'plans_count'   => LeavePlan::count(),
+            'types_count'   => LeaveType::count(),
+            'companies'     => $companies,
+            'leave_plans'   => $leavePlans->map(fn($p) => $this->transformLeavePlan($p, false))->values(),
+            'selected_plan' => $selectedPlan ? $this->transformLeavePlan($selectedPlan, true) : null,
+        ], 'Leave structure summary loaded successfully.');
     }
 
     // ==========================================
     // 1. LEAVE PLANS API
     // ==========================================
 
+    /**
+     * GET /api/hrms/leave-structure/plans
+     * List all leave plans cleanly.
+     */
     public function indexPlans(Request $request): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
@@ -112,19 +185,33 @@ class LeaveStructureApiController extends Controller
         }
 
         $plans = $query->orderBy('name', 'asc')->get();
+        $formatted = $plans->map(fn($p) => $this->transformLeavePlan($p, false))->values();
 
-        return $this->sendSuccess($plans, 'Leave plans retrieved successfully');
+        return $this->sendSuccess($formatted, 'Leave plans retrieved successfully.');
     }
 
-    public function showPlan(LeavePlan $leavePlan): JsonResponse
+    /**
+     * GET /api/hrms/leave-structure/plans/{id}
+     * Get single leave plan with its detailed types.
+     */
+    public function showPlan(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($leavePlan->load(['company', 'types']), 'Leave plan details loaded');
+        $leavePlan = LeavePlan::with(['company', 'types'])->find($id);
+        if (!$leavePlan) {
+            return $this->sendError("Leave plan with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($this->transformLeavePlan($leavePlan, true), 'Leave plan details loaded successfully.');
     }
 
+    /**
+     * POST /api/hrms/leave-structure/plans
+     * Create a new leave plan.
+     */
     public function storePlan(Request $request): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
@@ -132,68 +219,90 @@ class LeaveStructureApiController extends Controller
         }
 
         $validated = $request->validate([
-            'name'           => 'required|max:255',
+            'name'           => 'required|string|max:255',
             'company_id'     => 'nullable|integer|exists:companies,id',
             'effective_from' => 'required|date',
-            'description'    => 'nullable',
+            'description'    => 'nullable|string',
             'status'         => 'required',
         ]);
 
-        $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
+        $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
 
         $newPlan = LeavePlan::create([
-            'company_id'     => $validated['company_id'] ?: (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+            'company_id'     => $validated['company_id'] ?: (Company::first()?->id ?? 1),
             'name'           => $validated['name'],
             'effective_from' => $validated['effective_from'],
             'description'    => $validated['description'] ?? null,
             'status'         => $status,
         ]);
 
-        return $this->sendSuccess($newPlan, 'Leave plan created successfully', 201);
+        return $this->sendSuccess($this->transformLeavePlan($newPlan->load(['company', 'types']), true), 'Leave plan created successfully.', 201);
     }
 
-    public function updatePlan(Request $request, LeavePlan $leavePlan): JsonResponse
+    /**
+     * PUT /api/hrms/leave-structure/plans/{id}
+     * Update an existing leave plan.
+     */
+    public function updatePlan(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $leavePlan = LeavePlan::find($id);
+        if (!$leavePlan) {
+            return $this->sendError("Leave plan with ID '{$id}' not found.", 404);
+        }
+
         $validated = $request->validate([
-            'name'           => 'required|max:255',
+            'name'           => 'required|string|max:255',
             'company_id'     => 'nullable|integer|exists:companies,id',
             'effective_from' => 'required|date',
-            'description'    => 'nullable',
+            'description'    => 'nullable|string',
             'status'         => 'required',
         ]);
 
-        $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
+        $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
 
         $leavePlan->update([
-            'company_id'     => $validated['company_id'] ?: $leavePlan->company_id ?: (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+            'company_id'     => $validated['company_id'] ?: $leavePlan->company_id ?: (Company::first()?->id ?? 1),
             'name'           => $validated['name'],
             'effective_from' => $validated['effective_from'],
             'description'    => $validated['description'] ?? null,
             'status'         => $status,
         ]);
 
-        return $this->sendSuccess($leavePlan, 'Leave plan updated successfully');
+        return $this->sendSuccess($this->transformLeavePlan($leavePlan->fresh(['company', 'types']), true), 'Leave plan updated successfully.');
     }
 
-    public function destroyPlan(LeavePlan $leavePlan): JsonResponse
+    /**
+     * DELETE /api/hrms/leave-structure/plans/{id}
+     * Delete a leave plan.
+     */
+    public function destroyPlan(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $leavePlan = LeavePlan::find($id);
+        if (!$leavePlan) {
+            return $this->sendError("Leave plan with ID '{$id}' not found.", 404);
         }
 
         $leavePlan->delete();
 
-        return $this->sendSuccess(null, 'Leave plan deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Leave plan deleted successfully.');
     }
 
     // ==========================================
     // 2. LEAVE TYPES & POLICIES API
     // ==========================================
 
+    /**
+     * GET /api/hrms/leave-structure/types
+     * List paginated leave types.
+     */
     public function indexTypes(Request $request): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
@@ -228,20 +337,36 @@ class LeaveStructureApiController extends Controller
             default: $query->orderBy('name', 'asc'); break;
         }
 
-        $leaveTypes = $query->paginate($request->integer('per_page', 10));
+        $perPage = min($request->integer('per_page', 10), 100);
+        $leaveTypes = $query->paginate($perPage);
 
-        return $this->sendSuccess($leaveTypes, 'Leave types retrieved successfully');
+        $formatted = $this->formatPaginatedData($leaveTypes, fn($t) => $this->transformLeaveType($t));
+
+        return $this->sendSuccess($formatted, 'Leave types retrieved successfully.');
     }
 
-    public function showType(LeaveType $leaveType): JsonResponse
+    /**
+     * GET /api/hrms/leave-structure/types/{id}
+     * Get single leave type details.
+     */
+    public function showType(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($leaveType->load(['plan']), 'Leave type details loaded');
+        $leaveType = LeaveType::with(['plan'])->find($id);
+        if (!$leaveType) {
+            return $this->sendError("Leave type with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($this->transformLeaveType($leaveType), 'Leave type details loaded successfully.');
     }
 
+    /**
+     * POST /api/hrms/leave-structure/types
+     * Create a new leave type.
+     */
     public function storeType(Request $request): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
@@ -250,16 +375,16 @@ class LeaveStructureApiController extends Controller
 
         $validated = $request->validate([
             'leave_plan_id' => 'required|integer|exists:leave_plans,id',
-            'name'          => 'required|max:255',
-            'code'          => 'required|max:50',
+            'name'          => 'required|string|max:255',
+            'code'          => 'required|string|max:50',
             'type'          => 'required|in:paid,unpaid',
             'color'         => 'nullable|string|max:20',
             'quota'         => 'required|numeric|min:0',
-            'description'   => 'nullable',
+            'description'   => 'nullable|string',
             'status'        => 'required',
         ]);
 
-        $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
+        $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
 
         $leaveType = LeaveType::create([
             'leave_plan_id' => $validated['leave_plan_id'],
@@ -272,27 +397,36 @@ class LeaveStructureApiController extends Controller
             'status'        => $status,
         ]);
 
-        return $this->sendSuccess($leaveType, 'Leave type created successfully', 201);
+        return $this->sendSuccess($this->transformLeaveType($leaveType->load(['plan'])), 'Leave type created successfully.', 201);
     }
 
-    public function updateType(Request $request, LeaveType $leaveType): JsonResponse
+    /**
+     * PUT /api/hrms/leave-structure/types/{id}
+     * Update an existing leave type.
+     */
+    public function updateType(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $leaveType = LeaveType::find($id);
+        if (!$leaveType) {
+            return $this->sendError("Leave type with ID '{$id}' not found.", 404);
+        }
+
         $validated = $request->validate([
             'leave_plan_id' => 'required|integer|exists:leave_plans,id',
-            'name'          => 'required|max:255',
-            'code'          => 'required|max:50',
+            'name'          => 'required|string|max:255',
+            'code'          => 'required|string|max:50',
             'type'          => 'required|in:paid,unpaid',
             'color'         => 'nullable|string|max:20',
             'quota'         => 'required|numeric|min:0',
-            'description'   => 'nullable',
+            'description'   => 'nullable|string',
             'status'        => 'required',
         ]);
 
-        $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
+        $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
 
         $leaveType->update([
             'leave_plan_id' => $validated['leave_plan_id'],
@@ -305,13 +439,22 @@ class LeaveStructureApiController extends Controller
             'status'        => $status,
         ]);
 
-        return $this->sendSuccess($leaveType, 'Leave type updated successfully');
+        return $this->sendSuccess($this->transformLeaveType($leaveType->fresh(['plan'])), 'Leave type updated successfully.');
     }
 
-    public function updateRules(Request $request, LeaveType $leaveType): JsonResponse
+    /**
+     * PUT /api/hrms/leave-structure/types/{id}/rules
+     * Update policy rules for a leave type.
+     */
+    public function updateRules(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $leaveType = LeaveType::find($id);
+        if (!$leaveType) {
+            return $this->sendError("Leave type with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -322,24 +465,37 @@ class LeaveStructureApiController extends Controller
             'rules' => $validated['rules']
         ]);
 
-        return $this->sendSuccess($leaveType, 'Leave policy rules updated successfully');
+        return $this->sendSuccess($this->transformLeaveType($leaveType->fresh(['plan'])), 'Leave policy rules updated successfully.');
     }
 
-    public function destroyType(LeaveType $leaveType): JsonResponse
+    /**
+     * DELETE /api/hrms/leave-structure/types/{id}
+     * Delete a leave type.
+     */
+    public function destroyType(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $leaveType = LeaveType::find($id);
+        if (!$leaveType) {
+            return $this->sendError("Leave type with ID '{$id}' not found.", 404);
+        }
+
         $leaveType->delete();
 
-        return $this->sendSuccess(null, 'Leave type deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Leave type deleted successfully.');
     }
 
     // ==========================================
     // 3. RENEWAL & PLAN TRANSITION API
     // ==========================================
 
+    /**
+     * POST /api/hrms/leave-structure/plans/renew
+     * Year-end renewal of leave balances for assigned employees.
+     */
     public function renewPlanBalances(Request $request): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
@@ -352,9 +508,11 @@ class LeaveStructureApiController extends Controller
         ]);
 
         try {
-            $leavePlan = LeavePlan::findOrFail($validated['leave_plan_id']);
+            $leavePlan = LeavePlan::find($validated['leave_plan_id']);
+            if (!$leavePlan) {
+                return $this->sendError("Leave plan with ID '{$validated['leave_plan_id']}' not found.", 404);
+            }
 
-            // Update rules persistently in database if yearend_rules are provided
             if ($request->filled('yearend_rules')) {
                 foreach ($request->yearend_rules as $typeId => $ruleSet) {
                     $ltype = LeaveType::where('leave_plan_id', $leavePlan->id)->find($typeId);
@@ -436,12 +594,16 @@ class LeaveStructureApiController extends Controller
                 'status'          => true,
             ]);
 
-            return $this->sendSuccess($leavePlan->load('types'), 'Leave plan balances renewed successfully for all assigned employees');
+            return $this->sendSuccess($this->transformLeavePlan($leavePlan->fresh(['company', 'types']), true), 'Leave plan balances renewed successfully for all assigned employees.');
         } catch (\Exception $e) {
             return $this->sendError('Failed to renew leave plan balances: ' . $e->getMessage(), 500);
         }
     }
 
+    /**
+     * POST /api/hrms/leave-structure/plans/transition
+     * Transition employees to a new leave plan.
+     */
     public function processTransition(Request $request): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
@@ -449,7 +611,7 @@ class LeaveStructureApiController extends Controller
         }
 
         $validated = $request->validate([
-            'employee_ids'            => 'required|array',
+            'employee_ids'            => 'required|array|min:1',
             'employee_ids.*'          => 'exists:employees,id',
             'new_leave_plan_id'       => 'required|exists:leave_plans,id',
             'leave_transition_action' => 'required|in:transfer,prorate',
@@ -500,8 +662,8 @@ class LeaveStructureApiController extends Controller
 
             return $this->sendSuccess([
                 'transitioned_count' => $count,
-                'new_leave_plan_id'  => $newPlanId
-            ], "Successfully transitioned {$count} employee(s) to the new leave plan");
+                'new_leave_plan_id'  => (int)$newPlanId
+            ], "Successfully transitioned {$count} employee(s) to the new leave plan.");
         } catch (\Exception $e) {
             return $this->sendError('Leave plan transition failed: ' . $e->getMessage(), 500);
         }

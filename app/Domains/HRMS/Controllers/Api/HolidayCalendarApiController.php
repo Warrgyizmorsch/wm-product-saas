@@ -74,7 +74,7 @@ class HolidayCalendarApiController extends Controller
         }
 
         $data = $this->holidayCalendarRepository->getIndexData($request->all());
-        return $this->sendSuccess($data);
+        return $this->sendSuccess($data['holidays'] ?? $data, 'Holidays retrieved successfully.');
     }
 
     /**
@@ -87,13 +87,13 @@ class HolidayCalendarApiController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'holiday_date' => 'required|date',
-            'description' => 'nullable|string|max:1000',
-            'company_id' => 'nullable|exists:companies,id',
+            'name'             => 'required|string|max:255',
+            'holiday_date'     => 'required|date',
+            'description'      => 'nullable|string|max:1000',
+            'company_id'       => 'nullable|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
-            'branch_id' => 'nullable|exists:branches,id',
-            'status' => 'nullable|boolean',
+            'branch_id'        => 'nullable|exists:branches,id',
+            'status'           => 'nullable|boolean',
         ]);
 
         $validated['status'] = $request->has('status') ? (bool) $request->status : true;
@@ -103,34 +103,44 @@ class HolidayCalendarApiController extends Controller
     }
 
     /**
-     * GET /api/hrms/holidays/{holiday}
+     * GET /api/hrms/holidays/{id}
      */
-    public function show(HolidayCalendar $holiday): JsonResponse
+    public function show(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($holiday->load(['company', 'businessUnit', 'branch']));
+        $holiday = HolidayCalendar::with(['company', 'businessUnit', 'branch'])->find($id);
+        if (!$holiday) {
+            return $this->sendError("Holiday record with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($holiday, 'Holiday details loaded successfully.');
     }
 
     /**
-     * PUT /api/hrms/holidays/{holiday}
+     * PUT /api/hrms/holidays/{id}
      */
-    public function update(Request $request, HolidayCalendar $holiday): JsonResponse
+    public function update(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $holiday = HolidayCalendar::find($id);
+        if (!$holiday) {
+            return $this->sendError("Holiday record with ID '{$id}' not found.", 404);
+        }
+
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'holiday_date' => 'required|date',
-            'description' => 'nullable|string|max:1000',
-            'company_id' => 'nullable|exists:companies,id',
+            'name'             => 'required|string|max:255',
+            'holiday_date'     => 'required|date',
+            'description'      => 'nullable|string|max:1000',
+            'company_id'       => 'nullable|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
-            'branch_id' => 'nullable|exists:branches,id',
-            'status' => 'nullable|boolean',
+            'branch_id'        => 'nullable|exists:branches,id',
+            'status'           => 'nullable|boolean',
         ]);
 
         $validated['status'] = $request->has('status') ? (bool) $request->status : false;
@@ -140,15 +150,20 @@ class HolidayCalendarApiController extends Controller
     }
 
     /**
-     * DELETE /api/hrms/holidays/{holiday}
+     * DELETE /api/hrms/holidays/{id}
      */
-    public function destroy(HolidayCalendar $holiday): JsonResponse
+    public function destroy(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $holiday = HolidayCalendar::find($id);
+        if (!$holiday) {
+            return $this->sendError("Holiday record with ID '{$id}' not found.", 404);
+        }
+
         $this->holidayCalendarRepository->deleteHoliday($holiday);
-        return $this->sendSuccess(null, 'Holiday deleted successfully.');
+        return $this->sendSuccess(['id' => (int)$id], 'Holiday deleted successfully.');
     }
 }

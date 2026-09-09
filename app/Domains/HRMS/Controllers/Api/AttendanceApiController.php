@@ -618,7 +618,7 @@ class AttendanceApiController extends Controller
             $attendance->delete();
         }
 
-        return $this->sendSuccess(null, 'Attendance logs deleted successfully.');
+        return $this->sendSuccess(['date' => $date], 'Attendance logs deleted successfully.');
     }
 
     /**

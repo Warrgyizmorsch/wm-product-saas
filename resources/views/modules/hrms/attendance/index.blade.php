@@ -137,14 +137,14 @@
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Month</label>
                             <x-ui.odoo-form-ui type="select" name="month" select2-selector="default">
-                                <option value="">All Months</option>
+                                <option value="all" @selected(($filters['month'] ?? '') === 'all')>All Months</option>
                                 @for($i = 0; $i > -12; $i--)
                                     @php
                                         $m = now()->addMonths($i);
                                         $val = $m->format('Y-m');
                                         $label = $m->format('F Y');
                                     @endphp
-                                    <option value="{{ $val }}" @selected(request('month', $filters['month'] ?? '') === $val)>{{ $label }}</option>
+                                    <option value="{{ $val }}" @selected(($filters['month'] ?? '') === $val)>{{ $label }}</option>
                                 @endfor
                             </x-ui.odoo-form-ui>
                         </div>
@@ -602,7 +602,9 @@
         bsOffcanvas.show();
         
         // Fetch logs from controller
-        const monthVal = document.querySelector('input[name="month"]')?.value || '';
+        const monthSelect = document.querySelector('select[name="month"]');
+        const urlParams = new URLSearchParams(window.location.search);
+        const monthVal = monthSelect ? monthSelect.value : (urlParams.get('month') || '');
         fetch(`/hrms/attendance/employee/${employeeId}?month=${monthVal}`)
             .then(response => {
                 if (!response.ok) {
@@ -1290,15 +1292,20 @@
             });
         }
 
-        const rejectModal = document.getElementById('rejectCorrectionModal');
-        if (rejectModal) {
-            document.body.appendChild(rejectModal);
-        }
+        ['attendanceImportModal', 'rejectCorrectionModal', 'approveCorrectionModal'].forEach(function(modalId) {
+            const mEl = document.getElementById(modalId);
+            if (mEl) {
+                document.body.appendChild(mEl);
+            }
+        });
 
-        const approveModal = document.getElementById('approveCorrectionModal');
-        if (approveModal) {
-            document.body.appendChild(approveModal);
-        }
+        // Ensure clean backdrop removal on modal hide to prevent blurry screen issue
+        $(document).on('hidden.bs.modal', '.modal', function () {
+            if ($('.modal.show').length === 0) {
+                $('.modal-backdrop').remove();
+                $('body').removeClass('modal-open').css('overflow', '');
+            }
+        });
     });
 </script>
 
@@ -1315,11 +1322,11 @@
             <form action="{{ route('hrms.attendance.import') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <div class="modal-body px-4 py-3">
-                    <p class="text-muted fs-12 mb-3">Upload your attendance CSV file matching our standard template. All check-in/out times will be processed and statuses auto-detected if set to "auto".</p>
+                    <p class="text-muted fs-12 mb-3">Upload your attendance Excel (.xlsx, .xls) or CSV file matching our standard template. All check-in/out times will be processed and statuses auto-detected if set to "auto".</p>
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-11 text-uppercase mb-1">Select CSV File</label>
-                        <input type="file" name="file" class="form-control fs-12" accept=".csv,.txt" required>
+                        <label class="form-label fw-bold text-dark fs-11 text-uppercase mb-1">Select File (.xlsx, .xls, .csv, .txt)</label>
+                        <input type="file" name="file" class="form-control fs-12" accept=".csv,.txt,.xlsx,.xls" required>
                     </div>
 
                     <div class="bg-light border rounded-3 p-3">
@@ -1327,7 +1334,7 @@
                         <ul class="text-muted fs-11 ps-3 mb-0" style="line-height: 1.5;">
                             <li>Columns required: <code>employee_code</code>, <code>date</code></li>
                             <li>Columns optional: <code>check_in</code>, <code>check_out</code>, <code>status</code></li>
-                            <li>Status values: <code>auto</code>, <code>present</code>, <code>absent</code>, <code>half_day</code>, <code>on_leave</code>, <code>wfh</code></li>
+                            <li>Status values: <code>auto</code>, <code>present</code>, <code>absent</code>, <code>half_day</code>, <code>on_leave</code>, <code>wfh</code>, <code>weekly_off</code>, <code>holiday</code></li>
                             <li>Set status to <code>auto</code> to auto-calculate penalties, grace shifts, leaves, and WFH logs automatically.</li>
                         </ul>
                     </div>

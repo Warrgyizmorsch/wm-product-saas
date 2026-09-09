@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\LeaveType;
 use App\Domains\HRMS\Models\AttendancePenalty;
+use App\Domains\HRMS\Models\BusinessUnit;
+use App\Domains\HRMS\Models\Branch;
+use App\Domains\HRMS\Models\AttendanceRule;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -51,10 +54,10 @@ class PenalizationPolicyApiController extends Controller
 
             if ($authUser && $authPass) {
                 if (!auth()->attempt(['email' => $authUser, 'password' => $authPass])) {
-                    return $this->sendError('Invalid HTTP Basic Auth username or password.', 401);
+                    return $this->sendError('Invalid HTTP Basic Auth credentials.', 401);
                 }
             } else {
-                return $this->sendError('Unauthenticated access. Please log in or provide HTTP Basic Auth credentials.', 401);
+                return $this->sendError('Unauthenticated access. Please provide valid credentials.', 401);
             }
         }
 
@@ -71,16 +74,34 @@ class PenalizationPolicyApiController extends Controller
             return $authError;
         }
 
-        $companies  = Company::all();
+        $companies = Company::all()->map(fn($c) => [
+            'id'   => $c->id,
+            'name' => $c->company_name ?? $c->name,
+        ])->values();
+
         $leaveTypes = LeaveType::where('status', true)
             ->get()
             ->unique('name')
+            ->map(fn($lt) => [
+                'id'   => $lt->id,
+                'name' => $lt->name,
+                'code' => $lt->code,
+            ])
             ->values();
 
         $rules = AttendancePenalty::all()->keyBy('rule_type');
-        $businessUnits = \App\Domains\HRMS\Models\BusinessUnit::all();
-        $branches = \App\Domains\HRMS\Models\Branch::all();
-        $attendanceRules = \App\Domains\HRMS\Models\AttendanceRule::with(['company', 'businessUnit', 'branch'])->get();
+
+        $businessUnits = BusinessUnit::all()->map(fn($bu) => [
+            'id'   => $bu->id,
+            'name' => $bu->name,
+        ])->values();
+
+        $branches = Branch::all()->map(fn($b) => [
+            'id'   => $b->id,
+            'name' => $b->name,
+        ])->values();
+
+        $attendanceRules = AttendanceRule::with(['company', 'businessUnit', 'branch'])->get();
 
         return $this->sendSuccess([
             'rules'            => $rules,
@@ -89,7 +110,7 @@ class PenalizationPolicyApiController extends Controller
             'business_units'   => $businessUnits,
             'branches'         => $branches,
             'attendance_rules' => $attendanceRules,
-        ], 'Penalization policies loaded successfully');
+        ], 'Penalization policies loaded successfully.');
     }
 
     /**
@@ -112,7 +133,7 @@ class PenalizationPolicyApiController extends Controller
             return $this->sendError("No penalization policy configured for rule type: {$ruleType}", 404);
         }
 
-        return $this->sendSuccess($rule, "Penalization policy rule for {$ruleType} retrieved");
+        return $this->sendSuccess($rule, "Penalization policy rule for {$ruleType} retrieved.");
     }
 
     /**
@@ -234,22 +255,27 @@ class PenalizationPolicyApiController extends Controller
             $updateData
         );
 
-        return $this->sendSuccess($policy, "Penalization policy for {$request->rule_type} saved successfully");
+        return $this->sendSuccess($policy, "Penalization policy for {$request->rule_type} saved successfully.");
     }
 
     /**
-     * DELETE /api/hrms/penalization-policy/rules/{attendancePenalty}
+     * DELETE /api/hrms/penalization-policy/rules/{id}
      * Delete a penalization policy rule configuration.
      */
-    public function destroyRule(AttendancePenalty $attendancePenalty): JsonResponse
+    public function destroyRule(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $attendancePenalty = AttendancePenalty::find($id);
+        if (!$attendancePenalty) {
+            return $this->sendError("Penalization policy rule with ID '{$id}' not found.", 404);
+        }
+
         $attendancePenalty->delete();
 
-        return $this->sendSuccess(null, 'Penalization policy rule deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Penalization policy rule deleted successfully.');
     }
 
     public function queryAttendanceRule(Request $request): JsonResponse
@@ -262,7 +288,7 @@ class PenalizationPolicyApiController extends Controller
         $buId      = $request->query('business_unit_id');
         $branchId  = $request->query('branch_id');
 
-        $rule = \App\Domains\HRMS\Models\AttendanceRule::where('company_id', $companyId)
+        $rule = AttendanceRule::where('company_id', $companyId)
             ->where('business_unit_id', $buId ?: null)
             ->where('branch_id', $branchId ?: null)
             ->first();
@@ -271,7 +297,7 @@ class PenalizationPolicyApiController extends Controller
             return $this->sendError('No attendance rule found for this scope', 404);
         }
 
-        return $this->sendSuccess($rule, 'Attendance rule retrieved successfully');
+        return $this->sendSuccess($rule, 'Attendance rule retrieved successfully.');
     }
 
     public function saveAttendanceRule(Request $request): JsonResponse
@@ -313,18 +339,16 @@ class PenalizationPolicyApiController extends Controller
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
-        // Normalize empty strings to null for integer foreign keys
         $validated['business_unit_id'] = $validated['business_unit_id'] ?: null;
         $validated['branch_id'] = $validated['branch_id'] ?: null;
 
-        // Clean up historical duplicate entries for this exact scope
-        \App\Domains\HRMS\Models\AttendanceRule::where('company_id', $validated['company_id'])
+        AttendanceRule::where('company_id', $validated['company_id'])
             ->where('business_unit_id', $validated['business_unit_id'])
             ->where('branch_id', $validated['branch_id'])
             ->delete();
 
-        $rule = \App\Domains\HRMS\Models\AttendanceRule::create($validated);
+        $rule = AttendanceRule::create($validated);
 
-        return $this->sendSuccess($rule, 'Attendance rules saved successfully');
+        return $this->sendSuccess($rule, 'Attendance rules saved successfully.');
     }
 }

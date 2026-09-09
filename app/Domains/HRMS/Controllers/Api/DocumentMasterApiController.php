@@ -56,7 +56,7 @@ class DocumentMasterApiController extends Controller
                     return $this->sendError('Invalid HTTP Basic Auth credentials.', 401);
                 }
             } else {
-                return $this->sendError('Unauthenticated access.', 401);
+                return $this->sendError('Unauthenticated access. Please provide valid credentials.', 401);
             }
         }
         return null;
@@ -74,7 +74,7 @@ class DocumentMasterApiController extends Controller
 
         $data = $this->documentMasterRepository->getIndexData($request->all());
 
-        return $this->sendSuccess($data, 'Document masters dashboard data loaded');
+        return $this->sendSuccess($data, 'Document masters dashboard data loaded successfully.');
     }
 
     /**
@@ -99,13 +99,18 @@ class DocumentMasterApiController extends Controller
     }
 
     /**
-     * PUT /api/hrms/documents-master/categories/{category}
+     * PUT /api/hrms/documents-master/categories/{id}
      * Update an existing document category.
      */
-    public function updateCategory(Request $request, DocumentCategory $category): JsonResponse
+    public function updateCategory(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $category = DocumentCategory::find($id);
+        if (!$category) {
+            return $this->sendError("Document category with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -120,23 +125,27 @@ class DocumentMasterApiController extends Controller
     }
 
     /**
-     * DELETE /api/hrms/documents-master/categories/{category}
+     * DELETE /api/hrms/documents-master/categories/{id}
      * Delete an existing document category.
      */
-    public function destroyCategory(DocumentCategory $category): JsonResponse
+    public function destroyCategory(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        // Prevent deleting category if it has associated document masters
+        $category = DocumentCategory::find($id);
+        if (!$category) {
+            return $this->sendError("Document category with ID '{$id}' not found.", 404);
+        }
+
         if ($category->documentMasters()->exists()) {
             return $this->sendError('Cannot delete category because it has associated document masters.', 422);
         }
 
         $this->documentMasterRepository->deleteCategory($category);
 
-        return $this->sendSuccess(null, 'Document category deleted successfully.');
+        return $this->sendSuccess(['id' => (int)$id], 'Document category deleted successfully.');
     }
 
     /**
@@ -149,7 +158,7 @@ class DocumentMasterApiController extends Controller
             return $authError;
         }
 
-        $tenantId = auth()->user()->tenant_id;
+        $tenantId = auth()->user()?->tenant_id ?? 1;
 
         $validated = $request->validate([
             'document_category_id'  => 'required|exists:document_categories,id',
@@ -171,7 +180,6 @@ class DocumentMasterApiController extends Controller
             'status'                => 'required|string|in:active,inactive',
         ]);
 
-        // Normalize checkboxes
         $validated['is_required'] = $request->boolean('is_required');
         $validated['approval_required'] = $request->boolean('approval_required');
         $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
@@ -188,16 +196,21 @@ class DocumentMasterApiController extends Controller
     }
 
     /**
-     * PUT /api/hrms/documents-master/documents/{document}
+     * PUT /api/hrms/documents-master/documents/{id}
      * Update an existing document master.
      */
-    public function updateDocument(Request $request, DocumentMaster $document): JsonResponse
+    public function updateDocument(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        $tenantId = $document->tenant_id ?? auth()->user()->tenant_id;
+        $document = DocumentMaster::find($id);
+        if (!$document) {
+            return $this->sendError("Document master with ID '{$id}' not found.", 404);
+        }
+
+        $tenantId = $document->tenant_id ?? auth()->user()?->tenant_id ?? 1;
 
         $validated = $request->validate([
             'document_category_id'  => 'required|exists:document_categories,id',
@@ -219,7 +232,6 @@ class DocumentMasterApiController extends Controller
             'status'                => 'required|string|in:active,inactive',
         ]);
 
-        // Normalize checkboxes
         $validated['is_required'] = $request->boolean('is_required');
         $validated['approval_required'] = $request->boolean('approval_required');
         $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
@@ -236,28 +248,38 @@ class DocumentMasterApiController extends Controller
     }
 
     /**
-     * DELETE /api/hrms/documents-master/documents/{document}
+     * DELETE /api/hrms/documents-master/documents/{id}
      * Delete an existing document master.
      */
-    public function destroyDocument(DocumentMaster $document): JsonResponse
+    public function destroyDocument(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $document = DocumentMaster::find($id);
+        if (!$document) {
+            return $this->sendError("Document master with ID '{$id}' not found.", 404);
+        }
+
         $this->documentMasterRepository->deleteDocument($document);
 
-        return $this->sendSuccess(null, 'Document master deleted successfully.');
+        return $this->sendSuccess(['id' => (int)$id], 'Document master deleted successfully.');
     }
 
     /**
-     * PATCH /api/hrms/documents-master/documents/{document}/toggle
+     * PATCH /api/hrms/documents-master/documents/{id}/toggle
      * Toggle the status (active/inactive) of an existing document master.
      */
-    public function toggleStatus(DocumentMaster $document): JsonResponse
+    public function toggleStatus(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $document = DocumentMaster::find($id);
+        if (!$document) {
+            return $this->sendError("Document master with ID '{$id}' not found.", 404);
         }
 
         $newStatus = $document->status === 'active' ? 'inactive' : 'active';

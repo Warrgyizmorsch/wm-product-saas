@@ -1,3 +1,52 @@
+<style>
+    /* Fixed text editor height with scrollbar inside editor for long text */
+    #add_tmpl_quill_editor, #edit_tmpl_quill_editor {
+        height: 380px !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    #add_tmpl_quill_editor .ql-container, #edit_tmpl_quill_editor .ql-container {
+        flex: 1 1 auto !important;
+        height: calc(380px - 42px) !important;
+        overflow-y: auto !important;
+    }
+    #add_tmpl_quill_editor .ql-editor, #edit_tmpl_quill_editor .ql-editor {
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+        color: #1e293b !important;
+        min-height: 100% !important;
+        padding: 12px 15px !important;
+    }
+    /* Tight line spacing: exact match between text editor and generated document */
+    #add_tmpl_quill_editor .ql-editor p,
+    #edit_tmpl_quill_editor .ql-editor p,
+    .generated-doc-container p,
+    #previewTemplateContainer p,
+    #genModalPreviewBox p,
+    .doc-body p {
+        margin-top: 0 !important;
+        margin-bottom: 0.35em !important;
+        line-height: 1.5 !important;
+    }
+    /* Available Placeholders sidebar - clean view without scrollbar */
+    .placeholder-tags-wrapper {
+        overflow: visible !important;
+        max-height: none !important;
+    }
+    .placeholder-tags-wrapper .tag-btn {
+        font-size: 11px !important;
+        padding: 3px 7px !important;
+        font-weight: 500 !important;
+        border-radius: 4px !important;
+        transition: all 0.15s ease-in-out;
+    }
+    .placeholder-tags-wrapper .tag-btn:hover {
+        background-color: #e2e8f0 !important;
+        transform: translateY(-1px);
+    }
+</style>
+
 <!-- DOCUMENT TEMPLATES TAB -->
 <div class="tab-pane fade {{ request()->query('active_tab') === 'templates' ? 'show active' : '' }}" id="templates-pane" role="tabpanel" aria-labelledby="templates-tab">
     <div>
@@ -110,6 +159,7 @@
                                                data-name="{{ $tmpl->name }}"
                                                data-code="{{ $tmpl->code }}"
                                                data-category-id="{{ $tmpl->document_category_id }}"
+                                               data-requires-signature="{{ $tmpl->requires_signature ? '1' : '0' }}"
                                                data-body="{{ $tmpl->body_content }}"
                                                data-status="{{ $tmpl->status }}">
                                                 <i class="feather-edit-2 me-2 text-primary"></i> Edit Template
@@ -211,7 +261,7 @@
                         <div class="col-md-8">
                             <div class="mb-3">
                                 <label class="form-label fw-bold text-dark fs-12 mb-1">Template Content & Design <span class="text-danger">*</span></label>
-                                <div id="add_tmpl_quill_editor" style="min-height: 280px;" class="bg-white rounded border"></div>
+                                <div id="add_tmpl_quill_editor" style="height: 380px;" class="bg-white rounded border"></div>
                                 <input type="hidden" name="body_content" id="add_tmpl_body_input" required>
                                 <small class="text-muted mt-1 d-block"><i class="feather-info me-1"></i> Type your letter naturally like in MS Word. Click tags on the right to insert dynamic employee data or use the image button above for logos.</small>
                             </div>
@@ -219,33 +269,47 @@
 
                         <!-- Interactive Sidebar for Placeholders -->
                         <div class="col-md-4">
-                            <div class="p-3 bg-soft-primary rounded border border-primary-subtle h-100">
+                            <div class="p-3 bg-soft-primary rounded border border-primary-subtle">
                                 <h6 class="fw-bold text-primary fs-12 mb-2"><i class="feather-tag me-1"></i> Available Placeholders</h6>
                                 <p class="fs-11 text-muted mb-2">Click any tag to insert it into your editor:</p>
                                 
-                                <div class="placeholder-tags-wrapper d-flex flex-wrap gap-1 fs-11 max-h-300 overflow-auto">
+                                <div class="placeholder-tags-wrapper d-flex flex-wrap gap-1 fs-11">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-user me-1 text-primary"></i> Employee Data:</span>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{employee_name}}')">@{{employee_name}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{employee_id}}')">@{{employee_id}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{designation}}')">@{{designation}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{department}}')">@{{department}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{branch}}')">@{{branch}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{reporting_manager}}')">@{{reporting_manager}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{joining_date}}')">@{{joining_date}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{last_working_day}}')">@{{last_working_day}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{employment_status}}')">@{{employment_status}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{email}}')">@{{email}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{phone}}')">@{{phone}}</button>
-                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{company_name}}')">@{{company_name}}</button>
-                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{company_logo}}')">@{{company_logo}}</button>
-                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{current_date}}')">@{{current_date}}</button>
-                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{reference_number}}')">@{{reference_number}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{dob}}')">@{{dob}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{gender}}')">@{{gender}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{marital_status}}')">@{{marital_status}}</button>
 
                                     <hr class="w-100 my-1">
-                                    <span class="fw-bold text-dark fs-10 w-100">Digital Signatures:</span>
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-briefcase me-1 text-primary"></i> Company Details:</span>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{company_name}}')">@{{company_name}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{company_logo}}')">@{{company_logo}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{company_address}}')">@{{company_address}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{company_email}}')">@{{company_email}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{company_phone}}')">@{{company_phone}}</button>
+
+                                    <hr class="w-100 my-1">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-shield me-1 text-warning"></i> Document & Signatures:</span>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{current_date}}')">@{{current_date}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{issue_date}}')">@{{issue_date}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{reference_number}}')">@{{reference_number}}</button>
                                     <button type="button" class="btn btn-xs btn-soft-warning border text-warning tag-btn" onclick="insertTag('add', '@{{hr_signature}}')">@{{hr_signature}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{hr_name}}')">@{{hr_name}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{hr_designation}}')">@{{hr_designation}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('add', '@{{signature_date}}')">@{{signature_date}}</button>
                                     
                                     <hr class="w-100 my-1">
-                                    <span class="fw-bold text-dark fs-10 w-100">Dynamic Tables & Lists:</span>
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-grid me-1 text-info"></i> Dynamic Tables & Lists:</span>
                                     <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('add', '@{{education_table}}')">@{{education_table}}</button>
                                     <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('add', '@{{experience_table}}')">@{{experience_table}}</button>
                                     <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('add', '@{{skills_list}}')">@{{skills_list}}</button>
@@ -298,6 +362,11 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
+                            <x-ui.odoo-form-ui type="checkbox" label="Requires Employee Signature" name="requires_signature" id="edit_tmpl_requires_signature" value="1">
+                                Generated document requires Employee Signature
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
                             <x-ui.odoo-form-ui type="file" label="Replace File" name="template_file" placeholder="Upload replacement (.html, .txt, .docx)..." />
                         </div>
 
@@ -305,26 +374,56 @@
                         <div class="col-md-8">
                             <div class="mb-3">
                                 <label class="form-label fw-bold text-dark fs-12 mb-1">Template Content & Design <span class="text-danger">*</span></label>
-                                <div id="edit_tmpl_quill_editor" style="min-height: 280px;" class="bg-white rounded border"></div>
+                                <div id="edit_tmpl_quill_editor" style="height: 380px;" class="bg-white rounded border"></div>
                                 <input type="hidden" name="body_content" id="edit_tmpl_body_input" required>
                             </div>
                         </div>
 
                         <div class="col-md-4">
-                            <div class="p-3 bg-soft-primary rounded border border-primary-subtle h-100">
+                            <div class="p-3 bg-soft-primary rounded border border-primary-subtle">
                                 <h6 class="fw-bold text-primary fs-12 mb-2"><i class="feather-tag me-1"></i> Available Placeholders</h6>
                                 <p class="fs-11 text-muted mb-2">Click to insert tag:</p>
                                 <div class="placeholder-tags-wrapper d-flex flex-wrap gap-1 fs-11">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-user me-1 text-primary"></i> Employee Data:</span>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{employee_name}}')">@{{employee_name}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{employee_id}}')">@{{employee_id}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{designation}}')">@{{designation}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{department}}')">@{{department}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{branch}}')">@{{branch}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{reporting_manager}}')">@{{reporting_manager}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{joining_date}}')">@{{joining_date}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{last_working_day}}')">@{{last_working_day}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{employment_status}}')">@{{employment_status}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{email}}')">@{{email}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{phone}}')">@{{phone}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{dob}}')">@{{dob}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{gender}}')">@{{gender}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{marital_status}}')">@{{marital_status}}</button>
+
+                                    <hr class="w-100 my-1">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-briefcase me-1 text-primary"></i> Company Details:</span>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{company_name}}')">@{{company_name}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{company_logo}}')">@{{company_logo}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{company_address}}')">@{{company_address}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{company_email}}')">@{{company_email}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{company_phone}}')">@{{company_phone}}</button>
+
+                                    <hr class="w-100 my-1">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-shield me-1 text-warning"></i> Document & Signatures:</span>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{current_date}}')">@{{current_date}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{issue_date}}')">@{{issue_date}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{reference_number}}')">@{{reference_number}}</button>
                                     <button type="button" class="btn btn-xs btn-soft-warning border text-warning tag-btn" onclick="insertTag('edit', '@{{hr_signature}}')">@{{hr_signature}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{hr_name}}')">@{{hr_name}}</button>
                                     <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{hr_designation}}')">@{{hr_designation}}</button>
-                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{education_table}}')">@{{education_table}}</button>
-                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{skills_list}}')">@{{skills_list}}</button>
+                                    <button type="button" class="btn btn-xs btn-white border text-dark tag-btn" onclick="insertTag('edit', '@{{signature_date}}')">@{{signature_date}}</button>
+                                    
+                                    <hr class="w-100 my-1">
+                                    <span class="fw-bold text-dark fs-10 w-100 mb-1"><i class="feather-grid me-1 text-info"></i> Dynamic Tables & Lists:</span>
+                                    <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('edit', '@{{education_table}}')">@{{education_table}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('edit', '@{{experience_table}}')">@{{experience_table}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('edit', '@{{skills_list}}')">@{{skills_list}}</button>
+                                    <button type="button" class="btn btn-xs btn-soft-info border text-info tag-btn" onclick="insertTag('edit', '@{{certifications_list}}')">@{{certifications_list}}</button>
                                 </div>
                             </div>
                         </div>
@@ -601,6 +700,9 @@
             $('#edit_tmpl_code').val($(this).data('code'));
             $('#edit_tmpl_category_id').val($(this).data('category-id'));
             $('#edit_tmpl_status').val($(this).data('status'));
+
+            var reqSig = $(this).data('requires-signature');
+            $('#edit_tmpl_requires_signature').prop('checked', reqSig == 1 || reqSig === '1' || reqSig === true);
 
             var bodyVal = $(this).data('body') || '';
             $('#edit_tmpl_body_input').val(bodyVal);

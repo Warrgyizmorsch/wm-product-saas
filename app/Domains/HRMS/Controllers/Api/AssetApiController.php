@@ -131,13 +131,18 @@ class AssetApiController extends Controller
         return $this->sendSuccess($assets, 'Asset registry retrieved successfully');
     }
 
-    public function showAsset(Asset $asset): JsonResponse
+    public function showAsset(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($asset->load(['company', 'category', 'assignedEmployee', 'allocations.employee']), 'Asset details loaded');
+        $asset = Asset::with(['company', 'category', 'assignedEmployee', 'allocations.employee'])->find($id);
+        if (!$asset) {
+            return $this->sendError("Asset with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($asset, 'Asset details loaded');
     }
 
     public function storeAsset(Request $request): JsonResponse
@@ -161,12 +166,18 @@ class AssetApiController extends Controller
         ]);
 
         if (!empty($validated['asset_item_id'])) {
-            $item = \App\Domains\HRMS\Models\AssetItem::findOrFail($validated['asset_item_id']);
+            $item = \App\Domains\HRMS\Models\AssetItem::find($validated['asset_item_id']);
+            if (!$item) {
+                return $this->sendError("Asset item with ID '{$validated['asset_item_id']}' not found.", 404);
+            }
             $validated['company_id'] = $item->company_id;
             $validated['asset_category_id'] = $item->asset_category_id;
             $validated['name'] = $item->name;
         } else {
-            $category = AssetCategory::findOrFail($validated['asset_category_id']);
+            $category = AssetCategory::find($validated['asset_category_id']);
+            if (!$category) {
+                return $this->sendError("Asset category with ID '{$validated['asset_category_id']}' not found.", 404);
+            }
             $validated['company_id'] = $category->company_id;
         }
 
@@ -185,10 +196,15 @@ class AssetApiController extends Controller
         return $this->sendSuccess($asset, 'Asset created successfully', 201);
     }
 
-    public function updateAsset(Request $request, Asset $asset): JsonResponse
+    public function updateAsset(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $asset = Asset::find($id);
+        if (!$asset) {
+            return $this->sendError("Asset with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -212,12 +228,18 @@ class AssetApiController extends Controller
         ]);
 
         if (!empty($validated['asset_item_id'])) {
-            $item = \App\Domains\HRMS\Models\AssetItem::findOrFail($validated['asset_item_id']);
+            $item = \App\Domains\HRMS\Models\AssetItem::find($validated['asset_item_id']);
+            if (!$item) {
+                return $this->sendError("Asset item with ID '{$validated['asset_item_id']}' not found.", 404);
+            }
             $validated['company_id'] = $item->company_id;
             $validated['asset_category_id'] = $item->asset_category_id;
             $validated['name'] = $item->name;
         } else {
-            $category = AssetCategory::findOrFail($validated['asset_category_id']);
+            $category = AssetCategory::find($validated['asset_category_id']);
+            if (!$category) {
+                return $this->sendError("Asset category with ID '{$validated['asset_category_id']}' not found.", 404);
+            }
             $validated['company_id'] = $category->company_id;
         }
 
@@ -236,10 +258,15 @@ class AssetApiController extends Controller
         return $this->sendSuccess($asset, 'Asset updated successfully');
     }
 
-    public function destroyAsset(Asset $asset): JsonResponse
+    public function destroyAsset(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $asset = Asset::find($id);
+        if (!$asset) {
+            return $this->sendError("Asset with ID '{$id}' not found.", 404);
         }
 
         if ($asset->status === 'allocated' || $asset->assigned_employee_id !== null) {
@@ -248,13 +275,18 @@ class AssetApiController extends Controller
 
         $asset->delete();
 
-        return $this->sendSuccess(null, 'Asset deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Asset deleted successfully');
     }
 
-    public function allocateAsset(Request $request, Asset $asset): JsonResponse
+    public function allocateAsset(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $asset = Asset::find($id);
+        if (!$asset) {
+            return $this->sendError("Asset with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -294,10 +326,15 @@ class AssetApiController extends Controller
         return $this->sendSuccess($asset->load('assignedEmployee'), 'Asset allocated successfully');
     }
 
-    public function returnAsset(Request $request, Asset $asset): JsonResponse
+    public function returnAsset(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $asset = Asset::find($id);
+        if (!$asset) {
+            return $this->sendError("Asset with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -377,13 +414,18 @@ class AssetApiController extends Controller
         return $this->sendSuccess($categories, 'Asset categories retrieved successfully');
     }
 
-    public function showCategory(AssetCategory $category): JsonResponse
+    public function showCategory(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($category->load(['company', 'assets']), 'Asset category details loaded');
+        $category = AssetCategory::with(['company', 'assets'])->find($id);
+        if (!$category) {
+            return $this->sendError("Asset category with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($category, 'Asset category details loaded');
     }
 
     public function storeCategory(Request $request): JsonResponse
@@ -403,10 +445,15 @@ class AssetApiController extends Controller
         return $this->sendSuccess($category, 'Asset category created successfully', 201);
     }
 
-    public function updateCategory(Request $request, AssetCategory $category): JsonResponse
+    public function updateCategory(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $category = AssetCategory::find($id);
+        if (!$category) {
+            return $this->sendError("Asset category with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -420,10 +467,15 @@ class AssetApiController extends Controller
         return $this->sendSuccess($category, 'Asset category updated successfully');
     }
 
-    public function destroyCategory(AssetCategory $category): JsonResponse
+    public function destroyCategory(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $category = AssetCategory::find($id);
+        if (!$category) {
+            return $this->sendError("Asset category with ID '{$id}' not found.", 404);
         }
 
         $assetCount = $category->assets()->count();
@@ -438,7 +490,7 @@ class AssetApiController extends Controller
 
         $category->delete();
 
-        return $this->sendSuccess(null, 'Asset category deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Asset category deleted successfully');
     }
 
     // ==========================================
@@ -480,13 +532,18 @@ class AssetApiController extends Controller
         return $this->sendSuccess($items, 'Asset items retrieved successfully');
     }
 
-    public function showItem(\App\Domains\HRMS\Models\AssetItem $assetItem): JsonResponse
+    public function showItem(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($assetItem->load(['company', 'category', 'assets']), 'Asset item details loaded');
+        $assetItem = \App\Domains\HRMS\Models\AssetItem::with(['company', 'category', 'assets'])->find($id);
+        if (!$assetItem) {
+            return $this->sendError("Asset item with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($assetItem, 'Asset item details loaded');
     }
 
     public function storeItem(Request $request): JsonResponse
@@ -501,7 +558,10 @@ class AssetApiController extends Controller
             'description'       => 'nullable|string|max:500',
         ]);
 
-        $category = AssetCategory::findOrFail($validated['asset_category_id']);
+        $category = AssetCategory::find($validated['asset_category_id']);
+        if (!$category) {
+            return $this->sendError("Asset category with ID '{$validated['asset_category_id']}' not found.", 404);
+        }
         $validated['company_id'] = $category->company_id;
 
         $item = \App\Domains\HRMS\Models\AssetItem::create($validated);
@@ -509,10 +569,15 @@ class AssetApiController extends Controller
         return $this->sendSuccess($item, 'Asset item created successfully', 201);
     }
 
-    public function updateItem(Request $request, \App\Domains\HRMS\Models\AssetItem $assetItem): JsonResponse
+    public function updateItem(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $assetItem = \App\Domains\HRMS\Models\AssetItem::find($id);
+        if (!$assetItem) {
+            return $this->sendError("Asset item with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -521,7 +586,10 @@ class AssetApiController extends Controller
             'description'       => 'nullable|string|max:500',
         ]);
 
-        $category = AssetCategory::findOrFail($validated['asset_category_id']);
+        $category = AssetCategory::find($validated['asset_category_id']);
+        if (!$category) {
+            return $this->sendError("Asset category with ID '{$validated['asset_category_id']}' not found.", 404);
+        }
         $validated['company_id'] = $category->company_id;
 
         $assetItem->update($validated);
@@ -529,10 +597,15 @@ class AssetApiController extends Controller
         return $this->sendSuccess($assetItem, 'Asset item updated successfully');
     }
 
-    public function destroyItem(\App\Domains\HRMS\Models\AssetItem $assetItem): JsonResponse
+    public function destroyItem(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $assetItem = \App\Domains\HRMS\Models\AssetItem::find($id);
+        if (!$assetItem) {
+            return $this->sendError("Asset item with ID '{$id}' not found.", 404);
         }
 
         $allocatedCount = $assetItem->assets()->where('status', 'allocated')->count();
@@ -543,7 +616,7 @@ class AssetApiController extends Controller
         $assetItem->assets()->delete();
         $assetItem->delete();
 
-        return $this->sendSuccess(null, 'Asset item deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Asset item deleted successfully');
     }
 
     public function allocateItem(Request $request, \App\Domains\HRMS\Models\AssetItem $assetItem): JsonResponse
@@ -734,7 +807,10 @@ class AssetApiController extends Controller
             return $this->sendError('Either an asset category or specific asset must be selected.', 422);
         }
 
-        $employee = Employee::findOrFail($validated['employee_id']);
+        $employee = Employee::find($validated['employee_id']);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$validated['employee_id']}' not found.", 404);
+        }
         $companyId = $employee->company_id;
         $requestDate = date('Y-m-d');
         $reason = $validated['reason'];
@@ -773,10 +849,15 @@ class AssetApiController extends Controller
         return $this->sendSuccess($createdRequests, 'Asset request(s) submitted successfully', 201);
     }
 
-    public function rejectRequest(Request $request, AssetRequest $assetRequest): JsonResponse
+    public function rejectRequest(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $assetRequest = AssetRequest::find($id);
+        if (!$assetRequest) {
+            return $this->sendError("Asset request with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -791,10 +872,15 @@ class AssetApiController extends Controller
         return $this->sendSuccess($assetRequest, 'Asset request rejected successfully');
     }
 
-    public function allocateDirectRequest(AssetRequest $assetRequest): JsonResponse
+    public function allocateDirectRequest(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $assetRequest = AssetRequest::find($id);
+        if (!$assetRequest) {
+            return $this->sendError("Asset request with ID '{$id}' not found.", 404);
         }
 
         if ($assetRequest->status !== 'pending') {
@@ -900,10 +986,15 @@ class AssetApiController extends Controller
         ], "Successfully allocated {$allocatedCount} asset request(s)");
     }
 
-    public function allocateRequest(Request $request, AssetRequest $assetRequest): JsonResponse
+    public function allocateRequest(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $assetRequest = AssetRequest::find($id);
+        if (!$assetRequest) {
+            return $this->sendError("Asset request with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -1102,7 +1193,10 @@ class AssetApiController extends Controller
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($assetIds, $validated) {
             foreach ($assetIds as $assetId) {
-                $asset = Asset::findOrFail($assetId);
+                $asset = Asset::find($assetId);
+                if (!$asset) {
+                    continue;
+                }
                 $allocation = \App\Domains\HRMS\Models\AssetAllocation::where('asset_id', $assetId)
                     ->whereNull('returned_at')
                     ->first();

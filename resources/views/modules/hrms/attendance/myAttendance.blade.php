@@ -241,13 +241,25 @@
                                     @elseif($statusVal === 'half_day')
                                         <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="background-color: rgba(111, 66, 193, 0.1); color: #6f42c1 !important;">Half Day</span>
                                     @elseif($statusVal === 'on_leave')
-                                        <span class="badge bg-soft-primary text-primary px-3 py-1.5 fs-11 rounded-pill fw-bold" title="{{ $attendance->leave_type_name ?? '' }}">Leave</span>
+                                        @php
+                                            $leaveText = 'On Leave';
+                                            if (!empty($attendance->leave_type_name) && strtolower(trim($attendance->leave_type_name)) !== 'leave') {
+                                                $leaveText = 'On Leave: ' . $attendance->leave_type_name;
+                                            }
+                                        @endphp
+                                        <span class="badge bg-soft-primary text-primary px-3 py-1.5 fs-11 rounded-pill fw-bold">{{ $leaveText }}</span>
                                     @elseif($statusVal === 'absent')
                                         <span class="badge bg-soft-danger text-danger px-3 py-1.5 fs-11 rounded-pill fw-bold">Absent</span>
-                                    @elseif($statusVal === 'week_off')
-                                        <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold">Week Off</span>
+                                    @elseif($statusVal === 'week_off' || $statusVal === 'weekly_off')
+                                        <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold">Weekly Off</span>
                                     @elseif($statusVal === 'holiday')
-                                        <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;" title="{{ $attendance->holiday_name ?? '' }}">Holiday: {{ $attendance->holiday_name ?? '' }}</span>
+                                        @php
+                                            $holidayText = 'Holiday';
+                                            if (!empty($attendance->holiday_name)) {
+                                                $holidayText = 'Holiday: ' . $attendance->holiday_name;
+                                            }
+                                        @endphp
+                                        <span class="badge px-3 py-1.5 fs-11 rounded-pill fw-bold" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">{{ $holidayText }}</span>
                                     @else
                                         <span class="badge bg-soft-secondary text-secondary px-3 py-1.5 fs-11 rounded-pill fw-bold">{{ ucfirst(str_replace('_', ' ', $statusVal)) }}</span>
                                     @endif

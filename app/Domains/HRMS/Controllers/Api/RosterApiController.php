@@ -141,13 +141,18 @@ class RosterApiController extends Controller
         return $this->sendSuccess($shifts, 'Production shifts retrieved successfully');
     }
 
-    public function showShift(ProductionShift $shift): JsonResponse
+    public function showShift(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($shift->load('company'), 'Production shift details loaded');
+        $shift = ProductionShift::with('company')->find($id);
+        if (!$shift) {
+            return $this->sendError("Production shift with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($shift, 'Production shift details loaded');
     }
 
     public function storeShift(Request $request): JsonResponse
@@ -199,10 +204,15 @@ class RosterApiController extends Controller
         return $this->sendSuccess($shift, 'Production shift created successfully', 201);
     }
 
-    public function updateShift(Request $request, ProductionShift $shift): JsonResponse
+    public function updateShift(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $shift = ProductionShift::find($id);
+        if (!$shift) {
+            return $this->sendError("Production shift with ID '{$id}' not found.", 404);
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
@@ -248,15 +258,20 @@ class RosterApiController extends Controller
         return $this->sendSuccess($shift, 'Production shift updated successfully');
     }
 
-    public function destroyShift(ProductionShift $shift): JsonResponse
+    public function destroyShift(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $shift = ProductionShift::find($id);
+        if (!$shift) {
+            return $this->sendError("Production shift with ID '{$id}' not found.", 404);
+        }
+
         $shift->delete();
 
-        return $this->sendSuccess(null, 'Production shift deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Production shift deleted successfully');
     }
 
     // ==========================================
@@ -495,7 +510,10 @@ class RosterApiController extends Controller
             'value'       => 'nullable|string',
         ]);
 
-        $employee = Employee::findOrFail($validated['employee_id']);
+        $employee = Employee::find($validated['employee_id']);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$validated['employee_id']}' not found.", 404);
+        }
         $dayOfWeek = (int)$validated['day_of_week'];
         $val = $validated['value'] ?? null;
 

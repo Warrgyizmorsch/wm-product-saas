@@ -17,9 +17,12 @@ class AttendanceController extends Controller
     public function index(Request $request)
     {
         $filters = $request->only(['date', 'department_id', 'search', 'status', 'month']);
+        if (!isset($filters['month']) && !isset($filters['date'])) {
+            $filters['month'] = now()->format('Y-m');
+        }
         
         $date = $request->input('date');
-        if (!$date && !$request->has('month')) {
+        if (!$date && !isset($filters['month'])) {
             $date = \Carbon\Carbon::today()->format('Y-m-d');
         }
         $departmentId = $filters['department_id'] ?? null;
@@ -78,25 +81,27 @@ class AttendanceController extends Controller
 
         if ($view === 'date') {
             $monthFilter = $filters['month'] ?? null;
-            if (!$monthFilter && !isset($filters['date'])) {
-                $monthFilter = now()->format('Y-m');
-            }
 
-            $year = now()->year;
-            $month = now()->month;
-            if ($monthFilter) {
-                $parts = explode('-', $monthFilter);
-                if (count($parts) === 2) {
-                    $year = (int)$parts[0];
-                    $month = (int)$parts[1];
+            if ($monthFilter === 'all') {
+                $startDate = \Carbon\Carbon::now()->startOfYear();
+                $endDate = \Carbon\Carbon::now()->endOfDay();
+            } else {
+                $year = now()->year;
+                $month = now()->month;
+                if ($monthFilter) {
+                    $parts = explode('-', $monthFilter);
+                    if (count($parts) === 2) {
+                        $year = (int)$parts[0];
+                        $month = (int)$parts[1];
+                    }
                 }
-            }
 
-            $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
-            $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
-            $today = now()->startOfDay();
-            if ($endDate->gt($today)) {
-                $endDate = $today->copy();
+                $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+                $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
+                $today = now()->startOfDay();
+                if ($endDate->gt($today)) {
+                    $endDate = $today->copy();
+                }
             }
 
             if (isset($filters['date']) && $filters['date']) {
@@ -274,25 +279,27 @@ class AttendanceController extends Controller
         $employees = $query->get();
         
         $monthFilter = $filters['month'] ?? null;
-        if (!$monthFilter && !isset($filters['date'])) {
-            $monthFilter = now()->format('Y-m');
-        }
 
-        $year = now()->year;
-        $month = now()->month;
-        if ($monthFilter) {
-            $parts = explode('-', $monthFilter);
-            if (count($parts) === 2) {
-                $year = (int)$parts[0];
-                $month = (int)$parts[1];
+        if ($monthFilter === 'all') {
+            $startDate = \Carbon\Carbon::now()->startOfYear();
+            $endDate = \Carbon\Carbon::now()->endOfDay();
+        } else {
+            $year = now()->year;
+            $month = now()->month;
+            if ($monthFilter) {
+                $parts = explode('-', $monthFilter);
+                if (count($parts) === 2) {
+                    $year = (int)$parts[0];
+                    $month = (int)$parts[1];
+                }
             }
-        }
 
-        $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
-        $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
-        $today = now()->startOfDay();
-        if ($endDate->gt($today)) {
-            $endDate = $today->copy();
+            $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+            $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
+            $today = now()->startOfDay();
+            if ($endDate->gt($today)) {
+                $endDate = $today->copy();
+            }
         }
 
         if ($employees->isNotEmpty()) {
@@ -667,26 +674,35 @@ class AttendanceController extends Controller
 
     public function getEmployeeLogs(\App\Domains\HRMS\Models\Employee $employee)
     {
-        $monthFilter = request('month', now()->format('Y-m'));
-        $year = now()->year;
-        $month = now()->month;
-        if ($monthFilter) {
+        $monthFilter = request('month');
+
+        if ($monthFilter === 'all') {
+            $startDate = $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->startOfDay() : \Carbon\Carbon::now()->startOfYear();
+            $endDate = \Carbon\Carbon::now()->endOfDay();
+        } else {
+            if (!$monthFilter) {
+                $monthFilter = now()->format('Y-m');
+            }
+
+            $year = now()->year;
+            $month = now()->month;
             $parts = explode('-', $monthFilter);
             if (count($parts) === 2) {
                 $year = (int)$parts[0];
                 $month = (int)$parts[1];
             }
-        }
-        $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
-        $joiningDate = $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->startOfDay() : null;
-        if ($joiningDate && $joiningDate->gt($startDate)) {
-            $startDate = $joiningDate->copy();
-        }
 
-        $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
-        $today = now()->startOfDay();
-        if ($endDate->gt($today)) {
-            $endDate = $today->copy();
+            $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+            $joiningDate = $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->startOfDay() : null;
+            if ($joiningDate && $joiningDate->gt($startDate)) {
+                $startDate = $joiningDate->copy();
+            }
+
+            $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
+            $today = now()->startOfDay();
+            if ($endDate->gt($today)) {
+                $endDate = $today->copy();
+            }
         }
 
         $logs = Attendance::where('employee_id', $employee->id)
@@ -807,13 +823,21 @@ class AttendanceController extends Controller
                 } elseif ($status === 'half_day') {
                     $statusBadge = '<span class="badge bg-soft-danger text-danger">Half Day</span>';
                 } elseif ($status === 'on_leave') {
-                    $statusBadge = '<span class="badge bg-soft-primary text-primary">On Leave: ' . ($log->leave_type_name ?? 'Leave') . '</span>';
+                    $leaveLabel = 'On Leave';
+                    if (!empty($log->leave_type_name) && strtolower(trim($log->leave_type_name)) !== 'leave') {
+                        $leaveLabel = 'On Leave: ' . $log->leave_type_name;
+                    }
+                    $statusBadge = '<span class="badge bg-soft-primary text-primary">' . e($leaveLabel) . '</span>';
                 } elseif ($status === 'absent') {
                     $statusBadge = '<span class="badge bg-soft-danger text-danger">Absent</span>';
-                } elseif ($status === 'week_off') {
-                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Week Off</span>';
+                } elseif ($status === 'week_off' || $status === 'weekly_off') {
+                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Weekly Off</span>';
                 } elseif ($status === 'holiday') {
-                    $statusBadge = '<span class="badge bg-soft-indigo text-indigo" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">Holiday: ' . ($log->holiday_name ?? '') . '</span>';
+                    $holidayLabel = 'Holiday';
+                    if (!empty($log->holiday_name)) {
+                        $holidayLabel = 'Holiday: ' . $log->holiday_name;
+                    }
+                    $statusBadge = '<span class="badge bg-soft-indigo text-indigo" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">' . e($holidayLabel) . '</span>';
                 } else {
                     $statusBadge = '<span class="badge bg-soft-dark text-dark">' . ucfirst(str_replace('_', ' ', $status)) . '</span>';
                 }
@@ -962,13 +986,21 @@ class AttendanceController extends Controller
                 } elseif ($status === 'half_day') {
                     $statusBadge = '<span class="badge bg-soft-danger text-danger">Half Day</span>';
                 } elseif ($status === 'on_leave') {
-                    $statusBadge = '<span class="badge bg-soft-primary text-primary">On Leave: ' . ($log->leave_type_name ?? 'Leave') . '</span>';
+                    $leaveLabel = 'On Leave';
+                    if (!empty($log->leave_type_name) && strtolower(trim($log->leave_type_name)) !== 'leave') {
+                        $leaveLabel = 'On Leave: ' . $log->leave_type_name;
+                    }
+                    $statusBadge = '<span class="badge bg-soft-primary text-primary">' . e($leaveLabel) . '</span>';
                 } elseif ($status === 'absent') {
                     $statusBadge = '<span class="badge bg-soft-danger text-danger">Absent</span>';
-                } elseif ($status === 'week_off') {
-                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Week Off</span>';
+                } elseif ($status === 'week_off' || $status === 'weekly_off') {
+                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Weekly Off</span>';
                 } elseif ($status === 'holiday') {
-                    $statusBadge = '<span class="badge bg-soft-indigo text-indigo" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">Holiday: ' . ($log->holiday_name ?? '') . '</span>';
+                    $holidayLabel = 'Holiday';
+                    if (!empty($log->holiday_name)) {
+                        $holidayLabel = 'Holiday: ' . $log->holiday_name;
+                    }
+                    $statusBadge = '<span class="badge bg-soft-indigo text-indigo" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">' . e($holidayLabel) . '</span>';
                 } else {
                     $statusBadge = '<span class="badge bg-soft-dark text-dark">' . ucfirst(str_replace('_', ' ', $status)) . '</span>';
                 }
@@ -1516,22 +1548,42 @@ class AttendanceController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:csv,txt|max:5120',
+            'file' => 'required|file|max:10240',
         ]);
 
         $file = $request->file('file');
-        $path = $file->getRealPath();
-
-        $handle = fopen($path, 'r');
-        $header = fgetcsv($handle); // Read headers
-
-        if (!$header) {
-            fclose($handle);
-            return redirect()->back()->with('error', 'The uploaded file is empty.');
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (!in_array($ext, ['csv', 'txt', 'xls', 'xlsx'])) {
+            return redirect()->back()->with('error', 'The file must be a file of type: csv, txt, xls, xlsx.');
         }
 
+        $path = $file->getRealPath();
+
+        $rows = [];
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+            $worksheet = $spreadsheet->getActiveSheet();
+            $rows = $worksheet->toArray(null, true, true, false);
+        } catch (\Throwable $e) {
+            if (($handle = fopen($path, 'r')) !== false) {
+                while (($row = fgetcsv($handle)) !== false) {
+                    $rows[] = $row;
+                }
+                fclose($handle);
+            }
+        }
+
+        if (empty($rows) || !isset($rows[0])) {
+            return redirect()->back()->with('error', 'The uploaded file is empty or could not be parsed.');
+        }
+
+        // Read headers
+        $header = array_shift($rows);
+        $header = array_map(function ($col) {
+            return strtolower(trim((string)$col));
+        }, $header);
+
         // Map header column indices
-        $header = array_map('strtolower', $header);
         $colIndex = [
             'employee_code' => array_search('employee_code', $header),
             'date' => array_search('date', $header),
@@ -1541,7 +1593,6 @@ class AttendanceController extends Controller
         ];
 
         if ($colIndex['employee_code'] === false || $colIndex['date'] === false) {
-            fclose($handle);
             return redirect()->back()->with('error', 'Invalid template. "employee_code" and "date" columns are required.');
         }
 
@@ -1550,16 +1601,16 @@ class AttendanceController extends Controller
         $skippedRows = [];
         $rowNum = 1;
 
-        while (($row = fgetcsv($handle)) !== false) {
+        foreach ($rows as $row) {
             $rowNum++;
-            
+
             // Basic check for empty row
-            if (empty($row) || count($row) < 2) {
+            if (empty($row) || !array_filter($row, fn($v) => !is_null($v) && trim((string)$v) !== '')) {
                 continue;
             }
 
-            $empCode = trim($row[$colIndex['employee_code']] ?? '');
-            $dateStr = trim($row[$colIndex['date']] ?? '');
+            $empCode = trim((string)($row[$colIndex['employee_code']] ?? ''));
+            $dateStr = trim((string)($row[$colIndex['date']] ?? ''));
 
             if (!$empCode || !$dateStr) {
                 $skippedRows[] = "Row {$rowNum}: Missing employee_code or date.";
@@ -1575,22 +1626,40 @@ class AttendanceController extends Controller
 
             // Parse Date
             try {
-                $carbonDate = \Carbon\Carbon::parse($dateStr);
+                if (is_numeric($dateStr) && (float)$dateStr > 30000 && (float)$dateStr < 100000) {
+                    $carbonDate = \Carbon\Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$dateStr));
+                } else {
+                    $carbonDate = \Carbon\Carbon::parse($dateStr);
+                }
                 $formattedDate = $carbonDate->format('Y-m-d');
             } catch (\Exception $e) {
                 $skippedRows[] = "Row {$rowNum}: Invalid date format '{$dateStr}'.";
                 continue;
             }
 
-            // Extract values
-            $checkInVal = $colIndex['check_in'] !== false && !empty($row[$colIndex['check_in']]) ? trim($row[$colIndex['check_in']]) : null;
-            $checkOutVal = $colIndex['check_out'] !== false && !empty($row[$colIndex['check_out']]) ? trim($row[$colIndex['check_out']]) : null;
-            $statusVal = $colIndex['status'] !== false && !empty($row[$colIndex['status']]) ? strtolower(trim($row[$colIndex['status']])) : 'auto';
+            // Extract raw values
+            $checkInRaw = $colIndex['check_in'] !== false ? trim((string)($row[$colIndex['check_in']] ?? '')) : '';
+            $checkOutRaw = $colIndex['check_out'] !== false ? trim((string)($row[$colIndex['check_out']] ?? '')) : '';
+            $statusRaw = $colIndex['status'] !== false ? strtolower(trim((string)($row[$colIndex['status']] ?? ''))) : 'auto';
+
+            if ($checkInRaw !== '' && is_numeric($checkInRaw) && (float)$checkInRaw < 1) {
+                $checkInRaw = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$checkInRaw)->format('H:i:s');
+            }
+            if ($checkOutRaw !== '' && is_numeric($checkOutRaw) && (float)$checkOutRaw < 1) {
+                $checkOutRaw = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$checkOutRaw)->format('H:i:s');
+            }
+
+            $checkInVal = $checkInRaw !== '' ? $checkInRaw : null;
+            $checkOutVal = $checkOutRaw !== '' ? $checkOutRaw : null;
+            $statusVal = $statusRaw !== '' ? $statusRaw : 'auto';
 
             // Validate status enum
-            $validStatuses = ['auto', 'present', 'absent', 'late', 'half_day', 'on_leave', 'wfh'];
+            $validStatuses = ['auto', 'present', 'absent', 'late', 'half_day', 'on_leave', 'wfh', 'weekly_off', 'week_off', 'holiday'];
             if (!in_array($statusVal, $validStatuses)) {
                 $statusVal = 'auto';
+            }
+            if ($statusVal === 'week_off') {
+                $statusVal = 'weekly_off';
             }
 
             // Check constraint
@@ -1608,7 +1677,7 @@ class AttendanceController extends Controller
                     $skippedRows[] = "Row {$rowNum}: Invalid check_in time '{$checkInVal}'.";
                     continue;
                 }
-            } elseif (in_array($statusVal, ['absent', 'on_leave'])) {
+            } elseif (in_array($statusVal, ['absent', 'on_leave', 'weekly_off', 'holiday'])) {
                 $checkInDatetime = \Carbon\Carbon::parse($formattedDate . ' 00:00:00');
             }
 
@@ -1705,6 +1774,11 @@ class AttendanceController extends Controller
                 }
             }
 
+            // Fallback for check_in datetime if still null (for non-nullable DB column)
+            if (!$checkInDatetime) {
+                $checkInDatetime = \Carbon\Carbon::parse($formattedDate . ' 00:00:00');
+            }
+
             $locationType = ($finalStatus === 'wfh') ? 'wfh' : 'office';
 
             Attendance::updateOrCreate([
@@ -1722,9 +1796,7 @@ class AttendanceController extends Controller
             $successCount++;
         }
 
-        fclose($handle);
-
-        $msg = "Attendance logs imported successfully.";
+        $msg = "Attendance logs imported successfully ({$successCount} records processed).";
         if (count($skippedRows) > 0) {
             return redirect()->back()
                 ->with('success', $msg)

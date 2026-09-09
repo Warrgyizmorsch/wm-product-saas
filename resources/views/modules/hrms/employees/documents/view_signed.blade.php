@@ -135,10 +135,9 @@
         </div>
     </div>
 
-    <!-- MAIN DOCUMENT CONTAINER WITH OVERLAID SIGNATURE -->
+    <!-- MAIN DOCUMENT CONTAINER -->
     <div class="doc-container-wrapper">
         <div class="doc-frame-box">
-
             <!-- ORIGINAL DOCUMENT CONTENT (PDF or IMAGE) -->
             @if($isImage)
                 <div class="d-flex justify-content-center align-items-center h-100 p-3 bg-secondary-subtle overflow-auto">
@@ -147,27 +146,51 @@
             @else
                 <iframe src="{{ $fileUrl }}" style="width: 100%; height: 100%; border: none;"></iframe>
             @endif
-
-            <!-- OVERLAID DIGITAL SIGNATURE STAMP -->
-            @if($sigUrl)
-                <div class="sig-overlay-badge" style="{{ $sigPosCss }}">
-                    <img src="{{ $sigUrl }}" class="sig-overlay-img" alt="Digital Signature">
-                    <div class="fw-bold text-dark fs-12 mb-0.5">{{ $signerName }}</div>
-                    <div class="text-muted fs-10" style="font-size: 10px;">Digitally Signed on {{ $signedAtStr }}</div>
-                </div>
-            @endif
-
         </div>
 
+        <!-- DIGITAL SIGNATURE CARD (EXECUTIVE SECURITY CERTIFICATE DESIGN) -->
+        @if($sigUrl)
+            <div class="signature-section-block p-4 border-top" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border-left: 4px solid #10b981 !important;">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-4">
+                    <div class="pe-md-3" style="max-width: 650px;">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1 fs-11 fw-bold">
+                                <i data-feather="shield-check" style="width: 12px; height: 12px;" class="me-1"></i> VERIFIED SIGNATURE
+                            </span>
+                            <span class="text-muted fs-11">&bull; Legal Authenticity Certificate</span>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-1 fs-15">Employee Digital Signature Certificate</h6>
+                        <p class="text-muted fs-12 mb-0" style="line-height: 1.5;">This document has been electronically executed and legally validated via biometric/digital signature capture by the authorized signatory.</p>
+                    </div>
+
+                    <!-- SECURITY STAMP BOX -->
+                    <div class="employee-signature-card bg-white rounded-3 border p-3.5 text-center shadow-sm" style="min-width: 260px; max-width: 290px; border-color: #cbd5e1 !important; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06) !important;">
+                        <div class="bg-light rounded p-2 mb-2 border border-light">
+                            <img src="{{ $sigUrl }}" class="img-fluid" style="max-height: 65px; object-fit: contain; display: block; margin: 0 auto;" alt="Employee Signature">
+                        </div>
+                        <div class="fw-bold text-dark fs-14 mb-0.5" style="letter-spacing: -0.2px;">{{ $signerName }}</div>
+                        <div class="text-success fw-semibold fs-11 mb-1 d-flex align-items-center justify-content-center gap-1">
+                            <i data-feather="check-circle" style="width: 12px; height: 12px;"></i> Signed on {{ $signedAtStr }}
+                        </div>
+                        <div class="pt-2 border-top text-muted font-monospace fs-10 text-uppercase" style="font-size: 9.5px; letter-spacing: 0.5px;">
+                            REF: SIG-{{ strtoupper(substr(md5($document->id . $signedAtStr), 0, 8)) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <!-- DIGITAL VERIFICATION AUDIT TRAIL FOOTER -->
-        <div class="audit-footer-bar d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="audit-footer-bar d-flex justify-content-between align-items-center flex-wrap gap-3" style="background-color: #0f172a; color: #94a3b8; padding: 16px 24px; border-top: none;">
             <div>
-                <strong>DIGITAL VERIFICATION AUDIT TRAIL</strong><br>
-                Signer: <strong>{{ $signerName }}</strong> | IP Address: <code>{{ $document->signature_ip ?? '127.0.0.1' }}</code> | Date: {{ $signedAtStr }}
+                <div class="text-white fw-bold fs-11 tracking-wide text-uppercase mb-0.5" style="letter-spacing: 0.5px;">DIGITAL VERIFICATION AUDIT TRAIL</div>
+                <div class="fs-11 text-slate-300">
+                    Signer: <strong class="text-white">{{ $signerName }}</strong> &bull; IP Address: <code class="text-info bg-dark px-1.5 py-0.5 rounded">{{ $document->signature_ip ?? '127.0.0.1' }}</code> &bull; Timestamp: <span class="text-white">{{ $signedAtStr }}</span>
+                </div>
             </div>
             <div>
-                <span class="badge bg-dark text-white px-2.5 py-1.5 font-monospace fs-11">
-                    CERTIFIED AUTHENTIC &bull; WM SAAS ENGINE
+                <span class="badge bg-success text-white px-3 py-1.5 rounded-pill font-monospace fs-10 fw-bold shadow-sm" style="letter-spacing: 0.5px;">
+                    <i data-feather="lock" style="width: 10px; height: 10px;" class="me-1"></i> CERTIFIED AUTHENTIC
                 </span>
             </div>
         </div>

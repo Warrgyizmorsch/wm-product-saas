@@ -130,10 +130,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($companies, 'Companies retrieved successfully');
     }
 
-    public function showCompany(Company $company): JsonResponse
+    public function showCompany(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $company = Company::find($id);
+        if (!$company) {
+            return $this->sendError("Company with ID '{$id}' not found.", 404);
         }
 
         return $this->sendSuccess($company, 'Company details loaded');
@@ -204,10 +209,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($company, 'Company created successfully', 201);
     }
 
-    public function updateCompany(Request $request, Company $company): JsonResponse
+    public function updateCompany(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $company = Company::find($id);
+        if (!$company) {
+            return $this->sendError("Company with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -269,10 +279,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($company, 'Company updated successfully');
     }
 
-    public function destroyCompany(Company $company): JsonResponse
+    public function destroyCompany(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $company = Company::find($id);
+        if (!$company) {
+            return $this->sendError("Company with ID '{$id}' not found.", 404);
         }
 
         Employee::withTrashed()->where('company_id', $company->id)->update(['company_id' => null]);
@@ -290,7 +305,7 @@ class OrgApiController extends Controller
 
         $company->delete();
 
-        return $this->sendSuccess(null, 'Company deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Company deleted successfully');
     }
 
     // ==========================================
@@ -336,13 +351,18 @@ class OrgApiController extends Controller
         return $this->sendSuccess($businessUnits, 'Business units retrieved successfully');
     }
 
-    public function showBusinessUnit(BusinessUnit $businessUnit): JsonResponse
+    public function showBusinessUnit(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($businessUnit->load(['company', 'head']), 'Business unit details loaded');
+        $businessUnit = BusinessUnit::with(['company', 'head'])->find($id);
+        if (!$businessUnit) {
+            return $this->sendError("Business unit with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($businessUnit, 'Business unit details loaded');
     }
 
     public function storeBusinessUnit(Request $request): JsonResponse
@@ -374,10 +394,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($businessUnit, 'Business unit created successfully', 201);
     }
 
-    public function updateBusinessUnit(Request $request, BusinessUnit $businessUnit): JsonResponse
+    public function updateBusinessUnit(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $businessUnit = BusinessUnit::find($id);
+        if (!$businessUnit) {
+            return $this->sendError("Business unit with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -403,10 +428,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($businessUnit, 'Business unit updated successfully');
     }
 
-    public function destroyBusinessUnit(BusinessUnit $businessUnit): JsonResponse
+    public function destroyBusinessUnit(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $businessUnit = BusinessUnit::find($id);
+        if (!$businessUnit) {
+            return $this->sendError("Business unit with ID '{$id}' not found.", 404);
         }
 
         Employee::withTrashed()->where('business_unit_id', $businessUnit->id)->update(['business_unit_id' => null]);
@@ -423,7 +453,7 @@ class OrgApiController extends Controller
 
         $businessUnit->delete();
 
-        return $this->sendSuccess(null, 'Business unit deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Business unit deleted successfully');
     }
 
     // ==========================================
@@ -474,13 +504,18 @@ class OrgApiController extends Controller
         return $this->sendSuccess($branches, 'Branches retrieved successfully');
     }
 
-    public function showBranch(Branch $branch): JsonResponse
+    public function showBranch(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($branch->load(['businessUnit', 'company', 'manager']), 'Branch details loaded');
+        $branch = Branch::with(['businessUnit', 'company', 'manager'])->find($id);
+        if (!$branch) {
+            return $this->sendError("Branch with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($branch, 'Branch details loaded');
     }
 
     public function storeBranch(Request $request): JsonResponse
@@ -534,10 +569,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($branch, 'Branch created successfully', 201);
     }
 
-    public function updateBranch(Request $request, Branch $branch): JsonResponse
+    public function updateBranch(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $branch = Branch::find($id);
+        if (!$branch) {
+            return $this->sendError("Branch with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -585,10 +625,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($branch, 'Branch updated successfully');
     }
 
-    public function destroyBranch(Branch $branch): JsonResponse
+    public function destroyBranch(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $branch = Branch::find($id);
+        if (!$branch) {
+            return $this->sendError("Branch with ID '{$id}' not found.", 404);
         }
 
         Employee::withTrashed()->where('branch_id', $branch->id)->update(['branch_id' => null]);
@@ -604,7 +649,7 @@ class OrgApiController extends Controller
 
         $branch->delete();
 
-        return $this->sendSuccess(null, 'Branch deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Branch deleted successfully');
     }
 
     // ==========================================
@@ -658,13 +703,18 @@ class OrgApiController extends Controller
         return $this->sendSuccess($departments, 'Departments retrieved successfully');
     }
 
-    public function showDepartment(Department $department): JsonResponse
+    public function showDepartment(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($department->load(['branch', 'company', 'businessUnit', 'head']), 'Department details loaded');
+        $department = Department::with(['branch', 'company', 'businessUnit', 'head'])->find($id);
+        if (!$department) {
+            return $this->sendError("Department with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($department, 'Department details loaded');
     }
 
     public function storeDepartment(Request $request): JsonResponse
@@ -719,10 +769,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($department, 'Department created successfully', 201);
     }
 
-    public function updateDepartment(Request $request, Department $department): JsonResponse
+    public function updateDepartment(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $department = Department::find($id);
+        if (!$department) {
+            return $this->sendError("Department with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -771,10 +826,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($department, 'Department updated successfully');
     }
 
-    public function destroyDepartment(Department $department): JsonResponse
+    public function destroyDepartment(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $department = Department::find($id);
+        if (!$department) {
+            return $this->sendError("Department with ID '{$id}' not found.", 404);
         }
 
         Employee::withTrashed()->where('department_id', $department->id)->update([
@@ -785,7 +845,7 @@ class OrgApiController extends Controller
         Designation::where('department_id', $department->id)->delete();
         $department->delete();
 
-        return $this->sendSuccess(null, 'Department deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Department deleted successfully');
     }
 
     // ==========================================
@@ -831,13 +891,18 @@ class OrgApiController extends Controller
         return $this->sendSuccess($designations, 'Designations retrieved successfully');
     }
 
-    public function showDesignation(Designation $designation): JsonResponse
+    public function showDesignation(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        return $this->sendSuccess($designation->load(['department']), 'Designation details loaded');
+        $designation = Designation::with(['department'])->find($id);
+        if (!$designation) {
+            return $this->sendError("Designation with ID '{$id}' not found.", 404);
+        }
+
+        return $this->sendSuccess($designation, 'Designation details loaded');
     }
 
     public function storeDesignation(Request $request): JsonResponse
@@ -867,10 +932,15 @@ class OrgApiController extends Controller
         return $this->sendSuccess($designation, 'Designation created successfully', 201);
     }
 
-    public function updateDesignation(Request $request, Designation $designation): JsonResponse
+    public function updateDesignation(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $designation = Designation::find($id);
+        if (!$designation) {
+            return $this->sendError("Designation with ID '{$id}' not found.", 404);
         }
 
         $validated = $request->validate([
@@ -894,15 +964,20 @@ class OrgApiController extends Controller
         return $this->sendSuccess($designation, 'Designation updated successfully');
     }
 
-    public function destroyDesignation(Designation $designation): JsonResponse
+    public function destroyDesignation(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $designation = Designation::find($id);
+        if (!$designation) {
+            return $this->sendError("Designation with ID '{$id}' not found.", 404);
+        }
+
         Employee::withTrashed()->where('designation_id', $designation->id)->update(['designation_id' => null]);
         $designation->delete();
 
-        return $this->sendSuccess(null, 'Designation deleted successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Designation deleted successfully');
     }
 }

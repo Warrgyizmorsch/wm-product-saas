@@ -206,7 +206,7 @@ class PayrollCalculationService
         $computedSalaryItems = [];
         
         $baseStructure = null;
-        if ($employee->payGroup) {
+        if ($employee->payGroup && $employee->current_salary > 0) {
             $baseStructure = \App\Domains\HRMS\Models\SalaryStructure::where('pay_group_id', $employee->pay_group_id)
                 ->where('min_ctc', '<=', $employee->current_salary)
                 ->where('max_ctc', '>=', $employee->current_salary)
@@ -218,6 +218,13 @@ class PayrollCalculationService
         }
 
         if ($baseStructure && $baseStructure->items) {
+            // Pre-resolve: find the "basic" item in the structure (first fixed or % of CTC earning component)
+            $basicStructureItem = $baseStructure->items->first(function($i) {
+                return $i->component &&
+                       $i->component->type === 'earning' &&
+                       in_array($i->calculation_type, ['fixed', 'percentage_of_ctc']);
+            });
+
             foreach ($baseStructure->items as $item) {
                 $component = $item->component;
                 // Annual CTC / 12 = Base Monthly Value
@@ -227,14 +234,18 @@ class PayrollCalculationService
                 if ($item->calculation_type === 'percentage_of_ctc') {
                     $yearlyValue = ($employee->current_salary * $item->value) / 100;
                 } elseif ($item->calculation_type === 'percentage_of_basic') {
-                    // Find basic component item
-                    $basicItem = $baseStructure->items->filter(fn($i) => $i->component->code === 'BASIC')->first();
-                    if ($basicItem) {
-                        $basicYearly = ($employee->current_salary * $basicItem->value) / 100;
+                    // Resolve basic yearly value from the identified basic item
+                    if ($basicStructureItem) {
+                        if ($basicStructureItem->calculation_type === 'fixed') {
+                            $basicYearly = (float) $basicStructureItem->value; // already yearly
+                        } else {
+                            $basicYearly = ($employee->current_salary * $basicStructureItem->value) / 100;
+                        }
                         $yearlyValue = ($basicYearly * $item->value) / 100;
                     }
                 } elseif ($item->calculation_type === 'fixed') {
-                    $yearlyValue = $item->value * 12;
+                    // value is stored as the YEARLY amount
+                    $yearlyValue = $item->value;
                 } elseif ($item->calculation_type === 'balancing') {
                     // Will calculate remainder below
                     $yearlyValue = 0.00;
@@ -564,14 +575,30 @@ class PayrollCalculationService
         // 9.9.1. Dynamic PF Calculation
         if (isset($computedSalaryItems['PF'])) {
             if ($enablePf) {
-                // PF Wage Basis is standardly Basic + Dearness Allowance (DA)
-                $earnedBasic = ($computedSalaryItems['BASIC']['calculated_value'] ?? 0.00) + ($computedSalaryItems['DA']['calculated_value'] ?? 0.00);
-                $pfBasis = $restrictPfCeiling ? min($earnedBasic, 15000.00) : $earnedBasic;
+                // PF Wage Basis: Basic + DA. Find the basic component dynamically.
+                // Look for 'BASIC' or 'DA' codes first; fall back to any fixed earning if not found.
+                $pfEarnedBasic = 0.00;
+                $pfBaseBasic = 0.00;
+                foreach ($computedSalaryItems as $code => $item) {
+                    if ($item['type'] === 'earning' && (strtoupper($code) === 'BASIC' || strtoupper($code) === 'DA' || str_starts_with(strtoupper($code), 'BASIC'))) {
+                        $pfEarnedBasic += $item['calculated_value'] ?? 0.00;
+                        $pfBaseBasic   += $item['base_monthly'] ?? 0.00;
+                    }
+                }
+                // If no BASIC component found at all, fall back to first fixed earning
+                if ($pfEarnedBasic == 0.00) {
+                    foreach ($computedSalaryItems as $code => $item) {
+                        if ($item['type'] === 'earning' && !in_array($code, ['SPL', 'HRA', 'LOP'])) {
+                            $pfEarnedBasic = $item['calculated_value'] ?? 0.00;
+                            $pfBaseBasic   = $item['base_monthly'] ?? 0.00;
+                            break;
+                        }
+                    }
+                }
+                $pfBasis = $restrictPfCeiling ? min($pfEarnedBasic, 15000.00) : $pfEarnedBasic;
                 $pfDeduction = round($pfBasis * 0.12, 2);
                 $computedSalaryItems['PF']['calculated_value'] = $pfDeduction;
-                
-                $baseBasic = ($computedSalaryItems['BASIC']['base_monthly'] ?? 0) + ($computedSalaryItems['DA']['base_monthly'] ?? 0);
-                $computedSalaryItems['PF']['base_monthly'] = $restrictPfCeiling ? min($baseBasic, 15000.00) * 0.12 : $baseBasic * 0.12;
+                $computedSalaryItems['PF']['base_monthly'] = $restrictPfCeiling ? min($pfBaseBasic, 15000.00) * 0.12 : $pfBaseBasic * 0.12;
             } else {
                 $computedSalaryItems['PF']['calculated_value'] = 0.00;
                 $computedSalaryItems['PF']['base_monthly'] = 0.00;

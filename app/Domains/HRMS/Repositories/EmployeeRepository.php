@@ -130,16 +130,19 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         if ($salaryStructure) {
             $items = $salaryStructure->items()->with('component')->get();
             $ctc = (float) $employee->current_salary;
-            $basicAmount = 0.0;
+            // Find the "basic" item: first earning component that is fixed or % of CTC (code-agnostic)
+            $basicItemFound = $items->first(function($i) {
+                return $i->component &&
+                       $i->component->type === 'earning' &&
+                       in_array($i->calculation_type, ['fixed', 'percentage_of_ctc']);
+            });
 
-            foreach ($items as $item) {
-                if ($item->component && strtolower($item->component->code) === 'basic') {
-                    if ($item->calculation_type === 'fixed') {
-                        $basicAmount = (float) $item->value;
-                    } elseif ($item->calculation_type === 'percentage_of_ctc') {
-                        $basicAmount = ($item->value / 100) * $ctc;
-                    }
-                    break;
+            $basicAmount = 0.0;
+            if ($basicItemFound) {
+                if ($basicItemFound->calculation_type === 'fixed') {
+                    $basicAmount = (float) $basicItemFound->value; // stored as yearly
+                } elseif ($basicItemFound->calculation_type === 'percentage_of_ctc') {
+                    $basicAmount = ($basicItemFound->value / 100) * $ctc;
                 }
             }
 
@@ -282,10 +285,15 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         $options = $this->getDropdownOptions();
 
         $documentMasters = \App\Domains\HRMS\Models\DocumentMaster::where('status', 'active')->orderBy('name')->get();
+        $pipPlans = \App\Domains\HRMS\Models\PerformanceImprovementPlan::where('employee_id', $employee->id)
+            ->with(['category', 'manager', 'objectives', 'checkins'])
+            ->orderBy('created_at', 'desc')
+            ->get();
         $activeTabName = $inputs['active_tab'] ?? $inputs['tab'] ?? 'overview';
 
         return array_merge([
             'employee'                  => $employee,
+            'pipPlans'                  => $pipPlans,
             'availableAssets'           => $availableAssets,
             'leaveTypes'                => $leaveTypes,
             'documentMasters'           => $documentMasters,
