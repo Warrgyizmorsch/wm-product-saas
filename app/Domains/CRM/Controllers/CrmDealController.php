@@ -57,7 +57,7 @@ class CrmDealController extends Controller
             }
         }
 
-        $query = CrmDeal::with(['account', 'contact', 'owner', 'quotations'])
+        $query = CrmDeal::with(['account', 'contact', 'owner', 'quotations', 'lead'])
             ->where('tenant_id', $tenantId);
 
         if ($search) {
@@ -65,7 +65,13 @@ class CrmDealController extends Controller
                 $q->where('title', 'like', "%{$search}%")
                   ->orWhere('deal_number', 'like', "%{$search}%")
                   ->orWhereHas('account', fn($aq) => $aq->where('name', 'like', "%{$search}%"))
-                  ->orWhereHas('contact', fn($cq) => $cq->where('name', 'like', "%{$search}%"));
+                  ->orWhereHas('contact', fn($cq) => $cq->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('lead', fn($lq) => $lq->where('company_name', 'like', "%{$search}%")
+                      ->orWhere('contact_person', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('company_email', 'like', "%{$search}%")
+                      ->orWhere('phone', 'like', "%{$search}%")
+                      ->orWhere('company_phone', 'like', "%{$search}%"));
             });
         }
 
@@ -128,7 +134,7 @@ class CrmDealController extends Controller
             ];
         }
 
-        $allDeals = CrmDeal::with(['account', 'contact', 'quotations'])
+        $allDeals = CrmDeal::with(['account', 'contact', 'quotations', 'lead'])
             ->where('tenant_id', $tenantId)
             ->orderBy('updated_at', 'desc')
             ->get();
@@ -273,14 +279,20 @@ class CrmDealController extends Controller
         }
 
         // Fetch linked lead for complete activity roll-up & document history
-        $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
-            ->orWhere(function($q) use ($deal) {
-                if ($deal->crm_account_id) {
-                    $q->where('crm_account_id', $deal->crm_account_id);
-                }
-            })
-            ->with(['histories.user', 'leadDocuments'])
-            ->first();
+        $linkedLead = null;
+        if (!empty($deal->lead_id)) {
+            $linkedLead = \App\Domains\CRM\Models\Lead::with(['histories.user', 'leadDocuments'])->find($deal->lead_id);
+        }
+        if (!$linkedLead) {
+            $linkedLead = \App\Domains\CRM\Models\Lead::where('crm_deal_id', $deal->id)
+                ->orWhere(function($q) use ($deal) {
+                    if ($deal->crm_account_id) {
+                        $q->where('crm_account_id', $deal->crm_account_id);
+                    }
+                })
+                ->with(['histories.user', 'leadDocuments'])
+                ->first();
+        }
 
         $followupsQuery = \App\Domains\CRM\Models\LeadFollowup::where('crm_deal_id', $deal->id);
         if ($linkedLead) {

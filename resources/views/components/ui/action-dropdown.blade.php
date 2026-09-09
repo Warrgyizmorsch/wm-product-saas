@@ -2,7 +2,8 @@
     'viewUrl' => null,
     'viewIcon' => 'feather-eye',
     'offset' => '0,21',
-    'id' => null
+    'id' => null,
+    'align' => 'center'
 ])
 
 @php
@@ -40,12 +41,13 @@
                 right: 0 !important;
                 left: auto !important;
                 transform: none !important;
+                margin-top: 4px !important;
             }
         </style>
     @endpush
 @endonce
 
-<div {{ $attributes->class(['hstack gap-2 justify-content-end']) }}>
+<div {{ $attributes->class(['hstack gap-2', 'justify-content-' . ($align ?? 'center')]) }}>
     @if($viewUrl)
         <a href="{{ $viewUrl }}" class="action-dropdown-btn" title="View Details" data-bs-toggle="tooltip">
             <i class="feather {{ $viewIcon }}"></i>
@@ -58,7 +60,7 @@
 
     @if(isset($slot) && trim($slot) !== '')
         <div class="dropdown" id="{{ $dropdownId }}">
-            <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" data-offset="{{ $offset }}" title="More Actions" data-bs-toggle="tooltip">
+            <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" data-offset="{{ $offset }}" title="More Actions">
                 <i class="feather feather-more-horizontal"></i>
             </a>
             <ul class="dropdown-menu dropdown-menu-end" style="margin: 0;">

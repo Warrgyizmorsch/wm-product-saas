@@ -65,7 +65,7 @@
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-2"></i>Customer Information</h6>
                             
                             @php
-                                $clientName = $quotation->account ? $quotation->account->name : ($quotation->lead ? ($quotation->lead->company_name ?: $quotation->lead->contact_person) : 'Client');
+                                $clientName = $quotation->account ? $quotation->account->name : ($quotation->lead ? ($quotation->lead->company_name ?: $quotation->lead->contact_person) : ($quotation->crmDeal?->lead ? ($quotation->crmDeal->lead->company_name ?: $quotation->crmDeal->lead->contact_person) : 'Client'));
                             @endphp
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.customer')" name="_customer_display"

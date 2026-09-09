@@ -358,7 +358,8 @@ class LeadController extends Controller
     {
         $this->authorize('update', $lead);
         $this->leadRepo->qualifyLead($lead);
-        return redirect()->back()->with('success', "Lead #{$lead->id} successfully converted to Account & Deal and status updated to Won!");
+        return redirect()->back()
+            ->with('success', "Lead #{$lead->id} qualified into Deal successfully!");
     }
 
     public function trackStatus()

@@ -91,23 +91,24 @@
                     <i class="feather-arrow-left"></i>
                 </a>
 
-                @if($lead->crm_account_id)
-                    <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-briefcase me-1"></i> Account
+                @if($lead->crm_deal_id)
+                    <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="btn btn-xs btn-soft-success fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
+                        <i class="feather-git-branch me-1"></i> View Deal
                     </a>
-                    @if($lead->crm_deal_id)
-                        <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="btn btn-xs btn-soft-success fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
-                            <i class="feather-git-branch me-1"></i> Deal
-                        </a>
-                    @endif
-                @elseif($lead->status === 'Qualified')
+                @else
                     <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST" class="d-inline m-0 p-0">
                         @csrf
                         @method('PATCH')
                         <button type="submit" class="btn btn-xs btn-warning text-dark fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
-                            <i class="feather-user-check me-1"></i> Convert
+                            <i class="feather-user-check me-1"></i> Convert to Deal
                         </button>
                     </form>
+                @endif
+
+                @if($lead->crm_account_id)
+                    <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
+                        <i class="feather-briefcase me-1"></i> View Account
+                    </a>
                 @endif
 
 

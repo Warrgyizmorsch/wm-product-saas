@@ -259,6 +259,10 @@
                                 </tbody>
                             </x-ui.odoo-form-ui>
                         </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 px-1">
+                            <div id="invoicesTable-info" class="fs-12 text-muted"></div>
+                            <div id="invoicesTable-pagination"></div>
+                        </div>
                     @else
                         <div class="text-center py-5 text-muted border rounded">
                             <i class="feather-file-text display-6 text-muted opacity-50 mb-2 d-block"></i>
@@ -345,6 +349,10 @@
                                     @endforeach
                                 </tbody>
                             </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 px-1">
+                            <div id="paymentsTable-info" class="fs-12 text-muted"></div>
+                            <div id="paymentsTable-pagination"></div>
                         </div>
                     @else
                         <div class="text-center py-5 text-muted border rounded">
@@ -446,6 +454,10 @@
                                     @endforeach
                                 </tbody>
                             </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 px-1">
+                            <div id="ordersTable-info" class="fs-12 text-muted"></div>
+                            <div id="ordersTable-pagination"></div>
                         </div>
                     @else
                         <div class="text-center py-5 text-muted border rounded">
@@ -619,6 +631,10 @@
                                 </tfoot>
                             </x-ui.odoo-form-ui>
                         </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 px-1">
+                            <div id="ledgerTable-info" class="fs-12 text-muted"></div>
+                            <div id="ledgerTable-pagination"></div>
+                        </div>
                     @else
                         <div class="text-center py-5 text-muted border rounded">
                             <i class="feather-book-open display-6 text-muted opacity-50 mb-2 d-block"></i>
@@ -631,3 +647,76 @@
         </x-ui.odoo-form-ui>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+function initTablePagination(tableId, infoId, paginationId, itemsPerPage = 10) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    const rows = Array.from(tbody.children).filter(tr => tr.tagName === 'TR' && !tr.querySelector('td[colspan]'));
+    const totalItems = rows.length;
+    if (totalItems === 0) return;
+
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    let currentPage = 1;
+
+    function renderPage(page) {
+        currentPage = page;
+        const start = (page - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+
+        rows.forEach((row, index) => {
+            row.style.display = (index >= start && index < end) ? '' : 'none';
+        });
+
+        const infoEl = document.getElementById(infoId);
+        if (infoEl) {
+            infoEl.textContent = `Showing ${start + 1} to ${Math.min(end, totalItems)} of ${totalItems} entries`;
+        }
+
+        const pagEl = document.getElementById(paginationId);
+        if (pagEl) {
+            if (totalPages <= 1) {
+                pagEl.innerHTML = '';
+                return;
+            }
+            let html = '<ul class="pagination pagination-sm mb-0">';
+            html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a>
+            </li>`;
+            for (let i = 1; i <= totalPages; i++) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>`;
+            }
+            html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${currentPage + 1}">Next</a>
+            </li>`;
+            html += '</ul>';
+            pagEl.innerHTML = html;
+
+            pagEl.querySelectorAll('a.page-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const p = parseInt(this.getAttribute('data-page'));
+                    if (p >= 1 && p <= totalPages && p !== currentPage) {
+                        renderPage(p);
+                    }
+                });
+            });
+        }
+    }
+
+    renderPage(1);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    initTablePagination('invoicesTable', 'invoicesTable-info', 'invoicesTable-pagination', 10);
+    initTablePagination('paymentsTable', 'paymentsTable-info', 'paymentsTable-pagination', 10);
+    initTablePagination('ordersTable', 'ordersTable-info', 'ordersTable-pagination', 10);
+    initTablePagination('ledgerTable', 'ledgerTable-info', 'ledgerTable-pagination', 10);
+});
+</script>
+@endpush

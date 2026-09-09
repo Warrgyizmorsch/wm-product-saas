@@ -19,11 +19,38 @@ class Customer extends BaseModel
         'company_id',
         'branch_id',
         'name',
+        'company_name',
         'email',
         'phone',
         'gstin',
         'status',
+        'billing_address',
+        'shipping_address',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::created(function ($customer) {
+            if (!$customer->crmAccount()->exists()) {
+                CrmAccount::create([
+                    'tenant_id'        => $customer->tenant_id,
+                    'company_id'       => $customer->company_id,
+                    'branch_id'        => $customer->branch_id,
+                    'customer_id'      => $customer->id,
+                    'name'             => $customer->name,
+                    'email'            => $customer->email,
+                    'phone'            => $customer->phone,
+                    'gstin'            => $customer->gstin,
+                    'billing_address'  => $customer->billing_address ?? null,
+                    'shipping_address' => $customer->shipping_address ?? null,
+                    'status'           => strtolower($customer->status ?: 'active') === 'active' ? 'active' : 'inactive',
+                    'owner_id'         => auth()->id() ?? 1,
+                ]);
+            }
+        });
+    }
 
     public function crmAccount()
     {

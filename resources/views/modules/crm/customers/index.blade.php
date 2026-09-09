@@ -5,12 +5,13 @@
 @section('breadcrumb', 'CRM / Customers')
 
 @section('page-actions')
-    <x-ui.button href="{{ route('crm.customers.create') }}" variant="primary" icon="feather-plus">
+    <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#quickCreateModal_customer">
         New Customer
     </x-ui.button>
 @endsection
 
 @section('content')
+    <x-ui.master-modals :masters="['customer']" />
 
     @php
         $sortBy = request('sort_by', 'created_at');
@@ -95,25 +96,23 @@
             <x-ui.odoo-form-ui type="table" id="customersTable" class="mb-0">
                 <thead>
                     <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
-                            <input type="checkbox" class="form-check-input" id="selectAllCustomers">
-                        </th>
-                        <th style="background-color: #e8ecf1 !important;">Customer Name</th>
+                        <th style="background-color: #e8ecf1 !important;" class="ps-3">Customer Name</th>
                         <th style="background-color: #e8ecf1 !important;">Email Address</th>
                         <th style="background-color: #e8ecf1 !important;">Phone / Mobile</th>
                         <th style="background-color: #e8ecf1 !important;">Status</th>
-                        <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">Action</th>
+                        <th style="width: 1%; background-color: #e8ecf1 !important;" class="text-end pe-3">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($customers as $customer)
                         <tr>
-                            <td class="text-center">
-                                <input type="checkbox" class="form-check-input customer-checkbox">
-                            </td>
-                            <td>
+                            <td class="ps-3">
                                 <div>
-                                    <a href="{{ route('crm.customers.show', $customer) }}" class="fw-bold text-dark hover-primary d-block">{{ $customer->name }}</a>
+                                    @php
+                                        $accId = $customer->crmAccount?->id;
+                                        $accRoute = $accId ? route('crm.accounts.show', $accId) : route('crm.customers.show', $customer);
+                                    @endphp
+                                    <a href="{{ $accRoute }}" class="fw-bold text-dark hover-primary d-block">{{ $customer->name }}</a>
                                     @if($customer->gstin)
                                         <span class="fs-10 font-monospace text-muted">GST: {{ $customer->gstin }}</span>
                                     @endif
@@ -141,16 +140,22 @@
                                 @endif
                             </td>
                             <td class="text-end pe-3">
-                                <x-ui.action-dropdown :viewUrl="route('crm.customers.show', $customer)">
+                                <x-ui.action-dropdown align="end">
+                                    <x-slot:extraActions>
+                                        <a href="{{ $accRoute }}" class="btn btn-xs btn-soft-primary fw-bold text-nowrap px-2 py-1 fs-11" style="height: 28px; line-height: 20px; display: inline-flex; align-items: center;">
+                                            View Account
+                                        </a>
+                                    </x-slot:extraActions>
+
                                     @if (strtolower($customer->status) === 'active')
                                         <li>
-                                            <a href="{{ route('crm.customers.toggleStatus', [$customer, 'status' => 'inactive']) }}" class="dropdown-item fs-12 py-1.5 text-danger">
+                                            <a href="{{ route('crm.customers.toggleStatus', [$customer, 'status' => 'inactive']) }}" class="dropdown-item py-1.5 text-danger">
                                                 <i class="feather-user-x me-2 text-danger"></i>Mark as Inactive
                                             </a>
                                         </li>
                                     @else
                                         <li>
-                                            <a href="{{ route('crm.customers.toggleStatus', [$customer, 'status' => 'active']) }}" class="dropdown-item fs-12 py-1.5 text-success">
+                                            <a href="{{ route('crm.customers.toggleStatus', [$customer, 'status' => 'active']) }}" class="dropdown-item py-1.5 text-success">
                                                 <i class="feather-user-check me-2 text-success"></i>Mark as Active
                                             </a>
                                         </li>
@@ -160,7 +165,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
+                            <td colspan="5" class="text-center py-5 text-muted">
                                 <i class="feather-users display-6 mb-2 text-muted opacity-50 d-block"></i>
                                 No customers found matching your criteria.
                             </td>
@@ -170,17 +175,15 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        {{-- 4. Pagination --}}
-        @if($customers->hasPages())
-            <div class="mt-3">
-                <x-ui.pagination 
-                    :currentPage="$customers->currentPage()" 
-                    :totalPages="$customers->lastPage()" 
-                    :totalResults="$customers->total()" 
-                    :perPage="$customers->perPage()" 
-                />
-            </div>
-        @endif
+        {{-- 4. Common Component Pagination --}}
+        <div class="mt-3">
+            <x-ui.pagination 
+                :currentPage="$customers->currentPage()" 
+                :totalPages="$customers->lastPage()" 
+                :totalResults="$customers->total()" 
+                :perPage="$customers->perPage()" 
+            />
+        </div>
     </div>
 
     @push('scripts')

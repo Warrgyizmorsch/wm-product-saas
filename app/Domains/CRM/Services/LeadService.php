@@ -253,7 +253,7 @@ class LeadService
             }
             $message = 'Lead status updated to Lost.';
         } elseif ($newStatus === 'Won') {
-            if (!$lead->crm_account_id || !$lead->crm_deal_id) {
+            if (!$lead->crm_account_id) {
                 return [
                     'success' => false,
                     'message' => 'Cannot mark as Won. Account & Deal conversion required first!'

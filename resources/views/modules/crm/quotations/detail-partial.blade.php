@@ -23,7 +23,7 @@
     <div class="card-body p-3">
         <div class="row g-2 fs-12">
             <div class="col-5 text-muted">Customer</div>
-            <div class="col-7 fw-semibold text-dark">{{ $quotation->customer?->name ?? ($quotation->lead?->company_name ?? '—') }}</div>
+            <div class="col-7 fw-semibold text-dark">{{ $quotation->prepared_for_name }}</div>
 
             <div class="col-5 text-muted">Date</div>
             <div class="col-7 fw-semibold">{{ $quotation->quotation_date ? $quotation->quotation_date->format('d/m/Y') : '—' }}</div>

@@ -29,7 +29,7 @@ class CustomerController extends Controller
         $activeCount = Customer::where('tenant_id', $tenantId)->whereIn('status', ['active', 'Active'])->count();
         $inactiveCount = Customer::where('tenant_id', $tenantId)->whereIn('status', ['inactive', 'Inactive'])->count();
 
-        $query = Customer::query()->where('tenant_id', $tenantId);
+        $query = Customer::query()->where('tenant_id', $tenantId)->with('crmAccount');
 
         if ($search = $request->input('search')) {
             $query->where(function($q) use ($search) {
@@ -49,7 +49,7 @@ class CustomerController extends Controller
         $direction = $request->input('sort_order', 'desc');
         $query->orderBy($sort, $direction);
 
-        $customers = $query->paginate(15)->withQueryString();
+        $customers = $query->paginate(10)->withQueryString();
 
         return view('modules.crm.customers.index', compact('customers', 'totalCount', 'activeCount', 'inactiveCount'));
     }
@@ -65,20 +65,42 @@ class CustomerController extends Controller
     {
         $this->authorize('create', Customer::class);
 
-        $tenantId = tenant_id() ?? app(TenantContext::class)->id();
+        $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'company_name' => ['nullable', 'string', 'max:255'],
             'email' => [
-                'nullable', 
+                'required', 
                 'email', 
                 'max:255', 
                 Rule::unique('customers', 'email')->where(function ($query) use ($tenantId) {
                     return $query->where('tenant_id', $tenantId);
                 })
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => [
+                'nullable', 
+                'string', 
+                'max:50',
+                Rule::unique('customers', 'phone')->where(function ($query) use ($tenantId) {
+                    return $query->where('tenant_id', $tenantId)->whereNotNull('phone');
+                })
+            ],
+            'gstin' => [
+                'nullable', 
+                'string', 
+                'max:50',
+                Rule::unique('customers', 'gstin')->where(function ($query) use ($tenantId) {
+                    return $query->where('tenant_id', $tenantId)->whereNotNull('gstin');
+                })
+            ],
+            'billing_address' => ['nullable', 'string'],
+            'shipping_address' => ['nullable', 'string'],
             'status' => ['required', 'string', 'in:active,inactive'],
+        ], [
+            'email.unique' => 'Customer with this email address already exists.',
+            'phone.unique' => 'Customer with this phone number already exists.',
+            'gstin.unique' => 'Customer with this GSTIN already exists.',
         ]);
 
         $this->customers->create($validated);
@@ -95,18 +117,37 @@ class CustomerController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'company_name' => ['nullable', 'string', 'max:255'],
             'email' => [
-                'nullable', 
+                'required', 
                 'email', 
                 'max:255', 
                 Rule::unique('customers', 'email')->where(function ($query) use ($tenantId) {
                     return $query->where('tenant_id', $tenantId);
                 })
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'company_name' => ['nullable', 'string', 'max:255'],
+            'phone' => [
+                'nullable', 
+                'string', 
+                'max:50',
+                Rule::unique('customers', 'phone')->where(function ($query) use ($tenantId) {
+                    return $query->where('tenant_id', $tenantId)->whereNotNull('phone');
+                })
+            ],
+            'gstin' => [
+                'nullable', 
+                'string', 
+                'max:50',
+                Rule::unique('customers', 'gstin')->where(function ($query) use ($tenantId) {
+                    return $query->where('tenant_id', $tenantId)->whereNotNull('gstin');
+                })
+            ],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
+        ], [
+            'email.unique' => 'Customer with this email address already exists.',
+            'phone.unique' => 'Customer with this phone number already exists.',
+            'gstin.unique' => 'Customer with this GSTIN already exists.',
         ]);
 
         $validated['status'] = 'active';

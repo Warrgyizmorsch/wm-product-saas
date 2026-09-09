@@ -263,9 +263,32 @@ class QuotationService
             if (!$lead && $quotation->lead_id) {
                 $lead = Lead::find($quotation->lead_id);
             }
+            if (!$lead && $deal) {
+                if (!empty($deal->lead_id)) {
+                    $lead = Lead::find($deal->lead_id);
+                }
+                if (!$lead) {
+                    $lead = Lead::where('crm_deal_id', $deal->id)->first();
+                }
+            }
             if (!$lead && $account) {
                 $lead = Lead::where('crm_account_id', $account->id)->first();
             }
+
+            // Extract rich details from Lead or Quotation fallback
+            $gstin = $lead ? $lead->gstin : ($account ? $account->gstin : null);
+
+            $compEmail = $lead 
+                ? ($lead->company_email ?: $lead->email) 
+                : ($quotation->email ?: ($quotation->prepared_for_email !== '—' ? $quotation->prepared_for_email : ($account ? $account->email : null)));
+
+            $compPhone = $lead 
+                ? ($lead->company_phone ?: $lead->phone) 
+                : ($quotation->phone ?: ($quotation->prepared_for_phone !== '—' ? $quotation->prepared_for_phone : ($account ? $account->phone : null)));
+
+            $compName = $lead 
+                ? ($lead->company_name ?: ($lead->contact_person ?: $lead->name)) 
+                : ($quotation->prepared_for_name !== '—' && $quotation->prepared_for_name !== 'New Client' ? $quotation->prepared_for_name : ($account ? $account->name : ($deal ? $deal->title : 'Client')));
 
             // Determine if B2B or B2C
             $isB2B = $lead ? ($lead->lead_type === 'b2b' || !empty($lead->company_name) || !empty($lead->gstin)) : true;
@@ -273,20 +296,12 @@ class QuotationService
 
             if ($isB2B) {
                 // ========== B2B PRIORITY MATCHING ==========
-                $gstin = $lead ? $lead->gstin : ($account ? $account->gstin : null);
-                $compEmail = $lead ? ($lead->company_email ?: $lead->email) : ($account ? $account->email : null);
-                $compPhone = $lead ? ($lead->company_phone ?: $lead->phone) : ($account ? $account->phone : null);
-                $compName = $lead ? $lead->company_name : ($account ? $account->name : 'New Client');
-
-                // Priority 1: GSTIN
                 if (!empty($gstin)) {
                     $customer = Customer::where('tenant_id', $tenantId)->where('gstin', $gstin)->first();
                 }
-                // Priority 2: Company Email
                 if (!$customer && !empty($compEmail)) {
                     $customer = Customer::where('tenant_id', $tenantId)->whereRaw('LOWER(email) = ?', [strtolower($compEmail)])->first();
                 }
-                // Priority 3: Company Phone
                 if (!$customer && !empty($compPhone)) {
                     $cleanP = preg_replace('/[^0-9]/', '', $compPhone);
                     if (!empty($cleanP)) {
@@ -296,8 +311,7 @@ class QuotationService
                         })->first();
                     }
                 }
-                // Priority 4: Company Name
-                if (!$customer && !empty($compName) && strlen($compName) >= 3) {
+                if (!$customer && !empty($compName) && strlen($compName) >= 3 && !in_array($compName, ['New Client', 'Client'], true)) {
                     $cleanComp = trim(preg_replace('/(pvt|ltd|private|limited|inc|corp|co)/i', '', $compName));
                     if (!empty($cleanComp)) {
                         $customer = Customer::where('tenant_id', $tenantId)->where('name', 'like', "%{$cleanComp}%")->first();
@@ -315,21 +329,22 @@ class QuotationService
                     ]);
                 } else {
                     $customer->update([
-                        'status' => 'active',
+                        'name'   => ($customer->name === 'New Client' || empty($customer->name)) ? $compName : $customer->name,
+                        'email'  => $customer->email ?: $compEmail,
+                        'phone'  => $customer->phone ?: $compPhone,
                         'gstin'  => $customer->gstin ?: $gstin,
+                        'status' => 'active',
                     ]);
                 }
             } else {
                 // ========== B2C PRIORITY MATCHING ==========
-                $personName = $lead ? ($lead->contact_person ?: $lead->company_name) : 'Individual Customer';
-                $personEmail = $lead ? $lead->email : null;
-                $personPhone = $lead ? $lead->phone : null;
+                $personName = $lead ? ($lead->contact_person ?: $lead->company_name) : ($quotation->prepared_for_name !== '—' ? $quotation->prepared_for_name : 'Individual Customer');
+                $personEmail = $lead ? $lead->email : ($quotation->email ?: ($quotation->prepared_for_email !== '—' ? $quotation->prepared_for_email : null));
+                $personPhone = $lead ? $lead->phone : ($quotation->phone ?: ($quotation->prepared_for_phone !== '—' ? $quotation->prepared_for_phone : null));
 
-                // Priority 1: Email
                 if (!empty($personEmail)) {
                     $customer = Customer::where('tenant_id', $tenantId)->whereRaw('LOWER(email) = ?', [strtolower($personEmail)])->first();
                 }
-                // Priority 2: Mobile Phone
                 if (!$customer && !empty($personPhone)) {
                     $cleanP = preg_replace('/[^0-9]/', '', $personPhone);
                     if (!empty($cleanP)) {
@@ -339,7 +354,6 @@ class QuotationService
                         })->first();
                     }
                 }
-                // Priority 3: Person Name
                 if (!$customer && !empty($personName)) {
                     $customer = Customer::where('tenant_id', $tenantId)->where('name', 'like', "%{$personName}%")->first();
                 }
@@ -353,53 +367,145 @@ class QuotationService
                         'status'    => 'active',
                     ]);
                 } else {
-                    $customer->update(['status' => 'active']);
+                    $customer->update([
+                        'name'   => ($customer->name === 'New Client' || empty($customer->name)) ? $personName : $customer->name,
+                        'email'  => $customer->email ?: $personEmail,
+                        'phone'  => $customer->phone ?: $personPhone,
+                        'status' => 'active',
+                    ]);
                 }
             }
 
             // Sync CrmAccount
             if (!$account) {
-                $compName = $lead ? ($lead->company_name ?: ($lead->contact_person ?: 'New Client')) : 'New Client';
                 $account = CrmAccount::where('tenant_id', $tenantId)->where('customer_id', $customer->id)->first();
+                
+                if (!$account && !empty($customer->email)) {
+                    $account = CrmAccount::where('tenant_id', $tenantId)->where('email', $customer->email)->first();
+                }
+                if (!$account && !empty($customer->phone)) {
+                    $account = CrmAccount::where('tenant_id', $tenantId)->where('phone', $customer->phone)->first();
+                }
+                if (!$account && !empty($customer->gstin)) {
+                    $account = CrmAccount::where('tenant_id', $tenantId)->where('gstin', $customer->gstin)->first();
+                }
+                if (!$account && !empty($compName) && $compName !== 'New Client') {
+                    $account = CrmAccount::where('tenant_id', $tenantId)->where('name', $compName)->first();
+                }
+
                 if (!$account) {
                     $account = CrmAccount::create([
-                        'tenant_id'   => $tenantId,
-                        'customer_id' => $customer->id,
-                        'name'        => $compName,
-                        'email'       => $customer->email,
-                        'phone'       => $customer->phone,
-                        'status'      => 'active',
-                        'owner_id'    => auth()->id() ?: 1,
+                        'tenant_id'     => $tenantId,
+                        'customer_id'   => $customer->id,
+                        'name'          => $compName,
+                        'email'         => $compEmail ?: $customer->email,
+                        'phone'         => $compPhone ?: $customer->phone,
+                        'gstin'         => $gstin ?: $customer->gstin,
+                        'industry_type' => $lead ? $lead->industry_type : null,
+                        'street'        => $lead ? $lead->address : null,
+                        'city'          => $lead ? $lead->city : null,
+                        'state'         => $lead ? $lead->state : null,
+                        'country'       => $lead ? $lead->country : null,
+                        'status'        => 'active',
+                        'owner_id'      => auth()->id() ?: 1,
+                    ]);
+                } else {
+                    $account->update([
+                        'customer_id'   => $customer->id,
+                        'name'          => ($account->name === 'New Client' || empty($account->name)) ? $compName : $account->name,
+                        'email'         => $account->email ?: ($compEmail ?: $customer->email),
+                        'phone'         => $account->phone ?: ($compPhone ?: $customer->phone),
+                        'gstin'         => $account->gstin ?: ($gstin ?: $customer->gstin),
+                        'industry_type' => $account->industry_type ?: ($lead ? $lead->industry_type : null),
+                        'street'        => $account->street ?: ($lead ? $lead->address : null),
+                        'city'          => $account->city ?: ($lead ? $lead->city : null),
+                        'state'         => $account->state ?: ($lead ? $lead->state : null),
+                        'country'       => $account->country ?: ($lead ? $lead->country : null),
+                        'status'        => 'active',
                     ]);
                 }
             } else {
-                if (!$account->customer_id) {
-                    $account->update(['customer_id' => $customer->id]);
-                }
+                $account->update([
+                    'customer_id'   => $customer->id,
+                    'name'          => ($account->name === 'New Client' || empty($account->name)) ? $compName : $account->name,
+                    'email'         => $account->email ?: ($compEmail ?: $customer->email),
+                    'phone'         => $account->phone ?: ($compPhone ?: $customer->phone),
+                    'gstin'         => $account->gstin ?: ($gstin ?: $customer->gstin),
+                    'industry_type' => $account->industry_type ?: ($lead ? $lead->industry_type : null),
+                    'street'        => $account->street ?: ($lead ? $lead->address : null),
+                    'city'          => $account->city ?: ($lead ? $lead->city : null),
+                    'state'         => $account->state ?: ($lead ? $lead->state : null),
+                    'country'       => $account->country ?: ($lead ? $lead->country : null),
+                    'status'        => 'active',
+                ]);
+            }
+
+            if ($customer) {
+                $customer->update([
+                    'name'   => ($customer->name === 'New Client' || empty($customer->name)) ? $compName : $customer->name,
+                    'email'  => $customer->email ?: $compEmail,
+                    'phone'  => $customer->phone ?: $compPhone,
+                    'gstin'  => $customer->gstin ?: $gstin,
+                    'status' => 'active',
+                ]);
             }
 
             // 3. Sync or Find CRM Contact in `crm_contacts` table
             $companyName = $customer->name;
-            $contactEmail = $lead ? ($lead->email ?: $customer->email) : $customer->email;
-            $contactPhone = $lead ? ($lead->phone ?: $customer->phone) : $customer->phone;
+            $contactEmail = $lead ? ($lead->email ?: ($lead->company_email ?: $customer->email)) : ($quotation->email ?: $customer->email);
+            $contactPhone = $lead ? ($lead->phone ?: ($lead->company_phone ?: $customer->phone)) : ($quotation->phone ?: $customer->phone);
+            $contactName = $lead ? ($lead->contact_person ?: ($lead->company_name ?: $companyName)) : ($quotation->prepared_for_name !== '—' ? $quotation->prepared_for_name : $companyName);
+            $contactDesignation = $lead ? ($lead->designation ?: 'Primary Contact') : 'Primary Contact';
+
+            // Determine company/branch from account (needed for BelongsToCompany global scope)
+            $companyId = $account->company_id ?? (company_id() ?? null);
+            $branchId  = $account->branch_id  ?? (branch_id()  ?? null);
 
             $contact = null;
-            $contactName = $lead ? ($lead->contact_person ?: $companyName) : $companyName;
             if ($contactName) {
-                $contact = CrmContact::where('crm_account_id', $account->id)->where('name', $contactName)->first();
+                // Use withoutGlobalScopes so we find contacts even if company_id was previously null
+                $contact = CrmContact::withoutGlobalScopes()
+                    ->where('crm_account_id', $account->id)
+                    ->where(function($q) use ($contactName, $contactEmail) {
+                        $q->where('name', $contactName);
+                        if ($contactEmail) {
+                            $q->orWhere('email', $contactEmail);
+                        }
+                    })->first();
+
                 if (!$contact) {
                     $contact = CrmContact::create([
                         'tenant_id'      => $tenantId,
+                        'company_id'     => $companyId,
+                        'branch_id'      => $branchId,
                         'crm_account_id' => $account->id,
                         'name'           => $contactName,
+                        'designation'    => $contactDesignation,
                         'role'           => 'Purchase Decision Maker',
                         'email'          => $contactEmail,
                         'phone'          => $contactPhone,
                         'mobile'         => $contactPhone,
-                        'is_primary'     => $account->contacts()->count() === 0,
+                        'is_primary'     => true,
                         'status'         => 'active',
                     ]);
+                } else {
+                    // Ensure company_id / branch_id are set on existing contacts
+                    $contact->update([
+                        'company_id'  => $contact->company_id  ?: $companyId,
+                        'branch_id'   => $contact->branch_id   ?: $branchId,
+                        'designation' => $contact->designation ?: $contactDesignation,
+                        'email'       => $contact->email  ?: $contactEmail,
+                        'phone'       => $contact->phone  ?: $contactPhone,
+                        'mobile'      => $contact->mobile ?: $contactPhone,
+                        'is_primary'  => true,
+                    ]);
                 }
+
+                // Unset is_primary on all other contacts for this account
+                CrmContact::withoutGlobalScopes()
+                    ->where('crm_account_id', $account->id)
+                    ->where('id', '!=', $contact->id)
+                    ->update(['is_primary' => false]);
             }
 
             // 4. Update or Create Deal in `crm_deals` table
@@ -409,10 +515,11 @@ class QuotationService
             }
             if ($deal) {
                 $deal->update([
-                    'stage'        => 'Won',
-                    'actual_value' => $quotation->total_amount,
-                    'probability'  => 100,
-                    'closing_date' => now(),
+                    'crm_account_id' => $account->id,
+                    'stage'          => 'Won',
+                    'actual_value'   => $quotation->total_amount,
+                    'probability'    => 100,
+                    'closing_date'   => now(),
                 ]);
             } else {
                 $dealTitle = $lead ? ($lead->requirement ?: "Project for {$companyName}") : "Quotation {$quotation->quotation_number}";
