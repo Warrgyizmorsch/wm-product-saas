@@ -148,14 +148,14 @@
                     <a class="nav-link {{ $activeTab === 'categories' ? 'active' : '' }}" href="{{ route('hrms.pip.index', ['active_tab' => 'categories']) }}">
                         <i class="feather-tag"></i>
                         <span>PIP Categories Master</span>
-                        <x-ui.badge soft variant="secondary" class="ms-1">{{ $categories->count() }}</x-ui.badge>
+                        <x-ui.badge soft variant="secondary" class="ms-1">{{ $categories->total() }}</x-ui.badge>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'templates' ? 'active' : '' }}" href="{{ route('hrms.pip.index', ['active_tab' => 'templates']) }}">
                         <i class="feather-file-text"></i>
                         <span>Policy Templates Master</span>
-                        <x-ui.badge soft variant="info" class="ms-1">{{ $policyTemplates->count() }}</x-ui.badge>
+                        <x-ui.badge soft variant="info" class="ms-1">{{ $policyTemplates->total() }}</x-ui.badge>
                     </a>
                 </li>
             </ul>
@@ -196,7 +196,7 @@
 
                     <!-- Filter Dropdown -->
                     <x-ui.filter label="FILTER">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter PIP Records</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                         <form method="GET" action="{{ route('hrms.pip.index') }}">
                             <input type="hidden" name="active_tab" value="plans">
                             <input type="hidden" name="search" value="{{ request('search') }}">
@@ -204,7 +204,7 @@
                             
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
-                                <select name="status" class="form-select fs-13" style="border-radius: 6px; border: 1px solid #cbd5e1;">
+                                <x-ui.odoo-form-ui type="select" name="status">
                                     <option value="">All Statuses</option>
                                     <option value="active" @selected(request('status') === 'active')>Active</option>
                                     <option value="under_review" @selected(request('status') === 'under_review')>Under Review</option>
@@ -212,30 +212,30 @@
                                     <option value="extended" @selected(request('status') === 'extended')>Extended</option>
                                     <option value="role_reassigned" @selected(request('status') === 'role_reassigned')>Role Reassigned</option>
                                     <option value="failed_terminated" @selected(request('status') === 'failed_terminated')>Failed / Terminated</option>
-                                </select>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Department</label>
-                                <select name="department_id" class="form-select fs-13" style="border-radius: 6px; border: 1px solid #cbd5e1;">
+                                <x-ui.odoo-form-ui type="select" name="department_id">
                                     <option value="">All Departments</option>
                                     @foreach($departments as $dept)
                                         <option value="{{ $dept->id }}" @selected(request('department_id') == $dept->id)>{{ $dept->name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Category</label>
-                                <select name="category_id" class="form-select fs-13" style="border-radius: 6px; border: 1px solid #cbd5e1;">
+                                <x-ui.odoo-form-ui type="select" name="category_id">
                                     <option value="">All Categories</option>
-                                    @foreach($categories as $cat)
+                                    @foreach($categoriesList as $cat)
                                         <option value="{{ $cat->id }}" @selected(request('category_id') == $cat->id)>{{ $cat->name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.odoo-form-ui>
                             </div>
 
-                            <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-                                <a href="{{ route('hrms.pip.index') }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">Reset</a>
-                                <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px;">Apply</button>
+                            <div class="d-flex gap-2 justify-content-end mt-4 pt-2 border-top">
+                                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">APPLY FILTERS</x-ui.button>
+                                <x-ui.button href="{{ route('hrms.pip.index') }}" variant="light" size="sm" class="border flex-grow-1">RESET</x-ui.button>
                             </div>
                         </form>
                     </x-ui.filter>
@@ -305,9 +305,16 @@
                                     </small>
                                 </td>
                                 <td>
-                                    <span class="text-capitalize fw-medium text-secondary">
+                                    <span class="text-capitalize fw-medium text-secondary d-block">
                                         <i class="feather-clock me-1 text-muted"></i> {{ $plan->checkin_frequency }}
                                     </span>
+                                    @if($plan->is_checkin_overdue)
+                                        <x-ui.badge soft variant="danger" class="mt-1 fs-11" title="Check-in Overdue">
+                                            <i class="feather-alert-triangle me-1"></i> Overdue ({{ $plan->next_checkin_due_date?->format('M d') }})
+                                        </x-ui.badge>
+                                    @elseif($plan->next_checkin_due_date)
+                                        <small class="text-muted fs-11 d-block mt-0.5">Next: {{ $plan->next_checkin_due_date->format('M d') }}</small>
+                                    @endif
                                 </td>
                                 <td>
                                     @php
@@ -325,14 +332,87 @@
                                     </x-ui.badge>
                                 </td>
                                 <td class="text-end pe-3">
-                                    <x-ui.action-dropdown>
-                                        <a class="dropdown-item" href="{{ route('hrms.pip.show', $plan->id) }}">
-                                            <i class="feather-eye me-2 text-primary"></i> Open Workspace
-                                        </a>
-                                        <a class="dropdown-item" href="{{ route('hrms.employees.show', ['employee' => $plan->employee_id, 'tab' => 'pip']) }}">
-                                            <i class="feather-user me-2 text-muted"></i> View Employee Profile
-                                        </a>
+                                    <x-ui.action-dropdown id="pipActions{{ $plan->id }}">
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('hrms.pip.show', $plan->id) }}">
+                                                <i class="feather-eye me-2 text-primary"></i> Open Workspace
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#editPipModal_{{ $plan->id }}">
+                                                <i class="feather-edit-2 me-2 text-info"></i> Edit Plan Details
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete PIP #{{ $plan->pip_number }}? This will permanently remove all associated SMART objectives and check-ins.', function() { document.getElementById('deletePipForm{{ $plan->id }}').submit(); }, { title: 'Delete PIP Plan', confirmText: 'Yes, Delete', variant: 'danger' });">
+                                                <i class="feather-trash-2 me-2"></i> Delete Plan
+                                            </a>
+                                        </li>
                                     </x-ui.action-dropdown>
+                                    <form id="deletePipForm{{ $plan->id }}" action="{{ route('hrms.pip.destroy', $plan->id) }}" method="POST" class="d-none">
+                                        @csrf
+                                        @method('DELETE')
+                                    </form>
+
+                                    <!-- EDIT PIP MODAL -->
+                                    <div class="modal fade text-start" id="editPipModal_{{ $plan->id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                                            <div class="modal-content border-0 shadow">
+                                                <div class="modal-header border-bottom py-3">
+                                                    <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-edit me-1.5 text-primary"></i> Edit Performance Improvement Plan (#{{ $plan->pip_number }})</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <form action="{{ route('hrms.pip.update', $plan->id) }}" method="POST">
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <div class="modal-body p-4 text-start">
+                                                        <div class="row">
+                                                            <div class="col-md-6 mb-3">
+                                                                <x-ui.odoo-form-ui type="select" label="PIP Category" name="pip_category_id">
+                                                                    <option value="">Select Category</option>
+                                                                    @foreach($categoriesList as $cat)
+                                                                        <option value="{{ $cat->id }}" @selected($plan->pip_category_id == $cat->id)>{{ $cat->name }}</option>
+                                                                    @endforeach
+                                                                </x-ui.odoo-form-ui>
+                                                            </div>
+                                                            <div class="col-md-6 mb-3">
+                                                                <x-ui.odoo-form-ui type="select" label="Check-in Frequency" name="checkin_frequency" :required="true">
+                                                                    <option value="weekly" @selected($plan->checkin_frequency === 'weekly')>Weekly (Every 7 days)</option>
+                                                                    <option value="biweekly" @selected($plan->checkin_frequency === 'biweekly')>Bi-weekly (Every 14 days)</option>
+                                                                    <option value="monthly" @selected($plan->checkin_frequency === 'monthly')>Monthly (Every 30 days)</option>
+                                                                </x-ui.odoo-form-ui>
+                                                            </div>
+                                                        </div>
+                                                        <div class="row">
+                                                            <div class="col-md-6 mb-3">
+                                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" value="{{ $plan->start_date?->format('Y-m-d') }}" :required="true" />
+                                                            </div>
+                                                            <div class="col-md-6 mb-3">
+                                                                <x-ui.odoo-form-ui type="input" inputType="date" label="End Date" name="end_date" value="{{ $plan->end_date?->format('Y-m-d') }}" :required="true" />
+                                                            </div>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <x-ui.odoo-form-ui type="select" label="Plan Status" name="status" :required="true">
+                                                                <option value="active" @selected($plan->status === 'active')>Active</option>
+                                                                <option value="under_review" @selected($plan->status === 'under_review')>Under Review</option>
+                                                                <option value="extended" @selected($plan->status === 'extended')>Extended</option>
+                                                                <option value="completed_success" @selected($plan->status === 'completed_success')>Completed (Success)</option>
+                                                                <option value="role_reassigned" @selected($plan->status === 'role_reassigned')>Role Reassigned</option>
+                                                                <option value="failed_terminated" @selected($plan->status === 'failed_terminated')>Failed / Terminated</option>
+                                                            </x-ui.odoo-form-ui>
+                                                        </div>
+                                                        <div class="mb-0">
+                                                            <x-ui.odoo-form-ui type="textarea" label="Reason for PIP & Specific Concerns" name="reason_details" rows="3" value="{{ $plan->reason_details }}" :required="true" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-top bg-light py-2.5">
+                                                        <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                                                        <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Update PIP Plan</x-ui.button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -347,10 +427,16 @@
                 </table>
             </div>
 
-            @if($plans->hasPages())
-                <div class="mt-3">
-                    {{ $plans->links() }}
-                </div>
+            @if($plans->total() > 0)
+                <x-ui.pagination
+                    class="mt-3"
+                    :current-page="$plans->currentPage()"
+                    :total-pages="$plans->lastPage()"
+                    :total-results="$plans->total()"
+                    :per-page="$plans->perPage()"
+                    page-param="page"
+                    tab="plans"
+                />
             @endif
 
         @elseif($activeTab === 'categories')
@@ -375,7 +461,7 @@
                                     <form action="{{ route('hrms.pip.category.destroy', $cat->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this category?')">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-xs btn-outline-danger border-0"><i class="feather-trash-2"></i> Delete</button>
+                                        <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete Category" />
                                     </form>
                                 </td>
                             </tr>
@@ -387,6 +473,18 @@
                     </tbody>
                 </table>
             </div>
+
+            @if($categories->total() > 0)
+                <x-ui.pagination
+                    class="mt-3"
+                    :current-page="$categories->currentPage()"
+                    :total-pages="$categories->lastPage()"
+                    :total-results="$categories->total()"
+                    :per-page="$categories->perPage()"
+                    page-param="categories_page"
+                    tab="categories"
+                />
+            @endif
 
         @elseif($activeTab === 'templates')
             <!-- TAB 3: POLICY TEMPLATES MASTER -->
@@ -405,14 +503,14 @@
                         @forelse($policyTemplates as $tmpl)
                             <tr>
                                 <td class="ps-3 fw-bold text-dark">{{ $tmpl->name }}</td>
-                                <td><span class="badge bg-light text-dark border px-2 py-1">{{ $tmpl->duration_days }} Days</span></td>
+                                <td><x-ui.badge soft variant="secondary">{{ $tmpl->duration_days }} Days</x-ui.badge></td>
                                 <td class="text-capitalize">{{ $tmpl->checkin_frequency }}</td>
                                 <td class="text-muted">{{ $tmpl->description ?? 'N/A' }}</td>
                                 <td class="text-end pe-3">
                                     <form action="{{ route('hrms.pip.template.destroy', $tmpl->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this policy template?')">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-xs btn-outline-danger border-0"><i class="feather-trash-2"></i> Delete</button>
+                                        <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete Template" />
                                     </form>
                                 </td>
                             </tr>
@@ -424,6 +522,18 @@
                     </tbody>
                 </table>
             </div>
+
+            @if($policyTemplates->total() > 0)
+                <x-ui.pagination
+                    class="mt-3"
+                    :current-page="$policyTemplates->currentPage()"
+                    :total-pages="$policyTemplates->lastPage()"
+                    :total-results="$policyTemplates->total()"
+                    :per-page="$policyTemplates->perPage()"
+                    page-param="templates_page"
+                    tab="templates"
+                />
+            @endif
         @endif
 
     </div>
@@ -460,7 +570,7 @@
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="select" label="PIP Category" name="pip_category_id">
                                 <option value="">Select Category...</option>
-                                @foreach($categories as $cat)
+                                @foreach($categoriesList as $cat)
                                     <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
@@ -468,7 +578,7 @@
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="select" label="Apply Policy Template (Optional)" name="policy_template_id" id="pipPolicyTemplate">
                                 <option value="">-- No Template, Fill Manually --</option>
-                                @foreach($policyTemplates as $tmpl)
+                                @foreach($policyTemplatesList as $tmpl)
                                     <option value="{{ $tmpl->id }}"
                                         data-duration="{{ $tmpl->duration_days }}"
                                         data-frequency="{{ $tmpl->checkin_frequency }}">
@@ -496,8 +606,8 @@
                     </div>
                 </div>
                 <div class="modal-footer border-top bg-light py-2.5">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Initiate PIP</button>
+                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Initiate PIP</x-ui.button>
                 </div>
             </form>
         </div>
@@ -523,8 +633,8 @@
                     </div>
                 </div>
                 <div class="modal-footer border-top bg-light py-2.5">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Save Category</button>
+                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Save Category</x-ui.button>
                 </div>
             </form>
         </div>
@@ -545,30 +655,30 @@
                     <div class="mb-3">
                         <x-ui.odoo-form-ui type="input" label="Template Name" name="name" placeholder="e.g. Standard 30-Day Technical PIP" :required="true" />
                     </div>
-                    <div class="row g-3 mb-3">
-                        <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" inputType="number" label="Duration (Days)" name="duration_days" value="30" :required="true" min="7" max="180" />
-                        </div>
-                        <div class="col-6">
-                            <x-ui.odoo-form-ui type="select" label="Check-in Frequency" name="checkin_frequency" :required="true">
-                                <option value="weekly">Weekly</option>
-                                <option value="biweekly">Bi-weekly</option>
-                                <option value="monthly">Monthly</option>
-                            </x-ui.odoo-form-ui>
-                        </div>
+                    <div class="mb-3">
+                        <x-ui.odoo-form-ui type="input" inputType="number" label="Duration (Days)" name="duration_days" value="30" :required="true" min="7" max="180" />
+                    </div>
+                    <div class="mb-3">
+                        <x-ui.odoo-form-ui type="select" label="Check-in Frequency" name="checkin_frequency" :required="true">
+                            <option value="weekly">Weekly</option>
+                            <option value="biweekly">Bi-weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </x-ui.odoo-form-ui>
                     </div>
                     <div class="mb-0">
                         <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="3" placeholder="Template details..." />
                     </div>
                 </div>
                 <div class="modal-footer border-top bg-light py-2.5">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Save Template</button>
+                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Save Template</x-ui.button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<x-ui.confirmation-modal />
 
 @push('scripts')
 <script>

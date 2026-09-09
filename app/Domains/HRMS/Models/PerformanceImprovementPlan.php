@@ -81,4 +81,46 @@ class PerformanceImprovementPlan extends BaseModel
     {
         return $this->hasMany(PipCheckin::class, 'pip_id')->orderBy('review_date', 'asc');
     }
+
+    /**
+     * Smart Next Check-in Due Date calculation based on frequency and last checkin date.
+     */
+    public function getNextCheckinDueDateAttribute(): ?\Carbon\Carbon
+    {
+        if (!in_array($this->status, ['active', 'under_review', 'extended']) || !$this->start_date) {
+            return null;
+        }
+
+        $days = match($this->checkin_frequency) {
+            'weekly'   => 7,
+            'biweekly' => 14,
+            'monthly'  => 30,
+            default    => 7,
+        };
+
+        $latestCheckin = $this->checkins->sortByDesc('review_date')->first();
+        $baseDate = $latestCheckin ? \Carbon\Carbon::parse($latestCheckin->review_date) : \Carbon\Carbon::parse($this->start_date);
+
+        return $baseDate->copy()->addDays($days);
+    }
+
+    /**
+     * Determine if next check-in is overdue.
+     */
+    public function getIsCheckinOverdueAttribute(): bool
+    {
+        $nextDue = $this->next_checkin_due_date;
+        return $nextDue ? \Carbon\Carbon::now()->startOfDay()->greaterThan($nextDue->startOfDay()) : false;
+    }
+
+    /**
+     * Calculate days overdue.
+     */
+    public function getCheckinOverdueDaysAttribute(): int
+    {
+        if (!$this->is_checkin_overdue || !$this->next_checkin_due_date) {
+            return 0;
+        }
+        return (int) \Carbon\Carbon::now()->startOfDay()->diffInDays($this->next_checkin_due_date->startOfDay());
+    }
 }

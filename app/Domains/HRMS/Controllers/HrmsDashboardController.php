@@ -6,6 +6,7 @@ use App\Domains\HRMS\Models\Attendance;
 use App\Domains\HRMS\Models\AttendanceBreak;
 use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\BiometricPunchLog;
+use App\Domains\HRMS\Models\Broadcast;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Models\Employee;
@@ -297,6 +298,21 @@ class HrmsDashboardController extends Controller
             ->take(15)
             ->get();
 
+        // 13. Active Company Broadcasts & Announcements
+        app(\App\Domains\HRMS\Services\BroadcastService::class)->processScheduledBroadcasts($tenantId);
+
+        $totalBroadcastsCount = Broadcast::where('tenant_id', $tenantId)
+            ->where('status', 'published')
+            ->count();
+
+        $latestBroadcasts = Broadcast::with(['creator', 'receipts', 'comments.employee'])
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'published')
+            ->orderByRaw("FIELD(priority, 'urgent', 'important', 'normal')")
+            ->latest('published_at')
+            ->take(3)
+            ->get();
+
         return view('modules.hrms.dashboard.index', compact(
             'currentEmployee',
             'totalEmployees',
@@ -328,7 +344,9 @@ class HrmsDashboardController extends Controller
             'leaveTypes',
             'recentLateArrivals',
             'unprocessedPenalties',
-            'approvedLeaves'
+            'approvedLeaves',
+            'latestBroadcasts',
+            'totalBroadcastsCount'
         ));
     }
 
