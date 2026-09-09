@@ -145,6 +145,31 @@
                                                       <span class="fs-10 text-muted">Qty:</span>
                                                       <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_batch_quantity" min="0.0001" />
                                                   </div>
+
+                                                  <span class="text-black-50 me-1">|</span>
+
+                                                  <div class="form-check m-0 p-0 d-inline-flex align-items-center me-1">
+                                                      <input type="checkbox" class="form-check-input mt-0 me-1 ms-0" x-model="operation.is_parallel" x-bind:name="'operations['+index+'][is_parallel]'" x-bind:id="'par_edit_' + operation.uid" value="1">
+                                                      <label class="form-check-label fs-11 text-primary fw-semibold c-pointer mb-0" x-bind:for="'par_edit_' + operation.uid" title="Independent / Parallel operation — can start immediately without waiting for preceding operations">Parallel</label>
+                                                  </div>
+
+                                                  <div class="align-items-center gap-1"
+                                                       :class="(operation.is_parallel == 1 || operation.is_parallel === true) ? 'd-inline-flex' : 'd-none'"
+                                                       x-show="operation.is_parallel == 1 || operation.is_parallel === true">
+                                                      <span class="fs-10 text-muted">Grp:</span>
+                                                      <input type="text" x-bind:name="'operations['+index+'][parallel_group]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 50px; height: 20px; min-height: 20px;" x-model="operation.parallel_group" placeholder="e.g. A" title="Optional Parallel Group Name" />
+                                                  </div>
+                                              </div>
+
+                                              <div class="mt-1 d-flex align-items-center gap-1" x-show="!operation.is_parallel && index > 0">
+                                                  <span class="fs-10 text-muted text-nowrap"><i class="feather-git-commit me-1"></i>Predecessor:</span>
+                                                  <select x-bind:name="'operations['+index+'][predecessor_sequence]'" class="odoo-table-select text-muted fs-11 py-0" style="height: 22px; min-height: 22px;" x-model="operation.predecessor_sequence">
+                                                      <option value="">-- Auto (Previous Op) --</option>
+                                                      <option value="-1">-- None (Independent / Starts Immediately) --</option>
+                                                      <template x-for="(prevOp, pIdx) in getPriorOperations(index)" :key="prevOp.uid">
+                                                          <option :value="prevOp.sequence" x-text="'Op ' + prevOp.sequence + (prevOp.name ? ': ' + prevOp.name : '')" :selected="operation.predecessor_sequence == prevOp.sequence"></option>
+                                                      </template>
+                                                  </select>
                                               </div>
 
                                               <div class="mt-1">
@@ -324,6 +349,9 @@
                                 queue_threshold_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 overlap_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 transfer_batch_quantity: "{{ number_format($op->transfer_batch_quantity ?? 0, 2, '.', '') }}",
+                                is_parallel: {{ $op->is_parallel ? 'true' : 'false' }},
+                                parallel_group: "{{ $op->parallel_group ?? '' }}",
+                                predecessor_sequence: "{{ $op->previousOperation?->sequence ?? ($op->previous_operation_id === null && $loop->index > 0 && !$op->is_parallel ? '-1' : '') }}",
                                 @php
                                     $firstMat = \App\Domains\Production\Models\RoutingOperationMaterial::where('routing_operation_id', $op->id)->first();
                                 @endphp
@@ -374,8 +402,15 @@
                             overlap_enabled: false,
                             transfer_batch_quantity: '0.00',
                             material_id: '',
+                            is_parallel: false,
+                            parallel_group: '',
+                            predecessor_sequence: '',
                             availableMachines: []
                         });
+                    },
+
+                    getPriorOperations(currentIndex) {
+                        return this.operations.filter((op, idx) => idx < currentIndex);
                     },
 
                     removeOperation(index) {

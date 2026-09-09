@@ -34,6 +34,7 @@ class RoutingOperation extends BaseModel
         'routing_id',
         'sequence',
         'operation_number',
+        'previous_operation_id',
         'name',
         'description',
         'operation_type',
@@ -104,6 +105,11 @@ class RoutingOperation extends BaseModel
     public function routing(): BelongsTo
     {
         return $this->belongsTo(Routing::class, 'routing_id');
+    }
+
+    public function previousOperation(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'previous_operation_id');
     }
 
     public function workCenter(): BelongsTo

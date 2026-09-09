@@ -246,6 +246,13 @@
                                     @if ($op->is_external)
                                         <span class="badge bg-soft-danger text-danger mt-1 fs-9 text-uppercase">{{ __('production.outsourced') }}</span>
                                     @endif
+                                    @if ($op->is_parallel)
+                                        <span class="badge bg-soft-primary text-primary mt-1 fs-9"><i class="feather-shuffle me-1"></i>Parallel{{ $op->parallel_group ? ' (' . $op->parallel_group . ')' : '' }}</span>
+                                    @elseif ($op->previousOperation)
+                                        <span class="badge bg-soft-secondary text-secondary mt-1 fs-9"><i class="feather-git-commit me-1"></i>Predecessor: {{ $op->previousOperation->operation_number }}</span>
+                                    @elseif ($loop->index > 0 && $op->previous_operation_id === null)
+                                        <span class="badge bg-soft-success text-success mt-1 fs-9"><i class="feather-play me-1"></i>Independent</span>
+                                    @endif
                                 </td>
                                 <td class="align-middle">
                                     @php

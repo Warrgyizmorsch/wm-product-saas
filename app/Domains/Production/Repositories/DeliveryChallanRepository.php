@@ -151,13 +151,32 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
 
     public function getNextChallanNumber(int $tenantId): string
     {
-        $lastChallan = DeliveryChallan::where('tenant_id', $tenantId)->latest('id')->first();
-        $nextNum = 1;
+        $year = date('Y');
+        $prefix = "DC-{$year}-";
 
+        $lastChallan = DeliveryChallan::withoutGlobalScopes()
+            ->withTrashed()
+            ->where('tenant_id', $tenantId)
+            ->where('challan_number', 'like', "{$prefix}%")
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $nextNum = 1;
         if ($lastChallan && preg_match('/DC-\d{4}-(\d+)/', $lastChallan->challan_number, $matches)) {
             $nextNum = ((int) $matches[1]) + 1;
         }
 
-        return 'DC-' . date('Y') . '-' . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+        $num = $prefix . str_pad((string)$nextNum, 6, '0', STR_PAD_LEFT);
+
+        while (DeliveryChallan::withoutGlobalScopes()
+            ->withTrashed()
+            ->where('tenant_id', $tenantId)
+            ->where('challan_number', $num)
+            ->exists()) {
+            $nextNum++;
+            $num = $prefix . str_pad((string)$nextNum, 6, '0', STR_PAD_LEFT);
+        }
+
+        return $num;
     }
 }
