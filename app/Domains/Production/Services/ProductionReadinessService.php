@@ -410,32 +410,60 @@ class ProductionReadinessService
 
         // 1. Intra-routing predecessor check
         $intraReadyQty = $orderQty;
-        $prevOp = $op->previousOperation;
-        if (!$prevOp && $op->order && $op->order->relationLoaded('operations')) {
-            $prevOp = $op->order->operations
-                ->filter(function ($other) use ($op) {
-                    if ($other->sequence >= $op->sequence) return false;
-                    return $op->source_product_id
-                        ? (int) $other->source_product_id === (int) $op->source_product_id
-                        : empty($other->source_product_id);
-                })
-                ->sortByDesc('sequence')
-                ->first();
-        }
-        if (!$prevOp) {
-            $prevOp = ProductionOrderOperation::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('production_order_id', $op->production_order_id)
-                ->where('sequence', '<', $op->sequence)
-                ->where(function ($q) use ($op) {
-                    if ($op->source_product_id) {
-                        $q->where('source_product_id', $op->source_product_id);
-                    } else {
-                        $q->whereNull('source_product_id');
-                    }
-                })
-                ->orderBy('sequence', 'desc')
-                ->first();
+        $prevOp = null;
+
+        if ($op->previous_operation_id) {
+            $prevOp = $op->previousOperation;
+            if (!$prevOp) {
+                $prevOp = ProductionOrderOperation::withoutGlobalScopes()->find($op->previous_operation_id);
+            }
+        } elseif ($op->is_parallel) {
+            // Explicitly parallel operation - starts concurrently, no linear predecessor constraint
+            $prevOp = null;
+        } elseif ($op->routing_operation_id || $op->relationLoaded('routingOperation')) {
+            $rOp = $op->routingOperation ?: \App\Domains\Production\Models\RoutingOperation::find($op->routing_operation_id);
+            if ($rOp && ($rOp->is_parallel || $rOp->previous_operation_id === null)) {
+                // Explicitly independent or parallel routing operation
+                $prevOp = null;
+            }
+        } else {
+            // Check if order operations have explicit dependency tracking configured
+            $hasExplicitTracking = $op->order && $op->order->relationLoaded('operations')
+                ? $op->order->operations->contains(fn($o) => $o->previous_operation_id !== null || $o->is_parallel)
+                : ProductionOrderOperation::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('production_order_id', $op->production_order_id)
+                    ->where(fn($q) => $q->whereNotNull('previous_operation_id')->orWhere('is_parallel', true))
+                    ->exists();
+
+            if (!$hasExplicitTracking) {
+                if ($op->order && $op->order->relationLoaded('operations')) {
+                    $prevOp = $op->order->operations
+                        ->filter(function ($other) use ($op) {
+                            if ($other->sequence >= $op->sequence) return false;
+                            return $op->source_product_id
+                                ? (int) $other->source_product_id === (int) $op->source_product_id
+                                : empty($other->source_product_id);
+                        })
+                        ->sortByDesc('sequence')
+                        ->first();
+                }
+                if (!$prevOp) {
+                    $prevOp = ProductionOrderOperation::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('production_order_id', $op->production_order_id)
+                        ->where('sequence', '<', $op->sequence)
+                        ->where(function ($q) use ($op) {
+                            if ($op->source_product_id) {
+                                $q->where('source_product_id', $op->source_product_id);
+                            } else {
+                                $q->whereNull('source_product_id');
+                            }
+                        })
+                        ->orderBy('sequence', 'desc')
+                        ->first();
+                }
+            }
         }
 
         if ($prevOp) {

@@ -223,14 +223,39 @@ class ProductionOrderService
                     'overlap_enabled' => (bool) ($routingOp?->queue_threshold_enabled ?? $routingOp?->overlap_enabled ?? false),
                     'transfer_batch_quantity' => (float) ($routingOp?->transfer_batch_quantity ?? 0.0000),
                     'transfer_lag_minutes' => (int) ($routingOp?->transfer_lag_minutes ?? 0),
+                    'is_parallel' => (bool) ($routingOp?->is_parallel ?? false),
+                    'parallel_group' => $routingOp?->parallel_group,
+                    'parallel_type' => $routingOp?->parallel_type ?? 'AND',
                 ]);
                 $createdOps[] = $op;
             }
 
-            // Bind sequential self-referencing operations dependency chain (previous_operation_id)
+            // Bind operations dependency chain (previous_operation_id)
             for ($i = 1; $i < count($createdOps); $i++) {
-                $createdOps[$i]->previous_operation_id = $createdOps[$i - 1]->id;
-                $createdOps[$i]->save();
+                $currentOrderOp = $createdOps[$i];
+                $rOp = $currentOrderOp->routingOperation;
+                if ($rOp && $rOp->is_parallel) {
+                    $currentOrderOp->previous_operation_id = null;
+                    $currentOrderOp->status = ProductionOrderOperation::STATUS_READY;
+                } elseif ($rOp && $rOp->previous_operation_id) {
+                    $predOrderOp = collect($createdOps)->firstWhere('routing_operation_id', $rOp->previous_operation_id);
+                    $currentOrderOp->previous_operation_id = $predOrderOp?->id;
+                    if ($predOrderOp) {
+                        \App\Domains\Production\Models\ProductionOrderOperationDependency::firstOrCreate([
+                            'tenant_id' => $order->tenant_id,
+                            'production_order_id' => $order->id,
+                            'operation_id' => $currentOrderOp->id,
+                            'predecessor_operation_id' => $predOrderOp->id,
+                            'dependency_type' => 'FS',
+                        ]);
+                    }
+                } elseif ($rOp && array_key_exists('previous_operation_id', $rOp->getAttributes()) && $rOp->previous_operation_id === null) {
+                    $currentOrderOp->previous_operation_id = null;
+                    $currentOrderOp->status = ProductionOrderOperation::STATUS_READY;
+                } else {
+                    $currentOrderOp->previous_operation_id = $createdOps[$i - 1]->id;
+                }
+                $currentOrderOp->save();
             }
             }
 
@@ -1250,17 +1275,42 @@ class ProductionOrderService
                 'overlap_enabled' => (bool) ($routingOp->queue_threshold_enabled ?? $routingOp->overlap_enabled ?? false),
                 'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
                 'transfer_lag_minutes' => (int) ($routingOp->transfer_lag_minutes ?? 0),
+                'is_parallel' => (bool) ($routingOp->is_parallel ?? false),
+                'parallel_group' => $routingOp->parallel_group,
+                'parallel_type' => $routingOp->parallel_type ?? 'AND',
             ]);
             $createdOps[] = $op;
         }
 
-        // Bind intra-routing sequential dependencies (previous_operation_id) within each routing branch
+        // Bind intra-routing dependencies (previous_operation_id) within each routing branch
         $groupedOps = collect($createdOps)->groupBy(fn($op) => $op->source_routing_id ?: $op->source_product_id);
         foreach ($groupedOps as $branchOps) {
             $sortedOps = $branchOps->sortBy('sequence')->values();
             for ($i = 1; $i < count($sortedOps); $i++) {
-                $sortedOps[$i]->previous_operation_id = $sortedOps[$i - 1]->id;
-                $sortedOps[$i]->save();
+                $currentOrderOp = $sortedOps[$i];
+                $rOp = $currentOrderOp->routingOperation;
+                if ($rOp && $rOp->is_parallel) {
+                    $currentOrderOp->previous_operation_id = null;
+                    $currentOrderOp->status = ProductionOrderOperation::STATUS_READY;
+                } elseif ($rOp && $rOp->previous_operation_id) {
+                    $predOrderOp = $sortedOps->firstWhere('routing_operation_id', $rOp->previous_operation_id);
+                    $currentOrderOp->previous_operation_id = $predOrderOp?->id;
+                    if ($predOrderOp) {
+                        \App\Domains\Production\Models\ProductionOrderOperationDependency::firstOrCreate([
+                            'tenant_id' => $tenantId,
+                            'production_order_id' => $order->id,
+                            'operation_id' => $currentOrderOp->id,
+                            'predecessor_operation_id' => $predOrderOp->id,
+                            'dependency_type' => 'FS',
+                        ]);
+                    }
+                } elseif ($rOp && array_key_exists('previous_operation_id', $rOp->getAttributes()) && $rOp->previous_operation_id === null) {
+                    $currentOrderOp->previous_operation_id = null;
+                    $currentOrderOp->status = ProductionOrderOperation::STATUS_READY;
+                } else {
+                    $currentOrderOp->previous_operation_id = $sortedOps[$i - 1]->id;
+                }
+                $currentOrderOp->save();
             }
         }
 

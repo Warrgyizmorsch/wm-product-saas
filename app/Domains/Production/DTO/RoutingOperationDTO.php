@@ -34,6 +34,10 @@ class RoutingOperationDTO
         public readonly int     $dispatch_buffer_days = 0,
         public readonly int     $return_buffer_days = 0,
         public readonly ?int    $material_id = null,
+        public readonly bool    $is_parallel = false,
+        public readonly ?string $parallel_group = null,
+        public readonly ?int    $predecessor_sequence = null,
+        public readonly ?int    $previous_operation_id = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -70,6 +74,10 @@ class RoutingOperationDTO
             dispatch_buffer_days:          isset($data['dispatch_buffer_days']) ? (int) $data['dispatch_buffer_days'] : 0,
             return_buffer_days:            isset($data['return_buffer_days']) ? (int) $data['return_buffer_days'] : 0,
             material_id:                   !empty($data['material_id']) ? (int) $data['material_id'] : null,
+            is_parallel:                   !empty($data['is_parallel']),
+            parallel_group:                !empty($data['parallel_group']) ? trim((string) $data['parallel_group']) : null,
+            predecessor_sequence:          isset($data['predecessor_sequence']) && $data['predecessor_sequence'] !== '' && $data['predecessor_sequence'] !== 'none' ? (int) $data['predecessor_sequence'] : null,
+            previous_operation_id:         !empty($data['previous_operation_id']) ? (int) $data['previous_operation_id'] : null,
         );
     }
 
@@ -105,6 +113,9 @@ class RoutingOperationDTO
             'dispatch_buffer_days'           => $this->dispatch_buffer_days,
             'return_buffer_days'             => $this->return_buffer_days,
             'material_id'                    => $this->material_id,
+            'is_parallel'                    => $this->is_parallel,
+            'parallel_group'                 => $this->parallel_group,
+            'previous_operation_id'         => $this->previous_operation_id,
         ];
     }
 }

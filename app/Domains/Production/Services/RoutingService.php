@@ -327,14 +327,22 @@ class RoutingService
         // would conflict with soft-deleted rows if sequences are reused
         $routing->operations()->forceDelete();
 
+        $createdOps = [];
+        $opsBySeq = [];
+
         foreach ($operationDTOs as $index => $opDto) {
             $seq = $opDto->sequence ?: (($index + 1) * 10);
-            $createdOp = RoutingOperation::create(array_merge($opDto->toArray(), [
+            $data = array_merge($opDto->toArray(), [
                 'tenant_id'        => $tenantId,
                 'routing_id'       => $routing->id,
                 'sequence'         => $seq,
                 'operation_number' => $opDto->operation_number ?: 'OP-' . str_pad((string) $seq, 3, '0', STR_PAD_LEFT),
-            ]));
+            ]);
+            unset($data['previous_operation_id']);
+
+            $createdOp = RoutingOperation::create($data);
+            $createdOps[] = ['model' => $createdOp, 'dto' => $opDto];
+            $opsBySeq[$seq] = $createdOp->id;
 
             if (!empty($opDto->material_id)) {
                 $matProd = \App\Domains\Inventory\Models\Product::find($opDto->material_id);
@@ -348,6 +356,32 @@ class RoutingService
                     ]
                 );
             }
+        }
+
+        // Pass 2: Bind dependencies (previous_operation_id)
+        foreach ($createdOps as $index => $item) {
+            $model = $item['model'];
+            $dto = $item['dto'];
+
+            if ($dto->is_parallel) {
+                // Parallel operations are independent of previous operations
+                $model->previous_operation_id = null;
+            } elseif ($dto->predecessor_sequence !== null) {
+                if ($dto->predecessor_sequence <= 0) {
+                    // Explicitly marked independent / none
+                    $model->previous_operation_id = null;
+                } else {
+                    $model->previous_operation_id = $opsBySeq[$dto->predecessor_sequence] ?? null;
+                }
+            } elseif ($index > 0) {
+                // Default sequential fallback: depends on the immediate preceding operation
+                $prevModel = $createdOps[$index - 1]['model'];
+                $model->previous_operation_id = $prevModel->id;
+            } else {
+                $model->previous_operation_id = null;
+            }
+
+            $model->save();
         }
     }
 
