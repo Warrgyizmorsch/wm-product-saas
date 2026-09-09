@@ -66,7 +66,7 @@
                         </a>
                         <div class="dropdown-divider"></div>
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'duplicates', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'duplicates' ? 'active' : '' }}">
-                            <span class="text-danger fw-semibold"><i class="feather-copy me-1"></i>Group Side-by-Side Duplicates</span>
+                            <span class="text-danger fw-semibold"><i class="feather-copy me-1"></i>{{ __('crm.group_duplicates') }}</span>
                         </a>
                         <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'desc' ? 'active' : '' }}">
                             <span>{{ __('crm.sort_expected_amount_desc') }}</span>
@@ -108,35 +108,35 @@
                                     <option value="">{{ __('crm.all_statuses') }}</option>
                                     @foreach($leadStatuses as $ls)
                                         <option value="{{ $ls->name }}" {{ request('status') === $ls->name ? 'selected' : '' }}>
-                                            {{ $ls->name }}
+                                            {{ __('crm.statuses.' . $ls->name) ?? $ls->name }}
                                         </option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Lead Owner</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.lead_owner') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="lead_owner_id">
-                                    <option value="">All Lead Owners</option>
+                                    <option value="">{{ __('crm.all_lead_owners') }}</option>
                                     @foreach($users as $u)
                                         <option value="{{ $u->id }}" {{ (string)request('lead_owner_id') === (string)$u->id ? 'selected' : '' }}>{{ $u->name }} ({{ $u->email }})</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Quotation Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.quotation_status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="quotation_status">
-                                    <option value="">All Leads</option>
-                                    <option value="with_quotation" {{ request('quotation_status') === 'with_quotation' ? 'selected' : '' }}>With Quotation</option>
-                                    <option value="without_quotation" {{ request('quotation_status') === 'without_quotation' ? 'selected' : '' }}>Without Quotation</option>
+                                    <option value="">{{ __('crm.all_leads') }}</option>
+                                    <option value="with_quotation" {{ request('quotation_status') === 'with_quotation' ? 'selected' : '' }}>{{ __('crm.with_quotation') }}</option>
+                                    <option value="without_quotation" {{ request('quotation_status') === 'without_quotation' ? 'selected' : '' }}>{{ __('crm.without_quotation') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="row g-2 mb-3">
                                 <div class="col-6">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date From</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_from') }}</label>
                                     <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') ?? request('start_date') }}" />
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date To</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_to') }}</label>
                                     <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') ?? request('end_date') }}" />
                                 </div>
                             </div>
@@ -183,12 +183,18 @@
                 <div class="d-flex align-items-center gap-1 overflow-x-auto" style="scrollbar-width: thin;">
                     <a href="{{ request()->fullUrlWithQuery(['status' => null, 'duplicates_only' => null]) }}"
                        class="crm-status-tab {{ $isAll ? 'active' : '' }}">
-                        ALL ({{ $totalLeadsCount ?? $leads->total() }})
+                        {{ __('crm.tabs.all') }} ({{ $totalLeadsCount ?? $leads->total() }})
                     </a>
                     @foreach($leadStatuses as $ls)
                         @php
-                            $tabLabel = strtoupper($ls->name);
-                            if ($ls->name === 'New') $tabLabel = 'UNTOUCHED LEADS';
+                            $statusKey = strtolower($ls->name);
+                            $tabLabel = match($statusKey) {
+                                'new' => __('crm.tabs.untouched'),
+                                'qualified' => __('crm.tabs.qualified'),
+                                'won', 'converted' => __('crm.tabs.won'),
+                                'lost' => __('crm.tabs.lost'),
+                                default => strtoupper(__('crm.statuses.' . $ls->name) ?? $ls->name),
+                            };
                         @endphp
                         <a href="{{ request()->fullUrlWithQuery(['status' => $ls->name, 'duplicates_only' => null]) }}"
                            class="crm-status-tab {{ $activeStatus === $ls->name ? 'active' : '' }}">
@@ -197,7 +203,7 @@
                     @endforeach
                     <a href="{{ request()->fullUrlWithQuery(['duplicates_only' => '1', 'status' => null]) }}"
                        class="crm-status-tab crm-status-tab--duplicates {{ $isDuplicatesOnly ? 'active' : '' }}">
-                        <i class="feather-copy me-1 fs-11"></i>DUPLICATES ({{ $duplicatesCount ?? 0 }})
+                        <i class="feather-copy me-1 fs-11"></i>{{ __('crm.tabs.duplicates') }} ({{ $duplicatesCount ?? 0 }})
                     </a>
                 </div>
             </div>
@@ -212,10 +218,10 @@
                             </th>
                             <th style="width: 11%; background-color: #e8ecf1 !important;">{{ __('crm.call_date_time') }}</th>
                             <th style="width: 19%; background-color: #e8ecf1 !important;">{{ __('crm.lead_company') }}</th>
-                            <th style="width: 14%; background-color: #e8ecf1 !important;">Lead Owner</th>
+                            <th style="width: 14%; background-color: #e8ecf1 !important;">{{ __('crm.lead_owner') }}</th>
                             <th style="width: 17%; background-color: #e8ecf1 !important;">{{ __('crm.phone_email') }}</th>
                             <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.value_est_sale') }}</th>
-                            <th style="width: 18%; background-color: #e8ecf1 !important;">Details</th>
+                            <th style="width: 18%; background-color: #e8ecf1 !important;">{{ __('crm.details') }}</th>
                             <th style="width: 9%; background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
                             <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                         </tr>
@@ -327,7 +333,7 @@
                                 <td>
                                     <div class="d-flex flex-column gap-1 fs-11">
                                         @if($lead->source && $lead->source !== 'Select an Option')
-                                            <div><span class="text-muted">Source:</span> <span class="fw-semibold text-dark">{{ $lead->source }}</span></div>
+                                            <div><span class="text-muted">{{ __('crm.source') }}:</span> <span class="fw-semibold text-dark">{{ __('crm.sources.' . $lead->source) ?? $lead->source }}</span></div>
                                         @endif
                                         @php
                                             $currentPriority = ($lead->priority && $lead->priority !== 'Select an Option') ? $lead->priority : '';
@@ -348,7 +354,7 @@
                                             };
                                         @endphp
                                         <div class="d-flex align-items-center gap-1.5 my-0.5">
-                                            <span class="text-muted fs-11">Priority:</span>
+                                            <span class="text-muted fs-11">{{ __('crm.priority') }}:</span>
                                             <div class="star-rating-widget d-inline-flex align-items-center gap-1" id="starRating_{{ $lead->id }}" data-current-stars="{{ $starsCount }}" data-current-priority="{{ $currentPriority }}">
                                                 @for($i = 1; $i <= 4; $i++)
                                                     @php $targetPriority = $starLabels[$i]; @endphp
@@ -358,16 +364,16 @@
                                                        data-lead-id="{{ $lead->id }}"
                                                        data-bs-toggle="tooltip"
                                                        data-bs-placement="top"
-                                                       title="{{ $targetPriority }} Priority ({{ $i }} Star{{ $i > 1 ? 's' : '' }})"
+                                                       title="{{ __('crm.priorities.' . $targetPriority) }}"
                                                        onclick="updateLeadPriority({{ $lead->id }}, '{{ $targetPriority }}', this)"></i>
                                                 @endfor
                                             </div>
                                             <span class="badge fs-10 ms-1 priority-badge-{{ $lead->id }} {{ $badgeClasses }}">
-                                                {{ $currentPriority ?: 'Unset' }}
+                                                {{ $currentPriority ? (__('crm.priorities.' . $currentPriority) ?? $currentPriority) : 'Unset' }}
                                             </span>
                                         </div>
                                         @if($lead->segment && $lead->segment !== 'Select an Option')
-                                            <div><span class="text-muted">Segment:</span> <span class="fw-semibold text-dark">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span></div>
+                                            <div><span class="text-muted">{{ __('crm.segment') }}:</span> <span class="fw-semibold text-dark">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span></div>
                                         @endif
                                         @if((!$lead->source || $lead->source === 'Select an Option') && (!$lead->priority || $lead->priority === 'Select an Option') && (!$lead->segment || $lead->segment === 'Select an Option'))
                                             <span class="text-muted">—</span>
@@ -790,11 +796,11 @@
                 $('#offcanvasActionMode').val(mode);
 
                 if (mode === 'log_note') {
-                    $('#sectionPastInteraction').show();
+                    $('#sectionPastInteraction, #sectionLogInteraction').show();
                     $('#sectionDirectSchedule').hide();
                     $('#offcanvasFollowupDate').removeAttr('required');
                 } else if (mode === 'schedule') {
-                    $('#sectionPastInteraction').hide();
+                    $('#sectionPastInteraction, #sectionLogInteraction').hide();
                     $('#sectionDirectSchedule').show();
                     $('#offcanvasFollowupDate').attr('required', 'required');
                 }
@@ -816,7 +822,8 @@
                 $('#leadFollowupForm').attr('action', '/crm/leads/' + leadId + '/followups');
                 $('#offcanvasLeadStatus').val(leadStatus || 'New');
                 $('#offcanvasLeadPriority').val(leadPriority || 'Medium');
-                $('#offcanvasFollowupDate, #offcanvasNextFollowupDate').val(nextFollowup || '');
+                $('#offcanvasFollowupDate').val(nextFollowup || '');
+                $('#offcanvasNextFollowupDate').val('');
                 $('#offcanvasNotes, #offcanvasScheduleNotes').val('');
                 $('#offcanvasRecording').val('');
                 if ($('#offcanvasTagUser').length && $.fn.select2) {
@@ -868,83 +875,222 @@
                     </button>
                 </div>
 
-                <!-- Past Interaction Section (Tab 1: Log Activity) -->
+                <!-- Log Interaction Section (Tab 1: Log Interaction) -->
                 <div id="sectionPastInteraction">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up / Interaction Type</label>
-                        <select name="type" id="offcanvasFollowupType" class="form-select form-select-sm shadow-2xs">
-                            <option value="Call">Call</option>
-                            <option value="Email">Email</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                        </select>
-                    </div>
+                    <x-ui.modal-form-ui 
+                        type="select" 
+                        label="Follow Up / Interaction Type" 
+                        name="type" 
+                        id="offcanvasFollowupType" 
+                    >
+                        <option value="Call">Call</option>
+                        <option value="Email">Email</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Demo">Demo</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                    </x-ui.modal-form-ui>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up Status / Outcome</label>
-                        <select name="status" id="offcanvasFollowupStatus" class="form-select form-select-sm shadow-2xs">
-                            <option value="Connected">Connected</option>
-                            <option value="Not Connected">Not Connected</option>
-                            <option value="Not Answering">Not Answering</option>
-                        </select>
-                    </div>
+                    <x-ui.modal-form-ui 
+                        type="select" 
+                        label="Follow Up Status / Outcome" 
+                        name="status" 
+                        id="offcanvasFollowupStatus" 
+                    >
+                        <option value="Connected">Connected</option>
+                        <option value="Not Connected">Not Connected</option>
+                        <option value="Not Answering">Not Answering</option>
+                    </x-ui.modal-form-ui>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Discussion Notes / Summary</label>
-                        <textarea name="notes" id="offcanvasNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Write discussion notes..."></textarea>
-                    </div>
+                    <x-ui.modal-form-ui 
+                        type="textarea" 
+                        label="Discussion Notes / Summary" 
+                        name="notes" 
+                        id="offcanvasNotes" 
+                        rows="3" 
+                        placeholder="Write discussion notes..." 
+                    />
 
                     <!-- Next Follow-up Section inside Log Mode -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type (Optional)</label>
-                        <select name="next_activity_type" id="offcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
-                            <option value="Call">Call</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
-                            <option value="Email">Email</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                        </select>
-                    </div>
+                    <div class="border-top pt-3 mt-3">
+                        <h6 class="fs-12 fw-bold text-primary mb-3"><i class="feather-calendar me-1"></i> NEXT ACTIVITY SCHEDULE (OPTIONAL)</h6>
+                        
+                        <x-ui.modal-form-ui 
+                            type="input" 
+                            label="Next Activity Title" 
+                            name="next_title" 
+                            id="offcanvasNextTitle" 
+                            placeholder="e.g. Follow-up Call / Proposal Discussion" 
+                        />
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
-                        <input type="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <x-ui.modal-form-ui 
+                                    type="select" 
+                                    label="Next Activity Type" 
+                                    name="next_activity_type" 
+                                    id="offcanvasNextActivityType" 
+                                >
+                                    <option value="Call">Call</option>
+                                    <option value="Meeting">Meeting</option>
+                                    <option value="Demo">Demo</option>
+                                    <option value="Email">Email</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                </x-ui.modal-form-ui>
+                            </div>
+                            <div class="col-6">
+                                <x-ui.modal-form-ui 
+                                    type="select" 
+                                    label="Duration (Minutes)" 
+                                    name="next_duration_minutes" 
+                                    id="offcanvasNextDuration" 
+                                >
+                                    <option value="15">15 Mins</option>
+                                    <option value="30" selected>30 Mins</option>
+                                    <option value="45">45 Mins</option>
+                                    <option value="60">60 Mins (1 Hr)</option>
+                                    <option value="90">90 Mins</option>
+                                    <option value="120">120 Mins</option>
+                                </x-ui.modal-form-ui>
+                            </div>
+                        </div>
+
+                        <x-ui.modal-form-ui 
+                            type="input" 
+                            inputType="datetime-local" 
+                            label="Next Follow-up Date & Time (Optional)" 
+                            name="next_followup_date" 
+                            id="offcanvasNextFollowupDate" 
+                        />
+
+                        <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" checked>
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasNextSyncGoogle">
+                                        <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet">
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasNextCreateMeet">
+                                        <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <x-ui.modal-form-ui 
+                            type="input" 
+                            label="Guest / Attendee Emails" 
+                            name="next_guest_emails" 
+                            id="offcanvasNextGuestEmails" 
+                            placeholder="e.g. client@company.com (comma separated)" 
+                        />
                     </div>
                 </div>
 
                 <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
                 <div id="sectionDirectSchedule" style="display: none;">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
-                        <select name="schedule_type" id="offcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#offcanvasFollowupType').val(this.value)">
-                            <option value="Call">Call</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
-                            <option value="Email">Email</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                        </select>
+                    <x-ui.modal-form-ui 
+                        type="input" 
+                        label="Event / Meeting Title" 
+                        name="title" 
+                        id="offcanvasEventTitle" 
+                        placeholder="e.g. CRM Followup Call / Client Demo" 
+                        value="CRM Followup Call" 
+                    />
+
+                    <x-ui.modal-form-ui 
+                        type="select" 
+                        label="Activity Type" 
+                        name="schedule_type" 
+                        id="offcanvasScheduleType" 
+                        :required="true"
+                        onchange="$('#offcanvasFollowupType').val(this.value)"
+                    >
+                        <option value="Call">Call</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Demo">Demo</option>
+                        <option value="Email">Email</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                    </x-ui.modal-form-ui>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <x-ui.modal-form-ui 
+                                type="input" 
+                                inputType="datetime-local" 
+                                label="Due Date & Time" 
+                                name="followup_date" 
+                                id="offcanvasFollowupDate" 
+                                :required="true"
+                            />
+                        </div>
+                        <div class="col-6">
+                            <x-ui.modal-form-ui 
+                                type="select" 
+                                label="Duration (Minutes)" 
+                                name="duration_minutes" 
+                                id="offcanvasDuration" 
+                            >
+                                <option value="15">15 Mins</option>
+                                <option value="30" selected>30 Mins</option>
+                                <option value="45">45 Mins</option>
+                                <option value="60">60 Mins (1 Hr)</option>
+                                <option value="90">90 Mins</option>
+                                <option value="120">120 Mins</option>
+                            </x-ui.modal-form-ui>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
-                        <input type="datetime-local" name="followup_date" id="offcanvasFollowupDate" class="form-control form-control-sm shadow-2xs">
+                    <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" checked>
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasSyncGoogle">
+                                    <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                </label>
+                            </div>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet">
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasCreateMeet">
+                                    <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Description / Plan</label>
-                        <textarea name="schedule_notes" id="offcanvasScheduleNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Agenda / plan for upcoming activity..." oninput="$('#offcanvasNotes').val(this.value)"></textarea>
-                    </div>
+                    <x-ui.modal-form-ui 
+                        type="input" 
+                        label="Guest / Attendee Emails" 
+                        name="guest_emails" 
+                        id="offcanvasGuestEmails" 
+                        placeholder="e.g. client@company.com (comma separated)" 
+                    />
+
+                    <x-ui.modal-form-ui 
+                        type="textarea" 
+                        label="Description / Plan" 
+                        name="schedule_notes" 
+                        id="offcanvasScheduleNotes" 
+                        rows="3" 
+                        placeholder="Agenda / plan for upcoming activity..." 
+                        oninput="$('#offcanvasNotes').val(this.value)"
+                    />
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold text-dark fs-12 mb-1">Tag / Assign Persons</label>
-                    <select name="tagged_user_ids[]" id="offcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="Select persons to tag...">
-                        @foreach($users as $u)
-                            <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-ui.modal-form-ui 
+                    type="select" 
+                    label="Tag / Assign Persons" 
+                    name="tagged_user_ids[]" 
+                    id="offcanvasTagUser" 
+                    :multiple="true"
+                    data-placeholder="Select persons to tag..."
+                >
+                    @foreach($users as $u)
+                        <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                    @endforeach
+                </x-ui.modal-form-ui>
 
                 <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
                     <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>

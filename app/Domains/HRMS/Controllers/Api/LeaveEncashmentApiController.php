@@ -304,7 +304,7 @@ class LeaveEncashmentApiController extends Controller
 
         $this->reconcileEncashedBalance($empId, $typeId);
 
-        return $this->sendSuccess(null, __('hrms.leave.encashment_app.deleted_successfully'));
+        return $this->sendSuccess(['id' => (int)$id], __('hrms.leave.encashment_app.deleted_successfully'));
     }
 
     private function isValidEncashmentMonth(Carbon $date, string $frequency): bool

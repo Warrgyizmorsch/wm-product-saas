@@ -28,12 +28,12 @@
         $finalKanbanRoute = route('crm.leads.kanban');
     }
 
-    $finalCalRoute = $calendarRoute ?? route('crm.activities.index');
-    $shouldShowCalendar = $showCalendar ?? (!$isDealContext);
+    $finalCalRoute = $calendarRoute ?? ($isDealContext ? route('crm.deals.activities') : route('crm.activities.index'));
+    $shouldShowCalendar = $showCalendar ?? true;
 
     $isListActive = request()->routeIs('crm.leads.index') || request()->routeIs('crm.deals.index') || request()->routeIs('crm.accounts.index');
     $isKanbanActive = request()->routeIs('crm.leads.kanban') || request()->routeIs('crm.deals.kanban');
-    $isCalActive = request()->routeIs('crm.activities.index');
+    $isCalActive = request()->routeIs('crm.activities.index') || request()->routeIs('crm.deals.activities');
 @endphp
 
 @once

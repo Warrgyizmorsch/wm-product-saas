@@ -18,16 +18,16 @@
         ],
         'Revenue Cycle' => [
             ['label' => __('ui.crm'), 'icon' => 'feather-users', 'url' => '#', 'children' => [
-                ['label' => 'Accounts (Companies)', 'route' => 'crm.accounts.index'],
-                ['label' => 'Deals (Pipeline)', 'route' => 'crm.deals.index'],
-                ['label' => 'Leads', 'route' => 'crm.leads.index'],
-                ['label' => 'Track Status', 'route' => 'crm.leads.trackStatus'],
-                ['label' => 'Customers', 'route' => 'crm.customers.index'],
+                ['label' => __('crm.accounts_sidebar') ?: 'Accounts (Companies)', 'route' => 'crm.accounts.index'],
+                ['label' => __('crm.deals_sidebar') ?: 'Deals (Pipeline)', 'route' => 'crm.deals.index'],
+                ['label' => __('crm.leads') ?: 'Leads', 'route' => 'crm.leads.index'],
+                ['label' => __('crm.track_status_sidebar') ?: 'Track Status', 'route' => 'crm.leads.trackStatus'],
+                ['label' => __('crm.customers_sidebar') ?: 'Customers', 'route' => 'crm.customers.index'],
             ]],
-            ['label' => 'CRM Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
-                ['label' => 'Lead Status Master', 'route' => 'crm.masters.lead-statuses.index'],
-                ['label' => 'Deal Stage Master', 'route' => 'crm.masters.deal-statuses.index'],
-                ['label' => 'CRM & Sales Settings', 'route' => 'crm.settings.index'],
+            ['label' => __('crm.crm_masters_sidebar') ?: 'CRM Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
+                ['label' => __('crm.lead_status_master') ?: 'Lead Status Master', 'route' => 'crm.masters.lead-statuses.index'],
+                ['label' => __('crm.deal_stage_master') ?: 'Deal Stage Master', 'route' => 'crm.masters.deal-statuses.index'],
+                ['label' => __('crm.crm_sales_settings') ?: 'CRM & Sales Settings', 'route' => 'crm.settings.index'],
             ]],
             ['label' => 'Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],
@@ -173,6 +173,7 @@
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
             ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
+            ['label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index'],
             ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => [
                 ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'],
                 ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary'],

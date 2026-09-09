@@ -428,11 +428,11 @@ class PayrollRunApiController extends Controller
                 if ($or->employee_ids && count($or->employee_ids) > 0) {
                     $alreadyProcessed = array_merge($alreadyProcessed, $or->employee_ids);
                 } elseif ($or->pay_group_id) {
-                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
+                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->whereNotNull('salary_structure_id')->pluck('id')->toArray();
                     $alreadyProcessed = array_merge($alreadyProcessed, $pgEmpIds);
                 } else {
-                    $allEmpIds = Employee::pluck('id')->toArray();
-                    $alreadyProcessed = array_merge($alreadyProcessed, $allEmpIds);
+                    $genEmpIds = Employee::where('status', true)->whereNotNull('pay_group_id')->whereNotNull('salary_structure_id')->pluck('id')->toArray();
+                    $alreadyProcessed = array_merge($alreadyProcessed, $genEmpIds);
                 }
             }
             $alreadyProcessed = array_unique($alreadyProcessed);
@@ -936,6 +936,7 @@ class PayrollRunApiController extends Controller
         DB::beginTransaction();
         try {
             $insertData = [];
+            $responseData = [];
             foreach ($employees as $employee) {
                 $insertData[] = [
                     'tenant_id'           => auth()->user()->tenant_id ?? 1,
@@ -944,16 +945,25 @@ class PayrollRunApiController extends Controller
                     'amount'              => $validated['amount'],
                     'payroll_month'       => $validated['payroll_month'],
                     'status'              => 'pending',
-                    'remarks'             => $validated['remarks'],
+                    'remarks'             => $validated['remarks'] ?? null,
                     'created_at'          => now(),
                     'updated_at'          => now(),
+                ];
+
+                $responseData[] = [
+                    'employee_id'         => $employee->id,
+                    'salary_component_id' => (int)$validated['salary_component_id'],
+                    'payroll_month'       => $validated['payroll_month'],
+                    'amount'              => (float)$validated['amount'],
+                    'status'              => 'pending',
+                    'remarks'             => $validated['remarks'] ?? null,
                 ];
             }
 
             DB::table('employee_adhoc_components')->insert($insertData);
             DB::commit();
 
-            return $this->sendSuccess(null, 'Bulk ad-hoc adjustments created successfully for ' . $employees->count() . ' employees.');
+            return $this->sendSuccess($responseData, 'Bulk ad-hoc adjustments created successfully for ' . $employees->count() . ' employees.');
         } catch (\Exception $e) {
             DB::rollBack();
             return $this->sendError('Failed to create bulk adjustments: ' . $e->getMessage(), 500);

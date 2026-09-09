@@ -61,11 +61,16 @@ class LeadFollowupController extends Controller
             $notes = $request->input('schedule_notes') ?: $validated['notes'];
 
             $this->followupService->storeFollowup($lead, [
-                'type'            => $scheduleType,
-                'status'          => 'Pending',
-                'followup_date'   => $dueDate,
-                'notes'           => $notes,
-                'tagged_user_ids' => $validated['tagged_user_ids'] ?? null,
+                'type'                 => $scheduleType,
+                'title'                => $request->input('title'),
+                'duration_minutes'     => $request->input('duration_minutes'),
+                'guest_emails'         => $request->input('guest_emails'),
+                'status'               => 'Pending',
+                'followup_date'        => $dueDate,
+                'notes'                => $notes,
+                'tagged_user_ids'      => $validated['tagged_user_ids'] ?? null,
+                'sync_google_calendar' => $request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : true,
+                'create_meet_link'     => $request->boolean('create_meet_link'),
             ]);
 
             try {
@@ -93,11 +98,16 @@ class LeadFollowupController extends Controller
                 $nextNotes = !empty($pastNotes) ? ($pastNotes . " | " . $contextSuffix) : $contextSuffix;
 
                 $this->followupService->storeFollowup($lead, [
-                    'type'            => $nextType,
-                    'status'          => 'Pending',
-                    'followup_date'   => $nextDate,
-                    'notes'           => $nextNotes,
-                    'tagged_user_ids' => $validated['tagged_user_ids'] ?? null,
+                    'type'                 => $nextType,
+                    'title'                => $request->input('next_title') ?: ($request->input('title') ?: ("Next " . $nextType . " with " . ($lead->company_name ?: $lead->contact_person))),
+                    'duration_minutes'     => $request->input('next_duration_minutes') ?: ($request->input('duration_minutes') ?: 30),
+                    'guest_emails'         => $request->input('next_guest_emails') ?: $request->input('guest_emails'),
+                    'status'               => 'Pending',
+                    'followup_date'        => $nextDate,
+                    'notes'                => $nextNotes,
+                    'tagged_user_ids'      => $validated['tagged_user_ids'] ?? null,
+                    'sync_google_calendar' => $request->has('next_sync_google_calendar') ? $request->boolean('next_sync_google_calendar') : ($request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : true),
+                    'create_meet_link'     => $request->has('next_create_meet_link') ? $request->boolean('next_create_meet_link') : $request->boolean('create_meet_link'),
                 ]);
 
                 try {
@@ -154,6 +164,9 @@ class LeadFollowupController extends Controller
             'status'             => 'nullable|string',
             'notes'              => 'nullable|string',
             'stage'              => 'nullable|string',
+            'title'              => 'nullable|string',
+            'duration_minutes'   => 'nullable|integer',
+            'guest_emails'       => 'nullable|string',
             'tagged_user_id'     => 'nullable|exists:users,id',
             'tagged_user_ids'    => 'nullable|array',
             'tagged_user_ids.*'  => 'nullable|exists:users,id',
@@ -184,17 +197,73 @@ class LeadFollowupController extends Controller
             $taggedUserIds = !empty($validated['tagged_user_ids']) ? array_values(array_filter($validated['tagged_user_ids'])) : null;
             $primaryTaggedId = !empty($taggedUserIds) ? $taggedUserIds[0] : ($validated['tagged_user_id'] ?? null);
 
-            LeadFollowup::create([
-                'tenant_id'       => $tenantId,
-                'crm_deal_id'     => $deal->id,
-                'lead_id'         => null,
-                'followup_date'   => $followupDateTime,
-                'type'            => $scheduleType,
-                'status'          => 'Pending',
-                'notes'           => $notes,
-                'tagged_user_id'  => $primaryTaggedId,
-                'tagged_user_ids' => $taggedUserIds,
+            $durationMinutes = !empty($request->input('duration_minutes')) ? (int)$request->input('duration_minutes') : 30;
+            $guestEmailsInput = !empty($request->input('guest_emails')) ? trim($request->input('guest_emails')) : null;
+            $titleInput = !empty($request->input('title')) ? trim($request->input('title')) : ($scheduleType . " with " . ($deal->title ?: 'Deal #' . $deal->id));
+
+            $followup = LeadFollowup::create([
+                'tenant_id'        => $tenantId,
+                'crm_deal_id'      => $deal->id,
+                'lead_id'          => null,
+                'followup_date'    => $followupDateTime,
+                'type'             => $scheduleType,
+                'title'            => $titleInput,
+                'duration_minutes' => $durationMinutes,
+                'guest_emails'     => $guestEmailsInput,
+                'status'           => 'Pending',
+                'notes'            => $notes,
+                'tagged_user_id'   => $primaryTaggedId,
+                'tagged_user_ids'  => $taggedUserIds,
             ]);
+
+            $syncGoogle = $request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : true;
+            if ($syncGoogle) {
+                try {
+                    $createMeet = $request->boolean('create_meet_link') || in_array(strtolower($scheduleType), ['meeting', 'demo']);
+                    $attendees = [];
+                    if ($deal->contact?->email) $attendees[] = $deal->contact->email;
+                    if ($deal->account?->email) $attendees[] = $deal->account->email;
+                    if (auth()->check() && auth()->user()?->email) {
+                        $attendees[] = auth()->user()->email;
+                    }
+                    if (!empty($taggedUserIds)) {
+                        $taggedEmails = \App\Models\User::whereIn('id', $taggedUserIds)->pluck('email')->filter()->toArray();
+                        $attendees = array_merge($attendees, $taggedEmails);
+                    }
+                    if (!empty($guestEmailsInput)) {
+                        $extraEmails = array_map('trim', explode(',', $guestEmailsInput));
+                        $attendees = array_merge($attendees, $extraEmails);
+                    }
+                    $attendees = array_unique(array_values(array_filter($attendees)));
+
+                    $calService = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class);
+                    $res = $calService->createEvent([
+                        'summary'          => $titleInput,
+                        'description'      => $notes ?? '',
+                        'start_time'       => $followupDateTime->toIso8601String(),
+                        'end_time'         => (clone $followupDateTime)->addMinutes($durationMinutes)->toIso8601String(),
+                        'attendees'        => $attendees,
+                        'create_meet_link' => $createMeet,
+                        'deal_id'          => $deal->id,
+                    ]);
+
+                    if (\Schema::hasColumn('lead_followups', 'google_event_id')) {
+                        $followup->google_event_id = $res['google_event_id'] ?? null;
+                    }
+                    if (\Schema::hasColumn('lead_followups', 'google_meet_link')) {
+                        $followup->google_meet_link = $res['meet_link'] ?? null;
+                    }
+                    if (\Schema::hasColumn('lead_followups', 'is_google_meet')) {
+                        $followup->is_google_meet = $createMeet;
+                    }
+                    if (!empty($res['meet_link'])) {
+                        $followup->notes = ($followup->notes ? $followup->notes . "\n" : '') . "Google Meet: " . $res['meet_link'];
+                    }
+                    $followup->save();
+                } catch (\Throwable $ex) {
+                    \Illuminate\Support\Facades\Log::warning('Google Calendar auto-sync notice for deal: ' . $ex->getMessage());
+                }
+            }
         } else {
             $pastType = $validated['type'] ?? 'Call';
             $pastStatus = $validated['status'] ?? 'Connected';

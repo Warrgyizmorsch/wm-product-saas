@@ -18,6 +18,7 @@ class DocumentMaster extends BaseModel
         'is_required',
         'upload_responsibility',
         'approval_required',
+        'requires_signature',
         'expiry_applicable',
         'reminder_days_before',
         'employee_can_view',
@@ -28,6 +29,7 @@ class DocumentMaster extends BaseModel
     protected $casts = [
         'is_required' => 'boolean',
         'approval_required' => 'boolean',
+        'requires_signature' => 'boolean',
         'expiry_applicable' => 'boolean',
         'reminder_days_before' => 'integer',
         'employee_can_view' => 'boolean',

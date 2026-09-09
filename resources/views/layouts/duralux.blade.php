@@ -19,6 +19,15 @@
     <link rel="stylesheet" href="{{ asset('assets/css/production.css') }}">
     <script>
         (function () {
+            if (window.navigator && navigator.serviceWorker) {
+                navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                    registrations.forEach(function (registration) {
+                        registration.unregister();
+                    });
+                });
+            }
+        })();
+        (function () {
             var savedColor = localStorage.getItem('erp_primary_color');
             if (savedColor) {
                 document.documentElement.style.setProperty('--bs-primary', savedColor);
@@ -58,12 +67,6 @@
 </head>
 
 <body>
-    <div class="loader-bg">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">{{ __('ui.loading') }}</span>
-        </div>
-    </div>
-
     @include('partials.duralux.sidebar')
     @include('partials.duralux.header')
 

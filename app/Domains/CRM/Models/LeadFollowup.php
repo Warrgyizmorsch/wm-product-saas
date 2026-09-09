@@ -18,6 +18,12 @@ class LeadFollowup extends Model
         'branch_id',
         'lead_id',
         'crm_deal_id',
+        'google_event_id',
+        'google_meet_link',
+        'is_google_meet',
+        'title',
+        'duration_minutes',
+        'guest_emails',
         'followup_date',
         'type',
         'status',
@@ -32,6 +38,7 @@ class LeadFollowup extends Model
         'followup_date' => 'datetime',
         'original_followup_date' => 'datetime',
         'tagged_user_ids' => 'array',
+        'is_google_meet' => 'boolean',
     ];
 
     /**

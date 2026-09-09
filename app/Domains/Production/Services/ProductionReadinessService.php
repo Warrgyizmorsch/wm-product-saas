@@ -155,10 +155,20 @@ class ProductionReadinessService
     public function evaluateOrderReadiness(ProductionOrder $order): array
     {
         $tenantId = (int) $order->tenant_id;
-        $ops = $order->operations()
-            ->with(['predecessorDependencies', 'routingOperation', 'machine', 'workCenter'])
-            ->orderBy('sequence')
-            ->get();
+        if ($order->relationLoaded('operations')) {
+            $ops = $order->operations->sortBy('sequence');
+        } else {
+            $ops = $order->operations()
+                ->with(['predecessorDependencies', 'routingOperation', 'machine', 'workCenter'])
+                ->orderBy('sequence')
+                ->get();
+        }
+
+        foreach ($ops as $op) {
+            if (!$op->relationLoaded('order')) {
+                $op->setRelation('order', $order);
+            }
+        }
 
         if ($ops->isEmpty()) {
             return [
@@ -269,6 +279,29 @@ class ProductionReadinessService
             ->with(['product'])
             ->get();
 
+        if ($order && $order->relationLoaded('operations')) {
+            $sfgProductIds = $order->operations->pluck('source_product_id')->filter()->all();
+        } else {
+            $sfgProductIds = ProductionOrderOperation::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('production_order_id', $order->id)
+                ->whereNotNull('source_product_id')
+                ->pluck('source_product_id')
+                ->filter()
+                ->all();
+        }
+
+        if ($op->source_bom_id) {
+            $bomMaterialIds = ProductionBomItem::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('bom_id', $op->source_bom_id)
+                ->pluck('material_id')
+                ->all();
+            $reservations = $reservations->filter(fn($r) => in_array($r->product_id, $bomMaterialIds, true) && !in_array($r->product_id, $sfgProductIds, true));
+        } else {
+            $reservations = $reservations->filter(fn($r) => !in_array($r->product_id, $sfgProductIds, true));
+        }
+
         if ($reservations->isEmpty()) {
             return [
                 'status' => self::STATUS_READY,
@@ -377,14 +410,55 @@ class ProductionReadinessService
 
         // 1. Intra-routing predecessor check
         $intraReadyQty = $orderQty;
-        if ($op->previousOperation) {
-            $prevOp = $op->previousOperation;
+        $prevOp = $op->previousOperation;
+        if (!$prevOp && $op->order && $op->order->relationLoaded('operations')) {
+            $prevOp = $op->order->operations
+                ->filter(function ($other) use ($op) {
+                    if ($other->sequence >= $op->sequence) return false;
+                    return $op->source_product_id
+                        ? (int) $other->source_product_id === (int) $op->source_product_id
+                        : empty($other->source_product_id);
+                })
+                ->sortByDesc('sequence')
+                ->first();
+        }
+        if (!$prevOp) {
+            $prevOp = ProductionOrderOperation::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('production_order_id', $op->production_order_id)
+                ->where('sequence', '<', $op->sequence)
+                ->where(function ($q) use ($op) {
+                    if ($op->source_product_id) {
+                        $q->where('source_product_id', $op->source_product_id);
+                    } else {
+                        $q->whereNull('source_product_id');
+                    }
+                })
+                ->orderBy('sequence', 'desc')
+                ->first();
+        }
+
+        if ($prevOp) {
             $produced = (float) $prevOp->quantity_produced;
-            $transferred = (float) ($prevOp->quantity_transferred_out ?? 0.0);
+            $transferred = (float) ($op->quantity_transferred_in > 0 ? $op->quantity_transferred_in : ($prevOp->quantity_transferred_out ?? 0.0));
+            $isOverlap = (bool) (
+                $prevOp->overlap_enabled
+                || $op->overlap_enabled
+                || ((float) ($prevOp->transfer_batch_quantity ?? 0) > 0)
+                || ((float) ($op->transfer_batch_quantity ?? 0) > 0)
+                || (bool) ($prevOp->routingOperation?->overlap_enabled ?? false)
+                || (bool) ($op->routingOperation?->overlap_enabled ?? false)
+            );
 
-            $availableWip = max($produced, $transferred);
+            if ($prevOp->status === ProductionOrderOperation::STATUS_COMPLETED) {
+                $availableWip = max($produced, $transferred);
+            } elseif ($isOverlap || $transferred > 0) {
+                $availableWip = $transferred;
+            } else {
+                $availableWip = 0.0;
+            }
 
-            if ($prevOp->status !== ProductionOrderOperation::STATUS_COMPLETED && $availableWip <= 0.0) {
+            if ($availableWip <= 0.0) {
                 $intraReadyQty = 0.0;
                 $blockers[] = [
                     'code' => self::REASON_PREDECESSOR_INCOMPLETE,
@@ -496,36 +570,43 @@ class ProductionReadinessService
         $machine = $op->machine;
 
         if (!$machine && $op->work_center_id) {
-            // Check if active machines exist at Work Center
-            $activeMachines = Machine::withoutGlobalScopes()
+            $totalMachines = Machine::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('work_center_id', $op->work_center_id)
-                ->where('status', 'active')
-                ->get();
+                ->count();
 
-            if ($activeMachines->isEmpty()) {
-                $blockers[] = [
-                    'code' => self::REASON_NO_VALID_RESOURCE,
+            if ($totalMachines > 0) {
+                // Check if active machines exist at Work Center
+                $activeMachines = Machine::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('work_center_id', $op->work_center_id)
+                    ->where('status', 'active')
+                    ->get();
+
+                if ($activeMachines->isEmpty()) {
+                    $blockers[] = [
+                        'code' => self::REASON_NO_VALID_RESOURCE,
+                        'dimension' => 'machine',
+                        'message' => "No active machines available at assigned Work Center #{$op->work_center_id}.",
+                        'severity' => 'error',
+                    ];
+                    return [
+                        'status' => self::STATUS_BLOCKED,
+                        'assigned_machine' => null,
+                        'alternate_available' => false,
+                        'blockers' => $blockers,
+                        'warnings' => $warnings,
+                    ];
+                }
+
+                $machine = $activeMachines->first();
+                $warnings[] = [
+                    'code' => 'PRIMARY_MACHINE_UNASSIGNED',
                     'dimension' => 'machine',
-                    'message' => "No active machines available at assigned Work Center #{$op->work_center_id}.",
-                    'severity' => 'error',
-                ];
-                return [
-                    'status' => self::STATUS_BLOCKED,
-                    'assigned_machine' => null,
-                    'alternate_available' => false,
-                    'blockers' => $blockers,
-                    'warnings' => $warnings,
+                    'message' => "Primary machine unassigned; defaulting to active machine [{$machine->name}].",
+                    'severity' => 'info',
                 ];
             }
-
-            $machine = $activeMachines->first();
-            $warnings[] = [
-                'code' => 'PRIMARY_MACHINE_UNASSIGNED',
-                'dimension' => 'machine',
-                'message' => "Primary machine unassigned; defaulting to active machine [{$machine->name}].",
-                'severity' => 'info',
-            ];
         }
 
         if (!$machine) {
@@ -674,6 +755,19 @@ class ProductionReadinessService
                 'ready_qty' => $produced,
                 'blockers' => [],
                 'warnings' => $warnings,
+            ];
+        }
+
+        // If not yet dispatched to vendor (waiting/ready to generate PO/Challan and dispatch),
+        // the operation is ready for subcontract dispatch once predecessor and material dependencies allow.
+        if (in_array($statusStr, [ProductionOrderOperation::STATUS_WAITING, ProductionOrderOperation::STATUS_READY], true)) {
+            return [
+                'status' => self::STATUS_READY,
+                'required_qty' => $orderQty,
+                'returned_qty' => 0.0,
+                'ready_qty' => $orderQty,
+                'blockers' => [],
+                'warnings' => [],
             ];
         }
 

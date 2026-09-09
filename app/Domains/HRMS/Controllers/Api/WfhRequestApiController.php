@@ -320,7 +320,7 @@ class WfhRequestApiController extends Controller
 
         $wfhRequest->delete();
 
-        return $this->sendSuccess(null, 'WFH application withdrawn successfully.');
+        return $this->sendSuccess(['id' => (int)$id], 'WFH application withdrawn successfully.');
     }
 
     public function requestCancellation(Request $request, mixed $id): JsonResponse

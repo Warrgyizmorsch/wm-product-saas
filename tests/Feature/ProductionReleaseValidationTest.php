@@ -437,6 +437,25 @@ class ProductionReleaseValidationTest extends TestCase
 
         $order->update(['status' => 'released']);
         app(\App\Domains\Production\Services\ProductionWipService::class)->initializeWip($order->id);
+        $order = $order->fresh(['reservations']);
+
+        foreach ($order->reservations as $res) {
+            \App\Domains\Inventory\Models\ProductWarehouseStock::updateOrCreate([
+                'tenant_id' => $this->tenantA->id,
+                'warehouse_id' => $this->rawWarehouse->id,
+                'product_id' => $res->product_id,
+            ], [
+                'quantity' => (float) $res->quantity_planned * 10,
+                'available_qty' => (float) $res->quantity_planned * 10,
+            ]);
+            $res->update(['quantity_reserved' => (float) $res->quantity_planned]);
+            app(\App\Domains\Production\Services\ProductionMaterialService::class)->issueMaterial(
+                $res->id,
+                (float) $res->quantity_planned,
+                $this->rawWarehouse->id,
+                $this->userA->id
+            );
+        }
 
         $schedule = $schedulingService->generateSchedule($order, now());
         $op1 = $schedule->operations->where('sequence', 10)->first();

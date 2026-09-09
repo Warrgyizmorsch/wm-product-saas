@@ -3,6 +3,7 @@
 use App\Domains\CRM\Controllers\CustomerController;
 use App\Domains\CRM\Controllers\CrmAccountController;
 use App\Domains\CRM\Controllers\CrmDealController;
+use App\Domains\CRM\Controllers\DealActivityController;
 use App\Domains\CRM\Controllers\LeadController;
 use App\Domains\CRM\Controllers\LeadFollowupController;
 use App\Domains\CRM\Controllers\LeadActivityController;
@@ -10,6 +11,7 @@ use App\Domains\CRM\Controllers\LeadStatusController;
 use App\Domains\CRM\Controllers\DealStatusController;
 use App\Domains\CRM\Controllers\QuotationController;
 use App\Domains\CRM\Controllers\CrmSettingsController;
+use App\Domains\CRM\Controllers\GoogleCalendarController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('crm')
@@ -50,6 +52,7 @@ Route::prefix('crm')
         // CRM Deals Routes
         Route::get('deals', [CrmDealController::class, 'index'])->name('deals.index');
         Route::get('deals/kanban', [CrmDealController::class, 'kanban'])->name('deals.kanban');
+        Route::get('deals/activities', [DealActivityController::class, 'index'])->name('deals.activities');
         Route::get('deals/create', [CrmDealController::class, 'create'])->name('deals.create');
         Route::post('deals', [CrmDealController::class, 'store'])->name('deals.store');
         Route::get('deals/{deal}', [CrmDealController::class, 'show'])->name('deals.show');
@@ -68,6 +71,12 @@ Route::prefix('crm')
             ->name('leads.kanban');
         Route::get('activities', [LeadActivityController::class, 'index'])
             ->name('activities.index');
+        Route::post('google-calendar/schedule-event', [GoogleCalendarController::class, 'scheduleEvent'])
+            ->name('google-calendar.schedule-event');
+        Route::get('google-calendar/events', [GoogleCalendarController::class, 'fetchEvents'])
+            ->name('google-calendar.fetch-events');
+        Route::get('google-calendar/connect', [GoogleCalendarController::class, 'connectGoogleAccount'])
+            ->name('google-calendar.connect');
         Route::get('leads/track-status', [LeadController::class, 'trackStatus'])
             ->name('leads.trackStatus');
         Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])

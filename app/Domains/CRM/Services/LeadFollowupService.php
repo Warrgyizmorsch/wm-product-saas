@@ -28,10 +28,17 @@ class LeadFollowupService
         $taggedUserIds = !empty($validated['tagged_user_ids']) ? array_values(array_filter($validated['tagged_user_ids'])) : null;
         $primaryTaggedId = !empty($taggedUserIds) ? $taggedUserIds[0] : ($validated['tagged_user_id'] ?? null);
 
+        $durationMinutes = !empty($validated['duration_minutes']) ? (int)$validated['duration_minutes'] : 30;
+        $guestEmailsInput = !empty($validated['guest_emails']) ? trim($validated['guest_emails']) : null;
+        $titleInput = !empty($validated['title']) ? trim($validated['title']) : (($validated['type'] ?? 'Scheduled Call') . " with " . ($lead->company_name ?: $lead->contact_person));
+
         $followup = $this->followupRepo->create([
             'lead_id' => $lead->id,
             'followup_date' => $followupDateTime,
             'type' => $validated['type'],
+            'title' => $titleInput,
+            'duration_minutes' => $durationMinutes,
+            'guest_emails' => $guestEmailsInput,
             'status' => $validated['status'],
             'notes' => $validated['notes'] ?? null,
             'tagged_user_id' => $primaryTaggedId,
@@ -42,6 +49,56 @@ class LeadFollowupService
         $description = $followup->status === 'Pending'
             ? "Scheduled a {$followup->type} activity on " . $followup->followup_date->format('d/m/Y h:i A')
             : "Logged a {$followup->type} interaction: " . ($followup->notes ?: 'No details');
+
+        // Auto-Sync with Google Calendar if enabled or if pending activity
+        $syncGoogle = isset($validated['sync_google_calendar']) ? (bool)$validated['sync_google_calendar'] : true;
+        if ($followup->status === 'Pending' && $syncGoogle) {
+            try {
+                $createMeet = !empty($validated['create_meet_link']) || in_array(strtolower($validated['type']), ['meeting', 'demo']);
+                $attendees = [];
+                if ($lead->email) $attendees[] = $lead->email;
+                if ($lead->company_email) $attendees[] = $lead->company_email;
+                if (auth()->check() && auth()->user()?->email) {
+                    $attendees[] = auth()->user()->email;
+                }
+                if (!empty($taggedUserIds)) {
+                    $taggedEmails = \App\Models\User::whereIn('id', $taggedUserIds)->pluck('email')->filter()->toArray();
+                    $attendees = array_merge($attendees, $taggedEmails);
+                }
+                if (!empty($guestEmailsInput)) {
+                    $extraEmails = array_map('trim', explode(',', $guestEmailsInput));
+                    $attendees = array_merge($attendees, $extraEmails);
+                }
+                $attendees = array_unique(array_values(array_filter($attendees)));
+
+                $calService = app(GoogleCalendarIntegrationService::class);
+                $res = $calService->createEvent([
+                    'summary' => $titleInput,
+                    'description' => $validated['notes'] ?? '',
+                    'start_time' => $followupDateTime->toIso8601String(),
+                    'end_time' => (clone $followupDateTime)->addMinutes($durationMinutes)->toIso8601String(),
+                    'attendees' => $attendees,
+                    'create_meet_link' => $createMeet,
+                    'lead_id' => $lead->id,
+                ]);
+
+                if (\Schema::hasColumn('lead_followups', 'google_event_id')) {
+                    $followup->google_event_id = $res['google_event_id'] ?? null;
+                }
+                if (\Schema::hasColumn('lead_followups', 'google_meet_link')) {
+                    $followup->google_meet_link = $res['meet_link'] ?? null;
+                }
+                if (\Schema::hasColumn('lead_followups', 'is_google_meet')) {
+                    $followup->is_google_meet = $createMeet;
+                }
+                if (!empty($res['meet_link'])) {
+                    $followup->notes = ($followup->notes ? $followup->notes . "\n" : '') . "Google Meet: " . $res['meet_link'];
+                }
+                $followup->save();
+            } catch (\Throwable $ex) {
+                \Illuminate\Support\Facades\Log::warning('Google Calendar auto-sync notice: ' . $ex->getMessage());
+            }
+        }
 
         LeadHistory::logEvent(
             $lead,

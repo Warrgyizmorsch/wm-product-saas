@@ -683,10 +683,15 @@ class TravelExpenseApiController extends Controller
     /**
      * POST /api/hrms/travel-expense/travel/{travelRequest}/approve
      */
-    public function approveTravelRequest(Request $request, TravelRequest $travelRequest): JsonResponse
+    public function approveTravelRequest(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $travelRequest = TravelRequest::find($id);
+        if (!$travelRequest) {
+            return $this->sendError("Travel request with ID '{$id}' not found.", 404);
         }
 
         $approvedBudget = $request->input('approved_budget', $travelRequest->estimated_budget);
@@ -696,20 +701,25 @@ class TravelExpenseApiController extends Controller
             'approved_budget' => $approvedBudget
         ]);
 
-        return $this->sendSuccess($travelRequest, 'Travel request approved successfully.');
+        return $this->sendSuccess($this->transformTravelRequest($travelRequest->fresh(), true), 'Travel request approved successfully.');
     }
 
     /**
      * POST /api/hrms/travel-expense/travel/{travelRequest}/reject
      */
-    public function rejectTravelRequest(TravelRequest $travelRequest): JsonResponse
+    public function rejectTravelRequest(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $travelRequest = TravelRequest::find($id);
+        if (!$travelRequest) {
+            return $this->sendError("Travel request with ID '{$id}' not found.", 404);
+        }
+
         $travelRequest->update(['status' => 'rejected']);
-        return $this->sendSuccess($travelRequest, 'Travel request rejected successfully.');
+        return $this->sendSuccess($this->transformTravelRequest($travelRequest->fresh(), true), 'Travel request rejected successfully.');
     }
 
     /**
@@ -741,10 +751,15 @@ class TravelExpenseApiController extends Controller
     /**
      * POST /api/hrms/travel-expense/advance/{cashAdvance}/approve
      */
-    public function approveCashAdvance(Request $request, CashAdvance $cashAdvance): JsonResponse
+    public function approveCashAdvance(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $cashAdvance = CashAdvance::find($id);
+        if (!$cashAdvance) {
+            return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
         }
 
         $approvedAmount = $request->input('approved_amount', $cashAdvance->amount);
@@ -754,16 +769,21 @@ class TravelExpenseApiController extends Controller
             'approved_amount' => $approvedAmount
         ]);
 
-        return $this->sendSuccess($cashAdvance, 'Cash advance request approved successfully.');
+        return $this->sendSuccess($this->transformCashAdvance($cashAdvance->fresh(), true), 'Cash advance request approved successfully.');
     }
 
     /**
      * POST /api/hrms/travel-expense/advance/{cashAdvance}/disburse
      */
-    public function disburseCashAdvance(CashAdvance $cashAdvance): JsonResponse
+    public function disburseCashAdvance(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $cashAdvance = CashAdvance::find($id);
+        if (!$cashAdvance) {
+            return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
@@ -805,20 +825,25 @@ class TravelExpenseApiController extends Controller
             }
         }
 
-        return $this->sendSuccess($cashAdvance, 'Cash advance disbursed successfully.');
+        return $this->sendSuccess($this->transformCashAdvance($cashAdvance->fresh(), true), 'Cash advance disbursed successfully.');
     }
 
     /**
      * POST /api/hrms/travel-expense/advance/{cashAdvance}/reject
      */
-    public function rejectCashAdvance(CashAdvance $cashAdvance): JsonResponse
+    public function rejectCashAdvance(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $cashAdvance = CashAdvance::find($id);
+        if (!$cashAdvance) {
+            return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
+        }
+
         $cashAdvance->update(['status' => 'rejected']);
-        return $this->sendSuccess($cashAdvance, 'Cash advance request rejected successfully.');
+        return $this->sendSuccess($this->transformCashAdvance($cashAdvance->fresh(), true), 'Cash advance request rejected successfully.');
     }
 
     /**
@@ -906,8 +931,9 @@ class TravelExpenseApiController extends Controller
 
             $advanceAdjusted = 0.00;
             $advance = null;
-            if (!empty($validated['cash_advance_id'])) {
-                $advance = CashAdvance::find($validated['cash_advance_id']);
+            $cashAdvanceId = $validated['cash_advance_id'] ?? null;
+            if ($cashAdvanceId) {
+                $advance = CashAdvance::find($cashAdvanceId);
                 if ($advance) {
                     $advanceAmountVal = floatval($advance->approved_amount ?? $advance->amount);
                     $advanceAdjusted = min($advanceAmountVal, $totalAmount);
@@ -919,7 +945,7 @@ class TravelExpenseApiController extends Controller
             $rep = ExpenseReport::create([
                 'tenant_id'         => $tenantId,
                 'employee_id'       => $validated['employee_id'],
-                'travel_request_id' => $validated['travel_request_id'] ?: null,
+                'travel_request_id' => $validated['travel_request_id'] ?? null,
                 'title'             => $validated['title'],
                 'total_amount'      => $totalAmount,
                 'advance_adjusted'  => $advanceAdjusted,
@@ -959,10 +985,15 @@ class TravelExpenseApiController extends Controller
     /**
      * POST /api/hrms/travel-expense/report/{expenseReport}/update
      */
-    public function updateExpenseReport(Request $request, ExpenseReport $expenseReport): JsonResponse
+    public function updateExpenseReport(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $expenseReport = ExpenseReport::find($id);
+        if (!$expenseReport) {
+            return $this->sendError("Expense report with ID '{$id}' not found.", 404);
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
@@ -1046,8 +1077,9 @@ class TravelExpenseApiController extends Controller
 
             $advanceAdjusted = 0.00;
             $advance = null;
-            if (!empty($validated['cash_advance_id'])) {
-                $advance = CashAdvance::find($validated['cash_advance_id']);
+            $cashAdvanceId = $validated['cash_advance_id'] ?? null;
+            if ($cashAdvanceId) {
+                $advance = CashAdvance::find($cashAdvanceId);
                 if ($advance) {
                     $advanceAmountVal = floatval($advance->approved_amount ?? $advance->amount);
                     $advanceAdjusted = min($advanceAmountVal, $totalAmount);
@@ -1057,7 +1089,7 @@ class TravelExpenseApiController extends Controller
             $netReimbursement = max($totalAmount - $advanceAdjusted, 0.00);
 
             $expenseReport->update([
-                'travel_request_id' => $validated['travel_request_id'] ?: null,
+                'travel_request_id' => $validated['travel_request_id'] ?? null,
                 'title'             => $validated['title'],
                 'total_amount'      => $totalAmount,
                 'advance_adjusted'  => $advanceAdjusted,
@@ -1092,29 +1124,39 @@ class TravelExpenseApiController extends Controller
             }
         });
 
-        return $this->sendSuccess($expenseReport->fresh()->load('claims.category'), 'Expense report updated successfully.');
+        return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh()->load(['claims.category', 'employee', 'travelRequest', 'cashAdvance']), true), 'Expense report updated successfully.');
     }
 
     /**
      * POST /api/hrms/travel-expense/report/{expenseReport}/submit
      */
-    public function submitExpenseReport(ExpenseReport $expenseReport): JsonResponse
+    public function submitExpenseReport(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $expenseReport = ExpenseReport::find($id);
+        if (!$expenseReport) {
+            return $this->sendError("Expense report with ID '{$id}' not found.", 404);
+        }
+
         $expenseReport->update(['status' => 'submitted']);
-        return $this->sendSuccess($expenseReport, 'Expense report submitted for approval.');
+        return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report submitted for approval.');
     }
 
     /**
      * POST /api/hrms/travel-expense/report/{expenseReport}/approve
      */
-    public function approveExpenseReport(Request $request, ExpenseReport $expenseReport): JsonResponse
+    public function approveExpenseReport(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $expenseReport = ExpenseReport::find($id);
+        if (!$expenseReport) {
+            return $this->sendError("Expense report with ID '{$id}' not found.", 404);
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
@@ -1197,29 +1239,39 @@ class TravelExpenseApiController extends Controller
             }
         });
 
-        return $this->sendSuccess($expenseReport->fresh(), 'Expense report approved successfully.');
+        return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report approved successfully.');
     }
 
     /**
      * POST /api/hrms/travel-expense/report/{expenseReport}/reject
      */
-    public function rejectExpenseReport(ExpenseReport $expenseReport): JsonResponse
+    public function rejectExpenseReport(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
+        $expenseReport = ExpenseReport::find($id);
+        if (!$expenseReport) {
+            return $this->sendError("Expense report with ID '{$id}' not found.", 404);
+        }
+
         $expenseReport->update(['status' => 'rejected']);
-        return $this->sendSuccess($expenseReport, 'Expense report rejected successfully.');
+        return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report rejected successfully.');
     }
 
     /**
      * POST /api/hrms/travel-expense/report/{expenseReport}/pay
      */
-    public function payExpenseReport(ExpenseReport $expenseReport): JsonResponse
+    public function payExpenseReport(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $expenseReport = ExpenseReport::find($id);
+        if (!$expenseReport) {
+            return $this->sendError("Expense report with ID '{$id}' not found.", 404);
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
@@ -1306,16 +1358,21 @@ class TravelExpenseApiController extends Controller
             }
         });
 
-        return $this->sendSuccess($expenseReport->fresh(), 'Expense report marked as paid and advance settled successfully.');
+        return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report marked as paid and advance settled successfully.');
     }
 
     /**
      * GET /api/hrms/travel-expense/employee-policy/{employee}
      */
-    public function getEmployeePolicy(Employee $employee): JsonResponse
+    public function getEmployeePolicy(mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        $employee = Employee::find($id);
+        if (!$employee) {
+            return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();

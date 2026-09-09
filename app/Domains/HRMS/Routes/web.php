@@ -26,6 +26,7 @@ use App\Domains\HRMS\Controllers\EmployeeExitController;
 use App\Domains\HRMS\Controllers\ExitClearancePolicyController;
 use App\Domains\HRMS\Controllers\OrgStructureController;
 use App\Domains\HRMS\Controllers\HrmsDashboardController;
+use App\Domains\HRMS\Controllers\PipController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -129,6 +130,8 @@ Route::prefix('hrms')
             Route::patch('/documents/{document}/approve', [EmployeeController::class, 'approveDocument'])->name('employees.documents.approve');
             Route::patch('/documents/{document}/reject', [EmployeeController::class, 'rejectDocument'])->name('employees.documents.reject');
             Route::patch('/documents/{document}/status', [EmployeeController::class, 'updateDocumentStatus'])->name('employees.documents.status');
+            Route::post('/documents/{document}/sign', [EmployeeController::class, 'signDocument'])->name('employees.documents.sign');
+            Route::get('/documents/{document}/view-signed', [EmployeeController::class, 'viewSignedDocument'])->name('employees.documents.view-signed');
             Route::delete('/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
 
             Route::post('/{employee}/adhoc-components', [EmployeeController::class, 'storeAdhocComponent'])->name('employees.adhoc-components.store');
@@ -321,6 +324,7 @@ Route::prefix('hrms')
 
             // Document Template Routes
             Route::post('/templates', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'storeTemplate'])->name('documents-master.templates.store');
+            Route::post('/templates/parse-file', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'parseTemplateFile'])->name('documents-master.templates.parse-file');
             Route::match(['post', 'put'], '/templates/{template}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'updateTemplate'])->name('documents-master.templates.update');
             Route::post('/templates/{template}/toggle-status', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'toggleTemplateStatus'])->name('documents-master.templates.toggle-status');
             Route::delete('/templates/{template}', [\App\Domains\HRMS\Controllers\DocumentMasterController::class, 'destroyTemplate'])->name('documents-master.templates.destroy');
@@ -332,6 +336,7 @@ Route::prefix('hrms')
             Route::get('/', [\App\Domains\HRMS\Controllers\DocumentController::class, 'index'])->name('documents.index');
             Route::post('/bulk-upload', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkUpload'])->name('documents.bulk-upload');
         });
+
 
         Route::view('/track-status', 'modules.hrms.track-status')->name('track-status');
 
@@ -446,5 +451,22 @@ Route::prefix('hrms')
             Route::get('/{exit}/relieving-letter', [EmployeeExitController::class, 'viewRelievingLetter'])->name('exits.relieving-letter.view');
             Route::get('/{exit}/experience-certificate', [EmployeeExitController::class, 'viewExperienceCertificate'])->name('exits.experience-certificate.view');
             Route::get('/{exit}/noc-certificate', [EmployeeExitController::class, 'viewNocCertificate'])->name('exits.noc-certificate.view');
+        });
+
+        // PIP (Performance Improvement Plan) Module
+        Route::prefix('pip')->name('pip.')->group(function (): void {
+            Route::get('/', [PipController::class, 'index'])->name('index');
+            Route::post('/store', [PipController::class, 'store'])->name('store');
+            Route::get('/{pip}', [PipController::class, 'show'])->name('show');
+            Route::post('/{pip}/checkin/store', [PipController::class, 'storeCheckin'])->name('checkin.store');
+            Route::post('/{pip}/objective/store', [PipController::class, 'storeObjective'])->name('objective.store');
+            Route::post('/{pip}/objective/{objective}/status', [PipController::class, 'updateObjectiveStatus'])->name('objective.status');
+            Route::post('/{pip}/evaluate', [PipController::class, 'evaluate'])->name('evaluate');
+
+            // Masters (Categories & Templates)
+            Route::post('/category/store', [PipController::class, 'storeCategory'])->name('category.store');
+            Route::delete('/category/{category}', [PipController::class, 'destroyCategory'])->name('category.destroy');
+            Route::post('/template/store', [PipController::class, 'storeTemplate'])->name('template.store');
+            Route::delete('/template/{template}', [PipController::class, 'destroyTemplate'])->name('template.destroy');
         });
     });

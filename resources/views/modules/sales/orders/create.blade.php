@@ -117,13 +117,13 @@
                 <div class="table-responsive">
                     <x-ui.odoo-form-ui type="table" id="itemsTable">
                         <thead>
-                            <tr>
-                                <th style="width: 40%;">Product / Description</th>
-                                <th class="text-end" style="width: 10%;">Quantity</th>
-                                <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
-                                <th class="text-end col-discount" style="width: 12%;">Discount (₹)</th>
-                                <th class="text-end col-tax" style="width: 12%;">Taxes (%)</th>
-                                <th class="text-end pe-3" style="width: 15%;">Amount</th>
+                            <tr style="background-color: #f1f5f9;">
+                                <th style="width: 38%; min-width: 200px;">Product / Description</th>
+                                <th class="text-end" style="width: 9%;">Quantity</th>
+                                <th class="text-end" style="width: 13%;">Unit Price (₹)</th>
+                                <th class="text-end col-discount" style="width: 11%;">Discount (₹)</th>
+                                <th class="text-end col-tax" style="width: 11%;">Taxes (%)</th>
+                                <th class="text-end pe-3" style="width: 13%;">Amount</th>
                                 <th class="text-center" style="width: 5%;"></th>
                             </tr>
                         </thead>
@@ -323,34 +323,34 @@
             function getRowHtml(index, selectedId = '') {
                 return `
                     <tr class="item-row" data-row-id="${index}">
-                        <td class="ps-3">
-                            <select name="items[${index}][product_id]" class="form-select odoo-table-select item-name-input" data-master="product" required>
+                        <td style="width: 38%; min-width: 200px; vertical-align: top; padding: 8px 8px 8px 12px;">
+                            <select name="items[${index}][product_id]" class="form-select odoo-table-select item-name-input" data-master="product" required style="width: 100%;">
                                 ${buildProductOptions(selectedId)}
                             </select>
                             <div class="description-container mt-2" id="desc-container-${index}" style="display: none;">
-                                <textarea name="items[${index}][description]" class="form-control odoo-table-input" placeholder="Scope/details..."></textarea>
+                                <textarea name="items[${index}][description]" class="form-control odoo-table-input" placeholder="Scope/details..." style="width: 100%;"></textarea>
                             </div>
                             <a href="javascript:void(0)" class="toggle-desc-btn text-primary fs-11 mt-1 d-inline-block" data-row-id="${index}">
                                 <i class="feather-plus me-1"></i>Add Description
                             </a>
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="width: 80px; margin-left: auto;">
+                        <td style="width: 9%; text-align: right; vertical-align: middle; padding: 8px 6px;">
+                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="width: 100%; max-width: 90px; margin-left: auto; display: block;">
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 110px; margin-left: auto;">
+                        <td style="width: 13%; text-align: right; vertical-align: middle; padding: 8px 6px;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; max-width: 120px; margin-left: auto; display: block;">
                         </td>
-                        <td class="col-discount">
-                            <input type="number" name="items[${index}][discount]" class="odoo-table-input text-end line-discount-input" value="0.00" min="0" step="0.01" style="width: 90px; margin-left: auto;">
+                        <td class="col-discount" style="width: 11%; text-align: right; vertical-align: middle; padding: 8px 6px;">
+                            <input type="number" name="items[${index}][discount]" class="odoo-table-input text-end line-discount-input" value="0.00" min="0" step="0.01" style="width: 100%; max-width: 100px; margin-left: auto; display: block;">
                         </td>
-                        <td class="col-tax">
-                            <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 80px; margin-left: auto;">
+                        <td class="col-tax" style="width: 11%; text-align: right; vertical-align: middle; padding: 8px 6px;">
+                            <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; display: block;">
                         </td>
-                        <td class="text-end fw-bold text-dark amount-display pe-3">
+                        <td style="width: 13%; text-align: right; vertical-align: middle; padding: 8px 12px 8px 6px;" class="fw-bold text-dark amount-display">
                             ₹0.00
                         </td>
-                        <td class="text-center">
-                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn mt-1">
+                        <td style="width: 5%; text-align: center; vertical-align: middle; padding: 8px 6px;">
+                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn">
                                 <i class="feather-trash-2"></i>
                             </button>
                         </td>

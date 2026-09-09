@@ -59,6 +59,23 @@
     .status-dropdown-menu .dropdown-item.text-danger {
         color: #ef4444 !important;
     }
+    .modal select.form-select {
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
+        color: #1e293b !important;
+        background-color: #ffffff !important;
+        font-size: 13px !important;
+    }
+    .modal select.form-select:focus {
+        border-color: var(--bs-primary) !important;
+        box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb, 59, 130, 246), 0.2) !important;
+        outline: none !important;
+    }
+    .modal select.form-select option {
+        padding: 8px 12px !important;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+    }
 </style>
 <div class="tab-pane fade {{ $activeTabName === 'documents' ? 'show active' : '' }}" id="documents-pane" role="tabpanel" aria-labelledby="documents-tab">
     <div class="row">
@@ -245,8 +262,8 @@
                                                         </div>
                                                     </div>
                                                     <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
-                                                         @if($doc->documentMaster?->employee_can_view ?? true)
-                                                             <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.common.view') }}">
+                                                         @if(($doc->documentMaster?->employee_can_view ?? true) || $doc->file_path)
+                                                             <a href="{{ $doc->is_signed ? route('hrms.employees.documents.view-signed', $doc->id) : asset('storage/' . $doc->file_path) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.common.view') }}">
                                                                  <i class="feather-eye fs-11"></i>
                                                              </a>
                                                          @endif
@@ -255,10 +272,17 @@
                                                                  <i class="feather-refresh-cw fs-10"></i>
                                                              </a>
                                                          @endif
-                                                         @if($doc->documentMaster?->employee_can_download ?? true)
-                                                             <a href="{{ asset('storage/' . $doc->file_path) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.employees.lbl_download_doc') ?? 'Download' }}">
+                                                         @if(($doc->documentMaster?->employee_can_download ?? true) || $doc->file_path)
+                                                             <a href="{{ asset('storage/' . ($doc->signed_file_path ?: $doc->file_path)) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.employees.lbl_download_doc') ?? 'Download' }}">
                                                                  <i class="feather-download fs-11"></i>
                                                              </a>
+                                                         @endif
+                                                         @if($doc->status === 'pending_signature')
+                                                             <button type="button" class="btn btn-xs btn-warning text-dark fw-bold px-2 py-0.5 d-inline-flex align-items-center gap-1 border-0 rounded-pill ms-1" 
+                                                                     onclick="openSignModal('{{ $doc->id }}', '{{ route('hrms.employees.documents.sign', $doc->id) }}', '{{ e($doc->name) }}', '{{ asset('storage/' . $doc->file_path) }}', '{{ strtolower(pathinfo($doc->file_path, PATHINFO_EXTENSION)) }}')" 
+                                                                     title="Sign Document Now">
+                                                                 <i class="feather-edit-3 fs-10"></i> Sign
+                                                             </button>
                                                          @endif
                                                     </div>
                                                 </div>
@@ -342,6 +366,10 @@
                                                     <i class="feather-clock fs-11"></i>
                                                     {{ __('hrms.employees.lbl_pending_upload') }}
                                                 </span>
+                                            @elseif($doc->status === 'pending_signature')
+                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #d97706 !important; border: 1px solid rgba(245, 158, 11, 0.2); font-weight: 600;">
+                                                    <i class="feather-edit-3 fs-11"></i> Pending Signature
+                                                </span>
                                             @else
                                                 @if($requiresApproval)
                                                     <div class="dropdown d-inline-block">
@@ -385,6 +413,13 @@
                                                     <span class="fw-bold fs-13" style="color: #10b981; font-weight: 700; text-transform: uppercase;">
                                                         Approved
                                                     </span>
+                                                @endif
+                                                @if($doc->is_signed)
+                                                    <div class="mt-0.5">
+                                                        <span class="badge bg-soft-success text-success px-1.5 py-0.5 rounded fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
+                                                            <i class="feather-check-circle fs-9 me-0.5"></i> Digitally Signed
+                                                        </span>
+                                                    </div>
                                                 @endif
                                             @endif
                                         </td>
@@ -537,5 +572,253 @@
         $form.find('.expiry-error-msg').addClass('d-none');
         $(this).removeClass('is-invalid');
     });
+</script>
+
+<!-- SIGN DOCUMENT CANVAS MODAL (STANDARD FORMAT) -->
+<div class="modal fade" id="signDocumentCanvasModal" tabindex="-1" aria-labelledby="signDocumentCanvasModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2.5">
+                <h5 class="modal-title fw-bold text-dark" id="signDocumentCanvasModalLabel" style="font-size: 15px;">
+                    <i class="feather-edit-3 me-2 text-warning"></i>Sign Document
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="signDocumentForm" method="POST" action="">
+                @csrf
+                <input type="hidden" name="signature_image" id="modal_signature_image_input">
+                <div class="modal-body p-3">
+                    <div class="mb-2">
+                        <span class="text-muted fs-12">Document Name:</span>
+                        <span id="sign_modal_doc_title" class="fw-bold text-primary fs-14 ms-1"></span>
+                    </div>
+
+                    <!-- DOCUMENT PREVIEW (FULL SCROLLABLE PDF/IMAGE) -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-12 text-dark mb-1"><i class="feather-eye text-primary me-1"></i> Document Preview:</label>
+                        <div id="modal_doc_preview_wrapper" class="position-relative border rounded bg-light" style="height: 380px; border-color: #cbd5e1 !important;">
+                            <div id="modal_doc_preview_container" class="h-100 w-100 overflow-auto">
+                                <div class="d-flex align-items-center justify-content-center h-100 text-muted fs-13">
+                                    <i class="feather-file me-1"></i> Loading preview...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <input type="hidden" name="signature_position" value="bottom_right">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-bold fs-12 text-dark mb-0">Signature Input <span class="text-danger">*</span></label>
+                                <ul class="nav nav-pills bg-light p-1 rounded-pill border gap-1" id="signatureInputTabs" role="tablist">
+                                    <li class="nav-item">
+                                        <button type="button" id="btn_sig_type_draw" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary" style="background-color: var(--bs-primary) !important; color: #ffffff !important;" onclick="switchSigMode('draw')">
+                                            <i class="feather-edit-2 me-1"></i> Draw Signature
+                                        </button>
+                                    </li>
+                                    <li class="nav-item">
+                                        <button type="button" id="btn_sig_type_upload" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0" onclick="switchSigMode('upload')">
+                                            <i class="feather-upload-cloud me-1"></i> Upload Image
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- DRAW SIGNATURE TAB -->
+                            <div id="sig_draw_container">
+                                <div class="d-flex justify-content-end mb-1">
+                                    <button type="button" class="btn btn-xs btn-outline-secondary" onclick="clearSignatureCanvas()">
+                                        <i class="feather-rotate-ccw me-1"></i>Clear
+                                    </button>
+                                </div>
+                                <div class="border rounded bg-white p-1 text-center position-relative" style="border-color: #cbd5e1 !important;">
+                                    <canvas id="signatureCanvas" width="400" height="110" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 110px;"></canvas>
+                                </div>
+                                <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Draw signature using mouse or touch.</small>
+                            </div>
+
+                            <!-- UPLOAD SIGNATURE IMAGE TAB (CUSTOM UI) -->
+                            <div id="sig_upload_container" class="d-none">
+                                <div class="position-relative w-100">
+                                    <input type="file" id="sig_file_input" accept="image/png, image/jpeg, image/jpg, image/webp" class="position-absolute opacity-0 w-100 h-100" style="left:0; top:0; cursor:pointer; z-index:5;" onchange="handleSignatureFileUpload(this)">
+                                    <div class="form-control d-flex flex-column align-items-center justify-content-center gap-1.5 p-3 text-center" style="border: 2px dashed rgba(var(--bs-primary-rgb, 59, 130, 246), 0.3); background-color: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.02); border-radius: 8px; min-height: 140px;">
+                                        <div id="sig_upload_preview_box" class="d-flex flex-column align-items-center justify-content-center">
+                                            <i class="feather-upload-cloud mb-1" style="font-size: 24px; color: var(--bs-primary);"></i>
+                                            <span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop signature image here</span>
+                                            <small class="text-muted fs-10 mt-0.5">Supports PNG, JPG, JPEG, WEBP image formats</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Upload pre-saved PNG/JPG image file of your signature.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 gap-2">
+                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                    <button type="button" class="btn btn-primary px-4 text-uppercase fw-bold" onclick="submitDigitalSignature()" style="font-size: 11px; background-color: var(--bs-primary) !important; border-color: var(--bs-primary) !important; border-radius: 6px;">Confirm & Sign Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    var canvas = document.getElementById('signatureCanvas');
+    var ctx = canvas ? canvas.getContext('2d') : null;
+    var isDrawing = false;
+    var hasSigned = false;
+    var currentSigMode = 'draw';
+    var uploadedSigDataUrl = null;
+
+    if (canvas && ctx) {
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#0f172a';
+
+        function getCanvasPos(e) {
+            var rect = canvas.getBoundingClientRect();
+            var clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+            var clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        canvas.addEventListener('mousedown', function(e) {
+            isDrawing = true;
+            hasSigned = true;
+            var pos = getCanvasPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            if (!isDrawing) return;
+            var pos = getCanvasPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        });
+
+        canvas.addEventListener('mouseup', function() { isDrawing = false; });
+        canvas.addEventListener('mouseleave', function() { isDrawing = false; });
+
+        canvas.addEventListener('touchstart', function(e) {
+            isDrawing = true;
+            hasSigned = true;
+            var pos = getCanvasPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', function(e) {
+            if (!isDrawing) return;
+            var pos = getCanvasPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', function() { isDrawing = false; });
+    }
+
+    function clearSignatureCanvas() {
+        if (ctx && canvas) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            hasSigned = false;
+        }
+    }
+
+    function switchSigMode(mode) {
+        currentSigMode = mode;
+        if (mode === 'upload') {
+            $('#btn_sig_type_upload').attr('style', 'background-color: var(--bs-primary) !important; color: #ffffff !important;').addClass('active btn-primary').removeClass('text-secondary');
+            $('#btn_sig_type_draw').removeAttr('style').removeClass('active btn-primary').addClass('text-secondary');
+            $('#sig_draw_container').addClass('d-none');
+            $('#sig_upload_container').removeClass('d-none');
+        } else {
+            $('#btn_sig_type_draw').attr('style', 'background-color: var(--bs-primary) !important; color: #ffffff !important;').addClass('active btn-primary').removeClass('text-secondary');
+            $('#btn_sig_type_upload').removeAttr('style').removeClass('active btn-primary').addClass('text-secondary');
+            $('#sig_upload_container').addClass('d-none');
+            $('#sig_draw_container').removeClass('d-none');
+        }
+    }
+
+    function handleSignatureFileUpload(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedSigDataUrl = e.target.result;
+                $('#sig_upload_preview_box').html(
+                    '<div class="d-flex flex-column align-items-center gap-1">' +
+                    '<img src="' + uploadedSigDataUrl + '" style="max-height: 65px; max-width: 100%; object-fit: contain;" class="rounded border p-1 bg-white" alt="Uploaded Signature Preview" />' +
+                    '<span class="text-success fw-bold fs-11"><i class="feather-check-circle me-1"></i> ' + input.files[0].name + '</span>' +
+                    '</div>'
+                );
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function openSignModal(docId, actionUrl, docTitle, docFileUrl, docFileType) {
+        $('#sign_modal_doc_title').text(docTitle);
+        $('#signDocumentForm').attr('action', actionUrl);
+        clearSignatureCanvas();
+        uploadedSigDataUrl = null;
+        $('#sig_file_input').val('');
+        $('#sig_upload_preview_box').html(
+            '<i class="feather-upload-cloud text-primary mb-1" style="font-size: 24px;"></i>' +
+            '<span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop signature image here</span>' +
+            '<small class="text-muted fs-10 mt-0.5">Supports PNG, JPG, JPEG, WEBP image formats</small>'
+        );
+        switchSigMode('draw');
+
+        var previewContainer = $('#modal_doc_preview_container');
+        previewContainer.empty();
+
+        if (docFileUrl) {
+            var ext = (docFileType || '').toLowerCase();
+            if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) {
+                previewContainer.html(
+                    '<div class="d-flex justify-content-center align-items-center h-100 p-2 bg-dark-subtle overflow-auto">' +
+                    '<img src="' + docFileUrl + '" style="max-height: 370px; max-width: 100%; object-fit: contain;" class="rounded shadow-sm" />' +
+                    '</div>'
+                );
+            } else {
+                previewContainer.html(
+                    '<iframe src="' + docFileUrl + '" style="width: 100%; height: 370px; border: none; pointer-events: auto; overflow: auto;"></iframe>'
+                );
+            }
+        } else {
+            previewContainer.html(
+                '<div class="d-flex align-items-center justify-content-center h-100 text-muted fs-13"><i class="feather-file me-1"></i> Preview not available</div>'
+            );
+        }
+
+        var modal = new bootstrap.Modal(document.getElementById('signDocumentCanvasModal'));
+        modal.show();
+    }
+
+    function submitDigitalSignature() {
+        var dataUrl = null;
+        if (currentSigMode === 'upload') {
+            if (!uploadedSigDataUrl) {
+                alert('Please select a signature image file to upload.');
+                return;
+            }
+            dataUrl = uploadedSigDataUrl;
+        } else {
+            if (!hasSigned) {
+                alert('Please draw your signature inside the box before confirming.');
+                return;
+            }
+            dataUrl = canvas.toDataURL('image/png');
+        }
+
+        $('#modal_signature_image_input').val(dataUrl);
+        $('#signDocumentForm').submit();
+    }
 </script>
 

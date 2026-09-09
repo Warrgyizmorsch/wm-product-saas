@@ -617,7 +617,7 @@ class LeaveRequestApiController extends Controller
 
         $leaveRequest->delete();
 
-        return $this->sendSuccess(null, 'Leave application withdrawn successfully');
+        return $this->sendSuccess(['id' => (int)$id], 'Leave application withdrawn successfully.');
     }
 
     public function requestCancellation(Request $request, mixed $id): JsonResponse

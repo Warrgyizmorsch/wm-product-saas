@@ -432,6 +432,7 @@
                     <i class="feather-arrow-left"></i>
                 </a>
 
+
                 <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas">
                     <i class="feather-calendar me-1"></i> + Followup
                 </button>
@@ -1651,9 +1652,6 @@
                                     <div class="tab-pane fade" id="subtab-interactions" role="tabpanel">
                                         <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
                                             <h5 class="fw-bold text-dark fs-14 mb-0">Interactions / Scheduled Activities</h5>
-                                            <button type="button" class="btn btn-xs text-white fw-bold px-3 py-1.5 btn-open-deal-followup-offcanvas" style="background-color: #2b304a;" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="schedule">
-                                                <i class="feather-calendar me-1"></i>SCHEDULE ACTIVITY
-                                            </button>
                                         </div>
 
                                         @php
@@ -1956,25 +1954,74 @@
                     </div>
 
                     <!-- Next Follow-up Section inside Log Mode -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type (Optional)</label>
-                        <select name="next_activity_type" id="dealOffcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
-                            <option value="Call">Call</option>
-                            <option value="Meeting">Meeting</option>
-                            <option value="Demo">Demo</option>
-                            <option value="Email">Email</option>
-                            <option value="WhatsApp">WhatsApp</option>
-                        </select>
-                    </div>
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <h6 class="fw-bold text-primary fs-12 mb-2"><i class="feather-calendar me-1"></i> Schedule Next Activity / Google Event</h6>
+                        
+                        <div class="mb-2">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Next Event Title</label>
+                            <input type="text" name="next_title" id="dealOffcanvasNextTitle" class="form-control form-control-sm shadow-2xs" placeholder="e.g. Followup Call / Next Meeting" value="Followup Call">
+                        </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
-                        <input type="datetime-local" name="next_followup_date" id="dealOffcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs">
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type</label>
+                                <select name="next_activity_type" id="dealOffcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
+                                    <option value="Call">Call</option>
+                                    <option value="Meeting">Meeting</option>
+                                    <option value="Demo">Demo</option>
+                                    <option value="Email">Email</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">Next Duration (Mins)</label>
+                                <select name="next_duration_minutes" id="dealOffcanvasNextDuration" class="form-select form-select-sm shadow-2xs">
+                                    <option value="15">15 Mins</option>
+                                    <option value="30" selected>30 Mins</option>
+                                    <option value="45">45 Mins</option>
+                                    <option value="60">60 Mins (1 Hr)</option>
+                                    <option value="90">90 Mins</option>
+                                    <option value="120">120 Mins</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
+                            <input type="datetime-local" name="next_followup_date" id="dealOffcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs">
+                        </div>
+
+                        <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_sync_google_calendar" value="1" id="dealOffcanvasNextSyncGoogle" checked>
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasNextSyncGoogle">
+                                        <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_create_meet_link" value="1" id="dealOffcanvasNextCreateMeet">
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasNextCreateMeet">
+                                        <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-0">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Guest / Attendee Emails</label>
+                            <input type="text" name="next_guest_emails" id="dealOffcanvasNextGuestEmails" class="form-control form-control-sm shadow-2xs" placeholder="e.g. client@company.com (comma separated)">
+                        </div>
                     </div>
                 </div>
 
                 <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
                 <div id="dealSectionDirectSchedule" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Event / Meeting Title</label>
+                        <input type="text" name="title" id="dealOffcanvasEventTitle" class="form-control form-control-sm shadow-2xs" placeholder="e.g. CRM Followup Call / Client Demo" value="CRM Followup Call">
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
                         <select name="schedule_type" id="dealOffcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#dealOffcanvasFollowupType').val(this.value)">
@@ -1986,9 +2033,44 @@
                         </select>
                     </div>
 
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" name="followup_date" id="dealOffcanvasFollowupDate" class="form-control form-control-sm shadow-2xs">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Duration (Minutes)</label>
+                            <select name="duration_minutes" id="dealOffcanvasDuration" class="form-select form-select-sm shadow-2xs">
+                                <option value="15">15 Mins</option>
+                                <option value="30" selected>30 Mins</option>
+                                <option value="45">45 Mins</option>
+                                <option value="60">60 Mins (1 Hr)</option>
+                                <option value="90">90 Mins</option>
+                                <option value="120">120 Mins</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="dealOffcanvasSyncGoogle" checked>
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasSyncGoogle">
+                                    <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                </label>
+                            </div>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="dealOffcanvasCreateMeet">
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasCreateMeet">
+                                    <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
-                        <input type="datetime-local" name="followup_date" id="dealOffcanvasFollowupDate" class="form-control form-control-sm shadow-2xs">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Guest / Attendee Emails</label>
+                        <input type="text" name="guest_emails" id="dealOffcanvasGuestEmails" class="form-control form-control-sm shadow-2xs" placeholder="e.g. client@company.com (comma separated)">
                     </div>
 
                     <div class="mb-3">
@@ -2490,11 +2572,11 @@
             $('#dealOffcanvasActionMode').val(mode);
 
             if (mode === 'log_note') {
-                $('#dealSectionPastInteraction').show();
+                $('#dealSectionPastInteraction, #dealSectionLogInteraction').show();
                 $('#dealSectionDirectSchedule').hide();
                 $('#dealOffcanvasFollowupDate').removeAttr('required');
             } else if (mode === 'schedule') {
-                $('#dealSectionPastInteraction').hide();
+                $('#dealSectionPastInteraction, #dealSectionLogInteraction').hide();
                 $('#dealSectionDirectSchedule').show();
                 $('#dealOffcanvasFollowupDate').attr('required', 'required');
             }
@@ -2527,7 +2609,7 @@
 
             $('#dealFollowupOffcanvasTitle').text('Log / Schedule Activity for ' + dealTitle);
             $('#dealFollowupForm').attr('action', '/crm/deals/' + dealId + '/followups');
-            $('#dealOffcanvasNotes, #dealOffcanvasScheduleNotes').val('');
+            $('#dealOffcanvasNotes, #dealOffcanvasScheduleNotes, #dealOffcanvasNextFollowupDate').val('');
 
             initDealTagUserSelect2();
             if ($('#dealOffcanvasTagUser').hasClass('select2-hidden-accessible')) {
@@ -2632,5 +2714,175 @@
             border-top: 1px dashed #e2e8f0;
         }
     </style>
+
+
+    <!-- Offcanvas Drawer: Edit Followup / Schedule Activity -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg d-print-none" tabindex="-1" id="dealFollowupOffcanvas" aria-labelledby="dealFollowupOffcanvasLabel" style="width: 490px; max-width: 92vw;">
+        <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle">
+                    <i class="feather-calendar"></i>
+                </div>
+                <div>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="dealFollowupOffcanvasTitle">Log / Schedule Activity for {{ $deal->title }}</h5>
+                    <span class="text-muted fs-11">Log interaction & next followup or schedule activity</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        
+        <div class="offcanvas-body p-4 bg-white">
+            <form action="{{ route('crm.deals.followups.store', $deal->id) }}" method="POST" id="dealFollowupForm" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="action_mode" id="dealOffcanvasActionMode" value="log_note">
+
+                <!-- 2-Mode Switcher Tabs -->
+                <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
+                        LOG DISCUSSION & NEXT
+                    </button>
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn" data-mode="schedule" style="font-size: 12px; padding: 8px 6px; color: #64748b; background-color: transparent; border-radius: 6px; transition: all 0.2s ease;">
+                        DIRECT SCHEDULE ACTIVITY
+                    </button>
+                </div>
+
+                <!-- Past Interaction Section (Tab 1: Log Activity) -->
+                <div id="dealSectionPastInteraction">
+                    <x-ui.modal-form-ui type="select" name="type" id="dealOffcanvasFollowupType" label="Follow Up / Interaction Type" :searchable="true">
+                        <option value="Call">Call</option>
+                        <option value="Email">Email</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Demo">Demo</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                    </x-ui.modal-form-ui>
+
+                    <x-ui.modal-form-ui type="select" name="status" id="dealOffcanvasFollowupStatus" label="Follow Up Status / Outcome" :searchable="true">
+                        <option value="Connected">Connected</option>
+                        <option value="Not Connected">Not Connected</option>
+                        <option value="Not Answering">Not Answering</option>
+                    </x-ui.modal-form-ui>
+
+                    <x-ui.modal-form-ui type="textarea" name="notes" id="dealOffcanvasNotes" label="Discussion Notes / Summary" rows="3" placeholder="Write discussion notes..." />
+
+                    <!-- Next Follow-up Section inside Log Mode -->
+                    <div class="border-top pt-3 mt-3">
+                        <h6 class="fs-12 fw-bold text-primary mb-3"><i class="feather-calendar me-1"></i> NEXT ACTIVITY SCHEDULE (OPTIONAL)</h6>
+                        
+                        <x-ui.modal-form-ui type="input" name="next_title" id="dealOffcanvasNextTitle" label="Next Activity Title" placeholder="e.g. Follow-up Call / Proposal Discussion" />
+
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <x-ui.modal-form-ui type="select" name="next_activity_type" id="dealOffcanvasNextActivityType" label="Next Activity Type" :searchable="true">
+                                    <option value="Call">Call</option>
+                                    <option value="Meeting">Meeting</option>
+                                    <option value="Demo">Demo</option>
+                                    <option value="Email">Email</option>
+                                    <option value="WhatsApp">WhatsApp</option>
+                                </x-ui.modal-form-ui>
+                            </div>
+                            <div class="col-6">
+                                <x-ui.modal-form-ui type="select" name="next_duration_minutes" id="dealOffcanvasNextDuration" label="Duration (Minutes)" :searchable="true">
+                                    <option value="15">15 Mins</option>
+                                    <option value="30" selected>30 Mins</option>
+                                    <option value="45">45 Mins</option>
+                                    <option value="60">60 Mins (1 Hr)</option>
+                                    <option value="90">90 Mins</option>
+                                    <option value="120">120 Mins</option>
+                                </x-ui.modal-form-ui>
+                            </div>
+                        </div>
+
+                        <x-ui.modal-form-ui type="input" inputType="datetime-local" name="next_followup_date" id="dealOffcanvasNextFollowupDate" label="Next Follow-up Date & Time (Optional)" />
+
+                        <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_sync_google_calendar" value="1" id="dealOffcanvasNextSyncGoogle" checked>
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasNextSyncGoogle">
+                                        <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" name="next_create_meet_link" value="1" id="dealOffcanvasNextCreateMeet">
+                                    <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasNextCreateMeet">
+                                        <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <x-ui.modal-form-ui type="input" name="next_guest_emails" id="dealOffcanvasNextGuestEmails" label="Guest / Attendee Emails" placeholder="e.g. client@company.com (comma separated)" />
+                    </div>
+                </div>
+
+                <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
+                <div id="dealSectionDirectSchedule" style="display: none;">
+                    <x-ui.modal-form-ui type="input" name="title" id="dealOffcanvasEventTitle" label="Event / Meeting Title" placeholder="e.g. CRM Followup Call / Client Demo" value="CRM Followup Call" />
+
+                    <x-ui.modal-form-ui type="select" name="schedule_type" id="dealOffcanvasScheduleType" label="Activity Type *" :searchable="true" onchange="$('#dealOffcanvasFollowupType').val(this.value)">
+                        <option value="Call">Call</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Demo">Demo</option>
+                        <option value="Email">Email</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                    </x-ui.modal-form-ui>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <x-ui.modal-form-ui type="input" inputType="datetime-local" name="followup_date" id="dealOffcanvasFollowupDate" label="Due Date & Time *" />
+                        </div>
+                        <div class="col-6">
+                            <x-ui.modal-form-ui type="select" name="duration_minutes" id="dealOffcanvasDuration" label="Duration (Minutes)" :searchable="true">
+                                <option value="15">15 Mins</option>
+                                <option value="30" selected>30 Mins</option>
+                                <option value="45">45 Mins</option>
+                                <option value="60">60 Mins (1 Hr)</option>
+                                <option value="90">90 Mins</option>
+                                <option value="120">120 Mins</option>
+                            </x-ui.modal-form-ui>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="dealOffcanvasSyncGoogle" checked>
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasSyncGoogle">
+                                    <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                </label>
+                            </div>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="dealOffcanvasCreateMeet">
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasCreateMeet">
+                                    <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <x-ui.modal-form-ui type="input" name="guest_emails" id="dealOffcanvasGuestEmails" label="Guest / Attendee Emails" placeholder="e.g. client@company.com (comma separated)" />
+
+                    <x-ui.modal-form-ui type="textarea" name="schedule_notes" id="dealOffcanvasScheduleNotes" label="Description / Plan" rows="3" placeholder="Agenda / plan for upcoming activity..." oninput="$('#dealOffcanvasNotes').val(this.value)" />
+                </div>
+
+                <x-ui.modal-form-ui type="select" name="stage" id="dealOffcanvasStage" label="Deal Stage" :searchable="true">
+                    @foreach(($dealStatuses ?? []) as $stg)
+                        <option value="{{ $stg->name }}" {{ $deal->stage === $stg->name ? 'selected' : '' }}>{{ $stg->name }}</option>
+                    @endforeach
+                </x-ui.modal-form-ui>
+
+                <x-ui.modal-form-ui type="select" name="tagged_user_ids[]" id="dealOffcanvasTagUser" label="Tag / Assign Persons" multiple="true" :searchable="true">
+                    @foreach((\App\Models\User::orderBy('name')->get()) as $u)
+                        <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                    @endforeach
+                </x-ui.modal-form-ui>
+
+                <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">UPDATE DETAILS</button>
+                </div>
+            </form>
+        </div>
+    </div>
     @endpush
 @endsection
