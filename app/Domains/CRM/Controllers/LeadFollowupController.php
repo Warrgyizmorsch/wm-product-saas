@@ -69,7 +69,7 @@ class LeadFollowupController extends Controller
                 'followup_date'        => $dueDate,
                 'notes'                => $notes,
                 'tagged_user_ids'      => $validated['tagged_user_ids'] ?? null,
-                'sync_google_calendar' => $request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : true,
+                'sync_google_calendar' => $request->boolean('sync_google_calendar'),
                 'create_meet_link'     => $request->boolean('create_meet_link'),
             ]);
 
@@ -106,7 +106,7 @@ class LeadFollowupController extends Controller
                     'followup_date'        => $nextDate,
                     'notes'                => $nextNotes,
                     'tagged_user_ids'      => $validated['tagged_user_ids'] ?? null,
-                    'sync_google_calendar' => $request->has('next_sync_google_calendar') ? $request->boolean('next_sync_google_calendar') : ($request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : true),
+                    'sync_google_calendar' => $request->has('next_sync_google_calendar') ? $request->boolean('next_sync_google_calendar') : ($request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : false),
                     'create_meet_link'     => $request->has('next_create_meet_link') ? $request->boolean('next_create_meet_link') : $request->boolean('create_meet_link'),
                 ]);
 
@@ -216,10 +216,10 @@ class LeadFollowupController extends Controller
                 'tagged_user_ids'  => $taggedUserIds,
             ]);
 
-            $syncGoogle = $request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : true;
+            $syncGoogle = $request->boolean('sync_google_calendar') || $request->boolean('create_meet_link');
             if ($syncGoogle) {
                 try {
-                    $createMeet = $request->boolean('create_meet_link') || in_array(strtolower($scheduleType), ['meeting', 'demo']);
+                    $createMeet = $request->boolean('create_meet_link');
                     $attendees = [];
                     if ($deal->contact?->email) $attendees[] = $deal->contact->email;
                     if ($deal->account?->email) $attendees[] = $deal->account->email;
@@ -251,12 +251,14 @@ class LeadFollowupController extends Controller
                         $followup->google_event_id = $res['google_event_id'] ?? null;
                     }
                     if (\Schema::hasColumn('lead_followups', 'google_meet_link')) {
-                        $followup->google_meet_link = $res['meet_link'] ?? null;
+                        // Sirf Meet select kiya ho to meet link store karo
+                        $followup->google_meet_link = $createMeet ? ($res['meet_link'] ?? null) : null;
                     }
                     if (\Schema::hasColumn('lead_followups', 'is_google_meet')) {
                         $followup->is_google_meet = $createMeet;
                     }
-                    if (!empty($res['meet_link'])) {
+                    // Notes mein Meet URL sirf tab append karo jab Meet select tha
+                    if ($createMeet && !empty($res['meet_link'])) {
                         $followup->notes = ($followup->notes ? $followup->notes . "\n" : '') . "Google Meet: " . $res['meet_link'];
                     }
                     $followup->save();
