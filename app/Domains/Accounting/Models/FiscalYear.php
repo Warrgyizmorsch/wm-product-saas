@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
+use App\Domains\Accounting\Concerns\LogsAccountingActivity;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FiscalYear extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch;
+    use HasFactory, BelongsToCompany, BelongsToBranch, LogsAccountingActivity;
 
     public const STATUS_OPEN = 'open';
     public const STATUS_CLOSED = 'closed';

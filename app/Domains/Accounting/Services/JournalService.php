@@ -16,6 +16,7 @@ class JournalService
     public function __construct(
         private readonly JournalRepositoryInterface $journals,
         private readonly FiscalPeriodService $periods,
+        private readonly AccountingAuditLogService $auditLog,
     ) {
     }
 
@@ -54,7 +55,7 @@ class JournalService
 
             $journalNumber = $this->journals->nextJournalNumber($tenantId, $meta['journal_number_prefix'] ?? 'JNL');
 
-            return $this->journals->createWithEntries([
+            $journal = $this->journals->createWithEntries([
                 'tenant_id' => $tenantId,
                 'company_id' => $companyId,
                 'branch_id' => $branchId,
@@ -72,6 +73,20 @@ class JournalService
                 'posted_by' => $meta['posted_by'] ?? null,
                 'posted_at' => now(),
             ], $lines);
+
+            $this->auditLog->record(
+                $journal,
+                'journal.posted',
+                "Journal {$journal->journal_number} posted",
+                [
+                    'total_debit' => $journal->total_debit,
+                    'total_credit' => $journal->total_credit,
+                    'source' => $journal->source,
+                    'voucher_type' => $journal->voucher_type,
+                ]
+            );
+
+            return $journal;
         });
     }
 
@@ -120,6 +135,16 @@ class JournalService
                 'status' => Journal::STATUS_REVERSED,
                 'reversed_journal_id' => $reversal->id,
             ]);
+
+            $this->auditLog->record(
+                $original,
+                'journal.reversed',
+                "Journal {$original->journal_number} reversed by {$reversal->journal_number}",
+                [
+                    'reversal_journal_id' => $reversal->id,
+                    'reason' => $reason,
+                ]
+            );
 
             return $reversal;
         });
