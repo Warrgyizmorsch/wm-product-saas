@@ -18,16 +18,6 @@
     @endphp
 
     <div class="erp-single-panel">
-        @if ($errors->any())
-            <div class="alert alert-danger mb-3 alert-dismissible fade show fs-12 py-2" role="alert">
-                <ul class="mb-0 ps-3 text-start">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
-            </div>
-        @endif
 
         {{-- 1. Header: Title & Actions --}}
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
@@ -434,29 +424,30 @@
                                             </a>
                                         </li>
 
-                                        {{-- Create Account & Deal (for Qualified Leads) --}}
-                                        @if ($lead->crm_account_id)
+                                        {{-- Deal & Account options --}}
+                                        @if ($lead->crm_deal_id)
                                             <li>
-                                                <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="dropdown-item text-primary fw-semibold">
-                                                    <i class="feather-briefcase me-2 text-primary fs-12"></i>View Account
+                                                <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="dropdown-item text-success fw-semibold">
+                                                    <i class="feather-git-branch me-2 text-success fs-12"></i>View Deal
                                                 </a>
                                             </li>
-                                            @if ($lead->crm_deal_id)
-                                                <li>
-                                                    <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="dropdown-item text-success fw-semibold">
-                                                        <i class="feather-git-branch me-2 text-success fs-12"></i>View Deal
-                                                    </a>
-                                                </li>
-                                            @endif
-                                        @elseif (($lead->status ?: 'New') === 'Qualified')
+                                        @else
                                             <li>
                                                 <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST">
                                                     @csrf
                                                     @method('PATCH')
                                                     <button type="submit" class="dropdown-item text-warning fw-bold">
-                                                        <i class="feather-user-check me-2 text-warning fs-12"></i>Create Account & Deal
+                                                        <i class="feather-user-check me-2 text-warning fs-12"></i>Convert to Deal
                                                     </button>
                                                 </form>
+                                            </li>
+                                        @endif
+
+                                        @if ($lead->crm_account_id)
+                                            <li>
+                                                <a href="{{ route('crm.accounts.show', $lead->crm_account_id) }}" class="dropdown-item text-primary fw-semibold">
+                                                    <i class="feather-briefcase me-2 text-primary fs-12"></i>View Account
+                                                </a>
                                             </li>
                                         @endif
 

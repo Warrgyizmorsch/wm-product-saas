@@ -34,22 +34,20 @@
             <h5 class="fw-bold text-dark mb-0">Accounts Listing</h5>
             <div class="d-flex align-items-center flex-wrap gap-2">
                 <!-- Outside Search Box (HRMS Style) -->
-                <form method="GET" action="{{ route('crm.accounts.index') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 240px;">
+                <form method="GET" action="{{ route('crm.accounts.index') }}" class="d-flex align-items-center bg-light border rounded px-2.5 py-0.5 me-1" style="height: 34px; min-width: 280px; max-width: 360px;">
                     @foreach(request()->except(['search', 'page']) as $k => $v)
                         @if(is_scalar($v) && $v !== '')
                             <input type="hidden" name="{{ $k }}" value="{{ $v }}">
                         @endif
                     @endforeach
                     <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
-                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="Search account name, GSTIN, email, phone..." value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                    <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-12 text-dark" placeholder="Search accounts, GSTIN, email..." value="{{ request('search') }}" style="box-shadow: none; outline: none;">
                     @if(request('search'))
                         <a href="{{ route('crm.accounts.index', request()->except(['search', 'page'])) }}" class="text-muted text-decoration-none ms-1" title="Clear Search">
                             <i class="feather-x fs-12"></i>
                         </a>
                     @endif
                 </form>
-
-                <x-ui.view-switcher />
 
                 <x-ui.sort-dropdown label="Sort">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
@@ -88,131 +86,130 @@
             </div>
         @endif
 
-        {{-- 2. Data Table --}}
-        <div class="card border-0 shadow-sm bg-white overflow-hidden" style="border-radius: 4px;">
-            <div class="table-responsive">
-                <table class="table odoo-table align-middle mb-0">
-                    <thead>
+        {{-- 2. Data Table (Matches Leads/Customers borderless table 100%) --}}
+        <div class="table-responsive">
+            <x-ui.odoo-form-ui type="table" id="accountsTable" class="mb-0">
+                <thead>
+                    <tr style="background-color: #e8ecf1 !important;">
+                        <th style="background-color: #e8ecf1 !important;">ACCOUNT #</th>
+                        <th style="background-color: #e8ecf1 !important;">COMPANY NAME</th>
+                        <th style="background-color: #e8ecf1 !important;">GSTIN</th>
+                        <th style="background-color: #e8ecf1 !important;">PRIMARY CONTACT</th>
+                        <th style="background-color: #e8ecf1 !important;">PHONE / EMAIL</th>
+                        <th style="background-color: #e8ecf1 !important;" class="text-end">DEALS</th>
+                        <th style="background-color: #e8ecf1 !important;" class="text-end">LIFETIME REVENUE (LTV)</th>
+                        <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody class="fs-13 text-dark">
+                    @forelse($accounts as $acc)
                         <tr>
-                            <th style="width: 140px;">ACCOUNT #</th>
-                            <th>COMPANY NAME</th>
-                            <th>GSTIN</th>
-                            <th>PRIMARY CONTACT</th>
-                            <th>PHONE / EMAIL</th>
-                            <th class="text-end">DEALS</th>
-                            <th class="text-end">LIFETIME REVENUE (LTV)</th>
-                            <th class="text-end pe-3" style="width: 120px;">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody class="fs-13 text-dark">
-                        @forelse($accounts as $acc)
-                            <tr>
-                                <td class="font-monospace fw-bold">
-                                    <a href="{{ route('crm.accounts.show', $acc) }}" class="text-primary hover-underline">
-                                        {{ $acc->account_number }}
-                                    </a>
-                                </td>
-                                <td>
-                                    <a href="{{ route('crm.accounts.show', $acc) }}" class="fw-bold text-dark text-decoration-none hover-primary">
-                                        {{ $acc->name }}
-                                    </a>
-                                    @if($acc->industry_type)
-                                        <div class="text-muted fs-11 mt-0.5">{{ $acc->industry_type }}</div>
+                            <td class="font-monospace fw-bold">
+                                <a href="{{ route('crm.accounts.show', $acc) }}" class="text-primary hover-underline">
+                                    {{ $acc->account_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ route('crm.accounts.show', $acc) }}" class="fw-bold text-dark text-decoration-none hover-primary d-block">
+                                    {{ $acc->name }}
+                                </a>
+                                @if($acc->industry_type)
+                                    <div class="text-muted fs-11 mt-0.5">{{ $acc->industry_type }}</div>
+                                @endif
+                            </td>
+                            <td>
+                                @if($acc->gstin)
+                                    <span class="badge bg-light text-dark font-monospace border px-2 py-0.5 fs-11">{{ $acc->gstin }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                @php $pContact = $acc->primaryContact ?: $acc->contacts->first(); @endphp
+                                @if($pContact)
+                                    <span class="fw-semibold text-dark">{{ $pContact->name }}</span>
+                                    @if($pContact->designation)
+                                        <div class="text-muted fs-11">{{ $pContact->designation }}</div>
                                     @endif
-                                </td>
-                                <td>
-                                    @if($acc->gstin)
-                                        <span class="badge bg-light text-dark font-monospace border px-2 py-0.5 fs-11">{{ $acc->gstin }}</span>
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    @php $pContact = $acc->primaryContact ?: $acc->contacts->first(); @endphp
-                                    @if($pContact)
-                                        <span class="fw-semibold text-dark">{{ $pContact->name }}</span>
-                                        @if($pContact->designation)
-                                            <div class="text-muted fs-11">{{ $pContact->designation }}</div>
-                                        @endif
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    @if($acc->phone)
-                                        <div><i class="feather-phone me-1 text-muted fs-11"></i>{{ $acc->phone }}</div>
-                                    @endif
-                                    @if($acc->email)
-                                        <div class="text-muted fs-11"><i class="feather-mail me-1 text-muted fs-11"></i>{{ $acc->email }}</div>
-                                    @endif
-                                    @if(!$acc->phone && !$acc->email)
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                                <td class="text-end">
-                                    @php
-                                        $openCount = $acc->open_deals_count;
-                                        $wonCount = $acc->won_deals_count;
-                                        $totalDeals = $acc->deals->count();
-                                    @endphp
-                                    @if($totalDeals > 0)
-                                        <div class="d-inline-flex flex-column align-items-end gap-1">
-                                            <div class="d-flex gap-1 justify-content-end">
-                                                @if($openCount > 0)
-                                                    <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold" title="{{ $openCount }} Active Open Deals">
-                                                        🟢 {{ $openCount }} Open
-                                                    </span>
-                                                @endif
-                                                @if($wonCount > 0)
-                                                    <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-0.5 fw-bold" title="{{ $wonCount }} Closed Won Deals">
-                                                        🔵 {{ $wonCount }} Won
-                                                    </span>
-                                                @endif
-                                                @if($openCount == 0 && $wonCount == 0)
-                                                    <span class="badge bg-soft-secondary text-secondary border px-2 py-0.5 fw-bold">
-                                                        {{ $totalDeals }} Deals
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            <span class="text-muted fs-11 font-monospace">Total: {{ $totalDeals }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($acc->phone)
+                                    <div><i class="feather-phone me-1 text-muted fs-11"></i>{{ $acc->phone }}</div>
+                                @endif
+                                @if($acc->email)
+                                    <div class="text-muted fs-11"><i class="feather-mail me-1 text-muted fs-11"></i>{{ $acc->email }}</div>
+                                @endif
+                                @if(!$acc->phone && !$acc->email)
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td class="text-end">
+                                @php
+                                    $openCount = $acc->open_deals_count;
+                                    $wonCount = $acc->won_deals_count;
+                                    $totalDeals = $acc->deals->count();
+                                @endphp
+                                @if($totalDeals > 0)
+                                    <div class="d-inline-flex flex-column align-items-end gap-1">
+                                        <div class="d-flex gap-1 justify-content-end">
+                                            @if($openCount > 0)
+                                                <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold" title="{{ $openCount }} Active Open Deals">
+                                                    🟢 {{ $openCount }} Open
+                                                </span>
+                                            @endif
+                                            @if($wonCount > 0)
+                                                <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-0.5 fw-bold" title="{{ $wonCount }} Closed Won Deals">
+                                                    🔵 {{ $wonCount }} Won
+                                                </span>
+                                            @endif
+                                            @if($openCount == 0 && $wonCount == 0)
+                                                <span class="badge bg-soft-secondary text-secondary border px-2 py-0.5 fw-bold">
+                                                    {{ $totalDeals }} Deals
+                                                </span>
+                                            @endif
                                         </div>
-                                    @else
-                                        <span class="badge bg-light text-muted border px-2 py-0.5 font-monospace">0 Deals</span>
-                                    @endif
-                                </td>
-                                <td class="text-end fw-bold text-success fs-14">
-                                    ₹{{ number_format($acc->lifetime_revenue, 2) }}
-                                </td>
-                                <td class="text-end pe-3">
-                                    <div class="d-inline-flex gap-1 justify-content-end align-items-center">
-                                        <x-ui.icon-btn href="{{ route('crm.accounts.show', $acc) }}" variant="soft-primary" icon="feather-eye" title="View 360° Dashboard" />
-                                        <x-ui.icon-btn href="{{ route('crm.accounts.edit', $acc) }}" variant="soft-info" icon="feather-edit" title="Edit Account" />
+                                        <span class="text-muted fs-11 font-monospace">Total: {{ $totalDeals }}</span>
                                     </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
-                                    <i class="feather-briefcase fs-1 text-muted d-block mb-2"></i>
-                                    No accounts found matching your criteria.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                                @else
+                                    <span class="badge bg-light text-muted border px-2 py-0.5 font-monospace">0 Deals</span>
+                                @endif
+                            </td>
+                            <td class="text-end fw-bold text-success fs-14">
+                                ₹{{ number_format($acc->lifetime_revenue, 2) }}
+                            </td>
+                            <td class="text-end pe-3">
+                                <x-ui.action-dropdown :viewUrl="route('crm.accounts.show', $acc)">
+                                    <li>
+                                        <a href="{{ route('crm.accounts.edit', $acc) }}" class="dropdown-item fs-12 py-1.5 text-dark">
+                                            <i class="feather-edit me-2 text-muted"></i>Edit Account
+                                        </a>
+                                    </li>
+                                </x-ui.action-dropdown>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="feather-briefcase fs-1 text-muted d-block mb-2"></i>
+                                No accounts found matching your criteria.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </x-ui.odoo-form-ui>
+        </div>
 
-            <!-- Pagination Footer (Exact Lead Listing Pagination) -->
-            @if($accounts->hasPages())
-                <div class="p-3 border-top bg-light-50 d-flex justify-content-between align-items-center">
-                    <span class="text-muted fs-12">
-                        Showing {{ $accounts->firstItem() }} to {{ $accounts->lastItem() }} of {{ $accounts->total() }} accounts
-                    </span>
-                    <div>
-                        {{ $accounts->appends(request()->query())->links() }}
-                    </div>
-                </div>
-            @endif
+        {{-- 3. Common Component Pagination --}}
+        <div class="mt-3">
+            <x-ui.pagination 
+                :currentPage="$accounts->currentPage()" 
+                :totalPages="$accounts->lastPage()" 
+                :totalResults="$accounts->total()" 
+                :perPage="$accounts->perPage()" 
+            />
         </div>
     </div>
 @endsection

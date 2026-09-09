@@ -693,7 +693,9 @@
                                     </div>
                                     <div class="min-w-0 flex-grow-1 overflow-hidden">
                                         <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Account / Customer</span>
-                                        <span class="fs-13 fw-extrabold text-dark text-truncate d-block" title="{{ $deal->account ? $deal->account->name : 'N/A' }}">{{ $deal->account ? $deal->account->name : 'N/A' }}</span>
+                                        <span class="fs-13 fw-extrabold text-dark text-truncate d-block" title="{{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A') }}">
+                                            {{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A') }}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -722,6 +724,10 @@
                                             <div class="zoho-field-value text-dark fw-bold text-break">
                                                 @if($deal->account)
                                                     <a href="{{ route('crm.accounts.show', $deal->account) }}" class="text-primary hover-underline text-break" title="{{ $deal->account->name }}">{{ $deal->account->name }}</a>
+                                                @elseif($linkedLead)
+                                                    <a href="{{ route('crm.leads.show', $linkedLead->id) }}" class="text-primary hover-underline text-break" title="{{ $linkedLead->company_name ?: $linkedLead->contact_person }}">
+                                                        {{ $linkedLead->company_name ?: $linkedLead->contact_person }}
+                                                    </a>
                                                 @else
                                                     —
                                                 @endif
@@ -730,7 +736,7 @@
 
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">Contact Person</div>
-                                            <div class="zoho-field-value text-dark">{{ $deal->contact ? $deal->contact->name : '—' }}</div>
+                                            <div class="zoho-field-value text-dark">{{ $deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->contact_person ?: $linkedLead->company_name) : '—') }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
@@ -865,25 +871,37 @@
                                 <div class="row g-3">
                                     <div class="col-md-6 border-end">
                                         <div class="p-3 bg-light-50 rounded border">
-                                            <div class="fw-bold text-dark fs-14 mb-1">{{ $deal->account ? $deal->account->name : 'No Account Linked' }}</div>
-                                            <div class="fs-12 text-muted mb-2"><i class="feather-map-pin me-1"></i>{{ $deal->account ? ($deal->account->billing_address ?: 'Billing address not added') : '—' }}</div>
-                                            @if($deal->account && $deal->account->phone)
-                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i>{{ $deal->account->phone }}</div>
+                                            <div class="fw-bold text-dark fs-14 mb-1">
+                                                {{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'No Account Linked') }}
+                                            </div>
+                                            <div class="fs-12 text-muted mb-2"><i class="feather-map-pin me-1"></i>{{ $deal->account ? ($deal->account->billing_address ?: 'Billing address not added') : ($linkedLead ? ($linkedLead->address ?: 'Address not added') : '—') }}</div>
+                                            @php
+                                                $accPhone = $deal->account?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone);
+                                                $accEmail = $deal->account?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email);
+                                            @endphp
+                                            @if($accPhone)
+                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i>{{ $accPhone }}</div>
                                             @endif
-                                            @if($deal->account && $deal->account->email)
-                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i>{{ $deal->account->email }}</div>
+                                            @if($accEmail)
+                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i>{{ $accEmail }}</div>
                                             @endif
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="p-3 bg-light-50 rounded border">
-                                            <div class="fw-bold text-dark fs-14 mb-1">{{ $deal->contact ? $deal->contact->name : 'No Contact Person' }}</div>
-                                            <div class="fs-12 text-muted mb-2">{{ $deal->contact ? ($deal->contact->title ?: 'Primary Contact') : '—' }}</div>
-                                            @if($deal->contact && $deal->contact->phone)
-                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i>{{ $deal->contact->phone }}</div>
+                                            @php
+                                                $cName = $deal->contact?->name ?: ($linkedLead?->contact_person ?: $linkedLead?->company_name);
+                                                $cTitle = $deal->contact?->designation ?: ($deal->contact?->role ?: ($linkedLead?->designation ?: 'Primary Contact'));
+                                                $cPhone = $deal->contact?->phone ?: ($linkedLead?->phone ?: $linkedLead?->company_phone);
+                                                $cEmail = $deal->contact?->email ?: ($linkedLead?->email ?: $linkedLead?->company_email);
+                                            @endphp
+                                            <div class="fw-bold text-dark fs-14 mb-1">{{ $cName ?: 'No Contact Person' }}</div>
+                                            <div class="fs-12 text-muted mb-2">{{ $cTitle ?: '—' }}</div>
+                                            @if($cPhone)
+                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i>{{ $cPhone }}</div>
                                             @endif
-                                            @if($deal->contact && $deal->contact->email)
-                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i>{{ $deal->contact->email }}</div>
+                                            @if($cEmail)
+                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i>{{ $cEmail }}</div>
                                             @endif
                                         </div>
                                     </div>
@@ -1076,12 +1094,12 @@
                                         <div class="row g-4 mb-4 fs-13 text-dark">
                                             <div class="col-md-6">
                                                 <x-ui.odoo-form-ui type="input" label="Customer / Account" name="_customer_display"
-                                                    :value="$deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : 'N/A')"
+                                                    :value="$deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A'))"
                                                     readonly="true"
                                                     style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Contact Email" name="email" :value="old('email', $deal->contact ? $deal->contact->email : '')" :errorText="$errors->first('email')" />
-                                                <x-ui.odoo-form-ui type="input" label="Contact Phone" name="phone" :value="old('phone', $deal->contact ? $deal->contact->phone : '')" :errorText="$errors->first('phone')" />
+                                                <x-ui.odoo-form-ui type="input" label="Contact Email" name="email" :value="old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))" :errorText="$errors->first('email')" />
+                                                <x-ui.odoo-form-ui type="input" label="Contact Phone" name="phone" :value="old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))" :errorText="$errors->first('phone')" />
                                             </div>
                                             <div class="col-md-6">
                                                 <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
@@ -1183,12 +1201,12 @@
                                         <div class="row g-4 mb-4 fs-13 text-dark">
                                             <div class="col-md-6">
                                                 <x-ui.odoo-form-ui type="input" label="Customer / Account" name="_customer_display"
-                                                    :value="$deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : 'N/A')"
+                                                    :value="$deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A'))"
                                                     readonly="true"
                                                     style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Contact Email" name="email" :value="old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ''))" :errorText="$errors->first('email')" />
-                                                <x-ui.odoo-form-ui type="input" label="Contact Phone" name="phone" :value="old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ''))" :errorText="$errors->first('phone')" />
+                                                <x-ui.odoo-form-ui type="input" label="Contact Email" name="email" :value="old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')))" :errorText="$errors->first('email')" />
+                                                <x-ui.odoo-form-ui type="input" label="Contact Phone" name="phone" :value="old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')))" :errorText="$errors->first('phone')" />
                                             </div>
                                             <div class="col-md-6">
                                                 <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
@@ -1327,16 +1345,18 @@
                                         <div class="col-md-6 border-end">
                                             <div class="mb-3">
                                                 <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Customer / Company</label>
-                                                <div class="fw-bold text-dark fs-14">{{ $deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : 'N/A') }}</div>
+                                                <div class="fw-bold text-dark fs-14">
+                                                    {{ $deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A')) }}
+                                                </div>
                                             </div>
                                             <div class="row">
                                                 <div class="col-6">
                                                     <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Contact Email</label>
-                                                    <div class="fs-12 text-primary">{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : '—') }}</div>
+                                                    <div class="fs-12 text-primary">{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}</div>
                                                 </div>
                                                 <div class="col-6">
                                                     <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Contact Phone</label>
-                                                    <div class="fs-12 text-dark">{{ $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : '—') }}</div>
+                                                    <div class="fs-12 text-dark">{{ $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '—')) }}</div>
                                                 </div>
                                             </div>
                                         </div>

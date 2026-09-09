@@ -10,6 +10,7 @@ use App\Domains\CRM\Models\Customer;
 use App\Domains\Sales\Models\SalesOrder;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class CrmAccountController extends Controller
@@ -32,7 +33,7 @@ class CrmAccountController extends Controller
             });
         }
 
-        $accounts = $query->orderBy('id', 'desc')->paginate(15);
+        $accounts = $query->orderBy('id', 'desc')->paginate(10)->withQueryString();
 
         return view('modules.crm.accounts.index', compact('accounts', 'search'));
     }
@@ -50,8 +51,18 @@ class CrmAccountController extends Controller
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
             'gstin'         => 'nullable|string|max:50',
-            'email'         => 'nullable|email|max:255',
-            'phone'         => 'nullable|string|max:50',
+            'email'         => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('crm_accounts', 'email')->where(fn($q) => $q->where('tenant_id', $tenantId))
+            ],
+            'phone'         => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('crm_accounts', 'phone')->where(fn($q) => $q->where('tenant_id', $tenantId))
+            ],
             'website'       => 'nullable|string|max:255',
             'industry_type' => 'nullable|string|max:255',
             'credit_limit'  => 'nullable|numeric|min:0',
@@ -78,6 +89,16 @@ class CrmAccountController extends Controller
                     if (!empty($validated['email'])) $q->where('email', $validated['email']);
                     if (!empty($validated['phone'])) $q->orWhere('phone', $validated['phone']);
                 })->first();
+        }
+
+        if ($customer) {
+            // Check if an Account already exists for this customer
+            $existingAccount = CrmAccount::where('tenant_id', $tenantId)->where('customer_id', $customer->id)->first();
+            if ($existingAccount) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['name' => 'An Account for this Customer / Email / Phone already exists (' . $existingAccount->name . ').']);
+            }
         }
 
         if (!$customer) {
@@ -133,19 +154,72 @@ class CrmAccountController extends Controller
     {
         $account->load(['contacts', 'deals.quotations', 'quotations', 'customer', 'owner']);
 
+        // Deal metrics
         $openDealsCount = $account->deals->whereNotIn('stage', ['Closed Won', 'Closed Lost'])->count();
         $wonDealsCount = $account->deals->where('stage', 'Closed Won')->count();
         $lostDealsCount = $account->deals->where('stage', 'Closed Lost')->count();
         $pipelineValue = $account->deals->whereNotIn('stage', ['Closed Lost'])->sum('estimated_value');
+
+        // Customer financial metrics & tab data
+        $totalBilled = 0;
+        $outstandingBalance = 0;
+        $customerCreditBalance = 0;
+        $overdueAmount = 0;
+        $creditLimit = floatval($account->credit_limit ?? 0);
+        $availableCredit = $creditLimit;
+        $invoiceCount = 0;
+        $invoices = collect();
+        $payments = collect();
+        $salesOrders = collect();
+        $salesReturns = collect();
+
+        if ($account->customer) {
+            $customer = $account->customer;
+            $invoices = $customer->invoices()->with(['salesOrder.quotation.deal', 'customer'])->latest()->get();
+            $payments = $customer->payments()->with(['allocations.invoice', 'allocations.salesOrder'])->latest()->get();
+            $salesOrders = $customer->salesOrders()->with(['quotation.deal', 'items'])->latest()->get();
+            $salesReturns = \App\Domains\Sales\Models\SalesReturn::where('customer_id', $customer->id)
+                ->with(['salesOrder.quotation.deal'])
+                ->latest()->get();
+
+            $invoiceCount = $invoices->count();
+            $totalBilled = $invoices->where('status', '!=', 'cancelled')->sum('total_amount');
+            $totalPaid = $invoices->where('status', '!=', 'cancelled')->sum('amount_paid');
+            if ($totalPaid == 0 && $payments->isNotEmpty()) {
+                $totalPaid = $payments->where('status', 'completed')->sum('amount');
+            }
+            $totalReturns = $salesReturns->where('status', '!=', 'cancelled')->sum(function($r) {
+                return floatval($r->total_amount ?: $r->total_refund_amount);
+            });
+            $netOutstanding = $totalBilled - $totalPaid - $totalReturns;
+            $outstandingBalance = max(0, $netOutstanding);
+            $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;
+            $overdueAmount = $invoices->where('status', 'unpaid')
+                ->filter(fn($inv) => $inv->due_date && \Carbon\Carbon::parse($inv->due_date)->isPast())
+                ->sum('balance_due');
+            $availableCredit = max(0, $creditLimit - $outstandingBalance);
+        }
 
         return view('modules.crm.accounts.show', compact(
             'account',
             'openDealsCount',
             'wonDealsCount',
             'lostDealsCount',
-            'pipelineValue'
+            'pipelineValue',
+            'totalBilled',
+            'outstandingBalance',
+            'customerCreditBalance',
+            'overdueAmount',
+            'creditLimit',
+            'availableCredit',
+            'invoiceCount',
+            'invoices',
+            'payments',
+            'salesOrders',
+            'salesReturns'
         ));
     }
+
 
     public function edit(CrmAccount $account): View
     {

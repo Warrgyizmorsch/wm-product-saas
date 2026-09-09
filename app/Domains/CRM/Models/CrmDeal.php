@@ -32,6 +32,28 @@ class CrmDeal extends BaseModel
                 $deal->owner_id = auth()->id();
             }
         });
+
+        static::updated(function ($deal) {
+            if ($deal->isDirty('stage')) {
+                $stage = strtolower((string)$deal->stage);
+                if (in_array($stage, ['lost', 'closed lost'], true)) {
+                    $linkedLeads = Lead::where('crm_deal_id', $deal->id)->get();
+                    foreach ($linkedLeads as $lead) {
+                        $oldStatus = $lead->status;
+                        $lead->update(['status' => 'Lost']);
+                        if ($oldStatus !== 'Lost') {
+                            LeadHistory::logEvent(
+                                $lead,
+                                'status_updated',
+                                $oldStatus,
+                                'Lost',
+                                "Lead status marked as Lost because associated Deal #{$deal->deal_number} was Lost."
+                            );
+                        }
+                    }
+                }
+            }
+        });
     }
 
     protected $fillable = [

@@ -250,9 +250,11 @@
                                 }
                             }
 
-                            $contactName = $deal->contact ? $deal->contact->name : ($deal->account ? $deal->account->primaryContact?->name : null);
-                            $phone = $deal->contact?->phone ?: ($deal->account?->phone ?: null);
-                            $email = $deal->contact?->email ?: ($deal->account?->email ?: null);
+                            $dLead = $deal->lead;
+                            $companyName = $deal->account ? $deal->account->name : ($dLead ? ($dLead->company_name ?: $dLead->contact_person) : null);
+                            $contactName = $deal->contact ? $deal->contact->name : ($deal->account ? $deal->account->primaryContact?->name : ($dLead ? ($dLead->contact_person ?: $dLead->company_name) : null));
+                            $phone = $deal->contact?->phone ?: ($deal->account?->phone ?: ($dLead?->company_phone ?: $dLead?->phone));
+                            $email = $deal->contact?->email ?: ($deal->account?->email ?: ($dLead?->company_email ?: $dLead?->email));
                         @endphp
                         <tr class="table-deal-row">
                             <td class="text-center">
@@ -279,11 +281,19 @@
                                     <a href="{{ route('crm.accounts.show', $deal->account) }}" class="fw-bold text-dark text-decoration-none d-block">
                                         <i class="feather-briefcase me-1 text-primary"></i>{{ $deal->account->name }}
                                     </a>
+                                @elseif($companyName)
+                                    @if($dLead)
+                                        <a href="{{ route('crm.leads.show', $dLead->id) }}" class="fw-bold text-dark text-decoration-none d-block" title="View Lead Details">
+                                            <i class="feather-briefcase me-1 text-primary"></i>{{ $companyName }}
+                                        </a>
+                                    @else
+                                        <span class="fw-bold text-dark d-block"><i class="feather-briefcase me-1 text-primary"></i>{{ $companyName }}</span>
+                                    @endif
                                 @else
                                     <span class="fw-semibold text-dark">—</span>
                                 @endif
 
-                                @if($contactName)
+                                @if($contactName && $contactName !== $companyName)
                                     <span class="text-muted fs-11 d-block"><i class="feather-user me-1 text-muted"></i>{{ $contactName }}</span>
                                 @endif
                             </td>

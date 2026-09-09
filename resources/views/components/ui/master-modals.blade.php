@@ -95,8 +95,9 @@ $masterDefinitions = [
         'label'  => 'Customer',
         'route'  => 'crm.customers.quick-create',
         'fields' => [
-            ['component' => 'input', 'props' => ['label' => 'Customer Name',  'name' => 'name',  'placeholder' => 'e.g. Acme Corp',          'required' => true]],
-            ['component' => 'input', 'props' => ['label' => 'Email Address',  'name' => 'email', 'placeholder' => 'e.g. contact@acme.com',   'type' => 'email']],
+            ['component' => 'input', 'props' => ['label' => 'Customer Name',  'name' => 'name',  'placeholder' => 'e.g. Acme Corp or Manish Patidar', 'required' => true]],
+            ['component' => 'input', 'props' => ['label' => 'GSTIN',          'name' => 'gstin', 'placeholder' => 'e.g. 22AAAAA0000A1Z5']],
+            ['component' => 'input', 'props' => ['label' => 'Email Address',  'name' => 'email', 'placeholder' => 'e.g. contact@acme.com',   'type' => 'email', 'required' => true]],
             ['component' => 'input', 'props' => ['label' => 'Phone Number',   'name' => 'phone', 'placeholder' => 'e.g. +91-9876543210']],
             ['component' => 'textarea', 'props' => ['label' => 'Billing Address',  'name' => 'billing_address', 'placeholder' => 'Billing address...', 'rows' => 2]],
             ['component' => 'textarea', 'props' => ['label' => 'Shipping Address', 'name' => 'shipping_address', 'placeholder' => 'Shipping address...', 'rows' => 2]],
@@ -137,7 +138,7 @@ $masterDefinitions = [
     @if(isset($masterDefinitions[$masterKey]))
         @php $def = $masterDefinitions[$masterKey]; @endphp
         @if($masterKey === 'contact' || \Illuminate\Support\Facades\Route::has($def['route']))
-        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" title="Quick Create {{ $def['label'] }}" size="{{ in_array($masterKey, ['product', 'contact']) ? 'lg' : '' }}">
+        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" title="Quick Create {{ $def['label'] }}" size="{{ in_array($masterKey, ['product', 'contact', 'customer']) ? 'lg' : '' }}">
             @if($masterKey === 'product')
                 <!-- Handcrafted Premium Product Modal layout matching Inventory Create screen section headers -->
                 <div data-action="{{ route('products.quick-create') }}"
@@ -324,6 +325,79 @@ $masterDefinitions = [
                                 label="Email Address"
                                 name="email"
                                 placeholder="e.g. john.doe@gmail.com"
+                            />
+                        </div>
+                    </div>
+                </div>
+            @elseif($masterKey === 'customer')
+                <!-- Handcrafted Customer Quick Create Modal layout -->
+                <div data-action="{{ route('crm.customers.quick-create') }}"
+                     class="quick-create-form"
+                     id="quickCreateForm_customer">
+                    @csrf
+                    <div class="row g-4 text-dark fs-13">
+                        <!-- Column 1: Primary Details -->
+                        <div class="col-md-6 border-end-md">
+                            <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-1.5"></i>Basic Information</h6>
+                            
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                label="Customer Name"
+                                name="name"
+                                placeholder="e.g. Acme Corp or Manish Patidar"
+                                :required="true"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="text"
+                                label="GSTIN / Tax ID"
+                                name="gstin"
+                                placeholder="e.g. 22AAAAA0000A1Z5"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="email"
+                                label="Email Address"
+                                name="email"
+                                placeholder="e.g. contact@acme.com"
+                                :required="true"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="input"
+                                inputType="tel"
+                                label="Phone Number"
+                                name="phone"
+                                placeholder="e.g. +91 9876543210"
+                            />
+                        </div>
+
+                        <!-- Column 2: Address Details -->
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold text-primary mb-0"><i class="feather-map-pin me-1.5"></i>Address Details</h6>
+                                <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 fs-12 text-primary" onclick="var b = document.querySelector('#quickCreateForm_customer [name=billing_address]'); var s = document.querySelector('#quickCreateForm_customer [name=shipping_address]'); if(b && s) s.value = b.value;">
+                                    <i class="feather-copy me-1"></i>Copy Billing to Shipping
+                                </button>
+                            </div>
+
+                            <x-ui.odoo-form-ui
+                                type="textarea"
+                                label="Billing Address"
+                                name="billing_address"
+                                placeholder="Street, City, State, Pincode..."
+                                :rows="3"
+                            />
+
+                            <x-ui.odoo-form-ui
+                                type="textarea"
+                                label="Shipping Address"
+                                name="shipping_address"
+                                placeholder="Street, City, State, Pincode..."
+                                :rows="3"
                             />
                         </div>
                     </div>

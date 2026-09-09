@@ -34,6 +34,12 @@ class Lead extends Model
                 $lead->lead_number = 'LD-' . $year . '-' . str_pad((string)$count, 4, '0', STR_PAD_LEFT);
             }
         });
+
+        static::updating(function ($lead) {
+            if ($lead->isDirty('status') && strtolower($lead->status) === 'won' && !$lead->crm_account_id) {
+                throw new \InvalidArgumentException('Cannot mark as Won. Account & Deal conversion required first!');
+            }
+        });
     }
 
     protected $fillable = [
