@@ -299,6 +299,8 @@ class RbacSeeder extends Seeder
             'accounting.vouchers.credit_note.post' => $permissions['accounting.vouchers.credit_note.post'],
             'accounting.vouchers.debit_note.view' => $permissions['accounting.vouchers.debit_note.view'],
             'accounting.vouchers.debit_note.post' => $permissions['accounting.vouchers.debit_note.post'],
+            'accounting.bank_reconciliation.view' => $permissions['accounting.bank_reconciliation.view'],
+            'accounting.bank_reconciliation.create' => $permissions['accounting.bank_reconciliation.create'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
             'fixed_assets.categories.create' => $permissions['fixed_assets.categories.create'],
             'fixed_assets.categories.edit' => $permissions['fixed_assets.categories.edit'],
@@ -331,6 +333,7 @@ class RbacSeeder extends Seeder
             'accounting.vouchers.contra.view' => $permissions['accounting.vouchers.contra.view'],
             'accounting.vouchers.credit_note.view' => $permissions['accounting.vouchers.credit_note.view'],
             'accounting.vouchers.debit_note.view' => $permissions['accounting.vouchers.debit_note.view'],
+            'accounting.bank_reconciliation.view' => $permissions['accounting.bank_reconciliation.view'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
             'fixed_assets.assets.view' => $permissions['fixed_assets.assets.view'],
             'fixed_assets.depreciation.view' => $permissions['fixed_assets.depreciation.view'],
@@ -576,6 +579,9 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.vouchers.debit_note.view', 'module' => 'accounting', 'entity' => 'vouchers_debit_note', 'action' => 'view'],
             ['name' => 'accounting.vouchers.debit_note.post', 'module' => 'accounting', 'entity' => 'vouchers_debit_note', 'action' => 'post'],
             ['name' => 'accounting.vouchers.debit_note.reverse', 'module' => 'accounting', 'entity' => 'vouchers_debit_note', 'action' => 'reverse'],
+            ['name' => 'accounting.bank_reconciliation.view', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'view'],
+            ['name' => 'accounting.bank_reconciliation.create', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'create'],
+            ['name' => 'accounting.bank_reconciliation.complete', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'complete'],
         ];
 
         $permissions = [];

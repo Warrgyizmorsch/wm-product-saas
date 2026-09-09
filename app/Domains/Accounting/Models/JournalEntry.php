@@ -24,11 +24,16 @@ class JournalEntry extends BaseModel
         'debit',
         'credit',
         'description',
+        'is_reconciled',
+        'reconciled_at',
+        'bank_reconciliation_id',
     ];
 
     protected $casts = [
         'debit' => 'float',
         'credit' => 'float',
+        'is_reconciled' => 'boolean',
+        'reconciled_at' => 'datetime',
     ];
 
     public function journal(): BelongsTo
@@ -44,5 +49,20 @@ class JournalEntry extends BaseModel
     public function costCenter(): BelongsTo
     {
         return $this->belongsTo(CostCenter::class, 'cost_center_id');
+    }
+
+    public function bankReconciliation(): BelongsTo
+    {
+        return $this->belongsTo(BankReconciliation::class, 'bank_reconciliation_id');
+    }
+
+    /**
+     * Signed movement on this line alone, matching a bank statement's sign
+     * convention (positive = deposit, negative = withdrawal) when the line
+     * sits on a debit-normal cash/bank account.
+     */
+    public function signedAmount(): float
+    {
+        return round($this->debit - $this->credit, 2);
     }
 }

@@ -1,10 +1,12 @@
 <?php
 
+use App\Domains\Accounting\Controllers\AccountingAuditLogController;
 use App\Domains\Accounting\Controllers\AccountingPeriodController;
 use App\Domains\Accounting\Controllers\AccountingPostingFailureController;
 use App\Domains\Accounting\Controllers\ApAgingController;
 use App\Domains\Accounting\Controllers\ArAgingController;
 use App\Domains\Accounting\Controllers\BalanceSheetController;
+use App\Domains\Accounting\Controllers\BankReconciliationController;
 use App\Domains\Accounting\Controllers\CashFlowController;
 use App\Domains\Accounting\Controllers\ChartOfAccountController;
 use App\Domains\Accounting\Controllers\CostCenterController;
@@ -54,6 +56,15 @@ Route::prefix('accounting')
         Route::put('tax-rates/{taxRate}', [TaxRateController::class, 'update'])->name('tax-rates.update');
         Route::delete('tax-rates/{taxRate}', [TaxRateController::class, 'destroy'])->name('tax-rates.destroy');
 
+        Route::get('bank-reconciliation', [BankReconciliationController::class, 'index'])->name('bank-reconciliation.index');
+        Route::get('bank-reconciliation/create', [BankReconciliationController::class, 'create'])->name('bank-reconciliation.create');
+        Route::post('bank-reconciliation', [BankReconciliationController::class, 'store'])->name('bank-reconciliation.store');
+        Route::get('bank-reconciliation/{reconciliation}', [BankReconciliationController::class, 'show'])->name('bank-reconciliation.show');
+        Route::post('bank-reconciliation/{reconciliation}/import', [BankReconciliationController::class, 'import'])->name('bank-reconciliation.import');
+        Route::post('bank-reconciliation/{reconciliation}/auto-match', [BankReconciliationController::class, 'autoMatch'])->name('bank-reconciliation.auto-match');
+        Route::post('bank-reconciliation/{reconciliation}/match', [BankReconciliationController::class, 'match'])->name('bank-reconciliation.match');
+        Route::post('bank-reconciliation/{reconciliation}/complete', [BankReconciliationController::class, 'complete'])->name('bank-reconciliation.complete');
+
         Route::get('journals', [JournalController::class, 'index'])->name('journals.index');
         Route::get('journals/create', [JournalController::class, 'create'])->name('journals.create');
         Route::post('journals', [JournalController::class, 'store'])->name('journals.store');
@@ -72,6 +83,7 @@ Route::prefix('accounting')
         Route::get('reports/gst-summary', [GstSummaryController::class, 'index'])->name('reports.gst-summary');
         Route::get('reports/gstr1', [Gstr1Controller::class, 'index'])->name('reports.gstr1');
         Route::get('reports/gstr3b', [Gstr3bController::class, 'index'])->name('reports.gstr3b');
+        Route::get('reports/audit-trail', [AccountingAuditLogController::class, 'index'])->name('reports.audit-trail');
 
         Route::get('posting-failures', [AccountingPostingFailureController::class, 'index'])->name('posting-failures.index');
         Route::post('posting-failures/{failure}/retry', [AccountingPostingFailureController::class, 'retry'])->name('posting-failures.retry');

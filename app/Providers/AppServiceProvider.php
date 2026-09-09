@@ -276,6 +276,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Repositories\VoucherDetailRepositoryInterface::class,
             \App\Domains\Accounting\Repositories\VoucherDetailRepository::class
         );
+
+        // ── Accounting: Audit Log ──────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\AccountingAuditLogRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\AccountingAuditLogRepository::class
+        );
     }
 
     public function boot(): void
@@ -587,6 +593,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Accounting\Models\ChartOfAccount::class,
             \App\Domains\Accounting\Policies\ChartOfAccountPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\BankReconciliation::class,
+            \App\Domains\Accounting\Policies\BankReconciliationPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(
