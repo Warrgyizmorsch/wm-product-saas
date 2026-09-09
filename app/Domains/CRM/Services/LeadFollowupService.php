@@ -50,11 +50,11 @@ class LeadFollowupService
             ? "Scheduled a {$followup->type} activity on " . $followup->followup_date->format('d/m/Y h:i A')
             : "Logged a {$followup->type} interaction: " . ($followup->notes ?: 'No details');
 
-        // Auto-Sync with Google Calendar if enabled or if pending activity
-        $syncGoogle = isset($validated['sync_google_calendar']) ? (bool)$validated['sync_google_calendar'] : true;
+        // Auto-Sync with Google Calendar if either calendar or meet switch is enabled
+        $syncGoogle = !empty($validated['sync_google_calendar']) || !empty($validated['create_meet_link']);
         if ($followup->status === 'Pending' && $syncGoogle) {
             try {
-                $createMeet = !empty($validated['create_meet_link']) || in_array(strtolower($validated['type']), ['meeting', 'demo']);
+                $createMeet = !empty($validated['create_meet_link']);
                 $attendees = [];
                 if ($lead->email) $attendees[] = $lead->email;
                 if ($lead->company_email) $attendees[] = $lead->company_email;
@@ -86,12 +86,14 @@ class LeadFollowupService
                     $followup->google_event_id = $res['google_event_id'] ?? null;
                 }
                 if (\Schema::hasColumn('lead_followups', 'google_meet_link')) {
-                    $followup->google_meet_link = $res['meet_link'] ?? null;
+                    // Sirf Meet select kiya ho to meet link store karo
+                    $followup->google_meet_link = $createMeet ? ($res['meet_link'] ?? null) : null;
                 }
                 if (\Schema::hasColumn('lead_followups', 'is_google_meet')) {
                     $followup->is_google_meet = $createMeet;
                 }
-                if (!empty($res['meet_link'])) {
+                // Notes mein Meet URL sirf tab append karo jab Meet select tha
+                if ($createMeet && !empty($res['meet_link'])) {
                     $followup->notes = ($followup->notes ? $followup->notes . "\n" : '') . "Google Meet: " . $res['meet_link'];
                 }
                 $followup->save();

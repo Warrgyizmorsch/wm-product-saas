@@ -11,12 +11,17 @@
         overflow: hidden;
         border: 1px solid #e2e8f0;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        width: 100%;
+        overflow-x: auto;
     }
     .calendar-grid {
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         gap: 1px;
         background-color: #e2e8f0;
+        width: 100%;
+        min-width: 700px;
+        table-layout: fixed;
     }
     .calendar-day-header {
         background-color: #f8fafc;
@@ -28,6 +33,9 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         border-bottom: 1px solid #e2e8f0;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
     }
     .calendar-day-cell {
         background-color: #ffffff;
@@ -37,6 +45,10 @@
         flex-direction: column;
         transition: all 0.2s ease-in-out;
         position: relative;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        overflow: hidden;
     }
     .calendar-day-cell:hover {
         background-color: #f8fafc;
