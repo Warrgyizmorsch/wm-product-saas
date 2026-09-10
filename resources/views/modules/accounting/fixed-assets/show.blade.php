@@ -171,20 +171,14 @@
                     <x-ui.odoo-form-ui type="input" inputType="number" label="Non-recoverable Tax" name="non_recoverable_tax" id="capNonRecoverableTax" :value="old('non_recoverable_tax')" placeholder="0.00" />
                     <small class="form-text text-muted fs-11 d-block mt-n2 mb-2">Blocked ITC — added to the capitalized cost.</small>
                 </div>
-                <div class="col-12">
-                    <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2">
-                        <span class="fw-semibold fs-13 text-dark">Capitalization Cost (Acquisition + Attributable + Non-recoverable Tax)</span>
-                        <span class="fw-bold fs-15 text-primary" id="capCostPreview">0.00</span>
-                    </div>
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Residual Value" name="residual_value" id="capResidualValue" :value="old('residual_value')" placeholder="Defaults from category" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Residual Value" name="residual_value" :value="old('residual_value')" placeholder="Defaults from category" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Useful Life (months)" name="useful_life_months" id="capUsefulLife" :value="old('useful_life_months', $asset->category?->default_useful_life_months)" placeholder="e.g. 36" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Useful Life (months)" name="useful_life_months" :value="old('useful_life_months', $asset->category?->default_useful_life_months)" placeholder="e.g. 36" />
-                </div>
-                <div class="col-md-6">
-                    <x-ui.select label="Depreciation Method" name="depreciation_method" :selected="old('depreciation_method', $asset->category?->default_depreciation_method)" :options="[
+                    <x-ui.select label="Depreciation Method" name="depreciation_method" id="capMethod" :selected="old('depreciation_method', $asset->category?->default_depreciation_method)" :options="[
                         '' => 'Straight Line (default)',
                         'straight_line' => 'Straight Line',
                         'wdv' => 'Written Down Value (WDV)',
@@ -196,6 +190,32 @@
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" inputType="date" label="Depreciation Start Date" name="depreciation_start_date" :value="old('depreciation_start_date', now()->toDateString())" />
                 </div>
+
+                <div class="col-12">
+                    <div class="bg-light rounded px-3 py-3 mt-2">
+                        <h6 class="fs-11 text-uppercase text-muted fw-bold mb-2">Capitalization Summary</h6>
+                        <div class="d-flex justify-content-between py-1">
+                            <span class="text-muted">Acquisition + Attributable + Non-recoverable Tax</span>
+                            <span class="fw-semibold" id="capSummaryCost">0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1 border-bottom pb-2 mb-2">
+                            <span class="text-muted">Less: Residual Value</span>
+                            <span class="fw-semibold" id="capSummaryResidual">0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1">
+                            <span class="fw-semibold text-dark">Capitalized Asset Cost</span>
+                            <span class="fw-bold text-primary" id="capCostPreview">0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1">
+                            <span class="fw-semibold text-dark">Depreciable Amount</span>
+                            <span class="fw-bold" id="capSummaryDepreciable">0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1 pt-2 border-top mt-1">
+                            <span class="text-muted">Estimated Monthly Depreciation<span id="capMethodNote"></span></span>
+                            <span class="fw-bold text-success" id="capSummaryMonthly">0.00</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </x-ui.modal>
     @endif
@@ -204,16 +224,48 @@
 @push('scripts')
     <script>
         $(document).ready(function () {
+            function money(n) {
+                return (isFinite(n) ? n : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
             function updateCapCostPreview() {
                 const acquisition = parseFloat($('#capAcquisitionCost').val()) || 0;
                 const direct = parseFloat($('#capDirectCost').val()) || 0;
                 const nonRecoverableTax = parseFloat($('#capNonRecoverableTax').val()) || 0;
-                const total = acquisition + direct + nonRecoverableTax;
+                const cost = acquisition + direct + nonRecoverableTax;
 
-                $('#capCostPreview').text(total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                // Blank Residual Value means "use the category default", which this
+                // preview can't resolve client-side — treat blank as 0 here (same as
+                // the "no category default" fallback in AssetCapitalizationService)
+                // so the summary is a lower-bound estimate, not silently wrong.
+                const residual = parseFloat($('#capResidualValue').val()) || 0;
+                const usefulLifeMonths = parseFloat($('#capUsefulLife').val()) || 0;
+                const method = $('#capMethod').val() || 'straight_line';
+                const depreciable = Math.max(0, cost - residual);
+
+                let monthly = 0;
+                let note = '';
+                if (usefulLifeMonths > 0 && cost > 0) {
+                    if (method === 'wdv') {
+                        const years = usefulLifeMonths / 12;
+                        const safeResidual = Math.min(Math.max(residual, 0.01), cost);
+                        const annualRate = 1 - Math.pow(safeResidual / cost, 1 / years);
+                        monthly = cost * (annualRate / 12);
+                        note = ' (WDV, 1st month — declines after)';
+                    } else {
+                        monthly = depreciable / usefulLifeMonths;
+                    }
+                }
+
+                $('#capSummaryCost').text(money(cost));
+                $('#capSummaryResidual').text(residual > 0 ? '(' + money(residual) + ')' : money(0));
+                $('#capCostPreview').text(money(cost));
+                $('#capSummaryDepreciable').text(money(depreciable));
+                $('#capSummaryMonthly').text(money(monthly));
+                $('#capMethodNote').text(note);
             }
 
-            $('#capAcquisitionCost, #capDirectCost, #capNonRecoverableTax').on('input', updateCapCostPreview);
+            $('#capAcquisitionCost, #capDirectCost, #capNonRecoverableTax, #capResidualValue, #capUsefulLife, #capMethod').on('input change', updateCapCostPreview);
             updateCapCostPreview();
         });
     </script>
