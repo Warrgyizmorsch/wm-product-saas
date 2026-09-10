@@ -42,12 +42,50 @@ class EmployeeExitApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.employees.manage')
+            || $user->hasHrPermission('hrms.employees.manage');
+    }
+
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)
+            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
+            ->first()
+            ?? Employee::where('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->first();
+    }
+
     public function index(Request $request): JsonResponse
     {
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
-        $exits = EmployeeExit::where('tenant_id', $tenantId)
-            ->with(['employee.department', 'employee.designation', 'employee.company', 'clearances', 'fnfSettlement', 'documents'])
-            ->orderBy('created_at', 'desc')
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
+        $query = EmployeeExit::where('tenant_id', $tenantId)
+            ->with(['employee.department', 'employee.designation', 'employee.company', 'clearances', 'fnfSettlement', 'documents']);
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError('Employee profile not found.', 404);
+            }
+            $query->where('employee_id', $employee->id);
+        }
+
+        $exits = $query->orderBy('created_at', 'desc')
             ->paginate($request->integer('per_page', 15));
 
         return $this->sendSuccess($exits, 'Exits list retrieved successfully.');
@@ -64,6 +102,13 @@ class EmployeeExitApiController extends Controller
             'reason_category'    => 'nullable|string|max:255',
             'reason_details'     => 'nullable|string|max:2000',
         ]);
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only initiate resignation for yourself.', 403);
+        }
 
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
         $employee = Employee::find($validated['employee_id']);
@@ -109,6 +154,14 @@ class EmployeeExitApiController extends Controller
 
         if (!$exit) {
             return $this->sendError("Employee exit record with ID '{$id}' not found.", 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $employee) {
+            if ($exit->employee_id !== $employee->id) {
+                return $this->sendError('Unauthorized action. You can only view your own exit record.', 403);
+            }
         }
 
         return $this->sendSuccess($exit, 'Exit details retrieved successfully.');

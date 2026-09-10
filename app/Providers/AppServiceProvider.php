@@ -643,8 +643,58 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Company::class,
+            \App\Domains\HRMS\Policies\OrgPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\LeavePlan::class,
+            \App\Domains\HRMS\Policies\LeaveStructurePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Roster::class,
+            \App\Domains\HRMS\Policies\RosterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\AttendancePenaltyRule::class,
+            \App\Domains\HRMS\Policies\PenalizationPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\BiometricDevice::class,
+            \App\Domains\HRMS\Policies\BiometricDevicePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\DocumentType::class,
+            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\HolidayCalendar::class,
+            \App\Domains\HRMS\Policies\HolidayPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\ExpensePolicy::class,
+            \App\Domains\HRMS\Policies\ExpensePolicyPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\ExitClearanceItem::class,
+            \App\Domains\HRMS\Policies\ExitClearancePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\SalaryStructure::class,
             \App\Domains\HRMS\Policies\SalaryStructurePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\PerformanceImprovementPlan::class,
+            \App\Domains\HRMS\Policies\PipPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(
@@ -655,6 +705,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\Asset::class,
             \App\Domains\HRMS\Policies\AssetPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Broadcast::class,
+            \App\Domains\HRMS\Policies\BroadcastPolicy::class
         );
 
         // ── Fixed Asset Policies ────────────────────────────────────────────

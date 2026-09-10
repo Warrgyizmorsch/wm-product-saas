@@ -20,6 +20,8 @@ class HolidayCalendarController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', HolidayCalendar::class);
+
         $data = $this->holidayCalendarRepository->getIndexData($request->all());
 
         return view('modules.hrms.holiday-calendar.index', $data);
@@ -30,6 +32,8 @@ class HolidayCalendarController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', HolidayCalendar::class);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'holiday_date' => 'required|date',
@@ -53,6 +57,8 @@ class HolidayCalendarController extends Controller
      */
     public function update(Request $request, HolidayCalendar $holiday): RedirectResponse
     {
+        $this->authorize('update', $holiday);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'holiday_date' => 'required|date',
@@ -76,6 +82,8 @@ class HolidayCalendarController extends Controller
      */
     public function destroy(HolidayCalendar $holiday): RedirectResponse
     {
+        $this->authorize('delete', $holiday);
+
         $this->holidayCalendarRepository->deleteHoliday($holiday);
 
         return redirect()->route('hrms.holidays.index')

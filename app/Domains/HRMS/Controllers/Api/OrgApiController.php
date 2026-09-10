@@ -43,6 +43,17 @@ class OrgApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.organization_settings.manage');
+    }
+
     /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
@@ -150,6 +161,10 @@ class OrgApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
+        }
+
         $validated = $request->validate([
             'company_name'        => 'required|max:255',
             'legal_name'          => 'required|max:255',
@@ -213,6 +228,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $company = Company::find($id);
@@ -283,6 +302,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $company = Company::find($id);
@@ -371,6 +394,10 @@ class OrgApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
+        }
+
         $validated = $request->validate([
             'company_id'       => 'required|exists:companies,id',
             'name'             => 'required|max:255',
@@ -398,6 +425,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $businessUnit = BusinessUnit::find($id);
@@ -432,6 +463,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $businessUnit = BusinessUnit::find($id);
@@ -524,6 +559,10 @@ class OrgApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
+        }
+
         $validated = $request->validate([
             'company_id'          => 'required_without:business_unit_id|nullable|exists:companies,id',
             'business_unit_id'    => 'required_without:company_id|nullable|exists:business_units,id',
@@ -573,6 +612,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $branch = Branch::find($id);
@@ -629,6 +672,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $branch = Branch::find($id);
@@ -723,6 +770,10 @@ class OrgApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
+        }
+
         $validated = $request->validate([
             'company_id'           => 'required_without_all:branch_id,business_unit_id|nullable|exists:companies,id',
             'business_unit_id'     => 'required_without_all:company_id,branch_id|nullable|exists:business_units,id',
@@ -773,6 +824,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $department = Department::find($id);
@@ -830,6 +885,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $department = Department::find($id);
@@ -911,6 +970,10 @@ class OrgApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
+        }
+
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name'          => 'required|max:255',
@@ -936,6 +999,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $designation = Designation::find($id);
@@ -968,6 +1035,10 @@ class OrgApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage organization settings.', 403);
         }
 
         $designation = Designation::find($id);

@@ -44,6 +44,22 @@ class DocumentMasterApiController extends Controller
     }
 
     /**
+     * Helper to check if current user is HR Admin / Document Manager.
+     */
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return (bool) (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.documents.manage')
+        );
+    }
+
+    /**
      * Null-safe authorization check.
      */
     private function authorizeUser(): ?JsonResponse
@@ -87,6 +103,10 @@ class DocumentMasterApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can manage document categories.', 403);
+        }
+
         $validated = $request->validate([
             'company_id'  => 'required|exists:companies,id',
             'name'        => 'required|string|max:255',
@@ -106,6 +126,10 @@ class DocumentMasterApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can manage document categories.', 403);
         }
 
         $category = DocumentCategory::find($id);
@@ -134,6 +158,10 @@ class DocumentMasterApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can manage document categories.', 403);
+        }
+
         $category = DocumentCategory::find($id);
         if (!$category) {
             return $this->sendError("Document category with ID '{$id}' not found.", 404);
@@ -156,6 +184,10 @@ class DocumentMasterApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can manage document masters.', 403);
         }
 
         $tenantId = auth()->user()?->tenant_id ?? 1;
@@ -203,6 +235,10 @@ class DocumentMasterApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can manage document masters.', 403);
         }
 
         $document = DocumentMaster::find($id);
@@ -257,6 +293,10 @@ class DocumentMasterApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can manage document masters.', 403);
+        }
+
         $document = DocumentMaster::find($id);
         if (!$document) {
             return $this->sendError("Document master with ID '{$id}' not found.", 404);
@@ -275,6 +315,10 @@ class DocumentMasterApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can manage document masters.', 403);
         }
 
         $document = DocumentMaster::find($id);

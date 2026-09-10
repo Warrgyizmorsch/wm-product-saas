@@ -43,6 +43,17 @@ class HolidayCalendarApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hrms.holidays.manage');
+    }
+
     /**
      * Null-safe authorization check.
      */
@@ -84,6 +95,10 @@ class HolidayCalendarApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to create holiday record.', 403);
         }
 
         $validated = $request->validate([
@@ -128,6 +143,10 @@ class HolidayCalendarApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update holiday record.', 403);
+        }
+
         $holiday = HolidayCalendar::find($id);
         if (!$holiday) {
             return $this->sendError("Holiday record with ID '{$id}' not found.", 404);
@@ -156,6 +175,10 @@ class HolidayCalendarApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to delete holiday record.', 403);
         }
 
         $holiday = HolidayCalendar::find($id);

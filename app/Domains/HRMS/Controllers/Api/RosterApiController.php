@@ -48,6 +48,33 @@ class RosterApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hrms.roster.manage')
+            || $user->hasHrPermission('hrms.shift_roster.manage');
+    }
+
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)
+            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
+            ->first()
+            ?? Employee::where('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->first();
+    }
+
     /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
@@ -161,6 +188,10 @@ class RosterApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to create production shift.', 403);
+        }
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -208,6 +239,10 @@ class RosterApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update production shift.', 403);
         }
 
         $shift = ProductionShift::find($id);
@@ -264,6 +299,10 @@ class RosterApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to delete production shift.', 403);
+        }
+
         $shift = ProductionShift::find($id);
         if (!$shift) {
             return $this->sendError("Production shift with ID '{$id}' not found.", 404);
@@ -301,7 +340,17 @@ class RosterApiController extends Controller
             $dates[] = $date->format('Y-m-d');
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
         $query = Employee::query()->where('employees.status', true);
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError('Employee profile not found.', 404);
+            }
+            $query->where('employees.id', $employee->id);
+        }
 
         if ($companyId) {
             $query->where('employees.company_id', $companyId);
@@ -365,6 +414,10 @@ class RosterApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to assign shifts.', 403);
         }
 
         $validated = $request->validate([
@@ -454,6 +507,10 @@ class RosterApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update roster.', 403);
         }
 
         $validated = $request->validate([

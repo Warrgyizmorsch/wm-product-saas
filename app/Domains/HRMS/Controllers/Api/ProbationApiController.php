@@ -35,14 +35,50 @@ class ProbationApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.employees.manage')
+            || $user->hasHrPermission('hrms.employees.manage');
+    }
+
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)
+            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
+            ->first()
+            ?? Employee::where('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->first();
+    }
+
     public function index(Request $request): JsonResponse
     {
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
         $today = Carbon::today();
         $in15Days = Carbon::today()->addDays(15);
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
 
         $status = $request->input('status', 'in_probation');
         $query = Employee::query()->where('tenant_id', $tenantId)->with(['department', 'designation', 'probationEvaluations']);
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError('Employee profile not found.', 404);
+            }
+            $query->where('id', $employee->id);
+        }
 
         if ($status === 'in_probation') {
             $query->where('employee_stage', 'Probation');
@@ -61,6 +97,10 @@ class ProbationApiController extends Controller
 
     public function evaluate(Request $request, mixed $employee): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to perform probation evaluation.', 403);
+        }
+
         $empModel = Employee::find($employee);
         if (!$empModel) {
             return $this->sendError("Employee with ID '{$employee}' not found.", 404);

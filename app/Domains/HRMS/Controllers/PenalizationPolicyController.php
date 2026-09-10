@@ -13,6 +13,7 @@ class PenalizationPolicyController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', \App\Domains\HRMS\Models\AttendancePenaltyRule::class);
         $companies = Company::all();
         $leaveTypes = LeaveType::where('status', true)
             ->get()
@@ -75,6 +76,7 @@ class PenalizationPolicyController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', \App\Domains\HRMS\Models\AttendancePenaltyRule::class);
         $rules = [
             'rule_type' => 'required|in:late_arrival,under_hours,missing_logs,overtime_rules',
             'company_id' => 'nullable|integer',
@@ -261,6 +263,7 @@ class PenalizationPolicyController extends Controller
 
     public function saveAttendanceRule(Request $request)
     {
+        $this->authorize('update', \App\Domains\HRMS\Models\AttendancePenaltyRule::class);
         $validated = $request->validate([
             'company_id'             => 'required|integer|exists:companies,id',
             'business_unit_id'       => 'nullable|integer|exists:business_units,id',

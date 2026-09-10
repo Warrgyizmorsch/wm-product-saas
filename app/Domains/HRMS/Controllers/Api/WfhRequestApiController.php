@@ -34,6 +34,33 @@ class WfhRequestApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hrms.leave_requests.approve')
+            || $user->hasHrPermission('hrms.leaves.manage');
+    }
+
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)
+            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
+            ->first()
+            ?? Employee::where('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->first();
+    }
+
     private function authorizeUser(): ?JsonResponse
     {
         if (!auth()->check()) {
@@ -58,11 +85,22 @@ class WfhRequestApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
 
         $query = WfhRequest::query();
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendSuccess([
+                    'total_requests'    => 0,
+                    'pending_requests'  => 0,
+                    'approved_requests' => 0,
+                    'rejected_requests' => 0,
+                ], 'WFH requests summary loaded successfully');
+            }
+            $query->where('employee_id', $employee->id);
+        }
 
         $totalRequests   = (clone $query)->count();
         $pendingRequests = (clone $query)->where('status', 'pending')->count();
@@ -83,11 +121,17 @@ class WfhRequestApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
 
         $query = WfhRequest::query()->with(['employee', 'approvedByEmployee']);
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError('Employee record not found for the current user.', 404);
+            }
+            $query->where('employee_id', $employee->id);
+        }
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -118,6 +162,14 @@ class WfhRequestApiController extends Controller
             return $this->sendError("WFH request with ID '{$id}' not found.", 404);
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $employee) {
+            if ($wfhRequest->employee_id !== $employee->id) {
+                return $this->sendError('Unauthorized action. You can only view your own WFH requests.', 403);
+            }
+        }
+
         return $this->sendSuccess($wfhRequest, 'WFH request details loaded');
     }
 
@@ -140,6 +192,13 @@ class WfhRequestApiController extends Controller
             'notified_contacts' => 'nullable|array',
             'notified_contacts.*' => 'exists:employees,id'
         ]);
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only submit WFH requests for yourself.', 403);
+        }
 
         $employee = Employee::find($validated['employee_id']);
 
@@ -214,6 +273,11 @@ class WfhRequestApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. HR Admin permissions required to approve WFH request.', 403);
+        }
+
         $wfhRequest = WfhRequest::find($id);
         if (!$wfhRequest) {
             return $this->sendError("WFH request with ID '{$id}' not found.", 404);
@@ -237,6 +301,11 @@ class WfhRequestApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. HR Admin permissions required to reject WFH request.', 403);
+        }
+
         $wfhRequest = WfhRequest::find($id);
         if (!$wfhRequest) {
             return $this->sendError("WFH request with ID '{$id}' not found.", 404);
@@ -260,6 +329,11 @@ class WfhRequestApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. HR Admin permissions required to update WFH request status.', 403);
+        }
+
         $wfhRequest = WfhRequest::find($id);
         if (!$wfhRequest) {
             return $this->sendError("WFH request with ID '{$id}' not found.", 404);
@@ -314,6 +388,12 @@ class WfhRequestApiController extends Controller
             return $this->sendError("WFH request with ID '{$id}' not found.", 404);
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $authEmployee && $wfhRequest->employee_id !== $authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only withdraw your own WFH request.', 403);
+        }
+
         if (!$wfhRequest->canWithdraw()) {
             return $this->sendError('Only pending applications can be withdrawn.', 400);
         }
@@ -332,6 +412,12 @@ class WfhRequestApiController extends Controller
         $wfhRequest = WfhRequest::find($id);
         if (!$wfhRequest) {
             return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $authEmployee && $wfhRequest->employee_id !== $authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only request cancellation for your own WFH request.', 403);
         }
 
         if (!$wfhRequest->canRequestCancellation()) {
@@ -356,8 +442,8 @@ class WfhRequestApiController extends Controller
             return $authError;
         }
 
-        if (!auth()->user()->hasHrPermission('hr.settings.manage')) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. HR Admin permissions required to approve WFH cancellation.', 403);
         }
 
         $wfhRequest = WfhRequest::find($id);
@@ -383,8 +469,8 @@ class WfhRequestApiController extends Controller
             return $authError;
         }
 
-        if (!auth()->user()->hasHrPermission('hr.settings.manage')) {
-            return $this->sendError('Unauthorized.', 403);
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. HR Admin permissions required to deny WFH cancellation.', 403);
         }
 
         $wfhRequest = WfhRequest::find($id);

@@ -38,6 +38,15 @@ class ShiftChangeRequestController extends Controller
             'attachment'         => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
         ]);
 
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if ($currentEmp) {
+                $validated['employee_id'] = $currentEmp->id;
+            }
+        }
+
         $employee = Employee::findOrFail($validated['employee_id']);
 
         if (!$employee) {
@@ -79,6 +88,10 @@ class ShiftChangeRequestController extends Controller
 
     public function updateStatus(Request $request, ShiftChangeRequest $shiftChangeRequest, ?string $overrideAction = null): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        abort_unless($isHrAdmin, 403);
+
         if ($shiftChangeRequest->status === 'cancelled') {
             return redirect()->back()->with('error', __('hrms.shift_change.cancelled_status_error'));
         }
@@ -103,8 +116,20 @@ class ShiftChangeRequestController extends Controller
         return redirect()->back()->with('success', __('hrms.shift_change.status_updated'));
     }
 
-    public function destroy(ShiftChangeRequest $shiftChangeRequest): RedirectResponse
+    public function destroy(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $shiftChangeRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+            if ($shiftChangeRequest->status !== 'pending') {
+                return redirect()->back()->with('error', 'Only pending requests can be deleted.');
+            }
+        }
+
         if ($shiftChangeRequest->status === 'approved') {
             return redirect()->back()->with('error', __('hrms.shift_change.approved_no_delete'));
         }

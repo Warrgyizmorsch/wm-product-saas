@@ -43,6 +43,39 @@ class DocumentApiController extends Controller
     }
 
     /**
+     * Helper to check if current user is HR Admin / Document Manager.
+     */
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return (bool) (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.documents.manage')
+        );
+    }
+
+    /**
+     * Helper to resolve current authenticated user's employee record.
+     */
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)->first()
+            ?? Employee::where(function ($q) use ($user) {
+                $q->where('office_email', $user->email)
+                  ->orWhere('personal_email', $user->email);
+            })->first();
+    }
+
+    /**
      * Null-safe authorization check.
      */
     private function authorizeUser(): ?JsonResponse
@@ -71,22 +104,28 @@ class DocumentApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
         $activeTab = $request->query('tab', 'employee');
 
         $query = Document::with(['documentable', 'documentMaster', 'requestedBy'])
             ->where('documentable_type', Employee::class);
 
-        // Separate by tab (Employee vs HR Uploads)
-        if ($activeTab === 'employee') {
-            $query->whereHasMorph('documentable', [Employee::class], function ($q) {
-                $q->whereColumn('user_id', 'documents.requested_by_id');
-            });
+        if (!$isHrAdmin) {
+            $query->where('documentable_id', $employee?->id ?? 0);
         } else {
-            $query->where(function ($q) {
-                $q->whereDoesntHaveMorph('documentable', [Employee::class], function ($q2) {
-                    $q2->whereColumn('user_id', 'documents.requested_by_id');
-                })->orWhereNull('requested_by_id');
-            });
+            // Separate by tab (Employee vs HR Uploads) for HR Admins
+            if ($activeTab === 'employee') {
+                $query->whereHasMorph('documentable', [Employee::class], function ($q) {
+                    $q->whereColumn('user_id', 'documents.requested_by_id');
+                });
+            } else {
+                $query->where(function ($q) {
+                    $q->whereDoesntHaveMorph('documentable', [Employee::class], function ($q2) {
+                        $q2->whereColumn('user_id', 'documents.requested_by_id');
+                    })->orWhereNull('requested_by_id');
+                });
+            }
         }
 
         // Search by employee name, ID or document name
@@ -154,6 +193,10 @@ class DocumentApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can upload documents.', 403);
         }
 
         $validated = $request->validate([
@@ -247,6 +290,10 @@ class DocumentApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can approve documents.', 403);
+        }
+
         $document = Document::find($id);
         if (!$document) {
             return $this->sendError("Document with ID '{$id}' not found.", 404);
@@ -268,6 +315,10 @@ class DocumentApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can reject documents.', 403);
+        }
+
         $document = Document::find($id);
         if (!$document) {
             return $this->sendError("Document with ID '{$id}' not found.", 404);
@@ -287,6 +338,10 @@ class DocumentApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can update document status.', 403);
         }
 
         $document = Document::find($id);
@@ -315,9 +370,16 @@ class DocumentApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
         $document = Document::find($id);
         if (!$document) {
             return $this->sendError("Document with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isHrAdmin && $document->documentable_id !== $employee?->id) {
+            return $this->sendError('Unauthorized action.', 403);
         }
 
         $validated = $request->validate([
@@ -352,6 +414,10 @@ class DocumentApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can generate template documents.', 403);
         }
 
         $validated = $request->validate([

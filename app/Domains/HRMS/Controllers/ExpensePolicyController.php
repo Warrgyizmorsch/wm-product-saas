@@ -36,6 +36,8 @@ class ExpensePolicyController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', ExpensePolicy::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $activeTab = $request->query('tab', 'policies');
 
@@ -122,6 +124,8 @@ class ExpensePolicyController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', ExpensePolicy::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -149,6 +153,7 @@ class ExpensePolicyController extends Controller
      */
     public function update(Request $request, ExpensePolicy $policy): RedirectResponse
     {
+        $this->authorize('update', $policy);
         $validated = $request->validate([
             'name'             => 'required|string|max:255',
             'description'      => 'nullable|string|max:1000',
@@ -173,6 +178,7 @@ class ExpensePolicyController extends Controller
      */
     public function destroy(ExpensePolicy $policy): RedirectResponse
     {
+        $this->authorize('delete', $policy);
         $policy->rules()->delete();
         $policy->delete();
 
