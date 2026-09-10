@@ -157,12 +157,12 @@
                                         <div class="d-flex gap-1 justify-content-end">
                                             @if($openCount > 0)
                                                 <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold" title="{{ $openCount }} Active Open Deals">
-                                                    🟢 {{ $openCount }} Open
+                                                    {{ $openCount }} Open
                                                 </span>
                                             @endif
                                             @if($wonCount > 0)
                                                 <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-0.5 fw-bold" title="{{ $wonCount }} Closed Won Deals">
-                                                    🔵 {{ $wonCount }} Won
+                                                    {{ $wonCount }} Won
                                                 </span>
                                             @endif
                                             @if($openCount == 0 && $wonCount == 0)
