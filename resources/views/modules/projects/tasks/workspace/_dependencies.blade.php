@@ -15,6 +15,12 @@
                     <option value="{{ $otherTask['id'] }}">{{ $otherTask['label'] }}</option>
                 @endforeach
             </select>
+            <select name="dependency_type" class="form-select form-select-sm" style="max-width: 150px;">
+                <option value="Finish-to-Start">Finish-to-Start</option>
+                <option value="Start-to-Start">Start-to-Start</option>
+                <option value="Finish-to-Finish">Finish-to-Finish</option>
+                <option value="Start-to-Finish">Start-to-Finish</option>
+            </select>
             <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">{{ __('projects.add') }}</button>
         </form>
     @endif
@@ -93,10 +99,20 @@
                 var row = document.createElement('div');
                 row.className = 'd-flex align-items-center justify-content-between gap-2 border-bottom py-1';
 
+                var left = document.createElement('div');
+                left.className = 'd-flex align-items-center gap-2';
+
+                var typeBadge = document.createElement('span');
+                typeBadge.className = 'badge bg-soft-info text-info fs-11';
+                typeBadge.textContent = dependency.dependencyType || 'Finish-to-Start';
+
                 var label = document.createElement('span');
                 label.className = 'fs-12';
                 label.textContent = dependency.label;
-                row.appendChild(label);
+
+                left.appendChild(typeBadge);
+                left.appendChild(label);
+                row.appendChild(left);
 
                 if (canManage) {
                     var remove = document.createElement('button');
@@ -131,11 +147,15 @@
             addForm.addEventListener('submit', function (event) {
                 event.preventDefault();
                 var select = addForm.querySelector('select[name="depends_on_task_id"]');
+                var typeSelect = addForm.querySelector('select[name="dependency_type"]');
                 var button = addForm.querySelector('button[type="submit"]');
                 if (!select.value) return;
 
                 button.disabled = true;
-                wsRequest(addForm.action, 'POST', { depends_on_task_id: select.value })
+                wsRequest(addForm.action, 'POST', {
+                    depends_on_task_id: select.value,
+                    dependency_type: typeSelect ? typeSelect.value : 'Finish-to-Start'
+                })
                     .then(function (result) {
                         apply(result);
                         select.value = '';

@@ -28,6 +28,8 @@ class TaskService
     public function __construct(
         private readonly TaskRepositoryInterface $tasks,
         private readonly ActivityLogService $activity,
+        private readonly MilestoneService $milestones,
+        private readonly TaskDependencyService $dependencies,
     ) {
     }
 
@@ -73,8 +75,13 @@ class TaskService
             $data['milestone_id'] = $taskList->milestone_id;
             $data['task_code'] = $this->getNextTaskCode($project);
             $data['position'] = $this->nextPosition($taskList);
+            $data['status'] = $data['status'] ?? Task::STATUS_OPEN;
 
             $task = $this->tasks->create($data);
+
+            if ($task->milestone_id) {
+                $this->milestones->recalculateProgress($task->milestone_id);
+            }
 
             $this->activity->record(
                 $project,
@@ -92,6 +99,12 @@ class TaskService
     {
         return DB::transaction(function () use ($task, $data) {
             $project = $task->project;
+            $oldMilestoneId = $task->milestone_id;
+            $oldStatus = $task->status;
+
+            if (array_key_exists('status', $data) && $data['status'] !== $oldStatus) {
+                $this->dependencies->assertCanTransition($task, $data['status']);
+            }
 
             if (array_key_exists('task_list_id', $data) && (int) $data['task_list_id'] !== $task->task_list_id) {
                 $taskList = TaskList::findOrFail($data['task_list_id']);
@@ -100,6 +113,13 @@ class TaskService
             }
 
             $task = $this->tasks->update($task->id, $data);
+
+            if ($task->milestone_id !== $oldMilestoneId) {
+                $this->milestones->recalculateProgress($oldMilestoneId);
+                $this->milestones->recalculateProgress($task->milestone_id);
+            } elseif (array_key_exists('status', $data) && $data['status'] !== $oldStatus && $task->milestone_id) {
+                $this->milestones->recalculateProgress($task->milestone_id);
+            }
 
             $this->activity->record(
                 $project,
@@ -194,22 +214,30 @@ class TaskService
             ]);
         }
 
+        $this->dependencies->assertCanTransition($task, $newStatus);
+
         return DB::transaction(function () use ($task, $oldStatus, $newStatus) {
             $data = ['status' => $newStatus];
             $data['completed_at'] = $newStatus === Task::STATUS_COMPLETED ? now() : null;
 
-            $task = $this->tasks->update($task->id, $data);
+            $updatedTask = $this->tasks->update($task->id, $data);
+            $task->status = $newStatus;
+            $task->completed_at = $data['completed_at'];
+
+            if ($updatedTask->milestone_id) {
+                $this->milestones->recalculateProgress($updatedTask->milestone_id);
+            }
 
             $this->activity->record(
-                $task->project,
+                $updatedTask->project,
                 'task.status_changed',
-                "Task '{$task->title}' status changed",
+                "Task '{$updatedTask->title}' status changed",
                 "Status changed from '{$oldStatus}' to '{$newStatus}'",
-                $task,
+                $updatedTask,
                 ['old' => $oldStatus, 'new' => $newStatus],
             );
 
-            return $task;
+            return $updatedTask;
         });
     }
 
@@ -233,6 +261,8 @@ class TaskService
     public function delete(Task $task): bool
     {
         return DB::transaction(function () use ($task) {
+            $milestoneId = $task->milestone_id;
+
             $this->activity->record(
                 $task->project,
                 'task.deleted',
@@ -241,7 +271,13 @@ class TaskService
                 $task,
             );
 
-            return $this->tasks->delete($task->id);
+            $deleted = $this->tasks->delete($task->id);
+
+            if ($milestoneId) {
+                $this->milestones->recalculateProgress($milestoneId);
+            }
+
+            return $deleted;
         });
     }
 

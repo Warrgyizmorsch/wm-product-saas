@@ -16,6 +16,9 @@ class MilestoneRepository implements MilestoneRepositoryInterface
             ->withCount([
                 'taskLists',
                 'tasks',
+                'tasks as eligible_tasks_count' => function ($query) {
+                    $query->where('status', '!=', Task::STATUS_CANCELLED);
+                },
                 'tasks as completed_tasks_count' => function ($query) {
                     $query->where('status', Task::STATUS_COMPLETED);
                 },

@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Requests;
 
+use App\Domains\Projects\Models\TaskDependency;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -27,6 +28,11 @@ class StoreTaskDependencyRequest extends FormRequest
                     ->where('project_id', $project?->id),
                 Rule::unique('project_task_dependencies', 'depends_on_task_id')
                     ->where('task_id', $this->route('task')?->id),
+            ],
+            'dependency_type' => [
+                'nullable',
+                'string',
+                Rule::in(TaskDependency::TYPES),
             ],
         ];
     }
