@@ -176,13 +176,19 @@
 
                                             <div class="mt-1 d-flex align-items-center gap-1" x-show="!operation.is_parallel && index > 0">
                                                 <span class="fs-10 text-muted text-nowrap"><i class="feather-git-commit me-1"></i>Predecessor:</span>
-                                                <select x-bind:name="'operations['+index+'][predecessor_sequence]'" class="odoo-table-select text-muted fs-11 py-0" style="height: 22px; min-height: 22px;" x-model="operation.predecessor_sequence">
-                                                    <option value="">-- Auto (Previous Op) --</option>
-                                                    <option value="-1">-- None (Independent / Starts Immediately) --</option>
-                                                    <template x-for="(prevOp, pIdx) in getPriorOperations(index)" :key="prevOp.uid">
-                                                        <option :value="prevOp.sequence" x-text="'Op ' + prevOp.sequence + (prevOp.name ? ': ' + prevOp.name : '')" :selected="operation.predecessor_sequence == prevOp.sequence"></option>
-                                                    </template>
-                                                </select>
+                                                <div class="flex-grow-1">
+                                                    <x-ui.odoo-form-ui type="select" 
+                                                        x-bind:name="'operations['+index+'][predecessor_sequence]'" 
+                                                        class="odoo-table-select text-muted" 
+                                                        x-model="operation.predecessor_sequence" 
+                                                        select2Selector="default">
+                                                        <option value="">-- Auto (Previous Op) --</option>
+                                                        <option value="-1">-- None (Independent / Starts Immediately) --</option>
+                                                        <template x-for="(prevOp, pIdx) in getPriorOperations(index)" :key="prevOp.uid">
+                                                            <option :value="prevOp.sequence" x-text="'Op ' + prevOp.sequence + (prevOp.name ? ': ' + prevOp.name : '')" :selected="operation.predecessor_sequence == prevOp.sequence"></option>
+                                                        </template>
+                                                    </x-ui.odoo-form-ui>
+                                                </div>
                                             </div>
 
                                             <div class="mt-1">
@@ -261,16 +267,20 @@
                                                          @endforeach
                                                      </x-ui.odoo-form-ui>
                                                  </div>
-                                                 <div class="col-md-2" x-show="operation.subcontract_input_type !== 'previous_operation_wip'">
+                                                 <div class="col-md-3" x-show="operation.subcontract_input_type !== 'previous_operation_wip'">
                                                      <x-ui.odoo-form-ui type="select" label="Supply Type" x-bind:name="'operations['+index+'][material_supply_type]'" class="form-select form-select-sm fs-11" x-model="operation.material_supply_type">
                                                          <option value="company_supplied">Company Supplied</option>
                                                          <option value="vendor_supplied">Vendor Supplied</option>
                                                      </x-ui.odoo-form-ui>
                                                  </div>
-                                                 <div class="col-md-2" x-show="operation.subcontract_input_type === 'previous_operation_wip'">
-                                                     <label class="form-label text-muted fs-11 mb-1">Supply Type</label>
-                                                     <div class="form-control form-control-sm fs-11 bg-light text-primary fw-semibold d-flex align-items-center" style="height: 31px;">
-                                                         <i class="feather-layers me-1"></i>Previous Op WIP
+                                                 <div class="col-md-3" x-show="operation.subcontract_input_type === 'previous_operation_wip'">
+                                                     <div class="odoo-form-group mb-0">
+                                                         <label class="odoo-form-label fs-11 text-muted">Supply Type</label>
+                                                         <div class="flex-grow-1">
+                                                             <div class="form-control form-control-sm fs-11 bg-light text-primary fw-semibold d-flex align-items-center" style="height: 31px;">
+                                                                 <i class="feather-layers me-1"></i>Previous Op WIP
+                                                             </div>
+                                                         </div>
                                                      </div>
                                                  </div>
                                                  <div class="col-md-3">
@@ -279,10 +289,10 @@
                                                          <option value="previous_operation_wip">Previous Operation WIP (Job Work)</option>
                                                      </x-ui.odoo-form-ui>
                                                  </div>
-                                                 <div class="col-md-2">
+                                                 <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="input" inputType="number" label="Lead Time (Days)" min="0" x-bind:name="'operations['+index+'][subcontract_lead_time_days]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_lead_time_days" placeholder="0" />
                                                  </div>
-                                                 <div class="col-md-2">
+                                                 <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" label="Cost / Unit" x-bind:name="'operations['+index+'][subcontract_cost_per_unit]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_cost_per_unit" placeholder="0.00" />
                                                  </div>
                                                  <div class="col-md-3">
@@ -293,10 +303,10 @@
                                                          @endforeach
                                                      </x-ui.odoo-form-ui>
                                                  </div>
-                                                 <div class="col-md-2 mt-1">
+                                                 <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Dispatch Buffer (Days)" x-bind:name="'operations['+index+'][dispatch_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.dispatch_buffer_days" placeholder="0" />
                                                  </div>
-                                                 <div class="col-md-2 mt-1">
+                                                 <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Return Buffer (Days)" x-bind:name="'operations['+index+'][return_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.return_buffer_days" placeholder="0" />
                                                  </div>
                                              </div>
@@ -481,10 +491,16 @@
                     var self = this;
                     $(rowEl).find('[data-select2-selector="default"]').each(function() {
                         var $select = $(this);
+                        var nameAttr = $select.attr('name') || '';
+                        var isDynamic = nameAttr.indexOf('machine_id') !== -1 || nameAttr.indexOf('predecessor_sequence') !== -1;
 
                         if ($select.data('select2-initialized') && $select.hasClass('select2-hidden-accessible')) {
-                            $select.trigger('change.select2');
-                            return;
+                            if (isDynamic) {
+                                $select.select2('destroy');
+                            } else {
+                                $select.trigger('change.select2');
+                                return;
+                            }
                         }
 
                         if ($select.hasClass('select2-hidden-accessible')) {
@@ -493,6 +509,18 @@
 
                         $select.data('select2-initialized', true);
                         $select.select2(self.select2RowOptions());
+
+                        // Sync value if dynamic
+                        if (nameAttr.indexOf('predecessor_sequence') !== -1) {
+                            if (operation.predecessor_sequence !== undefined && operation.predecessor_sequence !== '') {
+                                $select.val(operation.predecessor_sequence).trigger('change.select2');
+                            }
+                        } else if (nameAttr.indexOf('machine_id') !== -1) {
+                            if (operation.machine_id) {
+                                $select.val(operation.machine_id).trigger('change.select2');
+                            }
+                        }
+
                         $select.off('change.routing-operation-select').on('change.routing-operation-select', function() {
                             var val = $select.val();
                             var nameAttr = $select.attr('name') || '';
@@ -504,6 +532,10 @@
                                 self.workCenterChanged(self.operations.indexOf(operation));
                             } else if (nameAttr.indexOf('machine_id') !== -1) {
                                 operation.machine_id = val;
+                            } else if (nameAttr.indexOf('material_id') !== -1) {
+                                operation.material_id = val;
+                            } else if (nameAttr.indexOf('predecessor_sequence') !== -1) {
+                                operation.predecessor_sequence = val;
                             }
 
                             this.dispatchEvent(new Event('input', { bubbles: true }));
