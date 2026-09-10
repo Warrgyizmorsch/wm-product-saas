@@ -82,6 +82,12 @@
         font-size: 13px;
         flex-shrink: 0;
     }
+    .modal-backdrop {
+        z-index: 1040 !important;
+    }
+    .modal {
+        z-index: 1060 !important;
+    }
 </style>
 @endpush
 
@@ -179,6 +185,222 @@
             </div>
         </div>
     </div>
+
+    <!-- Company Broadcasts & Announcements (Standardized Bounded Enterprise Card) -->
+    @if(isset($latestBroadcasts) && $latestBroadcasts->isNotEmpty())
+        <div class="card border mb-4 bg-white rounded-3 shadow-sm overflow-hidden" style="border-color: #cbd5e1 !important;">
+            <div class="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-soft-primary text-primary rounded-3 shadow-2xs" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8a6 6 0 0 1-12 0"></path><line x1="12" y1="2" x2="12" y2="8"></line><path d="M5 8H2a10 10 0 0 0 20 0h-3"></path><line x1="12" y1="22" x2="12" y2="18"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h6 class="fw-bold mb-0 text-dark fs-15">Company Broadcasts & Announcements</h6>
+                            <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-0.5 fs-11 fw-bold border border-primary border-opacity-10">{{ $totalBroadcastsCount ?? $latestBroadcasts->count() }} Active</span>
+                        </div>
+                        <span class="fs-11 text-muted">Stay updated with company notifications, policy updates and official notices.</span>
+                    </div>
+                </div>
+                @if(auth()->user() && in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'company admin', 'hr', 'hr manager', 'super admin', '1']))
+                    <a href="{{ route('hrms.broadcasts.index') }}" class="btn btn-sm btn-soft-primary fw-bold fs-12 d-inline-flex align-items-center gap-1.5 px-3 py-1.5 rounded-pill">
+                        <i class="feather-settings fs-13" style="font-style: normal; line-height: 1;"></i> <span>Manage Broadcasts</span> <i class="feather-arrow-right fs-12" style="font-style: normal; line-height: 1;"></i>
+                    </a>
+                @endif
+                <button class="btn btn-sm btn-light border border-secondary border-opacity-20 rounded-pill px-2 py-1.5 d-inline-flex align-items-center justify-content-center shadow-2xs" type="button" data-bs-toggle="collapse" data-bs-target="#broadcastsCollapseBody" aria-expanded="true" aria-controls="broadcastsCollapseBody" id="broadcastsCollapseToggle" title="Toggle announcements" style="width: 32px; height: 32px;">
+                    <svg id="broadcastsCollapseIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.25s ease;">
+                        <polyline points="18 15 12 9 6 15"></polyline>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="collapse show" id="broadcastsCollapseBody">
+            <div class="card-body p-4 bg-white">
+                <div class="d-flex flex-column gap-4">
+                    @foreach($latestBroadcasts as $broadcast)
+                        @php
+                            $badgeVariant = match($broadcast->priority) {
+                                'urgent' => 'danger',
+                                'important' => 'warning',
+                                default => 'info'
+                            };
+                            $empReceipt = $currentEmployee ? $broadcast->receipts->where('employee_id', $currentEmployee->id)->first() : null;
+                            $isAcknowledged = $empReceipt && $empReceipt->acknowledged_at;
+                        @endphp
+
+                        <!-- Broadcast Item Card Container with Distinct Dividers/Borders -->
+                        <div class="card border rounded-3 shadow-2xs overflow-hidden bg-white mb-0" style="border-color: #e2e8f0 !important;">
+                            <div class="card-body p-4">
+                                <div class="row g-3 align-items-start">
+                                    
+                                    @if($broadcast->banner_image_path)
+                                        <div class="col-md-3 col-lg-2">
+                                            <div class="rounded-3 overflow-hidden border border-secondary border-opacity-20 shadow-2xs position-relative" style="height: 115px; background: #0f172a;">
+                                                <img src="{{ asset('storage/' . $broadcast->banner_image_path) }}" class="w-100 h-100" style="object-fit: cover; object-position: center;" alt="{{ $broadcast->title }}" />
+                                            </div>
+                                        </div>
+                                        <div class="col-md-9 col-lg-10">
+                                    @else
+                                        <div class="col-12">
+                                    @endif
+
+                                            <!-- Top Header & Action Row -->
+                                            <div class="d-flex align-items-center justify-content-between gap-2 mb-2 flex-wrap">
+                                                <!-- Left: Priority Badge & Relative Time -->
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <span class="badge bg-soft-{{ $badgeVariant }} text-{{ $badgeVariant }} text-uppercase fs-10 fw-bolder px-2.5 py-1 rounded-pill border border-{{ $badgeVariant }} border-opacity-20 d-inline-flex align-items-center gap-1">
+                                                        @if($broadcast->priority === 'urgent')
+                                                            <i class="feather-alert-octagon fs-10" style="font-style: normal;"></i>
+                                                        @elseif($broadcast->priority === 'important')
+                                                            <i class="feather-alert-triangle fs-10" style="font-style: normal;"></i>
+                                                        @else
+                                                            <i class="feather-info fs-10" style="font-style: normal;"></i>
+                                                        @endif
+                                                        <span>{{ $broadcast->priority }} Priority</span>
+                                                    </span>
+
+                                                    <div class="text-muted fs-11 fw-medium d-inline-flex align-items-center gap-1 ms-1">
+                                                        <i class="feather-clock text-muted fs-11" style="font-style: normal;"></i>
+                                                        <span>{{ $broadcast->published_at ? $broadcast->published_at->diffForHumans() : 'Recently' }}</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Right: Action Buttons Grouped (Download, Acknowledge, Discussion) -->
+                                                <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+                                                    @if($broadcast->attachment_path)
+                                                        <a href="{{ asset('storage/' . $broadcast->attachment_path) }}" target="_blank" class="btn btn-sm btn-light border border-secondary border-opacity-20 text-dark fw-bold fs-11 py-1.5 px-3 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5" title="Download Attached Document">
+                                                            <i class="feather-file-text text-primary fs-12" style="font-style: normal; line-height: 1;"></i> <span>Download Document</span>
+                                                        </a>
+                                                    @endif
+
+                                                    @if($broadcast->is_acknowledgement_required)
+                                                        @if($isAcknowledged)
+                                                            <span class="badge bg-soft-success text-success fw-bold fs-11 px-3 py-1.5 rounded-pill d-inline-flex align-items-center gap-1.5 border border-success border-opacity-20">
+                                                                <i class="feather-check-circle fs-12" style="font-style: normal; line-height: 1;"></i> <span>Compliance Acknowledged</span>
+                                                            </span>
+                                                        @else
+                                                            <form action="{{ route('hrms.broadcasts.acknowledge', $broadcast->id) }}" method="POST" class="d-inline m-0">
+                                                                @csrf
+                                                                <button type="submit" class="btn btn-sm btn-success fw-bold fs-11 px-3.5 py-1.5 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5">
+                                                                    <i class="feather-check-circle fs-12" style="font-style: normal; line-height: 1;"></i> <span>I Acknowledge</span>
+                                                                </button>
+                                                            </form>
+                                                        @endif
+                                                    @endif
+
+                                                    @if($broadcast->allow_comments)
+                                                        <button type="button" class="btn btn-sm btn-soft-primary fw-bold fs-11 px-3.5 py-1.5 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5 border border-primary border-opacity-15" data-bs-toggle="modal" data-bs-target="#employeeBroadcastModal{{ $broadcast->id }}">
+                                                            <i class="feather-message-square fs-12 text-primary" style="font-style: normal; line-height: 1;"></i> <span>Comments & Discussion ({{ $broadcast->comments->count() }})</span>
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </div>
+
+                                            <!-- Broadcast Title -->
+                                            <h5 class="fw-bold text-dark fs-16 mb-0" style="line-height: 1.3;">
+                                                {{ $broadcast->title }}
+                                            </h5>
+
+                                            <!-- Complete Content Body -->
+                                            <div class="text-secondary fs-13 mb-0 mt-1" style="line-height: 1.5; color: #334155 !important; white-space: pre-line;">
+                                                {{ strip_tags($broadcast->content) }}
+                                            </div>
+
+                                        </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+            @if(isset($totalBroadcastsCount) && $totalBroadcastsCount > 3)
+                <div class="card-footer bg-light py-2.5 px-4 border-top d-flex align-items-center justify-content-between">
+                    <span class="fs-12 text-muted">Showing 3 of {{ $totalBroadcastsCount }} announcements &mdash; sorted by priority</span>
+                    <button type="button" class="btn btn-sm btn-soft-primary fw-bold fs-12 d-inline-flex align-items-center gap-1.5 px-3 py-1.5 rounded-pill" disabled title="Coming soon">
+                        <i class="feather-list fs-12" style="font-style: normal; line-height: 1;"></i>
+                        <span>View All ({{ $totalBroadcastsCount }})</span>
+                    </button>
+                </div>
+            @endif
+            </div>{{-- end collapse --}}
+        </div>
+
+        <!-- EMPLOYEE COMMENTS & DISCUSSION MODALS ONLY -->
+        @foreach($latestBroadcasts as $broadcast)
+            @if($broadcast->allow_comments)
+                @php
+                    $badgeVariant = match($broadcast->priority) {
+                        'urgent' => 'danger',
+                        'important' => 'warning',
+                        default => 'info'
+                    };
+                @endphp
+                <div class="modal fade" id="employeeBroadcastModal{{ $broadcast->id }}" tabindex="-1" aria-labelledby="employeeBroadcastModalLabel{{ $broadcast->id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
+                            <div class="modal-header bg-white border-bottom py-3 px-4" style="border-top-left-radius: 14px; border-top-right-radius: 14px;">
+                                <div class="d-flex align-items-center gap-2.5">
+                                    <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle shadow-2xs" style="width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;">
+                                        <i class="feather-message-square fs-16"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="modal-title fw-bold text-dark fs-15 mb-0">Comments & Discussion Thread</h6>
+                                        <span class="fs-11 text-muted">Q&A discussion for <strong class="text-dark">{{ $broadcast->title }}</strong></span>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-4 text-dark bg-white">
+                                <!-- Comment Post Form -->
+                                <form action="{{ route('hrms.broadcasts.comment.store', $broadcast->id) }}" method="POST" class="mb-4">
+                                    @csrf
+                                    <div class="mb-3">
+                                        <label class="form-label fs-12 fw-bold text-dark mb-1">Add to Discussion</label>
+                                        <textarea name="comment_text" rows="3" class="form-control fs-12 p-3 text-dark rounded-3" placeholder="Write a comment, query or reply regarding this announcement..." required style="border: 1px solid #cbd5e1; resize: vertical;"></textarea>
+                                    </div>
+                                    <div class="d-flex justify-content-end">
+                                        <button type="submit" class="btn btn-sm btn-primary fw-bold px-4 py-2 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5" style="background-color: #1c3faa; border-color: #1c3faa;">
+                                            <i class="feather-send fs-12 me-1"></i> <span>Post Comment</span>
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <!-- Discussion Feed -->
+                                <div class="d-flex flex-column gap-2.5" style="max-height: 320px; overflow-y: auto;">
+                                    @forelse($broadcast->comments->where('parent_id', null) as $comm)
+                                        <div class="p-3 rounded-3 border bg-light bg-opacity-60 fs-12">
+                                            <div class="d-flex justify-content-between align-items-center mb-1.5">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="avatar-text avatar-xs bg-primary text-white rounded-circle fw-bold fs-10" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background-color: #1c3faa !important;">
+                                                        {{ strtoupper(substr($comm->employee->full_name ?? ($comm->user->name ?? 'U'), 0, 1)) }}
+                                                    </div>
+                                                    <strong class="fw-bold text-dark fs-12">{{ $comm->employee->full_name ?? ($comm->user->name ?? 'Employee') }}</strong>
+                                                </div>
+                                                <span class="text-muted fs-11"><i class="feather-clock me-1 text-muted"></i>{{ $comm->created_at->diffForHumans() }}</span>
+                                            </div>
+                                            <div class="text-secondary fs-12 ps-4" style="line-height: 1.55; color: #334155 !important;">
+                                                {{ $comm->comment_text }}
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="text-muted fs-12 text-center py-4 bg-light rounded-3 border border-dashed">
+                                            <i class="feather-message-square text-muted fs-24 d-block mb-1.5 opacity-50"></i>
+                                            <span>No comments posted yet. Be the first to start the discussion!</span>
+                                        </div>
+                                    @endforelse
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light py-2.5 px-4 border-top d-flex justify-content-end align-items-center" style="border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;">
+                                <button type="button" class="btn btn-sm btn-light border border-secondary border-opacity-30 text-dark fw-bold px-4 py-1.5 rounded-pill fs-12" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        @endforeach
+    @endif
 
     <!-- 2. Row of 4 Hero KPI Cards using Standard Design Tokens -->
     <div class="row g-3 mb-3">
@@ -1764,5 +1986,26 @@
         if (prevBtn) prevBtn.disabled = (newPage === 1);
         if (nextBtn) nextBtn.disabled = (newPage === maxPages);
     }
+
+    // Auto-append modals to document.body on show to resolve theme stacking context blur
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.modal').forEach(function (modalEl) {
+            modalEl.addEventListener('show.bs.modal', function () {
+                document.body.appendChild(modalEl);
+            });
+        });
+
+        // Broadcasts collapse arrow rotation
+        const broadcastCollapse = document.getElementById('broadcastsCollapseBody');
+        const broadcastIcon = document.getElementById('broadcastsCollapseIcon');
+        if (broadcastCollapse && broadcastIcon) {
+            broadcastCollapse.addEventListener('show.bs.collapse', function () {
+                broadcastIcon.style.transform = 'rotate(0deg)';
+            });
+            broadcastCollapse.addEventListener('hide.bs.collapse', function () {
+                broadcastIcon.style.transform = 'rotate(180deg)';
+            });
+        }
+    });
 </script>
 @endpush

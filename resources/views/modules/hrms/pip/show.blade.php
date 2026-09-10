@@ -99,87 +99,198 @@
             </div>
         </div>
 
-        <!-- REASON & OBJECTIVES SECTION -->
-        <div class="row g-4 mb-4">
-            <div class="col-md-5">
-                <div class="p-3 bg-light rounded border h-100">
-                    <h6 class="fw-bold text-dark mb-2 fs-13"><i class="feather-alert-circle me-1 text-primary"></i> Reason for PIP & Core Deficiencies</h6>
+        <!-- REASON FOR PIP & CORE DEFICIENCIES (FULL-WIDTH CARD) -->
+        <div class="p-3 bg-light rounded border mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="flex-grow-1" style="min-width: 280px; max-width: 70%;">
+                    <h6 class="fw-bold text-dark mb-1 fs-13"><i class="feather-alert-circle me-1 text-primary"></i> Reason for PIP & Core Deficiencies</h6>
                     <p class="fs-13 text-secondary mb-0 style-line-height">{{ $pip->reason_details ?? '—' }}</p>
-
-                    @if($pip->final_outcome)
-                        <div class="mt-3 pt-3 border-top">
-                            <h6 class="fw-bold text-dark mb-1 fs-12 text-uppercase">Final Evaluation Outcome</h6>
-                            <span class="badge bg-primary text-white mb-2">{{ str_replace('_', ' ', strtoupper($pip->final_outcome)) }}</span>
-                            <p class="fs-12 text-muted mb-0"><em>"{{ $pip->final_comments }}"</em></p>
-                        </div>
-                    @endif
                 </div>
-            </div>
-            <div class="col-md-7">
-                <div class="p-3 bg-light rounded border h-100">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-target me-1 text-primary"></i> SMART Objectives & Deliverables</h6>
-                        @if(in_array($pip->status, ['active', 'under_review', 'extended']))
-                            <button type="button" class="btn btn-sm btn-outline-primary fs-12 fw-semibold"
-                                data-bs-toggle="modal" data-bs-target="#addObjectiveModal">
-                                <i class="feather-plus me-1"></i> Add Objective
-                            </button>
+                <div class="d-flex align-items-center gap-4 border-start ps-3 flex-wrap">
+                    <div>
+                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">PIP Category</span>
+                        <x-ui.badge soft variant="primary" class="mt-1">
+                            <i class="feather-tag me-1"></i> {{ $pip->category?->name ?? 'General Performance' }}
+                        </x-ui.badge>
+                    </div>
+                    <div>
+                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Check-in Frequency</span>
+                        <span class="fw-semibold text-dark text-capitalize mt-1 d-inline-block fs-12">
+                            <i class="feather-clock me-1 text-primary"></i> {{ $pip->checkin_frequency }}
+                        </span>
+                    </div>
+                    <div>
+                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Next Check-in Due</span>
+                        @if($pip->is_checkin_overdue)
+                            <x-ui.badge soft variant="danger" class="mt-1 fs-12">
+                                <i class="feather-alert-triangle me-1"></i> Overdue ({{ $pip->next_checkin_due_date?->format('M d') }})
+                            </x-ui.badge>
+                        @elseif($pip->next_checkin_due_date)
+                            <span class="fw-semibold text-dark mt-1 d-inline-block fs-12">
+                                <i class="feather-calendar me-1 text-primary"></i> {{ $pip->next_checkin_due_date->format('M d, Y') }}
+                            </span>
+                        @else
+                            <span class="text-muted fs-12 mt-1 d-inline-block">—</span>
                         @endif
                     </div>
-
-                    <div class="table-responsive bg-white rounded border">
-                        <table class="table table-hover align-middle mb-0 fs-12">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-3 py-2 text-muted text-uppercase fs-10">Objective Title</th>
-                                    <th class="py-2 text-muted text-uppercase fs-10">Benchmark</th>
-                                    <th class="py-2 text-muted text-uppercase fs-10">Status</th>
-                                    <th class="text-end pe-3 py-2 text-muted text-uppercase fs-10">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($pip->objectives as $obj)
-                                    <tr>
-                                        <td class="ps-3 fw-semibold text-dark">{{ $obj->title }}</td>
-                                        <td class="text-muted">{{ $obj->target_criteria ?? '—' }}</td>
-                                        <td>
-                                            @php
-                                                $objBadge = match($obj->status) {
-                                                    'achieved'           => 'success',
-                                                    'partially_achieved' => 'warning',
-                                                    'not_achieved'       => 'danger',
-                                                    'in_progress'        => 'primary',
-                                                    default              => 'secondary'
-                                                };
-                                            @endphp
-                                            <x-ui.badge soft variant="{{ $objBadge }}" class="text-capitalize fs-10">
-                                                {{ str_replace('_', ' ', $obj->status) }}
-                                            </x-ui.badge>
-                                        </td>
-                                        <td class="text-end pe-3">
-                                            @if(in_array($pip->status, ['active', 'under_review', 'extended']))
-                                                <form action="{{ route('hrms.pip.objective.status', [$pip->id, $obj->id]) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <select name="status" class="form-select form-select-xs border d-inline-block w-auto fs-11" onchange="this.form.submit()">
-                                                        <option value="pending"            @selected($obj->status === 'pending')>Pending</option>
-                                                        <option value="in_progress"        @selected($obj->status === 'in_progress')>In Progress</option>
-                                                        <option value="achieved"           @selected($obj->status === 'achieved')>Achieved</option>
-                                                        <option value="partially_achieved" @selected($obj->status === 'partially_achieved')>Partial</option>
-                                                        <option value="not_achieved"       @selected($obj->status === 'not_achieved')>Not Achieved</option>
-                                                    </select>
-                                                </form>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="4" class="text-center py-3 text-muted fs-12">No specific SMART objectives logged yet.</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
+            </div>
+
+            @if($pip->final_outcome)
+                <div class="mt-3 pt-3 border-top">
+                    <h6 class="fw-bold text-dark mb-1 fs-11 text-uppercase">Final Evaluation Outcome</h6>
+                    <x-ui.badge variant="primary" class="mb-1">{{ str_replace('_', ' ', strtoupper($pip->final_outcome)) }}</x-ui.badge>
+                    <p class="fs-12 text-muted mb-0"><em>"{{ $pip->final_comments }}"</em></p>
+                </div>
+            @endif
+        </div>
+
+        <!-- SMART OBJECTIVES & DELIVERABLES (FULL-WIDTH CARD) -->
+        <div class="p-3 bg-light rounded border mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-target me-1 text-primary"></i> SMART Objectives & Deliverables</h6>
+                @if(in_array($pip->status, ['active', 'under_review', 'extended']))
+                    <x-ui.button variant="outline-primary" icon="feather-plus" size="sm" data-bs-toggle="modal" data-bs-target="#addObjectiveModal" class="fw-semibold">
+                        Add Objective
+                    </x-ui.button>
+                @endif
+            </div>
+
+            <div class="table-responsive bg-white rounded border">
+                <table class="table table-hover align-top mb-0 fs-12">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-3 py-2 text-muted text-uppercase fs-10" style="width: 28%;">Objective & Expectation</th>
+                            <th class="py-2 text-muted text-uppercase fs-10" style="width: 17%;">Benchmark / Criteria</th>
+                            <th class="py-2 text-muted text-uppercase fs-10" style="width: 25%;">Support Provided by Company</th>
+                            <th class="py-2 text-muted text-uppercase fs-10" style="width: 12%;">Status</th>
+                            <th class="text-end pe-3 py-2 text-muted text-uppercase fs-10" style="width: 18%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($pip->objectives as $obj)
+                            <tr>
+                                <td class="ps-3 py-2.5">
+                                    <div class="fw-bold text-dark fs-12 text-break">{{ $obj->title }}</div>
+                                    @if($obj->description)
+                                        <div class="d-flex align-items-start gap-1.5 text-muted fs-11 mt-1">
+                                            <i class="feather-align-left text-muted flex-shrink-0 mt-0.5"></i>
+                                            <span class="text-break" style="word-break: break-word;">{{ $obj->description }}</span>
+                                        </div>
+                                    @endif
+                                </td>
+                                <td class="py-2.5 text-dark fs-12 fw-medium text-break" style="word-break: break-word;">
+                                    {{ $obj->target_criteria ?? '—' }}
+                                </td>
+                                <td class="py-2.5">
+                                    @if($obj->support_provided)
+                                        <div class="d-flex align-items-start gap-2 text-dark fs-12">
+                                            <i class="feather-life-buoy text-primary flex-shrink-0 mt-0.5"></i>
+                                            <span class="text-break" style="word-break: break-word;">{{ $obj->support_provided }}</span>
+                                        </div>
+                                    @else
+                                        <span class="text-muted fs-12">—</span>
+                                    @endif
+                                </td>
+                                <td class="py-2.5">
+                                    @php
+                                        $objBadge = match($obj->status) {
+                                            'achieved'           => 'success',
+                                            'partially_achieved' => 'warning',
+                                            'not_achieved'       => 'danger',
+                                            'in_progress'        => 'primary',
+                                            default              => 'secondary'
+                                        };
+                                    @endphp
+                                    <x-ui.badge soft variant="{{ $objBadge }}" class="text-capitalize fs-10">
+                                        {{ str_replace('_', ' ', $obj->status) }}
+                                    </x-ui.badge>
+                                </td>
+                                <td class="text-end pe-3 py-2.5">
+                                    @if(in_array($pip->status, ['active', 'under_review', 'extended']))
+                                        <div class="d-inline-flex align-items-center gap-3">
+                                            <form action="{{ route('hrms.pip.objective.status', [$pip->id, $obj->id]) }}" method="POST" class="d-inline me-1">
+                                                @csrf
+                                                <select name="status" class="form-select form-select-sm border rounded px-2.5 py-1 fs-12 fw-semibold text-dark bg-white shadow-none d-inline-block w-auto" onchange="this.form.submit()" style="cursor: pointer; min-width: 120px;">
+                                                    <option value="pending"            @selected($obj->status === 'pending')>Pending</option>
+                                                    <option value="in_progress"        @selected($obj->status === 'in_progress')>In Progress</option>
+                                                    <option value="achieved"           @selected($obj->status === 'achieved')>Achieved</option>
+                                                    <option value="partially_achieved" @selected($obj->status === 'partially_achieved')>Partially Achieved</option>
+                                                    <option value="not_achieved"       @selected($obj->status === 'not_achieved')>Not Achieved</option>
+                                                </select>
+                                            </form>
+                                            <x-ui.action-dropdown id="objActions{{ $obj->id }}">
+                                                <li>
+                                                    <a class="dropdown-item" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#editObjectiveModal_{{ $obj->id }}">
+                                                        <i class="feather-edit-2 me-2 text-primary"></i>Edit Objective Details
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete this SMART Objective? This action cannot be undone.', function() { document.getElementById('deleteObjForm{{ $obj->id }}').submit(); }, { title: 'Delete SMART Objective', confirmText: 'Yes, Delete', variant: 'danger' });">
+                                                        <i class="feather-trash-2 me-2"></i>Delete Objective
+                                                    </a>
+                                                </li>
+                                            </x-ui.action-dropdown>
+                                            <form id="deleteObjForm{{ $obj->id }}" action="{{ route('hrms.pip.objective.destroy', [$pip->id, $obj->id]) }}" method="POST" class="d-none">
+                                                @csrf
+                                                @method('DELETE')
+                                            </form>
+                                        </div>
+                                    @else
+                                        <span class="text-muted fs-12">—</span>
+                                    @endif
+
+                                    <!-- EDIT OBJECTIVE MODAL -->
+                                    <div class="modal fade text-start" id="editObjectiveModal_{{ $obj->id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content border-0 shadow">
+                                                <div class="modal-header border-bottom py-3">
+                                                    <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-edit me-1.5 text-primary"></i> Edit SMART Objective</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <form action="{{ route('hrms.pip.objective.update', [$pip->id, $obj->id]) }}" method="POST">
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <div class="modal-body p-4 text-start">
+                                                        <div class="mb-3">
+                                                            <x-ui.odoo-form-ui type="input" label="Objective Title" name="title" value="{{ $obj->title }}" :required="true" />
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="2" value="{{ $obj->description }}" />
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <x-ui.odoo-form-ui type="input" label="Success Benchmark / Target Criteria" name="target_criteria" value="{{ $obj->target_criteria }}" />
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <x-ui.odoo-form-ui type="textarea" label="Support Provided by Company" name="support_provided" rows="2" value="{{ $obj->support_provided }}" />
+                                                        </div>
+                                                        <div class="mb-0">
+                                                            <x-ui.odoo-form-ui type="select" label="Objective Status" name="status" :required="true">
+                                                                <option value="pending" @selected($obj->status === 'pending')>Pending</option>
+                                                                <option value="in_progress" @selected($obj->status === 'in_progress')>In Progress</option>
+                                                                <option value="achieved" @selected($obj->status === 'achieved')>Achieved</option>
+                                                                <option value="partially_achieved" @selected($obj->status === 'partially_achieved')>Partially Achieved</option>
+                                                                <option value="not_achieved" @selected($obj->status === 'not_achieved')>Not Achieved</option>
+                                                            </x-ui.odoo-form-ui>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-top bg-light py-2.5">
+                                                        <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                                                        <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Update Objective</x-ui.button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="text-center py-3 text-muted fs-12">No specific SMART objectives logged yet.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -195,6 +306,7 @@
                             <th class="py-3 text-muted text-uppercase fs-11">Reviewer</th>
                             <th class="py-3 text-muted text-uppercase fs-11">Status / Rating</th>
                             <th class="py-3 text-muted text-uppercase fs-11">Feedback & Discussion Notes</th>
+                            <th class="text-end pe-3 py-3 text-muted text-uppercase fs-11">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -221,10 +333,68 @@
                                 <td class="text-secondary">
                                     {{ $checkin->manager_comments }}
                                 </td>
+                                <td class="text-end pe-3">
+                                    @if(in_array($pip->status, ['active', 'under_review', 'extended']))
+                                        <x-ui.action-dropdown id="chkActions{{ $checkin->id }}">
+                                            <li>
+                                                <a class="dropdown-item" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#editCheckinModal_{{ $checkin->id }}">
+                                                    <i class="feather-edit-2 me-2 text-primary"></i>Edit Check-in
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete this Milestone Check-in record? This action cannot be undone.', function() { document.getElementById('deleteCheckinForm{{ $checkin->id }}').submit(); }, { title: 'Delete Milestone Check-in', confirmText: 'Yes, Delete', variant: 'danger' });">
+                                                    <i class="feather-trash-2 me-2"></i>Delete Check-in Log
+                                                </a>
+                                            </li>
+                                        </x-ui.action-dropdown>
+                                        <form id="deleteCheckinForm{{ $checkin->id }}" action="{{ route('hrms.pip.checkin.destroy', [$pip->id, $checkin->id]) }}" method="POST" class="d-none">
+                                            @csrf
+                                            @method('DELETE')
+                                        </form>
+                                    @else
+                                        <span class="text-muted fs-12">—</span>
+                                    @endif
+
+                                    <!-- EDIT CHECKIN MODAL -->
+                                    <div class="modal fade text-start" id="editCheckinModal_{{ $checkin->id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content border-0 shadow">
+                                                <div class="modal-header border-bottom py-3">
+                                                    <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-edit me-1.5 text-primary"></i> Edit Milestone Check-in</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <form action="{{ route('hrms.pip.checkin.update', [$pip->id, $checkin->id]) }}" method="POST">
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <div class="modal-body p-4 text-start">
+                                                        <div class="mb-3">
+                                                            <x-ui.odoo-form-ui type="input" inputType="date" label="Check-in Date" name="checkin_date" value="{{ $checkin->review_date?->format('Y-m-d') }}" :required="true" />
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <x-ui.odoo-form-ui type="select" label="Progress Rating" name="rating_status" :required="true">
+                                                                <option value="on_track" @selected($checkin->rating_status === 'on_track')>On Track</option>
+                                                                <option value="off_track" @selected($checkin->rating_status === 'off_track')>Off Track</option>
+                                                                <option value="at_risk" @selected($checkin->rating_status === 'at_risk')>At Risk</option>
+                                                                <option value="exceeding" @selected($checkin->rating_status === 'exceeding')>Exceeding Expectations</option>
+                                                            </x-ui.odoo-form-ui>
+                                                        </div>
+                                                        <div class="mb-0">
+                                                            <x-ui.odoo-form-ui type="textarea" label="Manager Notes & Feedback" name="manager_comments" rows="4" value="{{ $checkin->manager_comments }}" :required="true" />
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-top bg-light py-2.5">
+                                                        <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                                                        <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Update Check-in</x-ui.button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="text-center py-4 text-muted fs-12">
+                                <td colspan="5" class="text-center py-4 text-muted fs-12">
                                     No milestone check-ins recorded yet.
                                 </td>
                             </tr>
@@ -264,8 +434,8 @@
                     </div>
                 </div>
                 <div class="modal-footer border-top bg-light py-2.5">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Save Check-in</button>
+                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Save Check-in</x-ui.button>
                 </div>
             </form>
         </div>
@@ -300,8 +470,8 @@
                     </div>
                 </div>
                 <div class="modal-footer border-top bg-light py-2.5">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark px-4">Submit Final Evaluation</button>
+                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="submit" variant="warning" size="sm" class="fw-bold text-dark px-4">Submit Final Evaluation</x-ui.button>
                 </div>
             </form>
         </div>
@@ -333,13 +503,15 @@
                     </div>
                 </div>
                 <div class="modal-footer border-top bg-light py-2.5">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Add Objective</button>
+                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Add Objective</x-ui.button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<x-ui.confirmation-modal />
 
 @push('scripts')
 <script>

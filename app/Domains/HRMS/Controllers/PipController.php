@@ -28,7 +28,7 @@ class PipController extends Controller
     public function index(Request $request): View
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
-        $activeTab = $request->input('active_tab', 'plans');
+        $activeTab = $request->input('active_tab', $request->input('tab', 'plans'));
         $search = $request->input('search');
         $status = $request->input('status');
         $departmentId = $request->input('department_id');
@@ -82,8 +82,12 @@ class PipController extends Controller
         $terminatedCount = (clone $baseStats)->where('status', 'failed_terminated')->count();
 
         // Masters & Select Data
-        $categories = PipCategory::where('tenant_id', $tenantId)->get();
-        $policyTemplates = PipPolicyTemplate::where('tenant_id', $tenantId)->get();
+        $categoriesList = PipCategory::where('tenant_id', $tenantId)->get();
+        $policyTemplatesList = PipPolicyTemplate::where('tenant_id', $tenantId)->get();
+
+        $categories = PipCategory::where('tenant_id', $tenantId)->latest('id')->paginate(10, ['*'], 'categories_page')->appends($request->all());
+        $policyTemplates = PipPolicyTemplate::where('tenant_id', $tenantId)->latest('id')->paginate(10, ['*'], 'templates_page')->appends($request->all());
+
         $employees = Employee::where('tenant_id', $tenantId)->orderBy('full_name')->get();
         $departments = Department::where('tenant_id', $tenantId)->get();
 
@@ -96,7 +100,9 @@ class PipController extends Controller
             'completedCount',
             'terminatedCount',
             'categories',
+            'categoriesList',
             'policyTemplates',
+            'policyTemplatesList',
             'employees',
             'departments'
         ));
@@ -150,6 +156,37 @@ class PipController extends Controller
     }
 
     /**
+     * Update main PIP plan metadata.
+     */
+    public function update(Request $request, PerformanceImprovementPlan $pip): RedirectResponse
+    {
+        $validated = $request->validate([
+            'pip_category_id'   => 'nullable|exists:pip_categories,id',
+            'reason_details'    => 'required|string',
+            'start_date'        => 'required|date',
+            'end_date'          => 'required|date|after_or_equal:start_date',
+            'checkin_frequency' => 'required|in:weekly,biweekly,monthly',
+            'status'            => 'required|string',
+        ]);
+
+        $pip->update($validated);
+
+        return redirect()->back()->with('success', 'PIP plan details updated successfully.');
+    }
+
+    /**
+     * Delete PIP plan and associated records.
+     */
+    public function destroy(PerformanceImprovementPlan $pip): RedirectResponse
+    {
+        $pip->objectives()->delete();
+        $pip->checkins()->delete();
+        $pip->delete();
+
+        return redirect()->route('hrms.pip.index')->with('success', 'PIP plan deleted successfully.');
+    }
+
+    /**
      * Add SMART Objective goal.
      */
     public function storeObjective(Request $request, PerformanceImprovementPlan $pip): RedirectResponse
@@ -187,6 +224,36 @@ class PipController extends Controller
     }
 
     /**
+     * Update SMART Objective full details.
+     */
+    public function updateObjective(Request $request, PerformanceImprovementPlan $pip, PipObjective $objective): RedirectResponse
+    {
+        $validated = $request->validate([
+            'title'            => 'required|string|max:255',
+            'description'      => 'nullable|string',
+            'target_criteria'  => 'nullable|string',
+            'support_provided' => 'nullable|string',
+            'status'           => 'required|in:pending,in_progress,achieved,partially_achieved,not_achieved',
+        ]);
+
+        $objective->update($validated);
+
+        return redirect()->route('hrms.pip.show', $pip->id)
+            ->with('success', 'SMART Objective updated successfully.');
+    }
+
+    /**
+     * Delete SMART Objective.
+     */
+    public function destroyObjective(PerformanceImprovementPlan $pip, PipObjective $objective): RedirectResponse
+    {
+        $objective->delete();
+
+        return redirect()->route('hrms.pip.show', $pip->id)
+            ->with('success', 'SMART Objective removed successfully.');
+    }
+
+    /**
      * Store 1-on-1 Milestone Check-in.
      */
     public function storeCheckin(Request $request, PerformanceImprovementPlan $pip): RedirectResponse
@@ -210,6 +277,38 @@ class PipController extends Controller
 
         return redirect()->route('hrms.pip.show', $pip->id)
             ->with('success', 'Milestone check-in recorded successfully.');
+    }
+
+    /**
+     * Update 1-on-1 Milestone Check-in.
+     */
+    public function updateCheckin(Request $request, PerformanceImprovementPlan $pip, PipCheckin $checkin): RedirectResponse
+    {
+        $validated = $request->validate([
+            'checkin_date'    => 'required|date',
+            'rating_status'   => 'required|in:on_track,off_track,at_risk,exceeding',
+            'manager_comments'=> 'required|string',
+        ]);
+
+        $checkin->update([
+            'review_date'      => $validated['checkin_date'],
+            'rating_status'    => $validated['rating_status'],
+            'manager_comments' => $validated['manager_comments'],
+        ]);
+
+        return redirect()->route('hrms.pip.show', $pip->id)
+            ->with('success', 'Milestone check-in updated successfully.');
+    }
+
+    /**
+     * Delete 1-on-1 Milestone Check-in.
+     */
+    public function destroyCheckin(PerformanceImprovementPlan $pip, PipCheckin $checkin): RedirectResponse
+    {
+        $checkin->delete();
+
+        return redirect()->route('hrms.pip.show', $pip->id)
+            ->with('success', 'Milestone check-in log deleted successfully.');
     }
 
     /**

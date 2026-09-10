@@ -27,6 +27,7 @@ use App\Domains\HRMS\Controllers\ExitClearancePolicyController;
 use App\Domains\HRMS\Controllers\OrgStructureController;
 use App\Domains\HRMS\Controllers\HrmsDashboardController;
 use App\Domains\HRMS\Controllers\PipController;
+use App\Domains\HRMS\Controllers\BroadcastController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -458,9 +459,17 @@ Route::prefix('hrms')
             Route::get('/', [PipController::class, 'index'])->name('index');
             Route::post('/store', [PipController::class, 'store'])->name('store');
             Route::get('/{pip}', [PipController::class, 'show'])->name('show');
+            Route::put('/{pip}', [PipController::class, 'update'])->name('update');
+            Route::delete('/{pip}', [PipController::class, 'destroy'])->name('destroy');
             Route::post('/{pip}/checkin/store', [PipController::class, 'storeCheckin'])->name('checkin.store');
+            Route::put('/{pip}/checkin/{checkin}', [PipController::class, 'updateCheckin'])->name('checkin.update');
+            Route::delete('/{pip}/checkin/{checkin}', [PipController::class, 'destroyCheckin'])->name('checkin.destroy');
+
             Route::post('/{pip}/objective/store', [PipController::class, 'storeObjective'])->name('objective.store');
             Route::post('/{pip}/objective/{objective}/status', [PipController::class, 'updateObjectiveStatus'])->name('objective.status');
+            Route::put('/{pip}/objective/{objective}', [PipController::class, 'updateObjective'])->name('objective.update');
+            Route::delete('/{pip}/objective/{objective}', [PipController::class, 'destroyObjective'])->name('objective.destroy');
+
             Route::post('/{pip}/evaluate', [PipController::class, 'evaluate'])->name('evaluate');
 
             // Masters (Categories & Templates)
@@ -468,5 +477,18 @@ Route::prefix('hrms')
             Route::delete('/category/{category}', [PipController::class, 'destroyCategory'])->name('category.destroy');
             Route::post('/template/store', [PipController::class, 'storeTemplate'])->name('template.store');
             Route::delete('/template/{template}', [PipController::class, 'destroyTemplate'])->name('template.destroy');
+        });
+
+        // Company Broadcasts & Announcements Module
+        Route::prefix('broadcasts')->name('broadcasts.')->group(function (): void {
+            Route::get('/', [BroadcastController::class, 'index'])->name('index');
+            Route::post('/', [BroadcastController::class, 'store'])->name('store');
+            Route::get('/{broadcast}', [BroadcastController::class, 'show'])->name('show');
+            Route::put('/{broadcast}', [BroadcastController::class, 'update'])->name('update');
+            Route::delete('/{broadcast}', [BroadcastController::class, 'destroy'])->name('destroy');
+            Route::post('/{broadcast}/acknowledge', [BroadcastController::class, 'acknowledge'])->name('acknowledge');
+            Route::post('/{broadcast}/comment', [BroadcastController::class, 'storeComment'])->name('comment.store');
+            Route::post('/comment/{comment}/pin', [BroadcastController::class, 'togglePinComment'])->name('comment.pin');
+            Route::delete('/comment/{comment}', [BroadcastController::class, 'destroyComment'])->name('comment.destroy');
         });
     });
