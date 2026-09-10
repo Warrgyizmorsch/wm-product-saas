@@ -76,15 +76,7 @@
                     @can('approve', $routing)
                         <form action="{{ route('production.routing.approve', $routing->id) }}" method="POST" class="d-inline" id="approveRoutingForm">
                             @csrf
-                            <x-ui.button type="button" variant="success" icon="feather-check-circle" class="px-3" onclick="confirmAction({
-                                title: 'Approve & Activate Routing',
-                                message: @js(__('production.confirm_approve_routing')),
-                                confirmText: 'Approve & Activate',
-                                variant: 'success',
-                                onConfirm: function() {
-                                    document.getElementById('approveRoutingForm').submit();
-                                }
-                            })">
+                            <x-ui.button type="button" variant="success" icon="feather-check-circle" class="px-3" onclick="confirmApproveRouting()">
                                 {{ __('production.approve_activate') }}
                             </x-ui.button>
                         </form>
@@ -422,4 +414,20 @@
     </x-ui.modal>
 
     <x-ui.confirmation-modal />
+
+    @push('scripts')
+        <script>
+            function confirmApproveRouting() {
+                confirmAction({
+                    title: 'Approve & Activate Routing',
+                    message: @js(__('production.confirm_approve_routing')),
+                    confirmText: 'Approve & Activate',
+                    variant: 'success',
+                    onConfirm: function() {
+                        document.getElementById('approveRoutingForm').submit();
+                    }
+                });
+            }
+        </script>
+    @endpush
 @endsection
