@@ -1200,7 +1200,7 @@
                                 </div>
                             </div>
 
-                        @elseif ((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation)
+                        @elseif ((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation && $activeQuotation->status !== 'Accepted')
                             <!-- EDIT QUOTATION INLINE FORM -->
                             <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
                                 <div class="card-body p-4">
@@ -1320,7 +1320,9 @@
                                         <div class="d-flex flex-wrap gap-2">
                                             <a href="{{ route('crm.quotations.download', $activeQuotation->id) }}" class="btn btn-xs btn-primary"><i class="feather-printer me-1"></i>Print / Download</a>
                                             <a href="{{ route('crm.quotations.show', $activeQuotation->id) }}" class="btn btn-xs btn-light border"><i class="feather-eye me-1"></i>View Full Quote</a>
-                                            <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'edit_quotation' => 1, 'quotation_id' => $activeQuotation->id]) }}" class="btn btn-xs btn-warning text-dark fw-bold"><i class="feather-edit-2 me-1"></i>Edit Quotation</a>
+                                            @if ($activeQuotation->status !== 'Accepted')
+                                                <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'edit_quotation' => 1, 'quotation_id' => $activeQuotation->id]) }}" class="btn btn-xs btn-warning text-dark fw-bold"><i class="feather-edit-2 me-1"></i>Edit Quotation</a>
+                                            @endif
                                             
                                             @if ($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework')
                                                 <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">

@@ -135,8 +135,15 @@ class QuotationController extends Controller
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        if (in_array($validated['status'], ['Quotation Sent', 'Accepted', 'Approved'])) {
-            return back()->withErrors(['status' => 'A new quotation must start as Draft or Pending Approval.'])->withInput();
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+
+        if ($approvalPolicy === 'auto_approve') {
+            $validated['status'] = 'Approved';
+        } else {
+            if (in_array($validated['status'], ['Quotation Sent', 'Accepted', 'Approved'])) {
+                return back()->withErrors(['status' => 'A new quotation must start as Draft or Pending Approval.'])->withInput();
+            }
         }
 
         if ($request->filled('lead_id')) {
@@ -200,11 +207,15 @@ class QuotationController extends Controller
         return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
     }
 
-    public function edit(int $id): View
+    public function edit(int $id): View|RedirectResponse
     {
         $quotation = $this->quotationRepo->find($id);
         if (!$quotation) abort(404, 'Quotation not found.');
         $this->authorize('update', $quotation);
+
+        if ($quotation->status === 'Accepted') {
+            return redirect()->back()->with('error', 'Accepted quotations cannot be edited.');
+        }
 
         $quotation->load(['items.product', 'deal', 'account', 'lead']);
 
@@ -224,6 +235,10 @@ class QuotationController extends Controller
         $quotation = $this->quotationRepo->find($id);
         if (!$quotation) abort(404, 'Quotation not found.');
         $this->authorize('update', $quotation);
+
+        if ($quotation->status === 'Accepted') {
+            return redirect()->back()->with('error', 'Accepted quotations cannot be edited.');
+        }
 
         $validated = $request->validate([
             'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
@@ -245,8 +260,15 @@ class QuotationController extends Controller
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+
+        if ($approvalPolicy === 'auto_approve' && in_array($validated['status'], ['Draft', 'Pending Approval'])) {
+            $validated['status'] = 'Approved';
+        }
+
         $newStatus = $validated['status'];
-        if ($newStatus !== $quotation->status) {
+        if ($newStatus !== $quotation->status && $approvalPolicy !== 'auto_approve') {
             if (in_array($newStatus, ['Quotation Sent', 'Accepted']) && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Accepted'])) {
                 return back()->withErrors(['status' => 'A quotation must be Approved before it can be Sent or Accepted.'])->withInput();
             }
@@ -317,8 +339,11 @@ class QuotationController extends Controller
             'status' => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework,Converted,Won'],
         ]);
 
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+
         $newStatus = $validated['status'];
-        if ($newStatus !== $quotation->status) {
+        if ($newStatus !== $quotation->status && $approvalPolicy !== 'auto_approve') {
             if (in_array($newStatus, ['Quotation Sent', 'Sent', 'Accepted']) && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted'])) {
                 return back()->withErrors(['status' => 'A quotation must be Approved before it can be Sent or Accepted.']);
             }

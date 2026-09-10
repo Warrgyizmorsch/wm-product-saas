@@ -385,11 +385,17 @@ class LeadController extends Controller
         $request->validate(['file' => 'required|file|mimes:xlsx,xls,csv,txt']);
 
         try {
-            Excel::import(new LeadImport, $request->file('file'));
-            return redirect()->route('crm.leads.index')->with('success', 'Leads imported successfully!');
-        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
-            $errors = array_map(fn($f) => "Row {$f->row()}: " . implode(', ', $f->errors()), $e->failures());
-            return redirect()->route('crm.leads.index')->withErrors($errors);
+            $import = new LeadImport();
+            Excel::import($import, $request->file('file'));
+
+            $summary = [
+                'total'       => $import->totalCount,
+                'success'     => $import->successCount,
+                'failed'      => $import->failedCount,
+                'failed_rows' => $import->failedRows,
+            ];
+
+            return redirect()->route('crm.leads.index')->with('import_summary', $summary);
         } catch (\Exception $e) {
             return redirect()->route('crm.leads.index')->withErrors(['file' => 'Failed to import file: ' . $e->getMessage()]);
         }

@@ -204,10 +204,12 @@ class QuotationService
 
     public function handleQuotationStatusChange(Quotation $quotation, string $status, ?int $leadId = null): void
     {
+        $lead = $leadId ? Lead::find($leadId) : ($quotation->lead_id ? Lead::find($quotation->lead_id) : null);
+
         // 1. Automatic Deal Stage Transition when Quotation is Sent
         if (in_array($status, ['Quotation Sent', 'Sent'])) {
             $deal = $quotation->crm_deal_id ? CrmDeal::find($quotation->crm_deal_id) : null;
-            $leadObj = null;
+            $leadObj = $lead;
             if ($leadId) {
                 $leadObj = Lead::find($leadId);
             }
