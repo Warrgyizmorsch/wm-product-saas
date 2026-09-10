@@ -18,6 +18,20 @@ class LeadImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmptyR
      */
     public function model(array $row)
     {
+        // Infer or format lead_type (b2b or b2c)
+        $rawType = strtolower(trim((string)($row['lead_type'] ?? '')));
+        if (in_array($rawType, ['b2b', 'b2c'], true)) {
+            $leadType = $rawType;
+        } else {
+            if (!empty($row['company_name'])) {
+                $leadType = 'b2b';
+            } elseif (!empty($row['contact_person'])) {
+                $leadType = 'b2c';
+            } else {
+                $leadType = 'b2b';
+            }
+        }
+
         // Parse date robustly (handles serialized excel date format or string date format)
         $expectedSaleDate = null;
         if (!empty($row['expected_sale_date'])) {
@@ -37,18 +51,36 @@ class LeadImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmptyR
             }
         }
 
-        $ownerId = !empty($row['lead_owner_id']) ? $row['lead_owner_id'] : (!empty($row['lead_owner']) ? $row['lead_owner'] : (!empty($row['owner_id']) ? $row['owner_id'] : auth()->id()));
+        $ownerId = !empty($row['lead_owner_id'])
+            ? $row['lead_owner_id']
+            : (!empty($row['lead_owner'])
+                ? $row['lead_owner']
+                : (!empty($row['owner_id'])
+                    ? $row['owner_id']
+                    : (auth()->id() ?? 1)));
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         return new Lead([
-            'company_name' => $row['company_name'],
+            'tenant_id' => $tenantId,
+            'company_id' => company_id() ?? 1,
+            'branch_id' => branch_id() ?? null,
+            'lead_type' => $leadType,
+            'company_name' => $row['company_name'] ?? null,
+            'gstin' => $row['gstin'] ?? null,
+            'company_email' => $row['company_email'] ?? null,
+            'company_phone' => $row['company_phone'] ?? null,
             'contact_person' => $row['contact_person'] ?? null,
-            'email' => $row['email'] ?? null,
-            'phone' => $row['phone'] ?? null,
-            'expected_amount' => $row['expected_amount'] ?? null,
+            'designation' => $row['designation'] ?? null,
+            'email' => $row['contact_email'] ?? ($row['email'] ?? null),
+            'phone' => $row['contact_phone'] ?? ($row['phone'] ?? null),
+            'expected_amount' => (isset($row['expected_amount']) && is_numeric($row['expected_amount'])) ? (float)$row['expected_amount'] : null,
             'expected_sale_date' => $expectedSaleDate,
             'requirement' => $row['requirement'] ?? ($row['requirements'] ?? null),
             'industry_type' => $row['industry_type'] ?? null,
             'source' => $row['source'] ?? null,
+            'priority' => $row['priority'] ?? null,
+            'segment' => $row['segment'] ?? null,
             'country' => $row['country'] ?? null,
             'state' => $row['state'] ?? null,
             'city' => $row['city'] ?? null,
@@ -65,16 +97,25 @@ class LeadImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmptyR
     public function rules(): array
     {
         return [
-            'company_name' => 'required|max:255',
+            'lead_type' => 'nullable|string',
+            'company_name' => 'nullable|max:255',
+            'gstin' => 'nullable|max:100',
+            'company_email' => 'nullable|email|max:255',
+            'company_phone' => 'nullable|max:50',
             'contact_person' => 'nullable|max:255',
+            'designation' => 'nullable|max:255',
             'email' => 'nullable|email|max:255',
+            'contact_email' => 'nullable|email|max:255',
             'phone' => 'nullable|max:50',
+            'contact_phone' => 'nullable|max:50',
             'expected_amount' => 'nullable|numeric|min:0',
             'expected_sale_date' => 'nullable',
             'requirement' => 'nullable',
             'requirements' => 'nullable',
             'industry_type' => 'nullable|max:255',
             'source' => 'nullable|max:255',
+            'priority' => 'nullable|max:255',
+            'segment' => 'nullable|max:255',
             'country' => 'nullable|max:255',
             'state' => 'nullable|max:255',
             'city' => 'nullable|max:255',

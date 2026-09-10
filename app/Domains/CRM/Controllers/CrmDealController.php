@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Domains\CRM\Models\CrmAccount;
 use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
+use App\Domains\CRM\Models\Customer;
+use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\DealStatus;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -543,5 +545,278 @@ class CrmDealController extends Controller
         }
 
         return redirect()->back()->with('success', 'Deal requirements updated successfully!');
+    }
+
+    public function showConvertForm(CrmDeal $deal)
+    {
+        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
+        $deal->load(['account.contacts', 'contact', 'lead']);
+
+        $account = $deal->account;
+        $contact = $deal->contact;
+        $lead = $deal->lead;
+
+        $gstin = trim((string)($account?->gstin ?: ($lead?->gstin ?: '')));
+        $email = strtolower(trim((string)($account?->email ?: ($contact?->email ?: ($lead?->company_email ?: $lead?->email ?: '')))));
+        $phone = trim((string)($account?->phone ?: ($contact?->phone ?: ($lead?->company_phone ?: $lead?->phone ?: ''))));
+        $companyName = trim((string)($account?->name ?: ($lead?->company_name ?: ($lead?->contact_person ?: $deal->title))));
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+
+        $matchedCustomers = collect();
+        $matchReasons = [];
+
+        // 1. Check by GSTIN
+        if (!empty($gstin)) {
+            $byGstin = Customer::where('tenant_id', $tenantId)->where('gstin', $gstin)->get();
+            if ($byGstin->isNotEmpty()) {
+                $matchedCustomers = $matchedCustomers->merge($byGstin);
+                $matchReasons[] = "GSTIN ({$gstin})";
+            }
+        }
+
+        // 2. Check by Email
+        if (!empty($email)) {
+            $byEmail = Customer::where('tenant_id', $tenantId)->whereRaw('LOWER(email) = ?', [$email])->get();
+            if ($byEmail->isNotEmpty()) {
+                $matchedCustomers = $matchedCustomers->merge($byEmail);
+                $matchReasons[] = "Email ({$email})";
+            }
+        }
+
+        // 3. Check by Phone
+        if (!empty($phone) || (!empty($cleanPhone) && strlen($cleanPhone) >= 5)) {
+            $byPhone = Customer::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($phone, $cleanPhone) {
+                    if (!empty($phone)) $q->where('phone', 'like', "%{$phone}%");
+                    if (!empty($cleanPhone) && strlen($cleanPhone) >= 5) {
+                        $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"]);
+                    }
+                })->get();
+            if ($byPhone->isNotEmpty()) {
+                $matchedCustomers = $matchedCustomers->merge($byPhone);
+                $matchReasons[] = "Phone ({$phone})";
+            }
+        }
+
+        // 4. Check by Name
+        if (!empty($companyName) && strlen($companyName) >= 3 && !in_array($companyName, ['Client', 'New Client'], true)) {
+            $cleanComp = trim(preg_replace('/(pvt|ltd|private|limited|inc|corp|co)/i', '', $companyName));
+            if (!empty($cleanComp)) {
+                $byName = Customer::where('tenant_id', $tenantId)
+                    ->where('name', 'like', "%{$cleanComp}%")
+                    ->get();
+                if ($byName->isNotEmpty()) {
+                    $matchedCustomers = $matchedCustomers->merge($byName);
+                    $matchReasons[] = "Name ({$companyName})";
+                }
+            }
+        }
+
+        $matchedCustomers = $matchedCustomers->unique('id')->values();
+
+        // IF NO DUPLICATE MATCHED: Directly convert Deal to Customer!
+        if ($matchedCustomers->isEmpty()) {
+            return $this->executeDealCustomerConversion($deal, null, 'create_new');
+        }
+
+        // IF DUPLICATES EXIST: Show Zoho CRM prompt
+        $quotation = null;
+        return view('modules.crm.leads.convert', compact('deal', 'lead', 'quotation', 'matchedCustomers', 'matchReasons'));
+    }
+
+    public function processConvert(Request $request, CrmDeal $deal): RedirectResponse|View
+    {
+        $request->validate([
+            'conversion_mode'      => 'required|string|in:existing,create_new',
+            'existing_customer_id' => 'required_if:conversion_mode,existing|nullable|integer|exists:customers,id',
+        ]);
+
+        $mode = $request->input('conversion_mode');
+        $existingCustomerId = $request->input('existing_customer_id');
+
+        return $this->executeDealCustomerConversion($deal, $existingCustomerId, $mode, skipDuplicateCheck: true);
+    }
+
+    private function executeDealCustomerConversion(CrmDeal $deal, ?int $existingCustomerId, string $mode, bool $skipDuplicateCheck = false): RedirectResponse|View
+    {
+        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
+        $deal->load(['account', 'contact', 'lead']);
+        $account = $deal->account;
+
+        $leadObj = null;
+        if (!empty($deal->lead_id)) {
+            $leadObj = Lead::find($deal->lead_id);
+        }
+        if (!$leadObj) {
+            $leadObj = Lead::where('crm_deal_id', $deal->id)->first();
+        }
+
+        if ($mode === 'existing' && $existingCustomerId) {
+            $customer = Customer::find($existingCustomerId);
+
+            if ($account) {
+                $account->update([
+                    'customer_id' => $customer->id,
+                    'status'      => 'active',
+                ]);
+            } else {
+                $account = CrmAccount::create([
+                    'tenant_id'   => $tenantId,
+                    'customer_id' => $customer->id,
+                    'name'        => $customer->name,
+                    'email'       => $customer->email,
+                    'phone'       => $customer->phone,
+                    'gstin'       => $customer->gstin,
+                    'status'      => 'active',
+                    'owner_id'    => auth()->id() ?: 1,
+                ]);
+            }
+
+            $deal->update([
+                'crm_account_id' => $account->id,
+                'stage'          => 'Won',
+                'probability'    => 100,
+                'closing_date'   => now(),
+            ]);
+
+            if ($leadObj) {
+                $leadObj->update([
+                    'status'         => 'Won',
+                    'crm_account_id' => $account->id,
+                    'is_customer'    => true,
+                    'converted_at'   => now(),
+                ]);
+            }
+
+            // Sync lead contacts → account
+            $this->syncLeadContactsToAccount($account, $leadObj, $tenantId);
+
+            return redirect()->route('crm.deals.show', $deal->id)
+                ->with('success', "Deal #{$deal->deal_number} marked as Won and linked to existing customer '{$customer->name}'!");
+        } else {
+            // Mode: Create New Customer & Account
+            $compName  = $account?->name  ?: ($deal->lead?->company_name  ?: ($deal->lead?->contact_person ?: $deal->title));
+            $compEmail = $account?->email  ?: ($deal->contact?->email       ?: ($deal->lead?->company_email  ?: $deal->lead?->email));
+            $compPhone = $account?->phone  ?: ($deal->contact?->phone       ?: ($deal->lead?->company_phone  ?: $deal->lead?->phone));
+            $gstin     = $account?->gstin  ?: ($deal->lead?->gstin);
+            $companyName = $compName;
+
+            // Note: email unique constraint removed from customers table,
+            // so we can safely store the email as-is even if another customer has the same one.
+
+            // Create Customer — flag prevents boot hook from auto-creating a duplicate account
+            Customer::$skipAccountAutoCreate = true;
+            $customer = Customer::create([
+                'tenant_id' => $tenantId,
+                'name'      => $compName,
+                'email'     => $compEmail ?: null,
+                'phone'     => $compPhone,
+                'gstin'     => $gstin,
+                'status'    => 'active',
+            ]);
+            Customer::$skipAccountAutoCreate = false;
+
+            // Create exactly ONE CrmAccount linked to this new customer
+            $newAccount = CrmAccount::create([
+                'tenant_id'   => $tenantId,
+                'customer_id' => $customer->id,
+                'name'        => $compName,
+                'email'       => $compEmail ?: null,
+                'phone'       => $compPhone,
+                'gstin'       => $gstin,
+                'status'      => 'active',
+                'owner_id'    => auth()->id() ?: 1,
+            ]);
+
+            $deal->update([
+                'crm_account_id' => $newAccount->id,
+                'stage'          => 'Won',
+                'probability'    => 100,
+                'closing_date'   => now(),
+            ]);
+
+            if ($leadObj) {
+                $leadObj->update([
+                    'status'         => 'Won',
+                    'crm_account_id' => $newAccount->id,
+                    'is_customer'    => true,
+                    'converted_at'   => now(),
+                ]);
+            }
+
+            // Sync lead contacts → account
+            $this->syncLeadContactsToAccount($newAccount, $leadObj, $tenantId);
+
+            return redirect()->route('crm.deals.show', $deal->id)
+                ->with('success', "Deal #{$deal->deal_number} marked as Won and converted to new Customer & Account!");
+        }
+    }
+
+    /**
+     * Create primary contact + additional contacts from Lead data into a CrmAccount.
+     * Skips creation if a contact already exists to avoid duplicates.
+     */
+    private function syncLeadContactsToAccount(CrmAccount $account, ?Lead $lead, int $tenantId): void
+    {
+        if (!$lead) return;
+
+        // --- Primary Contact (lead's contact_person field) ---
+        $primaryName  = $lead->contact_person;
+        $primaryEmail = $lead->email;       // personal email
+        $primaryPhone = $lead->phone;       // personal phone
+        $primaryDesg  = $lead->designation;
+
+        if ($primaryName) {
+            $alreadyExists = $account->contacts()->where('is_primary', true)->exists();
+
+            if (!$alreadyExists) {
+                CrmContact::create([
+                    'tenant_id'      => $tenantId,
+                    'company_id'     => $account->company_id,
+                    'branch_id'      => $account->branch_id,
+                    'crm_account_id' => $account->id,
+                    'name'           => $primaryName,
+                    'designation'    => $primaryDesg,
+                    'email'          => $primaryEmail,
+                    'phone'          => $primaryPhone,
+                    'is_primary'     => true,
+                    'status'         => 'active',
+                ]);
+            }
+        }
+
+        // --- Additional Contacts (from lead's additional_contacts JSON array) ---
+        $additionalContacts = $lead->additional_contacts;
+        if (!empty($additionalContacts) && is_array($additionalContacts)) {
+            foreach ($additionalContacts as $extra) {
+                $extraName  = $extra['name']  ?? $extra['contact_person'] ?? null;
+                $extraEmail = $extra['email'] ?? null;
+                $extraPhone = $extra['phone'] ?? null;
+                $extraDesg  = $extra['designation'] ?? null;
+
+                if (!$extraName) continue;
+
+                // Skip if same email contact already exists in this account
+                if ($extraEmail) {
+                    $dup = $account->contacts()
+                        ->whereRaw('LOWER(email) = ?', [strtolower(trim($extraEmail))])
+                        ->exists();
+                    if ($dup) continue;
+                }
+
+                CrmContact::create([
+                    'tenant_id'      => $tenantId,
+                    'company_id'     => $account->company_id,
+                    'branch_id'      => $account->branch_id,
+                    'crm_account_id' => $account->id,
+                    'name'           => $extraName,
+                    'designation'    => $extraDesg,
+                    'email'          => $extraEmail,
+                    'phone'          => $extraPhone,
+                    'is_primary'     => false,
+                    'status'         => 'active',
+                ]);
+            }
+        }
     }
 }

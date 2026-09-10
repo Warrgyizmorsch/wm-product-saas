@@ -423,6 +423,8 @@ return [
         'lost' => 'खोई (LOST)',
         'duplicates' => 'डुप्लिकेट्स (DUPLICATES)',
     ],
+
+    'ignore_and_continue' => 'अनदेखा करें और जारी रखें',
 ];
 
 

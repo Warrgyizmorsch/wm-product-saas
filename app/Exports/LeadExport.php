@@ -14,7 +14,8 @@ class LeadExport implements FromCollection, WithHeadings, WithMapping
      */
     public function collection()
     {
-        return Lead::with(['owner'])->orderBy('id', 'desc')->get();
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+        return Lead::where('tenant_id', $tenantId)->with(['owner'])->orderBy('id', 'desc')->get();
     }
 
     /**
@@ -24,11 +25,16 @@ class LeadExport implements FromCollection, WithHeadings, WithMapping
     {
         return [
             'ID',
-            'Call Date',
+            'Lead Number',
+            'Lead Type',
             'Company Name',
+            'GSTIN',
+            'Company Email',
+            'Company Phone',
             'Contact Person',
-            'Email',
-            'Phone',
+            'Designation',
+            'Contact Email',
+            'Contact Phone',
             'Lead Owner',
             'Product',
             'Expected Amount',
@@ -55,9 +61,14 @@ class LeadExport implements FromCollection, WithHeadings, WithMapping
     {
         return [
             $lead->id,
-            $lead->call_date ? $lead->call_date->format('Y-m-d H:i') : null,
+            $lead->lead_number ?: ('LD-' . str_pad($lead->id, 4, '0', STR_PAD_LEFT)),
+            strtoupper($lead->lead_type ?: 'B2B'),
             $lead->company_name,
+            $lead->gstin,
+            $lead->company_email,
+            $lead->company_phone,
             $lead->contact_person,
+            $lead->designation,
             $lead->email,
             $lead->phone,
             $lead->owner?->name ?? 'N/A',

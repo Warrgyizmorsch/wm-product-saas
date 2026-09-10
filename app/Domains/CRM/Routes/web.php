@@ -56,6 +56,8 @@ Route::prefix('crm')
         Route::get('deals/create', [CrmDealController::class, 'create'])->name('deals.create');
         Route::post('deals', [CrmDealController::class, 'store'])->name('deals.store');
         Route::get('deals/{deal}', [CrmDealController::class, 'show'])->name('deals.show');
+        Route::get('deals/{deal}/convert-customer', [CrmDealController::class, 'showConvertForm'])->name('deals.showConvertForm');
+        Route::post('deals/{deal}/convert-customer', [CrmDealController::class, 'processConvert'])->name('deals.processConvert');
         Route::get('deals/{deal}/edit', [CrmDealController::class, 'edit'])->name('deals.edit');
         Route::put('deals/{deal}', [CrmDealController::class, 'update'])->name('deals.update');
         Route::patch('deals/{deal}/stage', [CrmDealController::class, 'updateStage'])->name('deals.updateStage');
@@ -87,6 +89,10 @@ Route::prefix('crm')
             ->name('leads.export');
         Route::post('leads/check-duplicate', [LeadController::class, 'checkDuplicate'])
             ->name('leads.checkDuplicate');
+        Route::get('leads/{lead}/convert', [LeadController::class, 'showConvertForm'])
+            ->name('leads.showConvertForm');
+        Route::post('leads/{lead}/convert', [LeadController::class, 'processConvert'])
+            ->name('leads.processConvert');
         Route::patch('leads/{lead}/qualify', [LeadController::class, 'qualify'])
             ->name('leads.qualify');
         Route::get('leads/{lead}', [LeadController::class, 'show'])
@@ -152,6 +158,8 @@ Route::prefix('crm')
         Route::get('quotations/{quotation}/edit', [QuotationController::class, 'edit'])->name('quotations.edit');
         Route::put('quotations/{quotation}', [QuotationController::class, 'update'])->name('quotations.update');
         Route::patch('quotations/{quotation}/status', [QuotationController::class, 'updateStatus'])->name('quotations.updateStatus');
+        Route::get('quotations/{quotation}/convert-customer', [QuotationController::class, 'showConvertForm'])->name('quotations.showConvertForm');
+        Route::post('quotations/{quotation}/convert-customer', [QuotationController::class, 'processConvert'])->name('quotations.processConvert');
         Route::post('quotations/{quotation}/approve', [QuotationController::class, 'approve'])->name('quotations.approve');
         Route::post('quotations/{quotation}/reject', [QuotationController::class, 'reject'])->name('quotations.reject');
         Route::delete('quotations/{quotation}', [QuotationController::class, 'destroy'])->name('quotations.destroy');

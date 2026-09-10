@@ -6,6 +6,8 @@ use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\LeadDocument;
 use App\Domains\CRM\Models\CrmAccount;
 use App\Domains\CRM\Models\CrmContact;
+use App\Domains\CRM\Models\CrmDeal;
+use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Repositories\LeadRepository;
 use App\Domains\CRM\Services\LeadService;
 use App\Domains\CRM\Services\LeadDuplicateService;
@@ -358,8 +360,11 @@ class LeadController extends Controller
     {
         $this->authorize('update', $lead);
         $this->leadRepo->qualifyLead($lead);
+        $deal = CrmDeal::find($lead->crm_deal_id);
+
+        $dealMsg = $deal ? " (Deal #{$deal->deal_number})" : "";
         return redirect()->back()
-            ->with('success', "Lead #{$lead->id} qualified into Deal successfully!");
+            ->with('success', "Lead #{$lead->id} converted to Deal{$dealMsg} successfully!");
     }
 
     public function trackStatus()
