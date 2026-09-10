@@ -66,4 +66,24 @@ interface JournalRepositoryInterface
      * @return Collection<int, Journal>
      */
     public function forDate(\DateTimeInterface $date): Collection;
+
+    /**
+     * Sum of all posted movements against one party (customer/vendor) strictly
+     * before $before, for a Party Ledger's carried-forward opening balance —
+     * mirrors openingBalance() but keyed by party_type/party_id instead of
+     * chart_of_account_id, since a party's lines can span more than one
+     * control account (e.g. Accounts Receivable vs. Customer Advances).
+     *
+     * @return array{debit: float, credit: float}
+     */
+    public function partyOpeningBalance(string $partyType, int $partyId, \DateTimeInterface $before): array;
+
+    /**
+     * Every posted JournalEntry for one party within a date range, for a
+     * Party Ledger report. Ordering by journal_date is done by the caller,
+     * same as ledgerEntries().
+     *
+     * @return Collection<int, \App\Domains\Accounting\Models\JournalEntry>
+     */
+    public function partyLedgerEntries(string $partyType, int $partyId, \DateTimeInterface $from, \DateTimeInterface $to): Collection;
 }

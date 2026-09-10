@@ -21,6 +21,8 @@ use App\Domains\HRMS\Controllers\Api\TravelExpenseApiController;
 use App\Domains\HRMS\Controllers\Api\PayrollRunApiController;
 use App\Domains\HRMS\Controllers\Api\ProbationApiController;
 use App\Domains\HRMS\Controllers\Api\EmployeeExitApiController;
+use App\Domains\HRMS\Controllers\Api\PipApiController;
+use App\Domains\HRMS\Controllers\Api\BroadcastApiController;
 use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 
 /*
@@ -454,6 +456,11 @@ Route::prefix('api/hrms/documents')
         Route::post('/{document}/approve', [DocumentApiController::class, 'approve'])->name('approve');
         Route::post('/{document}/reject', [DocumentApiController::class, 'reject'])->name('reject');
         Route::put('/{document}/status', [DocumentApiController::class, 'updateStatus'])->name('status.update');
+
+        // Document Digital Signature APIs
+        Route::post('/{document}/sign', [DocumentApiController::class, 'sign'])->name('sign');
+        Route::post('/generate-signed-template', [DocumentApiController::class, 'generateSignedTemplate'])->name('generate-signed-template');
+        Route::post('/user/signature', [DocumentApiController::class, 'updateUserSignature'])->name('user-signature');
     });
 
 // ==========================================
@@ -582,7 +589,62 @@ Route::prefix('api/hrms/user')
         Route::post('/signature', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'updateUserSignature'])->name('signature.update');
     });
 
+// ==========================================
+// 19. PERFORMANCE IMPROVEMENT PLAN (PIP) API ROUTES
+// ==========================================
+Route::prefix('api/hrms/pip')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.pip.')
+    ->group(function () {
+        // Master Dashboard & Listing
+        Route::get('/', [PipApiController::class, 'index'])->name('index');
+        Route::post('/', [PipApiController::class, 'store'])->name('store');
+        
+        // Masters (Categories & Templates)
+        Route::get('/categories', [PipApiController::class, 'indexCategories'])->name('categories.index');
+        Route::post('/categories', [PipApiController::class, 'storeCategory'])->name('categories.store');
+        Route::delete('/categories/{category}', [PipApiController::class, 'destroyCategory'])->name('categories.destroy');
+        
+        Route::get('/templates', [PipApiController::class, 'indexTemplates'])->name('templates.index');
+        Route::post('/templates', [PipApiController::class, 'storeTemplate'])->name('templates.store');
+        Route::delete('/templates/{template}', [PipApiController::class, 'destroyTemplate'])->name('templates.destroy');
 
+        // Detailed Workspace
+        Route::get('/{pip}', [PipApiController::class, 'show'])->name('show');
+        Route::put('/{pip}', [PipApiController::class, 'update'])->name('update');
+        Route::delete('/{pip}', [PipApiController::class, 'destroy'])->name('destroy');
 
+        // SMART Objectives
+        Route::post('/{pip}/objectives', [PipApiController::class, 'storeObjective'])->name('objectives.store');
+        Route::put('/{pip}/objectives/{objective}/status', [PipApiController::class, 'updateObjectiveStatus'])->name('objectives.status');
+        Route::put('/{pip}/objectives/{objective}', [PipApiController::class, 'updateObjective'])->name('objectives.update');
+        Route::delete('/{pip}/objectives/{objective}', [PipApiController::class, 'destroyObjective'])->name('objectives.destroy');
 
+        // 1-on-1 Milestone Check-ins
+        Route::post('/{pip}/checkins', [PipApiController::class, 'storeCheckin'])->name('checkins.store');
+        Route::put('/{pip}/checkins/{checkin}', [PipApiController::class, 'updateCheckin'])->name('checkins.update');
+        Route::delete('/{pip}/checkins/{checkin}', [PipApiController::class, 'destroyCheckin'])->name('checkins.destroy');
+
+        // Final Evaluation
+        Route::post('/{pip}/evaluate', [PipApiController::class, 'evaluate'])->name('evaluate');
+    });
+
+// ==========================================
+// 20. BROADCASTS & COMPANY ANNOUNCEMENTS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/broadcasts')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.hrms.broadcasts.')
+    ->group(function () {
+        Route::get('/', [BroadcastApiController::class, 'index'])->name('index');
+        Route::get('/management', [BroadcastApiController::class, 'management'])->name('management');
+        Route::post('/', [BroadcastApiController::class, 'store'])->name('store');
+        Route::get('/{id}', [BroadcastApiController::class, 'show'])->name('show');
+        Route::put('/{id}', [BroadcastApiController::class, 'update'])->name('update');
+        Route::delete('/{id}', [BroadcastApiController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/acknowledge', [BroadcastApiController::class, 'acknowledge'])->name('acknowledge');
+        Route::get('/{id}/comments', [BroadcastApiController::class, 'getComments'])->name('comments.index');
+        Route::post('/{id}/comments', [BroadcastApiController::class, 'storeComment'])->name('comments.store');
+        Route::get('/{id}/analytics', [BroadcastApiController::class, 'getAnalytics'])->name('analytics');
+    });
 

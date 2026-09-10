@@ -24,6 +24,7 @@ class Transporter extends Model
         'name',
         'code',
         'transporter_id',
+        'vendor_id',
         'gstin',
         'pan_number',
         'phone',

@@ -116,10 +116,10 @@
 
                 {{-- Submit Buttons --}}
                 <div class="d-flex align-items-center gap-2 border-top pt-3">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="feather-calendar me-2"></i>{{ __('production.generate_schedule') }}
-                    </button>
-                    <a href="{{ route('production.schedules.index') }}" class="btn btn-secondary">{{ __('production.cancel') }}</a>
+                    <x-ui.button type="submit" variant="primary" icon="feather-calendar">
+                        {{ __('production.generate_schedule') }}
+                    </x-ui.button>
+                    <x-ui.button :href="route('production.schedules.index')" variant="secondary">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

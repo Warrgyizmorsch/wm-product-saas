@@ -181,12 +181,17 @@
                 <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 pt-2 border-top border-light">
                     {{-- Adjustment Mode Selector --}}
                     <div class="dropdown">
-                        <button
-                            class="btn btn-sm btn-outline-dark dropdown-toggle d-inline-flex align-items-center gap-1.5 fs-12"
-                            type="button" id="btnShiftModeToggle" data-bs-toggle="dropdown" aria-expanded="false"
+                        <x-ui.button
+                            type="button"
+                            id="btnShiftModeToggle"
+                            variant="outline-dark"
+                            icon="feather-git-commit"
+                            class="dropdown-toggle"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
                             title="Shift Mode determines how downstream operations react to schedule moves">
-                            <i class="feather-git-commit text-primary"></i> <span id="currentShiftModeLabel">Ripple Shift</span>
-                        </button>
+                            <span id="currentShiftModeLabel">Ripple Shift</span>
+                        </x-ui.button>
                         <ul class="dropdown-menu dropdown-menu-end fs-12 shadow p-2" aria-labelledby="btnShiftModeToggle"
                             style="min-width: 300px; max-width: 360px;">
                             <li>
@@ -214,30 +219,31 @@
                     </div>
 
                     {{-- What-If Scenarios --}}
-                    <a href="{{ route('production.schedules.scenarios.index') }}"
-                        class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 fs-12">
-                        <i class="feather-layers text-primary"></i> What-If Scenarios
-                    </a>
+                    <x-ui.button
+                        href="{{ route('production.schedules.scenarios.index') }}"
+                        variant="outline-primary"
+                        icon="feather-layers">
+                        What-If Scenarios
+                    </x-ui.button>
 
                     {{-- Level Capacity --}}
-                    <x-ui.button id="btnLevelCapacity" variant="outline-warning" size="sm" icon="feather-zap">
+                    <x-ui.button id="btnLevelCapacity" variant="outline-warning" icon="feather-zap">
                         Level Capacity
                     </x-ui.button>
 
                     {{-- Pre-Release Check Button (Dynamically visible ONLY when schedule is ready to release) --}}
-                    <x-ui.button id="btnPreReleaseCheck" variant="success" size="sm" icon="feather-shield-check" class="d-none">
+                    <x-ui.button id="btnPreReleaseCheck" variant="success" icon="feather-check-circle" class="d-none">
                         Pre-Release Check
                     </x-ui.button>
 
                     {{-- Audit Log --}}
-                    <x-ui.button id="btnChangeHistory" variant="outline-secondary" size="sm" icon="feather-clock">
+                    <x-ui.button id="btnChangeHistory" variant="outline-secondary" icon="feather-clock">
                         Audit Log
                     </x-ui.button>
 
                     {{-- Refresh --}}
-                    <button type="button" id="btnRefreshBoardData" class="btn btn-sm btn-outline-secondary px-2 py-1" title="Refresh Board Data">
-                        <i class="feather-refresh-cw"></i>
-                    </button>
+                    <x-ui.button type="button" id="btnRefreshBoardData" variant="outline-secondary" icon="feather-refresh-cw" title="Refresh Board Data">
+                    </x-ui.button>
                 </div>
             </div>
 
@@ -383,8 +389,8 @@
             </div>
 
             <div class="modal-footer px-0 pb-0 pt-3 border-top">
-                <x-ui.button type="button" variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button type="button" id="btnGenerateLevelingPreview" variant="warning" size="sm" icon="feather-play">
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
+                <x-ui.button type="button" id="btnGenerateLevelingPreview" variant="warning" icon="feather-play">
                     Generate Preview
                 </x-ui.button>
             </div>
@@ -401,8 +407,8 @@
                 <span class="text-muted fs-11"><i class="feather-info me-1"></i> Preview expires in 30 minutes. Schedule
                     remains unchanged until applied.</span>
                 <div>
-                    <x-ui.button type="button" variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                    <x-ui.button type="button" id="btnApplyLeveling" variant="success" size="sm"
+                    <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="button" id="btnApplyLeveling" variant="success"
                         icon="feather-check-circle">
                         Apply Leveling Proposal
                     </x-ui.button>
@@ -491,14 +497,14 @@
                     <div class="text-muted fs-11">Locked operations cannot be moved via drag-and-drop or automatic capacity
                         leveling.</div>
                 </div>
-                <x-ui.button type="button" id="btnToggleLockInModal" variant="outline-danger" size="sm" icon="feather-lock">
+                <x-ui.button type="button" id="btnToggleLockInModal" variant="outline-danger" icon="feather-lock">
                     Toggle Lock
                 </x-ui.button>
             </div>
 
             <div class="modal-footer px-0 pb-0 pt-3 border-top">
-                <x-ui.button type="button" variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button type="button" id="btnSaveQuickEdit" variant="primary" size="sm" icon="feather-check">
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
+                <x-ui.button type="button" id="btnSaveQuickEdit" variant="primary" icon="feather-check">
                     Apply Reschedule
                 </x-ui.button>
             </div>
@@ -537,8 +543,8 @@
             </div>
 
             <div class="modal-footer px-0 pb-0 pt-3 border-top">
-                <x-ui.button type="button" id="btnCancelDrag" variant="secondary" size="sm">Cancel</x-ui.button>
-                <x-ui.button type="button" id="btnApplyDrag" variant="primary" size="sm" icon="feather-check">
+                <x-ui.button type="button" id="btnCancelDrag" variant="secondary">Cancel</x-ui.button>
+                <x-ui.button type="button" id="btnApplyDrag" variant="primary" icon="feather-check">
                     Confirm & Save Move
                 </x-ui.button>
             </div>
@@ -555,7 +561,7 @@
                 </div>
             </div>
             <div class="modal-footer px-0 pb-0 pt-3 border-top" id="preReleaseModalFooter">
-                <x-ui.button type="button" variant="secondary" size="sm" data-bs-dismiss="modal">Close</x-ui.button>
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Close</x-ui.button>
             </div>
         </x-ui.modal>
 
@@ -569,7 +575,7 @@
                 </div>
             </div>
             <div class="modal-footer px-0 pb-0 pt-3 border-top">
-                <x-ui.button type="button" variant="secondary" size="sm" data-bs-dismiss="modal">Close</x-ui.button>
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Close</x-ui.button>
             </div>
         </x-ui.modal>
 

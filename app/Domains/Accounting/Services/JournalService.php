@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\Services;
 use App\Domains\Accounting\Models\AccountingPeriod;
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Repositories\JournalRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
@@ -110,6 +111,8 @@ class JournalService
             $reversalLines = $original->entries->map(fn ($entry) => [
                 'chart_of_account_id' => $entry->chart_of_account_id,
                 'cost_center_id' => $entry->cost_center_id,
+                'party_type' => $entry->party_type,
+                'party_id' => $entry->party_id,
                 'debit' => $entry->credit,
                 'credit' => $entry->debit,
                 'description' => $reason ?? "Reversal of {$original->journal_number}",
@@ -183,6 +186,45 @@ class JournalService
     public function forDate(\DateTimeInterface $date): Collection
     {
         return $this->journals->forDate($date);
+    }
+
+    /**
+     * Opening balance + chronological entries + running/closing balance for
+     * one party (customer/vendor) over a date range — the Party Ledger.
+     *
+     * Sign convention is fixed per party type rather than derived from each
+     * line's own account normal_balance (unlike General Ledger): a customer's
+     * entries can land on either Accounts Receivable (debit-normal) or
+     * Customer Advances (credit-normal), so a single per-account signedMovement()
+     * doesn't hold across the whole statement. Instead — matching the existing
+     * hand-rolled Vendor ledger convention and standard ERP party-statement
+     * practice — a customer's balance is debit-minus-credit (positive = they
+     * owe us), a vendor's is credit-minus-debit (positive = we owe them).
+     *
+     * @return array{opening: float, entries: Collection, closing: float}
+     */
+    public function partyLedger(string $partyType, int $partyId, \DateTimeInterface $from, \DateTimeInterface $to, float $seedOpeningBalance = 0.0): array
+    {
+        $sign = $partyType === JournalEntry::PARTY_VENDOR ? -1 : 1;
+
+        $openingTotals = $this->journals->partyOpeningBalance($partyType, $partyId, $from);
+        $opening = round($seedOpeningBalance + $sign * ($openingTotals['debit'] - $openingTotals['credit']), 2);
+
+        $running = $opening;
+        $entries = $this->journals->partyLedgerEntries($partyType, $partyId, $from, $to)->map(function ($entry) use ($sign, &$running) {
+            $running = round($running + $sign * ($entry->debit - $entry->credit), 2);
+
+            return [
+                'entry' => $entry,
+                'running_balance' => $running,
+            ];
+        });
+
+        return [
+            'opening' => $opening,
+            'entries' => $entries,
+            'closing' => $running,
+        ];
     }
 
     /**

@@ -610,7 +610,7 @@
                                 <td><span class="text-muted fs-12">{{ $ao->planned_finish->toDateTimeString() }}</span></td>
                                 <td class="text-end">
                                     <div class="d-flex justify-content-end gap-1">
-                                        <x-ui.button size="sm" variant="light" class="border"
+                                        <x-ui.button variant="light" class="border"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#rescheduleModal"
                                                 data-op-id="{{ $ao->id }}"
@@ -621,7 +621,7 @@
                                                 data-op-wc-name="{{ $ao->workCenter?->name }}">
                                             {{ __('production.btn_reschedule') }}
                                         </x-ui.button>
-                                        <x-ui.button size="sm" variant="outline-primary"
+                                        <x-ui.button variant="outline-primary"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#suggestionsModal"
                                                 data-op-id="{{ $ao->id }}"

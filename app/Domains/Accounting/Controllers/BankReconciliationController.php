@@ -14,20 +14,37 @@ use InvalidArgumentException;
 
 class BankReconciliationController extends Controller
 {
+    private const SORTABLE = ['statement_date', 'opening_balance', 'closing_balance', 'status'];
+
     public function __construct(
         private readonly BankReconciliationService $reconciliations,
         private readonly ChartOfAccountsService $accounts,
     ) {
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', BankReconciliation::class);
 
+        $filters = $request->only(['search', 'status', 'sort', 'direction']);
+
+        $sort = in_array($filters['sort'] ?? null, self::SORTABLE, true) ? $filters['sort'] : 'statement_date';
+        $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+        $reconciliations = BankReconciliation::with('chartOfAccount')
+            ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['search'] ?? null, fn ($q, $search) => $q->whereHas(
+                'chartOfAccount',
+                fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")
+            ))
+            ->orderBy($sort, $direction)
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
         return view('modules.accounting.bank-reconciliation.index', [
-            'reconciliations' => BankReconciliation::with('chartOfAccount')
-                ->latest('statement_date')
-                ->paginate(15),
+            'reconciliations' => $reconciliations,
+            'filters' => $filters,
         ]);
     }
 

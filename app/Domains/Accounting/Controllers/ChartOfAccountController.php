@@ -17,7 +17,7 @@ class ChartOfAccountController extends Controller
     ) {
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', ChartOfAccount::class);
 
@@ -29,9 +29,21 @@ class ChartOfAccountController extends Controller
             'by_type' => collect($tree)->countBy(fn ($row) => $row['account']->type),
         ];
 
+        $filters = $request->only(['type']);
+
+        // Filtered by type only (server-side, since it's a discrete small set and
+        // a COA hierarchy's children normally share their parent's type). Free-text
+        // search stays client-side (see the view's script) because the tree's
+        // parent/child indentation can't be sliced by a backend LIKE query without
+        // either orphaning matched children or hiding their ancestors' context.
+        $visibleTree = empty($filters['type'])
+            ? $tree
+            : collect($tree)->filter(fn ($row) => $row['account']->type === $filters['type'])->values()->all();
+
         return view('modules.accounting.chart-of-accounts.index', [
-            'tree' => $tree,
+            'tree' => $visibleTree,
             'summary' => $summary,
+            'filters' => $filters,
             'parentOptions' => $this->parentOptions(),
         ]);
     }

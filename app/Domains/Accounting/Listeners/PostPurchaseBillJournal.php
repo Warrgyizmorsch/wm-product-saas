@@ -307,6 +307,8 @@ class PostPurchaseBillJournal
                 'debit'               => 0,
                 'credit'              => round((float)$bill->grand_total, 2),
                 'description'         => "Vendor Payable - Bill {$bill->bill_number}",
+                'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_VENDOR,
+                'party_id'            => $bill->vendor_id,
             ];
 
             // 7. Round Off / manual adjustment — grand_total above already

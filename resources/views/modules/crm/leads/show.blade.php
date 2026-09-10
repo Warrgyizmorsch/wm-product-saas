@@ -95,7 +95,7 @@
                     <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="btn btn-xs btn-soft-success fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
                         <i class="feather-git-branch me-1"></i> View Deal
                     </a>
-                @else
+                @elseif(strtolower($lead->status ?: '') === 'qualified')
                     <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST" class="d-inline m-0 p-0">
                         @csrf
                         @method('PATCH')
@@ -1371,21 +1371,59 @@
                                                                             <span class="fs-10 fw-bold text-muted text-uppercase d-block mb-1">
                                                                                 <i class="{{ $iconClass }} me-1 fs-9"></i>{{ $labelTitle }} ({{ $pNote['date']->format('d/m/Y') }}):
                                                                             </span>
-                                                                            <span class="text-secondary">{{ $pNote['notes'] }}</span>
+                                                                            <span class="text-secondary">{{ trim(preg_replace('/\n?Google Meet:\s*https?:\/\/\S+/i', '', $pNote['notes'])) }}</span>
                                                                         </div>
                                                                     @endforeach
                                                                 @endif
 
-                                                                @if($item->notes)
+                                                                @php
+                                                                    // notes mein se Google Meet URL alag karo
+                                                                    $rawNotes = $item->notes ?? '';
+                                                                    $meetUrlFromNotes = null;
+                                                                    $cleanNotes = $rawNotes;
+                                                                    if (preg_match('/(Google Meet:\s*)(https?:\/\/\S+)/i', $rawNotes, $m)) {
+                                                                        $meetUrlFromNotes = $m[2];
+                                                                        $cleanNotes = trim(preg_replace('/\n?Google Meet:\s*https?:\/\/\S+/i', '', $rawNotes));
+                                                                    }
+                                                                    $meetLink = $item->google_meet_link ?? $meetUrlFromNotes;
+                                                                    // Google Calendar link — event ID se direct link 500 error deta hai
+                                                                    // isliye Google Calendar home link use karo (user wahan event dekh sakta hai)
+                                                                    $calEventLink = null;
+                                                                    if (!empty($item->google_event_id) && !str_starts_with($item->google_event_id, 'g_evt_')) {
+                                                                        $calEventLink = 'https://calendar.google.com/calendar/r';
+                                                                    }
+                                                                @endphp
+
+                                                                @if($cleanNotes)
                                                                     <div class="activity-notes">
                                                                         @if(!empty($chronologicalPrevNotes))
                                                                             <span class="fs-10 fw-bold text-primary text-uppercase d-block mb-1">
                                                                                 <i class="feather-edit-2 me-1 fs-9"></i>Latest Note:
                                                                             </span>
                                                                         @endif
-                                                                        {{ $item->notes }}
+                                                                        {{ $cleanNotes }}
                                                                     </div>
                                                                 @endif
+
+                                                                @if($meetLink && $item->is_google_meet && $item->status === 'Pending')
+                                                                   <div class="mt-2 d-inline-block me-2">
+                                                                       <a href="{{ $meetLink }}" target="_blank"
+                                                                          class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
+                                                                          style="background: linear-gradient(135deg, #1a73e8, #0d47a1); box-shadow: 0 2px 6px rgba(26,115,232,0.35);">
+                                                                           <i class="feather-video me-1"></i> Join Google Meet
+                                                                       </a>
+                                                                   </div>
+                                                               @endif
+
+                                                               @if($calEventLink)
+                                                                   <div class="mt-2 d-inline-block">
+                                                                       <a href="{{ $calEventLink }}" target="_blank"
+                                                                          class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
+                                                                          style="background: linear-gradient(135deg, #34a853, #1e7e34); box-shadow: 0 2px 6px rgba(52,168,83,0.35);">
+                                                                           <i class="feather-calendar me-1"></i> View in Google Calendar
+                                                                       </a>
+                                                                   </div>
+                                                               @endif
 
                                                                 <!-- Attribution -->
                                                                 <div class="activity-by mt-1 d-flex align-items-center flex-wrap gap-2">
@@ -1438,7 +1476,7 @@
                                                                 :centered="true"
                                                                 :formAction="route('crm.followups.update', $item->id)"
                                                                 formMethod="PUT"
-                                                                submitText="Save &amp; Mark Connected"
+                                                                submitText="Save & Mark Connected"
                                                                 :closeText="__('crm.cancel')"
                                                             >
                                                                 <input type="hidden" name="status" value="Completed">
@@ -3325,6 +3363,34 @@
                 });
             });
 
+            window.toggleNextScheduleFieldsShow = function(show) {
+                var container = $('#containerNextScheduleFieldsShow');
+                var btn = $('#btnToggleNextScheduleShow');
+                var icon = $('#iconToggleNextScheduleShow');
+                var text = $('#textToggleNextScheduleShow');
+
+                if (show === undefined) {
+                    show = (container.css('display') === 'none');
+                }
+
+                if (show) {
+                    container.slideDown(200);
+                    btn.removeClass('btn-outline-primary').addClass('btn-soft-danger');
+                    icon.removeClass('feather-plus').addClass('feather-x');
+                    text.text('Remove Next Activity');
+                } else {
+                    container.slideUp(200);
+                    btn.removeClass('btn-soft-danger').addClass('btn-outline-primary');
+                    icon.removeClass('feather-x').addClass('feather-plus');
+                    text.text('Schedule Next Activity');
+                    $('#offcanvasNextTitle, #offcanvasNextFollowupDate, #offcanvasNextGuestEmails').val('');
+                }
+            };
+
+            $(document).on('click', '#btnToggleNextScheduleShow', function() {
+                toggleNextScheduleFieldsShow();
+            });
+
             // Open and populate Offcanvas drawer for Lead Followup / Schedule Activity
             $(document).on('click', '.btn-open-followup-offcanvas', function() {
                 var leadId = $(this).attr('data-lead-id') || '{{ $lead->id }}';
@@ -3338,9 +3404,12 @@
 
                 $('#offcanvasLeadStatus').val(leadStatus || 'New');
                 $('#offcanvasLeadPriority').val(leadPriority || 'Medium');
-                $('#offcanvasFollowupDate').val(nextFollowup || '');
-                $('#offcanvasNextFollowupDate').val('');
+                $('#offcanvasFollowupDate').val('');
                 $('#offcanvasNotes, #offcanvasScheduleNotes').val('');
+
+                // Next schedule section reset — blank, collapsed
+                $('#offcanvasNextFollowupDate').val('');
+                toggleNextScheduleFieldsShow(false);
 
                 if ($('#offcanvasTagUser').length && $.fn.select2) {
                     if ($('#offcanvasTagUser').hasClass('select2-hidden-accessible')) {
@@ -3425,59 +3494,81 @@
                     <x-ui.modal-form-ui type="textarea" name="notes" id="offcanvasNotes" label="Discussion Notes / Summary" rows="3" placeholder="Write discussion notes..." />
 
                     <!-- Next Follow-up Section inside Log Mode -->
-                    <div class="p-3 bg-light rounded-3 border mb-3">
-                        <h6 class="fw-bold text-primary fs-12 mb-2"><i class="feather-calendar me-1"></i> Schedule Next Activity / Google Event</h6>
+                    <div class="border-top pt-3 mt-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="fs-12 fw-bold text-dark mb-0">
+                                <i class="feather-calendar text-primary me-1"></i> NEXT ACTIVITY SCHEDULE
+                            </h6>
+                            <button type="button" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1" id="btnToggleNextScheduleShow">
+                                <i class="feather-plus fs-11" id="iconToggleNextScheduleShow"></i>
+                                <span id="textToggleNextScheduleShow">Schedule Next Activity</span>
+                            </button>
+                        </div>
                         
-                        <x-ui.modal-form-ui type="input" name="next_title" id="offcanvasNextTitle" label="Next Event Title" placeholder="e.g. Followup Call / Next Meeting" value="Followup Call" />
+                        <div id="containerNextScheduleFieldsShow" class="mt-3 p-3 bg-light rounded-3 border" style="display: none;">
+                            <x-ui.modal-form-ui type="input" name="next_title" id="offcanvasNextTitle" label="Next Event Title" placeholder="e.g. Followup Call / Next Meeting" value="" />
 
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <x-ui.modal-form-ui type="select" name="next_activity_type" id="offcanvasNextActivityType" label="Next Activity Type" :searchable="true">
-                                    <option value="Call">Call</option>
-                                    <option value="Meeting">Meeting</option>
-                                    <option value="Demo">Demo</option>
-                                    <option value="Email">Email</option>
-                                    <option value="WhatsApp">WhatsApp</option>
-                                </x-ui.modal-form-ui>
-                            </div>
-                            <div class="col-6">
-                                <x-ui.modal-form-ui type="select" name="next_duration_minutes" id="offcanvasNextDuration" label="Next Duration (Mins)" :searchable="true">
-                                    <option value="15">15 Mins</option>
-                                    <option value="30" selected>30 Mins</option>
-                                    <option value="45">45 Mins</option>
-                                    <option value="60">60 Mins (1 Hr)</option>
-                                    <option value="90">90 Mins</option>
-                                    <option value="120">120 Mins</option>
-                                </x-ui.modal-form-ui>
-                            </div>
-                        </div>
-
-                        <x-ui.modal-form-ui type="input" inputType="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" label="Next Follow-up Date & Time (Optional)" />
-
-                        <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                <div class="form-check form-switch mb-0">
-                                    <input class="form-check-input" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" checked>
-                                    <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasNextSyncGoogle">
-                                        <i class="feather-calendar text-danger me-1"></i> Google Calendar
-                                    </label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <x-ui.modal-form-ui type="select" name="next_activity_type" id="offcanvasNextActivityType" label="Next Activity Type" :searchable="true">
+                                        <option value="Call">Call</option>
+                                        <option value="Meeting">Meeting</option>
+                                        <option value="Demo">Demo</option>
+                                        <option value="Email">Email</option>
+                                        <option value="WhatsApp">WhatsApp</option>
+                                    </x-ui.modal-form-ui>
                                 </div>
-                                <div class="form-check form-switch mb-0">
-                                    <input class="form-check-input" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet">
-                                    <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasNextCreateMeet">
-                                        <i class="feather-video text-primary me-1"></i> Google Meet Video
-                                    </label>
+                                <div class="col-6">
+                                    <x-ui.modal-form-ui type="select" name="next_duration_minutes" id="offcanvasNextDuration" label="Next Duration (Mins)" :searchable="true">
+                                        <option value="15">15 Mins</option>
+                                        <option value="30" selected>30 Mins</option>
+                                        <option value="45">45 Mins</option>
+                                        <option value="60">60 Mins (1 Hr)</option>
+                                        <option value="90">90 Mins</option>
+                                        <option value="120">120 Mins</option>
+                                    </x-ui.modal-form-ui>
                                 </div>
                             </div>
-                        </div>
 
-                        <x-ui.modal-form-ui type="input" name="next_guest_emails" id="offcanvasNextGuestEmails" label="Guest / Attendee Emails" placeholder="e.g. client@company.com (comma separated)" />
+                            <x-ui.modal-form-ui type="input" inputType="datetime-local" name="next_followup_date" id="offcanvasNextFollowupDate" label="Next Follow-up Date & Time (Optional)" />
+
+                            <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextSyncGoogle" style="cursor: pointer;">
+                                                <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                            </label>
+                                            <input type="hidden" name="next_sync_google_calendar" value="0">
+                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="offcanvasNextSyncGoogle" style="cursor: pointer;">
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasNextCreateMeet" style="cursor: pointer;">
+                                                <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                            </label>
+                                            <input type="hidden" name="next_create_meet_link" value="0">
+                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="offcanvasNextCreateMeet" style="cursor: pointer;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <x-ui.modal-form-ui type="input" name="next_guest_emails" id="offcanvasNextGuestEmails" label="Guest / Attendee Emails" placeholder="e.g. client@company.com (comma separated)" />
+
+                            <x-ui.modal-form-ui type="select" name="tagged_user_ids[]" id="offcanvasTagUser" label="Tag / Assign Persons" multiple="true" :searchable="true">
+                                @foreach($users as $u)
+                                    <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
+                                @endforeach
+                            </x-ui.modal-form-ui>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
                 <div id="sectionDirectSchedule" style="display: none;">
-                    <x-ui.modal-form-ui type="input" name="title" id="offcanvasEventTitle" label="Event / Meeting Title" placeholder="e.g. CRM Followup Call / Client Demo" value="CRM Followup Call" />
+                    <x-ui.modal-form-ui type="input" name="title" id="offcanvasEventTitle" label="Event / Meeting Title" placeholder="e.g. CRM Followup Call / Client Demo" value="" />
 
                     <x-ui.modal-form-ui type="select" name="schedule_type" id="offcanvasScheduleType" label="Activity Type *" :searchable="true" onchange="$('#offcanvasFollowupType').val(this.value)">
                         <option value="Call">Call</option>
@@ -3489,7 +3580,7 @@
 
                     <div class="row g-2">
                         <div class="col-6">
-                            <x-ui.modal-form-ui type="input" inputType="datetime-local" name="followup_date" id="offcanvasFollowupDate" label="Due Date & Time *" value="{{ $lead->next_followup_date ? $lead->next_followup_date->format('Y-m-d\TH:i') : '' }}" />
+                            <x-ui.modal-form-ui type="input" inputType="datetime-local" name="followup_date" id="offcanvasFollowupDate" label="Due Date & Time *" value="" />
                         </div>
                         <div class="col-6">
                             <x-ui.modal-form-ui type="select" name="duration_minutes" id="offcanvasDuration" label="Duration (Minutes)" :searchable="true">
@@ -3503,19 +3594,25 @@
                         </div>
                     </div>
 
-                    <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" checked>
-                                <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasSyncGoogle">
-                                    <i class="feather-calendar text-danger me-1"></i> Google Calendar
-                                </label>
+                    <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasSyncGoogle" style="cursor: pointer;">
+                                        <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                    </label>
+                                    <input type="hidden" name="sync_google_calendar" value="0">
+                                    <input class="form-check-input ms-0 mt-0" type="checkbox" name="sync_google_calendar" value="1" id="offcanvasSyncGoogle" style="cursor: pointer;">
+                                </div>
                             </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet">
-                                <label class="form-check-label fw-bold fs-12 text-dark" for="offcanvasCreateMeet">
-                                    <i class="feather-video text-primary me-1"></i> Google Meet Video
-                                </label>
+                            <div class="col-6">
+                                <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                    <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="offcanvasCreateMeet" style="cursor: pointer;">
+                                        <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                    </label>
+                                    <input type="hidden" name="create_meet_link" value="0">
+                                    <input class="form-check-input ms-0 mt-0" type="checkbox" name="create_meet_link" value="1" id="offcanvasCreateMeet" style="cursor: pointer;">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -3525,15 +3622,9 @@
                     <x-ui.modal-form-ui type="textarea" name="schedule_notes" id="offcanvasScheduleNotes" label="Description / Plan" rows="3" placeholder="Agenda / plan for upcoming activity..." oninput="$('#offcanvasNotes').val(this.value)" />
                 </div>
 
-                <x-ui.modal-form-ui type="select" name="tagged_user_ids[]" id="offcanvasTagUser" label="Tag / Assign Persons" multiple="true" :searchable="true">
-                    @foreach($users as $u)
-                        <option value="{{ $u->id }}">{{ $u->name }} ({{ $u->email }})</option>
-                    @endforeach
-                </x-ui.modal-form-ui>
-
                 <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
                     <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
-                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">UPDATE DETAILS</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">SAVE</button>
                 </div>
             </form>
         </div>

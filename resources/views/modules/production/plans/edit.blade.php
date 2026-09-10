@@ -32,7 +32,9 @@
                         <h4 class="fw-bold text-dark mb-0">{{ __('production.edit_production_plan_with_number', ['number' => $plan->plan_number]) }}</h4>
                         <small class="text-muted">{{ __('production.status') }}: <span class="text-uppercase fw-semibold text-primary">{{ __('production.' . $plan->status) ?? $plan->status }}</span></small>
                     </div>
-                    <a href="{{ route('production.plans.show', $plan->id) }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
+                    <x-ui.button href="{{ route('production.plans.show', $plan->id) }}" variant="light" class="border">
+                        {{ __('production.cancel') }}
+                    </x-ui.button>
                 </div>
 
                 <div class="row g-4 fs-13 text-dark">
@@ -77,8 +79,8 @@
 
                 <!-- Footer Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">{{ __('production.update_plan') }}</button>
-                    <a href="{{ route('production.plans.show', $plan->id) }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
+                    <x-ui.button type="submit" variant="primary" class="px-4">{{ __('production.update_plan') }}</x-ui.button>
+                    <x-ui.button href="{{ route('production.plans.show', $plan->id) }}" variant="secondary" class="px-4">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

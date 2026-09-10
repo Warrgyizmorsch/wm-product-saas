@@ -7,6 +7,20 @@
     @push('styles')
         <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
         <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+        <style>
+            .erp-thin-table td .select2-container--bootstrap-5 .select2-selection {
+                min-height: 34px !important;
+                height: 34px !important;
+                padding: 3px 8px !important;
+                font-size: 12px !important;
+            }
+            .routing-select2-dropdown {
+                z-index: 2055;
+            }
+            .routing-select2-dropdown .select2-results__options {
+                max-height: 260px;
+            }
+        </style>
     @endpush
 
     @push('scripts')
@@ -145,7 +159,38 @@
                                                       <span class="fs-10 text-muted">Qty:</span>
                                                       <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_batch_quantity" min="0.0001" />
                                                   </div>
+
+                                                  <span class="text-black-50 me-1">|</span>
+
+                                                  <div class="form-check m-0 p-0 d-inline-flex align-items-center me-1">
+                                                      <input type="checkbox" class="form-check-input mt-0 me-1 ms-0" x-model="operation.is_parallel" x-bind:name="'operations['+index+'][is_parallel]'" x-bind:id="'par_edit_' + operation.uid" value="1">
+                                                      <label class="form-check-label fs-11 text-primary fw-semibold c-pointer mb-0" x-bind:for="'par_edit_' + operation.uid" title="Independent / Parallel operation — can start immediately without waiting for preceding operations">Parallel</label>
+                                                  </div>
+
+                                                  <div class="align-items-center gap-1"
+                                                       :class="(operation.is_parallel == 1 || operation.is_parallel === true) ? 'd-inline-flex' : 'd-none'"
+                                                       x-show="operation.is_parallel == 1 || operation.is_parallel === true">
+                                                      <span class="fs-10 text-muted">Grp:</span>
+                                                      <input type="text" x-bind:name="'operations['+index+'][parallel_group]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 50px; height: 20px; min-height: 20px;" x-model="operation.parallel_group" placeholder="e.g. A" title="Optional Parallel Group Name" />
+                                                  </div>
                                               </div>
+
+                                              <div class="mt-1 d-flex align-items-center gap-1" x-show="!operation.is_parallel && index > 0">
+                                                   <span class="fs-10 text-muted text-nowrap"><i class="feather-git-commit me-1"></i>Predecessor:</span>
+                                                   <div class="flex-grow-1">
+                                                       <x-ui.odoo-form-ui type="select" 
+                                                           x-bind:name="'operations['+index+'][predecessor_sequence]'" 
+                                                           class="odoo-table-select text-muted" 
+                                                           x-model="operation.predecessor_sequence" 
+                                                           select2Selector="default">
+                                                           <option value="">-- Auto (Previous Op) --</option>
+                                                           <option value="-1">-- None (Independent / Starts Immediately) --</option>
+                                                           <template x-for="(prevOp, pIdx) in getPriorOperations(index)" :key="prevOp.uid">
+                                                               <option :value="prevOp.sequence" x-text="'Op ' + prevOp.sequence + (prevOp.name ? ': ' + prevOp.name : '')" :selected="operation.predecessor_sequence == prevOp.sequence"></option>
+                                                           </template>
+                                                       </x-ui.odoo-form-ui>
+                                                   </div>
+                                               </div>
 
                                               <div class="mt-1">
                                                   <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][material_id]'" class="odoo-table-select text-muted" x-model="operation.material_id" select2Selector="default">
@@ -223,16 +268,20 @@
                                                          @endforeach
                                                      </x-ui.odoo-form-ui>
                                                  </div>
-                                                 <div class="col-md-2" x-show="operation.subcontract_input_type !== 'previous_operation_wip'">
+                                                 <div class="col-md-3" x-show="operation.subcontract_input_type !== 'previous_operation_wip'">
                                                      <x-ui.odoo-form-ui type="select" label="Supply Type" x-bind:name="'operations['+index+'][material_supply_type]'" class="form-select form-select-sm fs-11" x-model="operation.material_supply_type">
                                                          <option value="company_supplied">Company Supplied</option>
                                                          <option value="vendor_supplied">Vendor Supplied</option>
                                                      </x-ui.odoo-form-ui>
                                                  </div>
-                                                 <div class="col-md-2" x-show="operation.subcontract_input_type === 'previous_operation_wip'">
-                                                     <label class="form-label text-muted fs-11 mb-1">Supply Type</label>
-                                                     <div class="form-control form-control-sm fs-11 bg-light text-primary fw-semibold d-flex align-items-center" style="height: 31px;">
-                                                         <i class="feather-layers me-1"></i>Previous Op WIP
+                                                 <div class="col-md-3" x-show="operation.subcontract_input_type === 'previous_operation_wip'">
+                                                     <div class="odoo-form-group mb-0">
+                                                         <label class="odoo-form-label fs-11 text-muted">Supply Type</label>
+                                                         <div class="flex-grow-1">
+                                                             <div class="form-control form-control-sm fs-11 bg-light text-primary fw-semibold d-flex align-items-center" style="height: 31px;">
+                                                                 <i class="feather-layers me-1"></i>Previous Op WIP
+                                                             </div>
+                                                         </div>
                                                      </div>
                                                  </div>
                                                  <div class="col-md-3">
@@ -241,10 +290,10 @@
                                                          <option value="previous_operation_wip">Previous Operation WIP (Job Work)</option>
                                                      </x-ui.odoo-form-ui>
                                                  </div>
-                                                 <div class="col-md-2">
+                                                 <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="input" inputType="number" label="Lead Time (Days)" min="0" x-bind:name="'operations['+index+'][subcontract_lead_time_days]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_lead_time_days" placeholder="0" />
                                                  </div>
-                                                 <div class="col-md-2">
+                                                 <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" label="Cost / Unit" x-bind:name="'operations['+index+'][subcontract_cost_per_unit]'" class="form-control form-control-sm fs-11" x-model="operation.subcontract_cost_per_unit" placeholder="0.00" />
                                                  </div>
                                                  <div class="col-md-3">
@@ -255,10 +304,10 @@
                                                          @endforeach
                                                      </x-ui.odoo-form-ui>
                                                  </div>
-                                                 <div class="col-md-2 mt-1">
+                                                 <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Dispatch Buffer (Days)" x-bind:name="'operations['+index+'][dispatch_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.dispatch_buffer_days" placeholder="0" />
                                                  </div>
-                                                 <div class="col-md-2 mt-1">
+                                                 <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="input" inputType="number" min="0" label="Return Buffer (Days)" x-bind:name="'operations['+index+'][return_buffer_days]'" class="form-control form-control-sm fs-11" x-model="operation.return_buffer_days" placeholder="0" />
                                                  </div>
                                              </div>
@@ -283,7 +332,7 @@
                 <!-- Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
                     <x-ui.button type="submit" variant="primary" class="px-4">{{ __('production.update_routing') }}</x-ui.button>
-                    <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-light px-4">{{ __('production.cancel') }}</a>
+                    <x-ui.button :href="route('production.routing.show', $routing->id)" variant="light" class="px-4">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
             </form>
@@ -324,6 +373,9 @@
                                 queue_threshold_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 overlap_enabled: {{ ($op->queue_threshold_enabled ?? $op->overlap_enabled) ? 'true' : 'false' }},
                                 transfer_batch_quantity: "{{ number_format($op->transfer_batch_quantity ?? 0, 2, '.', '') }}",
+                                is_parallel: {{ $op->is_parallel ? 'true' : 'false' }},
+                                parallel_group: "{{ $op->parallel_group ?? '' }}",
+                                predecessor_sequence: "{{ $op->previousOperation?->sequence ?? ($op->previous_operation_id === null && $loop->index > 0 && !$op->is_parallel ? '-1' : '') }}",
                                 @php
                                     $firstMat = \App\Domains\Production\Models\RoutingOperationMaterial::where('routing_operation_id', $op->id)->first();
                                 @endphp
@@ -334,7 +386,7 @@
                             this.loadMachinesForOperation(this.operations.length - 1);
                         @endforeach
 
-                            if (this.operations.length === 0) {
+                        if (this.operations.length === 0) {
                             this.addOperation();
                         }
 
@@ -343,6 +395,7 @@
                                 this.recalculateSequences();
                             }
                         });
+                        this.$nextTick(() => this.initAllOperationSelects());
                     },
 
                     addOperation() {
@@ -374,14 +427,23 @@
                             overlap_enabled: false,
                             transfer_batch_quantity: '0.00',
                             material_id: '',
+                            is_parallel: false,
+                            parallel_group: '',
+                            predecessor_sequence: '',
                             availableMachines: []
                         });
+                        this.$nextTick(() => this.initAllOperationSelects());
+                    },
+
+                    getPriorOperations(currentIndex) {
+                        return this.operations.filter((op, idx) => idx < currentIndex);
                     },
 
                     removeOperation(index) {
                         if (this.operations.length > 1) {
                             this.operations.splice(index, 1);
                             this.recalculateSequences();
+                            this.$nextTick(() => this.initAllOperationSelects());
                         } else {
                             if (typeof confirmAction === 'function') {
                                 confirmAction({
@@ -409,6 +471,7 @@
                         if (clone.work_center_id) {
                             this.loadMachinesForOperation(index + 1);
                         }
+                        this.$nextTick(() => this.initAllOperationSelects());
                     },
 
                     moveUp(index) {
@@ -417,6 +480,7 @@
                             this.operations[index] = this.operations[index - 1];
                             this.operations[index - 1] = temp;
                             this.recalculateSequences();
+                            this.$nextTick(() => this.initAllOperationSelects());
                         }
                     },
 
@@ -426,6 +490,7 @@
                             this.operations[index] = this.operations[index + 1];
                             this.operations[index + 1] = temp;
                             this.recalculateSequences();
+                            this.$nextTick(() => this.initAllOperationSelects());
                         }
                     },
 
@@ -445,6 +510,7 @@
                         if (op.work_center_id) {
                             this.loadMachinesForOperation(index);
                         }
+                        this.$nextTick(() => this.initAllOperationSelects());
                     },
 
                     loadMachinesForOperation(index) {
@@ -457,6 +523,80 @@
                             })
                             .catch(err => console.error('Failed to load machines:', err));
                     },
+
+                    initOperationSelects(rowEl, operation) {
+                        var self = this;
+                        $(rowEl).find('[data-select2-selector="default"]').each(function() {
+                            var $select = $(this);
+                            var nameAttr = $select.attr('name') || '';
+                            var isDynamic = nameAttr.indexOf('machine_id') !== -1 || nameAttr.indexOf('predecessor_sequence') !== -1;
+
+                            if ($select.data('select2-initialized') && $select.hasClass('select2-hidden-accessible')) {
+                                if (isDynamic) {
+                                    $select.select2('destroy');
+                                } else {
+                                    $select.trigger('change.select2');
+                                    return;
+                                }
+                            }
+
+                            if ($select.hasClass('select2-hidden-accessible')) {
+                                $select.select2('destroy');
+                            }
+
+                            $select.data('select2-initialized', true);
+                            $select.select2(self.select2RowOptions());
+
+                            // Sync value if dynamic
+                            if (nameAttr.indexOf('predecessor_sequence') !== -1) {
+                                if (operation.predecessor_sequence !== undefined && operation.predecessor_sequence !== '') {
+                                    $select.val(operation.predecessor_sequence).trigger('change.select2');
+                                }
+                            } else if (nameAttr.indexOf('machine_id') !== -1) {
+                                if (operation.machine_id) {
+                                    $select.val(operation.machine_id).trigger('change.select2');
+                                }
+                            }
+
+                            $select.off('change.routing-operation-select').on('change.routing-operation-select', function() {
+                                var val = $select.val();
+                                var nameAttr = $select.attr('name') || '';
+
+                                if (nameAttr.indexOf('operation_type') !== -1) {
+                                    operation.operation_type = val;
+                                } else if (nameAttr.indexOf('work_center_id') !== -1) {
+                                    operation.work_center_id = val;
+                                    self.workCenterChanged(self.operations.indexOf(operation));
+                                } else if (nameAttr.indexOf('machine_id') !== -1) {
+                                    operation.machine_id = val;
+                                } else if (nameAttr.indexOf('material_id') !== -1) {
+                                    operation.material_id = val;
+                                } else if (nameAttr.indexOf('predecessor_sequence') !== -1) {
+                                    operation.predecessor_sequence = val;
+                                }
+
+                                this.dispatchEvent(new Event('input', { bubbles: true }));
+                            });
+                        });
+                    },
+
+                    initAllOperationSelects() {
+                        var self = this;
+                        $('.routing-operation-row').each(function(index) {
+                            if (self.operations[index]) {
+                                self.initOperationSelects(this, self.operations[index]);
+                            }
+                        });
+                    },
+
+                    select2RowOptions() {
+                        return {
+                            theme: "bootstrap-5",
+                            width: '100%',
+                            dropdownParent: $('body'),
+                            dropdownCssClass: 'routing-select2-dropdown'
+                        };
+                    }
                 }
             }
         </script>

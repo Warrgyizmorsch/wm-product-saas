@@ -8,18 +8,18 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <a href="{{ route('production.schedules.dispatch-board', ['schedule_id' => $schedule->id]) }}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1.5">
-            <i class="feather-grid"></i> Open Dispatch Board
-        </a>
+        <x-ui.button :href="route('production.schedules.dispatch-board', ['schedule_id' => $schedule->id])" variant="outline-primary" icon="feather-grid">
+            Open Dispatch Board
+        </x-ui.button>
 
-        <a href="{{ route('production.schedules.change-history', $schedule->id) }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1.5">
-            <i class="feather-clock"></i> History
-        </a>
+        <x-ui.button :href="route('production.schedules.change-history', $schedule->id)" variant="outline-secondary" icon="feather-clock">
+            History
+        </x-ui.button>
 
         @if($schedule->isScheduled())
-            <button type="button" onclick="openShowPreReleaseModal({{ $schedule->id }})" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5">
-                <i class="feather-play-circle"></i> {{ __('production.release_to_shop_floor') }}
-            </button>
+            <x-ui.button type="button" onclick="openShowPreReleaseModal({{ $schedule->id }})" variant="primary" icon="feather-play-circle">
+                {{ __('production.release_to_shop_floor') }}
+            </x-ui.button>
         @endif
 
         @if(!$schedule->isFrozen())
@@ -545,8 +545,8 @@
             <p class="fs-13 text-muted">{{ __('production.cancel_schedule_confirm', ['number' => $schedule->schedule_number]) }}</p>
         </form>
         <x-slot name="footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.back') ?? 'Back' }}</button>
-            <button type="submit" class="btn btn-danger" onclick="document.getElementById('cancelFormMain').submit();">{{ __('production.cancel_schedule') }}</button>
+            <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.back') ?? 'Back' }}</x-ui.button>
+            <x-ui.button type="submit" variant="danger" onclick="document.getElementById('cancelFormMain').submit();">{{ __('production.cancel_schedule') }}</x-ui.button>
         </x-slot>
     </x-ui.modal>
 
@@ -563,8 +563,8 @@
             </div>
         </form>
         <x-slot name="footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-warning" onclick="document.getElementById('rescheduleStartFormMain').submit();">Apply & Recalculate</button>
+            <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Cancel</x-ui.button>
+            <x-ui.button type="submit" variant="warning" onclick="document.getElementById('rescheduleStartFormMain').submit();">Apply & Recalculate</x-ui.button>
         </x-slot>
     </x-ui.modal>
 
@@ -578,7 +578,7 @@
         </div>
         <x-slot name="footer">
             <div id="showPreReleaseModalFooter" class="d-flex align-items-center justify-content-end gap-2 w-100">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">Close</x-ui.button>
             </div>
         </x-slot>
     </x-ui.modal>

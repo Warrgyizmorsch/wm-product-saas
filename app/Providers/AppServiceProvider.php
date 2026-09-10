@@ -282,6 +282,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Repositories\AccountingAuditLogRepositoryInterface::class,
             \App\Domains\Accounting\Repositories\AccountingAuditLogRepository::class
         );
+
+        // ── Accounting: Budget ─────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\BudgetRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\BudgetRepository::class
+        );
     }
 
     public function boot(): void
@@ -623,6 +629,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Accounting\Models\TaxRate::class,
             \App\Domains\Accounting\Policies\TaxRatePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\Budget::class,
+            \App\Domains\Accounting\Policies\BudgetPolicy::class
         );
 
         // ── HRMS Policies ────────────────────────────────────────────────────

@@ -10,6 +10,26 @@
         <!-- Left: Tax Rate List Table -->
         <div class="col-lg-8">
             <x-ui.card title="Tax Rate Directory" bodyClass="p-0" class="accounting-dense">
+                <div class="d-flex flex-wrap align-items-center gap-3 p-3 border-bottom">
+                    <div class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 220px;">
+                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                        <input type="text" id="trSearchInput" class="form-control border-0 bg-transparent p-0 fs-13"
+                               placeholder="Search name or type..." style="box-shadow: none; height: 32px;">
+                    </div>
+                    <select id="trTypeFilter" class="form-select form-select-sm" style="max-width: 160px;">
+                        <option value="">All Types</option>
+                        <option value="sales_tax">Sales Tax</option>
+                        <option value="gst">GST</option>
+                        <option value="vat">VAT</option>
+                        <option value="withholding">Withholding</option>
+                    </select>
+                    <select id="trStatusFilter" class="form-select form-select-sm" style="max-width: 140px;">
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+
                 <x-ui.table hoverable>
                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                         <tr>
@@ -22,9 +42,9 @@
                             <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="fs-13 text-dark">
+                    <tbody class="fs-13 text-dark" id="trTableBody">
                         @forelse ($taxRates as $taxRate)
-                            <tr>
+                            <tr data-tr-search="{{ strtolower($taxRate->name) }}" data-tr-type="{{ $taxRate->type }}" data-tr-status="{{ $taxRate->is_active ? 'active' : 'inactive' }}">
                                 <td class="ps-4 fw-bold">{{ $taxRate->name }}</td>
                                 <td class="text-uppercase">{{ $taxRate->type }}</td>
                                 <td class="text-end">{{ number_format($taxRate->rate, 2) }}%</td>
@@ -163,6 +183,25 @@
                 $('#resetTrForm').fadeOut();
                 $('#trSubmitBtn').html('Create Tax Rate');
             });
+
+            // All rows are already rendered (no pagination for a naturally small
+            // list) so filtering happens client-side, same as Chart of Accounts.
+            function applyTrFilters() {
+                const term = $('#trSearchInput').val().trim().toLowerCase();
+                const type = $('#trTypeFilter').val();
+                const status = $('#trStatusFilter').val();
+
+                $('#trTableBody tr[data-tr-search]').each(function () {
+                    const row = $(this);
+                    const matchesTerm = term === '' || row.data('tr-search').includes(term);
+                    const matchesType = type === '' || row.data('tr-type') === type;
+                    const matchesStatus = status === '' || row.data('tr-status') === status;
+                    row.toggle(matchesTerm && matchesType && matchesStatus);
+                });
+            }
+
+            $('#trSearchInput').on('input', applyTrFilters);
+            $('#trTypeFilter, #trStatusFilter').on('change', applyTrFilters);
         });
     </script>
 @endpush

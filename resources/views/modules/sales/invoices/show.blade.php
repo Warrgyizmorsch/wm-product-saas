@@ -117,7 +117,7 @@
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 6mm 8mm;
+                margin: 0 !important;
             }
 
             /* Hide top header, sidebar, buttons, and navigation */
@@ -133,37 +133,61 @@
                 display: none !important;
             }
 
-            /* Reset page wrappers for full height & width printing */
-            html, body {
+            /* Reset page wrappers for full height & width printing and remove top offsets */
+            html, body, main, .nxl-container, .nxl-content, .main-content, .row, .col-12 {
                 background: #ffffff !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 height: auto !important;
                 overflow: visible !important;
-                font-size: 11px !important;
+                font-size: 10px !important;
             }
 
-            .nxl-container,
-            .nxl-content,
-            .main-content {
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100% !important;
-                max-width: 100% !important;
-            }
-
-            /* Invoice sheet: static layout so browser can split across pages */
+            /* Invoice sheet: static layout with minimal top padding */
             .invoice-sheet {
                 position: static !important;
                 width: 100% !important;
                 max-width: 100% !important;
                 margin: 0 !important;
-                padding: 0 !important;
+                padding: 2mm 6mm 2mm 6mm !important;
                 border: none !important;
                 box-shadow: none !important;
                 border-radius: 0 !important;
                 background: #ffffff !important;
                 overflow: visible !important;
+            }
+
+            .invoice-sheet > div:first-child,
+            .invoice-sheet > .row:first-child {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+
+            .invoice-sheet .row {
+                --bs-gutter-x: 0.75rem !important;
+                --bs-gutter-y: 0.35rem !important;
+                margin-bottom: 4px !important;
+            }
+
+            .invoice-sheet .avatar-text {
+                width: 36px !important;
+                height: 36px !important;
+                font-size: 1rem !important;
+            }
+
+            .invoice-sheet h2 {
+                font-size: 17px !important;
+                margin-bottom: 2px !important;
+            }
+
+            .invoice-sheet h4 {
+                font-size: 13.5px !important;
+                margin-bottom: 2px !important;
+            }
+
+            .invoice-sheet h6 {
+                font-size: 11px !important;
+                margin-bottom: 2px !important;
             }
 
             /* Ensure background colors in cards & headers print cleanly */
@@ -176,39 +200,90 @@
 
             .invoice-sheet .invoice-table thead th {
                 background-color: #f8fafc !important;
-                padding: 4px 6px !important;
-                font-size: 10px !important;
+                padding: 3px 5px !important;
+                font-size: 9.5px !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
 
             .invoice-sheet .invoice-table td {
-                padding: 4px 6px !important;
-                font-size: 11px !important;
+                padding: 3px 5px !important;
+                font-size: 10px !important;
             }
 
             .invoice-sheet .p-3 {
-                padding: 6px 10px !important;
+                padding: 4px 8px !important;
             }
 
             .invoice-sheet .mb-4,
-            .invoice-sheet .mb-3 {
-                margin-bottom: 8px !important;
+            .invoice-sheet .mb-3,
+            .invoice-sheet .mb-5 {
+                margin-bottom: 4px !important;
             }
 
+            .invoice-sheet .mt-3,
             .invoice-sheet .mt-4,
             .invoice-sheet .mt-5 {
-                margin-top: 8px !important;
+                margin-top: 4px !important;
             }
 
             .invoice-sheet .pb-4 {
-                padding-bottom: 6px !important;
+                padding-bottom: 4px !important;
             }
 
-            .invoice-sheet fs-12,
+            .invoice-sheet .pt-2,
+            .invoice-sheet .pt-3,
+            .invoice-sheet .pt-4 {
+                padding-top: 4px !important;
+            }
+
             .invoice-sheet .fs-12,
             .invoice-sheet .fs-13 {
-                font-size: 11px !important;
+                font-size: 10.5px !important;
+            }
+
+            .invoice-sheet .fs-14 {
+                font-size: 11.5px !important;
+            }
+
+            .summary-table-box .p-3 {
+                padding: 5px 8px !important;
+            }
+
+            .summary-table-box .mb-2 {
+                margin-bottom: 2px !important;
+            }
+
+            .summary-table-box .my-2 {
+                margin: 2px 0 !important;
+            }
+
+            .summary-table-box .py-1\.5 {
+                padding-top: 2px !important;
+                padding-bottom: 2px !important;
+            }
+
+            .summary-table-box .fs-12 {
+                font-size: 10px !important;
+            }
+
+            .summary-table-box .fs-13 {
+                font-size: 10.5px !important;
+            }
+
+            .summary-table-box .fs-16 {
+                font-size: 13px !important;
+            }
+
+            .gst-summary-box table th,
+            .gst-summary-box table td {
+                padding: 2px 4px !important;
+                font-size: 9.5px !important;
+            }
+
+            .bank-details-box {
+                padding: 4px 8px !important;
+                margin-bottom: 4px !important;
             }
 
             /* Avoid breaking inside table rows */
@@ -217,7 +292,7 @@
                 break-inside: avoid;
             }
 
-            /* Strict Page Break Protection for Cards */
+            /* Page Break Protection for Cards */
             .bank-details-box,
             .gst-summary-box,
             .summary-table-box {
@@ -230,7 +305,7 @@
                 border: none !important;
                 background: transparent !important;
                 padding: 0 !important;
-                margin-top: 6px !important;
+                margin-top: 4px !important;
                 page-break-inside: auto !important;
                 break-inside: auto !important;
             }
@@ -251,7 +326,7 @@
                 break-inside: auto !important;
             }
 
-            /* Restore list-item display so numbers (1., 2., 3...) show cleanly in print */
+            /* Restore list-item display so numbers show cleanly in print */
             .terms-box ol > li,
             .terms-box ul > li,
             .terms-box li {
@@ -260,7 +335,7 @@
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
                 break-inside: avoid-page !important;
-                margin-bottom: 4px !important;
+                margin-bottom: 2px !important;
             }
 
             .terms-box p {
@@ -268,7 +343,7 @@
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
                 break-inside: avoid-page !important;
-                margin-bottom: 4px !important;
+                margin-bottom: 2px !important;
             }
 
             .terms-box li *,
@@ -280,8 +355,8 @@
             .signature-footer-block {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
-                margin-top: 10px !important;
-                padding-top: 8px !important;
+                margin-top: 6px !important;
+                padding-top: 4px !important;
             }
         }
     </style>
@@ -459,14 +534,14 @@
                 </div>
 
                 <!-- 4. Summary & Calculations Row -->
-                <div class="row pt-2 fs-13 text-dark mb-3">
-                    <!-- Left: GST Tax Rate Summary -->
+                <div class="row pt-2 fs-13 text-dark mb-4">
+                    <!-- Left: GST Tax Rate Summary, Bank Details & Terms -->
                     <div class="col-7">
                         @php
                             $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
                         @endphp
                         @if ($taxGroups->count() > 0 && $invoice->tax_amount > 0)
-                            <div class="card border shadow-none mb-0 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
+                            <div class="card border shadow-none mb-3 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
                                 <div class="py-1 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
                                     <span><i class="feather-pie-chart me-1 text-primary"></i>GST Tax Summary</span>
                                     <span class="badge bg-soft-primary text-primary fs-10" style="font-size: 10px;">{{ $invoice->gst_type === 'igst' ? 'IGST' : 'CGST + SGST' }}</span>
@@ -546,6 +621,23 @@
                                         </tfoot>
                                     </table>
                                 </div>
+                            </div>
+                        @endif
+
+                        <div class="p-3 bg-light bg-opacity-30 rounded border mb-3 bank-details-box" style="border-color: #cbd5e1 !important;">
+                            <h6 class="fw-bold text-dark fs-11 text-uppercase mb-2" style="letter-spacing: 0.5px;">Bank Payment Details:</h6>
+                            <div class="row fs-11 text-secondary g-2">
+                                <div class="col-6"><strong>Bank Name:</strong> State Bank of India</div>
+                                <div class="col-6"><strong>Account Name:</strong> {{ tenant() ? tenant()->name : 'SaaS ERP' }}</div>
+                                <div class="col-6"><strong>Account No:</strong> 398402948201</div>
+                                <div class="col-6"><strong>IFSC Code:</strong> SBIN0001234</div>
+                            </div>
+                        </div>
+
+                        @if ($invoice->notes)
+                            <div class="p-3 bg-light bg-opacity-30 rounded border terms-box" style="border-color: #cbd5e1 !important;">
+                                <h6 class="fw-bold text-dark fs-11 text-uppercase mb-1" style="letter-spacing: 0.5px;">Terms & Conditions / Customer Notes:</h6>
+                                <div class="mb-0 text-muted fs-12">{!! $invoice->notes !!}</div>
                             </div>
                         @endif
                     </div>
@@ -702,28 +794,6 @@
                                 </div>
                             @endif
                         </div>
-                    </div>
-                </div>
-
-                <!-- 4.5 Bank Details & Terms Row -->
-                <div class="row fs-13 text-dark mb-4">
-                    <div class="col-7">
-                        <div class="p-3 bg-light bg-opacity-30 rounded border mb-3 bank-details-box">
-                            <h6 class="fw-bold text-dark fs-11 text-uppercase mb-2" style="letter-spacing: 0.5px;">Bank Payment Details:</h6>
-                            <div class="row fs-11 text-secondary g-2">
-                                <div class="col-6"><strong>Bank Name:</strong> State Bank of India</div>
-                                <div class="col-6"><strong>Account Name:</strong> {{ tenant() ? tenant()->name : 'SaaS ERP' }}</div>
-                                <div class="col-6"><strong>Account No:</strong> 398402948201</div>
-                                <div class="col-6"><strong>IFSC Code:</strong> SBIN0001234</div>
-                            </div>
-                        </div>
-
-                        @if ($invoice->notes)
-                            <div class="p-3 bg-light bg-opacity-30 rounded border terms-box">
-                                <h6 class="fw-bold text-dark fs-11 text-uppercase mb-1" style="letter-spacing: 0.5px;">Terms & Conditions / Customer Notes:</h6>
-                                <div class="mb-0 text-muted fs-12">{!! $invoice->notes !!}</div>
-                            </div>
-                        @endif
                     </div>
                 </div>
 

@@ -41,9 +41,9 @@
                         <form action="{{ route('production.machines.unlink-asset', $machine->id) }}" method="POST"
                               onsubmit="return confirm('Unlink this fixed asset from the machine? The asset itself will not be affected.');">
                             @csrf
-                            <button type="submit" class="btn btn-sm btn-light border text-danger">
-                                <i class="feather-link-2 me-1"></i>Unlink
-                            </button>
+                            <x-ui.button type="submit" variant="light" icon="feather-link-2" class="border text-danger">
+                                Unlink
+                            </x-ui.button>
                         </form>
                     </div>
                 @else
@@ -61,9 +61,9 @@
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
-                            <button type="submit" class="btn btn-sm btn-primary">
-                                <i class="feather-link me-1"></i>Link
-                            </button>
+                            <x-ui.button type="submit" variant="primary" icon="feather-link">
+                                Link
+                            </x-ui.button>
                         </form>
                     @endif
                 @endif
@@ -78,7 +78,7 @@
                 <!-- Header with Close Button -->
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
                     <h4 class="fw-bold text-dark mb-0">{{ __('production.edit_machine_asset_with_name', ['name' => $machine->code]) }}</h4>
-                    <a href="{{ route('production.machines.index') }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
+                    <x-ui.button :href="route('production.machines.index')" variant="light" class="border">{{ __('production.cancel') }}</x-ui.button>
                 </div>
 
                 <div class="row g-4 fs-13 text-dark">
@@ -122,8 +122,8 @@
 
                 <!-- Footer Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">{{ __('production.update_machine_asset') }}</button>
-                    <a href="{{ route('production.machines.index') }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
+                    <x-ui.button type="submit" variant="primary" class="px-4">{{ __('production.update_machine_asset') }}</x-ui.button>
+                    <x-ui.button :href="route('production.machines.index')" variant="secondary" class="px-4">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

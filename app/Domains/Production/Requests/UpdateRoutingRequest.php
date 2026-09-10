@@ -64,6 +64,10 @@ class UpdateRoutingRequest extends FormRequest
             'operations.*.transfer_batch_quantity'            => 'nullable|numeric|min:0',
             'operations.*.transfer_lag_minutes'               => 'nullable|integer|min:0',
             'operations.*.material_id'                        => 'nullable|exists:products,id',
+            'operations.*.is_parallel'                        => 'nullable|boolean',
+            'operations.*.parallel_group'                     => 'nullable|string|max:50',
+            'operations.*.predecessor_sequence'               => 'nullable',
+            'operations.*.previous_operation_id'              => 'nullable|integer',
         ];
     }
 

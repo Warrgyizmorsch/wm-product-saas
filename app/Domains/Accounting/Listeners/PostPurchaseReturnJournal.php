@@ -128,6 +128,8 @@ class PostPurchaseReturnJournal
                 'debit'               => $vendorRefundAmount,
                 'credit'              => 0,
                 'description'         => "Purchase Return Debit Note {$return->return_number} - Vendor Refund",
+                'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_VENDOR,
+                'party_id'            => $return->vendor_id,
             ];
 
             // 2. Freight Expense / Return Loss - DEBIT (If Landed Cost was previously added)

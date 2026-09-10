@@ -6,6 +6,7 @@ use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\CrmAccount;
+use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Repositories\QuotationRepository;
 use App\Domains\CRM\Services\QuotationService;
@@ -391,6 +392,132 @@ class QuotationController extends Controller
 
         $this->quotationService->handleQuotationStatusChange($quotation, 'Rejected', $quotation->lead_id);
         return back()->with('success', 'Quotation rejected successfully!');
+    }
+
+    public function showConvertForm(int $id)
+    {
+        $quotation = $this->quotationRepo->find($id);
+        if (!$quotation) abort(404, 'Quotation not found.');
+        $this->authorize('update', $quotation);
+
+        $tenantId = $quotation->tenant_id ?? (tenant_id() ?? 1);
+        $lead = $quotation->lead;
+
+        $gstin = trim((string)($lead ? $lead->gstin : ($quotation->gstin ?? '')));
+        $email = strtolower(trim((string)($lead ? ($lead->company_email ?: $lead->email) : ($quotation->email ?: ($quotation->prepared_for_email !== '—' ? $quotation->prepared_for_email : '')))));
+        $phone = trim((string)($lead ? ($lead->company_phone ?: $lead->phone) : ($quotation->phone ?: ($quotation->prepared_for_phone !== '—' ? $quotation->prepared_for_phone : ''))));
+        $companyName = trim((string)($lead ? ($lead->company_name ?: $lead->contact_person) : ($quotation->prepared_for_name !== '—' ? $quotation->prepared_for_name : 'Client')));
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+
+        $matchedCustomers = collect();
+        $matchReasons = [];
+
+        // 1. Check by GSTIN
+        if (!empty($gstin)) {
+            $byGstin = Customer::where('tenant_id', $tenantId)->where('gstin', $gstin)->get();
+            if ($byGstin->isNotEmpty()) {
+                $matchedCustomers = $matchedCustomers->merge($byGstin);
+                $matchReasons[] = "GSTIN ({$gstin})";
+            }
+        }
+
+        // 2. Check by Email
+        if (!empty($email)) {
+            $byEmail = Customer::where('tenant_id', $tenantId)->whereRaw('LOWER(email) = ?', [$email])->get();
+            if ($byEmail->isNotEmpty()) {
+                $matchedCustomers = $matchedCustomers->merge($byEmail);
+                $matchReasons[] = "Email ({$email})";
+            }
+        }
+
+        // 3. Check by Phone
+        if (!empty($phone) || (!empty($cleanPhone) && strlen($cleanPhone) >= 5)) {
+            $byPhone = Customer::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($phone, $cleanPhone) {
+                    if (!empty($phone)) $q->where('phone', 'like', "%{$phone}%");
+                    if (!empty($cleanPhone) && strlen($cleanPhone) >= 5) {
+                        $q->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ["%{$cleanPhone}%"]);
+                    }
+                })->get();
+            if ($byPhone->isNotEmpty()) {
+                $matchedCustomers = $matchedCustomers->merge($byPhone);
+                $matchReasons[] = "Phone ({$phone})";
+            }
+        }
+
+        // 4. Check by Name
+        if (!empty($companyName) && strlen($companyName) >= 3 && !in_array($companyName, ['Client', 'New Client'], true)) {
+            $cleanComp = trim(preg_replace('/(pvt|ltd|private|limited|inc|corp|co)/i', '', $companyName));
+            if (!empty($cleanComp)) {
+                $byName = Customer::where('tenant_id', $tenantId)
+                    ->where('name', 'like', "%{$cleanComp}%")
+                    ->get();
+                if ($byName->isNotEmpty()) {
+                    $matchedCustomers = $matchedCustomers->merge($byName);
+                    $matchReasons[] = "Name ({$companyName})";
+                }
+            }
+        }
+
+        $matchedCustomers = $matchedCustomers->unique('id')->values();
+
+        // IF NO DUPLICATE MATCHED: Directly accept quotation and convert customer!
+        if ($matchedCustomers->isEmpty()) {
+            $quotation->update(['status' => 'Accepted']);
+            $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
+            return redirect()->route('crm.quotations.show', $quotation->id)
+                ->with('success', "Quotation #{$quotation->quotation_number} accepted and converted to Customer automatically!");
+        }
+
+        // IF DUPLICATES EXIST: Show Zoho CRM prompt
+        return view('modules.crm.leads.convert', compact('lead', 'quotation', 'matchedCustomers', 'matchReasons'));
+    }
+
+    public function processConvert(Request $request, int $id): RedirectResponse
+    {
+        $quotation = $this->quotationRepo->find($id);
+        if (!$quotation) abort(404, 'Quotation not found.');
+        $this->authorize('update', $quotation);
+
+        $request->validate([
+            'conversion_mode'      => 'required|string|in:existing,create_new',
+            'existing_customer_id' => 'required_if:conversion_mode,existing|nullable|integer|exists:customers,id',
+        ]);
+
+        $tenantId = $quotation->tenant_id ?? (tenant_id() ?? 1);
+        $mode = $request->input('conversion_mode');
+
+        if ($mode === 'existing') {
+            $customer = Customer::find($request->input('existing_customer_id'));
+            $account = CrmAccount::where('tenant_id', $tenantId)->where('customer_id', $customer->id)->first();
+            if (!$account) {
+                $account = CrmAccount::create([
+                    'tenant_id'   => $tenantId,
+                    'customer_id' => $customer->id,
+                    'name'        => $customer->name,
+                    'email'       => $customer->email,
+                    'phone'       => $customer->phone,
+                    'gstin'       => $customer->gstin,
+                    'status'      => 'active',
+                    'owner_id'    => auth()->id() ?: 1,
+                ]);
+            }
+
+            $quotation->update([
+                'status'         => 'Accepted',
+                'crm_account_id' => $account->id,
+            ]);
+
+            $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
+
+            return redirect()->route('crm.quotations.show', $quotation->id)
+                ->with('success', "Quotation #{$quotation->quotation_number} accepted and attached to existing customer '{$customer->name}'!");
+        } else {
+            $quotation->update(['status' => 'Accepted']);
+            $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
+            return redirect()->route('crm.quotations.show', $quotation->id)
+                ->with('success', "Quotation #{$quotation->quotation_number} accepted and converted to new Customer!");
+        }
     }
 
     public function destroy(int $id): RedirectResponse

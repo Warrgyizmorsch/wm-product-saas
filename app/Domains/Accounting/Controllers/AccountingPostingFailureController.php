@@ -7,25 +7,49 @@ use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class AccountingPostingFailureController extends Controller
 {
+    private const SORTABLE = ['occurred_at', 'model_class'];
+
     public function __construct(
         private readonly PostingFailureRecorder $recorder,
     ) {
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', Journal::class);
 
+        $filters = $request->only(['search', 'model_class', 'sort', 'direction']);
+
+        $sort = in_array($filters['sort'] ?? null, self::SORTABLE, true) ? $filters['sort'] : 'occurred_at';
+        $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
         $failures = AccountingPostingFailure::query()
             ->unresolved()
-            ->latest('occurred_at')
-            ->get();
+            ->when($filters['model_class'] ?? null, fn ($q, $modelClass) => $q->where('model_class', $modelClass))
+            ->when($filters['search'] ?? null, fn ($q, $search) => $q->where(function ($q) use ($search) {
+                $q->where('message', 'like', "%{$search}%")->orWhere('model_class', 'like', "%{$search}%");
+            }))
+            ->orderBy($sort, $direction)
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
 
-        return view('modules.accounting.posting-failures.index', compact('failures'));
+        $modelClasses = AccountingPostingFailure::query()
+            ->unresolved()
+            ->distinct()
+            ->orderBy('model_class')
+            ->pluck('model_class');
+
+        return view('modules.accounting.posting-failures.index', [
+            'failures' => $failures,
+            'filters' => $filters,
+            'modelClasses' => $modelClasses,
+        ]);
     }
 
     public function retry(AccountingPostingFailure $failure): RedirectResponse

@@ -25,15 +25,15 @@
 @endpush
 
 @section('page-actions')
-    <a href="{{ route('production.schedules.calendar') }}" class="btn btn-light me-2">
-        <i class="feather-calendar me-2"></i>{{ __('production.calendar_view') }}
-    </a>
-    <a href="{{ route('production.schedules.work-center-view') }}" class="btn btn-light me-2">
-        <i class="feather-grid me-2"></i>{{ __('production.work_center_view') }}
-    </a>
-    <a href="{{ route('production.schedules.create') }}" class="btn btn-primary">
-        <i class="feather-plus me-2"></i>{{ __('production.create_schedule') }}
-    </a>
+    <x-ui.button :href="route('production.schedules.calendar')" variant="light" icon="feather-calendar" class="me-2">
+        {{ __('production.calendar_view') }}
+    </x-ui.button>
+    <x-ui.button :href="route('production.schedules.work-center-view')" variant="light" icon="feather-grid" class="me-2">
+        {{ __('production.work_center_view') }}
+    </x-ui.button>
+    <x-ui.button :href="route('production.schedules.create')" variant="primary" icon="feather-plus">
+        {{ __('production.create_schedule') }}
+    </x-ui.button>
 @endsection
 
 @section('content')
@@ -180,8 +180,8 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('production.schedules.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
-                            <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
+                            <x-ui.button :href="route('production.schedules.index')" variant="light" class="border">{{ __('production.reset') }}</x-ui.button>
+                            <x-ui.button type="submit" variant="primary">{{ __('production.apply_filters') }}</x-ui.button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -293,8 +293,8 @@
                                         <p class="fs-13 text-muted">{{ __('production.cancel_schedule_warning') }}</p>
                                     </form>
                                     <x-slot name="footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.back') ?? 'Back' }}</button>
-                                        <button type="submit" class="btn btn-danger" onclick="document.getElementById('cancelForm{{ $schedule->id }}').submit();">{{ __('production.cancel_schedule') }}</button>
+                                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.back') ?? 'Back' }}</x-ui.button>
+                                        <x-ui.button type="submit" variant="danger" onclick="document.getElementById('cancelForm{{ $schedule->id }}').submit();">{{ __('production.cancel_schedule') }}</x-ui.button>
                                     </x-slot>
                                 </x-ui.modal>
                             </td>

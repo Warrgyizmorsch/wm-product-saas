@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\Listeners;
 
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Sales\Events\InvoicePosted;
@@ -43,6 +44,8 @@ class PostInvoiceJournal
                     'chart_of_account_id' => $accountsReceivable->id,
                     'debit' => (float) $invoice->total_amount,
                     'description' => "Invoice {$invoice->invoice_number}",
+                    'party_type' => JournalEntry::PARTY_CUSTOMER,
+                    'party_id' => $invoice->customer_id,
                 ],
                 [
                     'chart_of_account_id' => $salesRevenue->id,

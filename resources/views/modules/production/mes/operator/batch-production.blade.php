@@ -119,7 +119,7 @@
                             <td class="text-center">
                                 <div class="d-flex gap-1 justify-content-center flex-wrap">
                                     @if($item['can_log_progress'])
-                                        <x-ui.button size="sm" variant="info" class="text-white py-1 px-2 fs-11"
+                                        <x-ui.button variant="info" class="text-white py-1 px-2 fs-11"
                                             onclick="openLogProgressForBatch({{ $item['batch']->id }}, '{{ $item['batch']->batch_number }}', {{ $item['remaining_to_process'] }})"
                                             title="Log Progress">
                                             <i class="feather-edit-3 me-1"></i> Log
@@ -134,7 +134,7 @@
                                                 ->value('id');
                                         @endphp
                                         @if($wipId && $item['next_operation'])
-                                            <x-ui.button size="sm" variant="success" class="py-1 px-2 fs-11"
+                                            <x-ui.button variant="success" class="py-1 px-2 fs-11"
                                                 onclick="openTransferModal({{ $wipId }}, '{{ $item['batch']->batch_number }}', {{ $op->routing_operation_id }}, {{ $item['next_operation']->routing_operation_id }}, '{{ $item['next_operation']->name }}', {{ $item['ready_to_transfer'] }})"
                                                 title="Transfer WIP">
                                                 <i class="feather-send me-1"></i> Transfer
@@ -142,14 +142,14 @@
                                         @endif
                                     @endif
 
-                                    <x-ui.button size="sm" variant="light" class="border py-1 px-1 fs-11"
+                                    <x-ui.button variant="light" class="border py-1 px-1 fs-11"
                                         href="{{ route('production.labels.batches.print', $item['batch']->id) }}" target="_blank"
                                         title="Print Label">
                                         <i class="feather-printer"></i>
                                     </x-ui.button>
 
                                     @if($item['can_split'])
-                                        <x-ui.button size="sm" variant="light" class="border py-1 px-1 fs-11"
+                                        <x-ui.button variant="light" class="border py-1 px-1 fs-11"
                                             onclick="openSplitModal({{ $item['batch']->id }}, '{{ $item['batch']->batch_number }}', {{ $item['input_available'] }})"
                                             title="Split Batch">
                                             <i class="feather-git-commit"></i>
@@ -203,7 +203,7 @@
                                             ->value('id');
                                     @endphp
                                     @if($wipId && $item['next_operation'])
-                                        <x-ui.button size="sm" variant="warning" class="py-1 px-3 fs-11"
+                                        <x-ui.button variant="warning" class="py-1 px-3 fs-11"
                                             onclick="openTransferModal({{ $wipId }}, {{ $item['batch']->id }}, '{{ $item['batch']->batch_number }}', {{ $op->routing_operation_id }}, {{ $item['next_operation']->routing_operation_id }}, '{{ $item['next_operation']->name }}', {{ $item['ready_to_transfer'] }})">
                                             <i class="feather-send me-1"></i> Transfer WIP
                                         </x-ui.button>

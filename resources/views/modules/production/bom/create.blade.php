@@ -491,9 +491,8 @@
 
                 <!-- Footer Save and Cancel buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">{{ __('production.save_bom') }}</button>
-                    <a href="{{ route('production.boms.index') }}"
-                        class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
+                    <x-ui.button type="submit" variant="primary" class="px-4">{{ __('production.save_bom') }}</x-ui.button>
+                    <x-ui.button href="{{ route('production.boms.index') }}" variant="secondary" class="px-4">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>
@@ -526,9 +525,15 @@
                 },
 
                 fetchChildBomStatus(item) {
-                    if (!item.material_id) {
-                        item.child_bom_status = 'none';
-                        item.child_bom_versions = [];
+                    if (!item || !item.material_id) {
+                        if (item) {
+                            item.child_bom_status = 'none';
+                            item.child_bom_versions = [];
+                            item.child_bom_loading = false;
+                        }
+                        return;
+                    }
+                    if (item.child_bom_loading) {
                         return;
                     }
                     item.child_bom_loading = true;
@@ -565,7 +570,7 @@
                 init() {
                     window.bomAlpineInstance = this;
                     this.items = this.items.map((item, idx) => {
-                        const newItem = {
+                        return {
                             uid: item.uid || 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx,
                             material_id: item.material_id || '',
                             child_bom_id: item.child_bom_id || null,
@@ -581,14 +586,18 @@
                             child_bom_versions: [],
                             child_bom_loading: false
                         };
-                        if (newItem.material_id) {
-                            this.fetchChildBomStatus(newItem);
-                        }
-                        return newItem;
                     });
                     if (this.items.length === 0) {
                         this.addItem();
                     }
+
+                    this.$nextTick(() => {
+                        this.items.forEach(item => {
+                            if (item.material_id) {
+                                this.fetchChildBomStatus(item);
+                            }
+                        });
+                    });
 
                     // Store all routing options in memory on init
                     const allRoutings = [];
@@ -846,7 +855,7 @@
                         $select.data('select2-initialized', true);
                         $select.select2(self.select2RowOptions());
 
-                        // Capture type on init & trigger child BOM fetch if material selected
+                        // Capture type on init
                         var nameAttr = $select.attr('name') || '';
                         if (nameAttr.indexOf('material_id') !== -1) {
                             var val = $select.val();
@@ -854,9 +863,6 @@
                                 item.material_id = val;
                                 var selectedOption = $select.find('option[value="' + val + '"]');
                                 item.material_type = selectedOption.attr('data-type') || '';
-                                if (!item.child_bom_versions || item.child_bom_versions.length === 0) {
-                                    self.fetchChildBomStatus(item);
-                                }
                             }
                         } else if (nameAttr.indexOf('quantity_type') !== -1) {
                             var val = $select.val();

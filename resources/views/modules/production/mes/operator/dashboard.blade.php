@@ -163,19 +163,19 @@
                                                 @if($assign->status === 'assigned')
                                                     <form method="POST" action="{{ route('production.mes.assignments.accept', $assign->id) }}" class="flex-fill">
                                                         @csrf
-                                                        <x-ui.button type="submit" variant="success" size="sm" icon="feather-check" class="w-100 btn-touch">Accept</x-ui.button>
+                                                        <x-ui.button type="submit" variant="success" icon="feather-check" class="w-100 btn-touch">Accept</x-ui.button>
                                                     </form>
                                                     <form method="POST" action="{{ route('production.mes.assignments.reject', $assign->id) }}" class="flex-fill">
                                                         @csrf
-                                                        <x-ui.button type="submit" variant="outline-danger" size="sm" icon="feather-x" class="w-100 btn-touch">Reject</x-ui.button>
+                                                        <x-ui.button type="submit" variant="outline-danger" icon="feather-x" class="w-100 btn-touch">Reject</x-ui.button>
                                                     </form>
                                                 @elseif($assign->status === 'accepted')
                                                     @if($assign->operation && $assign->operation->status === 'completed')
-                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="secondary" size="sm" icon="feather-eye" class="">
+                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="secondary" icon="feather-eye" class="">
                                                             View
                                                         </x-ui.button>
                                                     @else
-                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="primary" size="sm" icon="feather-play" class="">
+                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="primary" icon="feather-play" class="">
                                                             Go to Execution
                                                         </x-ui.button>
                                                     @endif
@@ -209,7 +209,7 @@
                                         <div class="fw-bold text-dark fs-14">{{ $r->orderOperation->name ?? '—' }}</div>
                                         <small class="text-muted">Order: <strong>{{ $r->schedule->order->order_number ?? '—' }}</strong> | WC: {{ $r->workCenter->name ?? '—' }}</small>
                                     </div>
-                                    <x-ui.button href="{{ route('production.mes.operator.execution', $r->production_order_operation_id) }}" variant="light" size="sm" icon="feather-arrow-right" class="btn-touch border"></x-ui.button>
+                                    <x-ui.button href="{{ route('production.mes.operator.execution', $r->production_order_operation_id) }}" variant="light" icon="feather-arrow-right" class="btn-touch border"></x-ui.button>
                                 </div>
                             @empty
                                 <div class="text-center py-5 text-muted">

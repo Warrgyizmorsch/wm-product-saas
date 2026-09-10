@@ -95,7 +95,13 @@ class MesExecutionService
             }
 
             // Single-routing or fallback sequence check if no explicit dependencies exist
-            if (empty($predOrderOpIds) && $orderOp && $schedOp->sequence > 10) {
+            $isExplicitlyIndependentOrParallel = $orderOp && (
+                $orderOp->is_parallel
+                || ($orderOp->routing_operation_id && $orderOp->previous_operation_id === null)
+                || ($orderOp->relationLoaded('routingOperation') && $orderOp->routingOperation?->previous_operation_id === null)
+            );
+
+            if (empty($predOrderOpIds) && !$isExplicitlyIndependentOrParallel && $orderOp && $schedOp->sequence > 10) {
                 $prevSched = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                     ->where('sequence', '<', $schedOp->sequence)
                     ->orderBy('sequence', 'desc')
