@@ -1,3 +1,22 @@
+@php
+    $currentSort = $filters['sort'] ?? null;
+    $currentDirection = $filters['direction'] ?? 'desc';
+
+    $sortUrl = function (string $column) use ($currentSort, $currentDirection) {
+        $nextDirection = ($currentSort === $column && $currentDirection === 'asc') ? 'desc' : 'asc';
+
+        return request()->fullUrlWithQuery(['sort' => $column, 'direction' => $nextDirection]);
+    };
+
+    $sortIcon = function (string $column) use ($currentSort, $currentDirection) {
+        if ($currentSort !== $column) {
+            return 'feather-chevrons-up';
+        }
+
+        return $currentDirection === 'asc' ? 'feather-chevron-up' : 'feather-chevron-down';
+    };
+@endphp
+
 @extends('layouts.duralux')
 
 @section('title', 'Fixed Asset Register | SaaS ERP')
@@ -54,13 +73,29 @@
         <x-ui.table hoverable>
             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                 <tr>
-                    <th class="ps-4">Asset Code</th>
-                    <th>Name</th>
+                    <th class="ps-4">
+                        <a href="{{ $sortUrl('asset_code') }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1">
+                            Asset Code <i class="{{ $sortIcon('asset_code') }} fs-12"></i>
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ $sortUrl('name') }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1">
+                            Name <i class="{{ $sortIcon('name') }} fs-12"></i>
+                        </a>
+                    </th>
                     <th>Category</th>
-                    <th class="text-end">Capitalization Cost</th>
+                    <th class="text-end">
+                        <a href="{{ $sortUrl('capitalization_cost') }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1">
+                            Capitalization Cost <i class="{{ $sortIcon('capitalization_cost') }} fs-12"></i>
+                        </a>
+                    </th>
                     <th class="text-end">Accum. Depreciation</th>
                     <th class="text-end">Book Value</th>
-                    <th>Status</th>
+                    <th>
+                        <a href="{{ $sortUrl('status') }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1">
+                            Status <i class="{{ $sortIcon('status') }} fs-12"></i>
+                        </a>
+                    </th>
                     <th class="text-end pe-4">Actions</th>
                 </tr>
             </thead>

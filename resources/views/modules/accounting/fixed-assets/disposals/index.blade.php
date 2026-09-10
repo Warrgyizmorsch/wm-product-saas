@@ -85,30 +85,18 @@
     </x-ui.card>
 
     <!-- Rejection Reason Modal -->
-    <div class="modal fade" id="rejectActionModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg rounded-3">
-                <form id="rejectActionForm" method="POST" action="">
-                    @csrf
-                    <div class="modal-header bg-soft-danger text-danger border-bottom-0">
-                        <h5 class="modal-title fw-bold">
-                            <i class="feather-x-circle me-2"></i>Reject Disposal <span id="rejectModalDocNumber" class="text-dark"></span>
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-4">
-                        <div class="mb-3 text-start">
-                            <label class="form-label fw-bold text-dark fs-12 mb-1">Rejection reason isn't required by this workflow &mdash; approver decision only.</label>
-                        </div>
-                    </div>
-                    <div class="modal-footer bg-light border-top-0 px-4 py-3">
-                        <button type="button" class="btn btn-light btn-sm border" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold">Confirm Rejection</button>
-                    </div>
-                </form>
+    <x-ui.modal id="rejectActionModal" title="<i class='feather-x-circle me-2 text-danger'></i>Reject Disposal <span id='rejectModalDocNumber'></span>" centered :showFooter="false">
+        <form id="rejectActionForm" method="POST" action="">
+            @csrf
+            <div class="mb-3 text-start">
+                <label class="form-label fw-bold text-dark fs-12 mb-1">Rejection reason isn't required by this workflow &mdash; approver decision only.</label>
             </div>
-        </div>
-    </div>
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                <x-ui.button type="button" variant="light" size="sm" class="border" data-bs-dismiss="modal">Cancel</x-ui.button>
+                <x-ui.button type="submit" variant="danger" size="sm">Confirm Rejection</x-ui.button>
+            </div>
+        </form>
+    </x-ui.modal>
 @endsection
 
 @push('scripts')

@@ -30,7 +30,9 @@
             <tbody class="fs-13 text-dark">
                 @forelse ($vendors as $row)
                     <tr>
-                        <td class="ps-4 fw-semibold">{{ $row['name'] }}</td>
+                        <td class="ps-4 fw-semibold">
+                            <a href="{{ route('accounting.reports.party-ledger', ['party_type' => 'vendor', 'party_id' => $row['vendor_id']]) }}">{{ $row['name'] }}</a>
+                        </td>
                         <td class="text-end">{{ number_format($row['buckets']['not_due'], 2) }}</td>
                         <td class="text-end">{{ number_format($row['buckets']['0_30'], 2) }}</td>
                         <td class="text-end">{{ number_format($row['buckets']['31_60'], 2) }}</td>

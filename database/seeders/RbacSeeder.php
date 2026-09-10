@@ -301,6 +301,10 @@ class RbacSeeder extends Seeder
             'accounting.vouchers.debit_note.post' => $permissions['accounting.vouchers.debit_note.post'],
             'accounting.bank_reconciliation.view' => $permissions['accounting.bank_reconciliation.view'],
             'accounting.bank_reconciliation.create' => $permissions['accounting.bank_reconciliation.create'],
+            'accounting.budgets.view' => $permissions['accounting.budgets.view'],
+            'accounting.budgets.create' => $permissions['accounting.budgets.create'],
+            'accounting.budgets.update' => $permissions['accounting.budgets.update'],
+            'accounting.budgets.delete' => $permissions['accounting.budgets.delete'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
             'fixed_assets.categories.create' => $permissions['fixed_assets.categories.create'],
             'fixed_assets.categories.edit' => $permissions['fixed_assets.categories.edit'],
@@ -334,6 +338,7 @@ class RbacSeeder extends Seeder
             'accounting.vouchers.credit_note.view' => $permissions['accounting.vouchers.credit_note.view'],
             'accounting.vouchers.debit_note.view' => $permissions['accounting.vouchers.debit_note.view'],
             'accounting.bank_reconciliation.view' => $permissions['accounting.bank_reconciliation.view'],
+            'accounting.budgets.view' => $permissions['accounting.budgets.view'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
             'fixed_assets.assets.view' => $permissions['fixed_assets.assets.view'],
             'fixed_assets.depreciation.view' => $permissions['fixed_assets.depreciation.view'],
@@ -582,6 +587,11 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.bank_reconciliation.view', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'view'],
             ['name' => 'accounting.bank_reconciliation.create', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'create'],
             ['name' => 'accounting.bank_reconciliation.complete', 'module' => 'accounting', 'entity' => 'bank_reconciliation', 'action' => 'complete'],
+            ['name' => 'accounting.budgets.view', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'view'],
+            ['name' => 'accounting.budgets.create', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'create'],
+            ['name' => 'accounting.budgets.update', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'update'],
+            ['name' => 'accounting.budgets.delete', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'delete'],
+            ['name' => 'accounting.budgets.approve', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'approve'],
         ];
 
         $permissions = [];

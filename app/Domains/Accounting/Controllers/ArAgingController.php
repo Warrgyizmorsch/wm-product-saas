@@ -53,6 +53,7 @@ class ArAgingController extends Controller
             $balance = (float) $invoice->balance_due;
 
             $customers[$customerId] ??= [
+                'customer_id' => $customerId,
                 'name' => $customerName,
                 'buckets' => $buckets,
                 'total' => 0.0,

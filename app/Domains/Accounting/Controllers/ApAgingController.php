@@ -52,6 +52,7 @@ class ApAgingController extends Controller
             $balance = (float) $bill->due_amount;
 
             $vendors[$vendorId] ??= [
+                'vendor_id' => $vendorId,
                 'name' => $vendorName,
                 'buckets' => $buckets,
                 'total' => 0.0,

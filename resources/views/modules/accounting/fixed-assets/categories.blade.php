@@ -9,9 +9,9 @@
         <x-ui.button href="{{ route('accounting.fixed-assets.index') }}" variant="light" icon="feather-list" class="border">
             Asset Register
         </x-ui.button>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
-            <i class="feather-plus me-2"></i>Add Category
-        </button>
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+            Add Category
+        </x-ui.button>
     </div>
 @endsection
 
@@ -125,15 +125,9 @@
     </x-ui.card>
 
     <!-- MODAL: ADD CATEGORY -->
-    <div class="modal fade" id="addCategoryModal" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold"><i class="feather-sliders me-2 text-primary"></i>Add Asset Category</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form action="{{ route('accounting.fixed-assets.categories.store') }}" method="POST">
-                    @csrf
+    <x-ui.modal id="addCategoryModal" title="<i class='feather-sliders me-2 text-primary'></i>Add Asset Category" size="lg" centered :showFooter="false">
+        <form action="{{ route('accounting.fixed-assets.categories.store') }}" method="POST">
+            @csrf
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -198,20 +192,12 @@
                         <button type="submit" class="btn btn-primary px-4">Add Category</button>
                         <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
+        </form>
+    </x-ui.modal>
 
     <!-- MODAL: EDIT CATEGORY -->
-    <div class="modal fade" id="editCategoryModal" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold"><i class="feather-sliders me-2 text-primary"></i>Edit Asset Category</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form id="editCategoryForm" method="POST">
+    <x-ui.modal id="editCategoryModal" title="<i class='feather-sliders me-2 text-primary'></i>Edit Asset Category" size="lg" centered :showFooter="false">
+        <form id="editCategoryForm" method="POST">
                     @csrf
                     @method('PUT')
                     <div class="modal-body">
@@ -278,10 +264,8 @@
                         <button type="submit" class="btn btn-primary px-4">Save Changes</button>
                         <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
+        </form>
+    </x-ui.modal>
 
     @push('scripts')
         <script>

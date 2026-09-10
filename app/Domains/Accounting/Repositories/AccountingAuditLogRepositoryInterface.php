@@ -10,7 +10,7 @@ interface AccountingAuditLogRepositoryInterface
     public function create(array $data): AccountingAuditLog;
 
     /**
-     * @param array{subject_type?: string, event_type?: string, from?: string, to?: string} $filters
+     * @param array{subject_type?: string, event_type?: string, from?: string, to?: string, search?: string, sort?: string, direction?: string} $filters
      */
     public function paginate(array $filters = [], int $perPage = 25): LengthAwarePaginator;
 }

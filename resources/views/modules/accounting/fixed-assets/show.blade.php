@@ -158,13 +158,24 @@
             <p class="fs-13 text-muted">Establishes this asset's financial identity: capitalization cost, useful life, depreciation method and start date. Leave a field blank to use the category's default where available.</p>
             <div class="row g-3 fs-13">
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Acquisition Cost" name="acquisition_cost" :value="old('acquisition_cost', $asset->purchase_cost)" placeholder="0.00" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Acquisition Cost" name="acquisition_cost" id="capAcquisitionCost" :value="old('acquisition_cost', $asset->purchase_cost)" placeholder="0.00" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Directly Attributable Cost" name="directly_attributable_cost" :value="old('directly_attributable_cost')" placeholder="0.00" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Directly Attributable Cost" name="directly_attributable_cost" id="capDirectCost" :value="old('directly_attributable_cost')" placeholder="0.00" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Non-recoverable Tax" name="non_recoverable_tax" :value="old('non_recoverable_tax')" placeholder="0.00" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Recoverable Tax (GST/ITC)" name="recoverable_tax" id="capRecoverableTax" :value="old('recoverable_tax')" placeholder="0.00" />
+                    <small class="form-text text-muted fs-11 d-block mt-n2 mb-2">Tracked for reference only — not part of the capitalized cost.</small>
+                </div>
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Non-recoverable Tax" name="non_recoverable_tax" id="capNonRecoverableTax" :value="old('non_recoverable_tax')" placeholder="0.00" />
+                    <small class="form-text text-muted fs-11 d-block mt-n2 mb-2">Blocked ITC — added to the capitalized cost.</small>
+                </div>
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center bg-light rounded px-3 py-2">
+                        <span class="fw-semibold fs-13 text-dark">Capitalization Cost (Acquisition + Attributable + Non-recoverable Tax)</span>
+                        <span class="fw-bold fs-15 text-primary" id="capCostPreview">0.00</span>
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" inputType="number" label="Residual Value" name="residual_value" :value="old('residual_value')" placeholder="Defaults from category" />
@@ -189,3 +200,21 @@
         </x-ui.modal>
     @endif
 @endsection
+
+@push('scripts')
+    <script>
+        $(document).ready(function () {
+            function updateCapCostPreview() {
+                const acquisition = parseFloat($('#capAcquisitionCost').val()) || 0;
+                const direct = parseFloat($('#capDirectCost').val()) || 0;
+                const nonRecoverableTax = parseFloat($('#capNonRecoverableTax').val()) || 0;
+                const total = acquisition + direct + nonRecoverableTax;
+
+                $('#capCostPreview').text(total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            }
+
+            $('#capAcquisitionCost, #capDirectCost, #capNonRecoverableTax').on('input', updateCapCostPreview);
+            updateCapCostPreview();
+        });
+    </script>
+@endpush

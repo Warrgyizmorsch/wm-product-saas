@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\Listeners;
 
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
@@ -56,6 +57,8 @@ class PostVendorPaymentJournal
                     'description' => $isAdvance
                         ? "Advance to Vendor ({$vendorName})"
                         : "Accounts Payable settled ({$vendorName})",
+                    'party_type' => JournalEntry::PARTY_VENDOR,
+                    'party_id' => $payment->vendor_id,
                 ],
                 [
                     'chart_of_account_id' => $paymentAccount->id,

@@ -7,6 +7,8 @@ use App\Domains\Accounting\Controllers\ApAgingController;
 use App\Domains\Accounting\Controllers\ArAgingController;
 use App\Domains\Accounting\Controllers\BalanceSheetController;
 use App\Domains\Accounting\Controllers\BankReconciliationController;
+use App\Domains\Accounting\Controllers\BudgetController;
+use App\Domains\Accounting\Controllers\BudgetVsActualController;
 use App\Domains\Accounting\Controllers\CashFlowController;
 use App\Domains\Accounting\Controllers\ChartOfAccountController;
 use App\Domains\Accounting\Controllers\CostCenterController;
@@ -23,6 +25,7 @@ use App\Domains\Accounting\Controllers\GstSummaryController;
 use App\Domains\Accounting\Controllers\Gstr1Controller;
 use App\Domains\Accounting\Controllers\Gstr3bController;
 use App\Domains\Accounting\Controllers\JournalController;
+use App\Domains\Accounting\Controllers\PartyLedgerController;
 use App\Domains\Accounting\Controllers\ProfitLossController;
 use App\Domains\Accounting\Controllers\TaxRateController;
 use App\Domains\Accounting\Controllers\TrialBalanceController;
@@ -65,6 +68,14 @@ Route::prefix('accounting')
         Route::post('bank-reconciliation/{reconciliation}/match', [BankReconciliationController::class, 'match'])->name('bank-reconciliation.match');
         Route::post('bank-reconciliation/{reconciliation}/complete', [BankReconciliationController::class, 'complete'])->name('bank-reconciliation.complete');
 
+        Route::get('budgets', [BudgetController::class, 'index'])->name('budgets.index');
+        Route::get('budgets/create', [BudgetController::class, 'create'])->name('budgets.create');
+        Route::post('budgets', [BudgetController::class, 'store'])->name('budgets.store');
+        Route::get('budgets/{budget}/edit', [BudgetController::class, 'edit'])->name('budgets.edit');
+        Route::put('budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update');
+        Route::delete('budgets/{budget}', [BudgetController::class, 'destroy'])->name('budgets.destroy');
+        Route::post('budgets/{budget}/approve', [BudgetController::class, 'approve'])->name('budgets.approve');
+
         Route::get('journals', [JournalController::class, 'index'])->name('journals.index');
         Route::get('journals/create', [JournalController::class, 'create'])->name('journals.create');
         Route::post('journals', [JournalController::class, 'store'])->name('journals.store');
@@ -74,6 +85,7 @@ Route::prefix('accounting')
         Route::get('reports/day-book', [DayBookController::class, 'index'])->name('reports.day-book');
         Route::get('reports/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.trial-balance');
         Route::get('reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
+        Route::get('reports/party-ledger', [PartyLedgerController::class, 'index'])->name('reports.party-ledger');
         Route::get('reports/balance-sheet', [BalanceSheetController::class, 'index'])->name('reports.balance-sheet');
         Route::get('reports/balance-sheet/pdf', [BalanceSheetController::class, 'downloadPdf'])->name('reports.balance-sheet.pdf');
         Route::get('reports/profit-loss', [ProfitLossController::class, 'index'])->name('reports.profit-loss');
@@ -84,6 +96,7 @@ Route::prefix('accounting')
         Route::get('reports/gstr1', [Gstr1Controller::class, 'index'])->name('reports.gstr1');
         Route::get('reports/gstr3b', [Gstr3bController::class, 'index'])->name('reports.gstr3b');
         Route::get('reports/audit-trail', [AccountingAuditLogController::class, 'index'])->name('reports.audit-trail');
+        Route::get('reports/budget-vs-actual', [BudgetVsActualController::class, 'index'])->name('reports.budget-vs-actual');
 
         Route::get('posting-failures', [AccountingPostingFailureController::class, 'index'])->name('posting-failures.index');
         Route::post('posting-failures/{failure}/retry', [AccountingPostingFailureController::class, 'retry'])->name('posting-failures.retry');

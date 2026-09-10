@@ -107,6 +107,8 @@ class JournalRepository implements JournalRepositoryInterface
                 'branch_id' => $journal->branch_id,
                 'chart_of_account_id' => $line['chart_of_account_id'],
                 'cost_center_id' => $line['cost_center_id'] ?? null,
+                'party_type' => $line['party_type'] ?? null,
+                'party_id' => $line['party_id'] ?? null,
                 'debit' => $line['debit'] ?? 0,
                 'credit' => $line['credit'] ?? 0,
                 'description' => $line['description'] ?? null,
@@ -151,6 +153,35 @@ class JournalRepository implements JournalRepositoryInterface
             'debit' => (float) ($totals->debit ?? 0),
             'credit' => (float) ($totals->credit ?? 0),
         ];
+    }
+
+    public function partyOpeningBalance(string $partyType, int $partyId, \DateTimeInterface $before): array
+    {
+        $totals = JournalEntry::query()
+            ->where('party_type', $partyType)
+            ->where('party_id', $partyId)
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('journal_date', '<', $before))
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->first();
+
+        return [
+            'debit' => (float) ($totals->debit ?? 0),
+            'credit' => (float) ($totals->credit ?? 0),
+        ];
+    }
+
+    public function partyLedgerEntries(string $partyType, int $partyId, \DateTimeInterface $from, \DateTimeInterface $to): Collection
+    {
+        return JournalEntry::query()
+            ->where('party_type', $partyType)
+            ->where('party_id', $partyId)
+            ->whereHas('journal', fn ($q) => $q
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->whereBetween('journal_date', [$from, $to]))
+            ->with('journal', 'account')
+            ->get()
+            ->sortBy(fn ($entry) => $entry->journal->journal_date)
+            ->values();
     }
 
     public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection

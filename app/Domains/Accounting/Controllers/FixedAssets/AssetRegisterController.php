@@ -28,7 +28,11 @@ class AssetRegisterController extends Controller
     {
         abort_unless($this->policy->viewAny($request->user()), 403);
 
-        $filters = $request->only(['status', 'search', 'category_id']);
+        $filters = $request->only(['status', 'search', 'category_id', 'sort', 'direction']);
+
+        $sortable = ['asset_code', 'name', 'purchase_date', 'capitalization_cost', 'status'];
+        $sort = in_array($filters['sort'] ?? null, $sortable, true) ? $filters['sort'] : null;
+        $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
         $assets = Asset::with('category')
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
@@ -40,7 +44,7 @@ class AssetRegisterController extends Controller
                         ->orWhere('serial_number', 'like', "%{$search}%");
                 });
             })
-            ->orderByDesc('id')
+            ->when($sort, fn ($q) => $q->orderBy($sort, $direction), fn ($q) => $q->orderByDesc('id'))
             ->paginate(15)
             ->withQueryString();
 

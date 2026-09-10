@@ -12,6 +12,9 @@ class JournalEntry extends BaseModel
 {
     use HasFactory, BelongsToCompany, BelongsToBranch;
 
+    public const PARTY_CUSTOMER = 'customer';
+    public const PARTY_VENDOR = 'vendor';
+
     protected $table = 'journal_entries';
 
     protected $fillable = [
@@ -21,6 +24,8 @@ class JournalEntry extends BaseModel
         'journal_id',
         'chart_of_account_id',
         'cost_center_id',
+        'party_type',
+        'party_id',
         'debit',
         'credit',
         'description',

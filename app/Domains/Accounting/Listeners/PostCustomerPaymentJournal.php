@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\Listeners;
 
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
@@ -64,6 +65,8 @@ class PostCustomerPaymentJournal
                     'chart_of_account_id' => $creditAccount->id,
                     'credit' => (float) $payment->amount,
                     'description' => "Payment {$payment->payment_number}",
+                    'party_type' => JournalEntry::PARTY_CUSTOMER,
+                    'party_id' => $payment->customer_id,
                 ],
             ], [
                 'tenant_id' => $payment->tenant_id,

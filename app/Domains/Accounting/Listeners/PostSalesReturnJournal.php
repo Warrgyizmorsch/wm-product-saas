@@ -146,6 +146,8 @@ class PostSalesReturnJournal
                 'chart_of_account_id' => $accountsReceivable->id,
                 'credit'              => $totalCreditNoteRefund,
                 'description'         => "Credit Note Total Refund {$salesReturn->return_number}",
+                'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_CUSTOMER,
+                'party_id'            => $salesReturn->customer_id,
             ];
 
             $creditNoteJournal = $this->journals->post($lines, [

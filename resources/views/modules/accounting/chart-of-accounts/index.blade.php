@@ -12,6 +12,14 @@
 @section('breadcrumb', 'Accounting / Chart of Accounts')
 
 @section('page-actions')
+    <x-ui.filter label="Filters">
+        <form method="GET">
+            <x-ui.select label="Type" name="type" :selected="$filters['type'] ?? ''" :options="
+                ['' => 'All'] + collect(\App\Domains\Accounting\Models\ChartOfAccount::TYPES)->mapWithKeys(fn ($t) => [$t => ucfirst($t)])->all()
+            " />
+            <x-ui.button type="submit" variant="primary" size="sm" class="w-100">Apply</x-ui.button>
+        </form>
+    </x-ui.filter>
     @can('create', \App\Domains\Accounting\Models\ChartOfAccount::class)
         <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#chartOfAccountModal">
             New Account
@@ -45,6 +53,14 @@
     </div>
 
     <x-ui.card title="Accounts" bodyClass="p-0" class="accounting-dense">
+        <div class="d-flex align-items-center gap-3 p-3 border-bottom">
+            <div class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 280px; max-width: 360px;">
+                <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                <input type="text" id="coaSearchInput" class="form-control border-0 bg-transparent p-0 fs-13"
+                       placeholder="Search code or name..." style="box-shadow: none; height: 32px;">
+            </div>
+        </div>
+
         <x-ui.table hoverable>
             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                 <tr>
@@ -55,10 +71,10 @@
                     <th class="text-end pe-4">Actions</th>
                 </tr>
             </thead>
-            <tbody class="fs-13 text-dark">
+            <tbody class="fs-13 text-dark" id="coaTableBody">
                 @forelse ($tree as $row)
                     @php $account = $row['account']; @endphp
-                    <tr>
+                    <tr data-coa-search="{{ strtolower($account->code . ' ' . $account->name) }}">
                         <td class="ps-4" style="padding-left: {{ 24 + $row['depth'] * 22 }}px !important;">
                             <span class="fw-bold">{{ $account->code }}</span>
                             <span class="text-muted">{{ $account->name }}</span>
@@ -253,6 +269,19 @@
             @if ($errors->any())
                 new bootstrap.Modal(coaModal).show();
             @endif
+
+            // Client-side search: the tree is fully rendered server-side (no
+            // pagination — see ChartOfAccountController::index()'s comment on
+            // why), so filtering rows in place is simpler and safer than a
+            // backend query that would have to reconcile matched children
+            // with their unmatched parents.
+            $('#coaSearchInput').on('input', function () {
+                const term = $(this).val().trim().toLowerCase();
+                $('#coaTableBody tr[data-coa-search]').each(function () {
+                    const matches = term === '' || $(this).data('coa-search').includes(term);
+                    $(this).toggle(matches);
+                });
+            });
         });
     </script>
 @endpush
