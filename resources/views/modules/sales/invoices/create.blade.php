@@ -306,7 +306,7 @@
                             </div>
                         </div>
 
-                        <x-ui.odoo-form-ui type="editor" label="Invoice Notes / Terms & Conditions" name="notes" editorHeight="ht-150">{!! old('notes') !!}</x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="editor" label="Invoice Notes / Terms & Conditions" name="notes" editorHeight="ht-150">{!! old('notes', $salesOrder?->terms_conditions ?: ($salesOrder?->notes ?: '')) !!}</x-ui.odoo-form-ui>
                     </div>
 
                     <!-- Right Side: Order Summary Card -->

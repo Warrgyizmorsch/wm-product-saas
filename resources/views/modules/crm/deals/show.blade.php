@@ -433,20 +433,37 @@
                 </a>
 
 
+                @php
+                    $hasAcceptedQuotation = $deal->quotations->contains(fn($q) => in_array($q->status, ['Accepted', 'Converted', 'Won']));
+                    $hasCustomer = !empty($deal->account?->customer_id);
+                    $acceptedQuote = $deal->quotations->firstWhere('status', 'Accepted') ?: ($deal->quotations->firstWhere('status', 'Converted') ?: $activeQuotation);
+                @endphp
+
                 <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas">
                     <i class="feather-calendar me-1"></i> + Followup
                 </button>
 
-                @if($activeQuotation && ($activeQuotation->status === 'Accepted' || $deal->stage === 'Won'))
-                    <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-xs btn-success fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-shopping-cart me-1"></i> Convert to Sales Order
+                @if($deal->quotations->isEmpty())
+                    <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                        <i class="feather-file-plus me-1"></i> Create Quotation
                     </a>
                 @endif
 
-                @if($deal->quotations->isEmpty())
-                    <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-xs btn-success text-white fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                        <i class="feather-file-plus me-1"></i> Create Quotation
+                @if($hasAcceptedQuotation && !$hasCustomer)
+                    <a href="{{ route('crm.deals.showConvertForm', $deal->id) }}" class="btn btn-xs btn-warning text-dark fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                        <i class="feather-user-check me-1"></i> Convert to Customer
                     </a>
+                @endif
+
+                @if($hasCustomer)
+                    <span class="badge bg-soft-success text-success fw-bold px-2.5 py-1.5 fs-11 me-1">
+                        <i class="feather-check-circle me-1"></i> Customer Converted
+                    </span>
+                    @if($acceptedQuote && in_array($acceptedQuote->status, ['Accepted', 'Converted', 'Won']))
+                        <a href="{{ route('sales.orders.create', ['quotation_id' => $acceptedQuote->id]) }}" class="btn btn-xs btn-success fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                            <i class="feather-shopping-cart me-1"></i> Convert to Sales Order
+                        </a>
+                    @endif
                 @endif
 
 
@@ -1332,10 +1349,6 @@
                                                     <input type="hidden" name="status" value="Rejected">
                                                     <button type="submit" class="btn btn-xs btn-soft-danger fw-bold"><i class="feather-x-circle me-1"></i>Reject</button>
                                                 </form>
-                                            @elseif ($activeQuotation->status === 'Accepted')
-                                                <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-xs btn-success fw-bold">
-                                                    <i class="feather-shopping-cart me-1"></i>Convert to Sales Order
-                                                </a>
                                             @endif
                                         </div>
                                     </div>

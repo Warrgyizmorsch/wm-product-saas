@@ -98,10 +98,9 @@
                     </x-ui.filter>
                 </form>
 
-                <!-- Action Dropdown for Import/Export/Download Sample (Action button style) -->
                 <div class="dropdown d-inline-block">
-                    <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" :title="__('inventory.import_export_options')">
-                        <i class="feather feather-paperclip"></i>
+                    <a href="javascript:void(0)" class="action-dropdown-btn" data-bs-toggle="dropdown" aria-expanded="false" title="{{ __('inventory.import_export_options') }}">
+                        <i class="feather-paperclip"></i>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end fs-13 shadow-lg">
                         <li>

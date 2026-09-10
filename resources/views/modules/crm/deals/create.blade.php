@@ -304,11 +304,10 @@
                     </template>
                 </div>
             </div>
-        </div>
 
-            <div class="d-flex gap-2 justify-content-end border-top pt-4">
-                <a href="{{ route('crm.deals.index') }}" class="btn btn-light">Cancel</a>
-                <button type="submit" class="btn btn-primary px-4"><i class="feather-check me-1"></i>Save Deal</button>
+            <div class="d-flex gap-2 justify-content-end border-top pt-4 mt-3">
+                <a href="{{ route('crm.deals.index') }}" class="btn btn-light px-4">Cancel</a>
+                <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm"><i class="feather-check me-1"></i>Save Deal</button>
             </div>
         </form>
     </div>

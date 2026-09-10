@@ -15,9 +15,27 @@
         </a>
 
         @if ($quotation->status === 'Accepted')
-            <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="btn btn-sm btn-success fw-bold px-3">
-                <i class="feather-shopping-cart me-1.5"></i>Convert to Sales Order
-            </a>
+            @php
+                $deal = $quotation->crmDeal;
+                $hasCustomer = ($deal && strtolower($deal->stage) === 'won')
+                    || !empty($deal?->account?->customer_id)
+                    || !empty($quotation->account?->customer_id);
+            @endphp
+            @if (!$hasCustomer)
+                @if ($quotation->crm_deal_id)
+                    <a href="{{ route('crm.deals.showConvertForm', $quotation->crm_deal_id) }}" class="btn btn-sm btn-warning text-dark fw-bold px-3">
+                        <i class="feather-user-check me-1.5"></i>Convert to Customer
+                    </a>
+                @else
+                    <a href="{{ route('crm.quotations.showConvertForm', $quotation->id) }}" class="btn btn-sm btn-warning text-dark fw-bold px-3">
+                        <i class="feather-user-check me-1.5"></i>Convert to Customer
+                    </a>
+                @endif
+            @else
+                <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="btn btn-sm btn-success fw-bold px-3">
+                    <i class="feather-shopping-cart me-1.5"></i>Convert to Sales Order
+                </a>
+            @endif
         @endif
 
         <a href="{{ route('crm.quotations.download', $quotation->id) }}" class="btn btn-sm btn-primary fw-bold px-3">
@@ -113,7 +131,13 @@
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 0;
+                margin: 0 !important;
+            }
+
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
             }
 
             body > *,
@@ -133,24 +157,87 @@
                 visibility: visible;
             }
 
-            html, body {
+            html, body, main, .nxl-container, .nxl-content, .main-content, .row, .col-12 {
                 margin: 0 !important;
                 padding: 0 !important;
                 background: #fff !important;
+                font-size: 10px !important;
             }
             .invoice-sheet {
                 box-shadow: none !important;
                 border: 0 !important;
-                margin: 0 !important;
-                padding: 10mm 15mm !important;
+                margin: 0 auto !important;
+                padding: 2mm 6mm 2mm 6mm !important;
                 width: 100% !important;
                 max-width: 100% !important;
+                position: relative !important;
             }
 
-            .d-print-none,
+            .invoice-sheet > div:first-child,
+            .invoice-sheet > .row:first-child {
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+
+            .invoice-sheet .row {
+                --bs-gutter-x: 0.75rem !important;
+                --bs-gutter-y: 0.35rem !important;
+                margin-bottom: 4px !important;
+            }
+
+            .invoice-sheet .avatar-text {
+                width: 36px !important;
+                height: 36px !important;
+                font-size: 1rem !important;
+            }
+
+            .invoice-sheet h2 {
+                font-size: 17px !important;
+                margin-bottom: 2px !important;
+            }
+
+            .invoice-sheet h4 {
+                font-size: 13.5px !important;
+                margin-bottom: 2px !important;
+            }
+
+            .invoice-sheet .invoice-table thead th {
+                padding: 3px 5px !important;
+                font-size: 9.5px !important;
+            }
+
+            .invoice-sheet .invoice-table td {
+                padding: 3px 5px !important;
+                font-size: 10px !important;
+            }
+
+            .invoice-sheet .mb-4,
+            .invoice-sheet .mb-3,
+            .invoice-sheet .mb-5 {
+                margin-bottom: 4px !important;
+            }
+
+            .invoice-sheet .mt-4,
+            .invoice-sheet .mt-5 {
+                margin-top: 4px !important;
+            }
+
+            .invoice-sheet .p-3 {
+                padding: 5px 8px !important;
+            }
+
             .invoice-corner-ribbon {
                 display: none !important;
+            }
+
+            .d-print-none {
+                display: none !important;
                 visibility: hidden !important;
+            }
+
+            tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
         }
     </style>

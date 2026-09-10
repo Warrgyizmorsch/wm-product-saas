@@ -423,6 +423,8 @@ return [
         'lost' => 'LOST',
         'duplicates' => 'DUPLICATES',
     ],
+
+    'ignore_and_continue' => 'Ignore & Continue',
 ];
 
 

@@ -5,40 +5,93 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Sales Quotation - {{ $quotation->quotation_number }}</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        @page {
+            margin: 0;
+            size: A4 portrait;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
         body {
-            font-family: DejaVu Sans, sans-serif;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 11px;
             color: #1e293b;
             background: #ffffff;
-            padding: 24px 30px;
+            padding: 30px 35px;
+            position: relative;
         }
 
-        /* ── HEADER ─────────────────────────────────── */
-        .header-wrap {
+        /* ── CORNER RIBBON BADGE ───────────────────── */
+        .corner-ribbon-container {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 90px;
+            height: 90px;
+            overflow: hidden;
+            z-index: 10;
+        }
+        .corner-ribbon {
+            position: absolute;
+            top: 18px;
+            right: -24px;
+            width: 115px;
+            transform: rotate(45deg);
+            -webkit-transform: rotate(45deg);
+            text-align: center;
+            font-size: 8.5px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 4px 0;
+            color: #ffffff;
+        }
+
+        .ribbon-accepted, .ribbon-approved {
+            background-color: #16a34a;
+        }
+        .ribbon-sent, .ribbon-quotation-sent {
+            background-color: #2563eb;
+        }
+        .ribbon-draft {
+            background-color: #64748b;
+        }
+        .ribbon-rejected, .ribbon-declined {
+            background-color: #dc2626;
+        }
+        .ribbon-rework {
+            background-color: #d97706;
+        }
+
+        /* ── HEADER SECTION ──────────────────────── */
+        .header-table {
             width: 100%;
+            border-collapse: collapse;
             padding-bottom: 14px;
             border-bottom: 1px solid #e2e8f0;
-            margin-bottom: 16px;
+            margin-bottom: 18px;
         }
         .company-avatar {
             display: inline-block;
-            width: 42px;
-            height: 42px;
+            width: 40px;
+            height: 40px;
             background-color: #1e40af;
             color: #ffffff;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             text-align: center;
-            line-height: 42px;
+            line-height: 40px;
             border-radius: 6px;
             vertical-align: middle;
         }
         .company-info {
             display: inline-block;
             vertical-align: middle;
-            padding-left: 10px;
+            padding-left: 8px;
         }
         .company-name {
             font-size: 15px;
@@ -53,86 +106,115 @@
             font-size: 10px;
             color: #475569;
             margin-top: 6px;
-            line-height: 1.5;
+            line-height: 1.4;
         }
+
         .doc-title {
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 19px;
+            font-weight: 900;
             color: #1e40af;
             text-align: right;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
         .doc-number {
-            font-size: 12px;
+            font-size: 12.5px;
             font-weight: bold;
             color: #1e293b;
             text-align: right;
             margin-top: 2px;
         }
-        .doc-meta {
-            font-size: 11px;
-            color: #64748b;
-            text-align: right;
-            margin-top: 8px;
-        }
-        .doc-meta table {
+        .meta-table {
             margin-left: auto;
+            margin-top: 6px;
         }
-        .doc-meta td {
+        .meta-table td {
             padding: 1.5px 0;
-            font-size: 11px;
+            font-size: 10.5px;
         }
         .meta-label {
             color: #64748b;
             text-align: right;
             padding-right: 6px;
-            white-space: nowrap;
         }
         .meta-value {
             color: #1e293b;
             font-weight: bold;
             text-align: right;
-            white-space: nowrap;
         }
 
-        /* ── ADDRESS BOXES ───────────────────────────── */
-        .addr-box {
-            border: 1px solid #e2e8f0;
-            padding: 10px 12px;
-            background-color: #f8fafc;
-            vertical-align: top;
-            width: 48%;
+        /* ── PREPARED FOR & REFERENCES ───────────── */
+        .info-boxes-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 12px 0;
+            margin-left: -12px;
+            margin-right: -12px;
+            margin-bottom: 18px;
         }
-        .addr-label {
+        .info-box {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px 14px;
+            vertical-align: top;
+            width: 50%;
+        }
+        .box-title {
             font-size: 9px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: #64748b;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 4px;
             margin-bottom: 6px;
         }
-        .addr-name {
-            font-size: 12.5px;
+        .client-name {
+            font-size: 13px;
             font-weight: bold;
             color: #0f172a;
             margin-bottom: 3px;
         }
-        .addr-line {
+        .client-contact {
             font-size: 10.5px;
             color: #475569;
-            margin-bottom: 2px;
-            line-height: 1.4;
+            margin-bottom: 6px;
+        }
+        .address-block {
+            font-size: 10px;
+            color: #475569;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 6px;
+            margin-top: 4px;
+            line-height: 1.35;
         }
 
-        /* ── ITEMS TABLE ────────────────────────────── */
+        .ref-row {
+            width: 100%;
+            padding: 3px 0;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 10.5px;
+        }
+        .ref-row:last-child {
+            border-bottom: none;
+        }
+        .ref-label {
+            color: #64748b;
+            display: inline-block;
+            width: 45%;
+        }
+        .ref-val {
+            color: #0f172a;
+            font-weight: bold;
+            display: inline-block;
+            width: 50%;
+            text-align: right;
+        }
+
+        /* ── ITEMS TABLE ─────────────────────────── */
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 14px;
-            margin-bottom: 14px;
+            margin-bottom: 18px;
         }
         .items-table th {
             background-color: #f8fafc;
@@ -141,213 +223,258 @@
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            border-top: 1px solid #cbd5e1;
-            border-bottom: 2px solid #94a3b8;
-            padding: 7px 8px;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 2px solid #cbd5e1;
+            padding: 8px 10px;
         }
         .items-table td {
-            padding: 7px 8px;
-            border-bottom: 1px solid #e2e8f0;
+            padding: 9px 10px;
+            border-bottom: 1px solid #f1f5f9;
             font-size: 10.5px;
             color: #1e293b;
             vertical-align: top;
         }
-        .items-table tr:nth-child(even) td {
-            background-color: #fafafa;
-        }
-        .item-name {
+        .item-title {
             font-weight: bold;
             color: #0f172a;
             font-size: 11px;
         }
         .item-desc {
-            font-size: 9.5px;
+            font-size: 9px;
             color: #64748b;
             margin-top: 2px;
         }
 
-        /* ── SUMMARY SECTION ─────────────────────────── */
-        .summary-wrap {
+        /* ── SUMMARY SECTION ─────────────────────── */
+        .summary-wrapper {
             width: 100%;
+            border-collapse: collapse;
             margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e2e8f0;
         }
-        .terms-col {
+        .terms-column {
             width: 55%;
             vertical-align: top;
-        }
-        .summary-col {
-            width: 42%;
-            vertical-align: top;
-        }
-        .terms-title {
-            font-size: 9.5px;
-            font-weight: bold;
-            text-transform: uppercase;
-            color: #475569;
-            margin-bottom: 4px;
-            letter-spacing: 0.5px;
-        }
-        .terms-body {
-            font-size: 9.5px;
-            color: #475569;
-            line-height: 1.4;
             padding-right: 15px;
         }
-        .terms-body p {
-            margin-bottom: 3px;
+        .summary-column {
+            width: 45%;
+            vertical-align: top;
+        }
+        .section-label {
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+        .terms-content {
+            font-size: 10px;
+            color: #475569;
+            line-height: 1.4;
+        }
+        .terms-content p {
+            margin-bottom: 4px;
         }
 
         .summary-box {
-            border: 1px solid #cbd5e1;
             background-color: #f8fafc;
-            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
             padding: 10px 12px;
         }
-        .summary-table {
+        .summary-line {
             width: 100%;
-            border-collapse: collapse;
-        }
-        .summary-table td {
-            padding: 4px 0;
+            padding: 3px 0;
             font-size: 10.5px;
+            border-bottom: 1px solid #f1f5f9;
         }
-        .summary-label {
-            color: #475569;
+        .summary-lbl {
+            color: #64748b;
+            display: inline-block;
+            width: 50%;
         }
-        .summary-val {
+        .summary-num {
+            color: #0f172a;
+            font-weight: bold;
+            display: inline-block;
+            width: 48%;
             text-align: right;
+        }
+        .total-payable-box {
+            background-color: #f1f5f9;
+            border-radius: 4px;
+            padding: 6px 8px;
+            margin-top: 6px;
+        }
+        .total-payable-lbl {
             font-weight: bold;
             color: #0f172a;
-        }
-        .grand-total-row td {
-            border-top: 1.5px solid #cbd5e1;
-            padding-top: 6px;
-            padding-bottom: 2px;
             font-size: 11.5px;
+            display: inline-block;
+            width: 48%;
         }
-        .grand-total-label {
-            font-weight: bold;
-            color: #0f172a;
-        }
-        .grand-total-val {
-            text-align: right;
+        .total-payable-num {
             font-weight: bold;
             color: #1e40af;
+            font-size: 12.5px;
+            display: inline-block;
+            width: 50%;
+            text-align: right;
         }
 
-        /* ── FOOTER SIGNATURE ────────────────────────── */
-        .footer-wrap {
+        /* ── FOOTER SIGNATURE ────────────────────── */
+        .footer-table {
             width: 100%;
-            margin-top: 24px;
+            border-collapse: collapse;
+            margin-top: 30px;
             padding-top: 12px;
             border-top: 1px solid #e2e8f0;
         }
-        .footer-note {
+        .footer-text {
             font-size: 9.5px;
             color: #64748b;
-            width: 60%;
             vertical-align: bottom;
+            width: 60%;
+            line-height: 1.35;
         }
-        .sig-col {
-            width: 38%;
+        .sig-block {
             text-align: right;
             vertical-align: bottom;
+            width: 40%;
         }
         .sig-line {
             display: inline-block;
-            border-top: 1px solid #94a3b8;
-            width: 160px;
+            border-top: 1px solid #cbd5e1;
+            width: 170px;
             text-align: center;
             padding-top: 4px;
             font-size: 9px;
             font-weight: bold;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
             color: #64748b;
         }
     </style>
 </head>
 <body>
 
-    <!-- 1. HEADER SECTION -->
-    <div class="header-wrap">
-        <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-                <td style="vertical-align: top; width: 55%;">
-                    <div class="company-avatar">
-                        {{ strtoupper(substr(tenant() ? tenant()->name : 'E', 0, 1)) }}
-                    </div>
-                    <div class="company-info">
-                        <div class="company-name">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</div>
-                        <div class="company-sub">Official Corporate Sales Unit</div>
-                    </div>
-                    <div class="company-address">
-                        H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India<br>
-                        <strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State:</strong> Rajasthan (08)<br>
-                        <strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }}
-                    </div>
-                </td>
-                <td style="vertical-align: top; width: 45%; text-align: right;">
-                    <div class="doc-title">SALES QUOTATION</div>
-                    <div class="doc-number"># {{ $quotation->quotation_number }}</div>
-                    
-                    <div class="doc-meta">
-                        <table>
-                            <tr>
-                                <td class="meta-label">Quotation Date:</td>
-                                <td class="meta-value">{{ $quotation->quotation_date ? date('d-M-Y', strtotime($quotation->quotation_date)) : '—' }}</td>
-                            </tr>
-                            <tr>
-                                <td class="meta-label">Valid Until:</td>
-                                <td class="meta-value">{{ $quotation->expiry_date ? date('d-M-Y', strtotime($quotation->expiry_date)) : '—' }}</td>
-                            </tr>
-                            @if($quotation->salesPerson)
-                                <tr>
-                                    <td class="meta-label">Sales Rep:</td>
-                                    <td class="meta-value">{{ $quotation->salesPerson->name }}</td>
-                                </tr>
-                            @endif
-                            <tr>
-                                <td class="meta-label">Status:</td>
-                                <td class="meta-value" style="color: #1e40af;">{{ $quotation->status }}</td>
-                            </tr>
-                        </table>
-                    </div>
-                </td>
-            </tr>
-        </table>
+    <!-- Status Corner Ribbon Tag -->
+    @php
+        $ribbonClass = match($quotation->status) {
+            'Accepted', 'Approved' => 'ribbon-accepted',
+            'Sent', 'Quotation Sent' => 'ribbon-sent',
+            'Rejected', 'Declined' => 'ribbon-rejected',
+            'Rework', 'Quotation Rework' => 'ribbon-rework',
+            default => 'ribbon-draft',
+        };
+    @endphp
+    <div class="corner-ribbon-container">
+        <div class="corner-ribbon {{ $ribbonClass }}">
+            {{ $quotation->status }}
+        </div>
     </div>
 
-    <!-- 2. ADDRESS / PREPARED FOR BOXES -->
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px;">
+    <!-- 1. HEADER SECTION -->
+    <table class="header-table">
         <tr>
-            <td class="addr-box" style="margin-right: 4%;">
-                <div class="addr-label">Prepared For (Client):</div>
-                <div class="addr-name">{{ $quotation->prepared_for_name }}</div>
-                @if($quotation->prepared_for_email !== '—')
-                    <div class="addr-line"><strong>Email:</strong> {{ $quotation->prepared_for_email }}</div>
-                @endif
-                @if($quotation->prepared_for_phone !== '—')
-                    <div class="addr-line"><strong>Phone:</strong> {{ $quotation->prepared_for_phone }}</div>
-                @endif
-                @if($quotation->prepared_for_address)
-                    <div class="addr-line" style="margin-top: 4px;"><strong>Address:</strong> {{ $quotation->prepared_for_address }}</div>
-                @endif
+            <td style="vertical-align: top; width: 58%;">
+                <div class="company-avatar">
+                    {{ strtoupper(substr(tenant() ? tenant()->name : 'S', 0, 1)) }}
+                </div>
+                <div class="company-info">
+                    <div class="company-name">{{ tenant() ? tenant()->name : 'Demo Tenant' }}</div>
+                    <div class="company-sub">Official Corporate Sales Unit</div>
+                </div>
+                <div class="company-address">
+                    H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India<br>
+                    <strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)<br>
+                    <strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230
+                </div>
             </td>
-            <td style="width: 4%;"></td>
-            <td class="addr-box">
-                <div class="addr-label">References & Revision Info:</div>
-                @if ($quotation->crmDeal)
-                    <div class="addr-line"><strong>Deal Ref:</strong> {{ $quotation->crmDeal->deal_number }} ({{ $quotation->crmDeal->title }})</div>
-                @elseif ($quotation->lead)
-                    <div class="addr-line"><strong>Lead Ref:</strong> {{ $quotation->lead->title ?: $quotation->lead->name }}</div>
-                @endif
-                <div class="addr-line"><strong>Revision Number:</strong> Revision {{ $quotation->revision_number }}</div>
-                <div class="addr-line"><strong>Quotation Status:</strong> {{ $quotation->status }}</div>
+            <td style="vertical-align: top; width: 42%; text-align: right;">
+                <div class="doc-title">SALES QUOTATION</div>
+                <div class="doc-number"># {{ $quotation->quotation_number }}</div>
+                
+                <table class="meta-table">
+                    <tr>
+                        <td class="meta-label">Quotation Date:</td>
+                        <td class="meta-value">{{ $quotation->quotation_date ? date('d-M-Y', strtotime($quotation->quotation_date)) : '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="meta-label">Valid Until:</td>
+                        <td class="meta-value">{{ $quotation->expiry_date ? date('d-M-Y', strtotime($quotation->expiry_date)) : '—' }}</td>
+                    </tr>
+                    @if($quotation->salesPerson)
+                        <tr>
+                            <td class="meta-label">Sales Rep:</td>
+                            <td class="meta-value">{{ $quotation->salesPerson->name }}</td>
+                        </tr>
+                    @endif
+                </table>
             </td>
         </tr>
     </table>
 
-    <!-- 3. LINE ITEMS TABLE -->
+    <!-- 2. PREPARED FOR & QUOTATION REFERENCES -->
+    <table class="info-boxes-table">
+        <tr>
+            <!-- Left Box: Prepared For -->
+            <td class="info-box">
+                <div class="box-title">PREPARED FOR:</div>
+                <div class="client-name">{{ $quotation->prepared_for_name }}</div>
+                @if($quotation->prepared_for_email !== '—' || $quotation->prepared_for_phone !== '—')
+                    <div class="client-contact">
+                        @if($quotation->prepared_for_email !== '—')
+                            {{ $quotation->prepared_for_email }}
+                        @endif
+                        @if($quotation->prepared_for_email !== '—' && $quotation->prepared_for_phone !== '—')
+                            |
+                        @endif
+                        @if($quotation->prepared_for_phone !== '—')
+                            {{ $quotation->prepared_for_phone }}
+                        @endif
+                    </div>
+                @endif
+                @if ($quotation->prepared_for_address)
+                    <div class="address-block">
+                        <strong>Billing Address:</strong><br>{{ $quotation->prepared_for_address }}
+                    </div>
+                @endif
+            </td>
+
+            <!-- Right Box: Quotation References -->
+            <td class="info-box">
+                <div class="box-title">QUOTATION REFERENCES:</div>
+                
+                @if ($quotation->crmDeal)
+                    <div class="ref-row">
+                        <span class="ref-label">CRM Deal Ref:</span>
+                        <span class="ref-val" style="color: #2563eb;">{{ $quotation->crmDeal->deal_number }}</span>
+                    </div>
+                @elseif ($quotation->lead)
+                    <div class="ref-row">
+                        <span class="ref-label">Lead Ref:</span>
+                        <span class="ref-val" style="color: #2563eb;">{{ $quotation->lead->title ?: $quotation->lead->name }}</span>
+                    </div>
+                @endif
+
+                <div class="ref-row">
+                    <span class="ref-label">Revision Count:</span>
+                    <span class="ref-val">Revision {{ $quotation->revision_number }}</span>
+                </div>
+
+                <div class="ref-row">
+                    <span class="ref-label">Status:</span>
+                    <span class="ref-val">{{ $quotation->status }}</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- 3. ORDER LINES TABLE -->
     <table class="items-table">
         <thead>
             <tr>
@@ -364,7 +491,7 @@
                 <tr>
                     <td style="text-align: center; color: #64748b;">{{ $idx + 1 }}</td>
                     <td>
-                        <div class="item-name">{{ $item->item_name }}</div>
+                        <div class="item-title">{{ $item->item_name }}</div>
                         @if($item->description)
                             <div class="item-desc">{{ $item->description }}</div>
                         @endif
@@ -372,64 +499,62 @@
                     <td style="text-align: right;">{{ $item->quantity }}</td>
                     <td style="text-align: right;">₹{{ number_format($item->unit_price, 2) }}</td>
                     <td style="text-align: right;">{{ number_format($item->tax_rate, 2) }}%</td>
-                    <td style="text-align: right; font-weight: bold;">₹{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
+                    <td style="text-align: right; font-weight: bold; color: #0f172a;">₹{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
     </table>
 
     <!-- 4. CALCULATIONS & TERMS SECTION -->
-    <table class="summary-wrap">
+    <table class="summary-wrapper">
         <tr>
-            <!-- Left Column: Terms & Notes -->
-            <td class="terms-col">
+            <!-- Left Column: Terms & Conditions and Internal Notes -->
+            <td class="terms-column">
                 @if($quotation->terms_conditions)
-                    <div class="terms-title">Terms & Conditions:</div>
-                    <div class="terms-body">{!! $quotation->terms_conditions !!}</div>
+                    <div class="section-label">Terms & Conditions:</div>
+                    <div class="terms-content">{!! $quotation->terms_conditions !!}</div>
                 @endif
 
                 @if($quotation->notes)
-                    <div class="terms-title" style="margin-top: 8px;">Internal Notes:</div>
-                    <div class="terms-body" style="font-style: italic;">{{ $quotation->notes }}</div>
+                    <div class="section-label" style="margin-top: 8px;">Internal Notes:</div>
+                    <div class="terms-content" style="font-style: italic;">{{ $quotation->notes }}</div>
                 @endif
             </td>
 
-            <!-- Right Column: Summary Totals Box -->
-            <td class="summary-col">
+            <!-- Right Column: Totals Summary -->
+            <td class="summary-column">
                 <div class="summary-box">
-                    <table class="summary-table">
-                        <tr>
-                            <td class="summary-label">Subtotal:</td>
-                            <td class="summary-val">₹{{ number_format($quotation->subtotal, 2) }}</td>
-                        </tr>
-                        <tr>
-                            <td class="summary-label">Tax Amount (GST):</td>
-                            <td class="summary-val">₹{{ number_format($quotation->tax, 2) }}</td>
-                        </tr>
-                        @if($quotation->discount > 0)
-                            <tr style="color: #b91c1c;">
-                                <td class="summary-label" style="color: #b91c1c;">Discount:</td>
-                                <td class="summary-val" style="color: #b91c1c;">-₹{{ number_format($quotation->discount, 2) }}</td>
-                            </tr>
-                        @endif
-                        <tr class="grand-total-row">
-                            <td class="grand-total-label">Total Payable:</td>
-                            <td class="grand-total-val">₹{{ number_format($quotation->total_amount, 2) }}</td>
-                        </tr>
-                    </table>
+                    <div class="summary-line">
+                        <span class="summary-lbl">Subtotal:</span>
+                        <span class="summary-num">₹{{ number_format($quotation->subtotal, 2) }}</span>
+                    </div>
+                    <div class="summary-line">
+                        <span class="summary-lbl">Tax Amount (GST):</span>
+                        <span class="summary-num">₹{{ number_format($quotation->tax, 2) }}</span>
+                    </div>
+                    @if($quotation->discount > 0)
+                        <div class="summary-line" style="color: #dc2626;">
+                            <span class="summary-lbl" style="color: #dc2626;">Discount:</span>
+                            <span class="summary-num" style="color: #dc2626;">-₹{{ number_format($quotation->discount, 2) }}</span>
+                        </div>
+                    @endif
+                    <div class="total-payable-box">
+                        <span class="total-payable-lbl">Total Payable:</span>
+                        <span class="total-payable-num">₹{{ number_format($quotation->total_amount, 2) }}</span>
+                    </div>
                 </div>
             </td>
         </tr>
     </table>
 
-    <!-- 5. SIGNATURE & FOOTER -->
-    <table class="footer-wrap">
+    <!-- 5. SIGNATURE FOOTER BLOCK -->
+    <table class="footer-table">
         <tr>
-            <td class="footer-note">
+            <td class="footer-text">
                 This sales quotation is valid until {{ $quotation->expiry_date ? date('d-M-Y', strtotime($quotation->expiry_date)) : 'the expiry date' }}.<br>
-                For any queries, please contact sales office at {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }}.
+                For any queries, please contact our support at {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }}.
             </td>
-            <td class="sig-col">
+            <td class="sig-block">
                 <div class="sig-line">Authorized Signature</div>
             </td>
         </tr>

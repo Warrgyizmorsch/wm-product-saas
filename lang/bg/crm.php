@@ -424,6 +424,8 @@ return [
         'lost' => 'ЗАГУБЕНИ',
         'duplicates' => 'ДУБЛИКАТИ',
     ],
+
+    'ignore_and_continue' => 'Игнорирай и продължи',
 ];
 
 

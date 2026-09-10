@@ -14,6 +14,14 @@ class Customer extends BaseModel
 {
     use HasFactory, BelongsToCompany, BelongsToBranch;
 
+    /**
+     * Set to TRUE before Customer::create() inside deal conversion
+     * to prevent the boot hook from auto-creating a duplicate CrmAccount.
+     * Reset to FALSE immediately after. Direct customer creation leaves
+     * this as FALSE so the hook runs normally.
+     */
+    public static bool $skipAccountAutoCreate = false;
+
     protected $fillable = [
         'tenant_id',
         'company_id',
@@ -33,6 +41,11 @@ class Customer extends BaseModel
         parent::boot();
 
         static::created(function ($customer) {
+            // Skip when called from deal conversion (account is created manually there)
+            if (static::$skipAccountAutoCreate) {
+                return;
+            }
+
             if (!$customer->crmAccount()->exists()) {
                 CrmAccount::create([
                     'tenant_id'        => $customer->tenant_id,

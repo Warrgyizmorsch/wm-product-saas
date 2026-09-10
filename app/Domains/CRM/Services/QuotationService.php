@@ -256,12 +256,10 @@ class QuotationService
             $tenantId = $quotation->tenant_id ?? (tenant_id() ?? 1);
             $deal = $quotation->crm_deal_id ? CrmDeal::find($quotation->crm_deal_id) : null;
             $account = $quotation->crm_account_id ? CrmAccount::find($quotation->crm_account_id) : ($deal ? $deal->account : null);
-            $lead = null;
-            if ($leadId) {
-                $lead = Lead::find($leadId);
-            }
-            if (!$lead && $quotation->lead_id) {
-                $lead = Lead::find($quotation->lead_id);
+
+            // If account is not converted to customer yet, keep customer_id empty so user can click 'Convert to Customer'
+            if (!$account || !$account->customer_id) {
+                return;
             }
             if (!$lead && $deal) {
                 if (!empty($deal->lead_id)) {
