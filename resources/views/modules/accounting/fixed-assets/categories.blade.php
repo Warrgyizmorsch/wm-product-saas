@@ -273,13 +273,24 @@
                 const btn = event.relatedTarget;
                 const form = document.getElementById('editCategoryForm');
                 form.action = btn.getAttribute('data-action');
-                document.getElementById('edit_category_company_id').value = btn.getAttribute('data-company-id') || '';
+
+                // select2-enhanced <select> elements (odoo-form-ui type="select")
+                // render their own visual box that does NOT sync from a plain
+                // `.value = x` assignment — it has to be told via jQuery + a
+                // 'change' trigger, otherwise the native <select> holds the right
+                // value (form still submits correctly) but the widget keeps
+                // showing its placeholder, which looked like the field was blank.
+                function setSelect2(id, value) {
+                    $('#' + id).val(value || '').trigger('change');
+                }
+
+                setSelect2('edit_category_company_id', btn.getAttribute('data-company-id'));
                 document.getElementById('edit_category_name').value = btn.getAttribute('data-name') || '';
                 document.getElementById('edit_category_description').value = btn.getAttribute('data-description') || '';
-                document.getElementById('edit_category_fixed_asset_account_id').value = btn.getAttribute('data-fixed-asset-account-id') || '';
-                document.getElementById('edit_category_accumulated_depreciation_account_id').value = btn.getAttribute('data-accumulated-depreciation-account-id') || '';
-                document.getElementById('edit_category_depreciation_expense_account_id').value = btn.getAttribute('data-depreciation-expense-account-id') || '';
-                document.getElementById('edit_category_default_depreciation_method').value = btn.getAttribute('data-default-depreciation-method') || '';
+                setSelect2('edit_category_fixed_asset_account_id', btn.getAttribute('data-fixed-asset-account-id'));
+                setSelect2('edit_category_accumulated_depreciation_account_id', btn.getAttribute('data-accumulated-depreciation-account-id'));
+                setSelect2('edit_category_depreciation_expense_account_id', btn.getAttribute('data-depreciation-expense-account-id'));
+                setSelect2('edit_category_default_depreciation_method', btn.getAttribute('data-default-depreciation-method'));
                 document.getElementById('edit_category_default_useful_life_months').value = btn.getAttribute('data-default-useful-life-months') || '';
                 document.getElementById('edit_category_is_production_machinery').checked = btn.getAttribute('data-is-production-machinery') === '1';
             });
