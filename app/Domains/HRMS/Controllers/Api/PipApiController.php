@@ -49,12 +49,44 @@ class PipApiController extends Controller
     }
 
     /**
+     * Helper to check if current user has HR Admin permissions for PIP.
+     */
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hrms.pip.manage')
+            || $user->hasHrPermission('hrms.performance.manage')
+            || $user->hasHrPermission('hr.settings.manage');
+    }
+
+    /**
+     * Helper to get authenticated employee context.
+     */
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)
+            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
+            ->first();
+    }
+
+    /**
      * GET /api/hrms/pip
      * PIP Master list, summary stats, search, filter, and pagination.
      */
     public function index(Request $request): JsonResponse
     {
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
 
         $search = $request->input('search');
         $status = $request->input('status');
@@ -65,6 +97,16 @@ class PipApiController extends Controller
         $plansQuery = PerformanceImprovementPlan::query()
             ->where('tenant_id', $tenantId)
             ->with(['employee.department', 'employee.designation', 'manager', 'hrRepresentative', 'category', 'objectives', 'checkins']);
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError('Employee profile not found.', 404);
+            }
+            $plansQuery->where(function ($q) use ($employee) {
+                $q->where('employee_id', $employee->id)
+                  ->orWhere('manager_id', $employee->id);
+            });
+        }
 
         if ($search) {
             $plansQuery->where(function ($q) use ($search) {
@@ -103,6 +145,13 @@ class PipApiController extends Controller
 
         // Stats Computation
         $baseStats = PerformanceImprovementPlan::where('tenant_id', $tenantId);
+        if (!$isHrAdmin && $employee) {
+            $baseStats->where(function ($q) use ($employee) {
+                $q->where('employee_id', $employee->id)
+                  ->orWhere('manager_id', $employee->id);
+            });
+        }
+
         $stats = [
             'total_active'     => (clone $baseStats)->whereIn('status', ['active', 'under_review', 'extended'])->count(),
             'on_track'         => (clone $baseStats)->where('status', 'active')->count(),
@@ -123,6 +172,10 @@ class PipApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to initiate PIP.', 403);
+        }
+
         $validated = $request->validate([
             'employee_id'               => 'required|exists:employees,id',
             'manager_id'                => 'nullable|exists:employees,id',
@@ -166,6 +219,14 @@ class PipApiController extends Controller
             return $this->sendError("Performance Improvement Plan with ID '{$id}' not found.", 404);
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $employee) {
+            if ($pip->employee_id !== $employee->id && $pip->manager_id !== $employee->id && $pip->hr_representative_id !== auth()->id()) {
+                return $this->sendError('Unauthorized action. You can only view your own PIP record.', 403);
+            }
+        }
+
         return $this->sendSuccess($pip, 'PIP plan workspace details retrieved successfully.');
     }
 
@@ -175,6 +236,10 @@ class PipApiController extends Controller
      */
     public function update(Request $request, mixed $id): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update PIP plan.', 403);
+        }
+
         $pip = PerformanceImprovementPlan::find($id);
         if (!$pip) {
             return $this->sendError("PIP plan with ID '{$id}' not found.", 404);
@@ -200,6 +265,10 @@ class PipApiController extends Controller
      */
     public function destroy(mixed $id): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to delete PIP plan.', 403);
+        }
+
         $pip = PerformanceImprovementPlan::find($id);
         if (!$pip) {
             return $this->sendError("PIP plan with ID '{$id}' not found.", 404);
@@ -380,6 +449,10 @@ class PipApiController extends Controller
      */
     public function evaluate(Request $request, mixed $id): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to evaluate PIP.', 403);
+        }
+
         $pip = PerformanceImprovementPlan::find($id);
         if (!$pip) {
             return $this->sendError("PIP plan with ID '{$id}' not found.", 404);
@@ -416,6 +489,10 @@ class PipApiController extends Controller
      */
     public function storeCategory(Request $request): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required.', 403);
+        }
+
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'code'        => 'nullable|string|max:50',
@@ -436,6 +513,10 @@ class PipApiController extends Controller
      */
     public function destroyCategory(mixed $id): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required.', 403);
+        }
+
         $category = PipCategory::find($id);
         if (!$category) {
             return $this->sendError("PIP Category with ID '{$id}' not found.", 404);
@@ -466,6 +547,10 @@ class PipApiController extends Controller
      */
     public function storeTemplate(Request $request): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required.', 403);
+        }
+
         $validated = $request->validate([
             'name'              => 'required|string|max:255',
             'duration_days'     => 'required|integer|min:7|max:180',
@@ -487,6 +572,10 @@ class PipApiController extends Controller
      */
     public function destroyTemplate(mixed $id): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required.', 403);
+        }
+
         $template = PipPolicyTemplate::find($id);
         if (!$template) {
             return $this->sendError("PIP Policy Template with ID '{$id}' not found.", 404);

@@ -36,33 +36,84 @@ class BroadcastController extends Controller
         $category = $request->input('category');
         $sort = $request->input('sort', 'newest');
 
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
         // Base Query
         $baseQuery = Broadcast::query()->where('tenant_id', $tenantId);
 
         // Stats Computation
-        $totalActive = (clone $baseQuery)->where('status', 'published')->count();
-        $publishedThisMonth = (clone $baseQuery)->where('status', 'published')
+        $statsBaseQuery = clone $baseQuery;
+        if (!$isHrAdmin) {
+            if ($employee) {
+                $statsBaseQuery->where(function ($q) use ($employee) {
+                    $q->where('target_type', 'all')
+                      ->orWhereHas('receipts', fn($rq) => $rq->where('employee_id', $employee->id));
+                });
+            } else {
+                $statsBaseQuery->where('target_type', 'all');
+            }
+        }
+
+        $totalActive = (clone $statsBaseQuery)->where('status', 'published')->count();
+        $publishedThisMonth = (clone $statsBaseQuery)->where('status', 'published')
             ->whereMonth('published_at', now()->month)
             ->whereYear('published_at', now()->year)
             ->count();
-        $pendingAckCount = (clone $baseQuery)->where('status', 'published')
-            ->where('is_acknowledgement_required', true)
-            ->whereHas('receipts', fn($q) => $q->whereNull('acknowledged_at'))
-            ->count();
-        $scheduledCount = (clone $baseQuery)->where('status', 'scheduled')->count();
+
+        if (!$isHrAdmin && $employee) {
+            $pendingAckCount = (clone $statsBaseQuery)->where('status', 'published')
+                ->where('is_acknowledgement_required', true)
+                ->whereHas('receipts', fn($q) => $q->where('employee_id', $employee->id)->whereNull('acknowledged_at'))
+                ->count();
+        } else {
+            $pendingAckCount = (clone $baseQuery)->where('status', 'published')
+                ->where('is_acknowledgement_required', true)
+                ->whereHas('receipts', fn($q) => $q->whereNull('acknowledged_at'))
+                ->count();
+        }
+
+        $scheduledCount = $isHrAdmin ? (clone $baseQuery)->where('status', 'scheduled')->count() : 0;
 
         // 1. Published Query
         $publishedQuery = (clone $baseQuery)->where('status', 'published');
+        if (!$isHrAdmin) {
+            if ($employee) {
+                $publishedQuery->where(function ($q) use ($employee) {
+                    $q->where('target_type', 'all')
+                      ->orWhereHas('receipts', fn($rq) => $rq->where('employee_id', $employee->id));
+                });
+            } else {
+                $publishedQuery->where('target_type', 'all');
+            }
+        }
         $this->applyFilters($publishedQuery, $search, $priority, $category, $sort);
         $publishedBroadcasts = $publishedQuery->paginate(10, ['*'], 'published_page')->appends($request->all());
 
-        // 2. Scheduled & Drafts Query
-        $scheduledQuery = (clone $baseQuery)->whereIn('status', ['scheduled', 'draft']);
-        $this->applyFilters($scheduledQuery, $search, $priority, $category, $sort);
-        $scheduledBroadcasts = $scheduledQuery->paginate(10, ['*'], 'scheduled_page')->appends($request->all());
+        // 2. Scheduled & Drafts Query (HR Admin Only)
+        if ($isHrAdmin) {
+            $scheduledQuery = (clone $baseQuery)->whereIn('status', ['scheduled', 'draft']);
+            $this->applyFilters($scheduledQuery, $search, $priority, $category, $sort);
+            $scheduledBroadcasts = $scheduledQuery->paginate(10, ['*'], 'scheduled_page')->appends($request->all());
+        } else {
+            $scheduledBroadcasts = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 10, 1, [
+                'path'  => $request->url(),
+                'query' => $request->query(),
+            ]);
+        }
 
         // 3. Archived Query
         $archivedQuery = (clone $baseQuery)->whereIn('status', ['expired', 'archived']);
+        if (!$isHrAdmin) {
+            if ($employee) {
+                $archivedQuery->where(function ($q) use ($employee) {
+                    $q->where('target_type', 'all')
+                      ->orWhereHas('receipts', fn($rq) => $rq->where('employee_id', $employee->id));
+                });
+            } else {
+                $archivedQuery->where('target_type', 'all');
+            }
+        }
         $this->applyFilters($archivedQuery, $search, $priority, $category, $sort);
         $archivedBroadcasts = $archivedQuery->paginate(10, ['*'], 'archived_page')->appends($request->all());
 
@@ -86,8 +137,26 @@ class BroadcastController extends Controller
             'departments',
             'branches',
             'designations',
-            'employees'
+            'employees',
+            'isHrAdmin'
         ));
+    }
+
+    /**
+     * Helper to check if current user is HR Admin / Manager.
+     */
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return (bool) (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.broadcasts.manage') ||
+            $user->hasHrPermission('hrms.communications.manage')
+        );
     }
 
     /**
@@ -124,6 +193,8 @@ class BroadcastController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($this->isHrAdmin(), 403, 'Unauthorized action. Only HR Admins can create broadcasts.');
+
         $validated = $request->validate([
             'title'                        => 'required|string|max:255',
             'category'                     => 'required|in:announcement,policy_update,event,emergency,news',
@@ -184,9 +255,22 @@ class BroadcastController extends Controller
      */
     public function show(Broadcast $broadcast): View
     {
-        $broadcast->load(['creator', 'receipts.employee', 'comments.employee', 'comments.replies']);
-
+        $isHrAdmin = $this->isHrAdmin();
         $employee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin) {
+            if (!in_array($broadcast->status, ['published', 'expired', 'archived'])) {
+                abort(403, 'Unauthorized access to broadcast.');
+            }
+            if ($broadcast->target_type !== 'all') {
+                $hasReceipt = $employee && $broadcast->receipts()->where('employee_id', $employee->id)->exists();
+                if (!$hasReceipt) {
+                    abort(403, 'This broadcast announcement is not targeted to you.');
+                }
+            }
+        }
+
+        $broadcast->load(['creator', 'receipts.employee', 'comments.employee', 'comments.replies']);
 
         if ($employee) {
             $this->broadcastService->markRead($broadcast, $employee->id);
@@ -194,7 +278,7 @@ class BroadcastController extends Controller
 
         $analytics = $this->broadcastService->getAnalytics($broadcast);
 
-        return view('modules.hrms.broadcasts.show', compact('broadcast', 'analytics', 'employee'));
+        return view('modules.hrms.broadcasts.show', compact('broadcast', 'analytics', 'employee', 'isHrAdmin'));
     }
 
     /**
@@ -202,6 +286,8 @@ class BroadcastController extends Controller
      */
     public function update(Request $request, Broadcast $broadcast): RedirectResponse
     {
+        abort_unless($this->isHrAdmin(), 403, 'Unauthorized action. Only HR Admins can update broadcasts.');
+
         $validated = $request->validate([
             'title'                        => 'required|string|max:255',
             'category'                     => 'required|in:announcement,policy_update,event,emergency,news',
@@ -226,6 +312,8 @@ class BroadcastController extends Controller
      */
     public function destroy(Broadcast $broadcast): RedirectResponse
     {
+        abort_unless($this->isHrAdmin(), 403, 'Unauthorized action. Only HR Admins can delete broadcasts.');
+
         $broadcast->receipts()->delete();
         $broadcast->comments()->delete();
         $broadcast->delete();
@@ -281,6 +369,8 @@ class BroadcastController extends Controller
      */
     public function togglePinComment(BroadcastComment $comment): RedirectResponse
     {
+        abort_unless($this->isHrAdmin(), 403, 'Unauthorized action.');
+
         $this->broadcastService->togglePinComment($comment);
         return redirect()->back()->with('success', 'Comment pin status toggled.');
     }
@@ -290,6 +380,12 @@ class BroadcastController extends Controller
      */
     public function destroyComment(BroadcastComment $comment): RedirectResponse
     {
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+        $isOwner = $employee && $comment->employee_id === $employee->id;
+
+        abort_unless($isHrAdmin || $isOwner, 403, 'Unauthorized action.');
+
         $comment->delete();
         return redirect()->back()->with('success', 'Comment deleted successfully.');
     }

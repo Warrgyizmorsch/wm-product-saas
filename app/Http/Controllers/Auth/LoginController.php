@@ -65,9 +65,11 @@ class LoginController extends Controller
             $user->role = $user->primaryRole?->name;
         }
         $token = $user->createToken('api-token')->plainTextToken;
+        $employee = \App\Domains\HRMS\Models\Employee::resolveForUser($user);
 
         return response()->json([
             'user' => $user,
+            'employee_id' => $employee?->id,
             'token' => $token,
         ]);
     }

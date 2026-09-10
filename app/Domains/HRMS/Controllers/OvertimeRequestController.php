@@ -38,6 +38,15 @@ class OvertimeRequestController extends Controller
             'attachment'        => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
         ]);
 
+        $user = auth()->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if ($currentEmp) {
+                $validated['employee_id'] = $currentEmp->id;
+            }
+        }
+
         $employee = Employee::findOrFail($validated['employee_id']);
 
         if (!$employee) {
@@ -93,6 +102,10 @@ class OvertimeRequestController extends Controller
 
     public function updateStatus(Request $request, OvertimeRequest $overtimeRequest, ?string $overrideAction = null): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        abort_unless($isHrAdmin, 403);
+
         if ($overtimeRequest->status === 'cancelled') {
             return redirect()->back()->with('error', __('hrms.overtime.cancelled_status_error'));
         }
@@ -124,6 +137,9 @@ class OvertimeRequestController extends Controller
 
     public function updateSettings(Request $request): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        abort_unless($isHrAdmin, 403);
         $validated = $request->validate([
             'auto_overtime_threshold_hours' => 'required_without:min_overtime_request_hours|nullable|numeric|min:0',
             'min_overtime_request_hours'    => 'required_without:auto_overtime_threshold_hours|nullable|numeric|min:0.5',
@@ -144,8 +160,20 @@ class OvertimeRequestController extends Controller
         return redirect()->back()->with('success', __('hrms.overtime.policies_updated'));
     }
 
-    public function destroy(OvertimeRequest $overtimeRequest): RedirectResponse
+    public function destroy(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $overtimeRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+            if ($overtimeRequest->status !== 'pending') {
+                return redirect()->back()->with('error', 'Only pending requests can be deleted.');
+            }
+        }
+
         if ($overtimeRequest->status === 'approved') {
             return redirect()->back()->with('error', __('hrms.overtime.approved_no_delete'));
         }

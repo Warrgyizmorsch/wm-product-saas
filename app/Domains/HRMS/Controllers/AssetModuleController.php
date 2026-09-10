@@ -21,6 +21,7 @@ class AssetModuleController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', Asset::class);
         // Self-healing: Ensure all currently allocated assets have an active AssetAllocation record
         $allocatedAssetsWithoutActiveAlloc = Asset::where('status', 'allocated')
             ->whereNotNull('assigned_employee_id')

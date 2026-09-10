@@ -199,16 +199,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
-                    @if($isAdmin)
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.overtime.employee') }}" name="employee_id" id="ot_employee_id" :required="true">
-                                <option value="">{{ __('hrms.overtime.select_employee') }}</option>
-                                @foreach($employees as $emp)
-                                    <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        </div>
-                    @endif
+                    <input type="hidden" name="employee_id" id="ot_employee_id" value="{{ $employee ? $employee->id : '' }}">
 
                     <div class="mb-3">
                         <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.overtime.overtime_date') }}" name="date" id="ot_date" :required="true" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />

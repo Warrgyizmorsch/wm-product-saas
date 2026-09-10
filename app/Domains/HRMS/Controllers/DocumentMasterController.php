@@ -22,6 +22,8 @@ class DocumentMasterController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', \App\Domains\HRMS\Models\DocumentType::class);
+
         $data = $this->documentMasterRepository->getIndexData($request->all());
 
         return view('modules.hrms.document-master.index', $data);
@@ -32,6 +34,7 @@ class DocumentMasterController extends Controller
      */
     public function storeCategory(Request $request): RedirectResponse
     {
+        $this->authorize('create', \App\Domains\HRMS\Models\DocumentType::class);
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
@@ -50,6 +53,7 @@ class DocumentMasterController extends Controller
      */
     public function updateCategory(Request $request, DocumentCategory $category): RedirectResponse
     {
+        $this->authorize('update', \App\Domains\HRMS\Models\DocumentType::class);
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
@@ -67,6 +71,7 @@ class DocumentMasterController extends Controller
      */
     public function destroyCategory(DocumentCategory $category): RedirectResponse
     {
+        $this->authorize('delete', \App\Domains\HRMS\Models\DocumentType::class);
         // Prevent deleting category if it has associated document masters
         if ($category->documentMasters()->exists()) {
             return redirect()->route('hrms.documents-master.index', ['active_tab' => 'categories'])
@@ -84,6 +89,7 @@ class DocumentMasterController extends Controller
      */
     public function storeDocument(Request $request): RedirectResponse
     {
+        $this->authorize('create', \App\Domains\HRMS\Models\DocumentType::class);
         $tenantId = auth()->user()->tenant_id;
 
         $validated = $request->validate([
@@ -130,6 +136,7 @@ class DocumentMasterController extends Controller
      */
     public function updateDocument(Request $request, DocumentMaster $document): RedirectResponse
     {
+        $this->authorize('update', \App\Domains\HRMS\Models\DocumentType::class);
         $tenantId = $document->tenant_id ?? auth()->user()->tenant_id;
 
         $validated = $request->validate([
@@ -176,6 +183,7 @@ class DocumentMasterController extends Controller
      */
     public function destroyDocument(DocumentMaster $document): RedirectResponse
     {
+        $this->authorize('delete', \App\Domains\HRMS\Models\DocumentType::class);
         $this->documentMasterRepository->deleteDocument($document);
 
         return redirect()->route('hrms.documents-master.index', ['active_tab' => 'documents'])

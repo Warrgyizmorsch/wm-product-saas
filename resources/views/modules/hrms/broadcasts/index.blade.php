@@ -5,11 +5,13 @@
 @section('breadcrumb', 'HRMS / Communications / Broadcasts')
 
 @section('page-actions')
+    @if($isHrAdmin)
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="primary" icon="feather-plus-circle" data-bs-toggle="modal" data-bs-target="#createBroadcastModal" class="fw-bold text-uppercase">
             Create Broadcast
         </x-ui.button>
     </div>
+    @endif
 @endsection
 
 @push('styles')
@@ -154,6 +156,7 @@
                         <x-ui.badge soft variant="primary" class="ms-1">{{ $publishedBroadcasts->total() }}</x-ui.badge>
                     </a>
                 </li>
+                @if($isHrAdmin)
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'scheduled' ? 'active' : '' }}" href="{{ route('hrms.broadcasts.index', ['active_tab' => 'scheduled']) }}">
                         <i class="feather-clock"></i>
@@ -161,6 +164,7 @@
                         <x-ui.badge soft variant="warning" class="ms-1">{{ $scheduledBroadcasts->total() }}</x-ui.badge>
                     </a>
                 </li>
+                @endif
                 <li class="nav-item">
                     <a class="nav-link {{ $activeTab === 'archived' ? 'active' : '' }}" href="{{ route('hrms.broadcasts.index', ['active_tab' => 'archived']) }}">
                         <i class="feather-archive"></i>
@@ -309,11 +313,13 @@
                                                 <i class="feather-eye me-2 text-primary"></i> View Announcement
                                             </a>
                                         </li>
+                                        @if($isHrAdmin)
                                         <li>
                                             <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete broadcast {{ $bc->broadcast_number }}? This will remove all delivery receipts and comments.', function() { document.getElementById('deleteBcForm{{ $bc->id }}').submit(); }, { title: 'Delete Broadcast', confirmText: 'Yes, Delete', variant: 'danger' });">
                                                 <i class="feather-trash-2 me-2"></i> Delete Broadcast
                                             </a>
                                         </li>
+                                        @endif
                                     </x-ui.action-dropdown>
                                     <form id="deleteBcForm{{ $bc->id }}" action="{{ route('hrms.broadcasts.destroy', $bc->id) }}" method="POST" class="d-none">
                                         @csrf
@@ -472,6 +478,7 @@
     </div>
 </div>
 
+@if($isHrAdmin)
 <!-- CREATE BROADCAST MODAL -->
 <div class="modal fade" id="createBroadcastModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -557,6 +564,7 @@
         </div>
     </div>
 </div>
+@endif
 
 <x-ui.confirmation-modal />
 

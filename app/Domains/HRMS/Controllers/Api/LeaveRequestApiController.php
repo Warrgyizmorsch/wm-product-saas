@@ -44,6 +44,39 @@ class LeaveRequestApiController extends Controller
     }
 
     /**
+     * Helper to check if current user is HR Admin / Manager.
+     */
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return (bool) (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.leave_requests.approve')
+        );
+    }
+
+    /**
+     * Helper to resolve current authenticated user's employee record.
+     */
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)->first()
+            ?? Employee::where(function ($q) use ($user) {
+                $q->where('office_email', $user->email)
+                  ->orWhere('personal_email', $user->email);
+            })->first();
+    }
+
+    /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
     private function authorizeUser(): ?JsonResponse
@@ -74,11 +107,13 @@ class LeaveRequestApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
 
         $requestsQuery = LeaveRequest::query();
+        if (!$isHrAdmin) {
+            $requestsQuery->where('employee_id', $employee?->id ?? 0);
+        }
 
         $totalRequests   = (clone $requestsQuery)->count();
         $pendingRequests = (clone $requestsQuery)->where('status', 'pending')->count();
@@ -106,13 +141,14 @@ class LeaveRequestApiController extends Controller
             return $authError;
         }
         
-        $employee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
 
         $query = LeaveRequest::query()->with(['employee', 'leaveType', 'approvedByEmployee']);
 
-        if ($request->filled('employee_id')) {
+        if (!$isHrAdmin) {
+            $query->where('employee_id', $employee?->id ?? 0);
+        } elseif ($request->filled('employee_id')) {
             $query->where('employee_id', $request->employee_id);
         }
 
@@ -143,12 +179,19 @@ class LeaveRequestApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
         $leaveRequest = LeaveRequest::with(['employee', 'leaveType', 'approvedByEmployee'])
             ->where('tenant_id', tenant_id())
             ->find($id);
 
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isHrAdmin && $leaveRequest->employee_id !== $employee?->id) {
+            return $this->sendError('Unauthorized access to leave request.', 403);
         }
 
         return $this->sendSuccess($leaveRequest, 'Leave request details loaded');
@@ -177,7 +220,17 @@ class LeaveRequestApiController extends Controller
             'notified_contacts.*' => 'exists:employees,id'
         ]);
 
-        $employee = Employee::find($validated['employee_id']);
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError(__('hrms.leave.app.emp_not_found'), 404);
+            }
+            $validated['employee_id'] = $employee->id;
+        } else {
+            $employee = Employee::find($validated['employee_id']);
+        }
 
         if (!$employee) {
             return $this->sendError(__('hrms.leave.app.emp_not_found'), 404);
@@ -340,14 +393,17 @@ class LeaveRequestApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can approve leave requests.', 403);
+        }
+
         $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
         }
 
-        $adminEmployee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+        $adminEmployee = $this->getAuthenticatedEmployee();
 
         $rules = $leaveRequest->leaveType->rules ?? [];
         $workflowLevel = $rules['approval']['workflow_level'] ?? '1_level';
@@ -390,6 +446,11 @@ class LeaveRequestApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can reject leave requests.', 403);
+        }
+
         $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
@@ -417,6 +478,11 @@ class LeaveRequestApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can update leave status.', 403);
+        }
+
         $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
@@ -432,9 +498,7 @@ class LeaveRequestApiController extends Controller
         ]);
 
         $status        = $validated['status'];
-        $adminEmployee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+        $adminEmployee = $this->getAuthenticatedEmployee();
 
         $oldStatus = $leaveRequest->status;
         $rules     = $leaveRequest->leaveType->rules ?? [];
@@ -501,22 +565,16 @@ class LeaveRequestApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
         $employeeId = $request->integer('employee_id') ?: null;
-        if (!$employeeId) {
-            $employee = Employee::where('personal_email', auth()->user()->email)
-                ->orWhere('office_email', auth()->user()->email)
-                ->first();
+        if (!$isHrAdmin || !$employeeId) {
             $employeeId = $employee?->id;
         }
 
         if (!$employeeId) {
-            // Fallback: pick the first active employee
-            $firstEmp = Employee::where('status', true)->first() ?: Employee::first();
-            $employeeId = $firstEmp?->id;
-        }
-
-        if (!$employeeId) {
-            return $this->sendError('Employee profile not found. Please pass ?employee_id={id} query parameter.', 404);
+            return $this->sendError('Employee profile not found.', 404);
         }
 
         $balances = LeaveBalance::where('employee_id', $employeeId)->with(['leaveType.plan', 'employee'])->get();
@@ -606,9 +664,16 @@ class LeaveRequestApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
         $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isHrAdmin && $leaveRequest->employee_id !== $employee?->id) {
+            return $this->sendError('Unauthorized action.', 403);
         }
 
         if (!$leaveRequest->canWithdraw()) {
@@ -626,9 +691,16 @@ class LeaveRequestApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
         $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isHrAdmin && $leaveRequest->employee_id !== $employee?->id) {
+            return $this->sendError('Unauthorized action.', 403);
         }
 
         if (!$leaveRequest->canRequestCancellation()) {
@@ -653,6 +725,10 @@ class LeaveRequestApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can approve cancellations.', 403);
+        }
+
         $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
@@ -672,6 +748,10 @@ class LeaveRequestApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can deny cancellations.', 403);
         }
 
         $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);

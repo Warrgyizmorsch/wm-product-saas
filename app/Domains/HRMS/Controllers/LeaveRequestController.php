@@ -43,6 +43,15 @@ class LeaveRequestController extends Controller
             'notified_contacts.*' => 'exists:employees,id',
         ]);
 
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if ($currentEmp) {
+                $validated['employee_id'] = $currentEmp->id;
+            }
+        }
+
         $employee = Employee::findOrFail($validated['employee_id']);
 
         // Calculate duration server-side from dates + session types, excluding holidays & rest days
@@ -154,6 +163,15 @@ class LeaveRequestController extends Controller
 
     public function withdraw(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $leaveRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
         if (!$leaveRequest->canWithdraw()) {
             return redirect()->back()->with('error', 'Only pending applications can be withdrawn.');
         }
@@ -169,6 +187,15 @@ class LeaveRequestController extends Controller
 
     public function requestCancellation(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $leaveRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
         if (!$leaveRequest->canRequestCancellation()) {
             return redirect()->back()->with('error', 'Only approved applications can have a cancellation requested.');
         }
@@ -230,19 +257,14 @@ class LeaveRequestController extends Controller
     public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $user = auth()->user();
-
-        $employee = \App\Domains\HRMS\Models\Employee::where('personal_email', $user->email)
-            ->orWhere('office_email', $user->email)
-            ->first();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $employee = Employee::resolveForUser($user);
 
         $query = LeaveRequest::with(['employee', 'leaveType'])->orderBy('created_at', 'desc');
 
         // Non-admin: scope to own records only
-        if ($employee) {
-            $isAdmin = $employee->is_admin ?? false;
-            if (!$isAdmin) {
-                $query->where('employee_id', $employee->id);
-            }
+        if (!$isHrAdmin) {
+            $query->where('employee_id', $employee ? $employee->id : 0);
         }
 
         $rows = $query->get();

@@ -25,6 +25,15 @@ class LeaveEncashmentController extends Controller
             'reason' => 'nullable|string|max:1000',
         ]);
 
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if ($currentEmp) {
+                $request->merge(['employee_id' => $currentEmp->id]);
+            }
+        }
+
         $employee = Employee::findOrFail($request->employee_id);
         $leaveType = LeaveType::findOrFail($request->leave_type_id);
 
@@ -88,7 +97,9 @@ class LeaveEncashmentController extends Controller
 
     public function approve(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        abort_unless($isHrAdmin, 403);
 
         $leaveEncashment->update([
             'status' => 'approved',
@@ -104,7 +115,9 @@ class LeaveEncashmentController extends Controller
 
     public function reject(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        abort_unless($isHrAdmin, 403);
 
         $leaveEncashment->update([
             'status' => 'rejected',
@@ -117,8 +130,20 @@ class LeaveEncashmentController extends Controller
             ->with('success', __('hrms.leave.encashment_app.rejected_successfully'));
     }
 
-    public function destroy(LeaveEncashment $leaveEncashment): RedirectResponse
+    public function destroy(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $leaveEncashment->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+            if ($leaveEncashment->status !== 'pending') {
+                return redirect()->back()->with('error', 'Only pending encashment requests can be deleted.');
+            }
+        }
+
         $empId = $leaveEncashment->employee_id;
         $typeId = $leaveEncashment->leave_type_id;
 
@@ -187,19 +212,14 @@ class LeaveEncashmentController extends Controller
     public function exportEncashments(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $user = auth()->user();
-
-        $employee = Employee::where('personal_email', $user->email)
-            ->orWhere('office_email', $user->email)
-            ->first();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $employee = Employee::resolveForUser($user);
 
         $query = LeaveEncashment::with(['employee', 'leaveType'])->orderBy('created_at', 'desc');
 
         // Non-admin: scope to own records only
-        if ($employee) {
-            $isAdmin = $employee->is_admin ?? false;
-            if (!$isAdmin) {
-                $query->where('employee_id', $employee->id);
-            }
+        if (!$isHrAdmin) {
+            $query->where('employee_id', $employee ? $employee->id : 0);
         }
 
         $rows = $query->get();

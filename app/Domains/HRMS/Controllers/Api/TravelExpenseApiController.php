@@ -75,12 +75,19 @@ class TravelExpenseApiController extends Controller
     {
         $user = auth()->user();
         $employee = null;
-        if ($user && $user->email) {
-            $employee = Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        if ($user) {
+            $employee = Employee::where('user_id', $user->id)->first()
+                ?? Employee::where(function ($q) use ($user) {
+                    $q->where('office_email', $user->email)
+                      ->orWhere('personal_email', $user->email);
+                })->first();
         }
-        $isAdmin = ($user->role ?? '') === 'admin' || ($user && method_exists($user, 'hasRole') && $user->hasRole('admin'));
+
+        $isAdmin = (bool) ($user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.travel_expenses.approve')
+        ));
+
         return [$employee, $isAdmin];
     }
 

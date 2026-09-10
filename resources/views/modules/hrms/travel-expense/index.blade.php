@@ -286,69 +286,71 @@
                                     </td>
                                     <td class="text-end">
                                         @if($req->status === 'pending')
-                                            <div class="d-flex justify-content-end gap-1">
-                                                <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveTravelModal_{{ $req->id }}">Approve</button>
-                                                <form method="POST" action="{{ route('hrms.travel-expense.travel.reject', $req) }}" class="m-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11">Reject</button>
-                                                </form>
-                                            </div>
+                                            @if($isAdmin)
+                                                <div class="d-flex justify-content-end gap-1">
+                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveTravelModal_{{ $req->id }}">Approve</button>
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.travel.reject', $req) }}" class="m-0">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11">Reject</button>
+                                                    </form>
+                                                </div>
 
-                                            <!-- Modal to Approve Travel Request with Custom Budget & Linked Cash Advance -->
-                                            <div class="modal fade text-start" id="approveTravelModal_{{ $req->id }}" tabindex="-1" aria-labelledby="approveTravelModalLabel_{{ $req->id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
-                                                    <div class="modal-content text-dark">
-                                                        <form method="POST" action="{{ route('hrms.travel-expense.travel.approve', $req) }}">
-                                                            @csrf
-                                                            <div class="modal-header">
-                                                                <h6 class="modal-title fw-bold" id="approveTravelModalLabel_{{ $req->id }}"><i class="feather-check-circle text-success me-1"></i> Approve Travel Request</h6>
-                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                            </div>
-                                                            <div class="modal-body d-flex flex-column gap-3">
-                                                                <p class="fs-12 text-muted mb-0">Specify the approved budget for this trip. You can also approve the requested cash advance at the same time.</p>
-                                                                
-                                                                <div class="p-3 bg-light rounded border">
-                                                                    <div class="row g-2 fs-12">
-                                                                        <div class="col-6">
-                                                                            <span class="text-muted d-block fs-10 text-uppercase fw-semibold mb-0.5">Requested Budget</span>
-                                                                            <strong class="text-dark">{{ $currencySymbol }}{{ number_format($req->estimated_budget, 2) }}</strong>
-                                                                        </div>
-                                                                        @php
-                                                                            $pendingAdv = $req->cashAdvances->where('status', 'pending')->first();
-                                                                        @endphp
-                                                                        @if($pendingAdv)
-                                                                            <div class="col-6">
-                                                                                <span class="text-muted d-block fs-10 text-uppercase fw-semibold mb-0.5">Requested Advance</span>
-                                                                                <strong class="text-primary">{{ $currencySymbol }}{{ number_format($pendingAdv->amount, 2) }}</strong>
-                                                                            </div>
-                                                                        @endif
-                                                                    </div>
+                                                <!-- Modal to Approve Travel Request with Custom Budget & Linked Cash Advance -->
+                                                <div class="modal fade text-start" id="approveTravelModal_{{ $req->id }}" tabindex="-1" aria-labelledby="approveTravelModalLabel_{{ $req->id }}" aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
+                                                        <div class="modal-content text-dark">
+                                                            <form method="POST" action="{{ route('hrms.travel-expense.travel.approve', $req) }}">
+                                                                @csrf
+                                                                <div class="modal-header">
+                                                                    <h6 class="modal-title fw-bold" id="approveTravelModalLabel_{{ $req->id }}"><i class="feather-check-circle text-success me-1"></i> Approve Travel Request</h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                 </div>
-
-                                                                <x-ui.odoo-form-ui type="input" inputType="number" label="Approved Budget" name="approved_budget" value="{{ $req->estimated_budget }}" step="0.01" min="0.01" :required="true" />
-
-                                                                @if($pendingAdv)
-                                                                    <div class="p-3 bg-soft-info rounded border border-info-subtle mt-1">
-                                                                        <div class="form-check ps-0 d-flex align-items-center gap-2 mb-2">
-                                                                            <input class="form-check-input mt-0 ms-0" type="checkbox" name="approve_cash_advance" value="1" id="approve_advance_cb_{{ $req->id }}" checked style="float: none;" onchange="document.getElementById('advance_amt_wrapper_{{ $req->id }}').classList.toggle('d-none', !this.checked)">
-                                                                            <label class="form-check-label fw-bold fs-12 text-dark mb-0" for="approve_advance_cb_{{ $req->id }}">
-                                                                                <i class="feather-dollar-sign text-info me-1"></i>Also Approve Linked Cash Advance
-                                                                            </label>
-                                                                        </div>
-                                                                        <div id="advance_amt_wrapper_{{ $req->id }}">
-                                                                            <x-ui.odoo-form-ui type="input" inputType="number" label="Approved Advance Amount" name="approved_advance_amount" value="{{ $pendingAdv->amount }}" step="0.01" min="0.01" />
+                                                                <div class="modal-body d-flex flex-column gap-3">
+                                                                    <p class="fs-12 text-muted mb-0">Specify the approved budget for this trip. You can also approve the requested cash advance at the same time.</p>
+                                                                    
+                                                                    <div class="p-3 bg-light rounded border">
+                                                                        <div class="row g-2 fs-12">
+                                                                            <div class="col-6">
+                                                                                <span class="text-muted d-block fs-10 text-uppercase fw-semibold mb-0.5">Requested Budget</span>
+                                                                                <strong class="text-dark">{{ $currencySymbol }}{{ number_format($req->estimated_budget, 2) }}</strong>
+                                                                            </div>
+                                                                            @php
+                                                                                $pendingAdv = $req->cashAdvances->where('status', 'pending')->first();
+                                                                            @endphp
+                                                                            @if($pendingAdv)
+                                                                                <div class="col-6">
+                                                                                    <span class="text-muted d-block fs-10 text-uppercase fw-semibold mb-0.5">Requested Advance</span>
+                                                                                    <strong class="text-primary">{{ $currencySymbol }}{{ number_format($pendingAdv->amount, 2) }}</strong>
+                                                                                </div>
+                                                                            @endif
                                                                         </div>
                                                                     </div>
-                                                                @endif
-                                                            </div>
-                                                            <div class="modal-footer">
-                                                                <button type="button" class="btn btn-light border btn-sm text-uppercase fw-bold fs-11" data-bs-dismiss="modal">Cancel</button>
-                                                                <button type="submit" class="btn btn-success btn-sm text-uppercase fw-bold fs-11">Approve</button>
-                                                            </div>
-                                                        </form>
+
+                                                                    <x-ui.odoo-form-ui type="input" inputType="number" label="Approved Budget" name="approved_budget" value="{{ $req->estimated_budget }}" step="0.01" min="0.01" :required="true" />
+
+                                                                    @if($pendingAdv)
+                                                                        <div class="p-3 bg-soft-info rounded border border-info-subtle mt-1">
+                                                                            <div class="form-check ps-0 d-flex align-items-center gap-2 mb-2">
+                                                                                <input class="form-check-input mt-0 ms-0" type="checkbox" name="approve_cash_advance" value="1" id="approve_advance_cb_{{ $req->id }}" checked style="float: none;" onchange="document.getElementById('advance_amt_wrapper_{{ $req->id }}').classList.toggle('d-none', !this.checked)">
+                                                                                <label class="form-check-label fw-bold fs-12 text-dark mb-0" for="approve_advance_cb_{{ $req->id }}">
+                                                                                    <i class="feather-dollar-sign text-info me-1"></i>Also Approve Linked Cash Advance
+                                                                                </label>
+                                                                            </div>
+                                                                            <div id="advance_amt_wrapper_{{ $req->id }}">
+                                                                                <x-ui.odoo-form-ui type="input" inputType="number" label="Approved Advance Amount" name="approved_advance_amount" value="{{ $pendingAdv->amount }}" step="0.01" min="0.01" />
+                                                                            </div>
+                                                                        </div>
+                                                                    @endif
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-light border btn-sm text-uppercase fw-bold fs-11" data-bs-dismiss="modal">Cancel</button>
+                                                                    <button type="submit" class="btn btn-success btn-sm text-uppercase fw-bold fs-11">Approve</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            @endif
                                         @elseif($req->status === 'approved')
                                             @php
                                                 $activeUnpaidReport = $req->expenseReports->whereIn('status', ['draft', 'submitted', 'partially_approved', 'approved'])->first();
@@ -356,7 +358,7 @@
                                                 $approvedAdv = $req->cashAdvances->where('status', 'approved')->first();
                                             @endphp
                                             <div class="d-flex justify-content-end align-items-center gap-1 flex-wrap">
-                                                @if($approvedAdv)
+                                                @if($approvedAdv && $isAdmin)
                                                     <form method="POST" action="{{ route('hrms.travel-expense.advance.disburse', $approvedAdv) }}" class="m-0">
                                                         @csrf
                                                         <button type="submit" class="btn btn-sm btn-success py-1 fw-bold fs-11 text-uppercase" title="Disburse Cash Advance ({{ $currencySymbol }}{{ number_format($approvedAdv->approved_amount ?? $approvedAdv->amount, 2) }})">
@@ -523,49 +525,53 @@
                                     </td>
                                     <td class="text-end text-nowrap">
                                         @if($adv->status === 'pending')
-                                            <div class="d-flex justify-content-end gap-1">
-                                                <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveAdvanceModal_{{ $adv->id }}">Approve</button>
-                                                <form method="POST" action="{{ route('hrms.travel-expense.advance.reject', $adv) }}" class="m-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11">Reject</button>
-                                                </form>
-                                            </div>
+                                            @if($isAdmin)
+                                                <div class="d-flex justify-content-end gap-1">
+                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveAdvanceModal_{{ $adv->id }}">Approve</button>
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.advance.reject', $adv) }}" class="m-0">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11">Reject</button>
+                                                    </form>
+                                                </div>
 
-                                            <!-- Modal to Approve Cash Advance with Custom Amount -->
-                                            <div class="modal fade text-start" id="approveAdvanceModal_{{ $adv->id }}" tabindex="-1" aria-labelledby="approveAdvanceModalLabel_{{ $adv->id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
-                                                    <div class="modal-content text-dark">
-                                                        <form method="POST" action="{{ route('hrms.travel-expense.advance.approve', $adv) }}">
-                                                            @csrf
-                                                            <div class="modal-header">
-                                                                <h6 class="modal-title fw-bold" id="approveAdvanceModalLabel_{{ $adv->id }}"><i class="feather-check-circle text-success me-1"></i> Approve Cash Advance</h6>
-                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                            </div>
-                                                            <div class="modal-body d-flex flex-column gap-3">
-                                                                <p class="fs-12 text-muted mb-0">Specify the approved cash advance amount. You can partially approve a lower amount or adjust as needed.</p>
-                                                                
-                                                                <div class="p-3 bg-light rounded border">
-                                                                    <div class="fs-11 text-muted">Requested Amount</div>
-                                                                    <div class="fw-bold fs-15 text-dark">{{ $currencySymbol }}{{ number_format($adv->amount, 2) }}</div>
+                                                <!-- Modal to Approve Cash Advance with Custom Amount -->
+                                                <div class="modal fade text-start" id="approveAdvanceModal_{{ $adv->id }}" tabindex="-1" aria-labelledby="approveAdvanceModalLabel_{{ $adv->id }}" aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+                                                        <div class="modal-content text-dark">
+                                                            <form method="POST" action="{{ route('hrms.travel-expense.advance.approve', $adv) }}">
+                                                                @csrf
+                                                                <div class="modal-header">
+                                                                    <h6 class="modal-title fw-bold" id="approveAdvanceModalLabel_{{ $adv->id }}"><i class="feather-check-circle text-success me-1"></i> Approve Cash Advance</h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                 </div>
+                                                                <div class="modal-body d-flex flex-column gap-3">
+                                                                    <p class="fs-12 text-muted mb-0">Specify the approved cash advance amount. You can partially approve a lower amount or adjust as needed.</p>
+                                                                    
+                                                                    <div class="p-3 bg-light rounded border">
+                                                                        <div class="fs-11 text-muted">Requested Amount</div>
+                                                                        <div class="fw-bold fs-15 text-dark">{{ $currencySymbol }}{{ number_format($adv->amount, 2) }}</div>
+                                                                    </div>
 
-                                                                <x-ui.odoo-form-ui type="input" inputType="number" label="Approved Amount" name="approved_amount" value="{{ $adv->amount }}" step="0.01" min="1" :required="true" />
-                                                            </div>
-                                                            <div class="modal-footer">
-                                                                <button type="button" class="btn btn-light border btn-sm text-uppercase fw-bold fs-11" data-bs-dismiss="modal">Cancel</button>
-                                                                <button type="submit" class="btn btn-success btn-sm text-uppercase fw-bold fs-11">Approve</button>
-                                                            </div>
-                                                        </form>
+                                                                    <x-ui.odoo-form-ui type="input" inputType="number" label="Approved Amount" name="approved_amount" value="{{ $adv->amount }}" step="0.01" min="1" :required="true" />
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-light border btn-sm text-uppercase fw-bold fs-11" data-bs-dismiss="modal">Cancel</button>
+                                                                    <button type="submit" class="btn btn-success btn-sm text-uppercase fw-bold fs-11">Approve</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            @endif
                                         @elseif($adv->status === 'approved')
-                                            <div class="d-flex justify-content-end gap-1">
-                                                <form method="POST" action="{{ route('hrms.travel-expense.advance.disburse', $adv) }}" class="m-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11"><i class="feather-dollar-sign me-1"></i>Disburse</button>
-                                                </form>
-                                            </div>
+                                            @if($isAdmin)
+                                                <div class="d-flex justify-content-end gap-1">
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.advance.disburse', $adv) }}" class="m-0">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11"><i class="feather-dollar-sign me-1"></i>Disburse</button>
+                                                    </form>
+                                                </div>
+                                            @endif
                                         @else
                                             -
                                         @endif
@@ -856,104 +862,106 @@
                                                 </button>
                                             @endif
 
-                                            {{-- ACTIONS --}}
-                                            @if($rep->status === 'submitted')
-                                                <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11 text-uppercase" data-bs-toggle="modal" data-bs-target="#approveReportModal_{{ $rep->id }}">Review & Approve</button>
+                                            {{-- ADMIN ACTIONS --}}
+                                            @if($isAdmin)
+                                                @if($rep->status === 'submitted')
+                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11 text-uppercase" data-bs-toggle="modal" data-bs-target="#approveReportModal_{{ $rep->id }}">Review & Approve</button>
 
-                                                <form method="POST" action="{{ route('hrms.travel-expense.report.reject', $rep) }}" class="m-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase">Reject</button>
-                                                </form>
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.report.reject', $rep) }}" class="m-0">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase">Reject</button>
+                                                    </form>
 
-                                                <!-- Modal to Approve Expense Report with Custom Amount & Itemized Partial Approval -->
-                                                <div class="modal fade text-start" id="approveReportModal_{{ $rep->id }}" tabindex="-1" aria-labelledby="approveReportModalLabel_{{ $rep->id }}" aria-hidden="true">
-                                                    <div class="modal-dialog modal-lg modal-dialog-centered">
-                                                        <div class="modal-content">
-                                                            <form method="POST" action="{{ route('hrms.travel-expense.report.approve', $rep) }}">
-                                                                @csrf
-                                                                <input type="hidden" name="approved_amount" id="approve_amount_input_{{ $rep->id }}" value="{{ $rep->total_amount }}">
-                                                                <div class="modal-header">
-                                                                    <h5 class="modal-title fw-bold" id="approveReportModalLabel_{{ $rep->id }}"><i class="feather-check-square text-success me-1"></i> Review & Approve Expense Report</h5>
-                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                                </div>
-                                                                <div class="modal-body d-flex flex-column gap-3 text-start">
-                                                                    <div class="alert alert-info border-info-subtle fs-12 mb-0 d-flex gap-2 align-items-center">
-                                                                        <i class="feather-info text-info fs-15"></i>
-                                                                        <div>Select individual item decisions below (Approve/Reject). Total payout will recalculate automatically.</div>
+                                                    <!-- Modal to Approve Expense Report with Custom Amount & Itemized Partial Approval -->
+                                                    <div class="modal fade text-start" id="approveReportModal_{{ $rep->id }}" tabindex="-1" aria-labelledby="approveReportModalLabel_{{ $rep->id }}" aria-hidden="true">
+                                                        <div class="modal-dialog modal-lg modal-dialog-centered">
+                                                            <div class="modal-content">
+                                                                <form method="POST" action="{{ route('hrms.travel-expense.report.approve', $rep) }}">
+                                                                    @csrf
+                                                                    <input type="hidden" name="approved_amount" id="approve_amount_input_{{ $rep->id }}" value="{{ $rep->total_amount }}">
+                                                                    <div class="modal-header">
+                                                                        <h5 class="modal-title fw-bold" id="approveReportModalLabel_{{ $rep->id }}"><i class="feather-check-square text-success me-1"></i> Review & Approve Expense Report</h5>
+                                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                     </div>
-                                                                    <x-ui.odoo-form-ui type="table">
-                                                                         <thead>
-                                                                             <tr>
-                                                                                 <th style="width: 30%;">Item / Category</th>
-                                                                                 <th style="width: 15%;">Date</th>
-                                                                                 <th style="width: 15%;">Claimed Amount</th>
-                                                                                 <th style="width: 20%;">Decision</th>
-                                                                                 <th style="width: 20%;">Rejection Reason</th>
-                                                                             </tr>
-                                                                         </thead>
-                                                                         <tbody>
-                                                                             @foreach($rep->claims as $cItem)
+                                                                    <div class="modal-body d-flex flex-column gap-3 text-start">
+                                                                        <div class="alert alert-info border-info-subtle fs-12 mb-0 d-flex gap-2 align-items-center">
+                                                                            <i class="feather-info text-info fs-15"></i>
+                                                                            <div>Select individual item decisions below (Approve/Reject). Total payout will recalculate automatically.</div>
+                                                                        </div>
+                                                                        <x-ui.odoo-form-ui type="table">
+                                                                             <thead>
                                                                                  <tr>
-                                                                                     <td>
-                                                                                         <div class="fw-bold text-dark">{{ $cItem->category->name ?? 'Claim Item' }}</div>
-                                                                                     </td>
-                                                                                     <td>{{ $cItem->expense_date ? \Carbon\Carbon::parse($cItem->expense_date)->format('M d, Y') : '' }}</td>
-                                                                                     <td class="fw-bold text-dark">{{ $currencySymbol }}{{ number_format($cItem->amount, 2) }}</td>
-                                                                                     <td>
-                                                                                          <select name="items[{{ $cItem->id }}][decision]" 
-                                                                                                      id="item_decision_sel_{{ $cItem->id }}"
-                                                                                                      class="odoo-table-select claim-item-decision-select fw-semibold" 
-                                                                                                      data-claim-id="{{ $cItem->id }}"
-                                                                                                      data-amount="{{ $cItem->amount }}"
-                                                                                                      data-full-advance="{{ $fullAdvance }}"
-                                                                                                      onchange="handleItemDecisionChange(this, {{ $rep->id }}, {{ $fullAdvance }})">
-                                                                                              <option value="approved" @selected(($cItem->status ?? 'approved') !== 'rejected')>Approve</option>
-                                                                                              <option value="rejected" @selected(($cItem->status ?? '') === 'rejected')>Reject</option>
-                                                                                          </select>
-                                                                                          <input type="hidden" name="items[{{ $cItem->id }}][approved_amount]" id="item_approved_amt_{{ $cItem->id }}" value="{{ (($cItem->status ?? '') === 'rejected') ? 0 : $cItem->amount }}">
-                                                                                      </td>
-                                                                                      <td>
-                                                                                          <input type="text" 
-                                                                                                 name="items[{{ $cItem->id }}][rejection_reason]" 
-                                                                                                 id="item_rejection_reason_{{ $cItem->id }}" 
-                                                                                                 class="odoo-table-input item-rejection-input {{ (($cItem->status ?? '') === 'rejected') ? '' : 'd-none' }}" 
-                                                                                                 placeholder="Reason for rejection..." 
-                                                                                                 value="{{ $cItem->rejection_reason ?? '' }}" />
-                                                                                      </td>
+                                                                                     <th style="width: 30%;">Item / Category</th>
+                                                                                     <th style="width: 15%;">Date</th>
+                                                                                     <th style="width: 15%;">Claimed Amount</th>
+                                                                                     <th style="width: 20%;">Decision</th>
+                                                                                     <th style="width: 20%;">Rejection Reason</th>
                                                                                  </tr>
-                                                                             @endforeach
-                                                                         </tbody>
-                                                                     </x-ui.odoo-form-ui>
-                                                                    <div id="surplus_payroll_notice_{{ $rep->id }}" class="alert alert-warning border-warning-subtle fs-11 py-2 px-2.5 mt-1 mb-0 d-none animate__animated animate__fadeIn">
-                                                                        <i class="feather-alert-triangle me-1"></i> <strong>Surplus Refund:</strong> Since the employee took a surplus advance, the balance will be recovered via salary deduction.
-                                                                    </div>
+                                                                             </thead>
+                                                                             <tbody>
+                                                                                 @foreach($rep->claims as $cItem)
+                                                                                     <tr>
+                                                                                         <td>
+                                                                                             <div class="fw-bold text-dark">{{ $cItem->category->name ?? 'Claim Item' }}</div>
+                                                                                         </td>
+                                                                                         <td>{{ $cItem->expense_date ? \Carbon\Carbon::parse($cItem->expense_date)->format('M d, Y') : '' }}</td>
+                                                                                         <td class="fw-bold text-dark">{{ $currencySymbol }}{{ number_format($cItem->amount, 2) }}</td>
+                                                                                         <td>
+                                                                                              <select name="items[{{ $cItem->id }}][decision]" 
+                                                                                                          id="item_decision_sel_{{ $cItem->id }}"
+                                                                                                          class="odoo-table-select claim-item-decision-select fw-semibold" 
+                                                                                                          data-claim-id="{{ $cItem->id }}"
+                                                                                                          data-amount="{{ $cItem->amount }}"
+                                                                                                          data-full-advance="{{ $fullAdvance }}"
+                                                                                                          onchange="handleItemDecisionChange(this, {{ $rep->id }}, {{ $fullAdvance }})">
+                                                                                                  <option value="approved" @selected(($cItem->status ?? 'approved') !== 'rejected')>Approve</option>
+                                                                                                  <option value="rejected" @selected(($cItem->status ?? '') === 'rejected')>Reject</option>
+                                                                                              </select>
+                                                                                              <input type="hidden" name="items[{{ $cItem->id }}][approved_amount]" id="item_approved_amt_{{ $cItem->id }}" value="{{ (($cItem->status ?? '') === 'rejected') ? 0 : $cItem->amount }}">
+                                                                                          </td>
+                                                                                          <td>
+                                                                                              <input type="text" 
+                                                                                                     name="items[{{ $cItem->id }}][rejection_reason]" 
+                                                                                                     id="item_rejection_reason_{{ $cItem->id }}" 
+                                                                                                     class="odoo-table-input item-rejection-input {{ (($cItem->status ?? '') === 'rejected') ? '' : 'd-none' }}" 
+                                                                                                     placeholder="Reason for rejection..." 
+                                                                                                     value="{{ $cItem->rejection_reason ?? '' }}" />
+                                                                                          </td>
+                                                                                     </tr>
+                                                                                 @endforeach
+                                                                             </tbody>
+                                                                         </x-ui.odoo-form-ui>
+                                                                        <div id="surplus_payroll_notice_{{ $rep->id }}" class="alert alert-warning border-warning-subtle fs-11 py-2 px-2.5 mt-1 mb-0 d-none animate__animated animate__fadeIn">
+                                                                            <i class="feather-alert-triangle me-1"></i> <strong>Surplus Refund:</strong> Since the employee took a surplus advance, the balance will be recovered via salary deduction.
+                                                                        </div>
 
-                                                                    <div class="bg-light rounded border fs-12 d-flex flex-column text-dark mt-3" style="padding: 16px; gap: 10px;">
-                                                                        <div class="d-flex justify-content-between align-items-center">
-                                                                            <span class="text-muted fw-medium">Calculated Approved Total & Payout:</span>
-                                                                            <strong id="calc_payout_{{ $rep->id }}" class="text-primary fs-13">{{ $currencySymbol }}0.00</strong>
-                                                                        </div>
-                                                                        <div id="calc_surplus_wrapper_{{ $rep->id }}" class="d-flex justify-content-between align-items-center d-none text-warning fw-bold">
-                                                                            <span>Refund due to Company:</span>
-                                                                            <span id="calc_surplus_{{ $rep->id }}" class="fs-13">{{ $currencySymbol }}0.00</span>
+                                                                        <div class="bg-light rounded border fs-12 d-flex flex-column text-dark mt-3" style="padding: 16px; gap: 10px;">
+                                                                            <div class="d-flex justify-content-between align-items-center">
+                                                                                <span class="text-muted fw-medium">Calculated Approved Total & Payout:</span>
+                                                                                <strong id="calc_payout_{{ $rep->id }}" class="text-primary fs-13">{{ $currencySymbol }}0.00</strong>
+                                                                            </div>
+                                                                            <div id="calc_surplus_wrapper_{{ $rep->id }}" class="d-flex justify-content-between align-items-center d-none text-warning fw-bold">
+                                                                                <span>Refund due to Company:</span>
+                                                                                <span id="calc_surplus_{{ $rep->id }}" class="fs-13">{{ $currencySymbol }}0.00</span>
+                                                                            </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                                <div class="modal-footer bg-light border-top">
-                                                                    <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal" class="fw-bold text-uppercase">Cancel</x-ui.button>
-                                                                    <x-ui.button type="submit" variant="success" icon="feather-check-circle" class="fw-bold text-uppercase">Approve Expense Report</x-ui.button>
-                                                                </div>
-                                                            </form>
+                                                                    <div class="modal-footer bg-light border-top">
+                                                                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal" class="fw-bold text-uppercase">Cancel</x-ui.button>
+                                                                        <x-ui.button type="submit" variant="success" icon="feather-check-circle" class="fw-bold text-uppercase">Approve Expense Report</x-ui.button>
+                                                                    </div>
+                                                                </form>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            @endif
+                                                @endif
 
-                                            @if(in_array($rep->status, ['approved', 'partially_approved']))
-                                                <form method="POST" action="{{ route('hrms.travel-expense.report.pay', $rep) }}" class="m-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-success py-1 fw-bold fs-11 text-uppercase" title="Pay Out Approved Amount ({{ $currencySymbol }}{{ number_format($rep->approved_amount ?? $rep->total_amount, 2) }})"><i class="feather-credit-card me-1"></i> Pay Out</button>
-                                                </form>
+                                                @if(in_array($rep->status, ['approved', 'partially_approved']))
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.report.pay', $rep) }}" class="m-0">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-success py-1 fw-bold fs-11 text-uppercase" title="Pay Out Approved Amount ({{ $currencySymbol }}{{ number_format($rep->approved_amount ?? $rep->total_amount, 2) }})"><i class="feather-credit-card me-1"></i> Pay Out</button>
+                                                    </form>
+                                                @endif
                                             @endif
                                         </div>
                                     </td>

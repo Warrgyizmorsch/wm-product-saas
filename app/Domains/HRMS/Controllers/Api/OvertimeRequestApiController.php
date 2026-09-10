@@ -58,17 +58,53 @@ class OvertimeRequestApiController extends Controller
     }
 
 
+    /**
+     * Helper to check if current user is HR Admin / Overtime Manager.
+     */
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return (bool) (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage')
+        );
+    }
+
+    /**
+     * Helper to resolve current authenticated user's employee record.
+     */
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)->first()
+            ?? Employee::where(function ($q) use ($user) {
+                $q->where('office_email', $user->email)
+                  ->orWhere('personal_email', $user->email);
+            })->first();
+    }
+
     public function summary(): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        $employee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
 
         $query = OvertimeRequest::query();
+        if (!$isHrAdmin) {
+            $query->where('employee_id', $employee?->id ?? 0);
+        }
 
         $totalRequests   = (clone $query)->count();
         $pendingRequests = (clone $query)->where('status', 'pending')->count();
@@ -100,10 +136,17 @@ class OvertimeRequestApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
         $overtimeRequest = OvertimeRequest::with(['employee', 'approvedByEmployee'])->find($id);
 
         if (!$overtimeRequest) {
             return $this->sendError("Overtime request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isHrAdmin && $overtimeRequest->employee_id !== $employee?->id) {
+            return $this->sendError('Unauthorized access to overtime request.', 403);
         }
 
         return $this->sendSuccess($overtimeRequest, 'Overtime request details loaded');
@@ -115,8 +158,6 @@ class OvertimeRequestApiController extends Controller
             return $authError;
         }
 
-
-
         $validated = $request->validate([
             'employee_id'       => 'required|exists:employees,id',
             'date'              => 'required|date',
@@ -127,7 +168,17 @@ class OvertimeRequestApiController extends Controller
             'attachment'        => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
         ]);
 
-        $employee = Employee::find($validated['employee_id']);
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError('Employee record not found.', 404);
+            }
+            $validated['employee_id'] = $employee->id;
+        } else {
+            $employee = Employee::find($validated['employee_id']);
+        }
 
         if (!$employee) {
             return $this->sendError('Employee record not found.', 404);
@@ -185,6 +236,10 @@ class OvertimeRequestApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can update overtime request status.', 403);
+        }
+
         $overtimeRequest = OvertimeRequest::find($id);
         if (!$overtimeRequest) {
             return $this->sendError("Overtime request with ID '{$id}' not found.", 404);
@@ -224,9 +279,16 @@ class OvertimeRequestApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
         $overtimeRequest = OvertimeRequest::find($id);
         if (!$overtimeRequest) {
             return $this->sendError("Overtime request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isHrAdmin && $overtimeRequest->employee_id !== $employee?->id) {
+            return $this->sendError('Unauthorized action.', 403);
         }
 
         if ($overtimeRequest->status === 'approved') {

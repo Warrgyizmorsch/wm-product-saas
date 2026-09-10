@@ -45,6 +45,39 @@ class AttendanceApiController extends Controller
     }
 
     /**
+     * Helper to check if current user has HR Admin / Attendance permissions.
+     */
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hrms.attendance.view')
+            || $user->hasHrPermission('hrms.attendance.manage')
+            || $user->hasHrPermission('hr.settings.manage');
+    }
+
+    /**
+     * Helper to get authenticated employee.
+     */
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)
+            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
+            ->first()
+            ?? Employee::where('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->first();
+    }
+
+    /**
      * Null-safe authorization check.
      */
     private function authorizeUser(): ?JsonResponse
@@ -74,15 +107,22 @@ class AttendanceApiController extends Controller
         }
 
         $date = $request->query('date', Carbon::today()->format('Y-m-d'));
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
+        $baseQuery = Attendance::where('date', $date);
+        if (!$isHrAdmin && $employee) {
+            $baseQuery->where('employee_id', $employee->id);
+        }
 
         $stats = [
-            'total_present' => Attendance::where('date', $date)->count(),
-            'total_on_break' => Attendance::where('date', $date)
+            'total_present' => (clone $baseQuery)->count(),
+            'total_on_break' => (clone $baseQuery)
                 ->whereHas('breaks', function ($q) {
                     $q->whereNull('break_out');
                 })->count(),
-            'total_late' => Attendance::where('date', $date)->where('status', 'late')->count(),
-            'total_wfh'  => Attendance::where('date', $date)->where('location_type', 'wfh')->count(),
+            'total_late' => (clone $baseQuery)->where('status', 'late')->count(),
+            'total_wfh'  => (clone $baseQuery)->where('location_type', 'wfh')->count(),
         ];
 
         return $this->sendSuccess($stats, 'Attendance summary retrieved successfully');
@@ -104,7 +144,17 @@ class AttendanceApiController extends Controller
         $search = $filters['search'] ?? null;
         $statusFilter = $filters['status'] ?? null;
 
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
         $query = Attendance::with(['employee.department', 'breaks']);
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError('Employee profile not found.', 404);
+            }
+            $query->where('employee_id', $employee->id);
+        }
 
         if ($date) {
             $query->where('date', $date);
@@ -223,6 +273,13 @@ class AttendanceApiController extends Controller
             'selfie'      => 'nullable|string',
         ]);
 
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only clock in for yourself.', 403);
+        }
+
         try {
             $attendance = $this->attendanceRepository->checkIn(
                 $validated['employee_id'],
@@ -248,6 +305,12 @@ class AttendanceApiController extends Controller
         $attendance = Attendance::find($id);
         if (!$attendance) {
             return $this->sendError("Attendance log with ID '{$id}' not found.", 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $authEmployee && $attendance->employee_id !== $authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only clock out for yourself.', 403);
         }
 
         $validated = $request->validate([
@@ -283,6 +346,12 @@ class AttendanceApiController extends Controller
             return $this->sendError("Attendance log with ID '{$id}' not found.", 404);
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $authEmployee && $attendance->employee_id !== $authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only manage break for yourself.', 403);
+        }
+
         $this->attendanceRepository->breakIn($attendance->id);
         return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break started successfully.');
     }
@@ -301,6 +370,12 @@ class AttendanceApiController extends Controller
             return $this->sendError("Attendance log with ID '{$id}' not found.", 404);
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $authEmployee && $attendance->employee_id !== $authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only manage break for yourself.', 403);
+        }
+
         $this->attendanceRepository->breakOut($attendance->id);
         return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break ended successfully.');
     }
@@ -313,6 +388,10 @@ class AttendanceApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to manage manual attendance.', 403);
         }
 
         $employeeId = $request->input('employee_id');
@@ -612,6 +691,10 @@ class AttendanceApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to delete attendance logs.', 403);
+        }
+
         $attendances = Attendance::where('date', $date)->get();
         foreach ($attendances as $attendance) {
             $attendance->breaks()->delete();
@@ -635,6 +718,13 @@ class AttendanceApiController extends Controller
             'latitude'    => 'required|numeric|between:-90,90',
             'longitude'   => 'required|numeric|between:-180,180',
         ]);
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only track location for yourself.', 403);
+        }
 
         $result = $this->attendanceRepository->trackLocation(
             (int) $validated['employee_id'],

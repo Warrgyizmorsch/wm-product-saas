@@ -42,6 +42,18 @@ class BroadcastApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hrms.broadcasts.manage')
+            || $user->hasHrPermission('hrms.communications.manage')
+            || $user->hasHrPermission('hr.settings.manage');
+    }
+
     private function getAuthenticatedEmployee(): ?Employee
     {
         $user = auth()->user();
@@ -101,6 +113,10 @@ class BroadcastApiController extends Controller
      */
     public function management(Request $request): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to manage broadcasts.', 403);
+        }
+
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
 
         $broadcasts = Broadcast::where('tenant_id', $tenantId)
@@ -117,6 +133,10 @@ class BroadcastApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to create broadcast.', 403);
+        }
+
         $validated = $request->validate([
             'title'                        => 'required|string|max:255',
             'category'                     => 'required|in:announcement,policy_update,event,emergency,news',
@@ -168,6 +188,10 @@ class BroadcastApiController extends Controller
      */
     public function update(Request $request, $id): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update broadcast.', 403);
+        }
+
         $broadcast = Broadcast::find($id);
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
@@ -195,6 +219,10 @@ class BroadcastApiController extends Controller
      */
     public function destroy($id): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to delete broadcast.', 403);
+        }
+
         $broadcast = Broadcast::find($id);
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);
@@ -286,6 +314,10 @@ class BroadcastApiController extends Controller
      */
     public function getAnalytics($id): JsonResponse
     {
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to view broadcast analytics.', 403);
+        }
+
         $broadcast = Broadcast::find($id);
         if (!$broadcast) {
             return $this->sendError("Broadcast record with ID '{$id}' not found.", 404);

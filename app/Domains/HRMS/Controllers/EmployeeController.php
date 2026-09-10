@@ -214,6 +214,13 @@ class EmployeeController extends Controller
 
     public function show(Request $request, Employee $employee): View
     {
+        $authUser = auth()->user();
+        $isOwnProfile = $authUser && ($authUser->employee?->id === $employee->id || \App\Domains\HRMS\Models\Employee::resolveForUser($authUser)?->id === $employee->id);
+
+        if (!$isOwnProfile) {
+            $this->authorizeHrms('hrms.employees.view');
+        }
+
         $data = $this->employeeRepository->getProfileData($employee, $request->all());
 
         return view('modules.hrms.employees.show', $data);

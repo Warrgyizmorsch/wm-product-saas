@@ -9,6 +9,7 @@
         <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.broadcasts.index') }}" class="border text-dark fw-semibold">
             Back to Broadcasts
         </x-ui.button>
+        @if($isHrAdmin)
         <x-ui.button variant="outline-danger" icon="feather-trash-2" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete broadcast {{ $broadcast->broadcast_number }}? This will remove all receipts and comments.', function() { document.getElementById('adminDeleteBcForm').submit(); }, { title: 'Delete Broadcast', confirmText: 'Yes, Delete', variant: 'danger' });" class="fw-semibold">
             Delete Broadcast
         </x-ui.button>
@@ -16,6 +17,7 @@
             @csrf
             @method('DELETE')
         </form>
+        @endif
     </div>
 @endsection
 
@@ -85,11 +87,7 @@
                 </div>
 
                 <!-- MANDATORY READ ACKNOWLEDGEMENT ACTION FOR LOGGED-IN EMPLOYEE -->
-                @php
-                    $viewerRole = strtolower(auth()->user()->role ?? '');
-                    $isAdminViewer = in_array($viewerRole, ['admin', 'company admin', 'hr', 'hr manager', 'super admin', '1']);
-                @endphp
-                @if($broadcast->is_acknowledgement_required && $employee && !$isAdminViewer)
+                @if($broadcast->is_acknowledgement_required && $employee && !$isHrAdmin)
                     @php
                         $userReceipt = $broadcast->receipts->where('employee_id', $employee->id)->first();
                         $isAck = $userReceipt && $userReceipt->acknowledged_at;
@@ -112,8 +110,6 @@
                 @endif
             </div>
         </div>
-
-
 
         <!-- BROADCAST ANNOUNCEMENT CONTENT -->
         <div class="p-4 bg-white rounded border mb-4">
@@ -138,6 +134,7 @@
             @endif
         </div>
 
+        @if($isHrAdmin)
         <!-- DELIVERY & ACKNOWLEDGEMENT ANALYTICS SUMMARY -->
         <div class="p-3 bg-light rounded border mb-4">
             <h6 class="fw-bold text-dark mb-3 fs-13"><i class="feather-pie-chart me-1.5 text-primary"></i> Read & Acknowledgement Delivery Metrics</h6>
@@ -168,6 +165,7 @@
                 </div>
             </div>
         </div>
+        @endif
 
         <!-- COMMENTS & Q&A THREAD SECTION -->
         @if($broadcast->allow_comments)
@@ -205,15 +203,19 @@
                                     @if($comm->is_pinned)
                                         <x-ui.badge soft variant="primary" class="fs-10"><i class="feather-pin me-1"></i> Pinned Answer</x-ui.badge>
                                     @endif
+                                    @if($isHrAdmin)
                                     <form action="{{ route('hrms.broadcasts.comment.pin', $comm->id) }}" method="POST" class="d-inline">
                                         @csrf
                                         <x-ui.icon-btn type="submit" variant="soft-secondary" icon="feather-pin" title="Toggle Pin" />
                                     </form>
+                                    @endif
+                                    @if($isHrAdmin || ($employee && $comm->employee_id === $employee->id))
                                     <form action="{{ route('hrms.broadcasts.comment.destroy', $comm->id) }}" method="POST" class="d-inline">
                                         @csrf
                                         @method('DELETE')
                                         <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete Comment" />
                                     </form>
+                                    @endif
                                 </div>
                             </div>
                             <p class="fs-13 text-secondary mb-0 ps-4.5">{{ $comm->comment_text }}</p>
@@ -240,6 +242,7 @@
             </div>
         @endif
 
+        @if($isHrAdmin)
         <!-- AUDIT TRAIL RECEIPT TABLE -->
         <div class="p-3 bg-light rounded border">
             <h6 class="fw-bold text-dark mb-3 fs-13"><i class="feather-shield me-1.5 text-primary"></i> Read & Acknowledgement Audit Trail Log</h6>
@@ -268,7 +271,7 @@
                                 </td>
                                 <td>
                                     @if($rc->acknowledged_at)
-                                        <x-ui.badge soft variant="success" class="fs-10">{{ $rc->acknowledged_at->format('M d, H:i') }}</x-ui.badge>
+                                        <x-ui.badge soft variant="success" class="fs-10">{{ $rc->acknowledged_at->format('M d, Y H:i') }}</x-ui.badge>
                                     @else
                                         <span class="text-muted fs-11">Pending</span>
                                     @endif
@@ -284,6 +287,7 @@
                 </table>
             </div>
         </div>
+        @endif
 
     </div>
 </div>

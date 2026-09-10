@@ -27,16 +27,20 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         }
 
         $user = auth()->user();
-        $isAdmin = true;
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isAdmin = $isHrAdmin;
 
-        $employee = null;
-        if ($user && $user->email) {
-            $employee = Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
-        }
+        $employee = Employee::resolveForUser($user);
 
         $query = OvertimeRequest::query()->with(['employee', 'approvedByEmployee']);
+        $summaryQuery = OvertimeRequest::query();
+
+        // 🔒 Restrict ordinary employees to their OWN records only
+        if (!$isHrAdmin) {
+            $empId = $employee ? $employee->id : 0;
+            $query->where('employee_id', $empId);
+            $summaryQuery->where('employee_id', $empId);
+        }
 
         $overtimeSearch = $inputs['overtime_search'] ?? $inputs['search'] ?? '';
         $overtimeEmployeeId = $inputs['overtime_employee_id'] ?? $inputs['employee_id'] ?? '';
@@ -72,8 +76,6 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         $requests = $query->paginate(10, ['*'], 'overtime_page')->withQueryString();
 
         // Metric Counts
-        $summaryQuery = OvertimeRequest::query();
-
         $totalRequests    = (clone $summaryQuery)->count();
         $pendingRequests  = (clone $summaryQuery)->where('status', 'pending')->count();
         $approvedRequests = (clone $summaryQuery)->where('status', 'approved')->count();

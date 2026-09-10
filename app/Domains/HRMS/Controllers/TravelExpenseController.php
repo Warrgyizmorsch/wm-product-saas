@@ -27,8 +27,8 @@ class TravelExpenseController extends Controller
         $user = auth()->user();
 
         // 1. Resolve employee context
-        $employee = null;
-        if ($user && $user->email) {
+        $employee = Employee::resolveForUser($user);
+        if (!$employee && $user && $user->email) {
             $employee = Employee::where('personal_email', $user->email)
                 ->orWhere('office_email', $user->email)
                 ->first();
@@ -44,16 +44,11 @@ class TravelExpenseController extends Controller
         $categories = ExpenseCategory::where('tenant_id', $tenantId)->where('status', true)->orderBy('name')->get();
         $designations = Designation::where('status', true)->orderBy('name')->get();
 
-        // 3. Fetch operational lists (Travel Requests, Advances, Reports)
-        $isAdmin = $user && (
-            in_array(strtolower($user->role ?? ''), ['admin', 'hr', 'super-admin', 'manager']) ||
-            (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['admin', 'hr', 'super-admin', 'manager'])) ||
-            (method_exists($user, 'hasRole') && $user->hasRole('admin')) ||
-            ($employee && ($employee->is_admin ?? false)) ||
-            !$employee
-        );
+        // 3. Check HR Admin access via RBAC permissions (matching leave/wfh/shift modules)
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve'));
+        $isAdmin = $isHrAdmin;
 
-        // 3. Query lists with sorting, searching, filtering, and tab-safe pagination
+        // 4. Query lists with sorting, searching, filtering, and tab-safe pagination
         $activeTab = $request->input('tab', 'travel');
         $travelPageName = ($activeTab === 'travel') ? 'page' : 'travel_page';
         $advancePageName = ($activeTab === 'advance') ? 'page' : 'advance_page';
@@ -64,6 +59,11 @@ class TravelExpenseController extends Controller
         $travelSort = $request->input('travel_sort', 'newest');
 
         $travelQuery = TravelRequest::where('tenant_id', $tenantId)->with(['employee', 'expenseReports', 'cashAdvances']);
+        // 🔒 Scoping for non-HR employees
+        if (!$isHrAdmin) {
+            $empId = $employee ? $employee->id : 0;
+            $travelQuery->where('employee_id', $empId);
+        }
         if ($travelSearch) {
             $travelQuery->where(function($q) use ($travelSearch) {
                 $q->where('purpose', 'like', "%{$travelSearch}%")
@@ -84,6 +84,11 @@ class TravelExpenseController extends Controller
         $advanceSort = $request->input('advance_sort', 'newest');
 
         $advanceQuery = CashAdvance::where('tenant_id', $tenantId)->with(['employee', 'travelRequest']);
+        // 🔒 Scoping for non-HR employees
+        if (!$isHrAdmin) {
+            $empId = $employee ? $employee->id : 0;
+            $advanceQuery->where('employee_id', $empId);
+        }
         if ($advanceSearch) {
             $advanceQuery->where(function($q) use ($advanceSearch) {
                 $q->where('purpose', 'like', "%{$advanceSearch}%")
@@ -103,6 +108,11 @@ class TravelExpenseController extends Controller
         $reportSort = $request->input('report_sort', 'newest');
 
         $reportQuery = ExpenseReport::where('tenant_id', $tenantId)->with(['employee', 'claims.category', 'travelRequest.cashAdvances', 'travelRequest.expenseReports', 'cashAdvance']);
+        // 🔒 Scoping for non-HR employees
+        if (!$isHrAdmin) {
+            $empId = $employee ? $employee->id : 0;
+            $reportQuery->where('employee_id', $empId);
+        }
         if ($reportSearch) {
             $reportQuery->where(function($q) use ($reportSearch) {
                 $q->where('title', 'like', "%{$reportSearch}%")
@@ -117,16 +127,24 @@ class TravelExpenseController extends Controller
         $reportQuery->orderBy('created_at', $reportSort === 'oldest' ? 'asc' : 'desc');
         $expenseReports = $reportQuery->paginate(10, ['*'], $reportPageName)->withQueryString();
 
-        // Load all approved travel requests and open cash advances to show all options
-        $myApprovedTravelRequests = TravelRequest::where('status', 'approved')
+        // Load approved travel requests and open cash advances to show all options
+        $myApprovedTravelRequestsQuery = TravelRequest::where('status', 'approved')
             ->where('tenant_id', $tenantId)
             ->with(['expenseReports', 'cashAdvances'])
-            ->orderBy('created_at', 'desc')
-            ->get();
-        $myOpenCashAdvances = CashAdvance::whereIn('status', ['approved', 'disbursed'])
+            ->orderBy('created_at', 'desc');
+
+        $myOpenCashAdvancesQuery = CashAdvance::whereIn('status', ['approved', 'disbursed'])
             ->where('tenant_id', $tenantId)
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->orderBy('created_at', 'desc');
+
+        if (!$isHrAdmin) {
+            $empId = $employee ? $employee->id : 0;
+            $myApprovedTravelRequestsQuery->where('employee_id', $empId);
+            $myOpenCashAdvancesQuery->where('employee_id', $empId);
+        }
+
+        $myApprovedTravelRequests = $myApprovedTravelRequestsQuery->get();
+        $myOpenCashAdvances = $myOpenCashAdvancesQuery->get();
 
         return view('modules.hrms.travel-expense.index', compact(
             'employee',
@@ -192,6 +210,15 @@ class TravelExpenseController extends Controller
             'request_advance'  => 'nullable|boolean',
             'advance_amount'   => 'nullable|required_if:request_advance,1|numeric|min:1',
         ]);
+
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if ($currentEmp) {
+                $validated['employee_id'] = $currentEmp->id;
+            }
+        }
 
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
@@ -277,6 +304,15 @@ class TravelExpenseController extends Controller
             'amount'            => 'required|numeric|min:1',
             'purpose'           => 'required|string|max:255',
         ]);
+
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if ($currentEmp) {
+                $validated['employee_id'] = $currentEmp->id;
+            }
+        }
 
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
@@ -377,6 +413,15 @@ class TravelExpenseController extends Controller
             'claims.*.receipts'   => 'nullable|array',
             'claims.*.receipts.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
+
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if ($currentEmp) {
+                $validated['employee_id'] = $currentEmp->id;
+            }
+        }
 
         // Resolve active policy for the employee and enforce limits/receipt requirements
         $employee = Employee::find($validated['employee_id']);
@@ -512,6 +557,15 @@ class TravelExpenseController extends Controller
     public function updateExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if (!$currentEmp || $expenseReport->employee_id !== $currentEmp->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
 
         // Enforce update only in editable states (draft, partially_approved, rejected)
         if (!in_array($expenseReport->status, ['draft', 'partially_approved', 'rejected'])) {
@@ -714,8 +768,17 @@ class TravelExpenseController extends Controller
             ->with('success', 'Expense report resubmitted successfully.');
     }
 
-    public function submitExpenseReport(ExpenseReport $expenseReport): RedirectResponse
+    public function submitExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if (!$currentEmp || $expenseReport->employee_id !== $currentEmp->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
         $expenseReport->update(['status' => 'submitted']);
         return redirect()->back()->with('success', 'Expense report submitted for approval.');
     }
