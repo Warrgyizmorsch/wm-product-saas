@@ -292,10 +292,10 @@
 
                 {{-- Footer Actions --}}
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">
-                        <i class="feather-check-circle me-2"></i>{{ __('production.create_production_order') }}
-                    </button>
-                    <a href="{{ route('production.orders.index') }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
+                    <x-ui.button type="submit" variant="primary" icon="feather-check-circle" class="px-4">
+                        {{ __('production.create_production_order') }}
+                    </x-ui.button>
+                    <x-ui.button :href="route('production.orders.index')" variant="secondary" class="px-4">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

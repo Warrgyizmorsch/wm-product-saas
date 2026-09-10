@@ -491,9 +491,8 @@
 
                 <!-- Footer Save and Cancel buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">{{ __('production.save_bom') }}</button>
-                    <a href="{{ route('production.boms.index') }}"
-                        class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
+                    <x-ui.button type="submit" variant="primary" class="px-4">{{ __('production.save_bom') }}</x-ui.button>
+                    <x-ui.button href="{{ route('production.boms.index') }}" variant="secondary" class="px-4">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

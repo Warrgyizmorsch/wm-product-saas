@@ -5,15 +5,15 @@
 @section('breadcrumb', __('production.work_center_view'))
 
 @section('page-actions')
-    <a href="{{ route('production.schedules.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-list me-2"></i>{{ __('production.plans_list') ?? 'List View' }}
-    </a>
-    <a href="{{ route('production.schedules.calendar') }}" class="btn btn-light me-2">
-        <i class="feather-calendar me-2"></i>{{ __('production.calendar_view') }}
-    </a>
-    <a href="{{ route('production.mes.work-centers.index') }}" class="btn btn-light">
-        <i class="feather-monitor me-2"></i>{{ __('production.mes_dashboard') ?? 'MES Dashboard' }}
-    </a>
+    <x-ui.button :href="route('production.schedules.index')" variant="secondary" icon="feather-list" class="me-2">
+        {{ __('production.plans_list') ?? 'List View' }}
+    </x-ui.button>
+    <x-ui.button :href="route('production.schedules.calendar')" variant="light" icon="feather-calendar" class="me-2">
+        {{ __('production.calendar_view') }}
+    </x-ui.button>
+    <x-ui.button :href="route('production.mes.work-centers.index')" variant="light" icon="feather-monitor">
+        {{ __('production.mes_dashboard') ?? 'MES Dashboard' }}
+    </x-ui.button>
 @endsection
 
 @section('content')

@@ -3,50 +3,50 @@
 @section('title', __('production.bom_details') . ' | SaaS ERP')
 
 @section('page-actions')
-    <a href="{{ route('production.boms.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}
-    </a>
+    <x-ui.button href="{{ route('production.boms.index') }}" variant="secondary" icon="feather-arrow-left" class="me-2">
+        {{ __('production.back_to_list') }}
+    </x-ui.button>
     
     @if($bom->isDraft() || $bom->isUnderRevision())
-        <a href="{{ route('production.boms.edit', $bom->id) }}" class="btn btn-primary me-2">
-            <i class="feather-edit me-2"></i>{{ __('production.edit_draft') }}
-        </a>
+        <x-ui.button href="{{ route('production.boms.edit', $bom->id) }}" variant="primary" icon="feather-edit" class="me-2">
+            {{ __('production.edit_draft') }}
+        </x-ui.button>
 
         @if($bom->routing_id)
             <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}" class="d-inline me-2">
                 @csrf
-                <button type="submit" class="btn btn-info">
-                    <i class="feather-send me-2"></i>{{ __('production.submit_approval') }}
-                </button>
+                <x-ui.button type="submit" variant="info" icon="feather-send">
+                    {{ __('production.submit_approval') }}
+                </x-ui.button>
             </form>
         @else
-            <button type="button" class="btn btn-info me-2" disabled title="Routing reference must be selected in Edit Draft before submitting for approval" data-bs-toggle="tooltip">
-                <i class="feather-send me-2"></i>{{ __('production.submit_approval_routing_required') }}
-            </button>
+            <x-ui.button type="button" variant="info" icon="feather-send" class="me-2" disabled title="Routing reference must be selected in Edit Draft before submitting for approval" data-bs-toggle="tooltip">
+                {{ __('production.submit_approval_routing_required') }}
+            </x-ui.button>
         @endif
     @endif
 
     @if($bom->isPendingApproval())
         <form method="POST" action="{{ route('production.boms.approve', $bom->id) }}" class="d-inline me-2">
             @csrf
-            <button type="submit" class="btn btn-success">
-                <i class="feather-check-circle me-2"></i>{{ __('production.approve_bom') }}
-            </button>
+            <x-ui.button type="submit" variant="success" icon="feather-check-circle">
+                {{ __('production.approve_bom') }}
+            </x-ui.button>
         </form>
-        <button type="button" class="btn btn-danger me-2" data-bs-toggle="modal" data-bs-target="#rejectModal">
-            <i class="feather-x-circle me-2"></i>{{ __('production.reject') }}
-        </button>
+        <x-ui.button type="button" variant="danger" icon="feather-x-circle" class="me-2" data-bs-toggle="modal" data-bs-target="#rejectModal">
+            {{ __('production.reject') }}
+        </x-ui.button>
     @endif
 
     @if($bom->isApproved())
-        <button type="button" class="btn btn-danger me-2" data-bs-toggle="modal" data-bs-target="#cancelModal">
-            <i class="feather-slash me-2"></i>{{ __('production.cancel_bom') }}
-        </button>
+        <x-ui.button type="button" variant="danger" icon="feather-slash" class="me-2" data-bs-toggle="modal" data-bs-target="#cancelModal">
+            {{ __('production.cancel_bom') }}
+        </x-ui.button>
     @endif
 
-    <button type="button" class="btn btn-light-brand" data-bs-toggle="modal" data-bs-target="#duplicateModal">
-        <i class="feather-copy me-2"></i>{{ __('production.duplicate_version') }}
-    </button>
+    <x-ui.button type="button" variant="light-brand" icon="feather-copy" data-bs-toggle="modal" data-bs-target="#duplicateModal">
+        {{ __('production.duplicate_version') }}
+    </x-ui.button>
 @endsection
 
 @section('content')
@@ -65,20 +65,20 @@
                 </div>
                 <div class="d-flex gap-2 align-items-center">
                     @if(isset($parentBom))
-                        <a href="{{ route('production.boms.show', $parentBom->id) }}" class="btn btn-success btn-sm text-white">
-                            <i class="feather-arrow-left me-1"></i>{{ __('production.return_to_parent') }}
-                        </a>
-                        <a href="{{ route('production.boms.edit', $parentBom->id) }}" class="btn btn-outline-success btn-sm bg-white">
-                            <i class="feather-edit me-1"></i>{{ __('production.edit_parent') }}
-                        </a>
+                        <x-ui.button href="{{ route('production.boms.show', $parentBom->id) }}" variant="success" class="text-white" icon="feather-arrow-left">
+                            {{ __('production.return_to_parent') }}
+                        </x-ui.button>
+                        <x-ui.button href="{{ route('production.boms.edit', $parentBom->id) }}" variant="outline-success" class="bg-white" icon="feather-edit">
+                            {{ __('production.edit_parent') }}
+                        </x-ui.button>
                     @else
-                        <a href="{{ route('production.boms.create') }}?product_id={{ $parentProduct->id }}" class="btn btn-success btn-sm text-white">
-                            <i class="feather-plus me-1"></i>{{ __('production.return_to_add_parent') }}
-                        </a>
+                        <x-ui.button href="{{ route('production.boms.create') }}?product_id={{ $parentProduct->id }}" variant="success" class="text-white" icon="feather-plus">
+                            {{ __('production.return_to_add_parent') }}
+                        </x-ui.button>
                     @endif
-                    <button type="button" class="btn btn-secondary btn-sm ms-2" onclick="window.close();">
-                        <i class="feather-x me-1"></i>{{ __('production.close_tab') }}
-                    </button>
+                    <x-ui.button type="button" variant="secondary" class="ms-2" onclick="window.close();" icon="feather-x">
+                        {{ __('production.close_tab') }}
+                    </x-ui.button>
                 </div>
             </div>
         @elseif (session('success'))
@@ -683,9 +683,9 @@
                                         <td>{{ $wBom->effective_date ? $wBom->effective_date->format('d/m/Y') : 'N/A' }}</td>
                                         <td>{{ $wBom->expiry_date ? $wBom->expiry_date->format('d/m/Y') : 'No Expiry' }}</td>
                                         <td class="text-end">
-                                            <a href="{{ route('production.boms.show', $wBom->id) }}" class="btn btn-xs btn-soft-primary px-2 py-1 fs-11 text-nowrap">
-                                                <i class="feather-eye me-1"></i>{{ __('production.view') }} BOM
-                                            </a>
+                                            <x-ui.button href="{{ route('production.boms.show', $wBom->id) }}" variant="soft-primary" class="px-2 py-1 fs-11 text-nowrap" icon="feather-eye">
+                                                {{ __('production.view') }} BOM
+                                            </x-ui.button>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -709,8 +709,8 @@
                 <x-ui.input :label="__('production.new_version_name')" name="new_version" placeholder="e.g. 1.1.0 or 2.0.0" required />
             </form>
             <x-slot name="footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                <button type="submit" class="btn btn-primary" onclick="document.getElementById('dupForm').submit();">{{ __('production.duplicate_version') }}</button>
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" onclick="document.getElementById('dupForm').submit();">{{ __('production.duplicate_version') }}</x-ui.button>
             </x-slot>
         </x-ui.modal>
 
@@ -722,8 +722,8 @@
                 <x-ui.input :label="__('production.rejection_reason')" name="comments" placeholder="e.g. Scrap percentage is too high" required />
             </form>
             <x-slot name="footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                <button type="submit" class="btn btn-danger" onclick="document.getElementById('rejectForm').submit();">{{ __('production.reject_bom') }}</button>
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" variant="danger" onclick="document.getElementById('rejectForm').submit();">{{ __('production.reject_bom') }}</x-ui.button>
             </x-slot>
         </x-ui.modal>
 
@@ -735,8 +735,8 @@
                 <x-ui.input :label="__('production.cancellation_reason')" name="comments" placeholder="e.g. Product design obsolete" required />
             </form>
             <x-slot name="footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                <button type="submit" class="btn btn-danger" onclick="document.getElementById('cancelForm').submit();">{{ __('production.cancel_bom') }}</button>
+                <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" variant="danger" onclick="document.getElementById('cancelForm').submit();">{{ __('production.cancel_bom') }}</x-ui.button>
             </x-slot>
         </x-ui.modal>
     </div>

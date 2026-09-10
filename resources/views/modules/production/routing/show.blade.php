@@ -6,22 +6,22 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
-        <a href="{{ route('production.routing.index') }}" class="btn btn-secondary">
-            <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}
-        </a>
+        <x-ui.button :href="route('production.routing.index')" variant="secondary" icon="feather-arrow-left">
+            {{ __('production.back_to_list') }}
+        </x-ui.button>
         
         @if ($routing->isDraft())
             @can('update', $routing)
-                <a href="{{ route('production.routing.edit', $routing->id) }}" class="btn btn-primary">
-                    <i class="feather-edit me-2"></i>{{ __('production.edit_draft') }}
-                </a>
+                <x-ui.button :href="route('production.routing.edit', $routing->id)" variant="primary" icon="feather-edit">
+                    {{ __('production.edit_draft') }}
+                </x-ui.button>
             @endcan
         @endif
 
         @can('duplicate', $routing)
-            <button type="button" class="btn btn-light-brand" data-bs-toggle="modal" data-bs-target="#duplicateVersionModal">
-                <i class="feather-copy me-2"></i>{{ __('production.duplicate_routing_version') }}
-            </button>
+            <x-ui.button type="button" variant="light" icon="feather-copy" data-bs-toggle="modal" data-bs-target="#duplicateVersionModal">
+                {{ __('production.duplicate_routing_version') }}
+            </x-ui.button>
         @endcan
     </div>
 @endsection
@@ -65,9 +65,9 @@
                     @can('submit', $routing)
                         <form action="{{ route('production.routing.submit', $routing->id) }}" method="POST">
                             @csrf
-                            <button type="submit" class="btn btn-warning btn-sm px-3">
-                                <i class="feather-send me-1"></i>{{ __('production.submit_approval') }}
-                            </button>
+                            <x-ui.button type="submit" variant="warning" icon="feather-send" class="px-3">
+                                {{ __('production.submit_approval') }}
+                            </x-ui.button>
                         </form>
                     @endcan
                 @endif
@@ -76,7 +76,7 @@
                     @can('approve', $routing)
                         <form action="{{ route('production.routing.approve', $routing->id) }}" method="POST" class="d-inline" id="approveRoutingForm">
                             @csrf
-                            <button type="button" class="btn btn-success btn-sm px-3" onclick="confirmAction({
+                            <x-ui.button type="button" variant="success" icon="feather-check-circle" class="px-3" onclick="confirmAction({
                                 title: 'Approve & Activate Routing',
                                 message: @js(__('production.confirm_approve_routing')),
                                 confirmText: 'Approve & Activate',
@@ -85,23 +85,23 @@
                                     document.getElementById('approveRoutingForm').submit();
                                 }
                             })">
-                                <i class="feather-check-circle me-1"></i>{{ __('production.approve_activate') }}
-                            </button>
+                                {{ __('production.approve_activate') }}
+                            </x-ui.button>
                         </form>
                     @endcan
 
                     @can('reject', $routing)
-                        <button type="button" class="btn btn-danger btn-sm px-3" data-bs-toggle="modal" data-bs-target="#rejectModal">
-                            <i class="feather-x-circle me-1"></i>{{ __('production.reject') }}
-                        </button>
+                        <x-ui.button type="button" variant="danger" icon="feather-x-circle" class="px-3" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                            {{ __('production.reject') }}
+                        </x-ui.button>
                     @endcan
                 @endif
 
                 @if (!$routing->isCancelled() && !$routing->isHistorical())
                     @can('cancel', $routing)
-                        <button type="button" class="btn btn-outline-danger btn-sm px-3" data-bs-toggle="modal" data-bs-target="#cancelModal">
-                            <i class="feather-slash me-1"></i>{{ __('production.cancel_routing') }}
-                        </button>
+                        <x-ui.button type="button" variant="outline-danger" icon="feather-slash" class="px-3" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                            {{ __('production.cancel_routing') }}
+                        </x-ui.button>
                     @endcan
                 @endif
             </div>

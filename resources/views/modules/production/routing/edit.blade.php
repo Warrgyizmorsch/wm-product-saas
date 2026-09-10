@@ -332,7 +332,7 @@
                 <!-- Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
                     <x-ui.button type="submit" variant="primary" class="px-4">{{ __('production.update_routing') }}</x-ui.button>
-                    <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-light px-4">{{ __('production.cancel') }}</a>
+                    <x-ui.button :href="route('production.routing.show', $routing->id)" variant="light" class="px-4">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
             </form>

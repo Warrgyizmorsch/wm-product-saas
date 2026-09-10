@@ -79,7 +79,7 @@
     <div class="d-flex align-items-center gap-2">
         {{-- Print Order Label Button --}}
         <x-ui.button href="{{ route('production.labels.orders.print', $order->id) }}" target="_blank"
-            icon="feather-printer me-1" variant="outline-secondary" size="sm">
+            icon="feather-printer me-1" variant="outline-secondary">
             {{ __('production.print_label') }}
         </x-ui.button>
 
@@ -92,18 +92,17 @@
 
             @if($hasIssuedMaterial)
                 {{-- Release & Plan Button (Enabled) --}}
-                <button type="button" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal"
+                <x-ui.button type="button" variant="success" icon="feather-play-circle" data-bs-toggle="modal"
                     data-bs-target="#scheduleModal">
-                    <i class="feather-play-circle me-1"></i> Release & Plan
-                </button>
+                    Release & Plan
+                </x-ui.button>
             @else
                 {{-- Release & Plan Button (Disabled until store issues raw materials) --}}
                 <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" data-bs-placement="bottom"
                     title="Material issue required: Store must issue raw materials (fully or partially) before releasing & planning order.">
-                    <button type="button" class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1.5 opacity-65"
-                        disabled>
-                        <i class="feather-lock me-1"></i> Release & Plan
-                    </button>
+                    <x-ui.button type="button" variant="secondary" icon="feather-lock" class="opacity-65" disabled>
+                        Release & Plan
+                    </x-ui.button>
                 </span>
             @endif
 
@@ -130,10 +129,10 @@
         @if($order->isReleased() || $order->isInProgress())
             @if($order->schedules->isEmpty())
                 {{-- Generate Schedule Button --}}
-                <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal"
+                <x-ui.button type="button" variant="primary" icon="feather-calendar" data-bs-toggle="modal"
                     data-bs-target="#scheduleModal">
-                    <i class="feather-calendar"></i> {{ __('production.generate_schedule') }}
-                </button>
+                    {{ __('production.generate_schedule') }}
+                </x-ui.button>
             @endif
 
             {{-- Grouped Actions Dropdown --}}
@@ -779,18 +778,18 @@
                                 </div>
                                 <div class="d-flex gap-2">
                                     <x-ui.button href="{{ route('production.subcontract.delivery-challans.index') }}"
-                                        variant="outline-info" size="sm" icon="feather-truck me-1">
+                                        variant="outline-info" icon="feather-truck me-1">
                                         Delivery Challans
                                     </x-ui.button>
                                     @if($canPurchase && \Illuminate\Support\Facades\Route::has('purchase.orders.index'))
-                                        <x-ui.button href="{{ route('purchase.orders.index') }}" variant="outline-primary" size="sm"
+                                        <x-ui.button href="{{ route('purchase.orders.index') }}" variant="outline-primary"
                                             icon="feather-shopping-cart me-1">
                                             Purchase Orders
                                         </x-ui.button>
                                     @endif
                                     @if($canQuality && \Illuminate\Support\Facades\Route::has('production.quality.rework.index'))
                                         <x-ui.button href="{{ route('production.quality.rework.index') }}" variant="outline-warning"
-                                            size="sm" icon="feather-shield me-1">
+                                            icon="feather-shield me-1">
                                             Quality & Rework
                                         </x-ui.button>
                                     @endif
@@ -1346,7 +1345,7 @@
                                                                 class="badge bg-soft-primary text-primary fs-11">{{ strtoupper($batch->status) }}</span>
                                                         </td>
                                                         <td class="text-center">
-                                                            <x-ui.button size="sm" variant="light" class="border py-1 px-2"
+                                                            <x-ui.button variant="light" class="border py-1 px-2"
                                                                 href="{{ route('production.labels.batches.print', $batch->id) }}"
                                                                 target="_blank" title="Print Barcode Label">
                                                                 <i class="feather-printer me-1"></i> Print Label
@@ -1386,7 +1385,7 @@
                                                                     class="badge bg-soft-info text-info fs-11">{{ strtoupper($serial->status) }}</span>
                                                             </td>
                                                             <td class="text-center">
-                                                                <x-ui.button size="sm" variant="light" class="border py-1 px-2"
+                                                                <x-ui.button variant="light" class="border py-1 px-2"
                                                                     href="{{ route('production.labels.serials.print', $serial->id) }}"
                                                                     target="_blank" title="Print Barcode Label">
                                                                     <i class="feather-printer me-1"></i> Print Label
@@ -1429,7 +1428,7 @@
                                                         class="badge bg-soft-info text-info fs-11">{{ strtoupper($serial->status) }}</span>
                                                 </td>
                                                 <td class="text-center">
-                                                    <x-ui.button size="sm" variant="light" class="border py-1 px-2"
+                                                    <x-ui.button variant="light" class="border py-1 px-2"
                                                         href="{{ route('production.labels.serials.print', $serial->id) }}"
                                                         target="_blank" title="Print Barcode Label">
                                                         <i class="feather-printer me-1"></i> Print Label

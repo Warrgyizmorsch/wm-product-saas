@@ -26,8 +26,9 @@
                     <h4 class="fw-bold text-dark mb-0">
                         {{ __('production.edit_bill_of_materials_with_number', ['number' => $bom->bom_number]) }}
                     </h4>
-                    <a href="{{ route('production.boms.show', $bom->id) }}"
-                        class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
+                    <x-ui.button href="{{ route('production.boms.show', $bom->id) }}" variant="light" class="border">
+                        {{ __('production.cancel') }}
+                    </x-ui.button>
                 </div>
 
                 <!-- BOM Header Fields -->
@@ -505,9 +506,8 @@
                 </div>
 
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">{{ __('production.save_bom') }}</button>
-                    <a href="{{ route('production.boms.show', $bom->id) }}"
-                        class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
+                    <x-ui.button type="submit" variant="primary" class="px-4">{{ __('production.save_bom') }}</x-ui.button>
+                    <x-ui.button href="{{ route('production.boms.show', $bom->id) }}" variant="secondary" class="px-4">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

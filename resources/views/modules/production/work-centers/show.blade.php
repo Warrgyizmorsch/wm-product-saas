@@ -6,13 +6,13 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
-        <a href="{{ route('production.work-centers.index') }}" class="btn btn-secondary">
-            <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}
-        </a>
+        <x-ui.button :href="route('production.work-centers.index')" variant="secondary" icon="feather-arrow-left">
+            {{ __('production.back_to_list') }}
+        </x-ui.button>
         @can('update', $workCenter)
-            <a href="{{ route('production.work-centers.edit', $workCenter->id) }}" class="btn btn-primary">
-                <i class="feather-edit me-2"></i>{{ __('production.edit') }}
-            </a>
+            <x-ui.button :href="route('production.work-centers.edit', $workCenter->id)" variant="primary" icon="feather-edit">
+                {{ __('production.edit') }}
+            </x-ui.button>
         @endcan
     </div>
 @endsection
@@ -123,9 +123,9 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold text-dark mb-0">{{ __('production.assigned_shifts') }}</h5>
                 @can('update', $workCenter)
-                    <a href="{{ route('production.work-centers.edit', $workCenter->id) }}" class="btn btn-sm btn-soft-primary">
-                        <i class="feather-edit-2 me-1"></i>{{ __('production.manage_shifts') }}
-                    </a>
+                    <x-ui.button :href="route('production.work-centers.edit', $workCenter->id)" variant="light" icon="feather-edit-2">
+                        {{ __('production.manage_shifts') }}
+                    </x-ui.button>
                 @endcan
             </div>
 
@@ -169,9 +169,9 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold text-dark mb-0">{{ __('production.assigned_equipment') }}</h5>
                 @can('create', App\Domains\Production\Models\Machine::class)
-                    <a href="{{ route('production.machines.create', ['work_center_id' => $workCenter->id]) }}" class="btn btn-sm btn-soft-primary">
-                        <i class="feather-plus me-1"></i>{{ __('production.add_machine') }}
-                    </a>
+                    <x-ui.button :href="route('production.machines.create', ['work_center_id' => $workCenter->id])" variant="light" icon="feather-plus">
+                        {{ __('production.add_machine') }}
+                    </x-ui.button>
                 @endcan
             </div>
 

@@ -29,9 +29,9 @@
     <div class="d-flex align-items-center gap-2">
         <x-ui.import-export-dropdown type="work-centers" importModalTarget="#importWorkCentersModal" />
         @can('create', App\Domains\Production\Models\WorkCenter::class)
-            <a href="{{ route('production.work-centers.create') }}" class="btn btn-primary">
-                <i class="feather-plus me-2"></i>{{ __('production.create_work_center') }}
-            </a>
+            <x-ui.button :href="route('production.work-centers.create')" variant="primary" icon="feather-plus">
+                {{ __('production.create_work_center') }}
+            </x-ui.button>
         @endcan
     </div>
 @endsection
@@ -113,9 +113,8 @@
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('production.work-centers.index') }}"
-                                    class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
-                                <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
+                                <x-ui.button :href="route('production.work-centers.index')" variant="light" class="border">{{ __('production.reset') }}</x-ui.button>
+                                <x-ui.button type="submit" variant="primary">{{ __('production.apply_filters') }}</x-ui.button>
                             </div>
                         </x-ui.filter>
                     </form>
@@ -476,8 +475,8 @@
             <x-ui.odoo-form-ui type="file" name="file" label="Excel/CSV File" required placeholder="Choose file..." />
         </form>
         <x-slot name="footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-            <button type="submit" form="importWorkCentersForm" class="btn btn-primary">Import File</button>
+            <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" form="importWorkCentersForm" variant="primary">Import File</x-ui.button>
         </x-slot>
     </x-ui.modal>
 

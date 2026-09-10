@@ -30,7 +30,7 @@
                                 {{ $serial->barcode ?? '—' }}
                             </td>
                             <td class="text-center">
-                                <x-ui.button size="sm" variant="light" class="border py-1 px-2" href="{{ route('production.labels.serials.print', $serial->id) }}" target="_blank" title="{{ __('production.print_label') }}">
+                                <x-ui.button variant="light" class="border py-1 px-2" href="{{ route('production.labels.serials.print', $serial->id) }}" target="_blank" title="{{ __('production.print_label') }}">
                                     <i class="feather-printer me-1"></i> {{ __('production.print_label') }}
                                 </x-ui.button>
                             </td>
