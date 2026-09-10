@@ -15,6 +15,18 @@ class TaskDependency extends BaseModel
 
     protected $table = 'project_task_dependencies';
 
+    public const TYPE_FINISH_TO_START = 'Finish-to-Start';
+    public const TYPE_START_TO_START = 'Start-to-Start';
+    public const TYPE_FINISH_TO_FINISH = 'Finish-to-Finish';
+    public const TYPE_START_TO_FINISH = 'Start-to-Finish';
+
+    public const TYPES = [
+        self::TYPE_FINISH_TO_START,
+        self::TYPE_START_TO_START,
+        self::TYPE_FINISH_TO_FINISH,
+        self::TYPE_START_TO_FINISH,
+    ];
+
     protected $fillable = [
         'tenant_id',
         'company_id',
@@ -22,6 +34,7 @@ class TaskDependency extends BaseModel
         'project_id',
         'task_id',
         'depends_on_task_id',
+        'dependency_type',
     ];
 
     public function project(): BelongsTo

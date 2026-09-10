@@ -36,6 +36,10 @@ class Task extends BaseModel
 
     public const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
 
+    protected $attributes = [
+        'status' => self::STATUS_OPEN,
+    ];
+
     protected $fillable = [
         'tenant_id',
         'company_id',
