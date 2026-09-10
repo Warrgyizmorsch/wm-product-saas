@@ -7,12 +7,12 @@
 @endsection
 
 @section('page-actions')
-    <a href="{{ route('production.schedules.dispatch-board', ['schedule_id' => $schedule->id]) }}" class="btn btn-sm btn-primary me-2">
-        <i class="feather-grid me-1"></i> Dispatch Board
-    </a>
-    <a href="{{ route('production.schedules.show', $schedule->id) }}" class="btn btn-sm btn-outline-secondary">
-        <i class="feather-arrow-left me-1"></i> Schedule Details
-    </a>
+    <x-ui.button :href="route('production.schedules.dispatch-board', ['schedule_id' => $schedule->id])" variant="primary" icon="feather-grid" class="me-2">
+        Dispatch Board
+    </x-ui.button>
+    <x-ui.button :href="route('production.schedules.show', $schedule->id)" variant="outline-secondary" icon="feather-arrow-left">
+        Schedule Details
+    </x-ui.button>
 @endsection
 
 @section('content')

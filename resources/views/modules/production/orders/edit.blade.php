@@ -30,7 +30,7 @@
                         <h4 class="fw-bold text-dark mb-0">{{ __('production.edit_production_order_number', ['number' => $order->order_number]) }}</h4>
                         <small class="text-muted fs-12">{{ __('production.status') }}: <span class="fw-semibold text-uppercase text-primary">{{ $order->status }}</span> &mdash; {{ __('production.edit_order_draft_notice') }}</small>
                     </div>
-                    <a href="{{ route('production.orders.show', $order->id) }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
+                    <x-ui.button :href="route('production.orders.show', $order->id)" variant="light" class="border">{{ __('production.cancel') }}</x-ui.button>
                 </div>
 
                 <div class="row g-4 fs-13 text-dark">
@@ -71,10 +71,10 @@
 
                 {{-- Footer Actions --}}
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">
-                        <i class="feather-check-circle me-2"></i>{{ __('production.save_changes') }}
-                    </button>
-                    <a href="{{ route('production.orders.show', $order->id) }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
+                    <x-ui.button type="submit" variant="primary" icon="feather-check-circle" class="px-4">
+                        {{ __('production.save_changes') }}
+                    </x-ui.button>
+                    <x-ui.button :href="route('production.orders.show', $order->id)" variant="secondary" class="px-4">{{ __('production.cancel') }}</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

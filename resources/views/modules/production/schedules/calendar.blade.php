@@ -7,15 +7,15 @@
 @endsection
 
 @section('page-actions')
-    <a href="{{ route('production.schedules.dispatch-board') }}" class="btn btn-sm btn-primary me-2">
-        <i class="feather-grid me-1"></i> Dispatch Board
-    </a>
-    <a href="{{ route('production.schedules.index') }}" class="btn btn-sm btn-outline-secondary me-2">
-        <i class="feather-list me-1"></i>{{ __('production.plans_list') ?? 'List View' }}
-    </a>
-    <a href="{{ route('production.schedules.work-center-view') }}" class="btn btn-sm btn-outline-secondary">
-        <i class="feather-layers me-1"></i>{{ __('production.work_center_view') }}
-    </a>
+    <x-ui.button :href="route('production.schedules.dispatch-board')" variant="primary" icon="feather-grid" class="me-2">
+        Dispatch Board
+    </x-ui.button>
+    <x-ui.button :href="route('production.schedules.index')" variant="outline-secondary" icon="feather-list" class="me-2">
+        {{ __('production.plans_list') ?? 'List View' }}
+    </x-ui.button>
+    <x-ui.button :href="route('production.schedules.work-center-view')" variant="outline-secondary" icon="feather-layers">
+        {{ __('production.work_center_view') }}
+    </x-ui.button>
 @endsection
 
 @section('content')

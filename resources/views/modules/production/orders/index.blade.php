@@ -141,9 +141,9 @@
 @endpush
 
 @section('page-actions')
-    <a href="{{ route('production.orders.create') }}" class="btn btn-primary">
-        <i class="feather-plus me-2"></i>{{ __('production.create_direct_order') }}
-    </a>
+    <x-ui.button :href="route('production.orders.create')" variant="primary" icon="feather-plus">
+        {{ __('production.create_direct_order') }}
+    </x-ui.button>
 @endsection
 
 @section('content')
@@ -272,8 +272,8 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
-                            <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
+                            <x-ui.button :href="route('production.orders.index')" variant="light" class="border">{{ __('production.reset') }}</x-ui.button>
+                            <x-ui.button type="submit" variant="primary">{{ __('production.apply_filters') }}</x-ui.button>
                         </div>
                     </x-ui.filter>
                 </form>

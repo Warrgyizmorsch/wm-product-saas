@@ -25,7 +25,7 @@
 
 @section('page-actions')
     <x-ui.button href="{{ route('production.labels.orders.print', $order->id) }}" target="_blank" icon="feather-printer"
-        variant="outline-dark" size="sm" class="me-2">
+        variant="outline-dark" class="me-2">
         {{ __('production.print_order_label') }}
     </x-ui.button>
     <x-ui.icon-btn href="{{ route('production.mes.operator.dashboard') }}" icon="feather-arrow-left"
@@ -366,7 +366,7 @@
                                     @endif
                                 </span>
                                 @can('manage', \App\Domains\Production\Models\ProductionOperatorAssignment::class)
-                                    <x-ui.button variant="outline-primary" size="sm" icon="feather-user-plus me-1"
+                                    <x-ui.button variant="outline-primary" icon="feather-user-plus me-1"
                                         class="ms-auto" data-bs-toggle="modal" data-bs-target="#assignOperatorModal">
                                         {{ $assignment ? 'Reassign' : 'Assign' }}
                                     </x-ui.button>
@@ -456,11 +456,11 @@
                 <div class="mb-3">
                     <label class="form-label uppercase font-semibold fs-11 text-muted">Active Input field</label>
                     <div class="d-flex gap-2">
-                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn active"
+                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn active"
                             onclick="selectInput('produced', this)">Produced</x-ui.button>
-                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn"
+                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn"
                             onclick="selectInput('rejected', this)">Rejected</x-ui.button>
-                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn"
+                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn"
                             onclick="selectInput('scrapped', this)">Scrapped</x-ui.button>
                     </div>
                 </div>
@@ -545,11 +545,11 @@
                 <div class="mb-3">
                     <label class="form-label uppercase font-semibold fs-11 text-muted">Active Input field</label>
                     <div class="d-flex gap-2">
-                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn active"
+                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn active"
                             onclick="selectInput('log_produced', this)">Produced</x-ui.button>
-                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn"
+                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn"
                             onclick="selectInput('log_rejected', this)">Rejected</x-ui.button>
-                        <x-ui.button type="button" variant="outline-primary" size="sm" class="active-input-btn"
+                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn"
                             onclick="selectInput('log_scrapped', this)">Scrapped</x-ui.button>
                     </div>
                 </div>

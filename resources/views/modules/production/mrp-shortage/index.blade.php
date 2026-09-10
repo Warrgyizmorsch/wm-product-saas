@@ -6,10 +6,10 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <x-ui.button href="{{ route('inventory.material-requirements.index') }}" variant="light" size="sm" class="border shadow-sm" icon="feather-arrow-left">
+        <x-ui.button href="{{ route('inventory.material-requirements.index') }}" variant="light" class="border shadow-sm" icon="feather-arrow-left">
             Material Requirements
         </x-ui.button>
-        <x-ui.button href="{{ route('purchase.requisitions.index') }}" variant="light" size="sm" class="border shadow-sm" icon="feather-file-text">
+        <x-ui.button href="{{ route('purchase.requisitions.index') }}" variant="light" class="border shadow-sm" icon="feather-file-text">
             Purchase Requisitions
         </x-ui.button>
     </div>
@@ -107,7 +107,7 @@
                                     </option>
                                 @endforeach
                             </select>
-                            <x-ui.button type="submit" variant="success" size="sm" class="fw-bold px-3 py-1.5 shadow-sm text-nowrap" icon="feather-shopping-cart">
+                            <x-ui.button type="submit" variant="success" class="fw-bold px-3 py-1.5 shadow-sm text-nowrap" icon="feather-shopping-cart">
                                 Generate PR
                             </x-ui.button>
                         </div>

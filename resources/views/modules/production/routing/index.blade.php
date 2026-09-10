@@ -159,9 +159,9 @@
     <div class="d-flex align-items-center gap-2">
         <x-ui.import-export-dropdown type="routings" importModalTarget="#importRoutingsModal" />
         @can('create', App\Domains\Production\Models\Routing::class)
-            <a href="{{ route('production.routing.create') }}" class="btn btn-primary">
-                <i class="feather-plus me-2"></i>{{ __('production.create_new_routing') }}
-            </a>
+            <x-ui.button :href="route('production.routing.create')" variant="primary" icon="feather-plus">
+                {{ __('production.create_new_routing') }}
+            </x-ui.button>
         @endcan
     </div>
 @endsection
@@ -245,8 +245,8 @@
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('production.routing.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
-                                <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
+                                <x-ui.button :href="route('production.routing.index')" variant="light" class="border">{{ __('production.reset') }}</x-ui.button>
+                                <x-ui.button type="submit" variant="primary">{{ __('production.apply_filters') }}</x-ui.button>
                             </div>
                         </x-ui.filter>
                     </form>
@@ -449,8 +449,8 @@
                                         <x-ui.input :label="__('production.new_version_name')" name="new_version" placeholder="e.g. 1.1.0 or 2.0.0" required />
                                     </form>
                                     <x-slot name="footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                                        <button type="submit" class="btn btn-primary" onclick="document.getElementById('dupForm{{ $routing->id }}').submit();">{{ __('production.duplicate_version') }}</button>
+                                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                                        <x-ui.button type="submit" variant="primary" onclick="document.getElementById('dupForm{{ $routing->id }}').submit();">{{ __('production.duplicate_version') }}</x-ui.button>
                                     </x-slot>
                                 </x-ui.modal>
 
@@ -462,8 +462,8 @@
                                         <x-ui.input :label="__('production.rejection_reason')" name="comments" placeholder="e.g. Operation sequence correction required" required />
                                     </form>
                                     <x-slot name="footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                                        <button type="submit" class="btn btn-danger" onclick="document.getElementById('rejectForm{{ $routing->id }}').submit();">{{ __('production.reject_routing') }}</button>
+                                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                                        <x-ui.button type="submit" variant="danger" onclick="document.getElementById('rejectForm{{ $routing->id }}').submit();">{{ __('production.reject_routing') }}</x-ui.button>
                                     </x-slot>
                                 </x-ui.modal>
 
@@ -475,8 +475,8 @@
                                         <x-ui.input :label="__('production.cancellation_reason')" name="comments" placeholder="e.g. Process design obsolete" required />
                                     </form>
                                     <x-slot name="footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                                        <button type="submit" class="btn btn-danger" onclick="document.getElementById('cancelForm{{ $routing->id }}').submit();">{{ __('production.cancel_routing') }}</button>
+                                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+                                        <x-ui.button type="submit" variant="danger" onclick="document.getElementById('cancelForm{{ $routing->id }}').submit();">{{ __('production.cancel_routing') }}</x-ui.button>
                                     </x-slot>
                                 </x-ui.modal>
                             </td>
@@ -505,8 +505,8 @@
             <x-ui.odoo-form-ui type="file" name="file" :label="__('production.file_label')" required :placeholder="__('production.choose_file')" />
         </form>
         <x-slot name="footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-            <button type="submit" form="importRoutingsForm" class="btn btn-primary">{{ __('production.import_file') }}</button>
+            <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" form="importRoutingsForm" variant="primary">{{ __('production.import_file') }}</x-ui.button>
         </x-slot>
     </x-ui.modal>
 

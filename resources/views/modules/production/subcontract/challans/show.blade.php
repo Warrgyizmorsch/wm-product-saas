@@ -18,7 +18,7 @@
         <!-- Action Control Bar -->
         <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom flex-wrap gap-2">
             <div class="d-flex align-items-center gap-3">
-                <x-ui.button href="{{ route('production.subcontract.delivery-challans.index') }}" variant="outline-secondary" size="sm" icon="feather-arrow-left">
+                <x-ui.button href="{{ route('production.subcontract.delivery-challans.index') }}" variant="outline-secondary" icon="feather-arrow-left">
                     Back to Challans
                 </x-ui.button>
                 <span class="badge bg-primary text-white font-monospace fs-13 px-3 py-1.5">{{ $challan->challan_number }}</span>
@@ -26,19 +26,19 @@
             </div>
 
             <div class="d-flex align-items-center gap-2">
-                <x-ui.button href="{{ route('production.subcontract.delivery-challans.print', $challan->id) }}" target="_blank" variant="outline-primary" size="sm" icon="feather-printer">
+                <x-ui.button href="{{ route('production.subcontract.delivery-challans.print', $challan->id) }}" target="_blank" variant="outline-primary" icon="feather-printer">
                     Print Gate Pass (PDF)
                 </x-ui.button>
 
                 @if($challan->status === 'draft')
                     <form action="{{ route('production.subcontract.delivery-challans.dispatch', $challan->id) }}" method="POST" class="d-inline">
                         @csrf
-                        <x-ui.button type="submit" variant="success" size="sm" icon="feather-send">
+                        <x-ui.button type="submit" variant="success" icon="feather-send">
                             Dispatch & Deduct Stock
                         </x-ui.button>
                     </form>
                 @elseif(in_array($challan->status, ['dispatched', 'vendor_dispatched', 'in_transit']))
-                    <x-ui.button type="button" variant="primary" size="sm" icon="feather-check-circle" data-bs-toggle="modal" data-bs-target="#receiveItemsModal">
+                    <x-ui.button type="button" variant="primary" icon="feather-check-circle" data-bs-toggle="modal" data-bs-target="#receiveItemsModal">
                         Receive Processed Items
                     </x-ui.button>
                 @endif

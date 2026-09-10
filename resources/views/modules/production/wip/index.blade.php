@@ -119,10 +119,10 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <x-ui.button href="{{ route('production.wip.index', ['view' => $viewMode]) }}" variant="light" size="sm" class="border">
+                            <x-ui.button href="{{ route('production.wip.index', ['view' => $viewMode]) }}" variant="light" class="border">
                                 {{ __('production.reset') }}
                             </x-ui.button>
-                            <x-ui.button type="submit" variant="primary" size="sm">
+                            <x-ui.button type="submit" variant="primary">
                                 {{ __('production.apply_filters') }}
                             </x-ui.button>
                         </div>
@@ -152,16 +152,16 @@
                     </x-ui.odoo-form-ui>
                 </div>
                 @if($workCenterIdFilter)
-                    <x-ui.button href="{{ route('production.wip.index', array_merge(request()->except(['work_center_id', 'page']), ['view' => $viewMode])) }}" variant="light" size="sm" class="border text-nowrap">
+                    <x-ui.button href="{{ route('production.wip.index', array_merge(request()->except(['work_center_id', 'page']), ['view' => $viewMode])) }}" variant="light" class="border text-nowrap">
                         <i class="feather-x me-1"></i> Clear
                     </x-ui.button>
                 @endif
             </form>
             <div class="d-flex gap-2 flex-shrink-0">
-                <x-ui.button type="button" variant="light" size="sm" class="border" onclick="expandAllWorkCenters()">
+                <x-ui.button type="button" variant="light" class="border" onclick="expandAllWorkCenters()">
                     <i class="feather-maximize-2 me-1"></i> Expand All
                 </x-ui.button>
-                <x-ui.button type="button" variant="light" size="sm" class="border" onclick="collapseAllWorkCenters()">
+                <x-ui.button type="button" variant="light" class="border" onclick="collapseAllWorkCenters()">
                     <i class="feather-minimize-2 me-1"></i> Collapse All
                 </x-ui.button>
             </div>

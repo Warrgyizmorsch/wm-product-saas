@@ -3,76 +3,76 @@
 @section('title', __('production.production_plan_details', ['number' => $plan->plan_number]) . ' | SaaS ERP')
 
 @section('page-actions')
-    <a href="{{ route('production.plans.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}
-    </a>
+    <x-ui.button href="{{ route('production.plans.index') }}" variant="secondary" icon="feather-arrow-left" class="me-2">
+        {{ __('production.back_to_list') }}
+    </x-ui.button>
 
     @if($plan->isDraft())
-        <a href="{{ route('production.plans.edit', $plan->id) }}" class="btn btn-primary me-2">
-            <i class="feather-edit me-2"></i>{{ __('production.edit_plan') }}
-        </a>
+        <x-ui.button href="{{ route('production.plans.edit', $plan->id) }}" variant="primary" icon="feather-edit" class="me-2">
+            {{ __('production.edit_plan') }}
+        </x-ui.button>
         <form method="POST" action="{{ route('production.plans.submit', $plan->id) }}" class="d-inline me-2">
             @csrf
-            <button type="submit" class="btn btn-info">
-                <i class="feather-send me-2"></i>{{ __('production.submit_for_approval') }}
-            </button>
+            <x-ui.button type="submit" variant="info" icon="feather-send">
+                {{ __('production.submit_for_approval') }}
+            </x-ui.button>
         </form>
     @endif
 
     @if($plan->isPendingApproval())
         <form method="POST" action="{{ route('production.plans.approve', $plan->id) }}" class="d-inline me-2">
             @csrf
-            <button type="submit" class="btn btn-success">
-                <i class="feather-check-circle me-2"></i>{{ __('production.approve_plan') }}
-            </button>
+            <x-ui.button type="submit" variant="success" icon="feather-check-circle">
+                {{ __('production.approve_plan') }}
+            </x-ui.button>
         </form>
         <form method="POST" action="{{ route('production.plans.reject', $plan->id) }}" class="d-inline me-2">
             @csrf
-            <button type="submit" class="btn btn-danger">
-                <i class="feather-x-circle me-2"></i>{{ __('production.reject') }}
-            </button>
+            <x-ui.button type="submit" variant="danger" icon="feather-x-circle">
+                {{ __('production.reject') }}
+            </x-ui.button>
         </form>
     @endif
 
     @can('runMrp', $plan)
         <form method="POST" action="{{ route('production.plans.run-mrp', $plan->id) }}" class="d-inline me-2">
             @csrf
-            <button type="submit" class="btn btn-warning text-dark">
-                <i class="feather-cpu me-2"></i>{{ $plan->isMrpGenerated() ? __('production.refresh_mrp_snapshot') : __('production.run_mrp_engine') }}
-            </button>
+            <x-ui.button type="submit" variant="warning" class="text-dark" icon="feather-cpu">
+                {{ $plan->isMrpGenerated() ? __('production.refresh_mrp_snapshot') : __('production.run_mrp_engine') }}
+            </x-ui.button>
         </form>
     @endcan
 
     @if($plan->isApproved() || $plan->isMrpGenerated())
         <form method="POST" action="{{ route('production.plans.create-order', $plan->id) }}" class="d-inline me-2">
             @csrf
-            <button type="submit" class="btn btn-success">
-                <i class="feather-file-text me-2"></i>{{ __('production.generate_production_order') }}
-            </button>
+            <x-ui.button type="submit" variant="success" icon="feather-file-text">
+                {{ __('production.generate_production_order') }}
+            </x-ui.button>
         </form>
         <form method="POST" action="{{ route('production.plans.release', $plan->id) }}" class="d-inline me-2">
             @csrf
-            <button type="submit" class="btn btn-primary">
-                <i class="feather-play-circle me-2"></i>{{ __('production.release_to_shop_floor') }}
-            </button>
+            <x-ui.button type="submit" variant="primary" icon="feather-play-circle">
+                {{ __('production.release_to_shop_floor') }}
+            </x-ui.button>
         </form>
     @endif
 
     @if($plan->isReleased())
         <form method="POST" action="{{ route('production.plans.complete', $plan->id) }}" class="d-inline me-2">
             @csrf
-            <button type="submit" class="btn btn-success">
-                <i class="feather-check me-2"></i>{{ __('production.complete_plan') }}
-            </button>
+            <x-ui.button type="submit" variant="success" icon="feather-check">
+                {{ __('production.complete_plan') }}
+            </x-ui.button>
         </form>
     @endif
 
     @if($plan->isCompleted())
         <form method="POST" action="{{ route('production.plans.close', $plan->id) }}" class="d-inline me-2">
             @csrf
-            <button type="submit" class="btn btn-dark">
-                <i class="feather-archive me-2"></i>{{ __('production.close_archive') }}
-            </button>
+            <x-ui.button type="submit" variant="dark" icon="feather-archive">
+                {{ __('production.close_archive') }}
+            </x-ui.button>
         </form>
     @endif
 
@@ -80,9 +80,9 @@
         <form method="POST" action="{{ route('production.plans.cancel', $plan->id) }}" class="d-inline"
               onsubmit="return confirm('{{ __('production.confirm_cancel_plan') }}');">
             @csrf
-            <button type="submit" class="btn btn-outline-danger">
-                <i class="feather-slash me-2"></i>{{ __('production.cancel_plan') }}
-            </button>
+            <x-ui.button type="submit" variant="outline-danger" icon="feather-slash">
+                {{ __('production.cancel_plan') }}
+            </x-ui.button>
         </form>
     @endif
 @endsection
@@ -220,9 +220,9 @@
                     @can('runMrp', $plan)
                         <form method="POST" action="{{ route('production.plans.run-mrp', $plan->id) }}">
                             @csrf
-                            <button type="submit" class="btn btn-warning text-dark px-4 btn-sm">
-                                <i class="feather-play me-2"></i>{{ __('production.run_mrp_now') }}
-                            </button>
+                            <x-ui.button type="submit" variant="warning" class="text-dark px-4" icon="feather-play">
+                                {{ __('production.run_mrp_now') }}
+                            </x-ui.button>
                         </form>
                     @endcan
                 </div>
