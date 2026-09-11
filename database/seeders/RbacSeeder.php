@@ -269,6 +269,25 @@ class RbacSeeder extends Seeder
             'hrms.leave_structures.manage' => $permissions['hrms.leave_structures.manage'],
             'hrms.leave_encashments.view' => $permissions['hrms.leave_encashments.view'],
             'hrms.leave_encashments.approve' => $permissions['hrms.leave_encashments.approve'],
+            // Alias/narrow-gate permissions checked via hasHrPermission() alongside
+            // hr.settings.manage — granted here too so hr_manager keeps working even
+            // if hr.settings.manage is ever scoped down independently of these.
+            'hr.attendance.manage' => $permissions['hr.attendance.manage'],
+            'hr.employees.manage' => $permissions['hr.employees.manage'],
+            'hr.organization_settings.manage' => $permissions['hr.organization_settings.manage'],
+            'hr.payroll.manage' => $permissions['hr.payroll.manage'],
+            'hrms.assets.manage' => $permissions['hrms.assets.manage'],
+            'hrms.broadcasts.manage' => $permissions['hrms.broadcasts.manage'],
+            'hrms.communications.manage' => $permissions['hrms.communications.manage'],
+            'hrms.employees.manage' => $permissions['hrms.employees.manage'],
+            'hrms.holidays.manage' => $permissions['hrms.holidays.manage'],
+            'hrms.leaves.manage' => $permissions['hrms.leaves.manage'],
+            'hrms.payroll.manage' => $permissions['hrms.payroll.manage'],
+            'hrms.penalties.manage' => $permissions['hrms.penalties.manage'],
+            'hrms.performance.manage' => $permissions['hrms.performance.manage'],
+            'hrms.pip.manage' => $permissions['hrms.pip.manage'],
+            'hrms.roster.manage' => $permissions['hrms.roster.manage'],
+            'hrms.shift_roster.manage' => $permissions['hrms.shift_roster.manage'],
         ], RolePermission::SCOPE_TENANT);
 
         // Day-to-day bookkeeping only — deleting accounts/tax rates, closing fiscal
@@ -343,6 +362,7 @@ class RbacSeeder extends Seeder
             'fixed_assets.assets.view' => $permissions['fixed_assets.assets.view'],
             'fixed_assets.depreciation.view' => $permissions['fixed_assets.depreciation.view'],
             'fixed_assets.disposal.view' => $permissions['fixed_assets.disposal.view'],
+            'audit.logs.view' => $permissions['audit.logs.view'],
         ], RolePermission::SCOPE_TENANT);
 
         $this->assignDemoAdmin($roles['tenant_owner']);
@@ -384,6 +404,26 @@ class RbacSeeder extends Seeder
             ['name' => 'production.cost_adjustment.create', 'module' => 'production', 'entity' => 'cost_adjustment', 'action' => 'create'],
             ['name' => 'production.cost_adjustment.update', 'module' => 'production', 'entity' => 'cost_adjustment', 'action' => 'update'],
             ['name' => 'hr.settings.manage', 'module' => 'hr', 'entity' => 'settings', 'action' => 'manage'],
+            // Legacy/alias names still checked via hasHrPermission() across HRMS controllers
+            // (OR'd with hr.settings.manage) — seeded so they can actually be granted
+            // independently instead of silently always failing (Permission::where('name', ...)
+            // returning null short-circuits AccessService::allows() to false for every role).
+            ['name' => 'hr.attendance.manage', 'module' => 'hr', 'entity' => 'attendance', 'action' => 'manage'],
+            ['name' => 'hr.employees.manage', 'module' => 'hr', 'entity' => 'employees', 'action' => 'manage'],
+            ['name' => 'hr.organization_settings.manage', 'module' => 'hr', 'entity' => 'organization_settings', 'action' => 'manage'],
+            ['name' => 'hr.payroll.manage', 'module' => 'hr', 'entity' => 'payroll', 'action' => 'manage'],
+            ['name' => 'hrms.assets.manage', 'module' => 'hrms', 'entity' => 'assets', 'action' => 'manage'],
+            ['name' => 'hrms.broadcasts.manage', 'module' => 'hrms', 'entity' => 'broadcasts', 'action' => 'manage'],
+            ['name' => 'hrms.communications.manage', 'module' => 'hrms', 'entity' => 'communications', 'action' => 'manage'],
+            ['name' => 'hrms.employees.manage', 'module' => 'hrms', 'entity' => 'employees', 'action' => 'manage'],
+            ['name' => 'hrms.holidays.manage', 'module' => 'hrms', 'entity' => 'holidays', 'action' => 'manage'],
+            ['name' => 'hrms.leaves.manage', 'module' => 'hrms', 'entity' => 'leaves', 'action' => 'manage'],
+            ['name' => 'hrms.payroll.manage', 'module' => 'hrms', 'entity' => 'payroll', 'action' => 'manage'],
+            ['name' => 'hrms.penalties.manage', 'module' => 'hrms', 'entity' => 'penalties', 'action' => 'manage'],
+            ['name' => 'hrms.performance.manage', 'module' => 'hrms', 'entity' => 'performance', 'action' => 'manage'],
+            ['name' => 'hrms.pip.manage', 'module' => 'hrms', 'entity' => 'pip', 'action' => 'manage'],
+            ['name' => 'hrms.roster.manage', 'module' => 'hrms', 'entity' => 'roster', 'action' => 'manage'],
+            ['name' => 'hrms.shift_roster.manage', 'module' => 'hrms', 'entity' => 'shift_roster', 'action' => 'manage'],
             ['name' => 'hrms.employees.view', 'module' => 'hrms', 'entity' => 'employees', 'action' => 'view'],
             ['name' => 'hrms.employees.create', 'module' => 'hrms', 'entity' => 'employees', 'action' => 'create'],
             ['name' => 'hrms.employees.update', 'module' => 'hrms', 'entity' => 'employees', 'action' => 'update'],

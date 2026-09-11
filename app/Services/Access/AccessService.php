@@ -98,21 +98,17 @@ class AccessService
     }
 
     /**
-     * Modules where permission-table naming actually lines up with the
-     * sidebar's route-based module prefixes, and coverage is broad enough to
-     * trust as a real signal (96-97 rows for production/sales/accounting, 53
-     * for crm, 36 for inventory, 11 for projects). HRMS and Purchase are
-     * deliberately excluded: HRMS has only 3 permission rows total, all
-     * prefixed 'hr.' (not 'hrms.', the route prefix), and Purchase has none
-     * at all (its only related rows are prefixed 'grns.' for the separate
-     * Goods Receipt Note workflow) — filtering on either would hide the
-     * entire module for users who legitimately have access through
-     * mechanisms other than the Permission table (legacy role checks,
-     * hasHrPermission's narrow gate, etc.), which is worse than not
-     * filtering at all. Revisit this list once those two modules get proper
-     * per-entity permissions seeded.
+     * Modules where permission-table naming lines up with the sidebar's
+     * route-based module prefixes, and coverage is broad enough to trust as
+     * a real signal (96-97 rows for production/sales/accounting, 53 for crm,
+     * 36 for inventory, 11 for projects, 47 for hrms, 34 for purchase — see
+     * RbacSeeder). HRMS also has a handful of legacy 'hr.'-prefixed rows
+     * (not 'hrms.', the route prefix) and Purchase has separate 'grns.'
+     * rows for the Goods Receipt Note workflow; neither affects this list,
+     * since a user only needs *a* granted 'hrms.*'/'purchase.*' permission
+     * to keep the module visible, and every seeded HR/Purchase role has one.
      */
-    private const ROLE_FILTERABLE_MODULES = ['crm', 'sales', 'inventory', 'accounting', 'production', 'projects'];
+    private const ROLE_FILTERABLE_MODULES = ['crm', 'sales', 'inventory', 'accounting', 'production', 'projects', 'hrms', 'purchase'];
 
     /**
      * Distinct module prefixes (the leading segment of each granted

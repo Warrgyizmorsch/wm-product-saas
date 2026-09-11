@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Access\AccessAuditLog;
 use App\Models\Access\Permission;
 use App\Models\Access\Role;
 use App\Models\Access\RolePermission;
@@ -154,6 +155,185 @@ class AccessAuthorizationTest extends TestCase
             ->get(route('access.users.edit', $otherUser));
 
         $response->assertForbidden();
+    }
+
+    /** @test */
+    public function tenant_owner_can_assign_multiple_roles_to_a_user_and_change_them_later(): void
+    {
+        $salesExecutive = Role::query()->whereNull('tenant_id')->where('slug', 'sales_executive')->firstOrFail();
+        $inventoryManager = Role::query()->whereNull('tenant_id')->where('slug', 'inventory_manager')->firstOrFail();
+        $accountant = Role::query()->whereNull('tenant_id')->where('slug', 'accountant')->firstOrFail();
+
+        $store = $this->actingAs($this->tenantOwner)->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('access.users.store'), [
+                'name' => 'Multi Role',
+                'email' => 'multirole@example.com',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+                'role_ids' => [$salesExecutive->id, $inventoryManager->id],
+            ]);
+
+        $store->assertRedirect(route('access.users.index'));
+
+        $user = User::where('email', 'multirole@example.com')->firstOrFail();
+
+        $this->assertEqualsCanonicalizing(
+            [$salesExecutive->id, $inventoryManager->id],
+            $user->roles()->pluck('roles.id')->all()
+        );
+        // sales_executive (level 50) and inventory_manager (level 40) — the
+        // more senior (lower level) role becomes the primary role_id.
+        $this->assertEquals($inventoryManager->id, $user->role_id);
+
+        $update = $this->actingAs($this->tenantOwner)->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('access.users.update', $user), [
+                'name' => 'Multi Role',
+                'email' => 'multirole@example.com',
+                'role_ids' => [$accountant->id],
+            ]);
+
+        $update->assertRedirect(route('access.users.index'));
+
+        $this->assertEqualsCanonicalizing(
+            [$accountant->id],
+            $user->fresh()->roles()->pluck('roles.id')->all()
+        );
+        $this->assertEquals($accountant->id, $user->fresh()->role_id);
+    }
+
+    /** @test */
+    public function tenant_owner_can_deny_and_then_allow_a_specific_permission_override_for_a_user(): void
+    {
+        $target = $this->createUserWithRole('overridden@example.com', 'sales_executive', $this->tenant);
+        $permission = Permission::where('name', 'crm.leads.create')->firstOrFail();
+
+        // sales_executive is granted crm.leads.create at tenant scope by RbacSeeder,
+        // so an explicit deny override should block it despite the role grant.
+        $this->assertTrue(app(\App\Services\Access\AccessService::class)->allows($target, 'crm.leads.create', [
+            'tenant_id' => $this->tenant->id,
+        ]));
+
+        $deny = $this->actingAs($this->tenantOwner)->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('access.users.overrides.update', $target), [
+                'overrides' => [
+                    $permission->id => ['state' => 'deny', 'reason' => 'Under investigation'],
+                ],
+            ]);
+
+        $deny->assertRedirect(route('access.users.overrides.edit', $target));
+        $this->assertDatabaseHas('user_permission_overrides', [
+            'user_id' => $target->id,
+            'permission_id' => $permission->id,
+            'allowed' => false,
+            'reason' => 'Under investigation',
+        ]);
+
+        $this->assertFalse(app(\App\Services\Access\AccessService::class)->allows($target->fresh(), 'crm.leads.create', [
+            'tenant_id' => $this->tenant->id,
+        ]));
+
+        // Setting it back to "inherit" removes the override row and restores the role grant.
+        $this->actingAs($this->tenantOwner)->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('access.users.overrides.update', $target), [
+                'overrides' => [
+                    $permission->id => ['state' => 'inherit'],
+                ],
+            ]);
+
+        $this->assertDatabaseMissing('user_permission_overrides', [
+            'user_id' => $target->id,
+            'permission_id' => $permission->id,
+        ]);
+
+        $this->assertTrue(app(\App\Services\Access\AccessService::class)->allows($target->fresh(), 'crm.leads.create', [
+            'tenant_id' => $this->tenant->id,
+        ]));
+    }
+
+    /** @test */
+    public function a_platform_permission_cannot_be_granted_through_a_user_override(): void
+    {
+        // matchingOverride() returns `allowed` without running scopeMatches(),
+        // so an override row satisfies a platform-wide check that no
+        // tenant-scoped role grant can. A tenant owner must therefore never be
+        // able to write one, or they could browse every other tenant.
+        $target = $this->createUserWithRole('escalate@example.com', 'sales_executive', $this->tenant);
+        $platformPermission = Permission::where('name', 'platform.tenants.manage')->firstOrFail();
+
+        $this->actingAs($this->tenantOwner)->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('access.users.overrides.update', $target), [
+                'overrides' => [
+                    $platformPermission->id => ['state' => 'allow', 'reason' => 'nice try'],
+                ],
+            ]);
+
+        $this->assertDatabaseMissing('user_permission_overrides', [
+            'user_id' => $target->id,
+            'permission_id' => $platformPermission->id,
+        ]);
+
+        $this->assertFalse(app(\App\Services\Access\AccessService::class)->allows(
+            $target->fresh(),
+            'platform.tenants.manage'
+        ));
+    }
+
+    /** @test */
+    public function role_creation_permission_changes_and_role_assignment_are_all_audit_logged(): void
+    {
+        $store = $this->actingAs($this->tenantOwner)->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('access.roles.store'), [
+                'name' => 'Audited Role',
+                'level' => 60,
+            ]);
+
+        $role = Role::where('name', 'Audited Role')->firstOrFail();
+        $store->assertRedirect(route('access.roles.show', $role));
+
+        $this->assertDatabaseHas('access_audit_logs', [
+            'actor_id' => $this->tenantOwner->id,
+            'action' => 'role.created',
+            'subject_type' => 'role',
+            'subject_id' => $role->id,
+        ]);
+
+        $permission = Permission::first();
+
+        $this->actingAs($this->tenantOwner)->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('access.roles.permissions.update', $role), [
+                'grants' => [
+                    $permission->id => ['tenant' => '1'],
+                ],
+            ]);
+
+        $this->assertDatabaseHas('access_audit_logs', [
+            'actor_id' => $this->tenantOwner->id,
+            'action' => 'role.permissions.updated',
+            'subject_type' => 'role',
+            'subject_id' => $role->id,
+        ]);
+
+        $salesExecutive = Role::query()->whereNull('tenant_id')->where('slug', 'sales_executive')->firstOrFail();
+
+        $store = $this->actingAs($this->tenantOwner)->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('access.users.store'), [
+                'name' => 'Logged User',
+                'email' => 'logged@example.com',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+                'role_ids' => [$salesExecutive->id],
+            ]);
+
+        $newUser = User::where('email', 'logged@example.com')->firstOrFail();
+        $store->assertRedirect(route('access.users.index'));
+
+        $this->assertDatabaseHas('access_audit_logs', [
+            'actor_id' => $this->tenantOwner->id,
+            'target_user_id' => $newUser->id,
+            'action' => 'user.roles.updated',
+        ]);
+
+        $this->assertEquals(3, AccessAuditLog::where('tenant_id', $this->tenant->id)->count());
     }
 
     /** @test */

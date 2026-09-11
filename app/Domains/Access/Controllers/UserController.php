@@ -83,11 +83,19 @@ class UserController extends Controller
 
     private function validated(Request $request, ?User $user = null): array
     {
+        // Accept the new multi-select `role_ids[]` field, falling back to the
+        // legacy single `role_id` field so existing callers/integrations that
+        // only ever sent one role keep working unchanged.
+        if (! $request->has('role_ids') && $request->filled('role_id')) {
+            $request->merge(['role_ids' => [$request->input('role_id')]]);
+        }
+
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user?->id)],
             'password' => [$user ? 'nullable' : 'required', 'string', 'min:8', 'confirmed'],
-            'role_id' => ['required', 'integer', 'exists:roles,id'],
+            'role_ids' => ['required', 'array', 'min:1'],
+            'role_ids.*' => ['integer', 'exists:roles,id'],
         ]);
     }
 }
