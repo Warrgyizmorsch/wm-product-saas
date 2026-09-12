@@ -57,15 +57,30 @@ class AccessService
             return $this->allowsLegacyProductionPermission($user, $permissionName);
         }
 
-        $tenantId = $context['tenant_id'] ?? $user->tenant_id;
         $override = $this->matchingOverride($user, $permission->id, $context);
 
         if ($override !== null) {
-            return $override->allowed;
+            // Deny and allow are deliberately asymmetric. A deny always applies:
+            // a revocation that silently stopped working because the caller
+            // omitted a context key would be the dangerous direction to fail in.
+            // An allow has to earn its scope the same way a role grant does, so
+            // an override written as "own" can't hand out tenant-wide access.
+            if (! $override->allowed) {
+                return false;
+            }
+
+            if ($this->scopeMatches($override->scope, $user, $context)) {
+                return true;
+            }
+
+            // An allow override that doesn't cover this record isn't a denial —
+            // fall through and let the user's role grants speak.
         }
 
-        $roleIds = $this->roleIdsFor($user, $tenantId);
-
+        // $roleIds was already resolved above for the platform-admin check and
+        // neither $user nor $tenantId has changed since — roleIdsFor() costs two
+        // queries now that the legacy role_id is tenant-validated, so it is not
+        // worth repeating.
         if ($roleIds->isEmpty()) {
             return $this->allowsLegacyProductionPermission($user, $permissionName);
         }
@@ -237,7 +252,27 @@ class AccessService
      */
     private function roleIdsFor(User $user, ?int $tenantId): Collection
     {
-        $roleIds = collect([$user->role_id])->filter();
+        // The legacy users.role_id column carries no tenant of its own, so it
+        // has to be validated against the Role it points at. Without this, a
+        // stale or hand-edited role_id referencing another tenant's role would
+        // be honoured outright — the shared-schema role-collision risk. A role
+        // with a null tenant_id is a system template and stays valid for
+        // everyone; the UserRole join below already does the same check.
+        $roleIds = collect();
+
+        if ($user->role_id !== null) {
+            $legacyRoleIsUsable = Role::query()
+                ->whereKey($user->role_id)
+                ->where(function ($query) use ($tenantId): void {
+                    $query->whereNull('tenant_id')
+                        ->when($tenantId !== null, fn ($q) => $q->orWhere('tenant_id', $tenantId));
+                })
+                ->exists();
+
+            if ($legacyRoleIsUsable) {
+                $roleIds->push($user->role_id);
+            }
+        }
 
         $assignedRoleIds = UserRole::query()
             ->where('user_id', $user->id)
@@ -254,6 +289,14 @@ class AccessService
     }
 
     /**
+     * Whether a grant held at $scope covers the record described by $context.
+     *
+     * Every scope below TENANT compares the record's value against the user's
+     * own — a branch-scoped grant means "records in *this user's* branch", not
+     * "records that happen to carry any branch at all". Both sides must be
+     * present for a narrow scope to match, so a caller that omits the relevant
+     * context key fails closed rather than silently widening the grant.
+     *
      * @param array<string, mixed> $context
      */
     private function scopeMatches(string $scope, User $user, array $context): bool
@@ -261,10 +304,17 @@ class AccessService
         return match ($scope) {
             RolePermission::SCOPE_PLATFORM => true,
             RolePermission::SCOPE_TENANT => $this->sameValue($context['tenant_id'] ?? null, $user->tenant_id),
-            RolePermission::SCOPE_BRANCH => isset($context['branch_id']),
-            RolePermission::SCOPE_COMPANY => isset($context['company_id']),
-            RolePermission::SCOPE_DEPARTMENT => isset($context['department_id']),
+            RolePermission::SCOPE_COMPANY => $this->sameValue($context['company_id'] ?? null, $user->company_id),
+            RolePermission::SCOPE_BRANCH => $this->sameValue($context['branch_id'] ?? null, $user->branch_id),
+            RolePermission::SCOPE_DEPARTMENT => $this->sameValue($context['department_id'] ?? null, $user->department_id),
             RolePermission::SCOPE_OWN => $this->sameValue($context['owner_id'] ?? null, $user->id),
+            // SCOPE_TEAM is deliberately identical to SCOPE_OWN for now: there
+            // is no team or reporting-line relation on users to resolve a team
+            // from (HRMS's Employee.reporting_manager_id is a domain-module
+            // concern this shared service must not reach into). Treating it as
+            // "own" keeps it strictly narrower than intended rather than wider,
+            // so it can never over-grant — but a 'team' grant made in the role
+            // admin UI will behave as 'own' until a real team relation exists.
             RolePermission::SCOPE_TEAM => $this->sameValue($context['owner_id'] ?? null, $user->id),
             default => false,
         };

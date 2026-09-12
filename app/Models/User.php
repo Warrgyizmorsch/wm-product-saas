@@ -32,6 +32,7 @@ class User extends Authenticatable
         'tenant_id',
         'company_id',
         'branch_id',
+        'department_id',
         'role_id',
         'name',
         'email',
