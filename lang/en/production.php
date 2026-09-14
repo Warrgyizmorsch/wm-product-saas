@@ -504,7 +504,7 @@ return [
     'wc_metrics' => 'Capacity & Parameter Metrics',
     'wc_cost_structure' => 'Operating Cost Structure',
     'wc_cost_guide' => 'Cost Calculations Guide',
-    'wc_cost_guide_text_1' => 'Hourly Cost = $:cost',
+    'wc_cost_guide_text_1' => 'Hourly Cost = :cost',
     'wc_cost_guide_text_2' => 'Applied to Setup time & Processing time in routing calculations.',
     'nominal_capacity' => 'Nominal Capacity per Hour',
     'operational_efficiency' => 'Operational Efficiency',

@@ -85,24 +85,57 @@
                             {{ $workCenter->capacity_per_hour !== null ? number_format($workCenter->effectiveCapacityPerHour(), 2) . ' ' . __('production.units_hr') : __('production.unlimited') }}
                         </span>
                     </div>
+                    <div class="border-top pt-3">
+                        <span class="text-muted fs-11 text-uppercase d-block mb-1"><i class="feather-calendar me-1"></i>Production Calendar</span>
+                        <span class="fs-13 fw-semibold text-dark">
+                            @if ($workCenter->calendar)
+                                <span class="badge bg-soft-primary text-primary fs-11"><i class="feather-calendar me-1"></i>{{ $workCenter->calendar->name }}</span>
+                            @else
+                                <span class="text-muted fs-12 fst-italic">Default Factory Calendar</span>
+                            @endif
+                        </span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Overhead Cost Panel -->
+            <!-- Operating Cost Structure Panel -->
             <div class="col-md-4">
                 <h5 class="fw-bold text-dark mb-3">{{ __('production.wc_cost_structure') }}</h5>
-                <div class="d-flex flex-column gap-4 py-2 px-2">
-                    <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.overhead_cost_rate') }}</span>
-                        <span class="fs-24 fw-bold text-dark">{{ format_currency($workCenter->cost_per_hour) }} <span class="fs-13 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
-                        <small class="text-muted d-block mt-1">{{ __('production.overhead_cost_rate_help') }}</small>
+                @php
+                    $directCost = (float) ($workCenter->cost_per_hour ?? 0);
+                    $overheadCost = (float) ($workCenter->overhead_rate ?? 0);
+                    $totalStationCost = $directCost + $overheadCost;
+                @endphp
+                <div class="d-flex flex-column gap-3 py-1 px-1">
+                    <div class="d-flex justify-content-between align-items-center pb-2 border-bottom">
+                        <div>
+                            <span class="text-muted fs-11 text-uppercase d-block fw-semibold">{{ __('production.cost_per_hour') }}</span>
+                            <small class="text-muted fs-11">Direct Labor / Machine rate</small>
+                        </div>
+                        <span class="fs-18 fw-bold text-dark font-monospace">{{ format_currency($directCost) }} <span class="fs-11 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pb-2 border-bottom">
+                        <div>
+                            <span class="text-muted fs-11 text-uppercase d-block fw-semibold">{{ __('production.overhead_cost_rate') }}</span>
+                            <small class="text-muted fs-11">{{ __('production.overhead_cost_rate_help') }}</small>
+                        </div>
+                        <span class="fs-18 fw-bold text-dark font-monospace">{{ format_currency($overheadCost) }} <span class="fs-11 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
+                    </div>
+
+                    <div class="p-2.5 rounded bg-light border d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-dark fw-bold fs-12 text-uppercase d-block">Total Station Cost</span>
+                            <small class="text-muted fs-11">Combined Direct + Overhead rate</small>
+                        </div>
+                        <span class="fs-20 fw-bolder text-primary font-monospace">{{ format_currency($totalStationCost) }} <span class="fs-11 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
                     </div>
                     
-                    <div class="border-top pt-3 mt-2">
-                        <h6 class="fw-bold text-dark mb-2">{{ __('production.wc_cost_guide') }}</h6>
-                        <ul class="fs-12 text-muted ps-3 mb-0">
-                            <li class="mb-1">{{ __('production.wc_cost_guide_text_1', ['cost' => format_currency($workCenter->cost_per_hour)]) }}</li>
-
+                    <div class="border-top pt-2 mt-1">
+                        <h6 class="fw-bold text-dark mb-1 fs-12">{{ __('production.wc_cost_guide') }}</h6>
+                        <ul class="fs-11 text-muted ps-3 mb-0">
+                            <li class="mb-1">{{ __('production.wc_cost_guide_text_1', ['cost' => format_currency($directCost)]) }}</li>
+                            <li class="mb-1">Overhead Rate = <span class="fw-semibold text-dark">{{ format_currency($overheadCost) }}</span> / hr</li>
                             <li>{{ __('production.wc_cost_guide_text_2') }}</li>
                         </ul>
                     </div>
@@ -192,8 +225,16 @@
                     <tbody>
                         @forelse ($workCenter->machines as $machine)
                             <tr>
-                                <td class="align-middle fw-bold text-dark">{{ $machine->code }}</td>
-                                <td class="align-middle">{{ $machine->name }}</td>
+                                <td class="align-middle">
+                                    <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="fw-bold text-primary hover-primary">
+                                        {{ $machine->code }}
+                                    </a>
+                                </td>
+                                <td class="align-middle">
+                                    <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="fw-semibold text-dark hover-primary">
+                                        {{ $machine->name }}
+                                    </a>
+                                </td>
                                 <td class="align-middle">{{ $machine->machine_type ?? '—' }}</td>
                                 <td class="align-middle">{{ $machine->manufacturer ?? '—' }}</td>
                                 <td class="align-middle">{{ $machine->model_number ?? '—' }}</td>
@@ -213,6 +254,11 @@
                                 </td>
                                 <td class="text-end align-middle">
                                     <x-ui.action-dropdown>
+                                        <li>
+                                            <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="dropdown-item">
+                                                <i class="feather-eye me-2 text-muted fs-12"></i>{{ __('production.view_details') ?? 'View Details' }}
+                                            </a>
+                                        </li>
                                         <li>
                                             <a href="{{ route('production.machines.edit', $machine->id) }}" class="dropdown-item">
                                                 <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_machine') }}

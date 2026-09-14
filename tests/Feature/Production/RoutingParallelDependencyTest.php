@@ -185,7 +185,7 @@ class RoutingParallelDependencyTest extends TestCase
             'work_center_id' => $this->workCenter->id,
             'setup_time_minutes' => 5,
             'processing_time_minutes' => 20,
-            'is_parallel' => false,
+            'is_parallel' => true,
             'previous_operation_id' => null, // Independent
         ]);
 

@@ -200,10 +200,14 @@
                                 <input type="checkbox" class="form-check-input machine-checkbox" value="{{ $machine->id }}" data-can-delete="{{ auth()->user()->can('delete', $machine) ? 'true' : 'false' }}">
                             </td>
                             <td>
-                                <span class="fw-bold text-dark">{{ $machine->code }}</span>
+                                <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="fw-bold text-primary hover-primary">
+                                    {{ $machine->code }}
+                                </a>
                             </td>
                             <td>
-                                <span class="fw-semibold text-dark">{{ $machine->name }}</span>
+                                <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="fw-semibold text-dark hover-primary">
+                                    {{ $machine->name }}
+                                </a>
                             </td>
                             <td>
                                 @if ($machine->workCenter)
@@ -237,6 +241,11 @@
                             <td class="text-muted">{{ $machine->installation_date ? $machine->installation_date->format('Y-m-d') : '—' }}</td>
                             <td class="text-end">
                                 <x-ui.action-dropdown>
+                                    <li>
+                                        <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="dropdown-item">
+                                            <i class="feather-eye me-2 text-muted fs-12"></i>{{ __('production.view_details') ?? 'View Details' }}
+                                        </a>
+                                    </li>
                                     @can('update', $machine)
                                         <li>
                                             <a href="{{ route('production.machines.edit', $machine->id) }}" class="dropdown-item">

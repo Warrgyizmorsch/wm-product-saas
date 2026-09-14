@@ -35,7 +35,7 @@ class ProductionCostService
             return 0.0;
         }
 
-        $bom->loadMissing('routing.operations');
+        $bom->loadMissing('routing.operations.workCenter');
         $routing = $bom->routing;
         if (!$routing) {
             return 0.0;
@@ -48,7 +48,11 @@ class ProductionCostService
                 ? (100 / $operation->expected_yield_percentage)
                 : 1.0;
 
-            $laborCost = $activeMinutes * $operation->labor_cost_rate * $bom->base_quantity * $yieldFactor;
+            $routingLaborRate = (float) $operation->labor_cost_rate;
+            $wcLaborRate = $operation->workCenter ? ((float) $operation->workCenter->cost_per_hour / 60.0) : 0.0;
+            $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
+
+            $laborCost = $activeMinutes * $laborRate * $bom->base_quantity * $yieldFactor;
             $totalCost += $laborCost;
         }
 

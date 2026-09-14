@@ -264,6 +264,10 @@
                                             echo '<span class="fw-bold text-dark">' . e($matName) . '</span>';
                                             echo '<small class="text-muted font-monospace fs-10">' . e($matSku) . '</small>';
                                             
+                                            if (!empty($item->notes)) {
+                                                echo '<small class="text-muted fst-italic fs-11 mt-0.5"><i class="feather-file-text me-1 text-secondary"></i>' . e($item->notes) . '</small>';
+                                            }
+                                            
                                             if ($item->childBom) {
                                                 echo '<small class="mt-1">';
                                                 echo '<a href="' . route('production.boms.show', $item->childBom->id) . '" class="badge bg-soft-success text-success">';

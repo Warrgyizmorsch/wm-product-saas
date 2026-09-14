@@ -234,6 +234,16 @@ class PlanningExceptionService
             }
         }
 
+        foreach ($exceptions as &$exc) {
+            if (!isset($exc['message']) && isset($exc['reason'])) {
+                $exc['message'] = $exc['reason'];
+            }
+            if (!isset($exc['recommendation']) && isset($exc['recommended_action'])) {
+                $exc['recommendation'] = $exc['recommended_action'];
+            }
+        }
+        unset($exc);
+
         return [
             'order' => $order,
             'order_id' => $order->id,
@@ -264,10 +274,25 @@ class PlanningExceptionService
      */
     private function evaluateMaterialShortageVector(ProductionOrder $order, array $readiness, array &$exceptions): void
     {
+        $opsById = $order->operations ? $order->operations->keyBy('id') : collect();
+
         foreach ($readiness['operations'] as $opEval) {
+            $op = $opsById->get($opEval['operation_id']);
+            if ($op && $op->status === ProductionOrderOperation::STATUS_COMPLETED) {
+                continue;
+            }
+
             $mat = $opEval['material'] ?? [];
-            $isBlockedOrPartial = in_array($mat['status'] ?? '', [ProductionReadinessService::STATUS_BLOCKED, ProductionReadinessService::STATUS_PARTIALLY_READY]);
-            $hasShortage = ($mat['shortage_qty'] ?? 0) > 0 || (($mat['ready_qty'] ?? 0) < ($mat['required_qty'] ?? 0) && ($mat['required_qty'] ?? 0) > 0);
+            $matStatus = $mat['status'] ?? '';
+
+            if ($matStatus === ProductionReadinessService::STATUS_READY) {
+                continue;
+            }
+
+            $isBlockedOrPartial = in_array($matStatus, [ProductionReadinessService::STATUS_BLOCKED, ProductionReadinessService::STATUS_PARTIALLY_READY]);
+            $hasShortage = ($mat['shortage_qty'] ?? 0) > 0
+                || $matStatus === ProductionReadinessService::STATUS_BLOCKED
+                || ($matStatus === ProductionReadinessService::STATUS_PARTIALLY_READY && ($mat['ready_qty'] ?? 0) < ($opEval['target_qty'] ?? 0));
 
             if ($isBlockedOrPartial || $hasShortage) {
                 $blockers = $mat['blockers'] ?? [];
@@ -275,15 +300,18 @@ class PlanningExceptionService
                     ? implode('; ', array_map(fn($b) => is_array($b) ? ($b['message'] ?? $b['code'] ?? 'Blocker') : (string) $b, $blockers))
                     : "Material unreserved or insufficient stock";
                 $severity = ($opEval['sequence'] <= 10) ? self::SEVERITY_CRITICAL : self::SEVERITY_HIGH;
+                $reason = "Material shortage on operation '{$opEval['operation_name']}': {$reasonText}";
                 $exceptions[] = [
                     'type' => self::TYPE_MATERIAL_SHORTAGE,
                     'severity' => $severity,
                     'production_order_id' => $order->id,
                     'operation_id' => $opEval['operation_id'],
                     'operation_name' => $opEval['operation_name'],
-                    'reason' => "Material shortage on operation '{$opEval['operation_name']}': {$reasonText}",
+                    'reason' => $reason,
+                    'message' => $reason,
                     'risk_driver' => 'Material Shortage',
                     'recommended_action' => self::REC_REVIEW_MATERIAL_SHORTAGE,
+                    'recommendation' => self::REC_REVIEW_MATERIAL_SHORTAGE,
                     'evidence' => "Target Qty: {$opEval['target_qty']}, Ready Qty: {$opEval['ready_qty']}. Blocker: {$reasonText}",
                 ];
             }

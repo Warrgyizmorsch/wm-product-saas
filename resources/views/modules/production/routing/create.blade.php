@@ -105,10 +105,12 @@
                                 <tr>
                                     <th style="width: 45px;" class="text-center">{{ __('production.seq') }}</th>
                                     <th style="min-width: 310px;">{{ __('production.operation_name_yield') }}</th>
-                                    <th style="width: 165px;">{{ __('production.work_center') }}</th>
-                                    <th style="width: 165px;">{{ __('production.machine') }}</th>
-                                    <th style="width: 65px;" class="text-end">{{ __('production.setup') }} (m)</th>
-                                    <th style="width: 65px;" class="text-end">{{ __('production.run') }} (m)</th>
+                                    <th style="width: 160px;">{{ __('production.work_center') }}</th>
+                                    <th style="width: 160px;">{{ __('production.machine') }}</th>
+                                    <th style="width: 60px;" class="text-end">{{ __('production.setup') }} (m)</th>
+                                    <th style="width: 60px;" class="text-end">{{ __('production.run') }} (m)</th>
+                                    <th style="width: 60px;" class="text-end" title="Buffer / wait / cure / cool-down time (minutes) before downstream transfer">Wait (m)</th>
+                                    <th style="width: 75px;" class="text-end" title="Cost per minute. Leave 0 to use Work Center rate">Labor ({{ active_currency_symbol() }}/m)</th>
                                     <th style="width: 40px;" class="text-center">{{ __('production.qc_gate') }}</th>
                                     <th style="width: 110px;" class="text-end">{{ __('production.actions') }}</th>
                                 </tr>
@@ -157,6 +159,8 @@
                                                         x-transition:leave-end="opacity-0 transform -translate-x-2">
                                                     <span class="fs-10 text-muted">Qty:</span>
                                                     <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_batch_quantity" min="0.0001" />
+                                                    <span class="fs-10 text-muted ms-1" title="Transit / handling delay before the first transfer batch reaches the downstream operation.">Lag (m):</span>
+                                                    <input type="number" step="1" x-bind:name="'operations['+index+'][transfer_lag_minutes]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_lag_minutes" min="0" placeholder="0" title="Transit / handling delay before the first transfer batch reaches the downstream operation." />
                                                 </div>
 
                                                 <span class="text-black-50 me-1">|</span>
@@ -172,6 +176,17 @@
                                                     <span class="fs-10 text-muted">Grp:</span>
                                                     <input type="text" x-bind:name="'operations['+index+'][parallel_group]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 50px; height: 20px; min-height: 20px;" x-model="operation.parallel_group" placeholder="e.g. A" title="Optional Parallel Group Name" />
                                                 </div>
+                                            </div>
+
+                                            <div class="mt-1 d-flex align-items-center gap-2">
+                                                <input type="text" x-bind:name="'operations['+index+'][description]'" class="odoo-table-input fs-11 text-muted flex-grow-1" placeholder="Brief description..." x-model="operation.description" />
+                                                <button type="button" class="btn btn-xs py-0 px-1 fs-10 text-nowrap" :class="operation.instructions ? 'btn-soft-primary' : 'btn-outline-secondary'" @click="operation.showSop = !operation.showSop" title="Toggle Operation Instructions (SOP)">
+                                                    <i class="feather-file-text me-1"></i>SOP
+                                                </button>
+                                            </div>
+                                            <div x-show="operation.showSop" class="mt-1.5 p-2 bg-light rounded border" x-cloak>
+                                                <label class="form-label fs-10 fw-bold text-dark text-uppercase mb-1"><i class="feather-file-text me-1 text-primary"></i>Operation Instructions (SOP)</label>
+                                                <textarea x-bind:name="'operations['+index+'][instructions]'" class="odoo-table-input fs-11 text-muted bg-white" rows="2" placeholder="Detailed shop-floor SOP instructions for operators..." x-model="operation.instructions"></textarea>
                                             </div>
 
                                             <div class="mt-1 d-flex align-items-center gap-1" x-show="!operation.is_parallel && index > 0">
@@ -230,6 +245,16 @@
                                         <td class="align-middle">
                                             <input type="number" step="any" x-bind:name="'operations['+index+'][processing_time_minutes]'" class="odoo-table-input text-end" x-model="operation.processing_time_minutes" min="0" required />
                                         </td>
+
+                                        <!-- Wait Time -->
+                                        <td class="align-middle">
+                                            <input type="number" step="any" x-bind:name="'operations['+index+'][wait_time_minutes]'" class="odoo-table-input text-end" x-model="operation.wait_time_minutes" min="0" placeholder="0.0" title="Buffer / wait / cure / cool-down time (minutes) before downstream transfer" />
+                                        </td>
+                                        
+                                        <!-- Labor Cost Rate ($/min) -->
+                                        <td class="align-middle">
+                                            <input type="number" step="0.0001" x-bind:name="'operations['+index+'][labor_cost_rate]'" class="odoo-table-input text-end" x-model="operation.labor_cost_rate" min="0" placeholder="0.00" title="Cost per minute (Leave 0 to use Work Center hourly rate / 60)" />
+                                        </td>
                                         
                                         <!-- Quality Required -->
                                         <td class="text-center align-middle">
@@ -257,7 +282,7 @@
 
                                      <!-- Subcontract Details Expanded Panel -->
                                      <tr x-show="operation.is_external" class="bg-light-subtle">
-                                         <td colspan="8" class="p-2 border-top-0">
+                                         <td colspan="10" class="p-2 border-top-0">
                                              <div class="row g-2 align-items-center fs-12 px-2 py-2 bg-white rounded border">
                                                  <div class="col-md-3">
                                                      <x-ui.odoo-form-ui type="select" label="Vendor *" x-bind:name="'operations['+index+'][vendor_id]'" class="form-select form-select-sm fs-11" x-model="operation.vendor_id" x-bind:required="operation.is_external">
@@ -373,6 +398,11 @@
                         machine_id: '',
                         setup_time_minutes: '0.00',
                         processing_time_minutes: '0.00',
+                        wait_time_minutes: '0.00',
+                        labor_cost_rate: '0.0000',
+                        description: '',
+                        instructions: '',
+                        showSop: false,
                         expected_yield_percentage: '100.00',
                         quality_required: false,
                         is_external: false,
@@ -387,6 +417,7 @@
                         queue_threshold_enabled: false,
                         overlap_enabled: false,
                         transfer_batch_quantity: '0.00',
+                        transfer_lag_minutes: 0,
                         material_id: '',
                         is_parallel: false,
                         parallel_group: '',

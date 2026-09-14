@@ -69,7 +69,11 @@ class RoutingCostService
                           ? (100 / $operation->expected_yield_percentage)
                           : 1.0;
 
-        $laborCost      = $activeMinutes * $operation->labor_cost_rate * $quantity * $yieldFactor;
+        $routingLaborRate = (float) $operation->labor_cost_rate;
+        $wcLaborRate = $operation->workCenter ? ((float) $operation->workCenter->cost_per_hour / 60.0) : 0.0;
+        $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
+
+        $laborCost      = $activeMinutes * $laborRate * $quantity * $yieldFactor;
         $machineCost    = $activeMinutes * $operation->machine_cost_rate * $quantity * $yieldFactor;
         $totalCost      = $laborCost + $machineCost;
 

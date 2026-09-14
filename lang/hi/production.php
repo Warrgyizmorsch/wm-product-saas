@@ -457,7 +457,7 @@ return [
     'wc_metrics' => 'क्षमता और पैरामीटर मेट्रिक्स',
     'wc_cost_structure' => 'परिचालन लागत संरचना',
     'wc_cost_guide' => 'लागत गणना गाइड',
-    'wc_cost_guide_text_1' => 'प्रति घंटा लागत = $:cost',
+    'wc_cost_guide_text_1' => 'प्रति घंटा लागत = :cost',
     'wc_cost_guide_text_2' => 'राउटिंग गणना में सेटअप समय और प्रसंस्करण समय पर लागू।',
     'nominal_capacity' => 'प्रति घंटा नाममात्र क्षमता',
     'operational_efficiency' => 'परिचालन दक्षता',

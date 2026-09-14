@@ -292,6 +292,9 @@
                                                         </a>
                                                     </div>
                                                 </template>
+                                                <div class="mt-1">
+                                                    <input type="text" x-bind:name="'items['+index+'][notes]'" class="odoo-table-input fs-11 text-muted" placeholder="Component notes (optional)..." x-model="item.notes" />
+                                                </div>
                                             </td>
 
                                             <!-- Quantity & Type -->
@@ -587,6 +590,9 @@
                             material_id: item.material_id || '',
                             child_bom_id: item.child_bom_id || null,
                             quantity: item.quantity || '',
+                            quantity_type: item.quantity_type || 'fixed',
+                            formula: item.formula || '',
+                            notes: item.notes || '',
                             uom_id: item.uom_id || '',
                             material_scrap_percentage: item.material_scrap_percentage || 0,
                             is_alternative: !!parseInt(item.is_alternative) || item.is_alternative === true,
@@ -808,6 +814,7 @@
                         quantity: '',
                         quantity_type: 'fixed',
                         formula: '',
+                        notes: '',
                         uom_id: '',
                         material_scrap_percentage: 0,
                         is_alternative: false,
