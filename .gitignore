@@ -12,7 +12,12 @@
 /.vscode
 /.zed
 /auth.json
-/node_modules
+node_modules/
+**/node_modules/
+auth_info_baileys/
+**/auth_info_baileys/
+whatsapp_sessions/
+**/whatsapp_sessions/
 /public/build
 /public/hot
 /public/storage

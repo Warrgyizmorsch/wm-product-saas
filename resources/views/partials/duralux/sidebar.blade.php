@@ -16,6 +16,8 @@
                 ['label' => 'Subscriptions'],
                 ['label' => 'Usage Limits', 'route' => 'platform.usage.index'],
                 ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
+                ['label' => 'Email & SMTP Setup', 'route' => 'crm.emailSettings.index'],
+                ['label' => 'WhatsApp Web Setup', 'route' => 'crm.whatsappSettings.index'],
             ]],
             ['label' => __('ui.approvals_center'), 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
         ],
@@ -31,6 +33,8 @@
                 ['label' => __('crm.lead_status_master') ?: 'Lead Status Master', 'route' => 'crm.masters.lead-statuses.index'],
                 ['label' => __('crm.deal_stage_master') ?: 'Deal Stage Master', 'route' => 'crm.masters.deal-statuses.index'],
                 ['label' => __('crm.crm_sales_settings') ?: 'CRM & Sales Settings', 'route' => 'crm.settings.index'],
+                ['label' => 'Email & SMTP Accounts', 'route' => 'crm.emailSettings.index'],
+                ['label' => 'WhatsApp Web Setup', 'route' => 'crm.whatsappSettings.index'],
             ]],
             ['label' => 'Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],

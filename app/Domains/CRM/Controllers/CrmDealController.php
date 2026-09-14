@@ -9,6 +9,7 @@ use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\DealStatus;
+use App\Domains\CRM\Services\DealHealthService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -818,5 +819,33 @@ class CrmDealController extends Controller
                 ]);
             }
         }
+    }
+
+    /**
+     * AJAX action to check Google OAuth Connection Status
+     */
+    public function checkGoogleAuth(DealHealthService $service): JsonResponse
+    {
+        $userId = request('user_id') ?: (auth()->id() ?? 1);
+        $status = $service->checkAuthStatus((int) $userId);
+        return response()->json($status);
+    }
+
+    /**
+     * AJAX action to sync AI Deal Health
+     */
+    public function syncHealth(CrmDeal $deal, DealHealthService $service): JsonResponse
+    {
+        $result = $service->syncDealHealth($deal);
+        return response()->json($result);
+    }
+
+    /**
+     * AJAX action to generate AI email draft reply
+     */
+    public function generateDraftReply(CrmDeal $deal, DealHealthService $service): JsonResponse
+    {
+        $result = $service->generateDraftReply($deal);
+        return response()->json($result);
     }
 }
