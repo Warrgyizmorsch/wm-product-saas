@@ -4,6 +4,9 @@
     $tenantPlan = ucfirst((string) ($resolvedTenant?->plan ?? 'Starter'));
     $branding = tenant_branding($resolvedTenant);
 
+    $authUser = auth()->user();
+    $isHrAdmin = $authUser && ($authUser->hasHrPermission('hr.settings.manage') || $authUser->hasHrPermission('hrms.leave_requests.approve'));
+
     $modules = [
         __('ui.workspace') => [
             ['label' => __('ui.executive_dashboard'), 'icon' => 'feather-home', 'route' => 'dashboard'],
@@ -140,9 +143,9 @@
                 ['label' => 'Planning Exceptions / At-Risk',   'route' => 'production.planning-exceptions.index'],
             ]],
         ],
-        'HRMS' => [
+        'HRMS' => array_values(array_filter([
             ['label' => 'HRMS Dashboard', 'icon' => 'feather-home', 'route' => 'hrms.dashboard'],
-            ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => array_filter([
+            $isHrAdmin ? ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => array_values(array_filter([
                 ['label' => 'Org Structure', 'route' => 'hrms.org.index'],
                 ['label' => 'Salary Structure', 'route' => 'hrms.salary-structure.index'],
                 ['label' => 'Leave Structure', 'route' => 'hrms.leave-structure.index'],
@@ -158,28 +161,28 @@
                 ['label' => 'Holiday Calendar', 'route' => 'hrms.holidays.index'],
                 ['label' => 'Expense Policies', 'route' => 'hrms.expense-policy.index'],
                 ['label' => 'Offboarding Policies', 'route' => 'hrms.offboarding-policies.index'],
-            ])],
-            ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
-            ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'],
-            ['label' => 'Assets', 'icon' => 'feather-package', 'url' => '#', 'children' => [
-                ['label' => 'Employees Assets', 'route' => 'hrms.assets-module.index'],
+            ]))] : null,
+            $isHrAdmin ? ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'] : null,
+            $isHrAdmin ? ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'] : null,
+            ['label' => 'Assets', 'icon' => 'feather-package', 'url' => '#', 'children' => array_values(array_filter([
+                $isHrAdmin ? ['label' => 'Employees Assets', 'route' => 'hrms.assets-module.index'] : null,
                 ['label' => 'My Assets', 'route' => 'hrms.assets-module.my-assets'],
-            ]],
-             ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#', 'children' => [
-                 ['label' => 'Employees Attendance', 'route' => 'hrms.attendance.index'],
-                 ['label' => 'My Attendance', 'route' => 'hrms.attendance.myAttendance'],
-             ]],
+            ]))],
+            ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#', 'children' => array_values(array_filter([
+                $isHrAdmin ? ['label' => 'Employees Attendance', 'route' => 'hrms.attendance.index'] : null,
+                ['label' => 'My Attendance', 'route' => 'hrms.attendance.myAttendance'],
+            ]))],
             ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
             ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
-            ['label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index'],
+            $isHrAdmin ? ['label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index'] : null,
             ['label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index'],
-            ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => [
-                ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'],
+            ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => array_values(array_filter([
+                $isHrAdmin ? ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'] : null,
                 ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary'],
-            ]],
-        ],
+            ]))],
+        ])),
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
                 ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],

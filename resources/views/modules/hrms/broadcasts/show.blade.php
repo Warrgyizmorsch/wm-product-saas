@@ -10,7 +10,7 @@
             Back to Broadcasts
         </x-ui.button>
         @if($isHrAdmin)
-        <x-ui.button variant="outline-danger" icon="feather-trash-2" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete broadcast {{ $broadcast->broadcast_number }}? This will remove all receipts and comments.', function() { document.getElementById('adminDeleteBcForm').submit(); }, { title: 'Delete Broadcast', confirmText: 'Yes, Delete', variant: 'danger' });" class="fw-semibold">
+        <x-ui.button variant="danger" icon="feather-trash-2" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete broadcast {{ $broadcast->broadcast_number }}? This will remove all receipts and comments.', function() { document.getElementById('adminDeleteBcForm').submit(); }, { title: 'Delete Broadcast', confirmText: 'Yes, Delete', variant: 'danger' });" class="fw-semibold">
             Delete Broadcast
         </x-ui.button>
         <form id="adminDeleteBcForm" action="{{ route('hrms.broadcasts.destroy', $broadcast->id) }}" method="POST" class="d-none">

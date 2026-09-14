@@ -1426,10 +1426,10 @@
             var currSym = '{{ $currencySymbol }}';
 
             document.querySelectorAll(tableSelector + ' tbody tr').forEach(function(row, idx) {
-                var categorySelect = row.querySelector('select[name*="[category_id]"]');
-                var amountInput   = row.querySelector('input[name*="[amount]"]');
-                var receiptInput  = row.querySelector('input[type="file"][name*="[receipt]"]');
-                var existingReceipt = row.querySelector('input[name*="[existing_receipt]"]');
+                var categorySelect = row.querySelector('select[name*="category_id"]');
+                var amountInput   = row.querySelector('input[name*="amount"]');
+                var receiptInput  = row.querySelector('input[type="file"]');
+                var existingReceipt = row.querySelector('input[name*="existing_receipt"]');
 
                 if (!categorySelect || !amountInput) return;
 
@@ -1449,8 +1449,14 @@
                 }
 
                 // Check receipt required
-                var hasReceipt = (receiptInput && receiptInput.files && receiptInput.files.length > 0)
-                                 || (existingReceipt && existingReceipt.value);
+                var rowId = receiptInput ? receiptInput.getAttribute('data-row-id') : null;
+                var hasNewFiles = (receiptInput && receiptInput.files && receiptInput.files.length > 0)
+                                 || (rowId && window.rowFileStores && window.rowFileStores[rowId] && window.rowFileStores[rowId].length > 0)
+                                 || (row.querySelectorAll('.new-file-chip').length > 0);
+                var hasExistingFiles = (existingReceipt && existingReceipt.value)
+                                    || (row.querySelectorAll('.existing-receipt-chip').length > 0);
+                var hasReceipt = hasNewFiles || hasExistingFiles;
+
                 var needsReceipt = rule.receipt_required
                     || (rule.receipt_required_threshold && amount > rule.receipt_required_threshold);
                 if (needsReceipt && !hasReceipt) {
@@ -1620,14 +1626,16 @@
             e.preventDefault();
         });
 
-        // Clear warnings when amount or category changes
-        $(document).on('change input', '#claimsLinesTable select[name*="[category_id]"], #claimsLinesTable input[name*="[amount]"]', function() {
+        // Clear warnings when amount, category or file attachment changes
+        $(document).on('change input', '#claimsLinesTable select[name*="category_id"], #claimsLinesTable input[name*="amount"], #claimsLinesTable .odoo-table-file-input', function() {
             clearRowPolicyWarnings('#claimsLinesTable');
-            document.getElementById('addReportPolicyWarning').classList.add('d-none');
+            var warningBanner = document.getElementById('addReportPolicyWarning');
+            if (warningBanner) warningBanner.classList.add('d-none');
         });
-        $(document).on('change input', '#editClaimsLinesTable select[name*="[category_id]"], #editClaimsLinesTable input[name*="[amount]"]', function() {
+        $(document).on('change input', '#editClaimsLinesTable select[name*="category_id"], #editClaimsLinesTable input[name*="amount"], #editClaimsLinesTable .odoo-table-file-input', function() {
             clearRowPolicyWarnings('#editClaimsLinesTable');
-            document.getElementById('editReportPolicyWarning').classList.add('d-none');
+            var warningBanner = document.getElementById('editReportPolicyWarning');
+            if (warningBanner) warningBanner.classList.add('d-none');
         });
 
         document.addEventListener('DOMContentLoaded', function () {

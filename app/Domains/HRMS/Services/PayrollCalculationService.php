@@ -280,37 +280,6 @@ class PayrollCalculationService
                     $computedSalaryItems[$compCode]['base_monthly'] = round($balancingMonthly, 2);
                     $computedSalaryItems[$compCode]['calculated_value'] = round($balancingMonthly, 2);
                 }
-            } else {
-                // If there is no manual balancing component, check if the total monthly base earnings equal monthly CTC
-                $sumEarnings = 0.00;
-                foreach ($computedSalaryItems as $code => $data) {
-                    if ($data['type'] === 'earning') {
-                        $sumEarnings += $data['base_monthly'];
-                    }
-                }
-
-                if ($sumEarnings < $monthlyCTC) {
-                    $remainder = $monthlyCTC - $sumEarnings;
-                    
-                    // If Special Allowance (SPL) is already in the structure, add the remainder to it
-                    if (isset($computedSalaryItems['SPL'])) {
-                        $computedSalaryItems['SPL']['base_monthly'] = round($computedSalaryItems['SPL']['base_monthly'] + $remainder, 2);
-                        $computedSalaryItems['SPL']['calculated_value'] = round($computedSalaryItems['SPL']['calculated_value'] + $remainder, 2);
-                    } else {
-                        // Otherwise, fetch the SPL component and dynamically inject it to absorb the remainder
-                        $splComponent = \App\Domains\HRMS\Models\SalaryComponent::where('code', 'SPL')->first();
-                        if ($splComponent) {
-                            $computedSalaryItems['SPL'] = [
-                                'name'             => $splComponent->name,
-                                'type'             => $splComponent->type,
-                                'base_monthly'     => round($remainder, 2),
-                                'calculated_value' => round($remainder, 2),
-                                'deduction'        => 0.00,
-                                'reversal'         => 0.00,
-                            ];
-                        }
-                    }
-                }
             }
         }
 
@@ -542,35 +511,7 @@ class PayrollCalculationService
         $enableEsi = !isset($rules['enable_esi']) || (bool)$rules['enable_esi'];
         $restrictEsiThreshold = !isset($rules['restrict_esi_threshold']) || (bool)$rules['restrict_esi_threshold'];
 
-        // Inject PF component if enabled but not in the structure items
-        if ($enablePf && !isset($computedSalaryItems['PF'])) {
-            $pfComponent = \App\Domains\HRMS\Models\SalaryComponent::where('code', 'PF')->first();
-            if ($pfComponent) {
-                $computedSalaryItems['PF'] = [
-                    'name'             => $pfComponent->name,
-                    'type'             => $pfComponent->type,
-                    'base_monthly'     => 0.00,
-                    'calculated_value' => 0.00,
-                    'deduction'        => 0.00,
-                    'reversal'         => 0.00,
-                ];
-            }
-        }
 
-        // Inject ESI component if enabled but not in the structure items
-        if ($enableEsi && !isset($computedSalaryItems['ESI'])) {
-            $esiComponent = \App\Domains\HRMS\Models\SalaryComponent::where('code', 'ESI')->first();
-            if ($esiComponent) {
-                $computedSalaryItems['ESI'] = [
-                    'name'             => $esiComponent->name,
-                    'type'             => $esiComponent->type,
-                    'base_monthly'     => 0.00,
-                    'calculated_value' => 0.00,
-                    'deduction'        => 0.00,
-                    'reversal'         => 0.00,
-                ];
-            }
-        }
 
         // 9.9.1. Dynamic PF Calculation
         if (isset($computedSalaryItems['PF'])) {
