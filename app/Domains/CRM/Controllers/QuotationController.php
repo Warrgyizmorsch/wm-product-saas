@@ -207,6 +207,76 @@ class QuotationController extends Controller
         return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
     }
 
+    public function sendEmail(Request $request, int $id)
+    {
+        $quotation = $this->quotationRepo->find($id);
+        if (!$quotation) abort(404, 'Quotation not found.');
+        $this->authorize('view', $quotation);
+
+        $request->validate([
+            'to_email'   => 'required|email',
+            'subject'    => 'required|string|max:255',
+            'body_html'  => 'required|string',
+            'account_id' => 'nullable|exists:email_configurations,id',
+        ]);
+
+        try {
+            /** @var \App\Services\EmailService $emailService */
+            $emailService = app(\App\Services\EmailService::class);
+            $msgRecord = $emailService->sendQuotationEmail($quotation, $request->all());
+
+            return response()->json([
+                'success' => true,
+                'message' => "Quotation {$quotation->quotation_number} sent successfully to {$request->input('to_email')} with PDF attached!",
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send Quotation Email: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function sendWhatsApp(Request $request, int $id)
+    {
+        $quotation = $this->quotationRepo->find($id);
+        if (!$quotation) abort(404, 'Quotation not found.');
+        $this->authorize('view', $quotation);
+
+        $request->validate([
+            'phone'   => 'required|string',
+            'caption' => 'nullable|string',
+        ]);
+
+        try {
+            /** @var \App\Services\WhatsAppService $waService */
+            $waService = app(\App\Services\WhatsAppService::class);
+            $result = $waService->sendQuotation(
+                quotation: $quotation,
+                mobile: $request->input('phone'),
+                customCaption: $request->input('caption')
+            );
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $result['message'],
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Failed to send WhatsApp message.',
+                    'status'  => $result['status'] ?? 'error',
+                ], 422);
+            }
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send WhatsApp: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
     public function edit(int $id): View|RedirectResponse
     {
         $quotation = $this->quotationRepo->find($id);

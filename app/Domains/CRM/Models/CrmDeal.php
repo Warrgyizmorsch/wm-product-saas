@@ -74,13 +74,19 @@ class CrmDeal extends BaseModel
         'notes',
         'product_ids',
         'product_items',
+        'risk_level',
+        'health_score',
+        'sentiment_score',
+        'next_best_action',
+        'health_synced_at',
     ];
 
     protected $casts = [
-        'closing_date'    => 'date',
-        'estimated_value' => 'decimal:2',
-        'product_ids'     => 'array',
-        'product_items'   => 'array',
+        'closing_date'     => 'date',
+        'estimated_value'  => 'decimal:2',
+        'product_ids'      => 'array',
+        'product_items'    => 'array',
+        'health_synced_at' => 'datetime',
     ];
 
     public function account(): BelongsTo

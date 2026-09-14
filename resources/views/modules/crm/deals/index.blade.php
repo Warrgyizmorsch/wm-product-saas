@@ -215,6 +215,7 @@
                         <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">EST. VALUE (₹)</th>
                         <th style="width: 13%; background-color: #e8ecf1 !important;">CLOSING DATE & STATUS</th>
                         <th style="width: 12%; background-color: #e8ecf1 !important;">STAGE</th>
+                        <th style="width: 10%; background-color: #e8ecf1 !important;">HEALTH %</th>
                         <th style="width: 4%; background-color: #e8ecf1 !important;" class="text-end pe-3">ACTIONS</th>
                     </tr>
                 </thead>
@@ -381,6 +382,37 @@
                                             </select>
                                         </form>
                                     </div>
+                                @endif
+                            </td>
+                            <td>
+                                @if(!$deal->health_synced_at && !$deal->health_score)
+                                    <span class="badge bg-light text-muted border px-2 py-1 fs-11 fw-medium">
+                                        <i class="feather-clock me-1"></i>Not Synced
+                                    </span>
+                                @else
+                                    @php
+                                        $riskVal = ucfirst(strtolower($deal->risk_level ?: 'Low'));
+                                        $badgeStyle = match($riskVal) {
+                                            'High' => 'bg-danger text-white',
+                                            'Medium' => 'bg-warning text-dark',
+                                            'Low' => 'bg-success text-white',
+                                            default => 'bg-secondary text-white',
+                                        };
+                                        $scoreDisplay = $deal->health_score ?: 'N/A';
+                                        if (is_numeric($scoreDisplay)) {
+                                            $scoreDisplay .= '%';
+                                        }
+                                    @endphp
+                                    <span class="badge {{ $badgeStyle }} px-2 py-1 fs-11 fw-bold d-inline-flex align-items-center" title="{{ $deal->next_best_action ?: 'AI Deal Health Score' }}">
+                                        @if($riskVal === 'High')
+                                            <i class="feather-alert-octagon me-1"></i>
+                                        @elseif($riskVal === 'Medium')
+                                            <i class="feather-alert-circle me-1"></i>
+                                        @else
+                                            <i class="feather-check-circle me-1"></i>
+                                        @endif
+                                        {{ $scoreDisplay }} ({{ $riskVal }})
+                                    </span>
                                 @endif
                             </td>
                             <td class="text-end pe-3">
