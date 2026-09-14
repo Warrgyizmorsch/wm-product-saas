@@ -239,14 +239,27 @@ class JournalService
     }
 
     /**
+     * Totals are accumulated in integer minor units (paise) rather than floats.
+     *
+     * The previous implementation summed floats and compared `round($totalDebit, 2) !==
+     * round($totalCredit, 2)`. PHP's round() pre-rounding makes that correct for everyday
+     * amounts, but float drift grows with line count and magnitude. Integer accumulation
+     * is exact at any size, and the `$decimals` scale is what multi-currency posting needs
+     * (JPY has no minor unit, KWD has three). Behaviour for 2-decimal journals is unchanged.
+     *
      * @param array<int, array{chart_of_account_id: int, debit?: float, credit?: float}> $lines
+     * @param int $decimals minor-unit scale of the transaction currency (2 for INR/USD,
+     *                      0 for JPY, 3 for KWD)
      */
-    private function assertLinesAreBalanced(array $lines): void
+    private function assertLinesAreBalanced(array $lines, int $decimals = 2): void
     {
         if (count($lines) < 2) {
             throw new InvalidArgumentException('A journal requires at least two lines.');
         }
 
+        $scale = 10 ** $decimals;
+        $totalDebitMinor = 0;
+        $totalCreditMinor = 0;
         $totalDebit = 0.0;
         $totalCredit = 0.0;
 
@@ -270,6 +283,11 @@ class JournalService
                 throw new InvalidArgumentException('A journal line must have either a debit or a credit amount.');
             }
 
+            $totalDebitMinor += (int) round($debit * $scale);
+            $totalCreditMinor += (int) round($credit * $scale);
+
+            // Kept only for the exception message below, which reports the
+            // human-readable amounts rather than paise.
             $totalDebit += $debit;
             $totalCredit += $credit;
         }
@@ -291,7 +309,7 @@ class JournalService
             );
         }
 
-        if (round($totalDebit, 2) !== round($totalCredit, 2)) {
+        if ($totalDebitMinor !== $totalCreditMinor) {
             throw new InvalidArgumentException(
                 "Journal is not balanced: total debit {$totalDebit} does not equal total credit {$totalCredit}."
             );
