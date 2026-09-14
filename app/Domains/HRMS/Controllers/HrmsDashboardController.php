@@ -15,6 +15,7 @@ use App\Domains\HRMS\Models\EmployeePenalty;
 use App\Domains\HRMS\Models\ExpenseReport;
 use App\Domains\HRMS\Models\HolidayCalendar;
 use App\Domains\HRMS\Models\LeaveBalance;
+use App\Domains\HRMS\Models\LeavePlan;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\LeaveType;
 use App\Domains\HRMS\Models\WfhRequest;
@@ -166,6 +167,127 @@ class HrmsDashboardController extends Controller
                 }
             }
 
+        // Resolve Assigned Leave Plan & Detailed Leave Types List
+        $myAssignedPlan = null;
+        if ($currentEmployee && $currentEmployee->leave_plan_id) {
+            $myAssignedPlan = LeavePlan::with('types')->find($currentEmployee->leave_plan_id);
+        }
+        if (!$myAssignedPlan) {
+            $myAssignedPlan = LeavePlan::where('tenant_id', $tenantId)->where('status', true)->with('types')->first();
+        }
+
+        $myLeaveTypesList = [];
+        $planTypesCollection = collect();
+        if ($myAssignedPlan && $myAssignedPlan->types->isNotEmpty()) {
+            $planTypesCollection = $myAssignedPlan->types;
+        } else {
+            $planTypesCollection = LeaveType::where('tenant_id', $tenantId)->where('status', true)->get();
+        }
+
+        foreach ($planTypesCollection as $type) {
+            $bal = null;
+            if ($currentEmployee) {
+                $bal = LeaveBalance::where('tenant_id', $tenantId)
+                    ->where('employee_id', $currentEmployee->id)
+                    ->where('leave_type_id', $type->id)
+                    ->first();
+            }
+
+            $allocated = $bal ? floatval($bal->allocated) : floatval($type->quota ?? 12);
+            $used = $bal ? floatval($bal->used) : 0;
+            $remaining = $bal ? floatval($bal->remaining) : $allocated;
+
+            $myLeaveTypesList[] = [
+                'id'          => $type->id,
+                'name'        => $type->name,
+                'code'        => $type->code ?: strtoupper(substr($type->name, 0, 2)),
+                'color'       => $type->color ?: '#3b82f6',
+                'quota'       => floatval($type->quota ?? 12),
+                'allocated'   => $allocated,
+                'used'        => $used,
+                'remaining'   => $remaining,
+                'rules'       => $type->rules ?: [],
+                'description' => $type->description ?: '',
+            ];
+        }
+
+        // Resolve Shift Details & Weekly Roster Pattern dynamically from Master DB
+        $activeShift = null;
+        if ($currentEmployee) {
+            $activeShift = $currentEmployee->resolveShiftForDate($today);
+            if (!$activeShift && $currentEmployee->shift_id) {
+                $activeShift = \App\Domains\Production\Models\ProductionShift::find($currentEmployee->shift_id);
+            }
+        }
+
+        if (!$activeShift) {
+            $activeShift = \App\Domains\Production\Models\ProductionShift::where(function ($q) use ($tenantId) {
+                if ($tenantId) {
+                    $q->where('tenant_id', $tenantId);
+                }
+            })->where('active', true)->first();
+        }
+
+        if (!$activeShift) {
+            $activeShift = \App\Domains\Production\Models\ProductionShift::first();
+        }
+
+        if ($activeShift) {
+            $startTime = $activeShift->start_time ? Carbon::parse($activeShift->start_time)->format('H:i') : '09:00';
+            $endTime   = $activeShift->end_time ? Carbon::parse($activeShift->end_time)->format('H:i') : '18:00';
+            $myShiftDetails = [
+                'name'            => $activeShift->name ?: 'General Shift',
+                'badge'           => $activeShift->code ?: 'Default',
+                'timing'          => $startTime . ' - ' . $endTime,
+                'overtime_status' => $activeShift->overtime_allowed ? 'Allowed' : 'Not Allowed',
+                'is_ot_allowed'   => (bool) $activeShift->overtime_allowed,
+            ];
+        } else {
+            $myShiftDetails = [
+                'name'            => 'General Shift',
+                'badge'           => 'Default',
+                'timing'          => '09:00 - 18:00',
+                'overtime_status' => 'Not Allowed',
+                'is_ot_allowed'   => false,
+            ];
+        }
+
+        $myWeeklyPattern = [];
+        $startOfWeek = $now->copy()->startOfWeek(Carbon::SUNDAY);
+        for ($i = 0; $i < 7; $i++) {
+            $dayDate = $startOfWeek->copy()->addDays($i);
+            $dayDateStr = $dayDate->format('Y-m-d');
+            $dayName = $dayDate->format('D');
+
+            $dayShift = null;
+            if ($currentEmployee) {
+                $dayShift = $currentEmployee->resolveShiftForDate($dayDateStr);
+            }
+
+            if ($dayShift) {
+                $myWeeklyPattern[] = [
+                    'day'    => $dayName,
+                    'status' => $dayShift->name,
+                    'is_off' => false,
+                ];
+            } else {
+                $isWeekend = ($dayDate->dayOfWeek === 0 || $dayDate->dayOfWeek === 6);
+                if ($isWeekend) {
+                    $myWeeklyPattern[] = [
+                        'day'    => $dayName,
+                        'status' => 'Day Off',
+                        'is_off' => true,
+                    ];
+                } else {
+                    $myWeeklyPattern[] = [
+                        'day'    => $dayName,
+                        'status' => $activeShift ? $activeShift->name : 'Day Shift',
+                        'is_off' => false,
+                    ];
+                }
+            }
+        }
+
             // Calculate Profile & KYC Completion %
             $fields = [
                 $currentEmployee->full_name,
@@ -239,23 +361,27 @@ class HrmsDashboardController extends Controller
             ->take(15)
             ->get();
 
-        // 9. Celebrations (Birthdays & Work Anniversaries from real active employees)
+        // 9. Celebrations (Birthdays & Work Anniversaries from real active employees for current month)
         $allActiveEmployees = Employee::with(['department', 'designation'])
             ->where('tenant_id', $tenantId)
-            ->where('status', 'Active')
+            ->where('status', true)
             ->get();
 
         $upcomingBirthdays = $allActiveEmployees->filter(function ($emp) use ($now) {
             if (!$emp->date_of_birth) return false;
             $bday = Carbon::parse($emp->date_of_birth);
-            return $bday->month === $now->month && $bday->day >= $now->day;
-        })->take(5);
+            return $bday->month === $now->month;
+        })->sortBy(function ($emp) {
+            return Carbon::parse($emp->date_of_birth)->day;
+        })->values();
 
         $upcomingAnniversaries = $allActiveEmployees->filter(function ($emp) use ($now) {
             if (!$emp->date_of_joining) return false;
             $doj = Carbon::parse($emp->date_of_joining);
             return $doj->month === $now->month && $doj->year < $now->year;
-        })->take(5);
+        })->sortBy(function ($emp) {
+            return Carbon::parse($emp->date_of_joining)->day;
+        })->values();
 
         // 10. Department Distribution Breakdown
         $departments = Department::where('tenant_id', $tenantId)
@@ -264,22 +390,44 @@ class HrmsDashboardController extends Controller
             ->take(6)
             ->get();
 
+        $user = auth()->user();
+        $isHrOrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.leave_requests.approve') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.travel_expenses.approve') ||
+            $user->hasHrPermission('hrms.attendance.view')
+        );
+
         // 11. Late Arrivals (Last 7 Days) & Unprocessed Penalties
-        $recentLateArrivals = Attendance::with(['employee.department', 'employee.designation'])
+        $lateArrivalsQuery = Attendance::with(['employee.department', 'employee.designation'])
             ->where('tenant_id', $tenantId)
             ->whereIn('status', ['late', 'half_day'])
-            ->whereDate('date', '>=', $now->copy()->subDays(7))
+            ->whereDate('date', '>=', $now->copy()->subDays(7));
+
+        if (!$isHrOrAdmin && $currentEmployee) {
+            $lateArrivalsQuery->where('employee_id', $currentEmployee->id);
+        }
+
+        $recentLateArrivals = $lateArrivalsQuery
             ->orderBy('date', 'desc')
             ->take(15)
             ->get();
 
-        $unprocessedPenalties = EmployeePenalty::with(['employee.department', 'employee.designation'])
+        $penaltiesQuery = EmployeePenalty::with(['employee.department', 'employee.designation'])
             ->where('tenant_id', $tenantId)
             ->where(function ($q) {
                 $q->whereNull('status')
                   ->orWhere('status', 'pending')
                   ->orWhere('status', 'unprocessed');
-            })
+            });
+
+        if (!$isHrOrAdmin && $currentEmployee) {
+            $penaltiesQuery->where('employee_id', $currentEmployee->id);
+        }
+
+        $unprocessedPenalties = $penaltiesQuery
             ->orderBy('date', 'desc')
             ->take(15)
             ->get();
@@ -290,10 +438,16 @@ class HrmsDashboardController extends Controller
             $leaveTypes = LeaveType::where('tenant_id', $tenantId)->get();
         }
 
-        $approvedLeaves = LeaveRequest::with(['employee.department', 'employee.designation', 'leaveType'])
+        $approvedLeavesQuery = LeaveRequest::with(['employee.department', 'employee.designation', 'leaveType'])
             ->where('tenant_id', $tenantId)
             ->where('status', 'approved')
-            ->whereDate('end_date', '>=', $today)
+            ->whereDate('end_date', '>=', $today);
+
+        if (!$isHrOrAdmin && $currentEmployee) {
+            $approvedLeavesQuery->where('employee_id', $currentEmployee->id);
+        }
+
+        $approvedLeaves = $approvedLeavesQuery
             ->orderBy('start_date', 'asc')
             ->take(15)
             ->get();
@@ -305,13 +459,37 @@ class HrmsDashboardController extends Controller
             ->where('status', 'published')
             ->count();
 
-        $latestBroadcasts = Broadcast::with(['creator', 'receipts', 'comments.employee'])
+        $allPublishedBroadcasts = Broadcast::with(['creator', 'receipts', 'comments.employee'])
             ->where('tenant_id', $tenantId)
             ->where('status', 'published')
-            ->orderByRaw("FIELD(priority, 'urgent', 'important', 'normal')")
-            ->latest('published_at')
-            ->take(3)
             ->get();
+
+        $latestBroadcasts = $allPublishedBroadcasts->sort(function ($a, $b) use ($currentEmployee) {
+            $aAckReq = $a->is_acknowledgement_required;
+            $bAckReq = $b->is_acknowledgement_required;
+
+            $aReceipt = $currentEmployee ? $a->receipts->where('employee_id', $currentEmployee->id)->first() : null;
+            $bReceipt = $currentEmployee ? $b->receipts->where('employee_id', $currentEmployee->id)->first() : null;
+
+            $aPending = $aAckReq && (!$aReceipt || !$aReceipt->acknowledged_at);
+            $bPending = $bAckReq && (!$bReceipt || !$bReceipt->acknowledged_at);
+
+            // 1. Pending unacknowledged compliance items come first
+            if ($aPending !== $bPending) {
+                return $aPending ? -1 : 1;
+            }
+
+            // 2. Priority order (urgent > important > normal)
+            $priorities = ['urgent' => 1, 'important' => 2, 'normal' => 3];
+            $aPrio = $priorities[$a->priority] ?? 3;
+            $bPrio = $priorities[$b->priority] ?? 3;
+            if ($aPrio !== $bPrio) {
+                return $aPrio <=> $bPrio;
+            }
+
+            // 3. Newest published date
+            return strtotime($b->published_at ?? $b->created_at) <=> strtotime($a->published_at ?? $a->created_at);
+        })->take(3)->values();
 
         return view('modules.hrms.dashboard.index', compact(
             'currentEmployee',
@@ -330,6 +508,10 @@ class HrmsDashboardController extends Controller
             'recentPunches',
             'profileCompletion',
             'myLeaveBalances',
+            'myAssignedPlan',
+            'myLeaveTypesList',
+            'myShiftDetails',
+            'myWeeklyPattern',
             'pendingLeaves',
             'pendingWfh',
             'pendingCorrections',
@@ -346,7 +528,8 @@ class HrmsDashboardController extends Controller
             'unprocessedPenalties',
             'approvedLeaves',
             'latestBroadcasts',
-            'totalBroadcastsCount'
+            'totalBroadcastsCount',
+            'isHrOrAdmin'
         ));
     }
 

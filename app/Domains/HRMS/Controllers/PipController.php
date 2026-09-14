@@ -145,7 +145,7 @@ class PipController extends Controller
      */
     public function show(PerformanceImprovementPlan $pip): View
     {
-        $this->authorize('viewAny', PerformanceImprovementPlan::class);
+        $this->authorize('view', $pip);
 
         $pip->load([
             'employee.department',

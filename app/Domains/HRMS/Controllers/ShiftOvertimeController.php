@@ -26,7 +26,8 @@ class ShiftOvertimeController extends Controller
         // Explicitly name lists and counts so they don't overwrite each other
         $data['shiftRequests'] = $shiftData['requests'];
         $data['overtimeRequests'] = $overtimeData['requests'];
-        $data['activeTab'] = $request->input('tab', 'shift');
+        $rawTab = $request->input('tab', 'shift');
+        $data['activeTab'] = in_array($rawTab, ['shift-change', 'shift_change', 'shift']) ? 'shift' : $rawTab;
 
         return view('modules.hrms.shift-overtime.index', $data);
     }

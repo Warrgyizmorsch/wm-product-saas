@@ -228,7 +228,30 @@ class EmployeeController extends Controller
 
     public function update(Request $request, Employee $employee): RedirectResponse
     {
-        $this->authorizeHrms('hrms.employees.update');
+        $authUser = auth()->user();
+        $isHrOrAdmin = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', [
+            'tenant_id' => $authUser->tenant_id,
+        ]);
+        $isOwnProfile = $authUser?->employee?->id == $employee->id;
+
+        if (!$isHrOrAdmin && !$isOwnProfile) {
+            $this->authorizeHrms('hrms.employees.update');
+        }
+
+        if (!$isHrOrAdmin) {
+            $request->merge([
+                'employee_id' => $request->input('employee_id', $employee->employee_id),
+                'user_id' => $request->input('user_id', $employee->user_id),
+                'company_id' => $request->input('company_id', $employee->company_id),
+                'department_id' => $request->input('department_id', $employee->department_id),
+                'designation_id' => $request->input('designation_id', $employee->designation_id),
+                'date_of_joining' => $request->input('date_of_joining', $employee->date_of_joining ? $employee->date_of_joining->format('Y-m-d') : null),
+                'gender' => $request->input('gender', $employee->gender),
+                'full_name' => $request->input('full_name', $employee->full_name),
+                'job_title' => $request->input('job_title', $employee->job_title),
+                'status' => $request->input('status', $employee->status),
+            ]);
+        }
 
         $oldPlanId = $employee->leave_plan_id;
 
@@ -257,8 +280,8 @@ class EmployeeController extends Controller
         $this->employeeRepository->updateEmployee($employee, $validated, $request);
 
         return redirect()
-            ->route('hrms.employees.index')
-            ->with('success', 'Employee updated successfully.');
+            ->back()
+            ->with('success', 'Profile updated successfully.');
     }
 
     public function destroy(Employee $employee): RedirectResponse

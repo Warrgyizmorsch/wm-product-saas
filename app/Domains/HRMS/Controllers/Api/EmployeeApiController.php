@@ -236,7 +236,20 @@ class EmployeeApiController extends Controller
         }
 
         // Calculate components breakdown
-        $items = $salaryStructure ? $salaryStructure->items()->with('component')->get() : collect();
+        $rawItems = $salaryStructure ? $salaryStructure->items()->with('component')->get() : collect();
+        $items = $rawItems->filter(function($i) {
+            if (!$i->component) {
+                return false;
+            }
+            if (in_array($i->component->code, ['TE_RECOVERY', 'ADV_RECOVERY'])) {
+                if (!$i->component->is_adhoc) {
+                    $i->component->update(['is_adhoc' => true]);
+                }
+                return false;
+            }
+            return !$i->component->is_adhoc;
+        });
+
         $ctc = (float) $employee->current_salary;
         $computedComponents = [];
         $basicAmount = 0.0;
@@ -256,6 +269,9 @@ class EmployeeApiController extends Controller
         $balancingItem = null;
 
         foreach ($items as $item) {
+            if (!$item->component || $item->component->is_adhoc || in_array($item->component->code, ['TE_RECOVERY', 'ADV_RECOVERY'])) {
+                continue;
+            }
             $amount = 0.0;
             if ($item->calculation_type === 'fixed') {
                 $amount = (float) $item->value;
@@ -280,7 +296,7 @@ class EmployeeApiController extends Controller
             }
         }
 
-        if ($balancingItem) {
+        if ($balancingItem && $balancingItem->component && !$balancingItem->component->is_adhoc && !in_array($balancingItem->component->code, ['TE_RECOVERY', 'ADV_RECOVERY'])) {
             $balancingAmount = max(0.0, $ctc - $totalOtherEarnings);
             $computedComponents[$balancingItem->id] = [
                 'component_name' => $balancingItem->component->name,
@@ -295,7 +311,7 @@ class EmployeeApiController extends Controller
             'payGroup', 'leavePlan', 'defaultShift', 'shift', 'documents.requestedBy', 'employmentHistories', 'user'
         ]);
 
-        $adhocComponents = EmployeeAdhocComponent::where('employee_id', $employee->id)->with('component')->get();
+        $adhocComponents = EmployeeAdhocComponent::where('employee_id', $employee->id)->where('status', 'pending')->with('component')->get();
         $penalties       = EmployeePenalty::where('employee_id', $employee->id)->get();
 
         return $this->sendSuccess([

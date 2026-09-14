@@ -6,14 +6,16 @@
         $fallback = ($isEdit && $empObj && isset($empObj->$field)) ? $empObj->$field : $default;
         return old($field, $fallback);
     };
-    // Prepared for future role-based lock: when $isEmployeeSelfService is true, HR fields become readonly/disabled
-    $isEmployeeSelfService = $isEmployeeSelfService ?? false;
+    $authUser = auth()->user();
+    $isHrOrAdmin = $isHrOrAdmin ?? ($authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]));
+    $isEmployeeSelfService = $isEmployeeSelfService ?? !$isHrOrAdmin;
 @endphp
 @once
 <script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
 @endonce
 
 <div class="employee-form-container">
+    @if($isHrOrAdmin)
     <!-- ══════════════════════════════════════════════════════════════════════════ -->
     <!-- SECTION 1: OFFICIAL & COMPANY MANAGED FIELDS                            -->
     <!-- ══════════════════════════════════════════════════════════════════════════ -->
@@ -249,6 +251,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <!-- ══════════════════════════════════════════════════════════════════════════ -->
     <!-- SECTION 2: PERSONAL & EMPLOYEE SELF-SERVICE PROFILE                     -->
@@ -274,13 +277,72 @@
                 <div class="col-xl-3 employee-photo-col">
                     <div class="employee-photo-panel">
                         <div class="employee-photo-preview" id="{{ $prefix }}_photo_preview">
-                            {{ $isEdit ? 'EM' : strtoupper(substr((string) old('full_name', 'Employee'), 0, 2)) }}
+                            @if($isEdit && !empty($employee?->profile_photo_url))
+                                <img src="{{ asset('storage/' . $employee->profile_photo_url) }}" alt="{{ $employee->full_name }}">
+                            @elseif($isEdit && !empty($employee?->photo))
+                                <img src="{{ asset('storage/' . $employee->photo) }}" alt="{{ $employee->full_name }}">
+                            @else
+                                {{ ($isEdit && !empty($employee?->full_name)) ? strtoupper(substr($employee->full_name, 0, 2)) : strtoupper(substr((string) old('full_name', 'Employee'), 0, 2)) }}
+                            @endif
                         </div>
                         <div class="fw-semibold text-dark mb-1">{{ __('hrms.employees.frm_profile_photo') }}</div>
                         <div class="text-muted fs-12 mb-3">{{ __('hrms.employees.frm_photo_help') }}</div>
-                        <input type="file" class="form-control" name="photo" id="{{ $prefix }}_photo" accept=".png,.jpg,.jpeg,.webp" data-field-group="employee">
+                        <input type="file" class="form-control form-control-sm" name="photo" id="{{ $prefix }}_photo" accept=".png,.jpg,.jpeg,.webp" data-field-group="employee">
                     </div>
                 </div>
+
+                <style>
+                    .employee-photo-panel {
+                        border: 2px dashed #cbd5e1;
+                        border-radius: 16px;
+                        padding: 20px 16px;
+                        text-align: center;
+                        background-color: #f8fafc;
+                        transition: all 0.3s ease;
+                    }
+                    .employee-photo-panel:hover {
+                        border-color: var(--bs-primary);
+                        background-color: #ffffff;
+                    }
+                    .employee-photo-preview {
+                        width: 100px;
+                        height: 100px;
+                        border-radius: 50%;
+                        overflow: hidden;
+                        margin: 0 auto 12px;
+                        background: linear-gradient(135deg, rgba(13, 110, 253, 0.18), rgba(13, 110, 253, 0.05));
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: var(--bs-primary);
+                        font-size: 30px;
+                        font-weight: 800;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+                        border: 2px solid #ffffff;
+                    }
+                    .employee-photo-preview img {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                    }
+                </style>
+                <script>
+                    document.addEventListener('change', function(e) {
+                        if (e.target && (e.target.id === 'edit_photo' || e.target.id === 'create_photo')) {
+                            const file = e.target.files && e.target.files[0];
+                            if (!file) return;
+                            const prefix = e.target.id.replace('_photo', '');
+                            const reader = new FileReader();
+                            reader.onload = function(loadEvent) {
+                                const preview = document.getElementById(prefix + '_photo_preview');
+                                if (preview) {
+                                    preview.innerHTML = `<img src="${loadEvent.target.result}" alt="Preview">`;
+                                }
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                </script>
 
                 <!-- Personal Information -->
                 <div class="col-xl-9">

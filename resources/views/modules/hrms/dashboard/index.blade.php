@@ -92,11 +92,13 @@
 @endpush
 
 @section('page-actions')
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('hrms.employees.index') }}" class="btn btn-sm btn-primary fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5" style="background-color: #1c3faa; border-color: #1c3faa;">
-            <i class="feather-user-plus fs-14"></i> Add Employee
-        </a>
-    </div>
+    @if($isHrOrAdmin ?? false)
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="{{ route('hrms.employees.index') }}" class="btn btn-sm btn-primary fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5" style="background-color: #1c3faa; border-color: #1c3faa;">
+                <i class="feather-user-plus fs-14"></i> Add Employee
+            </a>
+        </div>
+    @endif
 @endsection
 
 @section('content')
@@ -188,6 +190,18 @@
 
     <!-- Company Broadcasts & Announcements (Standardized Bounded Enterprise Card) -->
     @if(isset($latestBroadcasts) && $latestBroadcasts->isNotEmpty())
+        @php
+            $hasUnacknowledgedBroadcasts = false;
+            foreach ($latestBroadcasts as $bcCheck) {
+                if ($bcCheck->is_acknowledgement_required) {
+                    $receipt = $currentEmployee ? $bcCheck->receipts->where('employee_id', $currentEmployee->id)->first() : null;
+                    if (!$receipt || !$receipt->acknowledged_at) {
+                        $hasUnacknowledgedBroadcasts = true;
+                        break;
+                    }
+                }
+            }
+        @endphp
         <div class="card border mb-4 bg-white rounded-3 shadow-sm overflow-hidden" style="border-color: #cbd5e1 !important;">
             <div class="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-3">
@@ -204,21 +218,16 @@
                         <span class="fs-11 text-muted">Stay updated with company notifications, policy updates and official notices.</span>
                     </div>
                 </div>
-                @if(auth()->user() && in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'company admin', 'hr', 'hr manager', 'super admin', '1']))
-                    <a href="{{ route('hrms.broadcasts.index') }}" class="btn btn-sm btn-soft-primary fw-bold fs-12 d-inline-flex align-items-center gap-1.5 px-3 py-1.5 rounded-pill">
-                        <i class="feather-settings fs-13" style="font-style: normal; line-height: 1;"></i> <span>Manage Broadcasts</span> <i class="feather-arrow-right fs-12" style="font-style: normal; line-height: 1;"></i>
-                    </a>
-                @endif
-                <button class="btn btn-sm btn-light border border-secondary border-opacity-20 rounded-pill px-2 py-1.5 d-inline-flex align-items-center justify-content-center shadow-2xs" type="button" data-bs-toggle="collapse" data-bs-target="#broadcastsCollapseBody" aria-expanded="true" aria-controls="broadcastsCollapseBody" id="broadcastsCollapseToggle" title="Toggle announcements" style="width: 32px; height: 32px;">
-                    <svg id="broadcastsCollapseIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.25s ease;">
+                <button class="btn btn-sm btn-light border border-secondary border-opacity-20 rounded-pill px-2 py-1.5 d-inline-flex align-items-center justify-content-center shadow-2xs" type="button" data-bs-toggle="collapse" data-bs-target="#broadcastsCollapseBody" aria-expanded="{{ $hasUnacknowledgedBroadcasts ? 'true' : 'false' }}" aria-controls="broadcastsCollapseBody" id="broadcastsCollapseToggle" title="Toggle announcements" style="width: 32px; height: 32px;">
+                    <svg id="broadcastsCollapseIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.25s ease; transform: {{ $hasUnacknowledgedBroadcasts ? 'rotate(0deg)' : 'rotate(180deg)' }};">
                         <polyline points="18 15 12 9 6 15"></polyline>
                     </svg>
                 </button>
             </div>
 
-            <div class="collapse show" id="broadcastsCollapseBody">
-            <div class="card-body p-4 bg-white">
-                <div class="d-flex flex-column gap-4">
+            <div class="collapse {{ $hasUnacknowledgedBroadcasts ? 'show' : '' }}" id="broadcastsCollapseBody">
+            <div class="card-body p-3 bg-white">
+                <div class="d-flex flex-column gap-3">
                     @foreach($latestBroadcasts as $broadcast)
                         @php
                             $badgeVariant = match($broadcast->priority) {
@@ -230,14 +239,14 @@
                             $isAcknowledged = $empReceipt && $empReceipt->acknowledged_at;
                         @endphp
 
-                        <!-- Broadcast Item Card Container with Distinct Dividers/Borders -->
+                        <!-- Compact Broadcast Item Card Container -->
                         <div class="card border rounded-3 shadow-2xs overflow-hidden bg-white mb-0" style="border-color: #e2e8f0 !important;">
-                            <div class="card-body p-4">
-                                <div class="row g-3 align-items-start">
+                            <div class="card-body p-3">
+                                <div class="row g-2.5 align-items-start">
                                     
                                     @if($broadcast->banner_image_path)
                                         <div class="col-md-3 col-lg-2">
-                                            <div class="rounded-3 overflow-hidden border border-secondary border-opacity-20 shadow-2xs position-relative" style="height: 115px; background: #0f172a;">
+                                            <div class="rounded-3 overflow-hidden border border-secondary border-opacity-20 shadow-2xs position-relative" style="height: 80px; background: #0f172a;">
                                                 <img src="{{ asset('storage/' . $broadcast->banner_image_path) }}" class="w-100 h-100" style="object-fit: cover; object-position: center;" alt="{{ $broadcast->title }}" />
                                             </div>
                                         </div>
@@ -247,66 +256,92 @@
                                     @endif
 
                                             <!-- Top Header & Action Row -->
-                                            <div class="d-flex align-items-center justify-content-between gap-2 mb-2 flex-wrap">
+                                            <div class="d-flex align-items-center justify-content-between gap-2 mb-1 flex-wrap">
                                                 <!-- Left: Priority Badge & Relative Time -->
-                                                <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                    <span class="badge bg-soft-{{ $badgeVariant }} text-{{ $badgeVariant }} text-uppercase fs-10 fw-bolder px-2.5 py-1 rounded-pill border border-{{ $badgeVariant }} border-opacity-20 d-inline-flex align-items-center gap-1">
+                                                <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                                    <span class="badge bg-soft-{{ $badgeVariant }} text-{{ $badgeVariant }} text-uppercase fs-9 fw-bolder px-2 py-0.5 rounded-pill border border-{{ $badgeVariant }} border-opacity-20 d-inline-flex align-items-center gap-1">
                                                         @if($broadcast->priority === 'urgent')
-                                                            <i class="feather-alert-octagon fs-10" style="font-style: normal;"></i>
+                                                            <i class="feather-alert-octagon fs-9" style="font-style: normal;"></i>
                                                         @elseif($broadcast->priority === 'important')
-                                                            <i class="feather-alert-triangle fs-10" style="font-style: normal;"></i>
+                                                            <i class="feather-alert-triangle fs-9" style="font-style: normal;"></i>
                                                         @else
-                                                            <i class="feather-info fs-10" style="font-style: normal;"></i>
+                                                            <i class="feather-info fs-9" style="font-style: normal;"></i>
                                                         @endif
                                                         <span>{{ $broadcast->priority }} Priority</span>
                                                     </span>
 
                                                     <div class="text-muted fs-11 fw-medium d-inline-flex align-items-center gap-1 ms-1">
-                                                        <i class="feather-clock text-muted fs-11" style="font-style: normal;"></i>
+                                                        <i class="feather-clock text-muted fs-10" style="font-style: normal;"></i>
                                                         <span>{{ $broadcast->published_at ? $broadcast->published_at->diffForHumans() : 'Recently' }}</span>
                                                     </div>
                                                 </div>
 
-                                                <!-- Right: Action Buttons Grouped (Download, Acknowledge, Discussion) -->
-                                                <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+                                                <!-- Right: Action Buttons Grouped (Download, Acknowledge, Add Comment) -->
+                                                <div class="d-flex align-items-center gap-2 flex-wrap ms-auto" style="gap: 10px !important;">
                                                     @if($broadcast->attachment_path)
-                                                        <a href="{{ asset('storage/' . $broadcast->attachment_path) }}" target="_blank" class="btn btn-sm btn-light border border-secondary border-opacity-20 text-dark fw-bold fs-11 py-1.5 px-3 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5" title="Download Attached Document">
+                                                        <a href="{{ asset('storage/' . $broadcast->attachment_path) }}" target="_blank" class="btn btn-xs btn-light border border-secondary border-opacity-20 text-dark fw-bold fs-11 py-1.5 px-3 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5" title="Download Attached Document">
                                                             <i class="feather-file-text text-primary fs-12" style="font-style: normal; line-height: 1;"></i> <span>Download Document</span>
                                                         </a>
                                                     @endif
 
-                                                    @if($broadcast->is_acknowledgement_required)
-                                                        @if($isAcknowledged)
-                                                            <span class="badge bg-soft-success text-success fw-bold fs-11 px-3 py-1.5 rounded-pill d-inline-flex align-items-center gap-1.5 border border-success border-opacity-20">
-                                                                <i class="feather-check-circle fs-12" style="font-style: normal; line-height: 1;"></i> <span>Compliance Acknowledged</span>
-                                                            </span>
-                                                        @else
-                                                            <form action="{{ route('hrms.broadcasts.acknowledge', $broadcast->id) }}" method="POST" class="d-inline m-0">
-                                                                @csrf
-                                                                <button type="submit" class="btn btn-sm btn-success fw-bold fs-11 px-3.5 py-1.5 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5">
-                                                                    <i class="feather-check-circle fs-12" style="font-style: normal; line-height: 1;"></i> <span>I Acknowledge</span>
-                                                                </button>
-                                                            </form>
-                                                        @endif
+                                                    @if($broadcast->is_acknowledgement_required && !$isAcknowledged)
+                                                        <form action="{{ route('hrms.broadcasts.acknowledge', $broadcast->id) }}" method="POST" class="d-inline m-0">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-xs btn-success fw-bold fs-11 px-3 py-1.5 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5">
+                                                                <i class="feather-check-circle fs-12" style="font-style: normal; line-height: 1;"></i> <span>I Acknowledge</span>
+                                                            </button>
+                                                        </form>
                                                     @endif
 
                                                     @if($broadcast->allow_comments)
-                                                        <button type="button" class="btn btn-sm btn-soft-primary fw-bold fs-11 px-3.5 py-1.5 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5 border border-primary border-opacity-15" data-bs-toggle="modal" data-bs-target="#employeeBroadcastModal{{ $broadcast->id }}">
-                                                            <i class="feather-message-square fs-12 text-primary" style="font-style: normal; line-height: 1;"></i> <span>Comments & Discussion ({{ $broadcast->comments->count() }})</span>
+                                                        <button type="button" class="btn btn-xs btn-soft-primary fw-bold fs-11 px-3 py-1.5 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5 border border-primary border-opacity-15" data-bs-toggle="modal" data-bs-target="#employeeBroadcastModal{{ $broadcast->id }}">
+                                                            <i class="feather-message-square fs-12 text-primary" style="font-style: normal; line-height: 1;"></i> <span>Add Comment</span>
                                                         </button>
                                                     @endif
                                                 </div>
                                             </div>
 
                                             <!-- Broadcast Title -->
-                                            <h5 class="fw-bold text-dark fs-16 mb-0" style="line-height: 1.3;">
+                                            <h6 class="fw-bold text-dark fs-15 mb-0" style="line-height: 1.25;">
                                                 {{ $broadcast->title }}
-                                            </h5>
+                                            </h6>
 
-                                            <!-- Complete Content Body -->
-                                            <div class="text-secondary fs-13 mb-0 mt-1" style="line-height: 1.5; color: #334155 !important; white-space: pre-line;">
+                                            <!-- Content Body (Compact Line Clamp) -->
+                                            <div class="text-secondary fs-12 mb-0 mt-1" style="line-height: 1.45; color: #334155 !important; white-space: pre-line;">
                                                 {{ strip_tags($broadcast->content) }}
                                             </div>
+
+                                            <!-- Compact Professional Inline Comments Section -->
+                                            @php
+                                                $topLevelComments = $broadcast->comments->where('parent_id', null);
+                                            @endphp
+                                            @if($broadcast->allow_comments && $topLevelComments->isNotEmpty())
+                                                <div class="mt-2.5 pt-2 border-top" style="border-color: #f1f5f9 !important;">
+                                                    <div class="mb-1.5">
+                                                        <span class="fs-11 fw-bold text-dark d-inline-flex align-items-center gap-1">
+                                                            <i class="feather-message-square text-primary fs-11"></i> Comments & Discussion ({{ $topLevelComments->count() }})
+                                                        </span>
+                                                    </div>
+
+                                                    <div class="d-flex flex-column gap-1" style="max-height: 120px; overflow-y: auto;">
+                                                        @foreach($topLevelComments as $comm)
+                                                            <div class="py-1 px-0 border-bottom d-flex align-items-center justify-content-between gap-2 fs-11" style="border-color: #f1f5f9 !important; background: transparent;">
+                                                                <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
+                                                                    <div class="avatar-text avatar-xs bg-primary text-white rounded-circle fw-bold fs-9 flex-shrink-0" style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; background-color: #1c3faa !important;">
+                                                                        {{ strtoupper(substr($comm->employee->full_name ?? ($comm->user->name ?? 'U'), 0, 1)) }}
+                                                                    </div>
+                                                                    <strong class="fw-bold text-dark fs-11 text-nowrap me-1">{{ $comm->employee->full_name ?? ($comm->user->name ?? 'Employee') }}:</strong>
+                                                                    <span class="text-secondary fs-11 text-truncate" style="color: #334155 !important;" title="{{ $comm->comment_text }}">{{ $comm->comment_text }}</span>
+                                                                </div>
+                                                                <div class="d-inline-flex align-items-center gap-1 text-muted fs-10 flex-shrink-0 ms-2" style="white-space: nowrap;">
+                                                                    <i class="feather-clock fs-10 text-muted" style="font-style: normal; line-height: 1;"></i>
+                                                                    <span>{{ $comm->created_at->diffForHumans() }}</span>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
 
                                         </div>
                                 </div>
@@ -315,19 +350,20 @@
                     @endforeach
                 </div>
             </div>
-            @if(isset($totalBroadcastsCount) && $totalBroadcastsCount > 3)
-                <div class="card-footer bg-light py-2.5 px-4 border-top d-flex align-items-center justify-content-between">
-                    <span class="fs-12 text-muted">Showing 3 of {{ $totalBroadcastsCount }} announcements &mdash; sorted by priority</span>
-                    <button type="button" class="btn btn-sm btn-soft-primary fw-bold fs-12 d-inline-flex align-items-center gap-1.5 px-3 py-1.5 rounded-pill" disabled title="Coming soon">
-                        <i class="feather-list fs-12" style="font-style: normal; line-height: 1;"></i>
-                        <span>View All ({{ $totalBroadcastsCount }})</span>
-                    </button>
-                </div>
-            @endif
+            <div class="card-footer bg-light bg-opacity-75 py-2.5 px-4 border-top d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-color: #e2e8f0 !important;">
+                <span class="fs-12 text-muted fw-medium">
+                    Showing {{ min(count($latestBroadcasts), $totalBroadcastsCount ?? count($latestBroadcasts)) }} of {{ $totalBroadcastsCount ?? count($latestBroadcasts) }} active announcements
+                </span>
+                <a href="{{ route('hrms.broadcasts.index') }}" class="btn btn-sm btn-soft-primary fw-bold fs-12 d-inline-flex align-items-center gap-1.5 px-3.5 py-1.5 rounded-pill shadow-2xs">
+                    <i class="feather-grid fs-12" style="font-style: normal; line-height: 1;"></i>
+                    <span>View All Announcements</span>
+                    <i class="feather-arrow-right fs-12" style="font-style: normal; line-height: 1;"></i>
+                </a>
+            </div>
             </div>{{-- end collapse --}}
         </div>
 
-        <!-- EMPLOYEE COMMENTS & DISCUSSION MODALS ONLY -->
+        <!-- EMPLOYEE COMMENTS POSTING MODAL -->
         @foreach($latestBroadcasts as $broadcast)
             @if($broadcast->allow_comments)
                 @php
@@ -338,7 +374,7 @@
                     };
                 @endphp
                 <div class="modal fade" id="employeeBroadcastModal{{ $broadcast->id }}" tabindex="-1" aria-labelledby="employeeBroadcastModalLabel{{ $broadcast->id }}" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content border-0 shadow-lg" style="border-radius: 14px;">
                             <div class="modal-header bg-white border-bottom py-3 px-4" style="border-top-left-radius: 14px; border-top-right-radius: 14px;">
                                 <div class="d-flex align-items-center gap-2.5">
@@ -346,55 +382,27 @@
                                         <i class="feather-message-square fs-16"></i>
                                     </div>
                                     <div>
-                                        <h6 class="modal-title fw-bold text-dark fs-15 mb-0">Comments & Discussion Thread</h6>
-                                        <span class="fs-11 text-muted">Q&A discussion for <strong class="text-dark">{{ $broadcast->title }}</strong></span>
+                                        <h6 class="modal-title fw-bold text-dark fs-15 mb-0">Post a Comment</h6>
+                                        <span class="fs-11 text-muted">Adding comment for <strong class="text-dark">{{ $broadcast->title }}</strong></span>
                                     </div>
                                 </div>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <div class="modal-body p-4 text-dark bg-white">
-                                <!-- Comment Post Form -->
-                                <form action="{{ route('hrms.broadcasts.comment.store', $broadcast->id) }}" method="POST" class="mb-4">
-                                    @csrf
+                            <form action="{{ route('hrms.broadcasts.comment.store', $broadcast->id) }}" method="POST">
+                                @csrf
+                                <div class="modal-body p-4 text-dark bg-white">
                                     <div class="mb-3">
-                                        <label class="form-label fs-12 fw-bold text-dark mb-1">Add to Discussion</label>
-                                        <textarea name="comment_text" rows="3" class="form-control fs-12 p-3 text-dark rounded-3" placeholder="Write a comment, query or reply regarding this announcement..." required style="border: 1px solid #cbd5e1; resize: vertical;"></textarea>
+                                        <label class="form-label fs-12 fw-bold text-dark mb-1">Your Comment / Reply</label>
+                                        <textarea name="comment_text" rows="4" class="form-control fs-12 p-3 text-dark rounded-3" placeholder="Write a comment, query or reply regarding this announcement..." required style="border: 1px solid #cbd5e1; resize: vertical;"></textarea>
                                     </div>
-                                    <div class="d-flex justify-content-end">
-                                        <button type="submit" class="btn btn-sm btn-primary fw-bold px-4 py-2 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5" style="background-color: #1c3faa; border-color: #1c3faa;">
-                                            <i class="feather-send fs-12 me-1"></i> <span>Post Comment</span>
-                                        </button>
-                                    </div>
-                                </form>
-
-                                <!-- Discussion Feed -->
-                                <div class="d-flex flex-column gap-2.5" style="max-height: 320px; overflow-y: auto;">
-                                    @forelse($broadcast->comments->where('parent_id', null) as $comm)
-                                        <div class="p-3 rounded-3 border bg-light bg-opacity-60 fs-12">
-                                            <div class="d-flex justify-content-between align-items-center mb-1.5">
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <div class="avatar-text avatar-xs bg-primary text-white rounded-circle fw-bold fs-10" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background-color: #1c3faa !important;">
-                                                        {{ strtoupper(substr($comm->employee->full_name ?? ($comm->user->name ?? 'U'), 0, 1)) }}
-                                                    </div>
-                                                    <strong class="fw-bold text-dark fs-12">{{ $comm->employee->full_name ?? ($comm->user->name ?? 'Employee') }}</strong>
-                                                </div>
-                                                <span class="text-muted fs-11"><i class="feather-clock me-1 text-muted"></i>{{ $comm->created_at->diffForHumans() }}</span>
-                                            </div>
-                                            <div class="text-secondary fs-12 ps-4" style="line-height: 1.55; color: #334155 !important;">
-                                                {{ $comm->comment_text }}
-                                            </div>
-                                        </div>
-                                    @empty
-                                        <div class="text-muted fs-12 text-center py-4 bg-light rounded-3 border border-dashed">
-                                            <i class="feather-message-square text-muted fs-24 d-block mb-1.5 opacity-50"></i>
-                                            <span>No comments posted yet. Be the first to start the discussion!</span>
-                                        </div>
-                                    @endforelse
                                 </div>
-                            </div>
-                            <div class="modal-footer bg-light py-2.5 px-4 border-top d-flex justify-content-end align-items-center" style="border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;">
-                                <button type="button" class="btn btn-sm btn-light border border-secondary border-opacity-30 text-dark fw-bold px-4 py-1.5 rounded-pill fs-12" data-bs-dismiss="modal">Close</button>
-                            </div>
+                                <div class="modal-footer bg-light py-2.5 px-4 border-top d-flex justify-content-between align-items-center" style="border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;">
+                                    <button type="button" class="btn btn-sm btn-light border border-secondary border-opacity-30 text-dark fw-bold px-4 py-1.5 rounded-pill fs-12" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4 py-2 rounded-pill shadow-2xs d-inline-flex align-items-center gap-1.5" style="background-color: #1c3faa; border-color: #1c3faa;">
+                                        <i class="feather-send fs-12 me-1"></i> <span>Post Comment</span>
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -402,7 +410,8 @@
         @endforeach
     @endif
 
-    <!-- 2. Row of 4 Hero KPI Cards using Standard Design Tokens -->
+    <!-- 2. Row of 4 Hero KPI Cards using Standard Design Tokens (Restricted to HR / Admin) -->
+    @if($isHrOrAdmin ?? false)
     <div class="row g-3 mb-3">
         <!-- KPI 1: Workforce -->
         <div class="col-xl-3 col-md-6">
@@ -526,11 +535,13 @@
         </div>
     </div>
 
+    @endif
+
     <!-- 3. Main 12-Column Dashboard Grid -->
     <div class="row g-3">
         
         <!-- ── MAIN COLUMN (8 COLS) ── -->
-        <div class="col-lg-8">
+        <div class="col-md-8 col-lg-8" style="min-width: 0;">
             
             <!-- Widget 1: Real-Time Web Attendance Punch Hub (Light Theme Aligned) -->
             <div class="card border-0 shadow-sm mb-3">
@@ -662,7 +673,10 @@
                 </div>
             </div>
 
-            <!-- Widget 2: Unified Action Center (Tabbed Inbox) -->
+
+
+            <!-- Widget 2: Unified Action Center (Tabbed Inbox - Restricted to HR / Admin / Managers) -->
+            @if($isHrOrAdmin ?? false)
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-header border-bottom p-2.5 px-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div class="d-flex align-items-center gap-2">
@@ -1024,8 +1038,9 @@
                     </div>
                 </div>
             </div>
+            @endif
 
-            <!-- Widget 3: Attendance Discipline & Penalty Watch (Late Arrivals & Unprocessed Penalties) -->
+            <!-- Widget 3: Late Arrivals & Unprocessed Penalties (HR sees company-wide; Employee sees own) -->
             <div class="row g-3 mb-3">
                 <!-- Late Arrivals (Last 7 Days) -->
                 <div class="col-md-6">
@@ -1171,7 +1186,180 @@
                 </div>
             </div>
 
-            <!-- Widget 3b: Probation & Offboarding Watch -->
+            <!-- Approved Leaves & Upcoming Public Holidays Row (Left Section) -->
+            <div class="row g-3 mb-3">
+                <!-- Approved Leaves (Out of Office Schedule) -->
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100" id="approvedLeavesCard">
+                        <div class="card-header border-bottom p-2.5 px-3 d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="dash-card-icon-avatar bg-soft-success text-success">
+                                    <i class="feather-check-square"></i>
+                                </div>
+                                <h6 class="card-title fw-bold text-dark mb-0 fs-13">Approved Leaves</h6>
+                            </div>
+                            <span class="badge bg-soft-success text-success fs-10 fw-bold">{{ $approvedLeaves->count() }} Approved</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush fs-12">
+                                @php $apprChunks = $approvedLeaves->chunk(5); @endphp
+                                @forelse($apprChunks as $pageIndex => $chunk)
+                                    @php $pageNo = $pageIndex + 1; @endphp
+                                    @foreach($chunk as $lReq)
+                                        @php
+                                            $sDate = \Carbon\Carbon::parse($lReq->start_date);
+                                            $eDate = \Carbon\Carbon::parse($lReq->end_date);
+                                            $numDays = $sDate->diffInDays($eDate) + 1;
+                                        @endphp
+                                        <div class="list-group-item p-2.5 px-3 d-flex justify-content-between align-items-center appr-page-item appr-page-{{ $pageNo }} {{ $pageNo > 1 ? 'd-none' : '' }}" data-page="{{ $pageNo }}">
+                                            <div class="d-flex align-items-center gap-3">
+                                                <div class="dash-card-icon-avatar bg-soft-success text-success rounded-circle flex-shrink-0" style="width: 32px; height: 32px; font-size: 14px;">
+                                                    <i class="feather-calendar"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-bold text-dark fs-12">{{ $lReq->employee->full_name ?? 'Employee' }}</div>
+                                                    <span class="text-muted fs-10">{{ $lReq->employee->department->name ?? 'Dept' }} &bull; {{ $lReq->leaveType->name ?? 'Leave' }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="text-end">
+                                                <span class="badge bg-soft-success text-success fs-10 fw-semibold">
+                                                    {{ $sDate->format('d M') }} - {{ $eDate->format('d M') }} ({{ $numDays }}d)
+                                                </span>
+                                                <div class="text-muted fs-10 mt-0.5">Approved</div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                    @if($chunk->count() < 5)
+                                        @for($i = 0; $i < (5 - $chunk->count()); $i++)
+                                            <div class="list-group-item p-2.5 px-3 d-flex justify-content-between align-items-center appr-page-item appr-page-{{ $pageNo }} {{ $pageNo > 1 ? 'd-none' : '' }}" style="min-height: 56.5px; opacity: 0; pointer-events: none;" aria-hidden="true">
+                                                &nbsp;
+                                            </div>
+                                        @endfor
+                                    @endif
+                                @empty
+                                    <div class="d-flex align-items-center justify-content-center text-muted fs-12 text-center" style="min-height: 282px;">
+                                        <div>
+                                            <i class="feather-check-circle text-success fs-3 mb-2 d-block opacity-75"></i>
+                                            <div>No upcoming approved leaves.</div>
+                                        </div>
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                        @php $totalApprPages = ceil($approvedLeaves->count() / 5); @endphp
+                        @if($totalApprPages > 1)
+                            <div class="card-footer bg-light p-2 px-3 d-flex justify-content-between align-items-center border-top">
+                                <span class="text-muted fs-11" id="apprPageIndicator">Page 1 of {{ $totalApprPages }}</span>
+                                <div class="d-flex align-items-center gap-1">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" id="apprPrevBtn" disabled onclick="changeSectionPage('appr', -1, {{ $totalApprPages }})">
+                                        <i class="feather-chevron-left fs-12"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" id="apprNextBtn" onclick="changeSectionPage('appr', 1, {{ $totalApprPages }})">
+                                        <i class="feather-chevron-right fs-12"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Upcoming Public Holidays -->
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100" id="upcomingHolidaysCard">
+                        <div class="card-header border-bottom p-2.5 px-3 d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="dash-card-icon-avatar bg-soft-danger text-danger">
+                                    <i class="feather-gift"></i>
+                                </div>
+                                <h6 class="card-title fw-bold text-dark mb-0 fs-13">Upcoming Holidays</h6>
+                            </div>
+                            @if($isHrOrAdmin ?? false)
+                                <a href="{{ route('hrms.holidays.index') }}" class="text-muted fs-11">Calendar &rarr;</a>
+                            @endif
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush fs-12">
+                                @php
+                                    $holidayChunks = $upcomingHolidays->chunk(5);
+                                @endphp
+                                @forelse($holidayChunks as $pageIndex => $chunk)
+                                    @php
+                                        $pageNo = $pageIndex + 1;
+                                    @endphp
+                                    @foreach($chunk as $hol)
+                                        @php
+                                            $holDate = \Carbon\Carbon::parse($hol->holiday_date);
+                                            $today = \Carbon\Carbon::today();
+                                            $hDaysLeft = $today->diffInDays($holDate, false);
+
+                                            if ($hDaysLeft == 0) {
+                                                $timeText = 'Today';
+                                            } elseif ($hDaysLeft < 0) {
+                                                $timeText = 'Passed';
+                                            } elseif ($hDaysLeft >= 30) {
+                                                $diff = $today->diff($holDate);
+                                                $m = $diff->m + ($diff->y * 12);
+                                                $d = $diff->d;
+                                                if ($m > 0 && $d > 0) {
+                                                    $timeText = "in {$m}m {$d}d";
+                                                } elseif ($m > 0) {
+                                                    $timeText = "in {$m}m";
+                                                } else {
+                                                    $timeText = "in {$d}d";
+                                                }
+                                            } else {
+                                                $timeText = "in {$hDaysLeft}d";
+                                            }
+                                        @endphp
+                                        <div class="list-group-item p-2.5 px-3 d-flex justify-content-between align-items-center holiday-page-item holiday-page-{{ $pageNo }} {{ $pageNo > 1 ? 'd-none' : '' }}" data-page="{{ $pageNo }}">
+                                            <div>
+                                                <div class="fw-bold text-dark">{{ $hol->name ?? ($hol->holiday_name ?? 'Holiday') }}</div>
+                                                <span class="text-muted fs-11">{{ $holDate->format('D, d M Y') }}</span>
+                                            </div>
+                                            <span class="badge bg-soft-danger text-danger fs-10">
+                                                {{ $timeText }}
+                                            </span>
+                                        </div>
+                                    @endforeach
+                                    @if($chunk->count() < 5)
+                                        @for($i = 0; $i < (5 - $chunk->count()); $i++)
+                                            <div class="list-group-item p-2.5 px-3 d-flex justify-content-between align-items-center holiday-page-item holiday-page-{{ $pageNo }} {{ $pageNo > 1 ? 'd-none' : '' }}" style="min-height: 56.5px; opacity: 0; pointer-events: none;" aria-hidden="true">
+                                                &nbsp;
+                                            </div>
+                                        @endfor
+                                    @endif
+                                @empty
+                                    <div class="d-flex align-items-center justify-content-center text-muted fs-12 text-center" style="min-height: 282px;">
+                                        <div>
+                                            <i class="feather-calendar fs-3 text-muted mb-2 d-block opacity-50"></i>
+                                            <div>No upcoming holidays scheduled.</div>
+                                        </div>
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                        @php
+                            $totalHolidayPages = ceil($upcomingHolidays->count() / 5);
+                        @endphp
+                        @if($totalHolidayPages > 1)
+                            <div class="card-footer bg-light p-2 px-3 d-flex justify-content-between align-items-center border-top">
+                                <span class="text-muted fs-11" id="holidayPageIndicator">Page 1 of {{ $totalHolidayPages }}</span>
+                                <div class="d-flex align-items-center gap-1">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" id="holidayPrevBtn" disabled onclick="changeHolidayPage(-1, {{ $totalHolidayPages }})">
+                                        <i class="feather-chevron-left fs-12"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" id="holidayNextBtn" onclick="changeHolidayPage(1, {{ $totalHolidayPages }})">
+                                        <i class="feather-chevron-right fs-12"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- Widget 3b: Probation & Offboarding Watch (Restricted to HR / Admin) -->
+            @if($isHrOrAdmin ?? false)
             <div class="row g-3 mb-3">
                 <!-- Probation Watch -->
                 <div class="col-md-6">
@@ -1334,6 +1522,7 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <!-- Widget 4: New Joinees & Team Spotlight -->
             <div class="card border-0 shadow-sm mb-3">
@@ -1374,49 +1563,173 @@
         </div>
 
         <!-- ── SIDEBAR COLUMN (4 COLS) ── -->
-        <div class="col-lg-4">
+        <div class="col-md-4 col-lg-4" style="min-width: 0;">
 
-            <!-- 1. My Leave Balances (ESS Card) -->
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-header border-bottom p-2.5 px-3 d-flex justify-content-between align-items-center">
+            <!-- 1. Assigned Leave Plan Card (Matches requested design pattern) -->
+            <div class="card border-0 shadow-sm mb-3" style="border-radius: 16px; background-color: #ffffff;">
+                <div class="card-header bg-transparent border-0 p-3 pb-1 d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center gap-2">
-                        <div class="dash-card-icon-avatar bg-soft-primary text-primary">
-                            <i class="feather-calendar"></i>
-                        </div>
-                        <h6 class="card-title fw-bold text-dark mb-0 fs-13">My Leave Balances</h6>
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle text-muted" style="width: 20px; height: 20px; border: 1.5px solid #64748b; font-size: 10px; font-weight: 700;">
+                            i
+                        </span>
+                        <h6 class="fw-bold text-dark mb-0 fs-14" style="letter-spacing: -0.2px;">Assigned Leave Plan</h6>
                     </div>
-                    <a href="{{ route('hrms.leaves.index') }}" class="btn btn-xs btn-primary fw-semibold px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
-                        <i class="feather-plus"></i> Apply
-                    </a>
                 </div>
-                <div class="card-body p-3 px-3">
-                    <div class="row g-2 text-center">
-                        <div class="col-4">
-                            <div class="p-2 rounded-2 bg-soft-primary border border-primary border-opacity-10">
-                                <span class="text-primary fs-10 text-uppercase fw-bold d-block">Casual</span>
-                                <h4 class="fw-bolder text-primary mb-0 mt-0.5 fs-18">{{ $myLeaveBalances['casual']['remaining'] }}</h4>
-                                <span class="text-muted fs-9 d-block mt-0.5">/ {{ $myLeaveBalances['casual']['allocated'] }} days</span>
-                            </div>
+
+                <div class="card-body p-3 pt-2">
+                    <!-- Leave Plan Banner Box -->
+                    <div class="p-3 mb-3 rounded-3" style="background-color: #f1f5f9; border: 1px solid #e2e8f0;">
+                        <div class="d-flex align-items-start justify-content-between mb-1">
+                            <h6 class="fw-bold text-dark mb-0 fs-14">{{ $myAssignedPlan->name ?? 'Standard Leave Plan' }}</h6>
+                            <span class="badge bg-soft-success text-success fw-bold px-2 py-0.5 fs-11" style="border-radius: 4px;">Active</span>
                         </div>
-                        <div class="col-4">
-                            <div class="p-2 rounded-2 bg-soft-success border border-success border-opacity-10">
-                                <span class="text-success fs-10 text-uppercase fw-bold d-block">Sick</span>
-                                <h4 class="fw-bolder text-success mb-0 mt-0.5 fs-18">{{ $myLeaveBalances['sick']['remaining'] }}</h4>
-                                <span class="text-muted fs-9 d-block mt-0.5">/ {{ $myLeaveBalances['sick']['allocated'] }} days</span>
-                            </div>
+                        <p class="text-muted fs-11 mb-0">{{ $myAssignedPlan->description ?? 'Regular corporate leave plan' }}</p>
+                    </div>
+
+                    <!-- Effective From Row -->
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-1">
+                        <span class="text-muted fs-10 text-uppercase fw-bold" style="letter-spacing: 0.5px;">EFFECTIVE FROM</span>
+                        <span class="fw-bold text-dark fs-12">
+                            {{ $myAssignedPlan && $myAssignedPlan->effective_from ? \Carbon\Carbon::parse($myAssignedPlan->effective_from)->format('d M, Y') : '01 Aug, 2026' }}
+                        </span>
+                    </div>
+
+                    <!-- Leave Types Table Header & Rows -->
+                    <div class="table-responsive mb-3 overflow-hidden">
+                        <table class="w-100 align-middle">
+                            <thead>
+                                <tr class="border-bottom" style="border-color: #f1f5f9 !important;">
+                                    <th class="text-muted fs-10 text-uppercase fw-bold pb-2" style="width: 55%; letter-spacing: 0.5px;">TYPE NAME</th>
+                                    <th class="text-muted fs-10 text-uppercase fw-bold pb-2 text-center" style="width: 25%; letter-spacing: 0.5px;">BALANCE</th>
+                                    <th class="text-muted fs-10 text-uppercase fw-bold pb-2 text-end" style="width: 20%; letter-spacing: 0.5px;">RULES</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($myLeaveTypesList as $lItem)
+                                    <tr class="border-bottom" style="border-color: #f8fafc !important;">
+                                        <td class="py-2.5">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px; background-color: {{ $lItem['color'] }}; flex-shrink: 0;"></span>
+                                                <span class="fw-bold text-dark fs-12">{{ $lItem['name'] }}</span>
+                                                <span class="text-muted fs-10 fw-semibold ms-0.5">{{ $lItem['code'] }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="py-2.5 text-center">
+                                            <span class="fw-bold text-dark fs-13">{{ (int)$lItem['remaining'] }} / {{ (int)$lItem['allocated'] }}</span>
+                                        </td>
+                                        <td class="py-2.5 text-end">
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-light border-0 p-0 rounded-3 d-inline-flex align-items-center justify-content-center view-leave-rules-btn"
+                                                    style="width: 32px; height: 32px; background-color: #f8fafc; color: #64748b;"
+                                                    data-name="{{ $lItem['name'] }}"
+                                                    data-code="{{ $lItem['code'] }}"
+                                                    data-quota="{{ (int)$lItem['allocated'] }}"
+                                                    data-rules="{{ json_encode($lItem['rules']) }}"
+                                                    data-description="{{ $lItem['description'] }}"
+                                                    title="View Policy Rules">
+                                                <i class="feather-sliders" style="font-size: 13px;"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="3" class="py-3 text-center text-muted fs-12">
+                                            <i class="feather-info me-1"></i> No leave types configured in master settings.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Dark Action Buttons (Equal height, single line text) -->
+                    <div class="row g-2 pt-1">
+                        <div class="col-6">
+                            <a href="{{ route('hrms.leaves.index') }}" 
+                               class="btn w-100 text-white fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
+                               style="background-color: #352627; border-color: #352627; border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
+                               title="Apply For Leave">
+                                <i class="feather-plus fs-12"></i> Apply Leave
+                            </a>
                         </div>
-                        <div class="col-4">
-                            <div class="p-2 rounded-2 bg-soft-info border border-info border-opacity-10">
-                                <span class="text-info fs-10 text-uppercase fw-bold d-block">Earned</span>
-                                <h4 class="fw-bolder text-info mb-0 mt-0.5 fs-18">{{ $myLeaveBalances['earned']['remaining'] }}</h4>
-                                <span class="text-muted fs-9 d-block mt-0.5">/ {{ $myLeaveBalances['earned']['allocated'] }} days</span>
-                            </div>
+                        <div class="col-6">
+                            <a href="{{ route('hrms.leaves.index', ['tab' => 'encashments']) }}" 
+                               class="btn w-100 text-white fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
+                               style="background-color: #352627; border-color: #352627; border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
+                               title="Apply For Leave Encashment">
+                                <i class="feather-dollar-sign fs-12"></i> Encashment
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
 
-
+            <!-- 2. Current Shift Details Card -->
+            <div class="card border-0 shadow-sm mb-3" style="border-radius: 16px; background-color: #ffffff;">
+                <div class="card-header bg-transparent border-0 p-3 pb-1 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle text-muted" style="width: 20px; height: 20px; border: 1.5px solid #64748b; font-size: 10px; font-weight: 700;">
+                            i
+                        </span>
+                        <h6 class="fw-bold text-dark mb-0 fs-14" style="letter-spacing: -0.2px;">Current Shift Details</h6>
+                    </div>
+                </div>
+                <div class="card-body p-3 pt-2">
+                    <div class="p-3 mb-3 rounded-3" style="background-color: #f1f5f9; border: 1px solid #e2e8f0;">
+                        <div class="d-flex align-items-start justify-content-between mb-2">
+                            <h6 class="fw-bold text-dark mb-0 fs-14">{{ $myShiftDetails['name'] ?? 'Day Shift' }}</h6>
+                            <span class="badge bg-soft-success text-success fw-bold px-2 py-0.5 fs-11" style="border-radius: 4px;">{{ $myShiftDetails['badge'] ?? 'Default' }}</span>
+                        </div>
+                        <div class="d-flex align-items-center text-muted fs-12 mb-1.5">
+                            <i class="feather-clock me-2 text-muted fs-13"></i>
+                            <span class="text-muted">Timing:</span>
+                            <strong class="text-dark ms-1.5 fs-12">{{ $myShiftDetails['timing'] ?? '09:00 - 18:00' }}</strong>
+                        </div>
+                        <div class="d-flex align-items-center text-muted fs-12">
+                            <i class="feather-zap me-2 text-muted fs-13"></i>
+                            <span class="text-muted">Overtime:</span>
+                            @if(!empty($myShiftDetails['is_ot_allowed']))
+                                <strong class="text-success ms-1.5 fs-12">Allowed</strong>
+                            @else
+                                <strong class="text-danger ms-1.5 fs-12">Not Allowed</strong>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted fs-10 text-uppercase fw-bold" style="letter-spacing: 0.5px;">WEEKLY SHIFT PATTERN</span>
+                    </div>
+                    <div class="d-flex flex-column gap-2 mb-3">
+                        @foreach($myWeeklyPattern as $wItem)
+                            <div class="d-flex align-items-center justify-content-between py-1 border-bottom" style="border-color: #f8fafc !important;">
+                                <span class="fw-semibold text-dark fs-12">{{ $wItem['day'] }}</span>
+                                @if(!empty($wItem['is_off']))
+                                    <span class="fw-bold text-danger fs-12">Day Off</span>
+                                @else
+                                    <span class="fw-bold text-dark fs-12">{{ $wItem['status'] }}</span>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="row g-2 pt-1">
+                        <div class="col-6">
+                            <a href="{{ route('hrms.shift-overtime.index', ['tab' => 'shift']) }}" 
+                               class="btn w-100 text-white fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
+                               style="background-color: #352627; border-color: #352627; border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
+                               title="Apply Shift Change Request">
+                                <i class="feather-plus fs-12"></i> Shift Change
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ route('hrms.shift-overtime.index', ['tab' => 'overtime']) }}" 
+                               class="btn w-100 text-white fw-bold py-2 px-1 text-uppercase d-flex align-items-center justify-content-center gap-1 shadow-sm text-nowrap"
+                               style="background-color: #352627; border-color: #352627; border-radius: 8px; font-size: 10.5px; height: 38px; letter-spacing: 0.2px; overflow: hidden;"
+                               title="Apply Overtime Request">
+                                <i class="feather-plus fs-12"></i> Overtime
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- 3. Latest Payslip Snapshot -->
             <div class="card border-0 shadow-sm mb-3">
@@ -1435,170 +1748,6 @@
                         <i class="feather-download"></i> View & Download Payslip (PDF)
                     </a>
                 </div>
-            </div>
-
-            <!-- 4. Approved Leaves (Out of Office Schedule) -->
-            <div class="card border-0 shadow-sm mb-3" id="approvedLeavesCard">
-                <div class="card-header border-bottom p-2.5 px-3 d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="dash-card-icon-avatar bg-soft-success text-success">
-                            <i class="feather-check-square"></i>
-                        </div>
-                        <h6 class="card-title fw-bold text-dark mb-0 fs-13">Approved Leaves</h6>
-                    </div>
-                    <span class="badge bg-soft-success text-success fs-10 fw-bold">{{ $approvedLeaves->count() }} Approved</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush fs-12">
-                        @php $apprChunks = $approvedLeaves->chunk(5); @endphp
-                        @forelse($apprChunks as $pageIndex => $chunk)
-                            @php $pageNo = $pageIndex + 1; @endphp
-                            @foreach($chunk as $lReq)
-                                @php
-                                    $sDate = \Carbon\Carbon::parse($lReq->start_date);
-                                    $eDate = \Carbon\Carbon::parse($lReq->end_date);
-                                    $numDays = $sDate->diffInDays($eDate) + 1;
-                                @endphp
-                                <div class="list-group-item p-2.5 px-3 d-flex justify-content-between align-items-center appr-page-item appr-page-{{ $pageNo }} {{ $pageNo > 1 ? 'd-none' : '' }}" data-page="{{ $pageNo }}">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="dash-card-icon-avatar bg-soft-success text-success rounded-circle flex-shrink-0" style="width: 32px; height: 32px; font-size: 14px;">
-                                            <i class="feather-calendar"></i>
-                                        </div>
-                                        <div>
-                                            <div class="fw-bold text-dark fs-12">{{ $lReq->employee->full_name ?? 'Employee' }}</div>
-                                            <span class="text-muted fs-10">{{ $lReq->employee->department->name ?? 'Dept' }} &bull; {{ $lReq->leaveType->name ?? 'Leave' }}</span>
-                                        </div>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="badge bg-soft-success text-success fs-10 fw-semibold">
-                                            {{ $sDate->format('d M') }} - {{ $eDate->format('d M') }} ({{ $numDays }}d)
-                                        </span>
-                                        <div class="text-muted fs-10 mt-0.5">Approved</div>
-                                    </div>
-                                </div>
-                            @endforeach
-                            @if($chunk->count() < 5)
-                                @for($i = 0; $i < (5 - $chunk->count()); $i++)
-                                    <div class="list-group-item p-2.5 px-3 d-flex justify-content-between align-items-center appr-page-item appr-page-{{ $pageNo }} {{ $pageNo > 1 ? 'd-none' : '' }}" style="min-height: 56.5px; opacity: 0; pointer-events: none;" aria-hidden="true">
-                                        &nbsp;
-                                    </div>
-                                @endfor
-                            @endif
-                        @empty
-                            <div class="d-flex align-items-center justify-content-center text-muted fs-12 text-center" style="min-height: 282px;">
-                                <div>
-                                    <i class="feather-check-circle text-success fs-3 mb-2 d-block opacity-75"></i>
-                                    <div>No upcoming approved leaves.</div>
-                                </div>
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-                @php $totalApprPages = ceil($approvedLeaves->count() / 5); @endphp
-                @if($totalApprPages > 1)
-                    <div class="card-footer bg-light p-2 px-3 d-flex justify-content-between align-items-center border-top">
-                        <span class="text-muted fs-11" id="apprPageIndicator">Page 1 of {{ $totalApprPages }}</span>
-                        <div class="d-flex align-items-center gap-1">
-                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" id="apprPrevBtn" disabled onclick="changeSectionPage('appr', -1, {{ $totalApprPages }})">
-                                <i class="feather-chevron-left fs-12"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" id="apprNextBtn" onclick="changeSectionPage('appr', 1, {{ $totalApprPages }})">
-                                <i class="feather-chevron-right fs-12"></i>
-                            </button>
-                        </div>
-                    </div>
-                @endif
-            </div>
-
-            <!-- 4b. Upcoming Public Holidays -->
-            <div class="card border-0 shadow-sm mb-3" id="upcomingHolidaysCard">
-                <div class="card-header border-bottom p-2.5 px-3 d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="dash-card-icon-avatar bg-soft-danger text-danger">
-                            <i class="feather-gift"></i>
-                        </div>
-                        <h6 class="card-title fw-bold text-dark mb-0 fs-13">Upcoming Holidays</h6>
-                    </div>
-                    <a href="{{ route('hrms.holidays.index') }}" class="text-muted fs-11">Calendar &rarr;</a>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush fs-12">
-                        @php
-                            $holidayChunks = $upcomingHolidays->chunk(5);
-                        @endphp
-                        @forelse($holidayChunks as $pageIndex => $chunk)
-                            @php
-                                $pageNo = $pageIndex + 1;
-                            @endphp
-                            @foreach($chunk as $hol)
-                                @php
-                                    $holDate = \Carbon\Carbon::parse($hol->holiday_date);
-                                    $today = \Carbon\Carbon::today();
-                                    $hDaysLeft = $today->diffInDays($holDate, false);
-
-                                    if ($hDaysLeft == 0) {
-                                        $timeText = 'Today';
-                                    } elseif ($hDaysLeft < 0) {
-                                        $timeText = 'Passed';
-                                    } elseif ($hDaysLeft >= 30) {
-                                        $diff = $today->diff($holDate);
-                                        $m = $diff->m + ($diff->y * 12);
-                                        $d = $diff->d;
-                                        if ($m > 0 && $d > 0) {
-                                            $timeText = "in {$m}m {$d}d";
-                                        } elseif ($m > 0) {
-                                            $timeText = "in {$m}m";
-                                        } else {
-                                            $timeText = "in {$d}d";
-                                        }
-                                    } else {
-                                        $timeText = "in {$hDaysLeft}d";
-                                    }
-                                @endphp
-                                <div class="list-group-item p-2.5 px-3 d-flex justify-content-between align-items-center holiday-page-item holiday-page-{{ $pageNo }} {{ $pageNo > 1 ? 'd-none' : '' }}" data-page="{{ $pageNo }}">
-                                    <div>
-                                        <div class="fw-bold text-dark">{{ $hol->name ?? ($hol->holiday_name ?? 'Holiday') }}</div>
-                                        <span class="text-muted fs-11">{{ $holDate->format('D, d M Y') }}</span>
-                                    </div>
-                                    <span class="badge bg-soft-danger text-danger fs-10">
-                                        {{ $timeText }}
-                                    </span>
-                                </div>
-                            @endforeach
-                            {{-- Pad last page with empty slots if fewer than 5 items --}}
-                            @if($chunk->count() < 5)
-                                @for($i = 0; $i < (5 - $chunk->count()); $i++)
-                                    <div class="list-group-item p-2.5 px-3 d-flex justify-content-between align-items-center holiday-page-item holiday-page-{{ $pageNo }} {{ $pageNo > 1 ? 'd-none' : '' }}" style="min-height: 56.5px; opacity: 0; pointer-events: none;" aria-hidden="true">
-                                        &nbsp;
-                                    </div>
-                                @endfor
-                            @endif
-                        @empty
-                            <div class="d-flex align-items-center justify-content-center text-muted fs-12 text-center" style="min-height: 282px;">
-                                <div>
-                                    <i class="feather-calendar fs-3 text-muted mb-2 d-block opacity-50"></i>
-                                    <div>No upcoming holidays scheduled.</div>
-                                </div>
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-                @php
-                    $totalHolidayPages = ceil($upcomingHolidays->count() / 5);
-                @endphp
-                @if($totalHolidayPages > 1)
-                    <div class="card-footer bg-light p-2 px-3 d-flex justify-content-between align-items-center border-top">
-                        <span class="text-muted fs-11" id="holidayPageIndicator">Page 1 of {{ $totalHolidayPages }}</span>
-                        <div class="d-flex align-items-center gap-1">
-                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" id="holidayPrevBtn" disabled onclick="changeHolidayPage(-1, {{ $totalHolidayPages }})">
-                                <i class="feather-chevron-left fs-12"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center" style="width: 26px; height: 26px;" id="holidayNextBtn" onclick="changeHolidayPage(1, {{ $totalHolidayPages }})">
-                                <i class="feather-chevron-right fs-12"></i>
-                            </button>
-                        </div>
-                    </div>
-                @endif
             </div>
 
             <!-- 5. Celebrations & Milestones (Birthdays & Anniversaries) -->
@@ -1691,7 +1840,8 @@
                 @endif
             </div>
 
-            <!-- 6. Department Workforce Distribution -->
+            <!-- 6. Department Workforce Distribution (Restricted to HR / Admin) -->
+            @if($isHrOrAdmin ?? false)
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-header border-bottom p-2.5 px-3 d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center gap-2">
@@ -1719,102 +1869,13 @@
                     @endforeach
                 </div>
             </div>
+            @endif
 
         </div>
     </div>
 
     <!-- ── DASHBOARD MODALS (Cleanly rendered with body relocation) ── -->
     <div id="dashModalsWrapper">
-        <!-- 1. Apply Leave Modal -->
-        <div class="modal fade" id="applyLeaveModal" tabindex="-1" aria-labelledby="applyLeaveModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg rounded-3">
-                    <div class="modal-header border-bottom p-3">
-                        <h5 class="modal-title fw-bold text-dark fs-15" id="applyLeaveModalLabel">
-                            <i class="feather-calendar text-primary me-1.5"></i>Apply Leave
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <form method="POST" action="{{ route('hrms.leaves.store') }}">
-                        @csrf
-                        <input type="hidden" name="employee_id" value="{{ $currentEmployee->id ?? '' }}">
-                        <div class="modal-body p-4 fs-13">
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold text-dark">Leave Type <span class="text-danger">*</span></label>
-                                <select name="leave_type_id" class="form-select fs-13" required>
-                                    <option value="">-- Select Leave Type --</option>
-                                    @foreach($leaveTypes as $lt)
-                                        <option value="{{ $lt->id }}">{{ $lt->name }} ({{ $lt->code }})</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="row g-2 mb-3">
-                                <div class="col-6">
-                                    <label class="form-label fw-semibold text-dark">Start Date <span class="text-danger">*</span></label>
-                                    <input type="date" name="start_date" class="form-control fs-13" value="{{ date('Y-m-d') }}" required>
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label fw-semibold text-dark">End Date <span class="text-danger">*</span></label>
-                                    <input type="date" name="end_date" class="form-control fs-13" value="{{ date('Y-m-d') }}" required>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold text-dark">Reason for Leave <span class="text-danger">*</span></label>
-                                <textarea name="reason" class="form-control fs-13" rows="3" placeholder="Please provide specific reason for leave application..." required></textarea>
-                            </div>
-                        </div>
-                        <div class="modal-footer border-top p-3 bg-light">
-                            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-sm btn-primary d-flex align-items-center gap-1" style="background-color: #1c3faa; border-color: #1c3faa;">
-                                <i class="feather-send"></i> Submit Application
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. Request WFH Modal -->
-        <div class="modal fade" id="requestWfhModal" tabindex="-1" aria-labelledby="requestWfhModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg rounded-3">
-                    <div class="modal-header border-bottom p-3">
-                        <h5 class="modal-title fw-bold text-dark fs-15" id="requestWfhModalLabel">
-                            <i class="feather-home text-info me-1.5"></i>Request Work From Home (WFH)
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <form method="POST" action="{{ route('hrms.wfh.store') }}">
-                        @csrf
-                        <input type="hidden" name="employee_id" value="{{ $currentEmployee->id ?? '' }}">
-                        <input type="hidden" name="start_date_type" value="full_day">
-                        <input type="hidden" name="end_date_type" value="full_day">
-                        <div class="modal-body p-4 fs-13">
-                            <div class="row g-2 mb-3">
-                                <div class="col-6">
-                                    <label class="form-label fw-semibold text-dark">Start Date <span class="text-danger">*</span></label>
-                                    <input type="date" name="start_date" class="form-control fs-13" value="{{ date('Y-m-d') }}" required>
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label fw-semibold text-dark">End Date <span class="text-danger">*</span></label>
-                                    <input type="date" name="end_date" class="form-control fs-13" value="{{ date('Y-m-d') }}" required>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold text-dark">Reason / Task Plan <span class="text-danger">*</span></label>
-                                <textarea name="reason" class="form-control fs-13" rows="3" placeholder="Provide details of tasks you will work on remotely..." required></textarea>
-                            </div>
-                        </div>
-                        <div class="modal-footer border-top p-3 bg-light">
-                            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-sm btn-info text-white d-flex align-items-center gap-1">
-                                <i class="feather-send"></i> Submit WFH Request
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
 
         <!-- 3. Confirm Clock-Out Modal -->
         <div class="modal fade" id="confirmClockOutModal" tabindex="-1" aria-labelledby="confirmClockOutModalLabel" aria-hidden="true">
@@ -1858,6 +1919,150 @@
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        <!-- 4. Leave Type Policy Rules Detail Modal -->
+        <div class="modal fade" id="dashboardLeaveTypeRulesModal" tabindex="-1" aria-labelledby="dashboardLeaveTypeRulesModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                    <div class="modal-header border-bottom p-3 px-4 bg-light">
+                        <div class="d-flex align-items-center gap-2.5">
+                            <div class="rounded-circle bg-soft-primary text-primary d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; flex-shrink: 0;">
+                                <i class="feather-sliders fs-16"></i>
+                            </div>
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="rulesModalTypeName">Casual Leave (CL)</h5>
+                                <p class="text-muted fs-11 mb-0">Policy rules, limits & eligibility configured for this leave category</p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4" style="background-color: #f8fafc;">
+                        <div class="row g-3">
+                            <!-- Section 1: Quota & Accrual Rules -->
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-xs h-100 rounded-3">
+                                    <div class="card-header bg-transparent border-bottom p-3">
+                                        <h6 class="fw-bold text-dark mb-0 fs-13 d-flex align-items-center gap-1.5">
+                                            <i class="feather-clock text-primary"></i> Accrual & Quota Rules
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <ul class="list-unstyled mb-0 d-flex flex-column gap-2.5 fs-12">
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Annual Quota (Quantity):</span>
+                                                <span class="fw-bold text-dark" id="modalRuleQuota">12 Days / Year</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Calculation Unit:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleCalculateIn">Days</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Accrual Rate & Frequency:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleRate">Immediate (Full Year)</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Prorated on Join:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleProrate">Yes</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Max Accumulation Limit:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleMaxAccum">30 Days</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Section 2: Application & Duration Limits -->
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-xs h-100 rounded-3">
+                                    <div class="card-header bg-transparent border-bottom p-3">
+                                        <h6 class="fw-bold text-dark mb-0 fs-13 d-flex align-items-center gap-1.5">
+                                            <i class="feather-file-text text-info"></i> Application & Duration Limits
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <ul class="list-unstyled mb-0 d-flex flex-column gap-2.5 fs-12">
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Minimum Duration:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleMinDuration">1 Day</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Maximum Duration:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleMaxDuration">10 Days</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Advance Notice Required:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleAdvanceNotice">None</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Medical Attachment:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleAttachment">Not Required</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Section 3: Year-End Carry Forward & Encashment -->
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-xs h-100 rounded-3">
+                                    <div class="card-header bg-transparent border-bottom p-3">
+                                        <h6 class="fw-bold text-dark mb-0 fs-13 d-flex align-items-center gap-1.5">
+                                            <i class="feather-refresh-cw text-success"></i> Year-End Settlement
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <ul class="list-unstyled mb-0 d-flex flex-column gap-2.5 fs-12">
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Year-End Action:</span>
+                                                <span class="fw-bold text-dark" id="modalRuleYearEndAction">Lapse</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Max Carry Forward:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleMaxCarry">6 Days</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Max Encashable Qty:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleMaxEncash">5 Days</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Section 4: Eligibility & Approval Workflow -->
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-xs h-100 rounded-3">
+                                    <div class="card-header bg-transparent border-bottom p-3">
+                                        <h6 class="fw-bold text-dark mb-0 fs-13 d-flex align-items-center gap-1.5">
+                                            <i class="feather-check-circle text-warning"></i> Eligibility & Approval
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <ul class="list-unstyled mb-0 d-flex flex-column gap-2.5 fs-12">
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Probation Period Rule:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleProbation">Allowed</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Notice Period Rule:</span>
+                                                <span class="fw-semibold text-dark" id="modalRuleNotice">Allowed</span>
+                                            </li>
+                                            <li class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted">Approval Workflow:</span>
+                                                <span class="fw-bold text-primary" id="modalRuleApproval">1-Level (Reporting Manager)</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light p-2.5 px-4 border-top">
+                        <button type="button" class="btn btn-secondary btn-sm fs-12 fw-semibold px-4" data-bs-dismiss="modal">Close</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2004,6 +2209,93 @@
             });
             broadcastCollapse.addEventListener('hide.bs.collapse', function () {
                 broadcastIcon.style.transform = 'rotate(180deg)';
+            });
+        }
+
+        // View Leave Rules Modal Handler
+        $(document).on('click', '.view-leave-rules-btn', function () {
+            const name = $(this).attr('data-name');
+            const code = $(this).attr('data-code');
+            const quota = $(this).attr('data-quota');
+            const rulesStr = $(this).attr('data-rules');
+
+            $('#rulesModalTypeName').text(`${name} (${code})`);
+            $('#modalRuleQuota').text(`${quota} Days / Year`);
+
+            let rules = {};
+            try {
+                if (rulesStr) {
+                    rules = typeof rulesStr === 'string' ? JSON.parse(rulesStr) : rulesStr;
+                }
+            } catch (e) {
+                console.error("Error parsing rules JSON:", e);
+            }
+
+            // Accrual Rules
+            const calculateIn = rules.accrual?.calculate_in || 'days';
+            const rate = rules.accrual?.rate || 'immediate';
+            const prorate = rules.accrual?.prorate !== false;
+            const maxAccum = rules.accrual?.max_accum || 30;
+
+            $('#modalRuleCalculateIn').text(calculateIn.toUpperCase());
+            $('#modalRuleRate').text(rate === 'immediate' ? 'Immediate (Full Year)' : (rate === 'periodic' ? 'Periodic / Monthly' : 'Attendance Based'));
+            $('#modalRuleProrate').text(prorate ? 'Yes' : 'No');
+            $('#modalRuleMaxAccum').text(`${maxAccum} Days`);
+
+            // Application Limits
+            const minDur = rules.application?.min_duration || 1;
+            const maxDur = rules.application?.max_duration || 10;
+            const advanceNotice = rules.application?.apply_in_advance ? `${rules.application.advance_days || 3} Days in advance` : 'None';
+            const attachment = rules.application?.require_attachment ? `Required for > ${rules.application.attachment_days || 3} days` : 'Not Required';
+
+            $('#modalRuleMinDuration').text(`${minDur} Day(s)`);
+            $('#modalRuleMaxDuration').text(`${maxDur} Day(s)`);
+            $('#modalRuleAdvanceNotice').text(advanceNotice);
+            $('#modalRuleAttachment').text(attachment);
+
+            // Year-End Rules
+            const yearendAction = rules.yearend?.action || 'lapse';
+            const maxCarry = rules.yearend?.max_carry || 6;
+            const maxEncash = rules.yearend?.max_encash || 5;
+
+            let actionLabel = 'Lapse at year end';
+            if (yearendAction === 'carry_forward') actionLabel = 'Carry Forward';
+            else if (yearendAction === 'encash') actionLabel = 'Encash Unused Days';
+
+            $('#modalRuleYearEndAction').text(actionLabel);
+            $('#modalRuleMaxCarry').text(`${maxCarry} Days`);
+            $('#modalRuleMaxEncash').text(`${maxEncash} Days`);
+
+            // Probation & Notice & Approval Rules
+            const probationRule = rules.probation?.rule || 'allow';
+            const noticeRule = rules.notice?.rule || 'allow';
+            const workflowLevel = rules.approval?.workflow_level || '1_level';
+
+            $('#modalRuleProbation').text(probationRule === 'allow' ? 'Allowed' : (probationRule === 'restrict' ? `Allowed after ${rules.probation?.months || 3} months` : 'Not Allowed'));
+            $('#modalRuleNotice').text(noticeRule === 'allow' ? 'Allowed' : 'Not Allowed');
+
+            let workflowLabel = '1-Level Approval (Reporting Manager)';
+            if (workflowLevel === '2_level') workflowLabel = '2-Level Approval (Manager + HR)';
+            else if (workflowLevel === 'auto') workflowLabel = 'Auto Approved';
+
+            $('#modalRuleApproval').text(workflowLabel);
+
+            var modalEl = document.getElementById('dashboardLeaveTypeRulesModal');
+            if (modalEl) {
+                var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            }
+        });
+
+        // Broadcast Collapse Icon Rotation Listener
+        var broadcastCollapseEl = document.getElementById('broadcastsCollapseBody');
+        var broadcastIconEl = document.getElementById('broadcastsCollapseIcon');
+        if (broadcastCollapseEl && broadcastIconEl) {
+            broadcastCollapseEl.addEventListener('show.bs.collapse', function () {
+                broadcastIconEl.style.transform = 'rotate(0deg)';
+            });
+            broadcastCollapseEl.addEventListener('hide.bs.collapse', function () {
+                broadcastIconEl.style.transform = 'rotate(180deg)';
             });
         }
     });
