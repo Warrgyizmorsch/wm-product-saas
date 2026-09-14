@@ -161,6 +161,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
 
         $adhocComponents = $adhocQuery->paginate(10, ['*'], 'adhoc_page')->withQueryString();
         $salaryStructures = $salaryStructuresQuery->paginate(10, ['*'], 'struct_page')->withQueryString();
+        $chartOfAccounts = \App\Domains\Accounting\Models\ChartOfAccount::orderBy('code', 'asc')->get();
 
         return compact(
             'companies',
@@ -169,7 +170,8 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
             'salaryComponents',
             'salaryStructures',
             'recurringComponents',
-            'adhocComponents'
+            'adhocComponents',
+            'chartOfAccounts'
         );
     }
 

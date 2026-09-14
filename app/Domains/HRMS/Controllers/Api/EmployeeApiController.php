@@ -158,7 +158,7 @@ class EmployeeApiController extends Controller
         $authEmployee = $this->getAuthenticatedEmployee();
 
         $query = Employee::query()
-            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan', 'user']);
+            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan', 'defaultShift', 'shift', 'user']);
 
         if (!$isHrAdmin) {
             if (!$authEmployee) {
@@ -292,7 +292,7 @@ class EmployeeApiController extends Controller
 
         $employee->load([
             'company', 'businessUnit', 'branch', 'department', 'designation',
-            'payGroup', 'leavePlan', 'documents.requestedBy', 'employmentHistories', 'user'
+            'payGroup', 'leavePlan', 'defaultShift', 'shift', 'documents.requestedBy', 'employmentHistories', 'user'
         ]);
 
         $adhocComponents = EmployeeAdhocComponent::where('employee_id', $employee->id)->with('component')->get();

@@ -108,7 +108,7 @@ class AccessService
      * since a user only needs *a* granted 'hrms.*'/'purchase.*' permission
      * to keep the module visible, and every seeded HR/Purchase role has one.
      */
-    private const ROLE_FILTERABLE_MODULES = ['crm', 'sales', 'inventory', 'accounting', 'production', 'projects', 'hrms', 'purchase'];
+    private const ROLE_FILTERABLE_MODULES = ['crm', 'sales', 'inventory', 'accounting', 'production', 'projects'];
 
     /**
      * Distinct module prefixes (the leading segment of each granted
