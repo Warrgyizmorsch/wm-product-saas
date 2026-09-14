@@ -3,8 +3,6 @@
 namespace App\Domains\Platform\Services;
 
 use App\Domains\Accounting\Services\ChartOfAccountsService;
-use App\Domains\Accounting\Services\CurrencyService;
-use App\Domains\Accounting\Services\TenantCurrencyGuard;
 use App\Domains\Platform\Repositories\TenantRepository;
 use App\Models\Access\Role;
 use App\Models\Tenant;
@@ -19,7 +17,6 @@ class TenantService
     public function __construct(
         private readonly TenantRepository $tenants,
         private readonly ChartOfAccountsService $chartOfAccounts,
-        private readonly TenantCurrencyGuard $currencyGuard,
     ) {
     }
 
@@ -62,19 +59,7 @@ class TenantService
 
     public function update(Tenant $tenant, array $data): bool
     {
-        $payload = $this->payload($data, $tenant);
-
-        // The currency is frozen once the tenant's ledger has entries in it.
-        $this->currencyGuard->assertCanChange($tenant->id, $tenant->currency, $payload['currency']);
-
-        return DB::transaction(function () use ($tenant, $payload): bool {
-            $updated = $this->tenants->update($tenant, $payload);
-
-            // companies.currency mirrors the tenant's so any code still reading it stays correct.
-            DB::table('companies')->where('tenant_id', $tenant->id)->update(['currency' => $payload['currency']]);
-
-            return $updated;
-        });
+        return $this->tenants->update($tenant, $this->payload($data, $tenant));
     }
 
     public function updateStatus(Tenant $tenant, string $status): bool
@@ -103,12 +88,12 @@ class TenantService
             'archived_at' => $data['status'] === Tenant::STATUS_ARCHIVED ? ($tenant?->archived_at ?? now()) : null,
             'timezone' => $data['timezone'],
             'locale' => $data['locale'],
-            'currency' => strtoupper((string) ($data['currency'] ?? '')) ?: ($tenant?->currency ?? CurrencyService::FALLBACK_BASE_CURRENCY),
             'settings' => [
                 'display_name' => $data['display_name'] ?: $data['name'],
                 'logo_full' => $this->storedLogoPath($data['logo_full'] ?? null, $settings['logo_full'] ?? null),
                 'logo_abbr' => $this->storedLogoPath($data['logo_abbr'] ?? null, $settings['logo_abbr'] ?? null),
                 'branch' => $data['branch'] ?: 'Main Office',
+                'currency' => $data['currency'] ?: 'INR',
                 'financial_year' => $data['financial_year'] ?: 'FY '.now()->format('Y'),
             ],
         ];

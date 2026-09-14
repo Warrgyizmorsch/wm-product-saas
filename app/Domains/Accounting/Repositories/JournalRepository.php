@@ -58,12 +58,6 @@ class JournalRepository implements JournalRepositoryInterface
         return Journal::find($id);
     }
 
-    public function countForTenant(int $tenantId): int
-    {
-        // withoutGlobalScopes also lifts SoftDeletingScope: deleted journals count too.
-        return Journal::withoutGlobalScopes()->where('tenant_id', $tenantId)->count();
-    }
-
     public function findWithEntries(int $id): ?Journal
     {
         return Journal::with(['entries.account'])->find($id);
@@ -117,8 +111,6 @@ class JournalRepository implements JournalRepositoryInterface
                 'party_id' => $line['party_id'] ?? null,
                 'debit' => $line['debit'] ?? 0,
                 'credit' => $line['credit'] ?? 0,
-                'foreign_debit' => $line['foreign_debit'] ?? null,
-                'foreign_credit' => $line['foreign_credit'] ?? null,
                 'description' => $line['description'] ?? null,
             ]);
         }

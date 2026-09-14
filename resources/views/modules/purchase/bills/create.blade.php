@@ -99,7 +99,7 @@
                         <div class="alert alert-info border-info p-3 mb-4 rounded shadow-sm d-flex align-items-center justify-content-between flex-wrap gap-2">
                             <div>
                                 <strong class="text-dark fs-13"><i class="feather-info text-info me-1.5"></i>Vendor Advance Credit Available:</strong>
-                                <span class="text-success fw-bold font-monospace fs-14 ms-1">{{ currency_symbol() }}{{ number_format($advanceAmount, 2) }}</span>
+                                <span class="text-success fw-bold font-monospace fs-14 ms-1">₹{{ number_format($advanceAmount, 2) }}</span>
                                 <small class="text-muted d-block fs-11 mt-0.5">This advance credit will be available to apply against the bill immediately after posting.</small>
                             </div>
                             <span class="badge bg-primary text-white px-3 py-2 fs-12 font-monospace">Credit Available</span>
@@ -172,7 +172,7 @@
                             <div id="freightFieldsContainer">
                                 <div class="row g-2 align-items-end">
                                     <div class="col-5" id="freightAmountCol">
-                                        <x-ui.odoo-form-ui type="input" label="Freight Amount ({{ currency_symbol() }})" name="freight_amount" id="freightAmountInput" inputType="number" step="0.01" min="0" :value="old('freight_amount', number_format($po?->freight_amount ?? 0, 2, '.', ''))" />
+                                        <x-ui.odoo-form-ui type="input" label="Freight Amount (₹)" name="freight_amount" id="freightAmountInput" inputType="number" step="0.01" min="0" :value="old('freight_amount', number_format($po?->freight_amount ?? 0, 2, '.', ''))" />
                                     </div>
                                     <div class="col-7" id="freightAllocationMethodCol">
                                         <x-ui.odoo-form-ui type="select" label="Allocation Rule" name="freight_allocation_method" id="freightAllocationMethodSelect">
@@ -210,21 +210,21 @@
                                         <th class="ps-3 py-2" style="width: 4%;">#</th>
                                         <th class="py-2" style="width: 26%;">{{ __('purchase.product') }}</th>
                                         <th class="text-center py-2" style="width: 10%;">{{ __('purchase.accepted_qty') }}</th>
-                                        <th class="text-end py-2" style="width: 12%;">{{ __('purchase.unit_rate') }} ({{ currency_symbol() }})</th>
-                                        <th class="text-end py-2" style="width: 12%;">Amount ({{ currency_symbol() }})</th>
+                                        <th class="text-end py-2" style="width: 12%;">{{ __('purchase.unit_rate') }} (₹)</th>
+                                        <th class="text-end py-2" style="width: 12%;">Amount (₹)</th>
                                         
                                         <!-- Item Level Discount Columns -->
                                         <th class="text-center py-2 discount-column" style="width: 9%;">Disc (%)</th>
-                                        <th class="text-end py-2 discount-column" style="width: 11%;">Disc Amt ({{ currency_symbol() }})</th>
+                                        <th class="text-end py-2 discount-column" style="width: 11%;">Disc Amt (₹)</th>
 
                                         <!-- Freight Share Column (Shown on Pro-Rata Method) -->
-                                        <th class="text-end py-2 freight-column text-primary" style="width: 12%;">Freight Share ({{ currency_symbol() }})</th>
+                                        <th class="text-end py-2 freight-column text-primary" style="width: 12%;">Freight Share (₹)</th>
 
                                         <!-- Item Level Tax Columns -->
                                         <th class="text-center py-2 tax-column" style="width: 9%;">Tax Rate (%)</th>
-                                        <th class="text-end py-2 tax-column" style="width: 11%;">Tax Amt ({{ currency_symbol() }})</th>
+                                        <th class="text-end py-2 tax-column" style="width: 11%;">Tax Amt (₹)</th>
 
-                                        <th class="text-end pe-3 py-2" style="width: 14%;">{{ __('purchase.line_total') }} ({{ currency_symbol() }})</th>
+                                        <th class="text-end pe-3 py-2" style="width: 14%;">{{ __('purchase.line_total') }} (₹)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -264,7 +264,7 @@
                                                 <input type="number" name="items[{{ $idx }}][unit_price]" class="odoo-table-input text-end font-monospace item-rate" value="{{ $rate }}" step="0.01" min="0" required>
                                             </td>
                                             <td class="text-end py-2 font-monospace text-dark item-amount-display">
-                                                {{ currency_symbol() }}{{ number_format($lineSub, 2) }}
+                                                ₹{{ number_format($lineSub, 2) }}
                                             </td>
 
                                             <!-- Discount Columns -->
@@ -272,12 +272,12 @@
                                                 <input type="number" name="items[{{ $idx }}][discount_percent]" class="odoo-table-input text-center font-monospace item-disc-percent" value="{{ $discPct }}" step="0.01" min="0" max="100">
                                             </td>
                                             <td class="text-end py-2 font-monospace text-danger discount-column item-disc-amount-display">
-                                                {{ currency_symbol() }}0.00
+                                                ₹0.00
                                             </td>
 
                                             <!-- Freight Share Column -->
                                             <td class="text-end py-2 font-monospace text-primary freight-column item-freight-share-display">
-                                                +{{ currency_symbol() }}0.00
+                                                +₹0.00
                                             </td>
 
                                             <!-- Tax Columns -->
@@ -285,11 +285,11 @@
                                                 <input type="number" name="items[{{ $idx }}][tax_rate]" class="odoo-table-input text-center font-monospace item-tax-rate" value="{{ $inheritedTaxRate }}" step="0.01" min="0" max="100">
                                             </td>
                                             <td class="text-end py-2 font-monospace text-muted tax-column item-tax-display">
-                                                {{ currency_symbol() }}0.00
+                                                ₹0.00
                                             </td>
 
                                             <td class="text-end pe-3 py-2 font-monospace fw-bold text-dark item-total-display">
-                                                {{ currency_symbol() }}0.00
+                                                ₹0.00
                                             </td>
                                         </tr>
                                     @endforeach
@@ -610,7 +610,7 @@
                     if (discType === 'item_wise') {
                         var discPct = parseFloat(row.find('.item-disc-percent').val()) || 0;
                         lineDisc = lineSub * (discPct / 100);
-                        row.find('.item-disc-amount-display').text('{{ currency_symbol() }}' + lineDisc.toFixed(2));
+                        row.find('.item-disc-amount-display').text('₹' + lineDisc.toFixed(2));
                     }
 
                     var lineNetSub = Math.max(0, lineSub - lineDisc);
@@ -620,9 +620,9 @@
                     if (isProRataFreight && itemsTaxableValue > 0) {
                         var ratio = lineNetSub / itemsTaxableValue;
                         itemFreightShare = freightAmount * ratio;
-                        row.find('.item-freight-share-display').text('+{{ currency_symbol() }}' + itemFreightShare.toFixed(2));
+                        row.find('.item-freight-share-display').text('+₹' + itemFreightShare.toFixed(2));
                     } else {
-                        row.find('.item-freight-share-display').text('+{{ currency_symbol() }}0.00');
+                        row.find('.item-freight-share-display').text('+₹0.00');
                     }
 
                     var lineTax = 0;
@@ -642,12 +642,12 @@
                         }
                     }
 
-                    row.find('.item-tax-display').text('{{ currency_symbol() }}' + lineTax.toFixed(2));
+                    row.find('.item-tax-display').text('₹' + lineTax.toFixed(2));
 
                     var lineTotal = lineNetSub + itemFreightShare + lineTax;
 
-                    row.find('.item-amount-display').text('{{ currency_symbol() }}' + lineSub.toFixed(2));
-                    row.find('.item-total-display').text('{{ currency_symbol() }}' + lineTotal.toFixed(2));
+                    row.find('.item-amount-display').text('₹' + lineSub.toFixed(2));
+                    row.find('.item-total-display').text('₹' + lineTotal.toFixed(2));
                 });
 
                 // Summary Calculation Engine based on Tax Mode
@@ -663,10 +663,10 @@
                     totalGST = totalTaxableBase * (orderTaxPct / 100);
                     grandTotal = totalTaxableBase + totalGST;
 
-                    $('#summaryOrderFreightText').val('{{ currency_symbol() }}' + freightAmount.toFixed(2));
-                    $('#summaryTotalTaxableBaseText').val('{{ currency_symbol() }}' + totalTaxableBase.toFixed(2));
+                    $('#summaryOrderFreightText').val('₹' + freightAmount.toFixed(2));
+                    $('#summaryTotalTaxableBaseText').val('₹' + totalTaxableBase.toFixed(2));
                     $('#summaryOrderTaxAmtLabel').text('Add: Order GST Tax (' + orderTaxPct + '%):');
-                    $('#summaryOrderTaxAmtText').val('+{{ currency_symbol() }}' + totalGST.toFixed(2));
+                    $('#summaryOrderTaxAmtText').val('+₹' + totalGST.toFixed(2));
                 } else if (isItemWiseTax) {
                     var itemsTaxTotal = itemTaxesTotal;
 
@@ -703,32 +703,32 @@
                         grandTotal = Math.max(0, itemsTotalInclTax + freightTotalInclTax);
                     }
 
-                    $('#summaryItemsTaxText').val('+{{ currency_symbol() }}' + (isProRataFreight ? totalGST : itemsTaxTotal).toFixed(2));
-                    $('#summaryItemsTotalText').val('{{ currency_symbol() }}' + itemsTotalInclTax.toFixed(2));
-                    $('#summaryFreightText').val('{{ currency_symbol() }}' + freightAmount.toFixed(2));
-                    $('#summaryFreightTaxText').val('+{{ currency_symbol() }}' + freightTaxAmount.toFixed(2));
-                    $('#summaryFreightTotalText').val('{{ currency_symbol() }}' + (freightAmount + freightTaxAmount).toFixed(2));
+                    $('#summaryItemsTaxText').val('+₹' + (isProRataFreight ? totalGST : itemsTaxTotal).toFixed(2));
+                    $('#summaryItemsTotalText').val('₹' + itemsTotalInclTax.toFixed(2));
+                    $('#summaryFreightText').val('₹' + freightAmount.toFixed(2));
+                    $('#summaryFreightTaxText').val('+₹' + freightTaxAmount.toFixed(2));
+                    $('#summaryFreightTotalText').val('₹' + (freightAmount + freightTaxAmount).toFixed(2));
                 }
 
                 // Financial Summary Card Common DOM Updates
-                $('#summarySubtotalText').val('{{ currency_symbol() }}' + grossSubtotal.toFixed(2));
-                $('#summaryItemDiscountText').val('-{{ currency_symbol() }}' + itemDiscountsTotal.toFixed(2));
-                $('#summaryGrossText').val('{{ currency_symbol() }}' + itemsTaxableValue.toFixed(2));
-                $('#summaryGrandtotalText').val('{{ currency_symbol() }}' + grandTotal.toFixed(2));
+                $('#summarySubtotalText').val('₹' + grossSubtotal.toFixed(2));
+                $('#summaryItemDiscountText').val('-₹' + itemDiscountsTotal.toFixed(2));
+                $('#summaryGrossText').val('₹' + itemsTaxableValue.toFixed(2));
+                $('#summaryGrandtotalText').val('₹' + grandTotal.toFixed(2));
 
                 if (isWithoutTax) {
                     $('#cgstRow, #sgstRow, #igstRow').addClass('d-none').hide();
                 } else if (isIgst) {
                     $('#cgstRow, #sgstRow').addClass('d-none').hide();
                     $('#igstRow').removeClass('d-none').show();
-                    $('#igstText').val('{{ currency_symbol() }}' + totalGST.toFixed(2));
+                    $('#igstText').val('₹' + totalGST.toFixed(2));
                 } else {
                     $('#igstRow').addClass('d-none').hide();
                     $('#cgstRow, #sgstRow').removeClass('d-none').show();
 
                     var halfTax = totalGST / 2;
-                    $('#cgstText').val('{{ currency_symbol() }}' + halfTax.toFixed(2));
-                    $('#sgstText').val('{{ currency_symbol() }}' + halfTax.toFixed(2));
+                    $('#cgstText').val('₹' + halfTax.toFixed(2));
+                    $('#sgstText').val('₹' + halfTax.toFixed(2));
                 }
             }
 

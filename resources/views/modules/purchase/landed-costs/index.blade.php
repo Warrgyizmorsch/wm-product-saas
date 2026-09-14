@@ -108,7 +108,7 @@
                                 <span class="font-monospace fs-12 text-dark">{{ $grnNumbers ?: '—' }}</span>
                             </td>
                             <td class="text-end fw-bold font-monospace text-dark">
-                                {{ currency_symbol() }}{{ number_format($voucher->total_expenses, 2) }}
+                                ₹{{ number_format($voucher->total_expenses, 2) }}
                             </td>
                             <td class="text-center">
                                 @php

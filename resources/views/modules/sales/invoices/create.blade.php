@@ -123,7 +123,7 @@
                         @if ($advanceAllocations > 0)
                             <div class="alert alert-info border-0 shadow-sm mt-3 py-2 px-3 fs-12 text-info">
                                 <i class="feather-info me-2 fw-bold"></i>
-                                Advance Paid on Sales Order: <strong>{{ currency_symbol() }}{{ number_format($advanceAllocations, 2) }}</strong>. Automatically adjusted!
+                                Advance Paid on Sales Order: <strong>₹{{ number_format($advanceAllocations, 2) }}</strong>. Automatically adjusted!
                             </div>
                         @endif
                     </div>
@@ -167,7 +167,7 @@
 
                         <div class="row g-2">
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount ({{ currency_symbol() }})" name="freight_amount" id="invFreightAmountInput" :value="old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
+                                <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="invFreightAmountInput" :value="old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
                             </div>
                             <div class="col-md-6">
                                 <x-ui.odoo-form-ui type="select" label="Freight GST Tax Rate" name="freight_tax_rate" id="invFreightTaxRateSelect">
@@ -204,7 +204,7 @@
                                     <th class="text-end" style="width: 10%;">Qty <span class="text-danger">*</span></th>
                                     <th class="text-end" style="width: 12%;">Rate <span class="text-danger">*</span></th>
                                     <th class="text-end" style="width: 12%;">Amount</th>
-                                    <th class="text-end discount-column" style="width: 10%;">Disc ({{ currency_symbol() }})</th>
+                                    <th class="text-end discount-column" style="width: 10%;">Disc (₹)</th>
                                     <th class="text-end tax-column" style="width: 10%;">Tax Rate (%)</th>
                                     <th class="text-end pe-3" style="width: 14%;">Total Amount</th>
                                     <th style="width: 3%;"></th>
@@ -320,20 +320,20 @@
                                 <!-- 1. Subtotal (Excl. Tax) -->
                                 <div class="d-flex justify-content-between align-items-center mb-3" id="summarySubtotalRow">
                                     <span class="text-muted fs-13 fw-semibold">Subtotal (Excl. Tax):</span>
-                                    <input type="text" id="calcSubtotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ currency_symbol() }}0.00">
+                                    <input type="text" id="calcSubtotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="₹0.00">
                                 </div>
 
                                 <!-- 2. Less: Item Discounts -->
                                 <div class="d-flex justify-content-between align-items-center mb-3 d-none" id="summaryDiscountRow">
                                     <span class="text-muted fs-13 fw-semibold" id="summaryDiscountLabel">Less: Item Discounts:</span>
-                                    <input type="text" id="calcDiscountDisplay" class="form-control form-control-sm text-end fw-bold text-danger" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="-{{ currency_symbol() }}0.00">
+                                    <input type="text" id="calcDiscountDisplay" class="form-control form-control-sm text-end fw-bold text-danger" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="-₹0.00">
                                     <input type="number" name="discount_amount" id="summaryDiscount" class="form-control form-control-sm text-end fw-bold text-danger d-none" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('discount_amount', $salesOrder?->discount ?: 0) }}" step="0.01">
                                 </div>
 
                                 <!-- 3. Items Taxable Value -->
                                 <div class="d-flex justify-content-between align-items-center mb-3" id="calcTaxableRow">
                                     <span class="text-muted fs-13 fw-semibold">Items Taxable Value:</span>
-                                    <input type="text" id="calcTaxableAmount" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ currency_symbol() }}0.00">
+                                    <input type="text" id="calcTaxableAmount" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="₹0.00">
                                 </div>
 
                                 <!-- 4. Order Tax Rate (%) -->
@@ -345,13 +345,13 @@
                                 <!-- 5. Add: Items GST Tax -->
                                 <div class="d-flex justify-content-between align-items-center mb-3" id="summaryItemsTaxRow">
                                     <span class="text-muted fs-13 fw-semibold">Add: Items GST Tax:</span>
-                                    <input type="text" id="summaryItemsTaxText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+{{ currency_symbol() }}0.00">
+                                    <input type="text" id="summaryItemsTaxText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
                                 </div>
 
                                 <!-- 6. Billed Items Total (Incl. GST) -->
                                 <div class="d-flex justify-content-between align-items-center mb-3 fw-bold text-dark" id="calcItemsTotalRow">
                                     <span class="fs-13">Billed Items Total (Incl. GST):</span>
-                                    <input type="text" id="calcItemsTotalInclGst" class="form-control form-control-sm text-end fw-bold text-dark" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f1f5f9;" readonly value="{{ currency_symbol() }}0.00">
+                                    <input type="text" id="calcItemsTotalInclGst" class="form-control form-control-sm text-end fw-bold text-dark" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f1f5f9;" readonly value="₹0.00">
                                 </div>
 
                                 <!-- FREIGHT BREAKDOWN SECTION -->
@@ -365,12 +365,12 @@
 
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryFreightTaxRow">
                                         <span class="text-muted fs-13 fw-semibold" id="summaryFreightTaxLabel">Add: Freight GST Tax:</span>
-                                        <input type="text" id="summaryFreightTaxText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+{{ currency_symbol() }}0.00">
+                                        <input type="text" id="summaryFreightTaxText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
                                     </div>
 
                                     <div class="d-flex justify-content-between align-items-center mb-3 fw-bold text-dark" id="summaryFreightTotalRow">
                                         <span class="fs-13">Total Freight (Incl. GST):</span>
-                                        <input type="text" id="summaryFreightTotalText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #eff6ff;" readonly value="{{ currency_symbol() }}0.00">
+                                        <input type="text" id="summaryFreightTotalText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #eff6ff;" readonly value="₹0.00">
                                     </div>
                                 </div>
 
@@ -379,18 +379,18 @@
                                 <div id="cgstSgstRows">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <span class="text-muted fs-13 fw-semibold">CGST (Central Tax):</span>
-                                        <input type="text" id="summaryCgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+{{ currency_symbol() }}0.00">
+                                        <input type="text" id="summaryCgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <span class="text-muted fs-13 fw-semibold">SGST (State Tax):</span>
-                                        <input type="text" id="summarySgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+{{ currency_symbol() }}0.00">
+                                        <input type="text" id="summarySgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
                                     </div>
                                 </div>
 
                                 <div id="igstRow" style="display: none;">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <span class="text-muted fs-13 fw-semibold">IGST (Integrated Tax):</span>
-                                        <input type="text" id="summaryIgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+{{ currency_symbol() }}0.00">
+                                        <input type="text" id="summaryIgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+₹0.00">
                                     </div>
                                 </div>
 
@@ -403,17 +403,17 @@
                                 <!-- 10. Grand Total -->
                                 <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-3">
                                     <span class="fw-bold text-primary fs-13">Grand Total:</span>
-                                    <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 36px; border: 1.5px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb; font-size: 14px; font-weight: 800;" readonly value="{{ currency_symbol() }}0.00">
+                                    <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 36px; border: 1.5px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb; font-size: 14px; font-weight: 800;" readonly value="₹0.00">
                                 </div>
 
                                 @if ($advanceAllocations > 0)
                                     <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top text-info">
                                         <span class="fs-12 fw-semibold">Advance Adjusted</span>
-                                        <span class="fw-bold">-{{ currency_symbol() }}{{ number_format($advanceAllocations, 2) }}</span>
+                                        <span class="fw-bold">-₹{{ number_format($advanceAllocations, 2) }}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mt-1 pt-1 text-success">
                                         <span class="fw-bold fs-13">Balance Due</span>
-                                        <span class="fw-extrabold fs-14" id="summaryBalanceDueText">{{ currency_symbol() }}0.00</span>
+                                        <span class="fw-extrabold fs-14" id="summaryBalanceDueText">₹0.00</span>
                                     </div>
                                 @endif
 
@@ -471,7 +471,7 @@
                     $('.discount-column').addClass('d-none').hide();
                     $('#summaryDiscountRow').addClass('d-none').hide();
                     $('#summaryDiscount').val('0.00');
-                    $('#calcDiscountDisplay').val('-{{ currency_symbol() }}0.00');
+                    $('#calcDiscountDisplay').val('-₹0.00');
                 }
 
                 if (taxType === 'item_wise_tax') {
@@ -682,10 +682,10 @@
                 if (discountType === 'item_wise') {
                     totalDiscount = itemDiscTotal;
                     $('#summaryDiscount').val(totalDiscount.toFixed(2));
-                    $('#calcDiscountDisplay').val('-{{ currency_symbol() }}' + totalDiscount.toFixed(2));
+                    $('#calcDiscountDisplay').val('-₹' + totalDiscount.toFixed(2));
                 } else if (discountType === 'order_wise') {
                     totalDiscount = parseFloat($('#summaryDiscount').val()) || 0;
-                    $('#calcDiscountDisplay').val('-{{ currency_symbol() }}' + totalDiscount.toFixed(2));
+                    $('#calcDiscountDisplay').val('-₹' + totalDiscount.toFixed(2));
                 }
 
                 const grossBeforeTax = Math.max(0, subtotal - totalDiscount);
@@ -721,21 +721,21 @@
                 const totalFreightInclGst = effectiveFreight + freightTax;
                 const grandTotalTax = itemsTaxTotal + freightTax;
 
-                $('#summaryItemsTaxText').val('+{{ currency_symbol() }}' + itemsTaxTotal.toFixed(2));
-                $('#summaryFreightTaxText').val('+{{ currency_symbol() }}' + freightTax.toFixed(2));
-                $('#summaryFreightTotalText').val('{{ currency_symbol() }}' + totalFreightInclGst.toFixed(2));
+                $('#summaryItemsTaxText').val('+₹' + itemsTaxTotal.toFixed(2));
+                $('#summaryFreightTaxText').val('+₹' + freightTax.toFixed(2));
+                $('#summaryFreightTotalText').val('₹' + totalFreightInclGst.toFixed(2));
 
                 if (taxType !== 'without_tax' && grandTotalTax > 0) {
                     if (gstType === 'igst') {
                         $('#cgstSgstRows').addClass('d-none').hide();
                         $('#igstRow').removeClass('d-none').show();
-                        $('#summaryIgstText').val('+{{ currency_symbol() }}' + grandTotalTax.toFixed(2));
+                        $('#summaryIgstText').val('+₹' + grandTotalTax.toFixed(2));
                     } else {
                         $('#cgstSgstRows').removeClass('d-none').show();
                         $('#igstRow').addClass('d-none').hide();
                         const halfTax = grandTotalTax / 2;
-                        $('#summaryCgstText').val('+{{ currency_symbol() }}' + halfTax.toFixed(2));
-                        $('#summarySgstText').val('+{{ currency_symbol() }}' + halfTax.toFixed(2));
+                        $('#summaryCgstText').val('+₹' + halfTax.toFixed(2));
+                        $('#summarySgstText').val('+₹' + halfTax.toFixed(2));
                     }
                 } else {
                     $('#cgstSgstRows').addClass('d-none').hide();
@@ -747,11 +747,11 @@
                 const grandTotal = itemsTotalInclGst + totalFreightInclGst + adjustment;
                 const balanceDue = Math.max(0, grandTotal - advanceAllocated);
 
-                $('#calcSubtotal').val('{{ currency_symbol() }}' + subtotal.toFixed(2));
-                $('#calcTaxableAmount').val('{{ currency_symbol() }}' + grossBeforeTax.toFixed(2));
-                $('#calcItemsTotalInclGst').val('{{ currency_symbol() }}' + itemsTotalInclGst.toFixed(2));
-                $('#summaryGrandtotalText').val('{{ currency_symbol() }}' + grandTotal.toFixed(2));
-                $('#summaryBalanceDueText').text('{{ currency_symbol() }}' + balanceDue.toFixed(2));
+                $('#calcSubtotal').val('₹' + subtotal.toFixed(2));
+                $('#calcTaxableAmount').val('₹' + grossBeforeTax.toFixed(2));
+                $('#calcItemsTotalInclGst').val('₹' + itemsTotalInclGst.toFixed(2));
+                $('#summaryGrandtotalText').val('₹' + grandTotal.toFixed(2));
+                $('#summaryBalanceDueText').text('₹' + balanceDue.toFixed(2));
 
                 // Build Tally-Style Tax Rate Breakdown Analysis Table
                 const taxGroups = {};
@@ -815,8 +815,8 @@
                             bodyHtml += `
                                 <tr>
                                     <td class="py-1 fw-bold">GST ${parseFloat(grp.rate)}%</td>
-                                    <td class="py-1 text-end fw-bold text-dark">{{ currency_symbol() }}${grp.tax.toFixed(2)}</td>
-                                    <td class="py-1 text-end">{{ currency_symbol() }}${igstAmt.toFixed(2)}</td>
+                                    <td class="py-1 text-end fw-bold text-dark">₹${grp.tax.toFixed(2)}</td>
+                                    <td class="py-1 text-end">₹${igstAmt.toFixed(2)}</td>
                                 </tr>
                             `;
                         });
@@ -824,8 +824,8 @@
                         footerHtml = `
                             <tr>
                                 <td class="py-1">Total</td>
-                                <td class="py-1 text-end text-primary">{{ currency_symbol() }}${totalTaxVal.toFixed(2)}</td>
-                                <td class="py-1 text-end">{{ currency_symbol() }}${totalIgstVal.toFixed(2)}</td>
+                                <td class="py-1 text-end text-primary">₹${totalTaxVal.toFixed(2)}</td>
+                                <td class="py-1 text-end">₹${totalIgstVal.toFixed(2)}</td>
                             </tr>
                         `;
                     } else {
@@ -848,9 +848,9 @@
                             bodyHtml += `
                                 <tr>
                                     <td class="py-1 fw-bold">GST ${parseFloat(grp.rate)}%</td>
-                                    <td class="py-1 text-end fw-bold text-dark">{{ currency_symbol() }}${grp.tax.toFixed(2)}</td>
-                                    <td class="py-1 text-end">{{ currency_symbol() }}${cgstAmt.toFixed(2)}</td>
-                                    <td class="py-1 text-end">{{ currency_symbol() }}${sgstAmt.toFixed(2)}</td>
+                                    <td class="py-1 text-end fw-bold text-dark">₹${grp.tax.toFixed(2)}</td>
+                                    <td class="py-1 text-end">₹${cgstAmt.toFixed(2)}</td>
+                                    <td class="py-1 text-end">₹${sgstAmt.toFixed(2)}</td>
                                 </tr>
                             `;
                         });
@@ -858,9 +858,9 @@
                         footerHtml = `
                             <tr>
                                 <td class="py-1">Total</td>
-                                <td class="py-1 text-end text-primary">{{ currency_symbol() }}${totalTaxVal.toFixed(2)}</td>
-                                <td class="py-1 text-end">{{ currency_symbol() }}${totalCgstVal.toFixed(2)}</td>
-                                <td class="py-1 text-end">{{ currency_symbol() }}${totalSgstVal.toFixed(2)}</td>
+                                <td class="py-1 text-end text-primary">₹${totalTaxVal.toFixed(2)}</td>
+                                <td class="py-1 text-end">₹${totalCgstVal.toFixed(2)}</td>
+                                <td class="py-1 text-end">₹${totalSgstVal.toFixed(2)}</td>
                             </tr>
                         `;
                     }

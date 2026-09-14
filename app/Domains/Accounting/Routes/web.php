@@ -88,7 +88,6 @@ Route::prefix('accounting')
 
         Route::get('journals', [JournalController::class, 'index'])->name('journals.index');
         Route::get('journals/create', [JournalController::class, 'create'])->name('journals.create');
-        Route::get('journals/exchange-rate', [JournalController::class, 'exchangeRate'])->name('journals.exchange-rate');
         Route::post('journals', [JournalController::class, 'store'])->name('journals.store');
         Route::get('journals/{journal}', [JournalController::class, 'show'])->name('journals.show');
         Route::post('journals/{journal}/reverse', [JournalController::class, 'reverse'])->name('journals.reverse');

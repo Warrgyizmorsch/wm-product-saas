@@ -30,7 +30,6 @@ class DatabaseSeeder extends Seeder
                 'plan_started_at' => now(),
                 'timezone' => 'Asia/Kolkata',
                 'locale' => 'en',
-                'currency' => 'INR',
                 'settings' => [],
             ],
         );

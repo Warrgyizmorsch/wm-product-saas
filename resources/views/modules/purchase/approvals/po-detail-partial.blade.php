@@ -124,15 +124,15 @@
                         <div class="text-muted fs-10">SKU: {{ $item->product->sku ?? '—' }}</div>
                     </td>
                     <td class="text-center fw-semibold">{{ (float)$item->quantity }}</td>
-                    <td class="text-end">{{ currency_symbol() }}{{ number_format($item->rate, 2) }}</td>
-                    <td class="text-end fw-bold">{{ currency_symbol() }}{{ number_format($lineTotal, 2) }}</td>
+                    <td class="text-end">₹{{ number_format($item->rate, 2) }}</td>
+                    <td class="text-end fw-bold">₹{{ number_format($lineTotal, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
         <tfoot class="table-light fw-bold">
             <tr>
                 <td colspan="3" class="text-end text-uppercase fs-10 text-muted letter-spacing-1">Grand Total</td>
-                <td class="text-end text-primary fs-14">{{ currency_symbol() }}{{ number_format($order->grand_total ?? $grandTotal, 2) }}</td>
+                <td class="text-end text-primary fs-14">₹{{ number_format($order->grand_total ?? $grandTotal, 2) }}</td>
             </tr>
         </tfoot>
     </table>

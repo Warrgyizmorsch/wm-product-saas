@@ -80,26 +80,26 @@
                                                 @endif
                                             </td>
                                             <td class="text-muted fs-13">{{ $calcTypeLabel }}</td>
-                                            <td class="text-end fw-semibold">{{ currency_symbol() }}{{ number_format($amt / 12, 2) }}</td>
-                                            <td class="text-end fw-semibold text-primary">{{ currency_symbol() }}{{ number_format($amt, 2) }}</td>
+                                            <td class="text-end fw-semibold">₹{{ number_format($amt / 12, 2) }}</td>
+                                            <td class="text-end fw-semibold text-primary">₹{{ number_format($amt, 2) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                                 <tfoot class="table-light border-top-2">
                                     <tr>
                                         <td colspan="3" class="fw-bold">{{ __('hrms.employees.lbl_total_earnings') }}</td>
-                                        <td class="text-end fw-bold text-success">{{ currency_symbol() }}{{ number_format($totalEarningsMonthly, 2) }}</td>
-                                        <td class="text-end fw-bold text-success">{{ currency_symbol() }}{{ number_format($totalEarningsMonthly * 12, 2) }}</td>
+                                        <td class="text-end fw-bold text-success">₹{{ number_format($totalEarningsMonthly, 2) }}</td>
+                                        <td class="text-end fw-bold text-success">₹{{ number_format($totalEarningsMonthly * 12, 2) }}</td>
                                     </tr>
                                     <tr>
                                         <td colspan="3" class="fw-bold">{{ __('hrms.employees.lbl_total_deductions') }}</td>
-                                        <td class="text-end fw-bold text-danger">{{ currency_symbol() }}{{ number_format($totalDeductionsMonthly, 2) }}</td>
-                                        <td class="text-end fw-bold text-danger">{{ currency_symbol() }}{{ number_format($totalDeductionsMonthly * 12, 2) }}</td>
+                                        <td class="text-end fw-bold text-danger">₹{{ number_format($totalDeductionsMonthly, 2) }}</td>
+                                        <td class="text-end fw-bold text-danger">₹{{ number_format($totalDeductionsMonthly * 12, 2) }}</td>
                                     </tr>
                                     <tr class="table-primary">
                                         <td colspan="3" class="fw-bold">{{ __('hrms.employees.lbl_net_salary') }}</td>
-                                        <td class="text-end fw-extrabold text-primary">{{ currency_symbol() }}{{ number_format(max(0, $totalEarningsMonthly - $totalDeductionsMonthly), 2) }}</td>
-                                        <td class="text-end fw-extrabold text-primary">{{ currency_symbol() }}{{ number_format(max(0, $totalEarningsMonthly - $totalDeductionsMonthly) * 12, 2) }}</td>
+                                        <td class="text-end fw-extrabold text-primary">₹{{ number_format(max(0, $totalEarningsMonthly - $totalDeductionsMonthly), 2) }}</td>
+                                        <td class="text-end fw-extrabold text-primary">₹{{ number_format(max(0, $totalEarningsMonthly - $totalDeductionsMonthly) * 12, 2) }}</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -123,7 +123,7 @@
                         </div>
                         <div>
                             <div class="info-label">{{ __('hrms.employees.lbl_annual_ctc') }}</div>
-                            <div class="info-value text-primary fs-18 fw-bold">{{ currency_symbol() }}{{ number_format($employee->current_salary, 2) }}</div>
+                            <div class="info-value text-primary fs-18 fw-bold">₹{{ number_format($employee->current_salary, 2) }}</div>
                         </div>
                     </div>
                 </div>
@@ -175,7 +175,7 @@
                                             </td>
                                             <td class="py-2 text-muted fw-medium">{{ $mName }}</td>
                                             <td class="py-2 px-3 text-end fw-bold {{ ($adhoc->component?->type === 'deduction') ? 'text-danger' : 'text-success' }}">
-                                                {{ ($adhoc->component?->type === 'deduction') ? '-' : '+' }}{{ currency_symbol() }}{{ number_format($adhoc->amount, 2) }}
+                                                {{ ($adhoc->component?->type === 'deduction') ? '-' : '+' }}₹{{ number_format($adhoc->amount, 2) }}
                                             </td>
                                         </tr>
                                     @endforeach

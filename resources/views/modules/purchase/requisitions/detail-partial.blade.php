@@ -155,8 +155,8 @@
                         @endif
                     </td>
                     <td class="text-center fw-semibold">{{ (float)$item->quantity }}</td>
-                    <td class="text-end">{{ currency_symbol() }}{{ number_format($item->estimated_cost, 2) }}</td>
-                    <td class="text-end fw-bold">{{ currency_symbol() }}{{ number_format($lineTotal, 2) }}</td>
+                    <td class="text-end">₹{{ number_format($item->estimated_cost, 2) }}</td>
+                    <td class="text-end fw-bold">₹{{ number_format($lineTotal, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -165,7 +165,7 @@
                 <td colspan="3" class="text-end text-uppercase fs-10 text-muted letter-spacing-1">
                     {{ __('purchase.estimated_requisition_total') }}
                 </td>
-                <td class="text-end text-primary fs-14">{{ currency_symbol() }}{{ number_format($grandTotal, 2) }}</td>
+                <td class="text-end text-primary fs-14">₹{{ number_format($grandTotal, 2) }}</td>
             </tr>
         </tfoot>
     </table>

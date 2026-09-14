@@ -108,7 +108,7 @@
                             <option value="Customer Pickup" @selected(old('freight_terms', $prefillSalesOrder?->freight_terms ?? '') == 'Customer Pickup')>Customer Pickup (Self Vehicle)</option>
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount ({{ currency_symbol() }})" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', $prefillSalesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
+                        <x-ui.odoo-form-ui type="input" inputType="number" label="Freight Amount (₹)" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', $prefillSalesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
                     </div>
 
                     <div class="col-md-6 ps-md-4">
@@ -483,7 +483,7 @@
                         activeSalesOrderInvoices = res.invoices;
                         $select.empty().append('<option value="">-- Dispatch Full Sales Order / Material Requirement --</option>');
                         res.invoices.forEach(function(inv) {
-                            $select.append(`<option value="${inv.id}">Invoice #${inv.invoice_number} (${inv.invoice_date}) - Total {{ currency_symbol() }}${inv.total_amount} [${inv.items.length} unfulfilled item(s)]</option>`);
+                            $select.append(`<option value="${inv.id}">Invoice #${inv.invoice_number} (${inv.invoice_date}) - Total ₹${inv.total_amount} [${inv.items.length} unfulfilled item(s)]</option>`);
                         });
                         $wrapper.removeClass('d-none');
                     } else {

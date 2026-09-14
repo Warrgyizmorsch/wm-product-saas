@@ -114,9 +114,9 @@ class TravelExpenseApiController extends Controller
             $reportQuery->where('employee_id', $employee->id);
         }
 
-        // One currency per tenant.
-        $currencyCode = company_currency()['code'];
-        $currencySymbol = currency_symbol();
+        $company = \App\Domains\HRMS\Models\Company::first();
+        $currencyCode = $company?->currency ?? 'USD';
+        $currencySymbol = self::currencySymbol($currencyCode);
 
         $data = [
             'currency_code'   => $currencyCode,
@@ -907,7 +907,7 @@ class TravelExpenseApiController extends Controller
                     $rule = $policy->rules()->where('expense_category_id', $c['category_id'])->first();
                     if ($rule) {
                         if ($rule->max_limit_per_claim && floatval($c['amount']) > floatval($rule->max_limit_per_claim)) {
-                            $errorMessages["claims.{$index}.amount"] = "This claim amount exceeds the policy limit of " . currency_symbol() . number_format($rule->max_limit_per_claim, 2) . " for category " . $rule->category->name . ".";
+                            $errorMessages["claims.{$index}.amount"] = "This claim amount exceeds the policy limit of ₹" . number_format($rule->max_limit_per_claim, 2) . " for category " . $rule->category->name . ".";
                         }
                         
                         $needsReceipt = false;
@@ -919,7 +919,7 @@ class TravelExpenseApiController extends Controller
                         
                         $fileKey = "claims.{$index}.receipt";
                         if ($needsReceipt && !$request->hasFile($fileKey)) {
-                            $errorMessages[$fileKey] = "A receipt attachment is required for " . $rule->category->name . " claims above " . currency_symbol() . number_format($rule->receipt_required_threshold ?: 0, 2) . ".";
+                            $errorMessages[$fileKey] = "A receipt attachment is required for " . $rule->category->name . " claims above ₹" . number_format($rule->receipt_required_threshold ?: 0, 2) . ".";
                         }
                     }
                 }
@@ -1053,7 +1053,7 @@ class TravelExpenseApiController extends Controller
                     $rule = $policy->rules()->where('expense_category_id', $c['category_id'])->first();
                     if ($rule) {
                         if ($rule->max_limit_per_claim && floatval($c['amount']) > floatval($rule->max_limit_per_claim)) {
-                            $errorMessages["claims.{$index}.amount"] = "This claim amount exceeds the policy limit of " . currency_symbol() . number_format($rule->max_limit_per_claim, 2) . " for category " . $rule->category->name . ".";
+                            $errorMessages["claims.{$index}.amount"] = "This claim amount exceeds the policy limit of ₹" . number_format($rule->max_limit_per_claim, 2) . " for category " . $rule->category->name . ".";
                         }
                         
                         $needsReceipt = false;

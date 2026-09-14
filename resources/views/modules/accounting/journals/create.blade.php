@@ -33,20 +33,6 @@
                     <div class="col-md-6">
                         <x-ui.odoo-form-ui type="input" label="Memo" name="memo" :value="old('memo')" placeholder="Short description of this entry" />
                     </div>
-                    <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="select" label="Currency" name="currency_code" id="journalCurrency">
-                            @foreach ($currencies as $currency)
-                                <option value="{{ $currency->code }}" @selected(old('currency_code', $baseCurrency['code']) === $currency->code)>
-                                    {{ $currency->code }} — {{ $currency->name }}{{ $currency->code === $baseCurrency['code'] ? ' (base)' : '' }}
-                                </option>
-                            @endforeach
-                        </x-ui.odoo-form-ui>
-                    </div>
-                    <div class="col-md-6" id="exchangeRateField" style="display: none;">
-                        <x-ui.odoo-form-ui type="input" inputType="number" label="Exchange Rate" name="exchange_rate" id="journalRate"
-                                          :value="old('exchange_rate')" step="any" min="0" placeholder="Units of {{ $baseCurrency['code'] }} per 1 unit" />
-                        <div id="rateHint" class="fs-11 text-muted mt-n1 ms-1"></div>
-                    </div>
                 </div>
 
                 <div class="border-top pt-4">
@@ -82,16 +68,12 @@
                     <div class="col-md-7"></div>
                     <div class="col-md-5">
                         <div class="d-flex justify-content-between py-1 border-bottom">
-                            <span class="text-muted fw-semibold">Total Debit <span class="totals-currency"></span>:</span>
+                            <span class="text-muted fw-semibold">Total Debit:</span>
                             <span class="fw-bold text-dark" id="calcDebit">0.00</span>
                         </div>
                         <div class="d-flex justify-content-between py-1 border-bottom">
-                            <span class="text-muted fw-semibold">Total Credit <span class="totals-currency"></span>:</span>
+                            <span class="text-muted fw-semibold">Total Credit:</span>
                             <span class="fw-bold text-dark" id="calcCredit">0.00</span>
-                        </div>
-                        <div class="d-flex justify-content-between py-1 border-bottom" id="baseTotalRow" style="display: none !important;">
-                            <span class="text-muted fw-semibold">Posts to ledger as ({{ $baseCurrency['code'] }}):</span>
-                            <span class="fw-bold text-primary" id="calcBase">—</span>
                         </div>
                     </div>
                 </div>
@@ -225,18 +207,6 @@
                 $('#calcDebit').text(totalDebit.toFixed(2));
                 $('#calcCredit').text(totalCredit.toFixed(2));
 
-                // Foreign journal: show what the ledger will record in base currency.
-                const currency = $('#journalCurrency').val();
-                const isForeign = currency && currency !== baseCurrency;
-                const rate = parseFloat($('#journalRate').val());
-                $('.totals-currency').text(currency ? '(' + currency + ')' : '');
-                if (isForeign) {
-                    $('#baseTotalRow').attr('style', '');
-                    $('#calcBase').text(rate > 0 ? (totalDebit * rate).toFixed(baseDecimals) : 'enter a rate');
-                } else {
-                    $('#baseTotalRow').attr('style', 'display: none !important;');
-                }
-
                 const indicator = $('#balanceIndicator');
                 if (totalDebit === 0 && totalCredit === 0) {
                     indicator.removeClass('bg-soft-success text-success bg-soft-danger text-danger')
@@ -251,63 +221,9 @@
                 }
             }
 
-            // ── Currency & exchange rate ────────────────────────────────────────
-            const baseCurrency = @json($baseCurrency['code']);
-            const baseDecimals = {{ (int) $baseCurrency['decimals'] }};
-            const rateUrl = @json(route('accounting.journals.exchange-rate'));
-            const oldRate = @json(old('exchange_rate'));
-
-            function lookupRate() {
-                const currency = $('#journalCurrency').val();
-                const isForeign = currency && currency !== baseCurrency;
-
-                $('#exchangeRateField').toggle(Boolean(isForeign));
-
-                if (!isForeign) {
-                    $('#journalRate').val('');
-                    $('#rateHint').text('');
-                    calculateTotals();
-                    return;
-                }
-
-                $('#rateHint').text('Looking up rate…');
-                $.getJSON(rateUrl, { currency: currency, date: $('input[name="journal_date"]').val() })
-                    .done(function (response) {
-                        $('#journalRate').val(response.rate);
-                        $('#rateHint').text('1 ' + currency + ' = ' + response.rate + ' ' + baseCurrency + ' from Exchange Rates. You can override it.');
-                        calculateTotals();
-                    })
-                    .fail(function (xhr) {
-                        $('#journalRate').val('');
-                        const message = (xhr.responseJSON && xhr.responseJSON.message) || 'No exchange rate found.';
-                        $('#rateHint').html('<span class="text-danger">' + escapeHtml(message) + ' Enter the rate manually.</span>');
-                        calculateTotals();
-                    });
-            }
-
-            $('#journalCurrency').on('change', lookupRate);
-            $('input[name="journal_date"]').on('change', function () {
-                if ($('#journalCurrency').val() !== baseCurrency) {
-                    lookupRate();
-                }
-            });
-            $('#journalRate').on('input', calculateTotals);
-
             // Journals need at least 2 lines to be postable — start with 2 blank rows.
             addRow();
             addRow();
-
-            // After a failed submit keep the rate the user had; otherwise look it up.
-            if ($('#journalCurrency').val() !== baseCurrency) {
-                if (oldRate) {
-                    $('#exchangeRateField').show();
-                    calculateTotals();
-                } else {
-                    lookupRate();
-                }
-            } else {
-                calculateTotals();
-            }
         });
     </script>
 @endpush

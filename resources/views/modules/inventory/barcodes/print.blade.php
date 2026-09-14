@@ -87,7 +87,7 @@
                     @endif
                 </div>
                 <svg class="barcode-svg" id="barcode-{{ $index }}"></svg>
-                <div class="price-tag">Price: {{ currency_symbol() }}{{ number_format($lbl['price'], 2) }}</div>
+                <div class="price-tag">Price: ₹{{ number_format($lbl['price'], 2) }}</div>
             </div>
         @endforeach
     </div>

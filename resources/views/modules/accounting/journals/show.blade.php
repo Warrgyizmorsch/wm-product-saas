@@ -44,16 +44,6 @@
                 @endif
             </div>
         </div>
-        @if ($journal->currency_code)
-            <div class="mt-3 pt-3 border-top fs-13">
-                <span class="text-muted fs-11 text-uppercase d-block mb-1">Transaction Currency</span>
-                <span class="fw-bold text-dark">{{ $journal->currency_code }}</span>
-                <span class="text-muted">
-                    at 1 {{ $journal->currency_code }} = {{ rtrim(rtrim(number_format($journal->exchange_rate, 6, '.', ''), '0'), '.') }} {{ $baseCurrency }}
-                    — ledger amounts below are in {{ $baseCurrency }}.
-                </span>
-            </div>
-        @endif
         @if ($journal->memo)
             <div class="mt-3 pt-3 border-top fs-13">
                 <span class="text-muted fs-11 text-uppercase d-block mb-1">Memo</span>
@@ -79,11 +69,8 @@
                 <tr>
                     <th class="ps-4">Account</th>
                     <th>Description</th>
-                    @if ($journal->currency_code)
-                        <th class="text-end">Amount ({{ $journal->currency_code }})</th>
-                    @endif
-                    <th class="text-end">Debit{{ $journal->currency_code ? " ({$baseCurrency})" : '' }}</th>
-                    <th class="text-end pe-4">Credit{{ $journal->currency_code ? " ({$baseCurrency})" : '' }}</th>
+                    <th class="text-end">Debit</th>
+                    <th class="text-end pe-4">Credit</th>
                 </tr>
             </thead>
             <tbody class="fs-13 text-dark">
@@ -94,17 +81,6 @@
                             <span class="text-muted">{{ $entry->account?->name }}</span>
                         </td>
                         <td class="text-muted">{{ $entry->description ?: '—' }}</td>
-                        @if ($journal->currency_code)
-                            <td class="text-end text-muted">
-                                @if ($entry->foreign_debit)
-                                    Dr {{ number_format($entry->foreign_debit, $foreignDecimals) }}
-                                @elseif ($entry->foreign_credit)
-                                    Cr {{ number_format($entry->foreign_credit, $foreignDecimals) }}
-                                @else
-                                    —
-                                @endif
-                            </td>
-                        @endif
                         <td class="text-end">{{ $entry->debit > 0 ? number_format($entry->debit, 2) : '—' }}</td>
                         <td class="text-end pe-4">{{ $entry->credit > 0 ? number_format($entry->credit, 2) : '—' }}</td>
                     </tr>
@@ -113,9 +89,6 @@
             <tfoot>
                 <tr class="fw-bold fs-13 bg-light">
                     <td class="ps-4" colspan="2">Total</td>
-                    @if ($journal->currency_code)
-                        <td class="text-end text-muted">{{ number_format($journal->entries->sum('foreign_debit'), $foreignDecimals) }}</td>
-                    @endif
                     <td class="text-end">{{ number_format($journal->total_debit, 2) }}</td>
                     <td class="text-end pe-4">{{ number_format($journal->total_credit, 2) }}</td>
                 </tr>

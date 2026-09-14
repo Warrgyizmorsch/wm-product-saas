@@ -178,7 +178,7 @@
                                 @endif
                             </td>
                             <td class="text-end fw-bold text-success fs-14">
-                                {{ currency_symbol() }}{{ number_format($acc->lifetime_revenue, 2) }}
+                                ₹{{ number_format($acc->lifetime_revenue, 2) }}
                             </td>
                             <td class="text-end pe-3">
                                 <x-ui.action-dropdown :viewUrl="route('crm.accounts.show', $acc)">

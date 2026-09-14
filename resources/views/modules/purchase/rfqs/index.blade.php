@@ -16,7 +16,7 @@
 
     @php
         $currency = tenant()?->settings['currency'] ?? 'INR';
-        $currencySymbol = ($currency === 'INR') ? (currency_symbol()) : $currency . ' ';
+        $currencySymbol = ($currency === 'INR') ? '₹' : $currency . ' ';
         $sortBy = request('sort_by', 'rfq_date');
         $sortOrder = request('sort_order', 'desc');
     @endphp

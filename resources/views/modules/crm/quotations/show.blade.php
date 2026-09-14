@@ -440,9 +440,9 @@
                                     <th style="width: 5%;" class="text-center">#</th>
                                     <th style="width: 45%;">Item & Description</th>
                                     <th class="text-end" style="width: 12%;">Qty</th>
-                                    <th class="text-end" style="width: 13%;">Rate ({{ currency_symbol() }})</th>
+                                    <th class="text-end" style="width: 13%;">Rate (₹)</th>
                                     <th class="text-end" style="width: 10%;">Tax %</th>
-                                    <th class="text-end" style="width: 15%;">Amount ({{ currency_symbol() }})</th>
+                                    <th class="text-end" style="width: 15%;">Amount (₹)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -456,9 +456,9 @@
                                             @endif
                                         </td>
                                         <td class="text-end font-monospace">{{ $item->quantity }}</td>
-                                        <td class="text-end font-monospace">{{ currency_symbol() }}{{ number_format($item->unit_price, 2) }}</td>
+                                        <td class="text-end font-monospace">₹{{ number_format($item->unit_price, 2) }}</td>
                                         <td class="text-end font-monospace">{{ number_format($item->tax_rate, 2) }}%</td>
-                                        <td class="text-end font-monospace fw-bold text-dark">{{ currency_symbol() }}{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
+                                        <td class="text-end font-monospace fw-bold text-dark">₹{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -490,21 +490,21 @@
                         <div class="p-3 bg-light bg-opacity-50 rounded border">
                             <div class="d-flex justify-content-between py-1 border-bottom fs-12">
                                 <span class="text-muted">Subtotal:</span>
-                                <span class="fw-bold text-dark">{{ currency_symbol() }}{{ number_format($quotation->subtotal, 2) }}</span>
+                                <span class="fw-bold text-dark">₹{{ number_format($quotation->subtotal, 2) }}</span>
                             </div>
                             <div class="d-flex justify-content-between py-1 border-bottom fs-12">
                                 <span class="text-muted">Tax Amount (GST):</span>
-                                <span class="fw-bold text-dark">{{ currency_symbol() }}{{ number_format($quotation->tax, 2) }}</span>
+                                <span class="fw-bold text-dark">₹{{ number_format($quotation->tax, 2) }}</span>
                             </div>
                             @if($quotation->discount > 0)
                                 <div class="d-flex justify-content-between py-1 border-bottom fs-12 text-danger">
                                     <span>Discount:</span>
-                                    <span class="fw-bold">-{{ currency_symbol() }}{{ number_format($quotation->discount, 2) }}</span>
+                                    <span class="fw-bold">-₹{{ number_format($quotation->discount, 2) }}</span>
                                 </div>
                             @endif
                             <div class="d-flex justify-content-between py-2 mt-2 fs-15 rounded px-2" style="background-color: #f1f5f9;">
                                 <span class="fw-bold text-dark">Total Payable:</span>
-                                <span class="fw-extrabold text-primary">{{ currency_symbol() }}{{ number_format($quotation->total_amount, 2) }}</span>
+                                <span class="fw-extrabold text-primary">₹{{ number_format($quotation->total_amount, 2) }}</span>
                             </div>
                         </div>
                     </div>

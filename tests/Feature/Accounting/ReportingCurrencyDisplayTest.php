@@ -22,17 +22,18 @@ class ReportingCurrencyDisplayTest extends TestCase
     {
         parent::setUp();
 
+        // Tenant setting deliberately disagrees with the company: the company must win.
         $tenant = Tenant::create([
             'name' => 'Test Tenant', 'slug' => 'test-tenant', 'status' => 'active', 'plan' => 'enterprise',
-            'currency' => 'GBP',
+            'settings' => ['currency' => 'INR'],
         ]);
         $this->seed(RbacSeeder::class);
 
         app(TenantContext::class)->set($tenant);
-        // Stale per-company values must be ignored: the tenant's currency wins.
-        // A second company makes the header render its company switcher chip.
-        Company::create(['company_name' => 'UK Ltd', 'currency' => 'INR']);
-        Company::create(['company_name' => 'India Pvt Ltd', 'currency' => 'USD']);
+        // First by id is resolved as the current company. A second company makes the
+        // header render its company switcher chip, which also carries the currency.
+        Company::create(['company_name' => 'UK Ltd', 'currency' => 'GBP']);
+        Company::create(['company_name' => 'India Pvt Ltd', 'currency' => 'INR']);
 
         $this->accountant = User::create(['tenant_id' => $tenant->id, 'name' => 'Accountant', 'email' => 'accountant@example.com', 'password' => bcrypt('password')]);
         $role = Role::query()->whereNull('tenant_id')->where('slug', 'accountant')->firstOrFail();
@@ -40,7 +41,7 @@ class ReportingCurrencyDisplayTest extends TestCase
     }
 
     /** @test */
-    public function accounting_pages_label_amounts_with_the_tenant_currency(): void
+    public function accounting_pages_label_amounts_with_the_company_currency_not_the_tenant_setting(): void
     {
         $response = $this->actingAs($this->accountant)->withHeader('X-Tenant', 'test-tenant')
             ->get(route('accounting.journals.index'));

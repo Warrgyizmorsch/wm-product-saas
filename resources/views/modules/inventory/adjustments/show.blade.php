@@ -132,10 +132,10 @@
                                     {{ number_format($item->quantity, 2) }}
                                 </td>
                                 <td class="text-end font-monospace fw-semibold fs-12 text-muted">
-                                    {{ currency_symbol() }}{{ number_format($item->unit_cost, 2) }}
+                                    ₹{{ number_format($item->unit_cost, 2) }}
                                 </td>
                                 <td class="text-end font-monospace fw-bold fs-13 text-dark">
-                                    {{ currency_symbol() }}{{ number_format($item->total_amount, 2) }}
+                                    ₹{{ number_format($item->total_amount, 2) }}
                                 </td>
                                 <td>
                                     @if(!empty($item->serial_numbers))

@@ -114,7 +114,7 @@
 @section('content')
     @php
         $currency = tenant()?->settings['currency'] ?? 'INR';
-        $currencySymbol = ($currency === 'INR') ? (currency_symbol()) : $currency . ' ';
+        $currencySymbol = ($currency === 'INR') ? '₹' : $currency . ' ';
     @endphp
 
     <div class="erp-single-panel text-dark">

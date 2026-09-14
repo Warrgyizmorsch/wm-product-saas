@@ -235,7 +235,7 @@
                                             <span class="text-muted">({{ $prior['employee']->employee_id }}) &bull; Withheld for {{ Carbon\Carbon::parse($prior['hold']->payroll_month . '-01')->format('F Y') }}</span>
                                         </div>
                                         <div class="d-flex align-items-center gap-3">
-                                            <span class="fw-bold text-primary">{{ currency_symbol() }}{{ number_format($prior['net_payout'], 2) }}</span>
+                                            <span class="fw-bold text-primary">₹{{ number_format($prior['net_payout'], 2) }}</span>
                                             @if($selectedRun->status === 'draft')
                                                 <form action="{{ route('hrms.payroll.hold.toggle', [$prior['employee']->id, $prior['hold']->payroll_month]) }}" method="POST" class="m-0">
                                                     @csrf
@@ -295,30 +295,30 @@
                                                 {{ $summary['lop_days'] ?? 0 }} days
                                             </span>
                                         </td>
-                                        <td class="text-end fw-semibold">{{ currency_symbol() }}{{ number_format($summary['base_gross_earnings'] ?? 0, 2) }}</td>
-                                        <td class="text-end text-danger">{{ currency_symbol() }}{{ number_format($summary['base_deductions'] ?? 0, 2) }}</td>
+                                        <td class="text-end fw-semibold">₹{{ number_format($summary['base_gross_earnings'] ?? 0, 2) }}</td>
+                                        <td class="text-end text-danger">₹{{ number_format($summary['base_deductions'] ?? 0, 2) }}</td>
                                         @php
                                             $netAdhoc = ($summary['adhoc_earnings'] ?? 0) - ($summary['adhoc_deductions'] ?? 0);
                                         @endphp
                                         <td class="text-end fw-semibold @if($netAdhoc > 0) text-success @elseif($netAdhoc < 0) text-danger @else text-secondary @endif">
                                             @if($netAdhoc > 0)
-                                                +{{ currency_symbol() }}{{ number_format($netAdhoc, 2) }}
+                                                +₹{{ number_format($netAdhoc, 2) }}
                                             @elseif($netAdhoc < 0)
-                                                -{{ currency_symbol() }}{{ number_format(abs($netAdhoc), 2) }}
+                                                -₹{{ number_format(abs($netAdhoc), 2) }}
                                             @else
-                                                {{ currency_symbol() }}0.00
+                                                ₹0.00
                                             @endif
                                         </td>
                                         <td class="text-end fw-semibold text-success">
                                             @if(($summary['overtime_payout'] ?? 0) > 0)
-                                                {{ currency_symbol() }}{{ number_format($summary['overtime_payout'], 2) }}
+                                                ₹{{ number_format($summary['overtime_payout'], 2) }}
                                                 <div class="fs-10 text-muted" style="font-size: 10px;">{{ number_format($summary['overtime_hours'] ?? 0, 1) }} hrs</div>
                                             @else
-                                                <span class="text-secondary">{{ currency_symbol() }}0.00</span>
+                                                <span class="text-secondary">₹0.00</span>
                                             @endif
                                         </td>
-                                        <td class="text-end text-primary">{{ currency_symbol() }}{{ number_format($summary['retro_lop_reversals'] ?? 0, 2) }}</td>
-                                        <td class="text-end fw-bold text-primary">{{ currency_symbol() }}{{ number_format($summary['net_payout'] ?? 0, 2) }}</td>
+                                        <td class="text-end text-primary">₹{{ number_format($summary['retro_lop_reversals'] ?? 0, 2) }}</td>
+                                        <td class="text-end fw-bold text-primary">₹{{ number_format($summary['net_payout'] ?? 0, 2) }}</td>
                                         <td class="text-center text-nowrap">
                                             @if($selectedRun->status === 'paid')
                                                 @if($row['hold_status'] === 'on_hold')
@@ -501,7 +501,7 @@
                         <div id="earningsTableBody" class="d-flex flex-column gap-2" style="min-height:60px;"></div>
                         <div class="d-flex justify-content-between align-items-center mt-3 pt-2" style="border-top:2px solid #e9ecef;">
                             <span class="fw-bold text-dark" style="font-size:13px;">Gross Earnings</span>
-                            <span class="fw-bold text-dark" style="font-size:13px;" id="modalGrossEarnings">{{ currency_symbol() }}0.00</span>
+                            <span class="fw-bold text-dark" style="font-size:13px;" id="modalGrossEarnings">₹0.00</span>
                         </div>
                     </div>
                     <!-- Deductions -->
@@ -515,7 +515,7 @@
                         <div id="deductionsTableBody" class="d-flex flex-column gap-2" style="min-height:60px;"></div>
                         <div class="d-flex justify-content-between align-items-center mt-3 pt-2" style="border-top:2px solid #e9ecef;">
                             <span class="fw-bold text-dark" style="font-size:13px;">Total Deductions</span>
-                            <span class="fw-bold text-dark" style="font-size:13px;" id="modalTotalDeductions">{{ currency_symbol() }}0.00</span>
+                            <span class="fw-bold text-dark" style="font-size:13px;" id="modalTotalDeductions">₹0.00</span>
                         </div>
                     </div>
                 </div>
@@ -526,7 +526,7 @@
                         <i class="feather-check-circle" style="color:#16a34a;font-size:18px;"></i>
                         <span class="fw-semibold" style="font-size:13px;color:#166534;" id="modalNetLabel">Net Salary Payout</span>
                     </div>
-                    <span class="fw-bold" style="font-size:18px;color:#16a34a;" id="modalNetPayout">{{ currency_symbol() }}0.00</span>
+                    <span class="fw-bold" style="font-size:18px;color:#16a34a;" id="modalNetPayout">₹0.00</span>
                 </div>
             </div>
 
@@ -742,7 +742,7 @@
                         </div>
 
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" inputType="number" label="Amount ({{ currency_symbol() }})" name="amount" :required="true" placeholder="0.00" step="0.01" />
+                            <x-ui.odoo-form-ui type="input" inputType="number" label="Amount (₹)" name="amount" :required="true" placeholder="0.00" step="0.01" />
                         </div>
 
                         <div class="col-12">
@@ -1166,7 +1166,7 @@
                 netLabel.innerHTML = `<span style="color:#166534;">Net Salary Payout (Paid for ${paidDaysVal} Days)</span> <span class="badge ms-2" style="background:#dbeafe;color:#1e40af;font-size:10px;border-radius:20px;padding:2px 8px;">Draft</span>`;
             }
 
-            const fmt = v => '{{ currency_symbol() }}' + parseFloat(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const fmt = v => '₹' + parseFloat(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
             let earningsHtml = '';
             let deductionsHtml = '';

@@ -15,7 +15,7 @@
     </div>
     <div class="text-end">
         <div class="fs-12 text-muted mb-1">Total Amount</div>
-        <h4 class="fw-bold text-primary mb-0">{{ currency_symbol() }}{{ number_format($quotation->total_amount, 2) }}</h4>
+        <h4 class="fw-bold text-primary mb-0">₹{{ number_format($quotation->total_amount, 2) }}</h4>
     </div>
 </div>
 
@@ -91,9 +91,9 @@
                         @endif
                     </td>
                     <td class="text-center fw-semibold">{{ (float)$item->quantity }}</td>
-                    <td class="text-end">{{ currency_symbol() }}{{ number_format($item->unit_price, 2) }}</td>
+                    <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
                     <td class="text-end text-muted">{{ $taxRate > 0 ? number_format($taxRate, 1) . '%' : '0%' }}</td>
-                    <td class="text-end fw-bold">{{ currency_symbol() }}{{ number_format($lineTotal, 2) }}</td>
+                    <td class="text-end fw-bold">₹{{ number_format($lineTotal, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -107,21 +107,21 @@
             @endphp
             <tr>
                 <td colspan="4" class="text-end text-muted fw-semibold py-1.5">Subtotal:</td>
-                <td class="text-end fw-bold text-dark py-1.5">{{ currency_symbol() }}{{ number_format($subtotalVal, 2) }}</td>
+                <td class="text-end fw-bold text-dark py-1.5">₹{{ number_format($subtotalVal, 2) }}</td>
             </tr>
             <tr>
                 <td colspan="4" class="text-end text-muted fw-semibold py-1.5">Tax:</td>
-                <td class="text-end fw-bold text-success py-1.5">+{{ currency_symbol() }}{{ number_format($taxVal, 2) }}</td>
+                <td class="text-end fw-bold text-success py-1.5">+₹{{ number_format($taxVal, 2) }}</td>
             </tr>
             @if(($quotation->discount ?: 0) > 0)
                 <tr>
                     <td colspan="4" class="text-end text-muted fw-semibold py-1.5">Discount:</td>
-                    <td class="text-end fw-bold text-danger py-1.5">-{{ currency_symbol() }}{{ number_format($quotation->discount, 2) }}</td>
+                    <td class="text-end fw-bold text-danger py-1.5">-₹{{ number_format($quotation->discount, 2) }}</td>
                 </tr>
             @endif
             <tr class="table-primary border-top border-2">
                 <td colspan="4" class="text-end text-uppercase fs-10 fw-bold text-dark letter-spacing-1 py-2">Grand Total:</td>
-                <td class="text-end text-primary fs-13 fw-extrabold py-2">{{ currency_symbol() }}{{ number_format($quotation->total_amount ?: ($subtotalVal + $taxVal - ($quotation->discount ?: 0)), 2) }}</td>
+                <td class="text-end text-primary fs-13 fw-extrabold py-2">₹{{ number_format($quotation->total_amount ?: ($subtotalVal + $taxVal - ($quotation->discount ?: 0)), 2) }}</td>
             </tr>
         </tfoot>
     </table>

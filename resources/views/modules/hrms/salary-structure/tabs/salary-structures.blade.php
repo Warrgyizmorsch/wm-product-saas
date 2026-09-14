@@ -113,7 +113,7 @@
                                 <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
                                     <div class="fw-bold text-dark structure-name fs-14">{{ $structure->name }}</div>
                                     <div class="fs-12 text-muted mt-1">
-                                        {{ currency_symbol() }}{{ number_format($structure->min_ctc, 2) }} - {{ currency_symbol() }}{{ number_format($structure->max_ctc, 2) }}
+                                        ₹{{ number_format($structure->min_ctc, 2) }} - ₹{{ number_format($structure->max_ctc, 2) }}
                                     </div>
                                     <div class="mt-1">
                                         <span class="badge bg-soft-info text-info rounded-pill px-2 fs-11">
@@ -185,7 +185,7 @@
                                                         </td>
                                                         <td class="pe-3 py-2 text-end fw-bold text-dark" style="white-space: nowrap;">
                                                             @if($item->calculation_type == 'fixed')
-                                                                {{ currency_symbol() }}{{ number_format($item->value, 2) }} <span class="text-muted fw-normal fs-11">({{ __('hrms.salary.fixed_amount') }})</span>
+                                                                ₹{{ number_format($item->value, 2) }} <span class="text-muted fw-normal fs-11">({{ __('hrms.salary.fixed_amount') }})</span>
                                                             @elseif(in_array($item->calculation_type, ['percentage_of_ctc', 'percentage_of_basic']))
                                                                 {{ number_format($item->value, 2) }}% <span class="text-muted fw-normal fs-11">{{ $calcTypeLabel }}</span>
                                                             @else
@@ -700,7 +700,7 @@
         }
 
         if (!matched) {
-            $('#sim-error-msg').html(`<i class="feather-alert-triangle me-2"></i>{{ __('hrms.salary.no_slab_match') }} <strong>{{ currency_symbol() }}${ctc.toLocaleString('en-IN')}</strong>.`).show();
+            $('#sim-error-msg').html(`<i class="feather-alert-triangle me-2"></i>{{ __('hrms.salary.no_slab_match') }} <strong>₹${ctc.toLocaleString('en-IN')}</strong>.`).show();
             $('#sim-results-card').hide();
             return;
         }
@@ -723,7 +723,7 @@
 
             if (item.calculation_type === 'fixed') {
                 valYearly = parseFloat(item.value);
-                ruleText = `{{ __('hrms.salary.fixed_amount') }}: {{ currency_symbol() }}${valYearly.toLocaleString('en-IN')}`;
+                ruleText = `{{ __('hrms.salary.fixed_amount') }}: ₹${valYearly.toLocaleString('en-IN')}`;
             } else if (item.calculation_type === 'percentage_of_ctc') {
                 valYearly = (parseFloat(item.value) / 100) * ctc;
                 ruleText = `${parseFloat(item.value)}% {{ __('hrms.salary.of_ctc') }}`;
@@ -782,8 +782,8 @@
                         <code style="font-size: 11px;">${r.code}</code>
                     </td>
                     <td>${typeBadge}</td>
-                    <td class="text-end fw-semibold">{{ currency_symbol() }}${(r.monthly).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                    <td class="text-end fw-semibold">{{ currency_symbol() }}${(r.yearly).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="text-end fw-semibold">₹${(r.monthly).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="text-end fw-semibold">₹${(r.yearly).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 </tr>
             `);
 
@@ -812,18 +812,18 @@
         tbody.append(`
             <tr class="table-light fw-bold border-top">
                 <td colspan="2">{{ __('hrms.salary.gross_salary_ctc') }}</td>
-                <td class="text-end text-success">{{ currency_symbol() }}${grossMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td class="text-end text-success">{{ currency_symbol() }}${grossYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end text-success">₹${grossMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end text-success">₹${grossYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
             <tr class="table-light fw-bold">
                 <td colspan="2">{{ __('hrms.salary.total_deductions') }}</td>
-                <td class="text-end text-danger">{{ currency_symbol() }}${deductionsMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td class="text-end text-danger">{{ currency_symbol() }}${deductionsYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end text-danger">₹${deductionsMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end text-danger">₹${deductionsYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
             <tr class="fw-bold border-top border-bottom" style="background-color: rgba(30, 64, 175, 0.08) !important;">
                 <td colspan="2"><span class="text-primary">{{ __('hrms.salary.net_salary') }}</span></td>
-                <td class="text-end text-primary">{{ currency_symbol() }}${netMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td class="text-end text-primary">{{ currency_symbol() }}${netYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end text-primary">₹${netMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end text-primary">₹${netYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
         `);
 

@@ -506,7 +506,7 @@
                             <td>Raw Material</td>
                             <td>450.00 kg</td>
                             <td>100.00 kg</td>
-                            <td>{{ currency_symbol() }}250.00</td>
+                            <td>₹250.00</td>
                             <td><x-ui.badge variant="success" soft>In Stock</x-ui.badge></td>
                         </tr>
                         <tr>
@@ -515,7 +515,7 @@
                             <td>Component</td>
                             <td>1,200.00 PCS</td>
                             <td>500.00 PCS</td>
-                            <td>{{ currency_symbol() }}4.50</td>
+                            <td>₹4.50</td>
                             <td><x-ui.badge variant="success" soft>In Stock</x-ui.badge></td>
                         </tr>
                         <tr>
@@ -524,7 +524,7 @@
                             <td>Raw Material</td>
                             <td>12.00 PCS</td>
                             <td>50.00 PCS</td>
-                            <td>{{ currency_symbol() }}85.00</td>
+                            <td>₹85.00</td>
                             <td><x-ui.badge variant="danger" soft>Low Stock</x-ui.badge></td>
                         </tr>
                     </tbody>

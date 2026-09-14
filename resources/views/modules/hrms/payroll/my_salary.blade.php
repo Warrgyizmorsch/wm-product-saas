@@ -53,7 +53,7 @@
                                         <span class="fs-11 text-muted">{{ $employee->account_number ?? 'N/A' }}</span>
                                     </td>
                                     <td class="text-end fw-bold text-success">
-                                        {{ currency_symbol() }}{{ number_format($calc['net_payout'] ?? 0, 2) }}
+                                        ₹{{ number_format($calc['net_payout'] ?? 0, 2) }}
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11">Released</span>
@@ -127,7 +127,7 @@
                                                     @if(($item['type'] ?? '') === 'earning')
                                                         <div class="d-flex justify-content-between fs-12 mb-2">
                                                             <span class="text-muted">{{ $item['name'] }}</span>
-                                                            <span class="fw-medium text-dark">{{ currency_symbol() }}{{ number_format($item['calculated_value'] ?? 0, 2) }}</span>
+                                                            <span class="fw-medium text-dark">₹{{ number_format($item['calculated_value'] ?? 0, 2) }}</span>
                                                         </div>
                                                     @endif
                                                 @endforeach
@@ -135,20 +135,20 @@
                                                 @if(($calc['adhoc_earnings'] ?? 0) > 0)
                                                     <div class="d-flex justify-content-between fs-12 mb-2">
                                                         <span class="text-muted">Ad-hoc Earnings (Bonus)</span>
-                                                        <span class="fw-medium text-success">+{{ currency_symbol() }}{{ number_format($calc['adhoc_earnings'], 2) }}</span>
+                                                        <span class="fw-medium text-success">+₹{{ number_format($calc['adhoc_earnings'], 2) }}</span>
                                                     </div>
                                                 @endif
 
                                                 @if(($calc['retro_lop_reversals'] ?? 0) > 0)
                                                     <div class="d-flex justify-content-between fs-12 mb-2">
                                                         <span class="text-muted">Retroactive Refunds</span>
-                                                        <span class="fw-medium text-success">+{{ currency_symbol() }}{{ number_format($calc['retro_lop_reversals'], 2) }}</span>
+                                                        <span class="fw-medium text-success">+₹{{ number_format($calc['retro_lop_reversals'], 2) }}</span>
                                                     </div>
                                                 @endif
 
                                                 <div class="d-flex justify-content-between border-top pt-2 mt-auto fs-12 fw-bold text-dark">
                                                     <span>Gross Earnings</span>
-                                                    <span>{{ currency_symbol() }}{{ number_format($calc['total_earnings'] ?? 0, 2) }}</span>
+                                                    <span>₹{{ number_format($calc['total_earnings'] ?? 0, 2) }}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -162,7 +162,7 @@
                                                     @if(($item['type'] ?? '') === 'deduction')
                                                         <div class="d-flex justify-content-between fs-12 mb-2">
                                                             <span class="text-muted">{{ $item['name'] }}</span>
-                                                            <span class="fw-medium text-dark">{{ currency_symbol() }}{{ number_format($item['calculated_value'] ?? 0, 2) }}</span>
+                                                            <span class="fw-medium text-dark">₹{{ number_format($item['calculated_value'] ?? 0, 2) }}</span>
                                                         </div>
                                                     @endif
                                                 @endforeach
@@ -172,20 +172,20 @@
                                                 @if(($calc['adhoc_deductions'] ?? 0) > 0)
                                                     <div class="d-flex justify-content-between fs-12 mb-2">
                                                         <span class="text-muted">Ad-hoc Deductions</span>
-                                                        <span class="fw-medium text-danger">-{{ currency_symbol() }}{{ number_format($calc['adhoc_deductions'], 2) }}</span>
+                                                        <span class="fw-medium text-danger">-₹{{ number_format($calc['adhoc_deductions'], 2) }}</span>
                                                     </div>
                                                 @endif
 
                                                 @if(($calc['attendance_penalties'] ?? 0) > 0)
                                                     <div class="d-flex justify-content-between fs-12 mb-2">
                                                         <span class="text-muted">Attendance Penalties</span>
-                                                        <span class="fw-medium text-danger">-{{ currency_symbol() }}{{ number_format($calc['attendance_penalties'], 2) }}</span>
+                                                        <span class="fw-medium text-danger">-₹{{ number_format($calc['attendance_penalties'], 2) }}</span>
                                                     </div>
                                                 @endif
 
                                                 <div class="d-flex justify-content-between border-top pt-2 mt-auto fs-12 fw-bold text-dark">
                                                     <span>Total Deductions</span>
-                                                    <span>{{ currency_symbol() }}{{ number_format($calc['total_deductions'] ?? 0, 2) }}</span>
+                                                    <span>₹{{ number_format($calc['total_deductions'] ?? 0, 2) }}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -197,7 +197,7 @@
                                             <i class="feather-check-circle me-1"></i> Net Salary Payout (Paid for {{ ($calc['total_days'] ?? 30) - ($calc['lop_days'] ?? 0) }} Days)
                                         </div>
                                         <div class="fs-16 fw-bold text-success-900">
-                                            {{ currency_symbol() }}{{ number_format($calc['net_payout'] ?? 0, 2) }}
+                                            ₹{{ number_format($calc['net_payout'] ?? 0, 2) }}
                                         </div>
                                     </div>
                                 </div>

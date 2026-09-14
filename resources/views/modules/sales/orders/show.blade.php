@@ -292,9 +292,9 @@
                                     <th class="py-2 text-center" style="width: 14%;">Warehouse</th>
                                     <th class="text-center py-2" style="width: 7%;">Qty</th>
                                     <th class="text-end py-2 pe-3" style="width: 11%;">Unit Price</th>
-                                    <th class="text-end py-2 pe-3" style="width: 10%;">Discount ({{ currency_symbol() }})</th>
+                                    <th class="text-end py-2 pe-3" style="width: 10%;">Discount (₹)</th>
                                     <th class="text-end py-2 pe-3" style="width: 9%;">Taxes (%)</th>
-                                    <th class="text-end pe-4 py-2" style="width: 14%;">Amount ({{ currency_symbol() }})</th>
+                                    <th class="text-end pe-4 py-2" style="width: 14%;">Amount (₹)</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-12 text-dark">
@@ -350,10 +350,10 @@
                                             </div>
                                         </td>
                                         <td class="text-center fw-semibold py-1.5">{{ $item->quantity }}</td>
-                                        <td class="text-end text-muted py-1.5 pe-3">{{ currency_symbol() }}{{ number_format($item->unit_price, 2) }}</td>
+                                        <td class="text-end text-muted py-1.5 pe-3">₹{{ number_format($item->unit_price, 2) }}</td>
                                         <td class="text-end text-danger py-1.5 pe-3">
                                             @if($item->discount > 0)
-                                                -{{ currency_symbol() }}{{ number_format($item->discount, 2) }}
+                                                -₹{{ number_format($item->discount, 2) }}
                                             @else
                                                 —
                                             @endif
@@ -365,7 +365,7 @@
                                                 —
                                             @endif
                                         </td>
-                                        <td class="text-end pe-4 fw-bold text-dark py-1.5">{{ currency_symbol() }}{{ number_format($lineTotalInclTax, 2) }}</td>
+                                        <td class="text-end pe-4 fw-bold text-dark py-1.5">₹{{ number_format($lineTotalInclTax, 2) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -424,21 +424,21 @@
                                 <!-- 1. Subtotal (Excl. Tax) -->
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                     <span class="text-muted fw-semibold">Subtotal (Excl. Tax):</span>
-                                    <span class="fw-bold text-dark">{{ currency_symbol() }}{{ number_format($grossSubtotal, 2) }}</span>
+                                    <span class="fw-bold text-dark">₹{{ number_format($grossSubtotal, 2) }}</span>
                                 </div>
 
                                 <!-- 2. Less: Item Discounts -->
                                 @if($order->discount_type !== 'without_discount' && $effectiveDiscount > 0)
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12 text-danger">
                                         <span class="fw-semibold">Less: Item Discounts:</span>
-                                        <span class="fw-bold">-{{ currency_symbol() }}{{ number_format($effectiveDiscount, 2) }}</span>
+                                        <span class="fw-bold">-₹{{ number_format($effectiveDiscount, 2) }}</span>
                                     </div>
                                 @endif
 
                                 <!-- 3. Items Taxable Value -->
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                     <span class="text-muted fw-semibold">Items Taxable Value:</span>
-                                    <span class="fw-bold text-dark">{{ currency_symbol() }}{{ number_format($taxableBase, 2) }}</span>
+                                    <span class="fw-bold text-dark">₹{{ number_format($taxableBase, 2) }}</span>
                                 </div>
 
                                 <!-- 4. Add: CGST / SGST or IGST Breakdown -->
@@ -446,16 +446,16 @@
                                     @if($gstType === 'cgst_sgst')
                                         <div class="d-flex justify-content-between align-items-center mb-1.5 fs-12">
                                             <span class="text-muted fw-medium">Add: CGST (Central Tax):</span>
-                                            <span class="text-muted font-monospace">+{{ currency_symbol() }}{{ number_format($itemsTaxAmount / 2, 2) }}</span>
+                                            <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount / 2, 2) }}</span>
                                         </div>
                                         <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                             <span class="text-muted fw-medium">Add: SGST (State Tax):</span>
-                                            <span class="text-muted font-monospace">+{{ currency_symbol() }}{{ number_format($itemsTaxAmount / 2, 2) }}</span>
+                                            <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount / 2, 2) }}</span>
                                         </div>
                                     @else
                                         <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                             <span class="text-muted fw-medium">Add: IGST (Integrated Tax):</span>
-                                            <span class="text-muted font-monospace">+{{ currency_symbol() }}{{ number_format($itemsTaxAmount, 2) }}</span>
+                                            <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount, 2) }}</span>
                                         </div>
                                     @endif
                                 @endif
@@ -463,14 +463,14 @@
                                 <!-- 5. Billed Items Total (Incl. GST) -->
                                 <div class="d-flex justify-content-between align-items-center my-2 py-1.5 px-2.5 rounded bg-white border fs-12 fw-bold text-dark" style="border-color: #e2e8f0 !important;">
                                     <span>Billed Items Total (Incl. GST):</span>
-                                    <span>{{ currency_symbol() }}{{ number_format($itemsTotalInclGst, 2) }}</span>
+                                    <span>₹{{ number_format($itemsTotalInclGst, 2) }}</span>
                                 </div>
 
                                 <!-- 6. Freight Charges -->
                                 @if($freightAmount > 0)
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                         <span class="text-muted fw-semibold">Freight Charges:</span>
-                                        <span class="fw-bold text-primary">{{ currency_symbol() }}{{ number_format($freightAmount, 2) }}</span>
+                                        <span class="fw-bold text-primary">₹{{ number_format($freightAmount, 2) }}</span>
                                     </div>
                                 @endif
 
@@ -478,14 +478,14 @@
                                 @if($adjustment != 0)
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                         <span class="text-muted fw-semibold">Adjustment:</span>
-                                        <span class="fw-bold text-dark">{{ currency_symbol() }}{{ number_format($adjustment, 2) }}</span>
+                                        <span class="fw-bold text-dark">₹{{ number_format($adjustment, 2) }}</span>
                                     </div>
                                 @endif
 
                                 <!-- 8. Grand Total -->
                                 <div class="d-flex justify-content-between align-items-center pt-2.5 border-top mt-2" style="border-color: #cbd5e1 !important;">
                                     <span class="fw-bold text-dark fs-13 text-uppercase" style="letter-spacing: 0.5px;">Grand Total:</span>
-                                    <span class="fw-bold text-primary fs-16">{{ currency_symbol() }}{{ number_format($grandTotal, 2) }}</span>
+                                    <span class="fw-bold text-primary fs-16">₹{{ number_format($grandTotal, 2) }}</span>
                                 </div>
                             </div>
                         </div>
@@ -644,7 +644,7 @@
                                                 <span class="text-muted fs-12">Advance / SO Billing</span>
                                             @endif
                                         </td>
-                                        <td class="text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($inv->total_amount ?? $inv->grand_total, 2) }}</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($inv->total_amount ?? $inv->grand_total, 2) }}</td>
                                         <td>
                                             <span class="badge {{ $invBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $inv->status }}</span>
                                         </td>
@@ -709,7 +709,7 @@
                                         <td class="text-muted">{{ date('d/m/Y', strtotime($alloc->payment->payment_date)) }}</td>
                                         <td><span class="fw-semibold text-dark">{{ $alloc->payment->payment_method }}</span></td>
                                         <td class="text-muted">{{ $alloc->payment->reference_no ?: '—' }}</td>
-                                        <td class="text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($alloc->allocated_amount, 2) }}</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($alloc->allocated_amount, 2) }}</td>
                                         <td class="text-end pe-4">
                                             <x-ui.action-dropdown :viewUrl="route('sales.payments.show', $alloc->payment->id)" id="payAction-{{ $alloc->payment->id }}">
                                                 <x-ui.dropdown-item href="{{ route('sales.payments.show', $alloc->payment->id) }}" icon="feather-eye me-2">
@@ -767,7 +767,7 @@
                                             <a href="{{ route('sales.returns.show', $ret->id) }}" class="text-primary">{{ $ret->return_number }}</a>
                                         </td>
                                         <td class="text-muted">{{ date('d/m/Y', strtotime($ret->return_date)) }}</td>
-                                        <td class="text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($ret->total_refund_amount, 2) }}</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($ret->total_refund_amount, 2) }}</td>
                                         <td><span class="badge {{ $retBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $ret->status }}</span></td>
                                         <td class="text-end pe-4">
                                             <x-ui.action-dropdown :viewUrl="route('sales.returns.show', $ret->id)" id="retAction-{{ $ret->id }}">

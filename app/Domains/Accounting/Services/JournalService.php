@@ -6,9 +6,7 @@ use App\Domains\Accounting\Models\AccountingPeriod;
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Models\JournalEntry;
-use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Repositories\JournalRepositoryInterface;
-use App\Domains\Accounting\Support\AccountCode;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -20,21 +18,11 @@ class JournalService
         private readonly JournalRepositoryInterface $journals,
         private readonly FiscalPeriodService $periods,
         private readonly AccountingAuditLogService $auditLog,
-        private readonly CurrencyService $currencies,
-        private readonly ChartOfAccountRepositoryInterface $accounts,
     ) {
     }
 
     /**
      * Post a balanced double-entry journal.
-     *
-     * Multi-currency: pass `currency_code` (and optionally `exchange_rate`) in $meta
-     * and give line amounts in that currency. They must balance in that currency;
-     * each line is then converted to the company's base currency, which is what
-     * debit/credit (and so every report) hold. The original amounts are kept in
-     * foreign_debit/foreign_credit, and any sub-unit conversion difference is
-     * posted to Round Off (5730). Without `currency_code`, or with the base code,
-     * lines are base-currency amounts exactly as before.
      *
      * @param array<int, array{chart_of_account_id: int, debit?: float, credit?: float, description?: string}> $lines
      * @param array{
@@ -49,51 +37,63 @@ class JournalService
      *     reference_id?: int,
      *     memo?: string,
      *     posted_by?: int,
-     *     currency_code?: string|null,
-     *     exchange_rate?: float|string|null,
      * } $meta
      */
     public function post(array $lines, array $meta = []): Journal
     {
-        $meta['tenant_id'] = $meta['tenant_id'] ?? tenant_id();
-        $meta['company_id'] = $meta['company_id'] ?? company_id();
-
-        $currency = strtoupper(trim((string) ($meta['currency_code'] ?? '')));
-        $baseCurrency = $currency !== '' ? $this->currencies->baseCurrencyForTenant($meta['tenant_id']) : null;
-
-        if ($currency === '' || $currency === $baseCurrency) {
-            unset($meta['currency_code'], $meta['exchange_rate']);
-
-            return $this->record($lines, $meta);
-        }
-
-        $tenantId = (int) ($meta['tenant_id'] ?? require_tenant_id());
+        $tenantId = $meta['tenant_id'] ?? tenant_id();
+        $companyId = $meta['company_id'] ?? company_id();
+        $branchId = $meta['branch_id'] ?? branch_id();
         $journalDate = Carbon::parse($meta['journal_date'] ?? now());
 
-        $rate = (float) ($meta['exchange_rate'] ?? 0);
-        if ($rate <= 0) {
-            $rate = $this->currencies->rate($currency, $baseCurrency, $journalDate, $tenantId);
-        }
+        $this->assertLinesAreBalanced($lines);
 
-        // Balance is a property of the document as entered, so check it in the
-        // transaction currency first — conversion can only add rounding noise.
-        $this->assertLinesAreBalanced($lines, $this->currencies->decimalsFor($currency));
+        return DB::transaction(function () use ($lines, $meta, $tenantId, $companyId, $branchId, $journalDate) {
+            $period = $this->periods->assertOpenPeriodForDate($journalDate);
 
-        $baseDecimals = $this->currencies->decimalsFor($baseCurrency);
-        $baseLines = $this->convertToBase($lines, $rate, $baseDecimals, $tenantId);
+            $totalDebit = array_sum(array_column($lines, 'debit'));
+            $totalCredit = array_sum(array_column($lines, 'credit'));
 
-        $meta['currency_code'] = $currency;
-        $meta['exchange_rate'] = $rate;
+            $journalNumber = $this->journals->nextJournalNumber($tenantId, $meta['journal_number_prefix'] ?? 'JNL');
 
-        return $this->record($baseLines, $meta, $baseDecimals);
+            $journal = $this->journals->createWithEntries([
+                'tenant_id' => $tenantId,
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'accounting_period_id' => $period->id,
+                'journal_number' => $journalNumber,
+                'journal_date' => $journalDate,
+                'source' => $meta['source'] ?? Journal::SOURCE_MANUAL,
+                'voucher_type' => $meta['voucher_type'] ?? null,
+                'reference_type' => $meta['reference_type'] ?? null,
+                'reference_id' => $meta['reference_id'] ?? null,
+                'memo' => $meta['memo'] ?? null,
+                'status' => Journal::STATUS_POSTED,
+                'total_debit' => round($totalDebit, 2),
+                'total_credit' => round($totalCredit, 2),
+                'posted_by' => $meta['posted_by'] ?? null,
+                'posted_at' => now(),
+            ], $lines);
+
+            $this->auditLog->record(
+                $journal,
+                'journal.posted',
+                "Journal {$journal->journal_number} posted",
+                [
+                    'total_debit' => $journal->total_debit,
+                    'total_credit' => $journal->total_credit,
+                    'source' => $journal->source,
+                    'voucher_type' => $journal->voucher_type,
+                ]
+            );
+
+            return $journal;
+        });
     }
 
     /**
      * Create the mirror-image journal that cancels out an already-posted one,
      * rather than mutating or deleting it — journals are an immutable audit trail.
-     *
-     * A foreign-currency journal is reversed at its original rate with its
-     * original base amounts, so the pair nets to exactly zero in both currencies.
      */
     public function reverse(int $journalId, ?string $reason = null, ?int $postedBy = null): Journal
     {
@@ -115,16 +115,10 @@ class JournalService
                 'party_id' => $entry->party_id,
                 'debit' => $entry->credit,
                 'credit' => $entry->debit,
-                'foreign_debit' => $entry->foreign_credit,
-                'foreign_credit' => $entry->foreign_debit,
                 'description' => $reason ?? "Reversal of {$original->journal_number}",
             ])->all();
 
-            $decimals = $original->currency_code
-                ? $this->currencies->decimalsFor($this->currencies->baseCurrencyForTenant($original->tenant_id))
-                : 2;
-
-            $reversal = $this->record($reversalLines, [
+            $reversal = $this->post($reversalLines, [
                 'tenant_id' => $original->tenant_id,
                 'company_id' => $original->company_id,
                 'branch_id' => $original->branch_id,
@@ -138,9 +132,7 @@ class JournalService
                 'reference_id' => $original->reference_id,
                 'memo' => $reason ?? "Reversal of {$original->journal_number}",
                 'posted_by' => $postedBy,
-                'currency_code' => $original->currency_code,
-                'exchange_rate' => $original->exchange_rate,
-            ], $decimals);
+            ]);
 
             $original->update([
                 'status' => Journal::STATUS_REVERSED,
@@ -247,135 +239,6 @@ class JournalService
     }
 
     /**
-     * Persist base-currency lines. Shared by post() and reverse().
-     *
-     * @param array<int, array<string, mixed>> $lines
-     * @param array<string, mixed> $meta
-     */
-    private function record(array $lines, array $meta, int $decimals = 2): Journal
-    {
-        $tenantId = $meta['tenant_id'] ?? tenant_id();
-        $companyId = $meta['company_id'] ?? company_id();
-        $branchId = $meta['branch_id'] ?? branch_id();
-        $journalDate = Carbon::parse($meta['journal_date'] ?? now());
-
-        $this->assertLinesAreBalanced($lines, $decimals);
-
-        return DB::transaction(function () use ($lines, $meta, $tenantId, $companyId, $branchId, $journalDate, $decimals) {
-            $period = $this->periods->assertOpenPeriodForDate($journalDate);
-
-            $totalDebit = array_sum(array_column($lines, 'debit'));
-            $totalCredit = array_sum(array_column($lines, 'credit'));
-
-            $journalNumber = $this->journals->nextJournalNumber($tenantId, $meta['journal_number_prefix'] ?? 'JNL');
-
-            $journal = $this->journals->createWithEntries([
-                'tenant_id' => $tenantId,
-                'company_id' => $companyId,
-                'branch_id' => $branchId,
-                'accounting_period_id' => $period->id,
-                'journal_number' => $journalNumber,
-                'journal_date' => $journalDate,
-                'source' => $meta['source'] ?? Journal::SOURCE_MANUAL,
-                'voucher_type' => $meta['voucher_type'] ?? null,
-                'currency_code' => $meta['currency_code'] ?? null,
-                'exchange_rate' => $meta['exchange_rate'] ?? 1,
-                'reference_type' => $meta['reference_type'] ?? null,
-                'reference_id' => $meta['reference_id'] ?? null,
-                'memo' => $meta['memo'] ?? null,
-                'status' => Journal::STATUS_POSTED,
-                'total_debit' => round($totalDebit, $decimals),
-                'total_credit' => round($totalCredit, $decimals),
-                'posted_by' => $meta['posted_by'] ?? null,
-                'posted_at' => now(),
-            ], $lines);
-
-            $this->auditLog->record(
-                $journal,
-                'journal.posted',
-                "Journal {$journal->journal_number} posted",
-                array_filter([
-                    'total_debit' => $journal->total_debit,
-                    'total_credit' => $journal->total_credit,
-                    'source' => $journal->source,
-                    'voucher_type' => $journal->voucher_type,
-                    'currency_code' => $journal->currency_code,
-                    'exchange_rate' => $journal->currency_code ? $journal->exchange_rate : null,
-                ], fn ($value) => $value !== null)
-            );
-
-            return $journal;
-        });
-    }
-
-    /**
-     * Convert transaction-currency lines to base currency, keeping the originals.
-     *
-     * Each line is rounded to the base currency's minor unit independently, so the
-     * converted totals can drift by a few minor units even though the originals
-     * balance (e.g. 1.00 = 0.50 + 0.50 at a rate of 0.333333 gives 0.33 vs 0.34).
-     * That residual is real and must land somewhere — it goes to Round Off.
-     *
-     * @param array<int, array<string, mixed>> $lines
-     * @return array<int, array<string, mixed>>
-     */
-    private function convertToBase(array $lines, float $rate, int $baseDecimals, int $tenantId): array
-    {
-        $scale = 10 ** $baseDecimals;
-        $debitMinor = 0;
-        $creditMinor = 0;
-        $converted = [];
-
-        foreach ($lines as $line) {
-            $foreignDebit = (float) ($line['debit'] ?? 0);
-            $foreignCredit = (float) ($line['credit'] ?? 0);
-
-            $baseDebit = round($foreignDebit * $rate, $baseDecimals);
-            $baseCredit = round($foreignCredit * $rate, $baseDecimals);
-
-            if ($baseDebit == 0.0 && $baseCredit == 0.0) {
-                $amount = $foreignDebit ?: $foreignCredit;
-
-                throw new InvalidArgumentException(
-                    "A line of {$amount} converts to zero in the base currency at rate {$rate}. Use a larger amount or check the exchange rate."
-                );
-            }
-
-            $debitMinor += (int) round($baseDebit * $scale);
-            $creditMinor += (int) round($baseCredit * $scale);
-
-            $converted[] = array_merge($line, [
-                'debit' => $baseDebit,
-                'credit' => $baseCredit,
-                'foreign_debit' => $foreignDebit > 0 ? $foreignDebit : null,
-                'foreign_credit' => $foreignCredit > 0 ? $foreignCredit : null,
-            ]);
-        }
-
-        $differenceMinor = $debitMinor - $creditMinor;
-
-        if ($differenceMinor !== 0) {
-            $amount = abs($differenceMinor) / $scale;
-            $roundOff = $this->accounts->findByCode(AccountCode::ROUND_OFF, $tenantId);
-
-            if ($roundOff === null) {
-                throw new InvalidArgumentException(
-                    "Currency conversion left a rounding difference of {$amount}, but the Round Off account (" . AccountCode::ROUND_OFF . ') does not exist.'
-                );
-            }
-
-            $converted[] = [
-                'chart_of_account_id' => $roundOff->id,
-                'debit' => $differenceMinor < 0 ? $amount : 0,
-                'credit' => $differenceMinor > 0 ? $amount : 0,
-                'description' => 'Currency conversion rounding',
-            ];
-        }
-
-        return $converted;
-    }
-
-    /**
      * Totals are accumulated in integer minor units (paise) rather than floats.
      *
      * The previous implementation summed floats and compared `round($totalDebit, 2) !==
@@ -385,8 +248,8 @@ class JournalService
      * (JPY has no minor unit, KWD has three). Behaviour for 2-decimal journals is unchanged.
      *
      * @param array<int, array{chart_of_account_id: int, debit?: float, credit?: float}> $lines
-     * @param int $decimals minor-unit scale of the currency the amounts are in
-     *                      (2 for INR/USD, 0 for JPY, 3 for KWD)
+     * @param int $decimals minor-unit scale of the transaction currency (2 for INR/USD,
+     *                      0 for JPY, 3 for KWD)
      */
     private function assertLinesAreBalanced(array $lines, int $decimals = 2): void
     {
@@ -424,7 +287,7 @@ class JournalService
             $totalCreditMinor += (int) round($credit * $scale);
 
             // Kept only for the exception message below, which reports the
-            // human-readable amounts rather than minor units.
+            // human-readable amounts rather than paise.
             $totalDebit += $debit;
             $totalCredit += $credit;
         }

@@ -288,7 +288,7 @@
                     <th class="text-right" style="width: 12%;">Unit Price</th>
                     <th class="text-right" style="width: 10%;">Tax Rate</th>
                     <th class="text-right" style="width: 10%;">Discount</th>
-                    <th class="text-right" style="width: 15%;">Amount ({{ currency_symbol() }})</th>
+                    <th class="text-right" style="width: 15%;">Amount (₹)</th>
                 </tr>
             </thead>
             <tbody>
@@ -308,16 +308,16 @@
                             {{ $item->warehouse?->name ?: '—' }}
                         </td>
                         <td class="text-center">{{ $item->quantity }}</td>
-                        <td class="text-right">{{ currency_symbol() }}{{ number_format($item->unit_price, 2) }}</td>
+                        <td class="text-right">₹{{ number_format($item->unit_price, 2) }}</td>
                         <td class="text-right">{{ number_format($item->tax_rate, 2) }}%</td>
                         <td class="text-right">
                             @if($item->discount > 0)
-                                {{ currency_symbol() }}{{ number_format($item->discount, 2) }}
+                                ₹{{ number_format($item->discount, 2) }}
                             @else
                                 —
                             @endif
                         </td>
-                        <td class="text-right" style="font-weight: bold;">{{ currency_symbol() }}{{ number_format($item->amount, 2) }}</td>
+                        <td class="text-right" style="font-weight: bold;">₹{{ number_format($item->amount, 2) }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -331,33 +331,33 @@
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                         <tr>
                             <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Subtotal:</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ currency_symbol() }}{{ number_format($order->subtotal, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">₹{{ number_format($order->subtotal, 2) }}</td>
                         </tr>
                         <tr>
                             <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Tax total (GST):</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ currency_symbol() }}{{ number_format($order->tax, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">₹{{ number_format($order->tax, 2) }}</td>
                         </tr>
                         @if($order->discount > 0)
                             <tr style="color: #b91c1c;">
                                 <td style="padding: 4px 0; text-align: left; border: 0;">Discount:</td>
-                                <td style="text-align: right; font-weight: bold; padding: 4px 0; border: 0;">-{{ currency_symbol() }}{{ number_format($order->discount, 2) }}</td>
+                                <td style="text-align: right; font-weight: bold; padding: 4px 0; border: 0;">-₹{{ number_format($order->discount, 2) }}</td>
                             </tr>
                         @endif
                         @if($order->shipping_charges > 0)
                             <tr>
                                 <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Shipping Charges:</td>
-                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ currency_symbol() }}{{ number_format($order->shipping_charges, 2) }}</td>
+                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">₹{{ number_format($order->shipping_charges, 2) }}</td>
                             </tr>
                         @endif
                         @if($order->adjustment != 0)
                             <tr>
                                 <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Adjustment:</td>
-                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ currency_symbol() }}{{ number_format($order->adjustment, 2) }}</td>
+                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">₹{{ number_format($order->adjustment, 2) }}</td>
                             </tr>
                         @endif
                         <tr style="border-top: 1px solid #cbd5e1;">
                             <td style="font-weight: bold; color: #0f172a; padding: 6px 0 0 0; font-size: 11px; text-align: left; border: 0;">Total Payable:</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e40af; padding: 6px 0 0 0; font-size: 11px; border: 0;">{{ currency_symbol() }}{{ number_format($order->total_amount, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold; color: #1e40af; padding: 6px 0 0 0; font-size: 11px; border: 0;">₹{{ number_format($order->total_amount, 2) }}</td>
                         </tr>
                     </table>
                 </div>

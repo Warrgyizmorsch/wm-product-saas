@@ -23,12 +23,6 @@ interface JournalRepositoryInterface
     public function createWithEntries(array $journalData, array $entryLines): Journal;
 
     /**
-     * Every journal ever recorded for a tenant — posted, reversed or soft-deleted —
-     * since all of them hold amounts in the tenant's currency.
-     */
-    public function countForTenant(int $tenantId): int;
-
-    /**
      * One row per account with summed debit/credit across every posted
      * journal in the given period, for a Trial Balance report.
      *

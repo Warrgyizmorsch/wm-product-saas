@@ -140,7 +140,7 @@
                                 @endif
                             </td>
                             <td class="text-end font-monospace fw-bold text-success">
-                                {{ currency_symbol() }}{{ number_format($order->grand_total, 2) }}
+                                ₹{{ number_format($order->grand_total, 2) }}
                             </td>
                             <td>
                                 @if($order->reminder_count > 0)

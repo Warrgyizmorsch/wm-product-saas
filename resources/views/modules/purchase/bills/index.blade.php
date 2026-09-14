@@ -189,9 +189,9 @@
                                     {{ $statusText }}
                                 </span>
                             </td>
-                            <td class="text-end font-monospace fw-bold text-dark">{{ currency_symbol() }}{{ number_format($bill->grand_total, 2) }}</td>
-                            <td class="text-end font-monospace text-success fw-semibold">{{ currency_symbol() }}{{ number_format($bill->paid_amount, 2) }}</td>
-                            <td class="text-end font-monospace fw-bold text-danger">{{ currency_symbol() }}{{ number_format($bill->due_amount, 2) }}</td>
+                            <td class="text-end font-monospace fw-bold text-dark">₹{{ number_format($bill->grand_total, 2) }}</td>
+                            <td class="text-end font-monospace text-success fw-semibold">₹{{ number_format($bill->paid_amount, 2) }}</td>
+                            <td class="text-end font-monospace fw-bold text-danger">₹{{ number_format($bill->due_amount, 2) }}</td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
                                     <button type="button" class="action-icon-btn view-btn btn-view-offcanvas" data-bill='{{ $billJson }}' title="{{ __('purchase.view_details') }}" data-bs-toggle="tooltip">
@@ -265,15 +265,15 @@
                 <h6 class="fw-bold text-dark mb-3 fs-12 text-uppercase"><i class="feather-dollar-sign text-success me-1"></i> Financial Summary</h6>
                 <div class="d-flex justify-content-between py-1.5 border-bottom">
                     <span class="text-muted">Grand Total:</span>
-                    <strong class="font-monospace text-dark fs-14" id="ocGrandTotal">{{ currency_symbol() }}0.00</strong>
+                    <strong class="font-monospace text-dark fs-14" id="ocGrandTotal">₹0.00</strong>
                 </div>
                 <div class="d-flex justify-content-between py-1.5 border-bottom">
                     <span class="text-muted">Paid Amount:</span>
-                    <span class="font-monospace text-success fw-bold fs-14" id="ocPaidAmount">{{ currency_symbol() }}0.00</span>
+                    <span class="font-monospace text-success fw-bold fs-14" id="ocPaidAmount">₹0.00</span>
                 </div>
                 <div class="d-flex justify-content-between py-2 mt-1">
                     <span class="fw-bold text-dark fs-14">Outstanding Due:</span>
-                    <strong class="font-monospace text-danger fs-16" id="ocDueAmount">{{ currency_symbol() }}0.00</strong>
+                    <strong class="font-monospace text-danger fs-16" id="ocDueAmount">₹0.00</strong>
                 </div>
             </div>
 
@@ -286,8 +286,8 @@
                             <tr>
                                 <th style="width: 46%;">Product</th>
                                 <th class="text-center" style="width: 14%;">Qty</th>
-                                <th class="text-end" style="width: 20%;">Rate ({{ currency_symbol() }})</th>
-                                <th class="text-end" style="width: 20%;">Total ({{ currency_symbol() }})</th>
+                                <th class="text-end" style="width: 20%;">Rate (₹)</th>
+                                <th class="text-end" style="width: 20%;">Total (₹)</th>
                             </tr>
                         </thead>
                         <tbody id="ocItemsBody">
@@ -327,9 +327,9 @@
                 $('#ocGrnNumber').text(bill.grn_number);
                 $('#ocBillDate').text(bill.bill_date);
                 $('#ocDueDate').text(bill.due_date);
-                $('#ocGrandTotal').text('{{ currency_symbol() }}' + bill.grand_total);
-                $('#ocPaidAmount').text('{{ currency_symbol() }}' + bill.paid_amount);
-                $('#ocDueAmount').text('{{ currency_symbol() }}' + bill.due_amount);
+                $('#ocGrandTotal').text('₹' + bill.grand_total);
+                $('#ocPaidAmount').text('₹' + bill.paid_amount);
+                $('#ocDueAmount').text('₹' + bill.due_amount);
 
                 const statusBadge = $('#ocStatusBadge');
                 statusBadge.attr('class', 'badge px-2.5 py-1 fs-11 fw-bold bg-soft-' + bill.badge_class + ' text-' + bill.badge_class);
@@ -342,8 +342,8 @@
                             <tr>
                                 <td class="fw-semibold text-dark">${escapeHtml(item.product_name)}</td>
                                 <td class="text-center font-monospace">${item.quantity}</td>
-                                <td class="text-end font-monospace">{{ currency_symbol() }}${item.unit_rate}</td>
-                                <td class="text-end font-monospace fw-bold">{{ currency_symbol() }}${item.total_amount}</td>
+                                <td class="text-end font-monospace">₹${item.unit_rate}</td>
+                                <td class="text-end font-monospace fw-bold">₹${item.total_amount}</td>
                             </tr>
                         `;
                     });

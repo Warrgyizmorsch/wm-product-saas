@@ -64,7 +64,7 @@
                             <div class="border-start ps-4">
                                 <span class="text-muted fs-11 text-uppercase d-block">{{ __('inventory.asset_value') }}</span>
                                 <h4 class="fw-bold text-dark mb-0">
-                                    {{ currency_symbol() }}{{ number_format(
+                                    ₹{{ number_format(
                                         $product->variation_type === 'Variant' 
                                         ? $product->variants->sum(fn($v) => $v->warehouseStocks->sum(fn($ws) => $ws->quantity * $ws->unit_cost))
                                         : $product->warehouseStocks->sum(fn($ws) => $ws->quantity * $ws->unit_cost), 
@@ -228,7 +228,7 @@
                                             <td class="fw-semibold">
                                                 @if($product->opening_stock)
                                                     {{ number_format($product->opening_stock, 0) }} {{ $product->uom?->code ?? 'pcs' }} 
-                                                    <span class="text-muted font-monospace fs-11">(@ {{ currency_symbol() }}{{ number_format($product->opening_stock_rate, 2) }}/unit)</span>
+                                                    <span class="text-muted font-monospace fs-11">(@ ₹{{ number_format($product->opening_stock_rate, 2) }}/unit)</span>
                                                 @else
                                                     —
                                                 @endif
@@ -285,7 +285,7 @@
                                     <tbody>
                                         <tr>
                                             <td class="text-muted" style="width: 160px;">{{ __('inventory.selling_price') }}</td>
-                                            <td class="fw-bold text-success">{{ currency_symbol() }}{{ number_format($product->selling_price, 2) }}</td>
+                                            <td class="fw-bold text-success">₹{{ number_format($product->selling_price, 2) }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.sales_account') }}</td>
@@ -293,7 +293,7 @@
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.purchase_cost') }}</td>
-                                            <td class="fw-bold text-danger">{{ currency_symbol() }}{{ number_format($product->cost_price, 2) }}</td>
+                                            <td class="fw-bold text-danger">₹{{ number_format($product->cost_price, 2) }}</td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">{{ __('inventory.purchase_account') }}</td>
@@ -386,8 +386,8 @@
                                                     <td class="text-end fw-bold text-dark">{{ number_format($qty, 0) }}</td>
                                                     <td class="text-end text-warning fw-semibold">{{ number_format($reserved, 0) }}</td>
                                                     <td class="text-end text-success fw-bold">{{ number_format($available, 0) }}</td>
-                                                    <td class="text-end">{{ currency_symbol() }}{{ number_format($cost, 2) }}</td>
-                                                    <td class="text-end fw-bold">{{ currency_symbol() }}{{ number_format($totalValuation, 2) }}</td>
+                                                    <td class="text-end">₹{{ number_format($cost, 2) }}</td>
+                                                    <td class="text-end fw-bold">₹{{ number_format($totalValuation, 2) }}</td>
                                                     <td>{{ number_format($product->reorder_point, 0) }}</td>
                                                 </tr>
                                             @endforeach
@@ -399,8 +399,8 @@
                                                     <td class="text-end fw-bold text-dark">{{ number_format($ws->quantity, 0) }}</td>
                                                     <td class="text-end text-warning fw-semibold">{{ number_format($ws->reserved_qty, 0) }}</td>
                                                     <td class="text-end text-success fw-bold">{{ number_format($ws->available_qty, 0) }}</td>
-                                                    <td class="text-end">{{ currency_symbol() }}{{ number_format($ws->unit_cost, 2) }}</td>
-                                                    <td class="text-end fw-bold">{{ currency_symbol() }}{{ number_format($ws->quantity * $ws->unit_cost, 2) }}</td>
+                                                    <td class="text-end">₹{{ number_format($ws->unit_cost, 2) }}</td>
+                                                    <td class="text-end fw-bold">₹{{ number_format($ws->quantity * $ws->unit_cost, 2) }}</td>
                                                     <td>
                                                         {{ number_format($product->reorder_point, 0) }}
                                                         @if($ws->quantity <= $product->reorder_point)
@@ -447,9 +447,9 @@
                                                     {{ $variant->name }}
                                                 </td>
                                                 <td class="font-monospace">{{ $variant->sku }}</td>
-                                                <td>{{ currency_symbol() }}{{ number_format($variant->selling_price, 2) }}</td>
-                                                <td class="text-muted">{{ currency_symbol() }}{{ number_format($variant->cost_price, 2) }}</td>
-                                                <td class="fw-semibold text-primary">{{ currency_symbol() }}{{ number_format($variantAvgCost, 2) }}</td>
+                                                <td>₹{{ number_format($variant->selling_price, 2) }}</td>
+                                                <td class="text-muted">₹{{ number_format($variant->cost_price, 2) }}</td>
+                                                <td class="fw-semibold text-primary">₹{{ number_format($variantAvgCost, 2) }}</td>
                                                 <td class="fw-bold">
                                                     {{ number_format($variant->total_stock, 0) }}
                                                     <span class="text-muted fs-11">/ {{ $product->uom?->code ?? 'pcs' }}</span>
@@ -529,8 +529,8 @@
                                                     @endif
                                                 </td>
                                                 <td class="text-end fw-bold">{{ number_format($tx->quantity, 0) }}</td>
-                                                <td class="text-end">{{ currency_symbol() }}{{ number_format($tx->unit_cost, 2) }}</td>
-                                                <td class="text-end fw-bold">{{ currency_symbol() }}{{ number_format($tx->total_value, 2) }}</td>
+                                                <td class="text-end">₹{{ number_format($tx->unit_cost, 2) }}</td>
+                                                <td class="text-end fw-bold">₹{{ number_format($tx->total_value, 2) }}</td>
                                                 <td class="text-end">
                                                     @if($tx->type === 'IN')
                                                         @if($tx->balance_qty > 0)

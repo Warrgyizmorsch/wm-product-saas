@@ -190,10 +190,10 @@
                                 @endif
                             </td>
                             <td class="text-end fw-bold">
-                                {{ currency_symbol() }}{{ number_format($product->selling_price, 2) }}
+                                ₹{{ number_format($product->selling_price, 2) }}
                             </td>
                             <td class="text-end text-muted">
-                                {{ currency_symbol() }}{{ number_format($product->cost_price, 2) }}
+                                ₹{{ number_format($product->cost_price, 2) }}
                             </td>
                             <td class="text-end">
                                 @if($product->item_type === 'Service')

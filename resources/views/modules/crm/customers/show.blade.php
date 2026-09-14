@@ -103,23 +103,23 @@
                 <div class="row g-3 text-center text-md-start">
                     <div class="col-md-3 border-end">
                         <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-file-text me-1 text-primary"></i>Total Lifetime Billed</span>
-                        <h4 class="fw-bold text-primary mb-0 fs-18">{{ currency_symbol() }}{{ number_format($totalBilled, 2) }}</h4>
+                        <h4 class="fw-bold text-primary mb-0 fs-18">₹{{ number_format($totalBilled, 2) }}</h4>
                         <span class="fs-11 text-muted">{{ $invoices->count() }} Invoices Issued</span>
                     </div>
                     <div class="col-md-3 border-end">
                         <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-alert-circle me-1 text-warning"></i>Outstanding Receivables</span>
-                        <h4 class="fw-bold text-warning mb-0 fs-18">{{ currency_symbol() }}{{ number_format($outstandingBalance, 2) }}</h4>
+                        <h4 class="fw-bold text-warning mb-0 fs-18">₹{{ number_format($outstandingBalance, 2) }}</h4>
                         <span class="fs-11 text-muted">Total Uncollected</span>
                     </div>
                     <div class="col-md-3 border-end">
                         <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-clock me-1 text-danger"></i>Overdue Amount</span>
-                        <h4 class="fw-bold text-danger mb-0 fs-18">{{ currency_symbol() }}{{ number_format($overdueAmount, 2) }}</h4>
+                        <h4 class="fw-bold text-danger mb-0 fs-18">₹{{ number_format($overdueAmount, 2) }}</h4>
                         <span class="fs-11 text-muted">Due Date Passed</span>
                     </div>
                     <div class="col-md-3">
                         <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-shield me-1 text-success"></i>Credit Limit / Available</span>
-                        <h4 class="fw-bold text-success mb-0 fs-18">{{ currency_symbol() }}{{ number_format($creditLimit, 2) }}</h4>
-                        <span class="fs-11 text-muted">Available: {{ currency_symbol() }}{{ number_format($availableCredit, 2) }}</span>
+                        <h4 class="fw-bold text-success mb-0 fs-18">₹{{ number_format($creditLimit, 2) }}</h4>
+                        <span class="fs-11 text-muted">Available: ₹{{ number_format($availableCredit, 2) }}</span>
                     </div>
                 </div>
             </div>
@@ -179,9 +179,9 @@
                                         <th style="background-color: #e8ecf1 !important;">Linked Sales Order & Deal</th>
                                         <th style="background-color: #e8ecf1 !important;">Invoice Date</th>
                                         <th style="background-color: #e8ecf1 !important;">Due Date</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Total Amount ({{ currency_symbol() }})</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Amount Paid ({{ currency_symbol() }})</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Balance Due ({{ currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Total Amount (₹)</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Amount Paid (₹)</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Balance Due (₹)</th>
                                         <th style="background-color: #e8ecf1 !important;" class="text-center">Status</th>
                                         <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">Action</th>
                                     </tr>
@@ -235,9 +235,9 @@
                                             </td>
                                             <td>{{ $inv->invoice_date ? \Carbon\Carbon::parse($inv->invoice_date)->format('d/m/Y') : '—' }}</td>
                                             <td>{{ $inv->due_date ? \Carbon\Carbon::parse($inv->due_date)->format('d/m/Y') : '—' }}</td>
-                                            <td class="text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($inv->total_amount, 2) }}</td>
-                                            <td class="text-end text-success fw-bold">{{ currency_symbol() }}{{ number_format($inv->amount_paid ?: 0, 2) }}</td>
-                                            <td class="text-end text-danger fw-bold">{{ currency_symbol() }}{{ number_format($inv->balance_due ?: ($inv->total_amount - ($inv->amount_paid ?: 0)), 2) }}</td>
+                                            <td class="text-end fw-bold text-dark">₹{{ number_format($inv->total_amount, 2) }}</td>
+                                            <td class="text-end text-success fw-bold">₹{{ number_format($inv->amount_paid ?: 0, 2) }}</td>
+                                            <td class="text-end text-danger fw-bold">₹{{ number_format($inv->balance_due ?: ($inv->total_amount - ($inv->amount_paid ?: 0)), 2) }}</td>
                                             <td class="text-center">
                                                 @if(strtolower($inv->status) === 'paid' || $inv->amount_paid >= $inv->total_amount)
                                                     <x-ui.status-badge status="completed" label="Paid" size="sm" />
@@ -288,7 +288,7 @@
                                         <th style="background-color: #e8ecf1 !important;">Date</th>
                                         <th style="background-color: #e8ecf1 !important;">Linked Invoice & Deal</th>
                                         <th style="background-color: #e8ecf1 !important;">Payment Mode & Ref #</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Amount Received ({{ currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Amount Received (₹)</th>
                                         <th style="background-color: #e8ecf1 !important;" class="text-center">Status</th>
                                     </tr>
                                 </thead>
@@ -341,7 +341,7 @@
                                                     <span class="font-monospace text-muted fs-11">Ref: {{ $pay->reference_no }}</span>
                                                 @endif
                                             </td>
-                                            <td class="text-end fw-bold text-success fs-14">{{ currency_symbol() }}{{ number_format($pay->amount, 2) }}</td>
+                                            <td class="text-end fw-bold text-success fs-14">₹{{ number_format($pay->amount, 2) }}</td>
                                             <td class="text-center">
                                                 <x-ui.status-badge status="completed" :label="ucfirst($pay->status ?: 'Completed')" size="sm" />
                                             </td>
@@ -384,7 +384,7 @@
                                         <th style="background-color: #e8ecf1 !important;">Linked Opportunity / Deal</th>
                                         <th style="background-color: #e8ecf1 !important;">Order Date</th>
                                         <th style="background-color: #e8ecf1 !important;">Items</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Total Amount ({{ currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end">Total Amount (₹)</th>
                                         <th style="background-color: #e8ecf1 !important;" class="text-center">Status</th>
                                         <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">Action</th>
                                     </tr>
@@ -439,7 +439,7 @@
                                             <td>
                                                 <span class="badge bg-light text-dark border">{{ $so->items->count() ?: 1 }} Item(s)</span>
                                             </td>
-                                            <td class="text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($so->total_amount ?: ($so->grand_total ?? 0), 2) }}</td>
+                                            <td class="text-end fw-bold text-dark">₹{{ number_format($so->total_amount ?: ($so->grand_total ?? 0), 2) }}</td>
                                             <td class="text-center">
                                                 <x-ui.status-badge status="confirmed" :label="ucfirst($so->status ?: 'Confirmed')" size="sm" />
                                             </td>
@@ -574,9 +574,9 @@
                                         <th style="background-color: #e8ecf1 !important;">Reference #</th>
                                         <th style="background-color: #e8ecf1 !important;">Particulars / Description</th>
                                         <th style="background-color: #e8ecf1 !important;">Linked Deal & SO</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-danger">Debit (Billed) ({{ currency_symbol() }})</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-success">Credit (Paid) ({{ currency_symbol() }})</th>
-                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-primary">Running Balance ({{ currency_symbol() }})</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-danger">Debit (Billed) (₹)</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-success">Credit (Paid) (₹)</th>
+                                        <th style="background-color: #e8ecf1 !important;" class="text-end text-primary">Running Balance (₹)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -615,18 +615,18 @@
                                                     <span class="text-muted">—</span>
                                                 @endif
                                             </td>
-                                            <td class="text-end text-danger font-monospace">{{ $row['debit'] > 0 ? (currency_symbol()) . number_format($row['debit'], 2) : '—' }}</td>
-                                            <td class="text-end text-success font-monospace">{{ $row['credit'] > 0 ? (currency_symbol()) . number_format($row['credit'], 2) : '—' }}</td>
-                                            <td class="text-end font-monospace fw-bold {{ $running > 0 ? 'text-danger' : 'text-success' }}">{{ currency_symbol() }}{{ number_format($running, 2) }}</td>
+                                            <td class="text-end text-danger font-monospace">{{ $row['debit'] > 0 ? '₹' . number_format($row['debit'], 2) : '—' }}</td>
+                                            <td class="text-end text-success font-monospace">{{ $row['credit'] > 0 ? '₹' . number_format($row['credit'], 2) : '—' }}</td>
+                                            <td class="text-end font-monospace fw-bold {{ $running > 0 ? 'text-danger' : 'text-success' }}">₹{{ number_format($running, 2) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                                 <tfoot class="table-light font-monospace fw-bold">
                                     <tr>
                                         <td colspan="5" class="text-end text-dark">Closing Balance:</td>
-                                        <td class="text-end text-danger">{{ currency_symbol() }}{{ number_format($sortedLedger->sum('debit'), 2) }}</td>
-                                        <td class="text-end text-success">{{ currency_symbol() }}{{ number_format($sortedLedger->sum('credit'), 2) }}</td>
-                                        <td class="text-end text-primary fs-14">{{ currency_symbol() }}{{ number_format($running, 2) }}</td>
+                                        <td class="text-end text-danger">₹{{ number_format($sortedLedger->sum('debit'), 2) }}</td>
+                                        <td class="text-end text-success">₹{{ number_format($sortedLedger->sum('credit'), 2) }}</td>
+                                        <td class="text-end text-primary fs-14">₹{{ number_format($running, 2) }}</td>
                                     </tr>
                                 </tfoot>
                             </x-ui.odoo-form-ui>

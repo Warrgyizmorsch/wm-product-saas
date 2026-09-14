@@ -306,7 +306,7 @@
 
                             <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
                                 <span class="text-muted">Total Refund Amount:</span>
-                                <strong class="fw-black text-danger fs-15">{{ currency_symbol() }}{{ number_format($displayRefundTotal, 2) }}</strong>
+                                <strong class="fw-black text-danger fs-15">₹{{ number_format($displayRefundTotal, 2) }}</strong>
                             </div>
 
                             @if ($return->salesOrder)
@@ -344,7 +344,7 @@
                                     <th style="width: 45%;">Product Details</th>
                                     <th style="width: 25%;">Restock Warehouse</th>
                                     <th class="text-end" style="width: 10%;">Qty</th>
-                                    <th class="text-end" style="width: 15%;">Refund Price ({{ currency_symbol() }})</th>
+                                    <th class="text-end" style="width: 15%;">Refund Price (₹)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -371,7 +371,7 @@
                                         </td>
                                         <td class="text-end fw-bold text-danger">{{ (int)$item->quantity }}</td>
                                         <td class="text-end fw-bold text-dark">
-                                            {{ currency_symbol() }}{{ number_format($item->unit_price, 2) }}
+                                            ₹{{ number_format($item->unit_price, 2) }}
                                         </td>
                                     </tr>
                                 @endforeach
@@ -379,7 +379,7 @@
                             <tfoot>
                                 <tr>
                                     <td colspan="4" class="text-end text-muted fw-semibold">Total Credit Refund:</td>
-                                    <td class="text-end fw-black text-danger fs-14">{{ currency_symbol() }}{{ number_format($displayRefundTotal, 2) }}</td>
+                                    <td class="text-end fw-black text-danger fs-14">₹{{ number_format($displayRefundTotal, 2) }}</td>
                                 </tr>
                             </tfoot>
                         </table>

@@ -179,14 +179,14 @@
                             <span class="fw-bold text-primary">{{ $rule->category->name }}</span>
                             <span class="text-muted fs-11 d-block">{{ $rule->category->code }}</span>
                         </td>
-                        <td>{!! $rule->max_limit_per_claim ? (currency_symbol()) . number_format($rule->max_limit_per_claim, 2) : '<span class="text-muted">No limit</span>' !!}</td>
-                        <td>{!! $rule->max_daily_limit ? (currency_symbol()) . number_format($rule->max_daily_limit, 2) : '<span class="text-muted">—</span>' !!}</td>
-                        <td>{!! $rule->max_monthly_limit ? (currency_symbol()) . number_format($rule->max_monthly_limit, 2) : '<span class="text-muted">—</span>' !!}</td>
+                        <td>{!! $rule->max_limit_per_claim ? '₹' . number_format($rule->max_limit_per_claim, 2) : '<span class="text-muted">No limit</span>' !!}</td>
+                        <td>{!! $rule->max_daily_limit ? '₹' . number_format($rule->max_daily_limit, 2) : '<span class="text-muted">—</span>' !!}</td>
+                        <td>{!! $rule->max_monthly_limit ? '₹' . number_format($rule->max_monthly_limit, 2) : '<span class="text-muted">—</span>' !!}</td>
                         <td>
                             @if($rule->receipt_required)
                                 <x-ui.badge variant="warning" soft class="px-2 py-1 fs-11">Always</x-ui.badge>
                             @elseif($rule->receipt_required_threshold)
-                                <span class="fs-12 text-muted">Above {{ currency_symbol() }}{{ number_format($rule->receipt_required_threshold, 2) }}</span>
+                                <span class="fs-12 text-muted">Above ₹{{ number_format($rule->receipt_required_threshold, 2) }}</span>
                             @else
                                 <span class="text-muted fs-12">Not required</span>
                             @endif
@@ -241,10 +241,10 @@
             @endforeach
         </x-ui.odoo-form-ui>
 
-        <x-ui.odoo-form-ui type="input" inputType="number" label="Max per Claim ({{ currency_symbol() }})" name="max_limit_per_claim" id="rule_claim" placeholder="e.g. 500" step="0.01" min="0" />
-        <x-ui.odoo-form-ui type="input" inputType="number" label="Max per Day ({{ currency_symbol() }})" name="max_daily_limit" id="rule_daily" placeholder="e.g. 1000" step="0.01" min="0" />
-        <x-ui.odoo-form-ui type="input" inputType="number" label="Max per Month ({{ currency_symbol() }})" name="max_monthly_limit" id="rule_monthly" placeholder="e.g. 5000" step="0.01" min="0" />
-        <x-ui.odoo-form-ui type="input" inputType="number" label="Receipt Threshold ({{ currency_symbol() }})" name="receipt_required_threshold" id="rule_threshold" placeholder="e.g. 250" step="0.01" min="0" />
+        <x-ui.odoo-form-ui type="input" inputType="number" label="Max per Claim (₹)" name="max_limit_per_claim" id="rule_claim" placeholder="e.g. 500" step="0.01" min="0" />
+        <x-ui.odoo-form-ui type="input" inputType="number" label="Max per Day (₹)" name="max_daily_limit" id="rule_daily" placeholder="e.g. 1000" step="0.01" min="0" />
+        <x-ui.odoo-form-ui type="input" inputType="number" label="Max per Month (₹)" name="max_monthly_limit" id="rule_monthly" placeholder="e.g. 5000" step="0.01" min="0" />
+        <x-ui.odoo-form-ui type="input" inputType="number" label="Receipt Threshold (₹)" name="receipt_required_threshold" id="rule_threshold" placeholder="e.g. 250" step="0.01" min="0" />
         
         <x-ui.odoo-form-ui type="select" label="Always Require Receipt?" name="receipt_required" id="rule_receipt" select2-selector="default">
             <option value="0" selected>No — only above threshold</option>

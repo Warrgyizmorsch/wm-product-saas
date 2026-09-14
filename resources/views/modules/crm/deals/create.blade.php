@@ -75,7 +75,7 @@
 
                     <x-ui.odoo-form-ui type="input" label="Project / Deal Title *" name="title" :value="old('title')" required="true" placeholder="e.g. Tiles Supply – ABC Mall Project" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Estimated Value ({{ currency_symbol() }}) *" name="estimated_value" :value="old('estimated_value', '0.00')" step="0.01" required="true" placeholder="0.00" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Estimated Value (₹) *" name="estimated_value" :value="old('estimated_value', '0.00')" step="0.01" required="true" placeholder="0.00" />
                 </div>
 
                 <!-- Right Column: Classification, Notes & Products -->

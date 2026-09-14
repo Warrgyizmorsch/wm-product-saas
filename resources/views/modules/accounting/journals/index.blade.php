@@ -101,12 +101,7 @@
                         <td>{{ $journal->journal_date->format('d M Y') }}</td>
                         <td class="text-capitalize">{{ $journal->source }}</td>
                         <td class="text-muted text-truncate" style="max-width: 220px;">{{ $journal->memo ?: '—' }}</td>
-                        <td class="text-end">
-                            @if ($journal->currency_code)
-                                <span class="badge bg-soft-info text-info me-1" title="Entered in {{ $journal->currency_code }} at {{ rtrim(rtrim(number_format($journal->exchange_rate, 6, '.', ''), '0'), '.') }}">{{ $journal->currency_code }}</span>
-                            @endif
-                            {{ number_format($journal->total_debit, 2) }}
-                        </td>
+                        <td class="text-end">{{ number_format($journal->total_debit, 2) }}</td>
                         <td class="text-end">{{ number_format($journal->total_credit, 2) }}</td>
                         <td>
                             @if ($journal->status === 'posted')

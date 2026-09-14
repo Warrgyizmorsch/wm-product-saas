@@ -49,7 +49,7 @@
                                 </td>
                                 <td>{{ $payment->payment_method }}</td>
                                 <td class="text-muted">{{ $payment->reference_no ?: '—' }}</td>
-                                <td class="text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($payment->amount, 2) }}</td>
+                                <td class="text-end fw-bold text-dark">₹{{ number_format($payment->amount, 2) }}</td>
                                 <td>
                                     @php
                                         $badgeClass = 'bg-soft-secondary text-secondary';

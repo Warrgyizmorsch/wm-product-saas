@@ -75,7 +75,7 @@
 
                     <x-ui.odoo-form-ui type="input" label="Project / Deal Title *" name="title" :value="old('title', $deal->title)" required="true" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Estimated Value ({{ currency_symbol() }}) *" name="estimated_value" :value="old('estimated_value', $deal->estimated_value)" step="0.01" required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Estimated Value (₹) *" name="estimated_value" :value="old('estimated_value', $deal->estimated_value)" step="0.01" required="true" />
                 </div>
 
                 <!-- Right Column: Classification, Notes & Products -->

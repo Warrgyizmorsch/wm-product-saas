@@ -83,7 +83,7 @@
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div>
                         <strong class="text-dark fs-13"><i class="feather-info text-info me-1.5"></i>Vendor Advance Credit Available:</strong>
-                        <span class="text-success fw-bold font-monospace fs-14 ms-1">{{ currency_symbol() }}{{ number_format($availAdv, 2) }}</span>
+                        <span class="text-success fw-bold font-monospace fs-14 ms-1">₹{{ number_format($availAdv, 2) }}</span>
                         <small class="text-muted d-block fs-11 mt-0.5">This supplier has available advance credit that can be applied to settle this bill.</small>
                     </div>
                     <div class="d-flex align-items-center gap-2">
@@ -95,7 +95,7 @@
                                 </button>
                             </form>
                         @endif
-                        <span class="badge bg-primary text-white p-2 fs-12">{{ __('purchase.net_payable_from_bank') }}: {{ currency_symbol() }}{{ number_format(max(0, $bill->due_amount - $availAdv), 2) }}</span>
+                        <span class="badge bg-primary text-white p-2 fs-12">{{ __('purchase.net_payable_from_bank') }}: ₹{{ number_format(max(0, $bill->due_amount - $availAdv), 2) }}</span>
                     </div>
                 </div>
             </div>
@@ -157,7 +157,7 @@
                     <span class="text-muted d-block fs-11 text-uppercase fw-bold">Freight Terms &amp; Method</span>
                     <strong class="text-capitalize d-block">{{ str_replace('_', ' ', $bill->freight_terms ?: 'To Pay') }}</strong>
                     @if($bill->freight_amount > 0)
-                        <span class="text-primary fw-bold font-monospace d-inline-block">{{ currency_symbol() }}{{ number_format($bill->freight_amount, 2) }}</span>
+                        <span class="text-primary fw-bold font-monospace d-inline-block">₹{{ number_format($bill->freight_amount, 2) }}</span>
                         <span class="badge bg-soft-primary text-primary fs-11 ms-1">
                             {{ $bill->freight_tax_method === 'pro_rata' ? 'Pro-Rata Apportionment' : ($bill->freight_tax_method === 'manual' ? 'Custom Tax Rate' : 'Highest GST Rate') }}
                         </span>
@@ -167,7 +167,7 @@
 
             <div class="col-md-2 text-md-end">
                 <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.grand_total') }}</span>
-                <strong class="fs-16 font-monospace text-primary">{{ currency_symbol() }}{{ number_format($bill->grand_total, 2) }}</strong>
+                <strong class="fs-16 font-monospace text-primary">₹{{ number_format($bill->grand_total, 2) }}</strong>
             </div>
         </div>
 
@@ -195,10 +195,10 @@
                         <th style="width: 32%;">{{ $isServiceBill ? 'Item / Service Description' : __('purchase.product') }}</th>
                         <th class="text-center" style="width: 10%;">{{ $isServiceBill ? 'Qty / Job' : __('purchase.billed_qty') }}</th>
                         <th class="text-end" style="width: 12%;">{{ $isServiceBill ? 'Service Rate' : __('purchase.unit_rate') }}</th>
-                        <th class="text-end" style="width: 12%;">Amount ({{ currency_symbol() }})</th>
+                        <th class="text-end" style="width: 12%;">Amount (₹)</th>
 
                         @if($isProRata)
-                            <th class="text-end text-primary" style="width: 12%;">Freight Share ({{ currency_symbol() }})</th>
+                            <th class="text-end text-primary" style="width: 12%;">Freight Share (₹)</th>
                         @endif
 
                         <th class="text-center" style="width: 9%;">Tax Rate</th>
@@ -258,16 +258,16 @@
                                 @endif
                             </td>
                             <td class="text-center font-monospace">{{ $isServiceBill ? '1 (Job)' : $qty }}</td>
-                            <td class="text-end font-monospace">{{ currency_symbol() }}{{ number_format($rate, 2) }}</td>
-                            <td class="text-end font-monospace">{{ currency_symbol() }}{{ number_format($lineSub, 2) }}</td>
+                            <td class="text-end font-monospace">₹{{ number_format($rate, 2) }}</td>
+                            <td class="text-end font-monospace">₹{{ number_format($lineSub, 2) }}</td>
 
                             @if($isProRata)
-                                <td class="text-end font-monospace text-primary fw-semibold">+{{ currency_symbol() }}{{ number_format($itemFreightShare, 2) }}</td>
+                                <td class="text-end font-monospace text-primary fw-semibold">+₹{{ number_format($itemFreightShare, 2) }}</td>
                             @endif
 
                             <td class="text-center font-monospace">{{ $taxRate }}%</td>
-                            <td class="text-end font-monospace text-muted">{{ currency_symbol() }}{{ number_format($lineTax, 2) }}</td>
-                            <td class="text-end pe-3 font-monospace fw-bold text-dark">{{ currency_symbol() }}{{ number_format($lineTotal, 2) }}</td>
+                            <td class="text-end font-monospace text-muted">₹{{ number_format($lineTax, 2) }}</td>
+                            <td class="text-end pe-3 font-monospace fw-bold text-dark">₹{{ number_format($lineTotal, 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -280,38 +280,38 @@
                 <div class="border rounded p-3 bg-light-50 fs-13 text-dark">
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Subtotal (Excl. Tax):</span>
-                        <strong class="font-monospace">{{ currency_symbol() }}{{ number_format($bill->subtotal, 2) }}</strong>
+                        <strong class="font-monospace">₹{{ number_format($bill->subtotal, 2) }}</strong>
                     </div>
 
                     @if($bill->discount_amount > 0)
                         <div class="d-flex justify-content-between mb-2 text-danger">
                             <span>Less: Discount:</span>
-                            <strong class="font-monospace">-{{ currency_symbol() }}{{ number_format($bill->discount_amount, 2) }}</strong>
+                            <strong class="font-monospace">-₹{{ number_format($bill->discount_amount, 2) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 border-top pt-1">
                             <span class="text-muted">Items Taxable Value:</span>
-                            <strong class="font-monospace">{{ currency_symbol() }}{{ number_format(max(0, $bill->subtotal - $bill->discount_amount), 2) }}</strong>
+                            <strong class="font-monospace">₹{{ number_format(max(0, $bill->subtotal - $bill->discount_amount), 2) }}</strong>
                         </div>
                     @endif
 
                     @if($bill->freight_amount > 0 && !$isProRata && $bill->tax_type !== 'order_wise_tax')
                         <div class="d-flex justify-content-between mb-2 text-primary">
                             <span>Add: Freight Charges:</span>
-                            <strong class="font-monospace">+{{ currency_symbol() }}{{ number_format($bill->freight_amount, 2) }}</strong>
+                            <strong class="font-monospace">+₹{{ number_format($bill->freight_amount, 2) }}</strong>
                         </div>
                     @elseif($bill->freight_amount > 0 && $isProRata)
                         <div class="d-flex justify-content-between mb-2 text-primary">
                             <span>Freight Charges (Apportioned Pro-Rata to Items):</span>
-                            <strong class="font-monospace">+{{ currency_symbol() }}{{ number_format($bill->freight_amount, 2) }}</strong>
+                            <strong class="font-monospace">+₹{{ number_format($bill->freight_amount, 2) }}</strong>
                         </div>
                     @elseif($bill->freight_amount > 0 && $bill->tax_type === 'order_wise_tax')
                         <div class="d-flex justify-content-between mb-2 text-primary">
                             <span>Add: Freight Charges:</span>
-                            <strong class="font-monospace">+{{ currency_symbol() }}{{ number_format($bill->freight_amount, 2) }}</strong>
+                            <strong class="font-monospace">+₹{{ number_format($bill->freight_amount, 2) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 border-top pt-1 fw-bold">
                             <span>Total Taxable Base (Items + Freight):</span>
-                            <strong class="font-monospace">{{ currency_symbol() }}{{ number_format(max(0, $bill->subtotal - $bill->discount_amount) + $bill->freight_amount, 2) }}</strong>
+                            <strong class="font-monospace">₹{{ number_format(max(0, $bill->subtotal - $bill->discount_amount) + $bill->freight_amount, 2) }}</strong>
                         </div>
                     @endif
 
@@ -326,16 +326,16 @@
                     @if($bill->gst_type === 'igst')
                         <div class="d-flex justify-content-between mb-2 text-muted">
                             <span>IGST (Integrated Tax):</span>
-                            <strong class="font-monospace">+{{ currency_symbol() }}{{ number_format($displayIgst, 2) }}</strong>
+                            <strong class="font-monospace">+₹{{ number_format($displayIgst, 2) }}</strong>
                         </div>
                     @else
                         <div class="d-flex justify-content-between mb-2 text-muted">
                             <span>CGST (Central Tax):</span>
-                            <strong class="font-monospace">+{{ currency_symbol() }}{{ number_format($displayCgst, 2) }}</strong>
+                            <strong class="font-monospace">+₹{{ number_format($displayCgst, 2) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 text-muted">
                             <span>SGST (State Tax):</span>
-                            <strong class="font-monospace">+{{ currency_symbol() }}{{ number_format($displaySgst, 2) }}</strong>
+                            <strong class="font-monospace">+₹{{ number_format($displaySgst, 2) }}</strong>
                         </div>
                     @endif
 
@@ -343,7 +343,7 @@
 
                     <div class="d-flex justify-content-between fw-bold fs-15 text-primary">
                         <span>Grand Total:</span>
-                        <strong class="font-monospace">{{ currency_symbol() }}{{ number_format($bill->grand_total, 2) }}</strong>
+                        <strong class="font-monospace">₹{{ number_format($bill->grand_total, 2) }}</strong>
                     </div>
                 </div>
             </div>
@@ -354,19 +354,19 @@
             <div class="col-md-4">
                 <div class="p-3 border rounded bg-light-50">
                     <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('purchase.grand_total') }}</span>
-                    <h4 class="fw-bold text-dark mb-0">{{ currency_symbol() }}{{ number_format($bill->grand_total, 2) }}</h4>
+                    <h4 class="fw-bold text-dark mb-0">₹{{ number_format($bill->grand_total, 2) }}</h4>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="p-3 border rounded bg-light-50">
                     <span class="fs-11 text-uppercase text-success fw-bold d-block mb-1">{{ __('purchase.paid_settled_amount') }}</span>
-                    <h4 class="fw-bold text-success mb-0">{{ currency_symbol() }}{{ number_format($bill->paid_amount, 2) }}</h4>
+                    <h4 class="fw-bold text-success mb-0">₹{{ number_format($bill->paid_amount, 2) }}</h4>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="p-3 border rounded bg-light-50">
                     <span class="fs-11 text-uppercase text-danger fw-bold d-block mb-1">{{ __('purchase.net_balance_due') }}</span>
-                    <h4 class="fw-bold text-danger mb-0">{{ currency_symbol() }}{{ number_format($bill->due_amount, 2) }}</h4>
+                    <h4 class="fw-bold text-danger mb-0">₹{{ number_format($bill->due_amount, 2) }}</h4>
                 </div>
             </div>
         </div>
@@ -400,7 +400,7 @@
                                 <td>{{ $alloc->payment?->payment_date ? $alloc->payment->payment_date->format('d-M-Y') : '—' }}</td>
                                 <td><span class="badge bg-soft-info text-info fs-11 fw-semibold">{{ $alloc->payment?->payment_method }}</span></td>
                                 <td class="font-monospace">{{ $alloc->payment?->reference_number ?: 'N/A' }}</td>
-                                <td class="text-end pe-3 font-monospace fw-bold text-success">{{ currency_symbol() }}{{ number_format($alloc->allocated_amount, 2) }}</td>
+                                <td class="text-end pe-3 font-monospace fw-bold text-success">₹{{ number_format($alloc->allocated_amount, 2) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -436,7 +436,7 @@
                                 Allocation: {{ ($bill->landed_cost_revaluation_data['allocation_method'] ?? '') === 'by_quantity' ? 'Equal Allocation per Unit Qty' : 'Proportional to Item Value (By Amount)' }}
                             </span>
                         </div>
-                        <p class="mb-2 fs-12 text-muted">Base freight of <strong>{{ currency_symbol() }}{{ number_format($bill->landed_cost_revaluation_data['total_base_freight'] ?? $bill->freight_amount, 2) }}</strong> was allocated to GRN received items. Effective Landed Stock Rate updated in Stock Ledger:</p>
+                        <p class="mb-2 fs-12 text-muted">Base freight of <strong>₹{{ number_format($bill->landed_cost_revaluation_data['total_base_freight'] ?? $bill->freight_amount, 2) }}</strong> was allocated to GRN received items. Effective Landed Stock Rate updated in Stock Ledger:</p>
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered bg-white fs-12 mb-0 shadow-xs rounded">
                                 <thead class="bg-light">
@@ -456,10 +456,10 @@
                                             <td><strong class="text-dark">{{ $revItem['product_name'] }}</strong></td>
                                             <td class="text-center"><span class="font-monospace text-muted">{{ $revItem['sku'] }}</span></td>
                                             <td class="text-center">{{ $revItem['quantity'] }}</td>
-                                            <td class="text-end font-monospace">{{ currency_symbol() }}{{ number_format($revItem['base_unit_cost'], 2) }}</td>
-                                            <td class="text-end font-monospace text-success">+{{ currency_symbol() }}{{ number_format($revItem['freight_share'], 2) }}</td>
-                                            <td class="text-end font-monospace text-success">+{{ currency_symbol() }}{{ number_format($revItem['freight_per_unit'], 2) }}</td>
-                                            <td class="text-end font-monospace fw-bold text-primary">{{ currency_symbol() }}{{ number_format($revItem['new_landed_cost'], 2) }}</td>
+                                            <td class="text-end font-monospace">₹{{ number_format($revItem['base_unit_cost'], 2) }}</td>
+                                            <td class="text-end font-monospace text-success">+₹{{ number_format($revItem['freight_share'], 2) }}</td>
+                                            <td class="text-end font-monospace text-success">+₹{{ number_format($revItem['freight_per_unit'], 2) }}</td>
+                                            <td class="text-end font-monospace fw-bold text-primary">₹{{ number_format($revItem['new_landed_cost'], 2) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>

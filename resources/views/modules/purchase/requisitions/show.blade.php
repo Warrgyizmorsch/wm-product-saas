@@ -203,15 +203,15 @@
                                     </td>
                                     <td>{{ $item->warehouse->name ?? '—' }}</td>
                                     <td class="text-end fw-semibold">{{ (float)$item->quantity }}</td>
-                                    <td class="text-end">{{ currency_symbol() }}{{ number_format($item->estimated_cost, 2) }}</td>
-                                    <td class="text-end fw-bold">{{ currency_symbol() }}{{ number_format($lineTotal, 2) }}</td>
+                                    <td class="text-end">₹{{ number_format($item->estimated_cost, 2) }}</td>
+                                    <td class="text-end fw-bold">₹{{ number_format($lineTotal, 2) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                         <tfoot class="bg-soft-light fw-bold text-dark">
                             <tr>
                                 <td colspan="4" class="text-end text-uppercase fs-11 letter-spacing-1 text-muted">{{ __('purchase.estimated_requisition_total') }}</td>
-                                <td class="text-end fs-15 text-primary">{{ currency_symbol() }}{{ number_format($grandTotal, 2) }}</td>
+                                <td class="text-end fs-15 text-primary">₹{{ number_format($grandTotal, 2) }}</td>
                             </tr>
                         </tfoot>
                     </table>

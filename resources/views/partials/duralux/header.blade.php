@@ -31,8 +31,8 @@
         'code' => strtoupper(str_replace('-', ' ', $tenantSlug)),
         'plan' => $tenantPlan,
         'branch' => $resolvedBranch?->name ?? ($tenantSettings['branch'] ?? 'Main Office'),
-        // One currency per tenant (tenants.currency).
-        'currency' => $resolvedTenant ? company_currency()['code'] : 'INR',
+        // The ledger's currency belongs to the company, not the tenant.
+        'currency' => $resolvedCompany ? company_currency()['code'] : ($tenantSettings['currency'] ?? 'INR'),
         'year' => $currentPeriod?->fiscalYear?->name ?? ($tenantSettings['financial_year'] ?? 'FY ' . now()->format('Y')),
     ];
 
@@ -440,7 +440,7 @@
                 </div>
 
                 @include('partials.duralux.language-switcher')
-                {{-- Currency comes from the selected company (company_currency()); there is no per-user switcher. --}}
+                {{-- Currency is auto-resolved from tenant settings via SetCurrency middleware. --}}
 
                 <div class="nxl-h-item d-none d-sm-flex">
                     <div class="full-screen-switcher">
