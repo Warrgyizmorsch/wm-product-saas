@@ -213,16 +213,19 @@
                 <table class="erp-thin-table">
                     <thead>
                         <tr>
-                            <th style="width: 20%">{{ __('production.operation_details') }}</th>
-                            <th style="width: 16%">Consumed Component / Input Item</th>
-                            <th style="width: 10%">{{ __('production.type') }}</th>
-                            <th style="width: 15%">{{ __('production.work_center') }}</th>
-                            <th style="width: 13%">{{ __('production.machine') }}</th>
-                            <th class="text-end" style="width: 8%">{{ __('production.setup') }}</th>
-                            <th class="text-end" style="width: 8%">{{ __('production.run') }}</th>
-                            <th class="text-end" style="width: 8%">{{ __('production.yield') }}</th>
-                            <th class="text-center" style="width: 5%">{{ __('production.qc_gate') }}</th>
-                            <th class="text-center" style="width: 8%">Queue Threshold</th>
+                            <th style="width: 4%" class="text-center">{{ __('production.seq') }}</th>
+                            <th style="width: 18%">{{ __('production.operation_details') }}</th>
+                            <th style="width: 13%">Consumed Component / Input Item</th>
+                            <th style="width: 8%">{{ __('production.type') }}</th>
+                            <th style="width: 12%">{{ __('production.work_center') }}</th>
+                            <th style="width: 11%">{{ __('production.machine') }}</th>
+                            <th class="text-end" style="width: 5%">{{ __('production.setup') }}</th>
+                            <th class="text-end" style="width: 5%">{{ __('production.run') }}</th>
+                            <th class="text-end" style="width: 5%">Wait</th>
+                            <th class="text-end" style="width: 7%">Labor ({{ active_currency_symbol() }}/m)</th>
+                            <th class="text-end" style="width: 5%">{{ __('production.yield') }}</th>
+                            <th class="text-center" style="width: 4%">{{ __('production.qc_gate') }}</th>
+                            <th class="text-center" style="width: 7%">Queue Threshold</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -234,6 +237,12 @@
                                     <span class="badge bg-soft-primary text-primary font-monospace ms-1 fs-9">{{ $op->operation_number }}</span>
                                     @if ($op->description)
                                         <small class="text-muted d-block mt-1">{{ $op->description }}</small>
+                                    @endif
+                                    @if ($op->instructions)
+                                        <div class="mt-1 p-1 px-2 bg-light rounded border fs-11 text-dark">
+                                            <span class="fw-semibold text-primary"><i class="feather-file-text me-1"></i>SOP:</span>
+                                            <span class="text-muted" style="white-space: pre-line;">{{ $op->instructions }}</span>
+                                        </div>
                                     @endif
                                     @if ($op->is_external)
                                         <span class="badge bg-soft-danger text-danger mt-1 fs-9 text-uppercase">{{ __('production.outsourced') }}</span>
@@ -282,6 +291,27 @@
                                 </td>
                                 <td class="text-end align-middle font-monospace">{{ number_format($op->setup_time_minutes, 1) }} min</td>
                                 <td class="text-end align-middle font-monospace">{{ number_format($op->processing_time_minutes, 1) }} min</td>
+                                <td class="text-end align-middle font-monospace">
+                                    @if ((float)($op->wait_time_minutes ?? 0) > 0)
+                                        {{ number_format($op->wait_time_minutes, 1) }} min
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td class="text-end align-middle font-monospace">
+                                    @php
+                                        $customRate = (float) ($op->labor_cost_rate ?? 0);
+                                        $wcRate = $op->workCenter ? ((float) $op->workCenter->cost_per_hour / 60.0) : 0.0;
+                                    @endphp
+                                    @if ($customRate > 0)
+                                        <span class="text-dark fw-semibold">{{ format_currency($customRate) }}</span>
+                                    @elseif ($wcRate > 0)
+                                        <span class="text-dark">{{ format_currency($wcRate) }}</span>
+                                        <small class="text-muted d-block fs-9">(from WC)</small>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
                                 <td class="text-end align-middle font-monospace">{{ number_format($op->expected_yield_percentage, 0) }}%</td>
                                 <td class="text-center align-middle">
                                     @if ($op->quality_required)
@@ -292,9 +322,16 @@
                                 </td>
                                 <td class="text-center align-middle">
                                     @if ($op->queue_threshold_enabled ?? $op->overlap_enabled)
-                                        <span class="badge bg-soft-info text-info" title="Queue Threshold Enabled (Partial Transfer Batch: {{ number_format($op->transfer_batch_quantity, 2) }})">
-                                            <i class="feather-zap me-1"></i>{{ number_format($op->transfer_batch_quantity, 2) }}
-                                        </span>
+                                        <div class="d-flex flex-column align-items-center gap-1">
+                                            <span class="badge bg-soft-info text-info" title="Queue Threshold Enabled (Partial Transfer Batch: {{ number_format($op->transfer_batch_quantity, 2) }})">
+                                                <i class="feather-zap me-1"></i>{{ number_format($op->transfer_batch_quantity, 2) }}
+                                            </span>
+                                            @if (!empty($op->transfer_lag_minutes) && (float) $op->transfer_lag_minutes > 0)
+                                                <span class="text-muted font-monospace fs-10" title="Transit / handling delay before the first transfer batch reaches the downstream operation.">
+                                                    Lag: {{ (int) $op->transfer_lag_minutes }}m
+                                                </span>
+                                            @endif
+                                        </div>
                                     @else
                                         <span class="text-muted fs-9 fw-semibold" title="Finish-to-Start (Standard Sequential Operation: 100% completion required before downstream op starts)">FS</span>
                                     @endif
@@ -302,7 +339,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center py-4 text-muted">
+                                <td colspan="13" class="text-center py-4 text-muted">
                                     <i class="feather-info me-2"></i>{{ __('production.no_operations_defined') }}
                                 </td>
                             </tr>

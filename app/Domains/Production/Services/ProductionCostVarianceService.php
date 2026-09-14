@@ -33,7 +33,10 @@ class ProductionCostVarianceService
         $actualOverheadCost = 0.0;
 
         foreach ($order->operations as $op) {
-            $laborRate = $op->routingOperation ? (float) $op->routingOperation->labor_cost_rate : 0.0;
+            $routingLaborRate = $op->routingOperation ? (float) $op->routingOperation->labor_cost_rate : 0.0;
+            $wcLaborRate = $op->workCenter ? ((float) $op->workCenter->cost_per_hour / 60.0) : 0.0;
+            $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
+
             $machineRate = $op->routingOperation ? (float) $op->routingOperation->machine_cost_rate : 0.0;
             $overheadRatePerMin = $op->workCenter ? ((float) $op->workCenter->overhead_rate / 60.0) : 0.0;
 
@@ -148,7 +151,10 @@ class ProductionCostVarianceService
                 $op = $log->operation;
                 if ($op) {
                     $operationsWorked[$op->operation_number] = $op->name;
-                    $laborRate = $op->routingOperation ? (float) $op->routingOperation->labor_cost_rate : 0.0;
+                    $routingLaborRate = $op->routingOperation ? (float) $op->routingOperation->labor_cost_rate : 0.0;
+                    $wcLaborRate = $op->workCenter ? ((float) $op->workCenter->cost_per_hour / 60.0) : 0.0;
+                    $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
+
                     $machineRate = $op->routingOperation ? (float) $op->routingOperation->machine_cost_rate : 0.0;
                     $overheadRatePerMin = $op->workCenter ? ((float) $op->workCenter->overhead_rate / 60.0) : 0.0;
 

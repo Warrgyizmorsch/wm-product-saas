@@ -300,8 +300,10 @@ class ProductionWipService
                 throw new InvalidArgumentException("Cannot modify WIP: Parent order is closed or cancelled.");
             }
 
-            // Resolve cost rates from routing snapshots
-            $laborRate = $orderOp->routingOperation?->labor_cost_rate ?? 0.0;
+            // Resolve cost rates from routing snapshots (with Work Center fallback)
+            $routingLaborRate = (float) ($orderOp->routingOperation?->labor_cost_rate ?? 0.0);
+            $wcLaborRate = $orderOp->workCenter ? ((float) $orderOp->workCenter->cost_per_hour / 60.0) : 0.0;
+            $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
             $machineRate = $orderOp->routingOperation?->machine_cost_rate ?? 0.0;
             $overheadRate = $orderOp->workCenter?->overhead_rate ?? 0.0;
 

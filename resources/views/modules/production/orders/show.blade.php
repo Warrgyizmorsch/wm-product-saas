@@ -3035,11 +3035,14 @@
                                                 <span
                                                     class="badge bg-soft-danger text-danger fs-11">{{ $exc['severity'] ?? 'HIGH' }}</span>
                                             </div>
-                                            <p class="fs-12 text-dark mb-2">{{ $exc['message'] ?? '' }}</p>
-                                            @if(!empty($exc['recommendation']))
+                                            <p class="fs-12 text-dark mb-2">{{ $exc['message'] ?? $exc['reason'] ?? '' }}</p>
+                                            @php
+                                                $actionText = $exc['recommendation'] ?? $exc['recommended_action'] ?? null;
+                                            @endphp
+                                            @if(!empty($actionText))
                                                 <div class="bg-light p-2 rounded fs-11 text-muted">
                                                     <strong>Recommended Action:</strong>
-                                                    {{ str_replace('_', ' ', $exc['recommendation']) }}
+                                                    {{ str_replace('_', ' ', $actionText) }}
                                                 </div>
                                             @endif
                                         </div>

@@ -114,6 +114,7 @@ Route::prefix('production')
         Route::post('machines/{machine}/link-asset', [MachineController::class, 'linkAsset'])->name('machines.link-asset');
         Route::post('machines/{machine}/unlink-asset', [MachineController::class, 'unlinkAsset'])->name('machines.unlink-asset');
         Route::resource('machines', MachineController::class)->except(['show']);
+        Route::get('machines/{id}', fn ($id) => redirect()->route('production.mes.machines.show', $id))->name('machines.show');
 
         // ── Plant Maintenance ──────────────────────────────────────────────────
         Route::prefix('maintenance')->as('maintenance.')->group(function (): void {

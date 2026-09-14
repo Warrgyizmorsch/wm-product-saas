@@ -191,7 +191,7 @@ class ScannerController extends Controller
         // Machine
         if ($entity instanceof Machine) {
             return [
-                'redirect' => route('production.machines.show', $entity->id),
+                'redirect' => route('production.mes.machines.show', $entity->id),
                 'message'  => "Machine [{$entity->code}] scanned.",
                 'entity_summary' => ['type' => 'machine', 'id' => $entity->id, 'code' => $entity->code],
             ];

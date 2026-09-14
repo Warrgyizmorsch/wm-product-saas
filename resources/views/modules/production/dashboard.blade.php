@@ -159,26 +159,18 @@
             border-radius: 10px;
         }
 
-        .production-dashboard-wrapper {
-            padding: 14px 24px 36px 24px;
-        }
 
-        @media (max-width: 768px) {
-            .production-dashboard-wrapper {
-                padding: 8px 12px 24px 12px;
-            }
-        }
     </style>
 @endpush
 
 @section('content')
-    <div class="production-dashboard-wrapper">
+    <div>
         {{-- ── 1. Top Executive Welcome Card (HRMS Style) ────────────────────────── --}}
-        <div class="card border-0 shadow-sm mb-4 bg-white rounded-3">
-            <div class="card-body p-4 px-4">
+        <div class="card border-0 shadow-sm mb-3 bg-white rounded-3">
+            <div class="card-body p-3 px-4">
                 <div class="row align-items-center">
                     <div class="col-lg-7">
-                        <div class="d-flex align-items-center gap-4">
+                        <div class="d-flex align-items-center gap-3">
                             <div class="avatar-initials-dash bg-soft-primary text-primary shadow-sm border border-primary border-opacity-10 fw-bolder fs-16 flex-shrink-0" style="width: 56px; height: 56px; border-radius: 50%;">
                                 {{ strtoupper(substr(auth()->user()?->name ?? 'PM', 0, 2)) }}
                             </div>
@@ -241,7 +233,7 @@
         </div>
 
         {{-- ── 2. Row of 4 Hero KPI Cards (HRMS Standard Tokens) ────────────────── --}}
-        <div class="row g-3 mb-4">
+        <div class="row g-3 mb-3">
             {{-- KPI 1: Active Production Orders Pipeline --}}
             <div class="col-xl-3 col-md-6">
                 <div class="card border-0 shadow-sm rounded-3 h-100 bg-white">
@@ -386,7 +378,7 @@
         </div>
 
         {{-- ── 3. Critical Action Center (Real-Time Red Flags & Exceptions) ─────── --}}
-        <div class="card border-0 shadow-sm rounded-3 mb-4 bg-white">
+        <div class="card border-0 shadow-sm rounded-3 mb-3 bg-white">
             <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-3">
                     <div class="dash-card-icon-avatar {{ $totalCriticalExceptions > 0 ? 'bg-soft-danger text-danger' : 'bg-soft-success text-success' }}">
@@ -416,7 +408,7 @@
                     </a>
                 </div>
             </div>
-            <div class="card-body p-4">
+            <div class="card-body p-3">
                 <div class="row g-3">
                     {{-- Alert 1: Overdue Production Orders --}}
                     <div class="col-xl-2 col-md-4 col-sm-6">
@@ -518,7 +510,7 @@
         </div>
 
         {{-- ── 4. Live Manufacturing Pulse (Machine State, Andon & MES) ────────── --}}
-        <div class="card border-0 shadow-sm rounded-3 mb-4 bg-white">
+        <div class="card border-0 shadow-sm rounded-3 mb-3 bg-white">
             <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-3">
                     <div class="dash-card-icon-avatar bg-soft-primary text-primary">
@@ -538,7 +530,7 @@
                     </x-ui.button>
                 </div>
             </div>
-            <div class="card-body p-4">
+            <div class="card-body p-3">
                 {{-- Machine States Grid --}}
                 <div class="row g-2 mb-3">
                     <div class="col-6 col-sm-4 col-md-2">
@@ -676,7 +668,7 @@
         </div>
 
         {{-- ── 5. Work-Center Capacity, Load & Bottleneck Pulse ───────────────── --}}
-        <div class="card border-0 shadow-sm rounded-3 mb-4 bg-white">
+        <div class="card border-0 shadow-sm rounded-3 mb-3 bg-white">
             <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-3">
                     <div class="dash-card-icon-avatar bg-soft-warning text-warning">
@@ -693,7 +685,7 @@
                     </x-ui.button>
                 </div>
             </div>
-            <div class="card-body p-4">
+            <div class="card-body p-3">
                 {{-- Bottleneck Spotlight (If any center is >= 85% or >100%) --}}
                 @if(!empty($bottleneckWorkCenters) && $bottleneckWorkCenters->isNotEmpty())
                     <div class="alert alert-warning border border-warning bg-soft-warning p-3 rounded-3 mb-3">
@@ -769,7 +761,7 @@
         </div>
 
         {{-- ── 6. Quality Intelligence & Defect Analytics (Phase 3A) ─────────── --}}
-        <div class="card border-0 shadow-sm rounded-3 mb-4 bg-white">
+        <div class="card border-0 shadow-sm rounded-3 mb-3 bg-white">
             <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-3">
                     <div class="dash-card-icon-avatar bg-soft-success text-success">
@@ -789,7 +781,7 @@
                     </x-ui.button>
                 </div>
             </div>
-            <div class="card-body p-4">
+            <div class="card-body p-3">
                 <div class="row g-3 mb-3">
                     {{-- First Pass Yield (FPY) --}}
                     <div class="col-xl-3 col-sm-6">
@@ -901,7 +893,7 @@
         </div>
 
         {{-- ── 7. Six Big Losses & Cycle Time Intelligence (Phase 3B) ─────────── --}}
-        <div class="card border-0 shadow-sm rounded-3 mb-4 bg-white">
+        <div class="card border-0 shadow-sm rounded-3 mb-3 bg-white">
             <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-3">
                     <div class="dash-card-icon-avatar bg-soft-primary text-primary">
@@ -919,9 +911,9 @@
                     </x-ui.button>
                 </div>
             </div>
-            <div class="card-body p-4">
+            <div class="card-body p-3">
                 {{-- Six Big Losses Grid --}}
-                <div class="mb-4">
+                <div class="mb-3">
                     <div class="d-flex align-items-center justify-content-between mb-2.5">
                         <span class="fs-11 fw-bold text-uppercase text-muted">TPM Six Big Losses Classification</span>
                         <small class="text-muted fs-11">Overall Downtime Rate: <strong class="text-dark font-monospace">{{ number_format($downtimeRate, 1) }}%</strong></small>
@@ -981,7 +973,7 @@
                 {{-- Cycle Times & Asset Utilizations Strip --}}
                 <div class="row g-3 pt-3.5 border-top">
                     <div class="col-md-6">
-                        <div class="p-4 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between" style="min-height: 135px;">
+                        <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between" style="min-height: 135px;">
                             <span class="fs-11 fw-bold text-uppercase text-muted d-block mb-3">
                                 <i class="feather-clock me-1 text-primary"></i>Cycle Times &amp; Waiting Averages
                             </span>
@@ -1006,7 +998,7 @@
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="p-4 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between" style="min-height: 135px;">
+                        <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between" style="min-height: 135px;">
                             <span class="fs-11 fw-bold text-uppercase text-muted d-block mb-3">
                                 <i class="feather-cpu me-1 text-success"></i>Resource Utilizations
                             </span>
@@ -1031,7 +1023,7 @@
         </div>
 
         {{-- ── 8. Plant Maintenance & Subcontracting SLA Integration (Phase 3C) ── --}}
-        <div class="card border-0 shadow-sm rounded-3 mb-4 bg-white">
+        <div class="card border-0 shadow-sm rounded-3 mb-3 bg-white">
             <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-3">
                     <div class="dash-card-icon-avatar bg-soft-warning text-warning">
@@ -1054,7 +1046,7 @@
                     </x-ui.button>
                 </div>
             </div>
-            <div class="card-body p-4">
+            <div class="card-body p-3">
                 {{-- Plant Maintenance Top Strip --}}
                 <div class="row g-3 mb-3">
                     <div class="col-md-3 col-sm-6">
@@ -1178,7 +1170,7 @@
         </div>
 
         {{-- ── 9. Execution Variance, Order Risk & Planning Pulse (Phase 4) ──────── --}}
-        <div class="card border-0 shadow-sm rounded-3 mb-4 bg-white">
+        <div class="card border-0 shadow-sm rounded-3 mb-3 bg-white">
             <div class="card-header bg-white py-3 px-4 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-3">
                     <div class="dash-card-icon-avatar bg-soft-primary text-primary">
@@ -1201,11 +1193,11 @@
                     </x-ui.button>
                 </div>
             </div>
-            <div class="card-body p-4">
+            <div class="card-body p-3">
                 <div class="row g-3">
                     {{-- Left Card: Operational Execution Variance --}}
                     <div class="col-xl-4 col-md-6 col-12">
-                        <div class="p-4 rounded-3 border bg-light h-100 d-flex flex-column justify-content-between">
+                        <div class="p-2 rounded-3 border bg-light h-100 d-flex flex-column justify-content-between">
                             <div>
                                 <div class="d-flex align-items-center justify-content-between mb-3">
                                     <span class="fs-11 fw-bold text-uppercase text-muted d-inline-flex align-items-center gap-1">
@@ -1217,7 +1209,7 @@
                                 </div>
 
                                 {{-- Output Metrics --}}
-                                <div class="p-3 rounded-3 bg-white border mb-3">
+                                <div class="p-2 rounded-3 bg-white border mb-3">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
                                         <span class="fs-11 text-muted">Output Units (Planned vs Actual)</span>
                                         <span class="fs-11 fw-bold font-monospace {{ $outputVariance >= 0 ? 'text-success' : 'text-danger' }}">
@@ -1241,7 +1233,7 @@
                                 </div>
 
                                 {{-- Duration Metrics --}}
-                                <div class="p-3 rounded-3 bg-white border mb-3">
+                                <div class="p-2 rounded-3 bg-white border mb-3">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
                                         <span class="fs-11 text-muted">Operation Hours (Actual vs Plan)</span>
                                         <span class="fs-11 fw-bold font-monospace {{ $durationVarianceHours <= 0 ? 'text-success' : 'text-danger' }}">
@@ -1262,7 +1254,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="pt-3 mt-3 border-top text-end">
+                            <div class="pt-1 mt-3 border-top text-end">
                                 <a href="{{ route('production.variances.index') }}" class="fs-11 text-primary text-decoration-none fw-semibold">
                                     Full Variance Analysis <i class="feather-arrow-right ms-1"></i>
                                 </a>
@@ -1272,7 +1264,7 @@
 
                     {{-- Middle Card: Near-Term Order Completion Risk --}}
                     <div class="col-xl-5 col-md-6 col-12">
-                        <div class="p-4 rounded-3 border bg-light h-100 d-flex flex-column justify-content-between">
+                        <div class="p-2 rounded-3 border bg-light h-100 d-flex flex-column justify-content-between">
                             <div>
                                 <div class="d-flex align-items-center justify-content-between mb-3">
                                     <div class="d-flex align-items-center gap-2">
@@ -1361,7 +1353,7 @@
                                     </div>
                                 @endif
                             </div>
-                            <div class="pt-3 mt-3 border-top text-end">
+                            <div class="pt-1 mt-3 border-top text-end">
                                 <a href="{{ route('production.planning-exceptions.index') }}" class="fs-11 text-danger text-decoration-none fw-semibold">
                                     Full Exception Engine <i class="feather-arrow-right ms-1"></i>
                                 </a>
@@ -1371,14 +1363,14 @@
 
                     {{-- Right Card: Planning & ECO Pipeline Pulse --}}
                     <div class="col-xl-3 col-12">
-                        <div class="p-4 rounded-3 border bg-light h-100 d-flex flex-column justify-content-between">
+                        <div class="p-2 rounded-3 border bg-light h-100 d-flex flex-column justify-content-between">
                             <div>
                                 <span class="fs-11 fw-bold text-uppercase text-muted d-block mb-3">
                                     <i class="feather-layers me-1 text-info"></i>Planning &amp; ECO Pulse
                                 </span>
 
                                 {{-- Master Plans Strip --}}
-                                <div class="p-3 rounded-3 bg-white border mb-3">
+                                <div class="p-2 rounded-3 bg-white border mb-3">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
                                         <span class="fs-11 fw-bold text-dark"><i class="feather-calendar me-1 text-primary"></i>Master Plans</span>
                                         <a href="{{ route('production.plans.index') }}" class="fs-10 text-primary text-decoration-none font-monospace">View All</a>
@@ -1404,7 +1396,7 @@
                                 </div>
 
                                 {{-- ECO Pipeline Strip --}}
-                                <div class="p-3 rounded-3 bg-white border mb-3">
+                                <div class="p-2 rounded-3 bg-white border mb-3">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
                                         <span class="fs-11 fw-bold text-dark"><i class="feather-git-pull-request me-1 text-warning"></i>ECO Pipeline</span>
                                         <a href="{{ route('production.ecos.index') }}" class="fs-10 text-primary text-decoration-none font-monospace">View All</a>
@@ -1444,7 +1436,7 @@
         {{-- ── 10. Material Readiness Banner (If any fully issued orders exist) ── --}}
         @if($fullyIssuedCount > 0)
             @php $firstFullyOrder = $fullyIssuedOrders->first(); @endphp
-            <div class="ready-start-banner p-4 mb-4 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="ready-start-banner p-3 mb-3 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <div class="d-flex align-items-center gap-3">
                     <div class="avatar-md bg-success text-white rounded-circle d-flex align-items-center justify-content-center fs-20 flex-shrink-0" style="width: 48px; height: 48px;">
                         <i class="feather-check-circle"></i>
@@ -1472,7 +1464,7 @@
         @endif
 
         {{-- ── 11. Operational Worklists using Common Horizontal Tabs & Table ──── --}}
-        <div class="card border-0 shadow-sm rounded-3 mb-4 bg-white overflow-hidden">
+        <div class="card border-0 shadow-sm rounded-3 mb-3 bg-white overflow-hidden">
             <div class="card-header bg-white pt-3 pb-0 px-4 border-bottom-0">
                 <x-ui.horizontal-tabs id="operationalTabs" :tabs="$worklistTabs" />
             </div>
@@ -1482,7 +1474,7 @@
 
                     {{-- ── TAB 1: Pending Demand ────────────────────────────────── --}}
                     <div class="tab-pane fade show active" id="content-demand" role="tabpanel" aria-labelledby="content-demand-tab">
-                        <div class="px-4 py-3.5 bg-light border-bottom d-flex align-items-center justify-content-between">
+                        <div class="px-4 py-3.5 bg-light border-bottom d-flex align-items-center justify-content-between" style="background-color: white !important; padding-top: 10px !important; padding-bottom: 10px !important;">
                             <div>
                                 <h6 class="fw-bold text-dark mb-1 fs-13">Pending Sales Orders to Manufacture</h6>
                                 <small class="text-muted d-block">Sales Orders / Material Requisitions awaiting Production Order conversion.</small>
