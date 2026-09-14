@@ -382,6 +382,11 @@ class CrmDealController extends Controller
             if (!$hasAcceptedQuote) {
                 return back()->withErrors(['stage' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.'])->withInput();
             }
+
+            $hasCustomer = !empty($deal->account?->customer_id);
+            if (!$hasCustomer) {
+                return back()->withErrors(['stage' => 'Customer conversion required! Please click "Convert to Customer" button first before marking Deal as Won.'])->withInput();
+            }
         }
 
         $targetStatus = $dealStatuses->firstWhere('name', $stage);
@@ -444,6 +449,18 @@ class CrmDealController extends Controller
             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
             if (!$hasAcceptedQuote) {
                 $errMsg = 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.';
+                if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $errMsg
+                    ], 422);
+                }
+                return redirect()->back()->with('error', $errMsg);
+            }
+
+            $hasCustomer = !empty($deal->account?->customer_id);
+            if (!$hasCustomer) {
+                $errMsg = 'Customer conversion required! Please click "Convert to Customer" button first before marking Deal as Won.';
                 if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
                     return response()->json([
                         'success' => false,

@@ -35,8 +35,8 @@ return [
     'statuses' => [
         'New' => 'नया (New)',
         'Qualified' => 'योग्य (Qualified)',
+        'Converted' => 'कन्वर्ट किया गया (Converted)',
         'Won' => 'जीता (Won)',
-        'Converted' => 'जीता (Won)',
         'Lost' => 'खोया (Lost)',
     ],
     'priorities' => [

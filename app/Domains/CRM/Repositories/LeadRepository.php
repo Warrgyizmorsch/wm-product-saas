@@ -171,9 +171,9 @@ class LeadRepository
             ]);
         }
 
-        // 2. Update Lead Record with Deal reference & Status to 'Qualified'
+        // 2. Update Lead Record with Deal reference & Status to 'Converted'
         $updated = $lead->update([
-            'status'      => 'Qualified',
+            'status'      => 'Converted',
             'crm_deal_id' => $deal->id,
         ]);
 
@@ -181,8 +181,8 @@ class LeadRepository
             $lead,
             'status_updated',
             $oldStatus,
-            'Qualified',
-            "Lead qualified & converted into Deal #{$deal->deal_number}"
+            'Converted',
+            "Lead converted into Deal #{$deal->deal_number}"
         );
 
         return $updated;

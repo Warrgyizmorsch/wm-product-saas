@@ -74,6 +74,7 @@ class ProductService
             ]);
 
             if ($validated['variation_type'] === 'Single' && !$isService) {
+                $openingStock = (float)($validated['opening_stock'] ?? 0);
                 if (!empty($validated['warehouse_stocks'])) {
                     foreach ($validated['warehouse_stocks'] as $whId => $stockData) {
                         $qty = (float)($stockData['quantity'] ?? 0);
@@ -89,10 +90,20 @@ class ProductService
                             );
                         }
                     }
+                } elseif ($openingStock > 0) {
+                    $defaultWarehouse = Warehouse::ensureDefaultWarehouse($tenantId);
+                    StockService::recordInflow(
+                        $tenantId,
+                        $parentProduct->id,
+                        $defaultWarehouse->id,
+                        $openingStock,
+                        $parentProduct->cost_price > 0 ? $parentProduct->cost_price : (float)($validated['opening_stock_rate'] ?? 0),
+                        'Opening Stock'
+                    );
                 }
             } else {
                 if (!empty($validated['variants'])) {
-                    $defaultWarehouse = Warehouse::query()->where('is_default', true)->first() ?? Warehouse::query()->first();
+                    $defaultWarehouse = Warehouse::ensureDefaultWarehouse($tenantId);
 
                     foreach ($validated['variants'] as $vData) {
                         $variantProduct = $this->productRepo->create([
@@ -206,7 +217,7 @@ class ProductService
                 }
 
                 $submittedVariants = $requestInput['variants'] ?? [];
-                $defaultWarehouse = Warehouse::query()->where('is_default', true)->first() ?? Warehouse::query()->first();
+                $defaultWarehouse = Warehouse::ensureDefaultWarehouse($tenantId);
                 $processedIds = [];
 
                 foreach ($submittedVariants as $vData) {

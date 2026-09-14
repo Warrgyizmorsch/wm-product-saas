@@ -180,9 +180,6 @@
                             $statusKey = strtolower($ls->name);
                             $tabLabel = match($statusKey) {
                                 'new' => __('crm.tabs.untouched'),
-                                'qualified' => __('crm.tabs.qualified'),
-                                'won', 'converted' => __('crm.tabs.won'),
-                                'lost' => __('crm.tabs.lost'),
                                 default => strtoupper(__('crm.statuses.' . $ls->name) ?? $ls->name),
                             };
                         @endphp
@@ -383,12 +380,14 @@
                                                     @foreach($leadStatuses as $ls)
                                                         @php
                                                             $statusOption = $ls->name;
+                                                            $presetBgColors = ['bg-primary', 'bg-info', 'bg-teal', 'bg-success', 'bg-warning', 'bg-danger', 'bg-secondary', 'bg-dark'];
                                                             $bgClass = match(strtolower($statusOption)) {
                                                                 'new' => 'bg-primary',
                                                                 'qualified' => 'bg-teal',
+                                                                'converted' => 'bg-info',
                                                                 'won' => 'bg-success',
                                                                 'lost' => 'bg-danger',
-                                                                default => ($ls->color ?: 'bg-primary'),
+                                                                default => (!empty($ls->color) && str_starts_with($ls->color, 'bg-') ? $ls->color : $presetBgColors[abs($ls->id ?? 0) % count($presetBgColors)]),
                                                             };
                                                         @endphp
                                                         <option value="{{ $statusOption }}" data-bg="{{ $bgClass }}" {{ ($lead->status ?: 'New') === $statusOption ? 'selected' : '' }}>

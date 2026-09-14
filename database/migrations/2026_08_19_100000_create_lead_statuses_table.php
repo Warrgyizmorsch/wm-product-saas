@@ -29,8 +29,9 @@ return new class extends Migration
             $defaults = [
                 ['tenant_id' => 1, 'name' => 'New',       'sort_order' => 1, 'color' => 'bg-primary',   'is_protected' => true, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
                 ['tenant_id' => 1, 'name' => 'Qualified', 'sort_order' => 2, 'color' => 'bg-teal',      'is_protected' => true, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-                ['tenant_id' => 1, 'name' => 'Won',       'sort_order' => 3, 'color' => 'bg-success',   'is_protected' => true, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-                ['tenant_id' => 1, 'name' => 'Lost',      'sort_order' => 4, 'color' => 'bg-danger',    'is_protected' => true, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+                ['tenant_id' => 1, 'name' => 'Converted', 'sort_order' => 3, 'color' => 'bg-info',      'is_protected' => true, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+                ['tenant_id' => 1, 'name' => 'Won',       'sort_order' => 4, 'color' => 'bg-success',   'is_protected' => true, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+                ['tenant_id' => 1, 'name' => 'Lost',      'sort_order' => 5, 'color' => 'bg-danger',    'is_protected' => true, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
             ];
             DB::table('lead_statuses')->insert($defaults);
         }

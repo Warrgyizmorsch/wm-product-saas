@@ -33,6 +33,20 @@ class DealHealthService
             $response = Http::withoutVerifying()->timeout(8)->get($this->baseUrl . "/auth/user/{$userId}");
             if ($response->successful()) {
                 $data = $response->json();
+
+                // Validate if Google OAuth token is actually valid or expired/revoked
+                $evalCheck = Http::withoutVerifying()->timeout(6)->get($this->baseUrl . "/agent/evaluate-emails/{$userId}", [
+                    'limit' => 1
+                ]);
+                $rawCheck = json_encode($evalCheck->json() ?? []);
+                if (str_contains($rawCheck, 'invalid_grant') || str_contains($rawCheck, 'Token has been expired')) {
+                    return [
+                        'is_connected'    => false,
+                        'connected_email' => null,
+                        'login_url'       => $loginUrl,
+                    ];
+                }
+
                 return [
                     'is_connected'    => true,
                     'connected_email' => $data['email'] ?? $data['user']['email'] ?? 'Google Account Connected',
@@ -62,17 +76,31 @@ class DealHealthService
         try {
             // First attempt to evaluate via user emails
             $response = Http::withoutVerifying()->timeout(15)->get($this->baseUrl . "/agent/evaluate-emails/{$userId}", [
-                'limit'        => 5,
+                'limit'        => 10,
                 'sender_email' => $contactEmail,
             ]);
 
-            if ($response->failed()) {
+            $data = $response->successful() ? $response->json() : null;
+            $rawJsonStr = json_encode($data ?? []);
+            $hasPermissionError = str_contains($rawJsonStr, 'insufficientPermissions') || str_contains($rawJsonStr, 'insufficient authentication scopes');
+
+            if (!$data || empty($data['reports']) || !is_array($data['reports'])) {
                 // Fallback to deal endpoint
-                $response = Http::withoutVerifying()->timeout(15)->get($this->baseUrl . "/deals/{$deal->id}");
+                $fallbackRes = Http::withoutVerifying()->timeout(15)->get($this->baseUrl . "/deals/{$deal->id}");
+                if ($fallbackRes->successful()) {
+                    $data = $fallbackRes->json();
+                }
             }
 
-            if ($response->successful()) {
-                $data = $response->json();
+            if ($data) {
+                if (str_contains($rawJsonStr, 'invalid_grant') || str_contains($rawJsonStr, 'Token has been expired')) {
+                    return [
+                        'success'        => false,
+                        'auth_connected' => false,
+                        'login_url'      => $authStatus['login_url'],
+                        'message'        => 'Google Workspace token has expired or been revoked. Please click the green "Gmail Connected" badge to re-authenticate.',
+                    ];
+                }
 
                 // Handle API reports array
                 $reportData = null;
@@ -123,10 +151,12 @@ class DealHealthService
                     $riskLevel = $reportData['risk_level'] ?? 'Low';
                     $sentimentScore = $reportData['sentiment_score'] ?? 'Neutral';
                     $nextBestAction = $reportData['next_best_action'] ?? 'No action required.';
-                    $healthScore = $reportData['health_score'] ?? $reportData['sentiment_score'] ?? null;
+                    $rawHealthScore = $reportData['health_score'] ?? $reportData['sentiment_score'] ?? null;
 
-                    if (is_numeric($healthScore)) {
-                        $healthScore = $healthScore . '%';
+                    if (is_numeric($rawHealthScore)) {
+                        $healthScore = ($rawHealthScore <= 5) ? ($rawHealthScore * 20) . '%' : $rawHealthScore . '%';
+                    } else {
+                        $healthScore = $rawHealthScore ? (string)$rawHealthScore : ($riskLevel === 'High' ? '20%' : '80%');
                     }
                 }
 
@@ -138,6 +168,11 @@ class DealHealthService
                     'health_synced_at' => Carbon::now(),
                 ]);
 
+                $diagMessage = "Evaluated emails for contact: {$contactEmail}";
+                if ($hasPermissionError) {
+                    $diagMessage = "Gmail Email Read permission is missing for Google Account ({$contactEmail}). Please click Gmail Connected badge & grant Read permission.";
+                }
+
                 return [
                     'success'               => true,
                     'auth_connected'        => $authStatus['is_connected'],
@@ -148,9 +183,7 @@ class DealHealthService
                     'sentiment_score'       => $deal->sentiment_score,
                     'next_best_action'      => $deal->next_best_action,
                     'health_synced_at'      => $deal->health_synced_at->diffForHumans(),
-                    'message'               => $contactEmail 
-                        ? "Evaluated emails for contact: {$contactEmail}" 
-                        : "No contact email linked to Deal. Checked general deal activity.",
+                    'message'               => $diagMessage,
                 ];
             } else {
                 return [

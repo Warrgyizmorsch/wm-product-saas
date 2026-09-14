@@ -4,104 +4,94 @@
 @section('page-title', 'Email Accounts & Database SMTP Setup')
 @section('breadcrumb', 'CRM / Settings / Email Accounts')
 
+@section('page-actions')
+    <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addAccountModal">
+        ADD NEW EMAIL ACCOUNT
+    </x-ui.button>
+@endsection
+
 @section('content')
-<div class="container-fluid p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+<div class="erp-single-panel bg-white p-4 rounded-3 border shadow-sm">
+    <!-- Header Title & Context Strip -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 pb-3 border-bottom">
         <div>
-            <h4 class="fw-bold text-dark mb-1"><i class="feather-mail text-primary me-2"></i>Database Multi-Account SMTP & Email Setup</h4>
+            <h5 class="fw-bold text-dark mb-1"><i class="feather-mail text-primary me-2"></i>Database Multi-Account SMTP & Email Setup</h5>
             <p class="text-muted fs-12 mb-0">Configure corporate SMTP credentials for sending quotations, client emails, and background sync stored in database.</p>
         </div>
-        <button type="button" class="btn btn-primary fw-bold px-3 py-2 fs-12" data-bs-toggle="modal" data-bs-target="#addAccountModal">
-            <i class="feather-plus me-1.5"></i>Add New Email Account
-        </button>
-    </div>
-
-    <!-- TENANT / COMPANY / BRANCH CONTEXT BADGES -->
-    <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
-        <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2 fs-12">
-            <div>
-                <span class="fw-bold text-secondary me-2"><i class="feather-layers me-1"></i>Current Context:</span>
-                <span class="badge bg-primary me-1"><i class="feather-globe me-1"></i>Tenant ID: {{ $tenantId }}</span>
-                <span class="badge bg-info text-dark me-1"><i class="feather-briefcase me-1"></i>Company ID: {{ $companyId ?: 'All Companies' }}</span>
-                <span class="badge bg-secondary me-1"><i class="feather-git-branch me-1"></i>Branch ID: {{ $branchId ?: 'All Branches' }}</span>
-            </div>
-            <div>
-                <span class="text-muted fs-11"><i class="feather-database me-1 text-success"></i>Strict Database Configuration Enabled</span>
-            </div>
+        <div class="d-flex align-items-center flex-wrap gap-2 fs-12">
+            <span class="fw-bold text-secondary me-1"><i class="feather-layers me-1"></i>Current Context:</span>
+            <span class="badge erp-badge bg-primary text-white"><i class="feather-globe me-1"></i>Tenant ID: {{ $tenantId }}</span>
+            <span class="badge erp-badge bg-info text-dark"><i class="feather-briefcase me-1"></i>Company: {{ $companyId ?: 'All Companies' }}</span>
+            <span class="badge erp-badge bg-secondary text-white"><i class="feather-git-branch me-1"></i>Branch: {{ $branchId ?: 'All Branches' }}</span>
         </div>
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm fs-13 mb-4">
-            <i class="feather-check-circle me-1.5"></i>{{ session('success') }}
-        </div>
+        <x-ui.toast :auto="true" title="{{ session('success') }}" type="success" delay="5000" />
     @endif
 
-    <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px;">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table align-middle mb-0 fs-13">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-3">Account Name</th>
-                            <th>Email Address</th>
-                            <th>Company & Branch</th>
-                            <th>SMTP Host & Port</th>
-                            <th>Encryption</th>
-                            <th>Status / Default</th>
-                            <th class="text-end pe-3">Testing & Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($accounts as $acc)
-                            <tr>
-                                <td class="ps-3 fw-bold text-dark">
-                                    {{ $acc->name }}
-                                    @if($acc->is_default)
-                                        <span class="badge bg-soft-primary text-primary ms-1 fs-10">Default</span>
-                                    @endif
-                                </td>
-                                <td class="font-monospace text-primary fw-semibold">{{ $acc->email_address }}</td>
-                                <td>
-                                    <span class="badge bg-soft-info text-dark fs-11">{{ $acc->company?->name ?? 'All Companies' }}</span>
-                                    <span class="badge bg-soft-secondary text-muted fs-11">{{ $acc->branch?->name ?? 'All Branches' }}</span>
-                                </td>
-                                <td>
-                                    <span class="font-monospace text-dark">{{ $acc->host }}:{{ $acc->port }}</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-light text-dark border text-uppercase">{{ $acc->encryption }}</span>
-                                </td>
-                                <td>
-                                    @if($acc->is_active)
-                                        <span class="badge bg-soft-success text-success fw-bold"><i class="feather-check me-1"></i>Active</span>
-                                    @else
-                                        <span class="badge bg-soft-secondary text-muted">Inactive</span>
-                                    @endif
-                                </td>
-                                <td class="text-end pe-3">
-                                    <div class="d-flex justify-content-end gap-1.5">
-                                        <button type="button" class="btn btn-xs btn-outline-primary fw-bold btn-test-connection" data-account-id="{{ $acc->id }}" data-account-name="{{ $acc->name }}">
-                                            <i class="feather-activity me-1"></i>Test Connection
-                                        </button>
-                                        <button type="button" class="btn btn-xs btn-outline-success fw-bold btn-open-test-mail-modal" data-account-id="{{ $acc->id }}" data-account-name="{{ $acc->name }}" data-email-address="{{ $acc->email_address }}">
-                                            <i class="feather-send me-1"></i>Send Test Email
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center py-4 text-muted">
-                                    <i class="feather-mail fs-36 text-muted mb-2 d-block opacity-50"></i>
-                                    No custom SMTP email accounts configured in Database for this context. Click "Add New Email Account" to setup.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <!-- Table Section with Common Table Component -->
+    <div class="table-responsive flex-grow-1">
+        <x-ui.odoo-form-ui type="table" id="emailAccountsTable" class="mb-0">
+            <thead>
+                <tr style="background-color: #e8ecf1 !important;">
+                    <th style="background-color: #e8ecf1 !important;" class="ps-3">Account Name</th>
+                    <th style="background-color: #e8ecf1 !important;">Email Address</th>
+                    <th style="background-color: #e8ecf1 !important;">Scope (Company & Branch)</th>
+                    <th style="background-color: #e8ecf1 !important;">SMTP Host & Port</th>
+                    <th style="background-color: #e8ecf1 !important;">Encryption</th>
+                    <th style="background-color: #e8ecf1 !important;">Status</th>
+                    <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">Testing & Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($accounts as $acc)
+                    <tr>
+                        <td class="ps-3 fw-bold text-dark">
+                            {{ $acc->name }}
+                            @if($acc->is_default)
+                                <span class="badge bg-soft-primary text-primary ms-1 fs-10 font-monospace border">Default</span>
+                            @endif
+                        </td>
+                        <td class="font-monospace text-primary fw-bold">{{ $acc->email_address }}</td>
+                        <td>
+                            <span class="badge bg-soft-info text-dark fs-11 border me-1">{{ $acc->company?->name ?? 'All Companies' }}</span>
+                            <span class="badge bg-soft-secondary text-muted fs-11 border">{{ $acc->branch?->name ?? 'All Branches' }}</span>
+                        </td>
+                        <td>
+                            <span class="font-monospace text-dark fw-medium">{{ $acc->host }}:{{ $acc->port }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border text-uppercase font-monospace">{{ $acc->encryption }}</span>
+                        </td>
+                        <td>
+                            @if($acc->is_active)
+                                <x-ui.status-badge status="Active" type="success" />
+                            @else
+                                <x-ui.status-badge status="Inactive" type="secondary" />
+                            @endif
+                        </td>
+                        <td class="text-end pe-3">
+                            <div class="d-flex justify-content-end align-items-center gap-2">
+                                <button type="button" class="btn btn-xs btn-outline-primary fw-bold btn-test-connection px-2.5 py-1" data-account-id="{{ $acc->id }}" data-account-name="{{ $acc->name }}">
+                                    <i class="feather-activity me-1"></i>Test Connection
+                                </button>
+                                <button type="button" class="btn btn-xs btn-outline-success fw-bold btn-open-test-mail-modal px-2.5 py-1" data-account-id="{{ $acc->id }}" data-account-name="{{ $acc->name }}" data-email-address="{{ $acc->email_address }}">
+                                    <i class="feather-send me-1"></i>Send Test Email
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="feather-mail fs-36 text-muted mb-2 d-block opacity-50"></i>
+                            No custom SMTP email accounts configured in Database for this context. Click "Add New Email Account" to setup.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </x-ui.odoo-form-ui>
     </div>
 </div>
 
@@ -158,13 +148,15 @@
     </div>
 </x-ui.modal>
 
-<!-- TEST RESULT NOTIFICATION MODAL (NO JS ALERT) -->
-<x-ui.modal id="connectionResultModal" title="<i class='feather-info me-1.5 text-primary'></i>Status Result" size="md" :centered="true" :showFooter="false">
-    <div class="p-3 text-center">
-        <div id="connectionResultIcon" class="mb-3"></div>
-        <h5 id="connectionResultTitle" class="fw-bold text-dark mb-2 fs-16"></h5>
-        <div id="connectionResultMessage" class="alert alert-light border text-start fs-12 mb-4 font-monospace p-3 text-break"></div>
-        <button type="button" class="btn btn-primary fw-bold px-4" data-bs-dismiss="modal">OK</button>
+<!-- TEST RESULT NOTIFICATION MODAL -->
+<x-ui.modal id="connectionResultModal" title="<i class='feather-info me-1.5 text-primary'></i>System Notification" size="lg" :centered="true" :showFooter="false">
+    <div class="py-4 px-3 text-center">
+        <div id="connectionResultIcon" class="mb-3 d-flex justify-content-center"></div>
+        <h4 id="connectionResultTitle" class="fw-bold text-dark mb-3 fs-18"></h4>
+        <div id="connectionResultMessage" class="alert alert-light border text-center fs-13 mb-4 font-monospace p-3.5 text-break shadow-2xs rounded-3 mx-auto" style="max-width: 520px; background-color: #f8fafc; border-color: #e2e8f0 !important; color: #334155; line-height: 1.6;"></div>
+        <div class="d-flex justify-content-center mt-3">
+            <button type="button" class="btn btn-primary fw-bold px-5 py-2 fs-13 shadow-2xs rounded-3" data-bs-dismiss="modal" style="min-width: 140px;">OK</button>
+        </div>
     </div>
 </x-ui.modal>
 
@@ -199,11 +191,11 @@
     $(document).ready(function() {
         function showNotificationModal(isSuccess, title, message) {
             const iconHtml = isSuccess 
-                ? '<div class="avatar avatar-lg bg-soft-success text-success rounded-circle mx-auto mb-2" style="width: 50px; height: 50px; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-check-circle fs-28"></i></div>'
-                : '<div class="avatar avatar-lg bg-soft-danger text-danger rounded-circle mx-auto mb-2" style="width: 50px; height: 50px; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-alert-triangle fs-28"></i></div>';
+                ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
+                : '<div class="avatar avatar-xl bg-soft-danger text-danger rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(239, 68, 68, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
             
             $('#connectionResultIcon').html(iconHtml);
-            $('#connectionResultTitle').text(title).attr('class', isSuccess ? 'fw-bold text-success mb-2 fs-16' : 'fw-bold text-danger mb-2 fs-16');
+            $('#connectionResultTitle').text(title).attr('class', isSuccess ? 'fw-bold text-success mb-2 fs-18' : 'fw-bold text-danger mb-2 fs-18');
             $('#connectionResultMessage').text(message);
             
             const modalEl = document.getElementById('connectionResultModal');
