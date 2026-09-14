@@ -142,7 +142,7 @@
                                 </span>
                             </td>
                             <td class="font-monospace fw-semibold fs-12">
-                                ₹{{ number_format($sn->purchase_rate, 2) }}
+                                {{ currency_symbol() }}{{ number_format($sn->purchase_rate, 2) }}
                             </td>
                             <td>
                                 @if($sn->transactionIn)

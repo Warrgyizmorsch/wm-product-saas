@@ -88,23 +88,30 @@ if (! function_exists('current_company_id')) {
 
 if (! function_exists('company_currency')) {
     /**
-     * The selected company's base (reporting) currency — what every ledger amount
-     * is stored in. Not to be confused with active_currency(), the older
-     * session-based display switcher used by Production/Purchase screens.
+     * The current tenant's currency (tenants.currency) — what every amount in
+     * every company of the tenant is stored and reported in. The name predates
+     * the one-currency-per-tenant rule and is kept for existing callers.
      *
      * @return array{code: string, symbol: string, name: string, decimals: int}
      */
     function company_currency(): array
     {
-        $code = app(\App\Domains\Accounting\Services\CurrencyService::class)->baseCurrencyFor(company_id());
-        $currency = \App\Models\Currency::query()->where('code', $code)->first(['code', 'name', 'symbol', 'decimals']);
+        $tenantId = tenant_id();
 
-        return [
-            'code' => $code,
-            'symbol' => $currency?->symbol ?? $code,
-            'name' => $currency?->name ?? $code,
-            'decimals' => (int) ($currency?->decimals ?? 2),
-        ];
+        // One currency per tenant. Views call this hundreds of times per page, so
+        // resolve once per tenant per request (once() keys on $tenantId and is
+        // flushed between tests).
+        return once(function () use ($tenantId): array {
+            $code = app(\App\Domains\Accounting\Services\CurrencyService::class)->baseCurrencyForTenant($tenantId);
+            $currency = \App\Models\Currency::query()->where('code', $code)->first(['code', 'name', 'symbol', 'decimals']);
+
+            return [
+                'code' => $code,
+                'symbol' => $currency?->symbol ?? $code,
+                'name' => $currency?->name ?? $code,
+                'decimals' => (int) ($currency?->decimals ?? 2),
+            ];
+        });
     }
 }
 
@@ -210,30 +217,38 @@ if (! function_exists('tenant_branding_url')) {
     }
 }
 
+/*
+ * Display-currency helpers. Every amount in the app is stored in the selected
+ * company's base currency, so display is just that currency's code and symbol —
+ * no conversion. These replace an older session-based switcher that scaled
+ * amounts by hardcoded rates from config/currency.php (now removed). The
+ * convert_* helpers are kept as identity functions for existing callers.
+ */
+
+if (! function_exists('currency_symbol')) {
+    /** Symbol of the selected company's base currency, e.g. "£". */
+    function currency_symbol(): string
+    {
+        return company_currency()['symbol'];
+    }
+}
+
 if (! function_exists('active_currency')) {
     function active_currency(): string
     {
-        $currencies = config('currency.currencies', []);
-        $sessionCurrency = session('active_currency');
-
-        if ($sessionCurrency && isset($currencies[$sessionCurrency])) {
-            return $sessionCurrency;
-        }
-
-        return config('currency.base', 'USD');
+        return company_currency()['code'];
     }
 }
 
 if (! function_exists('active_currency_info')) {
     function active_currency_info(): array
     {
-        $code = active_currency();
-        $currencies = config('currency.currencies', []);
+        $currency = company_currency();
 
-        return $currencies[$code] ?? [
-            'code' => 'USD',
-            'name' => 'US Dollar',
-            'symbol' => '$',
+        return [
+            'code' => $currency['code'],
+            'name' => $currency['name'],
+            'symbol' => $currency['symbol'],
             'rate' => 1.0,
             'position' => 'prefix',
         ];
@@ -243,41 +258,28 @@ if (! function_exists('active_currency_info')) {
 if (! function_exists('active_currency_symbol')) {
     function active_currency_symbol(): string
     {
-        return active_currency_info()['symbol'] ?? '$';
+        return currency_symbol();
     }
 }
 
 if (! function_exists('active_currency_rate')) {
     function active_currency_rate(): float
     {
-        return (float) (active_currency_info()['rate'] ?? 1.0);
+        return 1.0;
     }
 }
 
 if (! function_exists('convert_from_base')) {
     function convert_from_base($amountInBase): float
     {
-        if ($amountInBase === null || $amountInBase === '') {
-            return 0.0;
-        }
-
-        return (float) $amountInBase * active_currency_rate();
+        return ($amountInBase === null || $amountInBase === '') ? 0.0 : (float) $amountInBase;
     }
 }
 
 if (! function_exists('convert_to_base')) {
     function convert_to_base($amountInActiveCurrency): float
     {
-        if ($amountInActiveCurrency === null || $amountInActiveCurrency === '') {
-            return 0.0;
-        }
-
-        $rate = active_currency_rate();
-        if ($rate <= 0) {
-            return (float) $amountInActiveCurrency;
-        }
-
-        return (float) $amountInActiveCurrency / $rate;
+        return ($amountInActiveCurrency === null || $amountInActiveCurrency === '') ? 0.0 : (float) $amountInActiveCurrency;
     }
 }
 
@@ -305,11 +307,7 @@ if (! function_exists('format_indian_number')) {
 if (! function_exists('format_currency')) {
     function format_currency($amountInBase, int $decimals = 2, bool $includeSymbol = true): string
     {
-        if ($amountInBase === null || $amountInBase === '') {
-            $val = 0.0;
-        } else {
-            $val = convert_from_base($amountInBase);
-        }
+        $val = convert_from_base($amountInBase);
 
         $code = active_currency();
         $isNegative = $val < 0;

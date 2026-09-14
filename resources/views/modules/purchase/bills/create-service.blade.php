@@ -68,7 +68,7 @@
                             @if(isset($dispatches))
                                 @foreach($dispatches as $d)
                                     <option value="{{ $d->id }}" @selected(old('dispatch_order_id', request('dispatch_order_id', $selectedDispatch?->id)) == $d->id)>
-                                        Dispatch #{{ $d->dispatch_number ?? $d->id }} — {{ $d->transporter?->name ?? 'Transporter' }} (₹{{ number_format($d->freight_amount, 2) }})
+                                        Dispatch #{{ $d->dispatch_number ?? $d->id }} — {{ $d->transporter?->name ?? 'Transporter' }} ({{ currency_symbol() }}{{ number_format($d->freight_amount, 2) }})
                                     </option>
                                 @endforeach
                             @endif
@@ -130,7 +130,7 @@
 
                     <div class="row g-2">
                         <div class="col-6">
-                            <x-ui.odoo-form-ui type="input" inputType="number" label="Service Amount (₹)" name="amount" id="serviceAmountInput" step="0.01" min="0.01" value="{{ old('amount', $prefilled['amount'] ?? request('amount', '')) }}" placeholder="0.00" required="true" />
+                            <x-ui.odoo-form-ui type="input" inputType="number" label="Service Amount ({{ currency_symbol() }})" name="amount" id="serviceAmountInput" step="0.01" min="0.01" value="{{ old('amount', $prefilled['amount'] ?? request('amount', '')) }}" placeholder="0.00" required="true" />
                         </div>
                         <div class="col-6">
                             <x-ui.odoo-form-ui type="select" label="GST Rate (%)" name="tax_rate" id="taxRateSelect" required="true">

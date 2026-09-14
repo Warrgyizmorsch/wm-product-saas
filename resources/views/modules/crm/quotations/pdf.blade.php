@@ -481,9 +481,9 @@
                 <th style="width: 5%; text-align: center;">#</th>
                 <th style="width: 45%;">Item & Description</th>
                 <th style="width: 12%; text-align: right;">Qty</th>
-                <th style="width: 13%; text-align: right;">Rate (₹)</th>
+                <th style="width: 13%; text-align: right;">Rate ({{ currency_symbol() }})</th>
                 <th style="width: 10%; text-align: right;">Tax %</th>
-                <th style="width: 15%; text-align: right;">Amount (₹)</th>
+                <th style="width: 15%; text-align: right;">Amount ({{ currency_symbol() }})</th>
             </tr>
         </thead>
         <tbody>
@@ -497,9 +497,9 @@
                         @endif
                     </td>
                     <td style="text-align: right;">{{ $item->quantity }}</td>
-                    <td style="text-align: right;">₹{{ number_format($item->unit_price, 2) }}</td>
+                    <td style="text-align: right;">{{ currency_symbol() }}{{ number_format($item->unit_price, 2) }}</td>
                     <td style="text-align: right;">{{ number_format($item->tax_rate, 2) }}%</td>
-                    <td style="text-align: right; font-weight: bold; color: #0f172a;">₹{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
+                    <td style="text-align: right; font-weight: bold; color: #0f172a;">{{ currency_symbol() }}{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -526,21 +526,21 @@
                 <div class="summary-box">
                     <div class="summary-line">
                         <span class="summary-lbl">Subtotal:</span>
-                        <span class="summary-num">₹{{ number_format($quotation->subtotal, 2) }}</span>
+                        <span class="summary-num">{{ currency_symbol() }}{{ number_format($quotation->subtotal, 2) }}</span>
                     </div>
                     <div class="summary-line">
                         <span class="summary-lbl">Tax Amount (GST):</span>
-                        <span class="summary-num">₹{{ number_format($quotation->tax, 2) }}</span>
+                        <span class="summary-num">{{ currency_symbol() }}{{ number_format($quotation->tax, 2) }}</span>
                     </div>
                     @if($quotation->discount > 0)
                         <div class="summary-line" style="color: #dc2626;">
                             <span class="summary-lbl" style="color: #dc2626;">Discount:</span>
-                            <span class="summary-num" style="color: #dc2626;">-₹{{ number_format($quotation->discount, 2) }}</span>
+                            <span class="summary-num" style="color: #dc2626;">-{{ currency_symbol() }}{{ number_format($quotation->discount, 2) }}</span>
                         </div>
                     @endif
                     <div class="total-payable-box">
                         <span class="total-payable-lbl">Total Payable:</span>
-                        <span class="total-payable-num">₹{{ number_format($quotation->total_amount, 2) }}</span>
+                        <span class="total-payable-num">{{ currency_symbol() }}{{ number_format($quotation->total_amount, 2) }}</span>
                     </div>
                 </div>
             </td>

@@ -150,7 +150,7 @@
                                 </div>
 
                                 <div class="mt-1">
-                                    <span class="fs-11 fw-bold text-dark">MRP: ₹<span id="previewPrice">0.00</span></span>
+                                    <span class="fs-11 fw-bold text-dark">MRP: {{ currency_symbol() }}<span id="previewPrice">0.00</span></span>
                                 </div>
                             </div>
                             <span class="fs-11 text-muted mt-3" id="previewFootNote"><i class="feather-info me-1"></i>Preview of single sticker label</span>

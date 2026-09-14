@@ -4,16 +4,8 @@
     $subscriptionStatuses = \App\Models\Tenant::subscriptionStatuses();
     $locales = collect(config('localization.supported', []))->map(fn ($meta) => $meta['name'] ?? $meta['native'] ?? '');
     $timezones = \DateTimeZone::listIdentifiers();
-    $currencies = [
-        'INR' => 'INR — Indian Rupee',
-        'USD' => 'USD — US Dollar',
-        'EUR' => 'EUR — Euro',
-        'GBP' => 'GBP — British Pound',
-        'AED' => 'AED — UAE Dirham',
-        'SGD' => 'SGD — Singapore Dollar',
-        'AUD' => 'AUD — Australian Dollar',
-        'CAD' => 'CAD — Canadian Dollar',
-    ];
+    $currencies = \App\Models\Currency::query()->where('is_active', true)->orderBy('code')->get(['code', 'name', 'symbol']);
+    $currencyLocked = $tenant->exists && app(\App\Domains\Accounting\Services\TenantCurrencyGuard::class)->isLocked($tenant->id);
     $suffix = $tenant->id ?? 'new';
 @endphp
 
@@ -115,15 +107,20 @@
         @error('locale')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
     <div class="col-md-4">
-        <x-ui.odoo-form-ui type="select" label="Currency" name="currency" :searchable="false" class="@error('currency') is-invalid @enderror">
-            @php $currentCurrency = old('currency', $settings['currency'] ?? 'INR'); @endphp
-            @foreach ($currencies as $value => $label)
-                <option value="{{ $value }}" @selected($currentCurrency === $value)>{{ $label }}</option>
-            @endforeach
-            @if (! isset($currencies[$currentCurrency]))
-                <option value="{{ $currentCurrency }}" selected>{{ $currentCurrency }}</option>
-            @endif
-        </x-ui.odoo-form-ui>
+        @php $currentCurrency = old('currency', $tenant->currency ?: 'INR'); @endphp
+        @if ($currencyLocked)
+            {{-- Locked: journals exist in this currency. Still submitted so validation passes. --}}
+            <input type="hidden" name="currency" value="{{ $tenant->currency }}">
+            <x-ui.odoo-form-ui type="input" label="Currency" name="currency_display" :value="$tenant->currency" :readonly="true"
+                              helperText="Locked: this tenant already has accounting entries in {{ $tenant->currency }}." />
+        @else
+            <x-ui.odoo-form-ui type="select" label="Currency" name="currency" :required="true" class="@error('currency') is-invalid @enderror"
+                              helperText="One currency for the whole tenant. Locked after the first accounting entry.">
+                @foreach ($currencies as $currencyOption)
+                    <option value="{{ $currencyOption->code }}" @selected($currentCurrency === $currencyOption->code)>{{ $currencyOption->code }} — {{ $currencyOption->name }} ({{ $currencyOption->symbol }})</option>
+                @endforeach
+            </x-ui.odoo-form-ui>
+        @endif
         @error('currency')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
 

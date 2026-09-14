@@ -497,9 +497,9 @@
                                     <th style="width: 5%;" class="text-center">#</th>
                                     <th style="width: 45%;">Item & Description</th>
                                     <th class="text-end" style="width: 12%;">Qty</th>
-                                    <th class="text-end" style="width: 13%;">Rate (₹)</th>
+                                    <th class="text-end" style="width: 13%;">Rate ({{ currency_symbol() }})</th>
                                     <th class="text-end" style="width: 10%;">Tax %</th>
-                                    <th class="text-end" style="width: 15%;">Amount (₹)</th>
+                                    <th class="text-end" style="width: 15%;">Amount ({{ currency_symbol() }})</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -516,7 +516,7 @@
                                             @endif
                                         </td>
                                         <td class="text-end fw-semibold">{{ (float)$item->quantity }}</td>
-                                        <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
+                                        <td class="text-end">{{ currency_symbol() }}{{ number_format($item->unit_price, 2) }}</td>
                                         <td class="text-end text-muted">{{ (float)$item->tax_rate }}%</td>
                                         <td class="text-end fw-bold text-dark">
                                             @php
@@ -524,7 +524,7 @@
                                                     ? $item->total_amount
                                                     : ($item->subtotal > 0 ? $item->subtotal : ($item->quantity * $item->unit_price));
                                             @endphp
-                                            ₹{{ number_format($lineTotal, 2) }}
+                                            {{ currency_symbol() }}{{ number_format($lineTotal, 2) }}
                                         </td>
                                     </tr>
                                 @endforeach
@@ -584,8 +584,8 @@
                                                     @endphp
                                                     <tr>
                                                         <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">₹{{ number_format($grpTax, 2) }}</td>
-                                                        <td class="py-1 text-end">₹{{ number_format($grpIgst, 2) }}</td>
+                                                        <td class="py-1 text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($grpTax, 2) }}</td>
+                                                        <td class="py-1 text-end">{{ currency_symbol() }}{{ number_format($grpIgst, 2) }}</td>
                                                     </tr>
                                                 @else
                                                     @php
@@ -596,9 +596,9 @@
                                                     @endphp
                                                     <tr>
                                                         <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">₹{{ number_format($grpTax, 2) }}</td>
-                                                        <td class="py-1 text-end">₹{{ number_format($grpCgst, 2) }}</td>
-                                                        <td class="py-1 text-end">₹{{ number_format($grpSgst, 2) }}</td>
+                                                        <td class="py-1 text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($grpTax, 2) }}</td>
+                                                        <td class="py-1 text-end">{{ currency_symbol() }}{{ number_format($grpCgst, 2) }}</td>
+                                                        <td class="py-1 text-end">{{ currency_symbol() }}{{ number_format($grpSgst, 2) }}</td>
                                                     </tr>
                                                 @endif
                                             @endforeach
@@ -607,15 +607,15 @@
                                             @if($invoice->gst_type === 'igst')
                                                 <tr>
                                                     <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">₹{{ number_format($totTax, 2) }}</td>
-                                                    <td class="py-1 text-end">₹{{ number_format($totIgst, 2) }}</td>
+                                                    <td class="py-1 text-end text-primary">{{ currency_symbol() }}{{ number_format($totTax, 2) }}</td>
+                                                    <td class="py-1 text-end">{{ currency_symbol() }}{{ number_format($totIgst, 2) }}</td>
                                                 </tr>
                                             @else
                                                 <tr>
                                                     <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">₹{{ number_format($totTax, 2) }}</td>
-                                                    <td class="py-1 text-end">₹{{ number_format($totCgst, 2) }}</td>
-                                                    <td class="py-1 text-end">₹{{ number_format($totSgst, 2) }}</td>
+                                                    <td class="py-1 text-end text-primary">{{ currency_symbol() }}{{ number_format($totTax, 2) }}</td>
+                                                    <td class="py-1 text-end">{{ currency_symbol() }}{{ number_format($totCgst, 2) }}</td>
+                                                    <td class="py-1 text-end">{{ currency_symbol() }}{{ number_format($totSgst, 2) }}</td>
                                                 </tr>
                                             @endif
                                         </tfoot>
@@ -694,35 +694,35 @@
                             <!-- 1. Subtotal (Excl. Tax) -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                 <span class="text-muted fw-semibold">Subtotal (Excl. Tax):</span>
-                                <span class="fw-bold text-dark">₹{{ number_format($grossSubtotal, 2) }}</span>
+                                <span class="fw-bold text-dark">{{ currency_symbol() }}{{ number_format($grossSubtotal, 2) }}</span>
                             </div>
 
                             <!-- 2. Less: Item Discounts -->
                             @if($invoice->discount_type !== 'without_discount' && $effectiveDiscount > 0)
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12 text-danger">
                                     <span class="fw-semibold">Less: Item Discounts:</span>
-                                    <span class="fw-bold">-₹{{ number_format($effectiveDiscount, 2) }}</span>
+                                    <span class="fw-bold">-{{ currency_symbol() }}{{ number_format($effectiveDiscount, 2) }}</span>
                                 </div>
                             @endif
 
                             <!-- 3. Items Taxable Value -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                 <span class="text-muted fw-semibold">Items Taxable Value:</span>
-                                <span class="fw-bold text-dark">₹{{ number_format($taxableBase, 2) }}</span>
+                                <span class="fw-bold text-dark">{{ currency_symbol() }}{{ number_format($taxableBase, 2) }}</span>
                             </div>
 
                             <!-- 4. Add: Items GST Tax -->
                             @if($invoice->tax_type !== 'without_tax' && $itemsTaxAmount > 0)
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                     <span class="text-muted fw-medium">Add: Items GST Tax:</span>
-                                    <span class="text-muted font-monospace">+₹{{ number_format($itemsTaxAmount, 2) }}</span>
+                                    <span class="text-muted font-monospace">+{{ currency_symbol() }}{{ number_format($itemsTaxAmount, 2) }}</span>
                                 </div>
                             @endif
 
                             <!-- 5. Billed Items Total (Incl. GST) -->
                             <div class="d-flex justify-content-between align-items-center my-2 py-1.5 px-2.5 rounded bg-white border fs-12 fw-bold text-dark" style="border-color: #e2e8f0 !important;">
                                 <span>Billed Items Total (Incl. GST):</span>
-                                <span>₹{{ number_format($itemsTotalInclGst, 2) }}</span>
+                                <span>{{ currency_symbol() }}{{ number_format($itemsTotalInclGst, 2) }}</span>
                             </div>
 
                             <!-- 6. Freight Charges -->
@@ -730,17 +730,17 @@
                                 <hr class="my-2 border-slate">
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                     <span class="text-muted fw-semibold">Freight Charges:</span>
-                                    <span class="fw-bold text-primary">₹{{ number_format($freightAmount, 2) }}</span>
+                                    <span class="fw-bold text-primary">{{ currency_symbol() }}{{ number_format($freightAmount, 2) }}</span>
                                 </div>
                                 @if($freightTax > 0)
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                         <span class="text-muted fw-semibold">Add: Freight GST Tax:</span>
-                                        <span class="text-muted font-monospace">+₹{{ number_format($freightTax, 2) }}</span>
+                                        <span class="text-muted font-monospace">+{{ currency_symbol() }}{{ number_format($freightTax, 2) }}</span>
                                     </div>
                                 @endif
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12 fw-bold text-primary">
                                     <span>Total Freight (Incl. GST):</span>
-                                    <span>₹{{ number_format($totalFreightInclGst, 2) }}</span>
+                                    <span>{{ currency_symbol() }}{{ number_format($totalFreightInclGst, 2) }}</span>
                                 </div>
                             @endif
 
@@ -750,16 +750,16 @@
                                 @if($gstType === 'cgst_sgst')
                                     <div class="d-flex justify-content-between align-items-center mb-1.5 fs-12">
                                         <span class="text-muted fw-medium">CGST (Central Tax):</span>
-                                        <span class="text-muted font-monospace">+₹{{ number_format($totalInvoiceTaxAmount / 2, 2) }}</span>
+                                        <span class="text-muted font-monospace">+{{ currency_symbol() }}{{ number_format($totalInvoiceTaxAmount / 2, 2) }}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                         <span class="text-muted fw-medium">SGST (State Tax):</span>
-                                        <span class="text-muted font-monospace">+₹{{ number_format($totalInvoiceTaxAmount / 2, 2) }}</span>
+                                        <span class="text-muted font-monospace">+{{ currency_symbol() }}{{ number_format($totalInvoiceTaxAmount / 2, 2) }}</span>
                                     </div>
                                 @else
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                         <span class="text-muted fw-medium">IGST (Integrated Tax):</span>
-                                        <span class="text-muted font-monospace">+₹{{ number_format($totalInvoiceTaxAmount, 2) }}</span>
+                                        <span class="text-muted font-monospace">+{{ currency_symbol() }}{{ number_format($totalInvoiceTaxAmount, 2) }}</span>
                                     </div>
                                 @endif
                             @endif
@@ -768,14 +768,14 @@
                             @if($adjustment != 0)
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                     <span class="text-muted fw-semibold">Adjustment:</span>
-                                    <span class="fw-bold text-dark">₹{{ number_format($adjustment, 2) }}</span>
+                                    <span class="fw-bold text-dark">{{ currency_symbol() }}{{ number_format($adjustment, 2) }}</span>
                                 </div>
                             @endif
 
                             <!-- 8. Grand Total -->
                             <div class="d-flex justify-content-between align-items-center pt-2.5 border-top mt-2" style="border-color: #cbd5e1 !important;">
                                 <span class="fw-bold text-dark fs-13 text-uppercase" style="letter-spacing: 0.5px;">Grand Total:</span>
-                                <span class="fw-bold text-primary fs-16">₹{{ number_format($grandTotal, 2) }}</span>
+                                <span class="fw-bold text-primary fs-16">{{ currency_symbol() }}{{ number_format($grandTotal, 2) }}</span>
                             </div>
 
                             <!-- 9. Balance Due (if applicable) -->
@@ -786,11 +786,11 @@
                             @if($totalPaid > 0)
                                 <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top text-success fs-12">
                                     <span class="fw-semibold">Amount Paid:</span>
-                                    <span class="fw-bold">-₹{{ number_format($totalPaid, 2) }}</span>
+                                    <span class="fw-bold">-{{ currency_symbol() }}{{ number_format($totalPaid, 2) }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mt-1 pt-1 text-danger fs-13">
                                     <span class="fw-bold">Balance Due:</span>
-                                    <span class="fw-bold">₹{{ number_format($balDue, 2) }}</span>
+                                    <span class="fw-bold">{{ currency_symbol() }}{{ number_format($balDue, 2) }}</span>
                                 </div>
                             @endif
                         </div>

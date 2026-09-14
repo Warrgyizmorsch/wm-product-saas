@@ -64,13 +64,15 @@ class CurrencyServiceTest extends TestCase
     }
 
     /** @test */
-    public function base_currency_comes_from_the_company(): void
+    public function base_currency_comes_from_the_tenant(): void
     {
-        $usCompany = Company::create(['company_name' => 'Acme US', 'currency' => 'usd']);
-        $inCompany = Company::create(['company_name' => 'Acme India']);
+        $gbpTenant = Tenant::create(['name' => 'UK', 'slug' => 'uk', 'status' => 'active', 'plan' => 'enterprise', 'currency' => 'gbp']);
+        // A company's own currency column is ignored — one currency per tenant.
+        Company::create(['company_name' => 'Acme US', 'currency' => 'USD']);
 
-        $this->assertSame('USD', $this->service()->baseCurrencyFor($usCompany->id));
-        $this->assertSame('INR', $this->service()->baseCurrencyFor($inCompany->id));
+        $this->assertSame('GBP', $this->service()->baseCurrencyForTenant($gbpTenant->id));
+        $this->assertSame('INR', $this->service()->baseCurrencyForTenant($this->tenant->id), 'column default');
+        $this->assertSame('INR', $this->service()->baseCurrencyForTenant(999999), 'unknown tenant falls back');
     }
 
     /** @test */

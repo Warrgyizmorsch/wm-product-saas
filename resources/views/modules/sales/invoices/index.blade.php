@@ -172,9 +172,9 @@
                                 @endif
                             </td>
                             <td class="text-end fw-bold text-dark pe-3">
-                                ₹{{ number_format($inv->total_amount, 2) }}
+                                {{ currency_symbol() }}{{ number_format($inv->total_amount, 2) }}
                                 @if ($inv->balance_due > 0 && $inv->balance_due < $inv->total_amount)
-                                    <small class="d-block text-danger fs-10 font-normal">Due: ₹{{ number_format($inv->balance_due, 2) }}</small>
+                                    <small class="d-block text-danger fs-10 font-normal">Due: {{ currency_symbol() }}{{ number_format($inv->balance_due, 2) }}</small>
                                 @endif
                             </td>
                             <td>

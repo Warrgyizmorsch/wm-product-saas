@@ -180,7 +180,7 @@ class OrgApiController extends Controller
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
-            'currency'            => 'required|string|max:10',
+            'currency'            => 'nullable|string|max:10', // ignored: one currency per tenant
             'time_zone'           => 'required|string|max:50',
             'status'              => 'required',
             'logo'                => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
@@ -189,13 +189,6 @@ class OrgApiController extends Controller
         $logo = null;
         if ($request->hasFile('logo')) {
             $logo = $request->file('logo')->store('legal_entities', 'public');
-        }
-
-        $currency = null;
-        if ($request->currency) {
-            $parts = explode('-', $request->currency);
-            $currency = trim($parts[0]);
-            $currency = substr($currency, 0, 10);
         }
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -215,7 +208,7 @@ class OrgApiController extends Controller
             'state'               => $validated['state'] ?? null,
             'country'             => $validated['country'] ?? null,
             'postal_code'         => $validated['postal_code'] ?? null,
-            'currency'            => $currency,
+            'currency'            => company_currency()['code'],
             'timezone'            => $validated['time_zone'],
             'status'              => $status,
             'logo'                => $logo,
@@ -254,7 +247,7 @@ class OrgApiController extends Controller
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
-            'currency'            => 'required|string|max:10',
+            'currency'            => 'nullable|string|max:10', // ignored: one currency per tenant
             'time_zone'           => 'required|string|max:50',
             'status'              => 'required',
             'logo'                => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
@@ -263,13 +256,6 @@ class OrgApiController extends Controller
         $logo = $company->logo;
         if ($request->hasFile('logo')) {
             $logo = $request->file('logo')->store('legal_entities', 'public');
-        }
-
-        $currency = null;
-        if ($request->currency) {
-            $parts = explode('-', $request->currency);
-            $currency = trim($parts[0]);
-            $currency = substr($currency, 0, 10);
         }
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -289,7 +275,7 @@ class OrgApiController extends Controller
             'state'               => $validated['state'] ?? null,
             'country'             => $validated['country'] ?? null,
             'postal_code'         => $validated['postal_code'] ?? null,
-            'currency'            => $currency,
+            'currency'            => company_currency()['code'],
             'timezone'            => $validated['time_zone'],
             'status'              => $status,
             'logo'                => $logo,

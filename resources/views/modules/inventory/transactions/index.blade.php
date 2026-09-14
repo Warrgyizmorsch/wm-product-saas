@@ -78,7 +78,7 @@
                     <div class="overflow-hidden flex-grow-1">
                         <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="TOTAL INWARD (IN)">TOTAL INWARD (IN)</span>
                         <div class="fs-16 fw-bold text-success text-nowrap text-truncate" title="+{{ number_format($totalInQty, 2) }} Units">+{{ number_format($totalInQty, 2) }} Units</div>
-                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">Inward Value: ₹{{ number_format($totalInValue, 2) }}</span>
+                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">Inward Value: {{ currency_symbol() }}{{ number_format($totalInValue, 2) }}</span>
                     </div>
                 </div>
             </div>
@@ -91,7 +91,7 @@
                     <div class="overflow-hidden flex-grow-1">
                         <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="TOTAL OUTWARD (OUT)">TOTAL OUTWARD (OUT)</span>
                         <div class="fs-16 fw-bold text-danger text-nowrap text-truncate" title="-{{ number_format($totalOutQty, 2) }} Units">-{{ number_format($totalOutQty, 2) }} Units</div>
-                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">Outward Value: ₹{{ number_format($totalOutValue, 2) }}</span>
+                        <span class="fs-11 text-muted d-block text-truncate mt-0.5">Outward Value: {{ currency_symbol() }}{{ number_format($totalOutValue, 2) }}</span>
                     </div>
                 </div>
             </div>
@@ -300,8 +300,8 @@
                             <td class="text-end font-monospace fw-bold text-dark fs-13">
                                 {{ number_format($trx->balance_qty ?? 0, 2) }}
                             </td>
-                            <td class="text-end font-monospace text-muted fs-12">₹{{ number_format($trx->unit_cost, 2) }}</td>
-                            <td class="text-end font-monospace fw-bold text-dark fs-13">₹{{ number_format($trx->total_value, 2) }}</td>
+                            <td class="text-end font-monospace text-muted fs-12">{{ currency_symbol() }}{{ number_format($trx->unit_cost, 2) }}</td>
+                            <td class="text-end font-monospace fw-bold text-dark fs-13">{{ currency_symbol() }}{{ number_format($trx->total_value, 2) }}</td>
                             <td>
                                 <div class="d-flex flex-column align-items-start gap-1">
                                     <span class="badge bg-light text-secondary border fs-11 fw-medium">

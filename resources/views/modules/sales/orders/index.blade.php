@@ -157,9 +157,9 @@
                                 <span class="badge {{ $billingStatusBadge }} px-2 py-1 fs-11 fw-bold">{{ $billingStatusLabel }}</span>
                                 <small class="text-muted d-block fs-10 mt-0.5">SO State: {{ $order->status }}</small>
                             </td>
-                            <td class="text-end fw-bold text-dark">₹{{ number_format($order->total_amount, 2) }}</td>
-                            <td class="text-end fw-bold text-success">₹{{ number_format($invoicedAmt, 2) }}</td>
-                            <td class="text-end fw-bold text-danger">₹{{ number_format($balancedAmt, 2) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($order->total_amount, 2) }}</td>
+                            <td class="text-end fw-bold text-success">{{ currency_symbol() }}{{ number_format($invoicedAmt, 2) }}</td>
+                            <td class="text-end fw-bold text-danger">{{ currency_symbol() }}{{ number_format($balancedAmt, 2) }}</td>
                             
                             {{-- Send Status & Action Column --}}
                             <td class="text-center py-2">

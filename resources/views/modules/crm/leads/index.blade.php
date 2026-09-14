@@ -313,7 +313,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end pe-4">
-                                    <span class="fw-bold text-dark d-block mb-1">{{ $lead->expected_amount ? '₹' . number_format($lead->expected_amount, 2) : '—' }}</span>
+                                    <span class="fw-bold text-dark d-block mb-1">{{ $lead->expected_amount ? (currency_symbol()) . number_format($lead->expected_amount, 2) : '—' }}</span>
                                     @if($lead->expected_sale_date)
                                         <span class="text-muted fs-11"><i class="feather-calendar me-1 fs-10 text-success"></i>{{ $lead->expected_sale_date->format('d/m/Y') }}</span>
                                     @else

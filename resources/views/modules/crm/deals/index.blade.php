@@ -212,7 +212,7 @@
                         <th style="width: 20%; background-color: #e8ecf1 !important;">PROJECT / DEAL TITLE</th>
                         <th style="width: 18%; background-color: #e8ecf1 !important;">COMPANY / CONTACT</th>
                         <th style="width: 15%; background-color: #e8ecf1 !important;">PHONE / EMAIL</th>
-                        <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">EST. VALUE (₹)</th>
+                        <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">EST. VALUE ({{ currency_symbol() }})</th>
                         <th style="width: 13%; background-color: #e8ecf1 !important;">CLOSING DATE & STATUS</th>
                         <th style="width: 12%; background-color: #e8ecf1 !important;">STAGE</th>
                         <th style="width: 10%; background-color: #e8ecf1 !important;">HEALTH %</th>
@@ -312,7 +312,7 @@
                                 @endif
                             </td>
                             <td class="text-end pe-3 fw-bold text-success fs-14">
-                                ₹{{ number_format($deal->actual_value ?: $deal->estimated_value, 2) }}
+                                {{ currency_symbol() }}{{ number_format($deal->actual_value ?: $deal->estimated_value, 2) }}
                             </td>
                             <td>
                                 @if($deal->closing_date)

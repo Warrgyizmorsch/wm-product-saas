@@ -31,7 +31,7 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" inputType="number" label="Amount (₹)" name="amount" id="amountInput" :value="old('amount', $prefillAmount)" :required="true" step="0.01" placeholder="0.00" style="font-weight: bold; color: #1e40af;" />
+                        <x-ui.odoo-form-ui type="input" inputType="number" label="Amount ({{ currency_symbol() }})" name="amount" id="amountInput" :value="old('amount', $prefillAmount)" :required="true" step="0.01" placeholder="0.00" style="font-weight: bold; color: #1e40af;" />
 
                         <x-ui.odoo-form-ui type="select" label="Payment Method" name="payment_method" :required="true">
                             <option value="Bank Transfer" @selected(old('payment_method') == 'Bank Transfer')>Bank Transfer / Wire</option>
@@ -62,7 +62,7 @@
                                 <option value="">Select Sales Order...</option>
                                 @foreach ($salesOrders as $so)
                                     <option value="{{ $so->id }}" data-customer="{{ $so->customer_id }}" @selected(old('sales_order_id', $prefillSalesOrderId) == $so->id)>
-                                        {{ $so->sales_order_number }} (Total: ₹{{ number_format($so->total_amount, 2) }})
+                                        {{ $so->sales_order_number }} (Total: {{ currency_symbol() }}{{ number_format($so->total_amount, 2) }})
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
@@ -74,7 +74,7 @@
                                 <option value="">Select Invoice...</option>
                                 @foreach ($invoices as $inv)
                                     <option value="{{ $inv->id }}" data-customer="{{ $inv->customer_id ?? $inv->salesOrder?->customer_id }}" data-balance="{{ $inv->balance_due }}" @selected(old('invoice_id', $prefillInvoiceId) == $inv->id)>
-                                        {{ $inv->invoice_number }} (Balance: ₹{{ number_format($inv->balance_due, 2) }})
+                                        {{ $inv->invoice_number }} (Balance: {{ currency_symbol() }}{{ number_format($inv->balance_due, 2) }})
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>

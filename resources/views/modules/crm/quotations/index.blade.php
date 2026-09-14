@@ -118,7 +118,7 @@
                             </td>
                             <td>{{ $quotation->quotation_date ? $quotation->quotation_date->format('d/m/Y') : '—' }}</td>
                             <td>{{ $quotation->expiry_date ? $quotation->expiry_date->format('d/m/Y') : '—' }}</td>
-                            <td class="text-end fw-bold text-dark">₹{{ number_format($quotation->total_amount, 2) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ currency_symbol() }}{{ number_format($quotation->total_amount, 2) }}</td>
                             <td class="ps-4">
                                 @php
                                     $displayStatus = $quotation->status;

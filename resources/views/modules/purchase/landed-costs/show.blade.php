@@ -27,7 +27,7 @@
             <div class="d-flex align-items-center gap-3">
                 <div class="text-end">
                     <small class="text-muted text-uppercase font-monospace fw-bold fs-11 d-block">Total Additional Expenses</small>
-                    <h3 class="fw-bold text-primary font-monospace mb-0">₹{{ number_format($voucher->total_expenses, 2) }}</h3>
+                    <h3 class="fw-bold text-primary font-monospace mb-0">{{ currency_symbol() }}{{ number_format($voucher->total_expenses, 2) }}</h3>
                 </div>
 
                 @if($voucher->isDraft())
@@ -91,10 +91,10 @@
                         <tr>
                             <th style="width: 18%">Expense Head</th>
                             <th style="width: 22%">Vendor / Transporter</th>
-                            <th style="width: 12%" class="text-end">Base Amount (₹)</th>
+                            <th style="width: 12%" class="text-end">Base Amount ({{ currency_symbol() }})</th>
                             <th style="width: 13%">GST &amp; Mechanism</th>
-                            <th style="width: 12%" class="text-end">Tax Amt (₹)</th>
-                            <th style="width: 13%" class="text-end">Total Payable (₹)</th>
+                            <th style="width: 12%" class="text-end">Tax Amt ({{ currency_symbol() }})</th>
+                            <th style="width: 13%" class="text-end">Total Payable ({{ currency_symbol() }})</th>
                             <th style="width: 10%">Vendor Bill</th>
                         </tr>
                     </thead>
@@ -108,7 +108,7 @@
                                         Basis: {{ $exp->allocation_basis === 'by_amount' ? 'By Value' : ($exp->allocation_basis === 'equal' ? 'Equal' : 'By Qty') }}
                                     </span>
                                 </td>
-                                <td class="text-end font-monospace fw-bold text-dark">₹{{ number_format($exp->amount, 2) }}</td>
+                                <td class="text-end font-monospace fw-bold text-dark">{{ currency_symbol() }}{{ number_format($exp->amount, 2) }}</td>
                                 <td>
                                     @if($exp->tax_rate > 0)
                                         <span class="badge bg-soft-info text-info border border-info font-monospace px-2 py-1 fs-11">{{ (float)$exp->tax_rate }}% GST</span>
@@ -125,8 +125,8 @@
                                         <span class="badge bg-light text-muted border px-2 py-1 fs-11">No Tax</span>
                                     @endif
                                 </td>
-                                <td class="text-end font-monospace text-primary">₹{{ number_format($exp->tax_amount, 2) }}</td>
-                                <td class="text-end font-monospace fw-bold text-success">₹{{ number_format($exp->total_with_tax, 2) }}</td>
+                                <td class="text-end font-monospace text-primary">{{ currency_symbol() }}{{ number_format($exp->tax_amount, 2) }}</td>
+                                <td class="text-end font-monospace fw-bold text-success">{{ currency_symbol() }}{{ number_format($exp->total_with_tax, 2) }}</td>
                                 <td>
                                     @if($exp->vendorBill)
                                         <a href="{{ route('purchase.bills.show', $exp->vendor_bill_id) }}" class="badge bg-primary text-white text-decoration-none font-monospace">
@@ -171,10 +171,10 @@
                                     <small class="text-muted font-monospace">SKU: {{ $item->product->sku ?? '—' }}</small>
                                 </td>
                                 <td class="text-center fw-semibold">{{ (float)$item->quantity }} {{ $item->product?->uom?->code ?? 'PCS' }}</td>
-                                <td class="text-end font-monospace">₹{{ number_format($item->base_unit_rate, 2) }}</td>
-                                <td class="text-end font-monospace text-primary fw-bold">+ ₹{{ number_format($item->allocated_cost, 2) }}</td>
+                                <td class="text-end font-monospace">{{ currency_symbol() }}{{ number_format($item->base_unit_rate, 2) }}</td>
+                                <td class="text-end font-monospace text-primary fw-bold">+ {{ currency_symbol() }}{{ number_format($item->allocated_cost, 2) }}</td>
                                 <td class="text-end font-monospace text-success fw-bold">
-                                    ₹{{ number_format($item->new_landed_unit_cost, 2) }} / {{ $item->product?->uom?->code ?? 'PCS' }}
+                                    {{ currency_symbol() }}{{ number_format($item->new_landed_unit_cost, 2) }} / {{ $item->product?->uom?->code ?? 'PCS' }}
                                 </td>
                             </tr>
                         @endforeach

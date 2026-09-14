@@ -61,9 +61,9 @@
                     <!-- PF Ceiling -->
                     <div class="col-md-6 col-12">
                         <div class="pt-2">
-                            <x-ui.checkbox id="restrict_pf_ceiling" name="restrict_pf_ceiling" value="1" :checked="($rules['restrict_pf_ceiling'] ?? true)" label="Restrict PF Contribution to Wage Ceiling (₹15,000)" />
+                            <x-ui.checkbox id="restrict_pf_ceiling" name="restrict_pf_ceiling" value="1" :checked="($rules['restrict_pf_ceiling'] ?? true)" label="Restrict PF Contribution to Wage Ceiling ({{ currency_symbol() }}15,000)" />
                         </div>
-                        <small class="text-muted d-block fs-11 mt-1">If enabled, the PF calculation basis is capped at a maximum basic salary of ₹15,000 per month (max deduction ₹1,800).</small>
+                        <small class="text-muted d-block fs-11 mt-1">If enabled, the PF calculation basis is capped at a maximum basic salary of {{ currency_symbol() }}15,000 per month (max deduction {{ currency_symbol() }}1,800).</small>
                     </div>
 
                     <!-- ESI Enabled -->
@@ -77,9 +77,9 @@
                     <!-- ESI Threshold -->
                     <div class="col-md-6 col-12">
                         <div class="pt-2">
-                            <x-ui.checkbox id="restrict_esi_threshold" name="restrict_esi_threshold" value="1" :checked="($rules['restrict_esi_threshold'] ?? true)" label="Apply ESI Gross Salary Threshold (₹21,000)" />
+                            <x-ui.checkbox id="restrict_esi_threshold" name="restrict_esi_threshold" value="1" :checked="($rules['restrict_esi_threshold'] ?? true)" label="Apply ESI Gross Salary Threshold ({{ currency_symbol() }}21,000)" />
                         </div>
-                        <small class="text-muted d-block fs-11 mt-1">If enabled, ESI will only be deducted if the employee's monthly gross salary is ₹21,000 or below.</small>
+                        <small class="text-muted d-block fs-11 mt-1">If enabled, ESI will only be deducted if the employee's monthly gross salary is {{ currency_symbol() }}21,000 or below.</small>
                     </div>
                 </div>
             </div>

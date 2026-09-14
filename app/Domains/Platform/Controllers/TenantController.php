@@ -126,7 +126,7 @@ class TenantController extends Controller
             'logo_full' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
             'logo_abbr' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
             'branch' => ['nullable', 'string', 'max:255'],
-            'currency' => ['nullable', 'string', 'max:10'],
+            'currency' => ['required', Rule::exists('currencies', 'code')->where('is_active', true)],
             'financial_year' => ['nullable', 'string', 'max:50'],
             'owner_name' => [$tenant ? 'nullable' : 'required_with:owner_email', 'nullable', 'string', 'max:255'],
             'owner_email' => [$tenant ? 'nullable' : 'required_with:owner_name', 'nullable', 'email', 'max:255'],

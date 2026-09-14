@@ -759,7 +759,7 @@
                                 $('#dupAccountNameText').text(res.account_name + ' (' + res.account_number + ')');
                                 $('#dupAccountGstinText').text(res.gstin || 'N/A');
                                 
-                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>Lifetime Revenue: <strong id="dupAccountRevenueText" class="text-success">₹' + res.lifetime_revenue + '</strong></span>');
+                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>Lifetime Revenue: <strong id="dupAccountRevenueText" class="text-success">{{ currency_symbol() }}' + res.lifetime_revenue + '</strong></span>');
                                 $('#dupDealsContainer').html('<span><i class="feather-layers me-1 text-info"></i>Active Deals: <strong id="dupAccountDealsText" class="text-dark">' + res.open_deals_count + ' Open Deals</strong></span>');
                                 $('#dupDateContainer').html('<span><i class="feather-calendar me-1 text-primary"></i>Last Purchase: <strong id="dupAccountLastPurchaseText" class="text-dark">' + res.last_purchase_date + '</strong></span>');
                                 
@@ -777,7 +777,7 @@
                                 $('#dupAccountNameText').text(leadName);
                                 $('#dupAccountGstinText').text('Lead #' + (res.lead ? res.lead.id : ''));
                                 
-                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>Expected Amount: <strong id="dupAccountRevenueText" class="text-success">₹' + expAmt + '</strong></span>');
+                                $('#dupRevenueContainer').html('<span><i class="feather-dollar-sign me-1 text-success"></i>Expected Amount: <strong id="dupAccountRevenueText" class="text-success">{{ currency_symbol() }}' + expAmt + '</strong></span>');
                                 $('#dupDealsContainer').html('<span><i class="feather-tag me-1 text-info"></i>Status: <strong id="dupAccountDealsText" class="text-dark">' + (res.lead ? (res.lead.status || 'New') : 'N/A') + '</strong></span>');
                                 $('#dupDateContainer').html('<span><i class="feather-calendar me-1 text-primary"></i>Created On: <strong id="dupAccountLastPurchaseText" class="text-dark">' + createdAt + '</strong></span>');
 
@@ -907,7 +907,7 @@
                         </div>
                         <div class="row g-2 fs-12 text-muted mt-1">
                             <div class="col-6" id="dupRevenueContainer">
-                                <span><i class="feather-dollar-sign me-1 text-success"></i>Revenue: <strong id="dupAccountRevenueText" class="text-success">₹0.00</strong></span>
+                                <span><i class="feather-dollar-sign me-1 text-success"></i>Revenue: <strong id="dupAccountRevenueText" class="text-success">{{ currency_symbol() }}0.00</strong></span>
                             </div>
                             <div class="col-6" id="dupDealsContainer">
                                 <span><i class="feather-layers me-1 text-info"></i>Active: <strong id="dupAccountDealsText" class="text-dark">0 Deals</strong></span>

@@ -29,20 +29,20 @@
                         <h6 class="fw-bold text-dark mb-0">
                             <i class="feather-info text-info me-1.5"></i>{{ __('purchase.po_advance_payment_summary') }}
                         </h6>
-                        <span class="badge bg-success text-white px-2.5 py-1 fs-11 fw-bold">₹{{ number_format($totalAdvancePaid, 2) }} {{ __('purchase.advance_available') }}</span>
+                        <span class="badge bg-success text-white px-2.5 py-1 fs-11 fw-bold">{{ currency_symbol() }}{{ number_format($totalAdvancePaid, 2) }} {{ __('purchase.advance_available') }}</span>
                     </div>
                     <div class="row g-2 text-dark fs-13">
                         <div class="col-md-4">
                             <span class="text-muted d-block fs-11 text-uppercase fw-bold">{{ __('purchase.total_bill_due') }}</span>
-                            <strong class="font-monospace text-dark fs-14">₹{{ number_format($selectedBill->due_amount, 2) }}</strong>
+                            <strong class="font-monospace text-dark fs-14">{{ currency_symbol() }}{{ number_format($selectedBill->due_amount, 2) }}</strong>
                         </div>
                         <div class="col-md-4">
                             <span class="text-muted d-block fs-11 text-uppercase fw-bold text-success">{{ __('purchase.po_advance_paid') }}</span>
-                            <strong class="font-monospace text-success fs-14">- ₹{{ number_format($totalAdvancePaid, 2) }}</strong>
+                            <strong class="font-monospace text-success fs-14">- {{ currency_symbol() }}{{ number_format($totalAdvancePaid, 2) }}</strong>
                         </div>
                         <div class="col-md-4">
                             <span class="text-muted d-block fs-11 text-uppercase fw-bold text-primary">{{ __('purchase.suggested_net_bank_out') }}</span>
-                            <strong class="font-monospace text-primary fs-15">₹{{ number_format($suggestedNetPayable, 2) }}</strong>
+                            <strong class="font-monospace text-primary fs-15">{{ currency_symbol() }}{{ number_format($suggestedNetPayable, 2) }}</strong>
                         </div>
                     </div>
                 </div>
@@ -72,7 +72,7 @@
                 </div>
 
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('purchase.net_bank_outflow') }} (₹)" name="amount" :value="old('amount', ($totalAdvancePaid > 0 ? $suggestedNetPayable : $selectedBill?->due_amount))" step="0.01" min="0.01" required="true" placeholder="{{ __('purchase.amount_placeholder') }}" :errorText="$errors->first('amount')" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('purchase.net_bank_outflow') }} ({{ currency_symbol() }})" name="amount" :value="old('amount', ($totalAdvancePaid > 0 ? $suggestedNetPayable : $selectedBill?->due_amount))" step="0.01" min="0.01" required="true" placeholder="{{ __('purchase.amount_placeholder') }}" :errorText="$errors->first('amount')" />
                 </div>
 
                 <div class="col-md-4">
@@ -104,7 +104,7 @@
                                 <th>{{ __('purchase.invoice_date') }}</th>
                                 <th class="text-end">{{ __('purchase.grand_total') }}</th>
                                 <th class="text-end">{{ __('purchase.outstanding_due') }}</th>
-                                <th class="text-end pe-3" style="width: 200px;">{{ __('purchase.allocated_amount') }} (₹)</th>
+                                <th class="text-end pe-3" style="width: 200px;">{{ __('purchase.allocated_amount') }} ({{ currency_symbol() }})</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -114,8 +114,8 @@
                                     {{ $selectedBill->bill_number }}
                                 </td>
                                 <td>{{ $selectedBill->bill_date ? $selectedBill->bill_date->format('d-M-Y') : '—' }}</td>
-                                <td class="text-end font-monospace">₹{{ number_format($selectedBill->grand_total, 2) }}</td>
-                                <td class="text-end font-monospace text-danger fw-bold">₹{{ number_format($selectedBill->due_amount, 2) }}</td>
+                                <td class="text-end font-monospace">{{ currency_symbol() }}{{ number_format($selectedBill->grand_total, 2) }}</td>
+                                <td class="text-end font-monospace text-danger fw-bold">{{ currency_symbol() }}{{ number_format($selectedBill->due_amount, 2) }}</td>
                                 <td class="text-end pe-3">
                                     <input type="number" name="allocations[0][allocated_amount]" class="form-control form-control-sm text-end font-monospace fw-bold text-success" value="{{ ($totalAdvancePaid > 0 ? $suggestedNetPayable : $selectedBill->due_amount) }}" step="0.01" min="0.01" max="{{ $selectedBill->due_amount }}" required>
                                 </td>
