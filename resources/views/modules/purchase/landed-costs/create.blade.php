@@ -83,7 +83,7 @@
 
                     <x-ui.odoo-form-ui type="input" label="Posting Date" name="posting_date_dummy" value="[Auto-set on Post]" readonly="true" />
 
-                    <x-ui.odoo-form-ui type="input" label="Total Expenses" name="total_expenses_dummy" id="totalExpensesDisplay" value="₹0.00" readonly="true" class="fw-bold text-primary font-monospace fs-14" />
+                    <x-ui.odoo-form-ui type="input" label="Total Expenses" name="total_expenses_dummy" id="totalExpensesDisplay" value="{{ currency_symbol() }}0.00" readonly="true" class="fw-bold text-primary font-monospace fs-14" />
                 </div>
             </div>
 
@@ -99,7 +99,7 @@
                             <tr>
                                 <th style="width: 20%">Expense Head <span class="text-danger">*</span></th>
                                 <th style="width: 22%">Vendor / Transporter</th>
-                                <th style="width: 15%" class="text-end">Base Amount (₹) <span class="text-danger">*</span></th>
+                                <th style="width: 15%" class="text-end">Base Amount ({{ currency_symbol() }}) <span class="text-danger">*</span></th>
                                 <th style="width: 13%">GST Rate (%)</th>
                                 <th style="width: 15%">Tax Mechanism</th>
                                 <th style="width: 10%">Allocation Basis</th>
@@ -380,7 +380,7 @@
                     totalPayable += linePayable;
                 });
 
-                $('#totalExpensesDisplay').val('₹' + totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                $('#totalExpensesDisplay').val('{{ currency_symbol() }}' + totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
                 renderPreviewTable(totalExpenses);
             }
@@ -438,9 +438,9 @@
                                 <small class="text-muted font-monospace">SKU: ${item.sku}</small>
                             </td>
                             <td class="text-center fw-semibold">${item.received_qty} ${item.uom}</td>
-                            <td class="text-end font-monospace">₹${item.unit_rate.toFixed(2)}</td>
-                            <td class="text-end font-monospace text-primary fw-bold">+ ₹${allocated.toFixed(2)}</td>
-                            <td class="text-end font-monospace text-success fw-bold">₹${newLandedUnitCost.toFixed(2)} / ${item.uom}</td>
+                            <td class="text-end font-monospace">{{ currency_symbol() }}${item.unit_rate.toFixed(2)}</td>
+                            <td class="text-end font-monospace text-primary fw-bold">+ {{ currency_symbol() }}${allocated.toFixed(2)}</td>
+                            <td class="text-end font-monospace text-success fw-bold">{{ currency_symbol() }}${newLandedUnitCost.toFixed(2)} / ${item.uom}</td>
                         </tr>
                     `;
                     $tbody.append(rowHtml);

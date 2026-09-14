@@ -677,7 +677,7 @@
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
                                         <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Estimated Deal Value</span>
-                                        <span class="fs-14 fw-extrabold text-dark d-block">₹{{ number_format($deal->estimated_value, 2) }}</span>
+                                        <span class="fs-14 fw-extrabold text-dark d-block">{{ currency_symbol() }}{{ number_format($deal->estimated_value, 2) }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -688,7 +688,7 @@
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
                                         <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Expected Revenue</span>
-                                        <span class="fs-14 fw-extrabold text-primary d-block">₹{{ number_format($expectedRevenue, 2) }} <span class="fs-10 text-muted">({{ $deal->probability }}%)</span></span>
+                                        <span class="fs-14 fw-extrabold text-primary d-block">{{ currency_symbol() }}{{ number_format($expectedRevenue, 2) }} <span class="fs-10 text-muted">({{ $deal->probability }}%)</span></span>
                                     </div>
                                 </div>
                             </div>
@@ -859,12 +859,12 @@
 
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">Estimated Revenue</div>
-                                            <div class="zoho-field-value text-dark fw-bold">₹{{ number_format($deal->estimated_value, 2) }}</div>
+                                            <div class="zoho-field-value text-dark fw-bold">{{ currency_symbol() }}{{ number_format($deal->estimated_value, 2) }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">Actual Realized Revenue</div>
-                                            <div class="zoho-field-value text-success fw-bold">₹{{ number_format($deal->actual_value, 2) }}</div>
+                                            <div class="zoho-field-value text-success fw-bold">{{ currency_symbol() }}{{ number_format($deal->actual_value, 2) }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
@@ -924,8 +924,8 @@
                                                         <th>Product / Item Name</th>
                                                         <th>SKU</th>
                                                         <th class="text-center">Quantity</th>
-                                                        <th class="text-end">Unit Price (₹)</th>
-                                                        <th class="text-end">Total Estimated Value (₹)</th>
+                                                        <th class="text-end">Unit Price ({{ currency_symbol() }})</th>
+                                                        <th class="text-end">Total Estimated Value ({{ currency_symbol() }})</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -945,8 +945,8 @@
                                                             </td>
                                                             <td class="font-monospace text-muted">{{ $pObj->sku }}</td>
                                                             <td class="text-center fw-bold text-primary">{{ number_format($pQty, 0) }} {{ $pObj->uom?->code ?? 'Pcs' }}</td>
-                                                            <td class="text-end">₹{{ number_format($pPrice, 2) }}</td>
-                                                            <td class="text-end fw-bold text-success">₹{{ number_format($lineVal, 2) }}</td>
+                                                            <td class="text-end">{{ currency_symbol() }}{{ number_format($pPrice, 2) }}</td>
+                                                            <td class="text-end fw-bold text-success">{{ currency_symbol() }}{{ number_format($lineVal, 2) }}</td>
                                                         </tr>
                                                     @endforeach
                                                 </tbody>
@@ -954,7 +954,7 @@
                                                     <tfoot class="table-light fw-bold">
                                                         <tr>
                                                             <td colspan="4" class="text-end text-uppercase fs-12">Total Deal Product Value:</td>
-                                                            <td class="text-end text-success fs-14">₹{{ number_format($grandProductTotal, 2) }}</td>
+                                                            <td class="text-end text-success fs-14">{{ currency_symbol() }}{{ number_format($grandProductTotal, 2) }}</td>
                                                         </tr>
                                                     </tfoot>
                                                 @endif
@@ -1230,7 +1230,7 @@
                                                         <tr>
                                                             <th style="width: 38%;">Product Description</th>
                                                             <th class="text-end" style="width: 10%;">Qty</th>
-                                                            <th class="text-end" style="width: 18%;">Unit Price (₹)</th>
+                                                            <th class="text-end" style="width: 18%;">Unit Price ({{ currency_symbol() }})</th>
                                                             <th class="text-end" style="width: 12%;">Taxes (%)</th>
                                                             <th class="text-end pe-3" style="width: 17%;">Amount</th>
                                                             <th class="text-center" style="width: 5%;"></th>
@@ -1259,11 +1259,11 @@
                                             <div class="col-md-4">
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">Subtotal:</span>
-                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                    <span class="fw-bold text-dark" id="calcSubtotal">{{ currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">Taxes:</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">{{ currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                                     <span class="text-muted fw-semibold me-2">Discount:</span>
@@ -1271,7 +1271,7 @@
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">Grand Total:</span>
-                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                    <span class="fw-extrabold text-primary" id="calcTotal">{{ currency_symbol() }}0.00</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1337,7 +1337,7 @@
                                                         <tr>
                                                             <th style="width: 38%;">Product Description</th>
                                                             <th class="text-end" style="width: 10%;">Qty</th>
-                                                            <th class="text-end" style="width: 18%;">Unit Price (₹)</th>
+                                                            <th class="text-end" style="width: 18%;">Unit Price ({{ currency_symbol() }})</th>
                                                             <th class="text-end" style="width: 12%;">Taxes (%)</th>
                                                             <th class="text-end pe-3" style="width: 17%;">Amount</th>
                                                             <th class="text-center" style="width: 5%;"></th>
@@ -1366,11 +1366,11 @@
                                             <div class="col-md-4">
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">Subtotal:</span>
-                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                    <span class="fw-bold text-dark" id="calcSubtotal">{{ currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">Taxes:</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">{{ currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                                     <span class="text-muted fw-semibold me-2">Discount:</span>
@@ -1378,7 +1378,7 @@
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">Grand Total:</span>
-                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                    <span class="fw-extrabold text-primary" id="calcTotal">{{ currency_symbol() }}0.00</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1577,9 +1577,9 @@
                                                     <th>#</th>
                                                     <th>Product Description</th>
                                                     <th class="text-end">Qty</th>
-                                                    <th class="text-end">Unit Price (₹)</th>
+                                                    <th class="text-end">Unit Price ({{ currency_symbol() }})</th>
                                                     <th class="text-end">Tax (%)</th>
-                                                    <th class="text-end">Amount (₹)</th>
+                                                    <th class="text-end">Amount ({{ currency_symbol() }})</th>
                                                 </tr>
                                             </thead>
                                             <tbody class="fs-13 text-dark">
@@ -1593,9 +1593,9 @@
                                                             @endif
                                                         </td>
                                                         <td class="text-end font-monospace fw-bold">{{ $item->quantity }}</td>
-                                                        <td class="text-end font-monospace">₹{{ number_format($item->unit_price, 2) }}</td>
+                                                        <td class="text-end font-monospace">{{ currency_symbol() }}{{ number_format($item->unit_price, 2) }}</td>
                                                         <td class="text-end font-monospace">{{ $item->tax_rate }}%</td>
-                                                        <td class="text-end font-monospace fw-bold text-success">₹{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
+                                                        <td class="text-end font-monospace fw-bold text-success">{{ currency_symbol() }}{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
                                                     </tr>
                                                 @empty
                                                     <tr>
@@ -1619,15 +1619,15 @@
                                         <div class="col-md-5">
                                             <div class="d-flex justify-content-between py-1 border-bottom">
                                                 <span class="text-muted">Subtotal:</span>
-                                                <span class="fw-bold">₹{{ number_format($activeQuotation->subtotal ?? 0, 2) }}</span>
+                                                <span class="fw-bold">{{ currency_symbol() }}{{ number_format($activeQuotation->subtotal ?? 0, 2) }}</span>
                                             </div>
                                             <div class="d-flex justify-content-between py-1 border-bottom">
                                                 <span class="text-muted">Tax Amount:</span>
-                                                <span class="fw-bold">₹{{ number_format($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0, 2) }}</span>
+                                                <span class="fw-bold">{{ currency_symbol() }}{{ number_format($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0, 2) }}</span>
                                             </div>
                                             <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1">
                                                 <span class="fw-bold text-dark">Grand Total:</span>
-                                                <span class="fw-extrabold text-primary">₹{{ number_format($activeQuotation->total_amount, 2) }}</span>
+                                                <span class="fw-extrabold text-primary">{{ currency_symbol() }}{{ number_format($activeQuotation->total_amount, 2) }}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1676,7 +1676,7 @@
                                                         <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $rev->id]) }}" class="fw-bold text-dark text-decoration-none">
                                                             {{ $rev->quotation_number }}
                                                         </a>
-                                                        <span class="text-muted mt-0.5" style="font-size: 9px;">₹{{ number_format($rev->total_amount, 2) }}</span>
+                                                        <span class="text-muted mt-0.5" style="font-size: 9px;">{{ currency_symbol() }}{{ number_format($rev->total_amount, 2) }}</span>
                                                     </div>
                                                 </div>
                                             @endforeach
@@ -1717,7 +1717,7 @@
                                                     <th>Sales Order #</th>
                                                     <th>Order Date</th>
                                                     <th>Customer Name</th>
-                                                    <th>Total Amount (₹)</th>
+                                                    <th>Total Amount ({{ currency_symbol() }})</th>
                                                     <th>Order Status</th>
                                                     <th class="text-end pe-3">Action</th>
                                                 </tr>
@@ -1728,7 +1728,7 @@
                                                         <td class="font-monospace fw-bold text-primary">{{ $so->order_number }}</td>
                                                         <td>{{ $so->order_date ? \Illuminate\Support\Carbon::parse($so->order_date)->format('d/m/Y') : '—' }}</td>
                                                         <td class="fw-bold text-dark">{{ $so->customer_name }}</td>
-                                                        <td class="fw-bold text-success font-monospace">₹{{ number_format($so->total_amount, 2) }}</td>
+                                                        <td class="fw-bold text-success font-monospace">{{ currency_symbol() }}{{ number_format($so->total_amount, 2) }}</td>
                                                         <td>
                                                             <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold">
                                                                 {{ $so->status }}
@@ -2397,7 +2397,7 @@
                             <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
                         </td>
                         <td class="text-end fw-bold text-dark amount-display pe-3" style="font-size: 13px; padding-top: 8px;">
-                            ₹0.00
+                            {{ currency_symbol() }}0.00
                         </td>
                         <td class="text-center" style="padding-top: 6px;">
                             <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn">
@@ -2489,15 +2489,15 @@
                     subtotal += amount;
                     taxTotal += tax;
 
-                    $(this).find('.amount-display').text('₹' + amount.toFixed(2));
+                    $(this).find('.amount-display').text('{{ currency_symbol() }}' + amount.toFixed(2));
                 });
 
                 const discount = parseFloat($('#discountInput').val()) || 0;
                 const grandTotal = subtotal + taxTotal - discount;
 
-                $('#calcSubtotal').text('₹' + subtotal.toFixed(2));
-                $('#calcTax').text('₹' + taxTotal.toFixed(2));
-                $('#calcTotal').text('₹' + Math.max(0, grandTotal).toFixed(2));
+                $('#calcSubtotal').text('{{ currency_symbol() }}' + subtotal.toFixed(2));
+                $('#calcTax').text('{{ currency_symbol() }}' + taxTotal.toFixed(2));
+                $('#calcTotal').text('{{ currency_symbol() }}' + Math.max(0, grandTotal).toFixed(2));
             }
 
             $('#addItemRow').on('click', function() { addRow(); });

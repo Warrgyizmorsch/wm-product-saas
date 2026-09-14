@@ -171,7 +171,7 @@
                                 </span>
                             </td>
                             <td class="text-end font-monospace fw-bold text-dark fs-12">
-                                ₹{{ number_format((float) $dispatch->freight_amount, 2) }}
+                                {{ currency_symbol() }}{{ number_format((float) $dispatch->freight_amount, 2) }}
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-soft-warning text-warning border border-warning-subtle px-2 py-0.5 fw-bold fs-11">

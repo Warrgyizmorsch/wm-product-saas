@@ -217,7 +217,7 @@
                         </span>
                     </div>
                     <div class="fs-11 text-muted fw-semibold mt-1">
-                        Total Value: <span class="text-dark font-monospace col-total">₹ {{ number_format($columnData['total_amount'], 2) }}</span>
+                        Total Value: <span class="text-dark font-monospace col-total">{{ currency_symbol() }} {{ number_format($columnData['total_amount'], 2) }}</span>
                     </div>
                 </div>
 
@@ -244,7 +244,7 @@
                                     {{ $lead->company_name }}
                                 </a>
                                 <span class="badge bg-soft-success text-success fs-10 font-monospace fw-bold">
-                                    ₹ {{ number_format($expAmt, 0) }}
+                                    {{ currency_symbol() }} {{ number_format($expAmt, 0) }}
                                 </span>
                             </div>
 
@@ -526,7 +526,7 @@
                 });
 
                 if (countBadge) countBadge.textContent = cards.length;
-                if (totalSpan) totalSpan.textContent = '₹ ' + totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                if (totalSpan) totalSpan.textContent = '{{ currency_symbol() }} ' + totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             });
         }
     });

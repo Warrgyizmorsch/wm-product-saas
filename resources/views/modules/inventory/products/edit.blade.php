@@ -192,7 +192,7 @@
                         <div class="col-lg-6">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-dollar-sign me-2"></i>{{ __('inventory.sales_purchase_info') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" value="{{ $product->selling_price }}" inputType="number" step="0.01" placeholder="Selling Price (₹)" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" value="{{ $product->selling_price }}" inputType="number" step="0.01" placeholder="Selling Price ({{ currency_symbol() }})" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" required="true">
                                 <option value="" disabled {{ empty($product->sales_account) ? 'selected' : '' }}>Select Sales Account</option>
@@ -207,7 +207,7 @@
                                 @endforelse
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" value="{{ $product->cost_price }}" inputType="number" step="0.01" placeholder="Purchase Cost (₹)" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" value="{{ $product->cost_price }}" inputType="number" step="0.01" placeholder="Purchase Cost ({{ currency_symbol() }})" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" required="true">
                                 <option value="" disabled {{ empty($product->purchase_account) ? 'selected' : '' }}>Select Purchase Account</option>
@@ -334,7 +334,7 @@
                                             <th>Warehouse Code</th>
                                             <th>Warehouse Name</th>
                                             <th>Quantity on Hand</th>
-                                            <th>Unit Cost (₹)</th>
+                                            <th>Unit Cost ({{ currency_symbol() }})</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -430,8 +430,8 @@
                                         <tr>
                                             <th>Variant Details</th>
                                             <th>SKU *</th>
-                                            <th>Selling Price (₹)</th>
-                                            <th>Cost Price (₹)</th>
+                                            <th>Selling Price ({{ currency_symbol() }})</th>
+                                            <th>Cost Price ({{ currency_symbol() }})</th>
                                             <th>Opening Stock</th>
                                             <th>Reorder Point</th>
                                         </tr>

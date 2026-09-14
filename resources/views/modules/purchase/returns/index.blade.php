@@ -44,7 +44,7 @@
                                             ? $ret->total_refund_amount
                                             : ($ret->total_amount > 0 ? $ret->total_amount : $ret->items->sum(fn($i) => (float)$i->quantity * (float)$i->unit_price));
                                     @endphp
-                                    ₹{{ number_format($retTotal, 2) }}
+                                    {{ currency_symbol() }}{{ number_format($retTotal, 2) }}
                                 </td>
                                 <td>
                                     @php

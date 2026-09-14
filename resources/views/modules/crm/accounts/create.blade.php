@@ -45,7 +45,7 @@
 
                         <x-ui.odoo-form-ui type="input" label="Industry Type" name="industry_type" :value="old('industry_type')" placeholder="e.g. Construction / Infrastructure" />
 
-                        <x-ui.odoo-form-ui type="input" inputType="number" label="Credit Limit (₹)" name="credit_limit" :value="old('credit_limit', '0.00')" step="0.01" placeholder="0.00" />
+                        <x-ui.odoo-form-ui type="input" inputType="number" label="Credit Limit ({{ currency_symbol() }})" name="credit_limit" :value="old('credit_limit', '0.00')" step="0.01" placeholder="0.00" />
 
                         <x-ui.odoo-form-ui type="select" label="Account Manager / Owner" name="owner_id">
                             <option value="">Select Account Manager...</option>

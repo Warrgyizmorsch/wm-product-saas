@@ -28,7 +28,7 @@ class ExchangeRateSyncTest extends TestCase
 
     private function tenantWithCompany(string $slug, string $baseCurrency): Tenant
     {
-        $tenant = Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'status' => 'active', 'plan' => 'enterprise']);
+        $tenant = Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'status' => 'active', 'plan' => 'enterprise', 'currency' => $baseCurrency]);
 
         app(TenantContext::class)->set($tenant);
         Company::create(['company_name' => ucfirst($slug) . ' Ltd', 'currency' => $baseCurrency]);

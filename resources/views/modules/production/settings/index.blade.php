@@ -88,10 +88,10 @@
 
                         <!-- Auto Approval Limit Field -->
                         <div class="mb-4 pt-3 border-top" id="limitContainer">
-                            <label for="subcontract_auto_approval_limit" class="form-label fw-semibold text-dark fs-13">Subcontract Auto Approval Limit (₹ / Currency)</label>
+                            <label for="subcontract_auto_approval_limit" class="form-label fw-semibold text-dark fs-13">Subcontract Auto Approval Limit ({{ currency_symbol() }} / Currency)</label>
                             <p class="text-muted fs-12 mb-2">If an auto-approved subcontract PO total cost exceeds this threshold, the system automatically falls back to <strong>Draft PO</strong> for manual purchase review.</p>
                             <div class="input-group input-group-sm" style="max-width: 300px;">
-                                <span class="input-group-text bg-light fw-bold text-muted">₹</span>
+                                <span class="input-group-text bg-light fw-bold text-muted">{{ currency_symbol() }}</span>
                                 <input type="number" step="0.01" min="0" name="subcontract_auto_approval_limit" id="subcontract_auto_approval_limit" class="form-control font-monospace" value="{{ old('subcontract_auto_approval_limit', $autoApprovalLimit) }}">
                             </div>
                         </div>

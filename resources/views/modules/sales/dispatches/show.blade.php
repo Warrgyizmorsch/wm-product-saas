@@ -123,7 +123,7 @@
                         <div class="hstack gap-1.5 flex-wrap">
                             <span class="badge {{ $termClass }} border fs-11 fw-semibold">{{ $dispatch->freight_terms ?: 'To Be Billed' }}</span>
                             @if($dispatch->freight_amount > 0)
-                                <span class="fw-bold text-dark fs-12">₹{{ number_format($dispatch->freight_amount, 2) }}</span>
+                                <span class="fw-bold text-dark fs-12">{{ currency_symbol() }}{{ number_format($dispatch->freight_amount, 2) }}</span>
                             @endif
                         </div>
                         @if($dispatch->lr_number)
@@ -143,12 +143,12 @@
                                 <div class="fs-11 text-muted">
                                     <div class="d-flex justify-content-between">
                                         <span>Billed Amt:</span>
-                                        <strong class="text-dark">₹{{ number_format($actualAmt, 2) }}</strong>
+                                        <strong class="text-dark">{{ currency_symbol() }}{{ number_format($actualAmt, 2) }}</strong>
                                     </div>
                                     @if(abs($variance) > 0.01)
                                         <div class="d-flex justify-content-between {{ $variance > 0 ? 'text-danger' : 'text-success' }}">
                                             <span>Variance:</span>
-                                            <strong>{{ $variance > 0 ? '+' : '' }}₹{{ number_format($variance, 2) }}</strong>
+                                            <strong>{{ $variance > 0 ? '+' : '' }}{{ currency_symbol() }}{{ number_format($variance, 2) }}</strong>
                                         </div>
                                     @endif
                                 </div>
@@ -371,7 +371,7 @@
                     </select>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold fs-12 text-dark">Freight Amount (₹)</label>
+                    <label class="form-label fw-semibold fs-12 text-dark">Freight Amount ({{ currency_symbol() }})</label>
                     <input type="number" name="freight_amount" class="form-control form-control-sm text-end fw-bold" value="{{ old('freight_amount', (float)$dispatch->freight_amount) }}" min="0" step="0.01">
                 </div>
             </div>

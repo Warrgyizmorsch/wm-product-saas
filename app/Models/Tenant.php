@@ -50,6 +50,7 @@ class Tenant extends Model
         'archived_at',
         'timezone',
         'locale',
+        'currency',
         'settings',
     ];
 

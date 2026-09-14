@@ -3,22 +3,20 @@
 namespace App\Domains\Accounting\Services;
 
 use App\Domains\Accounting\Repositories\ExchangeRateRepositoryInterface;
-use App\Domains\HRMS\Models\Company;
 use App\Models\Currency;
+use App\Models\Tenant;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
 
 /**
  * Base-currency resolution and exchange-rate conversion for the ledger.
  *
- * The base (functional) currency is per company — companies.currency — so a tenant
- * can run legal entities that report in different currencies. This is separate
- * from the session display currency in app/helpers.php (active_currency(),
- * convert_to_base()), which must never be applied to journal amounts.
+ * Each tenant has exactly one base currency (tenants.currency); every company in
+ * the tenant reports in it and every stored amount is in it.
  */
 class CurrencyService
 {
-    /** Matches the default TenantService and the companies.currency column use. */
+    /** Default for tenants created without an explicit currency. */
     public const FALLBACK_BASE_CURRENCY = 'INR';
 
     /** @var array<string, int> */
@@ -29,22 +27,23 @@ class CurrencyService
     ) {
     }
 
-    public function baseCurrencyFor(?int $companyId = null): string
+    /**
+     * The tenant's currency — the current tenant when none is given. Pass the id
+     * explicitly from queue workers and listeners, where there is no TenantContext.
+     */
+    public function baseCurrencyForTenant(?int $tenantId = null): string
     {
-        $companyId ??= company_id();
+        $tenantId ??= tenant_id();
 
-        if ($companyId !== null) {
-            // withoutGlobalScopes: callable from queue workers with no TenantContext.
-            $code = Company::withoutGlobalScopes()->whereKey($companyId)->value('currency');
+        if ($tenantId !== null) {
+            $code = Tenant::query()->whereKey($tenantId)->value('currency');
 
             if ($code) {
                 return strtoupper($code);
             }
         }
 
-        $tenantCode = tenant()?->settings['currency'] ?? null;
-
-        return $tenantCode ? strtoupper($tenantCode) : self::FALLBACK_BASE_CURRENCY;
+        return self::FALLBACK_BASE_CURRENCY;
     }
 
     /**

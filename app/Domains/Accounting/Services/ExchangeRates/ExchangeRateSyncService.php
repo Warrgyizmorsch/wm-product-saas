@@ -5,7 +5,6 @@ namespace App\Domains\Accounting\Services\ExchangeRates;
 use App\Domains\Accounting\Models\ExchangeRate;
 use App\Domains\Accounting\Models\ExchangeRateSyncSetting;
 use App\Domains\Accounting\Services\CurrencyService;
-use App\Domains\HRMS\Models\Company;
 use Illuminate\Support\Carbon;
 use Throwable;
 
@@ -13,8 +12,8 @@ use Throwable;
  * Pulls market rates from the configured provider into a tenant's exchange_rates.
  *
  * Rules:
- * - Rates are stored foreign → base ("1 GBP = 2.28 BGN") for every base currency
- *   used by the tenant's companies. CurrencyService::rate() resolves the inverse.
+ * - Rates are stored foreign → base ("1 GBP = 112.4 INR") against the tenant's
+ *   currency. CurrencyService::rate() resolves the inverse.
  * - The provider's publication date is the effective date, so no weekend or
  *   holiday rows are invented.
  * - Manual rates win: a row a user entered (source=manual) is never overwritten;
@@ -27,6 +26,7 @@ class ExchangeRateSyncService
 {
     public function __construct(
         private readonly ExchangeRateProvider $provider,
+        private readonly CurrencyService $currencies,
     ) {
     }
 
@@ -143,23 +143,14 @@ class ExchangeRateSyncService
     }
 
     /**
-     * Distinct base currencies across the tenant's companies.
+     * The tenant's base currency, as a list so a future multi-base setup needs no
+     * caller changes.
      *
      * @return array<int, string>
      */
     public function baseCurrenciesFor(int $tenantId): array
     {
-        $codes = Company::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
-            ->pluck('currency')
-            ->filter()
-            ->map(fn ($code) => strtoupper((string) $code))
-            ->unique()
-            ->values()
-            ->all();
-
-        return $codes !== [] ? $codes : [CurrencyService::FALLBACK_BASE_CURRENCY];
+        return [$this->currencies->baseCurrencyForTenant($tenantId)];
     }
 
     /**

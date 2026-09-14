@@ -47,17 +47,17 @@
             <a href="{{ request()->fullUrlWithQuery(['item_category' => 'all', 'page' => 1]) }}" 
                class="ledger-tab-link {{ request('item_category', 'all') === 'all' ? 'active' : '' }}">
                 <i class="feather-pie-chart fs-15 text-primary"></i>
-                <span>All Items Valuation (₹{{ number_format($totalValuation, 0) }})</span>
+                <span>All Items Valuation ({{ currency_symbol() }}{{ number_format($totalValuation, 0) }})</span>
             </a>
             <a href="{{ request()->fullUrlWithQuery(['item_category' => 'fg', 'page' => 1]) }}" 
                class="ledger-tab-link {{ request('item_category') === 'fg' ? 'active' : '' }}">
                 <i class="feather-package fs-15 text-success"></i>
-                <span>Finished Goods (FG) Valuation (₹{{ number_format($fgValuation, 0) }})</span>
+                <span>Finished Goods (FG) Valuation ({{ currency_symbol() }}{{ number_format($fgValuation, 0) }})</span>
             </a>
             <a href="{{ request()->fullUrlWithQuery(['item_category' => 'rm', 'page' => 1]) }}" 
                class="ledger-tab-link {{ request('item_category') === 'rm' ? 'active' : '' }}">
                 <i class="feather-layers fs-15 text-info"></i>
-                <span>Raw Materials & Components (₹{{ number_format($rmValuation, 0) }})</span>
+                <span>Raw Materials & Components ({{ currency_symbol() }}{{ number_format($rmValuation, 0) }})</span>
             </a>
         </div>
     </div>
@@ -71,7 +71,7 @@
                 </div>
                 <div class="overflow-hidden flex-grow-1">
                     <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="TOTAL STOCK VALUATION">TOTAL STOCK VALUATION</span>
-                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="₹{{ number_format($totalValuation, 2) }}">₹{{ number_format($totalValuation, 2) }}</div>
+                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="{{ currency_symbol() }}{{ number_format($totalValuation, 2) }}">{{ currency_symbol() }}{{ number_format($totalValuation, 2) }}</div>
                     <span class="fs-11 text-muted d-block text-truncate mt-0.5">Total physical asset value</span>
                 </div>
             </div>
@@ -84,7 +84,7 @@
                 </div>
                 <div class="overflow-hidden flex-grow-1">
                     <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="FINISHED GOODS VALUATION">FINISHED GOODS VALUATION</span>
-                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="₹{{ number_format($fgValuation, 2) }}">₹{{ number_format($fgValuation, 2) }}</div>
+                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="{{ currency_symbol() }}{{ number_format($fgValuation, 2) }}">{{ currency_symbol() }}{{ number_format($fgValuation, 2) }}</div>
                     <span class="fs-11 text-muted d-block text-truncate mt-0.5">Finished stock ({{ number_format($fgQty, 2) }} Units)</span>
                 </div>
             </div>
@@ -97,7 +97,7 @@
                 </div>
                 <div class="overflow-hidden flex-grow-1">
                     <span class="fs-11 fw-bold text-uppercase text-muted d-block text-truncate mb-1" title="RAW MATERIALS VALUATION">RAW MATERIALS VALUATION</span>
-                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="₹{{ number_format($rmValuation, 2) }}">₹{{ number_format($rmValuation, 2) }}</div>
+                    <div class="fs-16 fw-bold text-dark text-nowrap text-truncate" title="{{ currency_symbol() }}{{ number_format($rmValuation, 2) }}">{{ currency_symbol() }}{{ number_format($rmValuation, 2) }}</div>
                     <span class="fs-11 text-muted d-block text-truncate mt-0.5">Raw materials & WIP ({{ number_format($rmQty, 2) }} Units)</span>
                 </div>
             </div>
@@ -219,10 +219,10 @@
                                 {{ number_format($stock->quantity, 2) }}
                             </td>
                             <td class="text-end font-monospace text-muted fs-12">
-                                ₹{{ number_format($unitCost, 2) }}
+                                {{ currency_symbol() }}{{ number_format($unitCost, 2) }}
                             </td>
                             <td class="text-end pe-3 font-monospace fw-bold fs-13 text-primary">
-                                ₹{{ number_format($value, 2) }}
+                                {{ currency_symbol() }}{{ number_format($value, 2) }}
                             </td>
                         </tr>
                     @empty

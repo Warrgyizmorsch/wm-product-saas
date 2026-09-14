@@ -388,7 +388,7 @@ class VendorBillService
                     'source'         => Journal::SOURCE_PURCHASE,
                     'reference_type' => 'vendor_bill_advance_settlement',
                     'reference_id'   => $bill->id,
-                    'memo'           => "Advance Credit Adjustment of ₹{$appliedAmount} for Bill {$bill->bill_number}",
+                    'memo'           => "Advance Credit Adjustment of " . currency_symbol() . "{$appliedAmount} for Bill {$bill->bill_number}",
                     'posted_by'      => auth()->id() ?: 1,
                 ]);
             }

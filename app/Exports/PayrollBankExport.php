@@ -92,7 +92,7 @@ class PayrollBankExport implements FromArray, WithHeadings, WithTitle, ShouldAut
             'Account Number',
             'IFSC Code',
             'Bank Name',
-            'Amount (₹)',
+            'Amount (' . currency_symbol() . ')',
             'Remarks / Narration'
         ];
     }

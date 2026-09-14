@@ -977,13 +977,13 @@
                                                         {{-- Row 3: Limits --}}
                                                         <div class="row g-3 mb-3">
                                                             <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="number" label="Max Limit per Claim (₹)" name="max_limit_per_claim" id="expense_max_claim" placeholder="e.g. 500" step="0.01" min="0" />
+                                                                <x-ui.odoo-form-ui type="number" label="Max Limit per Claim ({{ currency_symbol() }})" name="max_limit_per_claim" id="expense_max_claim" placeholder="e.g. 500" step="0.01" min="0" />
                                                             </div>
                                                             <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="number" label="Max Monthly Limit (₹)" name="max_monthly_limit" id="expense_max_monthly" placeholder="e.g. 5000" step="0.01" min="0" />
+                                                                <x-ui.odoo-form-ui type="number" label="Max Monthly Limit ({{ currency_symbol() }})" name="max_monthly_limit" id="expense_max_monthly" placeholder="e.g. 5000" step="0.01" min="0" />
                                                             </div>
                                                             <div class="col-md-4 col-12">
-                                                                <x-ui.odoo-form-ui type="number" label="Receipt Required Above (₹)" name="receipt_required_threshold" id="expense_receipt_threshold" placeholder="e.g. 250" step="0.01" min="0" />
+                                                                <x-ui.odoo-form-ui type="number" label="Receipt Required Above ({{ currency_symbol() }})" name="receipt_required_threshold" id="expense_receipt_threshold" placeholder="e.g. 250" step="0.01" min="0" />
                                                             </div>
                                                         </div>
 
@@ -1020,9 +1020,9 @@
                                                                                 </td>
                                                                                 <td class="text-dark">{{ $policy->designation ? $policy->designation->name : 'All Grades' }}</td>
                                                                                 <td class="text-muted">{{ $policy->name }}</td>
-                                                                                <td>{{ $policy->max_limit_per_claim ? '₹' . number_format($policy->max_limit_per_claim, 2) : 'No Limit' }}</td>
-                                                                                <td>{{ $policy->max_monthly_limit ? '₹' . number_format($policy->max_monthly_limit, 2) : 'No Limit' }}</td>
-                                                                                <td>{{ $policy->receipt_required_threshold ? '₹' . number_format($policy->receipt_required_threshold, 2) : 'Always' }}</td>
+                                                                                <td>{{ $policy->max_limit_per_claim ? (currency_symbol()) . number_format($policy->max_limit_per_claim, 2) : 'No Limit' }}</td>
+                                                                                <td>{{ $policy->max_monthly_limit ? (currency_symbol()) . number_format($policy->max_monthly_limit, 2) : 'No Limit' }}</td>
+                                                                                <td>{{ $policy->receipt_required_threshold ? (currency_symbol()) . number_format($policy->receipt_required_threshold, 2) : 'Always' }}</td>
                                                                                 <td>
                                                                                     <x-ui.badge variant="{{ $policy->status ? 'success' : 'danger' }}" soft class="px-2 py-1">
                                                                                         {{ $policy->status ? 'Active' : 'Inactive' }}

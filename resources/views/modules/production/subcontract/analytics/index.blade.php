@@ -127,7 +127,7 @@
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <span class="fs-12 text-muted fw-bold text-uppercase d-block mb-1">WIP Value at Vendor</span>
-                        <h3 class="fw-bold text-dark mb-0 font-monospace">₹{{ number_format($overall['wip_value_at_vendor'], 2) }}</h3>
+                        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ currency_symbol() }}{{ number_format($overall['wip_value_at_vendor'], 2) }}</h3>
                         <div class="fs-12 text-muted font-monospace mt-1">
                             Qty: <strong>{{ number_format($overall['wip_quantity_at_vendor'], 2) }}</strong> units outside
                         </div>
