@@ -115,6 +115,13 @@ class QuotationController extends Controller
     {
         $this->authorize('create', Quotation::class);
 
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+
+        $statusRule = $approvalPolicy === 'auto_approve'
+            ? ['nullable', 'string']
+            : ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'];
+
         $validated = $request->validate([
             'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
             'crm_account_id'      => ['nullable', 'integer', 'exists:crm_accounts,id'],
@@ -124,7 +131,7 @@ class QuotationController extends Controller
             'quotation_date'      => ['required', 'date'],
             'expiry_date'         => ['nullable', 'date', 'after_or_equal:quotation_date'],
             'discount'            => ['nullable', 'numeric', 'min:0'],
-            'status'              => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
+            'status'              => $statusRule,
             'terms_conditions'    => ['nullable', 'string'],
             'notes'               => ['nullable', 'string'],
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
@@ -135,13 +142,10 @@ class QuotationController extends Controller
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
-        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
-
         if ($approvalPolicy === 'auto_approve') {
             $validated['status'] = 'Approved';
         } else {
-            if (in_array($validated['status'], ['Quotation Sent', 'Accepted', 'Approved'])) {
+            if (in_array($validated['status'] ?? 'Draft', ['Quotation Sent', 'Accepted', 'Approved'])) {
                 return back()->withErrors(['status' => 'A new quotation must start as Draft or Pending Approval.'])->withInput();
             }
         }
@@ -310,6 +314,13 @@ class QuotationController extends Controller
             return redirect()->back()->with('error', 'Accepted quotations cannot be edited.');
         }
 
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+
+        $statusRule = $approvalPolicy === 'auto_approve'
+            ? ['nullable', 'string']
+            : ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'];
+
         $validated = $request->validate([
             'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
             'crm_account_id'      => ['nullable', 'integer', 'exists:crm_accounts,id'],
@@ -319,7 +330,7 @@ class QuotationController extends Controller
             'quotation_date'      => ['required', 'date'],
             'expiry_date'         => ['nullable', 'date', 'after_or_equal:quotation_date'],
             'discount'            => ['nullable', 'numeric', 'min:0'],
-            'status'              => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
+            'status'              => $statusRule,
             'terms_conditions'    => ['nullable', 'string'],
             'notes'               => ['nullable', 'string'],
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
@@ -330,10 +341,7 @@ class QuotationController extends Controller
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
-        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
-
-        if ($approvalPolicy === 'auto_approve' && in_array($validated['status'], ['Draft', 'Pending Approval'])) {
+        if ($approvalPolicy === 'auto_approve') {
             $validated['status'] = 'Approved';
         }
 

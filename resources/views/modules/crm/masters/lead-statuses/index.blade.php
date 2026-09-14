@@ -139,12 +139,15 @@
                 @forelse($statuses as $index => $st)
                     @php
                         $isProtected = $st->isProtected();
+                        $presetBadgeVariants = ['primary', 'info', 'teal', 'success', 'warning', 'danger', 'secondary', 'dark'];
+                        $rawColor = str_replace(['bg-soft-', 'bg-', 'text-'], '', $st->color ?: '');
                         $badgeColor = match(strtolower($st->name)) {
                             'new' => 'primary',
                             'qualified' => 'teal',
+                            'converted' => 'info',
                             'won' => 'success',
                             'lost' => 'danger',
-                            default => str_replace('bg-', '', $st->color ?: 'primary'),
+                            default => (!empty($rawColor) && in_array($rawColor, $presetBadgeVariants, true) ? $rawColor : $presetBadgeVariants[abs($st->id ?? 0) % count($presetBadgeVariants)]),
                         };
                         $rowNum = ($statuses->currentPage() - 1) * $statuses->perPage() + $index + 1;
                     @endphp

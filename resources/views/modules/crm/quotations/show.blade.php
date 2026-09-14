@@ -633,12 +633,14 @@
 </x-ui.modal>
 
 <!-- RESULT NOTIFICATION MODAL (COMMON COMPONENT) -->
-<x-ui.modal id="waResultModal" title="<i class='feather-info me-1.5 text-primary'></i>System Notification" size="md" :centered="true" :showFooter="false">
-    <div class="p-3 text-center">
-        <div id="waResultIcon" class="mb-3"></div>
-        <h5 id="waResultTitle" class="fw-bold text-dark mb-2 fs-16"></h5>
-        <div id="waResultMessage" class="alert alert-light border text-start fs-12 mb-4 font-monospace p-3 text-break"></div>
-        <button type="button" class="btn btn-primary fw-bold px-4" data-bs-dismiss="modal">OK</button>
+<x-ui.modal id="waResultModal" title="<i class='feather-info me-1.5 text-primary'></i>System Notification" size="lg" :centered="true" :showFooter="false">
+    <div class="py-4 px-3 text-center">
+        <div id="waResultIcon" class="mb-3 d-flex justify-content-center"></div>
+        <h4 id="waResultTitle" class="fw-bold text-dark mb-3 fs-18"></h4>
+        <div id="waResultMessage" class="alert alert-light border text-center fs-13 mb-4 font-monospace p-3.5 text-break shadow-2xs rounded-3 mx-auto" style="max-width: 520px; background-color: #f8fafc; border-color: #e2e8f0 !important; color: #334155; line-height: 1.6;"></div>
+        <div class="d-flex justify-content-center mt-3">
+            <button type="button" class="btn btn-primary fw-bold px-5 py-2 fs-13 shadow-2xs rounded-3" data-bs-dismiss="modal" style="min-width: 140px;">OK</button>
+        </div>
     </div>
 </x-ui.modal>
 
@@ -646,11 +648,11 @@
 <script>
     function showNotificationModal(isSuccess, title, message) {
         const iconHtml = isSuccess 
-            ? '<div class="avatar avatar-lg bg-soft-success text-success rounded-circle mx-auto mb-2" style="width: 50px; height: 50px; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-check-circle fs-28"></i></div>'
-            : '<div class="avatar avatar-lg bg-soft-danger text-danger rounded-circle mx-auto mb-2" style="width: 50px; height: 50px; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-alert-triangle fs-28"></i></div>';
+            ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
+            : '<div class="avatar avatar-xl bg-soft-danger text-danger rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(239, 68, 68, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
         
         $('#waResultIcon').html(iconHtml);
-        $('#waResultTitle').text(title).attr('class', isSuccess ? 'fw-bold text-success mb-2 fs-16' : 'fw-bold text-danger mb-2 fs-16');
+        $('#waResultTitle').text(title).attr('class', isSuccess ? 'fw-bold text-success mb-2 fs-18' : 'fw-bold text-danger mb-2 fs-18');
         $('#waResultMessage').text(message);
         
         const modalEl = document.getElementById('waResultModal');

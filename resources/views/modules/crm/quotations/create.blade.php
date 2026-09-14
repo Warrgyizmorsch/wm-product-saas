@@ -161,10 +161,17 @@
                             <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expiration')" name="expiry_date"
                                 :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" required="true">
-                                <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
-                                <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Sent for Approval</option>
-                            </x-ui.odoo-form-ui>
+                            @php
+                                $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+                                $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+                            @endphp
+
+                            @if(!$isQuotationAutoApprove)
+                                <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" required="true">
+                                    <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
+                                    <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Sent for Approval</option>
+                                </x-ui.odoo-form-ui>
+                            @endif
                         </div>
                     </div>
 

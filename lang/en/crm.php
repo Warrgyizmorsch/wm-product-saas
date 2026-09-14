@@ -35,8 +35,8 @@ return [
     'statuses' => [
         'New' => 'New',
         'Qualified' => 'Qualified',
+        'Converted' => 'Converted',
         'Won' => 'Won',
-        'Converted' => 'Won',
         'Lost' => 'Lost',
     ],
     'priorities' => [

@@ -202,18 +202,7 @@ class ProductImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmp
             }
 
             if (!$warehouse && $tenantId) {
-                $warehouse = Warehouse::where('tenant_id', $tenantId)->where('is_default', true)->first()
-                    ?? Warehouse::where('tenant_id', $tenantId)->first();
-            }
-
-            if (!$warehouse) {
-                $warehouse = Warehouse::create([
-                    'tenant_id' => $tenantId,
-                    'name' => 'Main Warehouse',
-                    'code' => 'MAIN',
-                    'status' => 'active',
-                    'is_default' => true,
-                ]);
+                $warehouse = Warehouse::ensureDefaultWarehouse($tenantId);
             }
 
             try {
