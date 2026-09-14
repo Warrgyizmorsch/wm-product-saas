@@ -48,6 +48,8 @@ class Journal extends BaseModel
         'journal_date',
         'source',
         'voucher_type',
+        'currency_code',
+        'exchange_rate',
         'reference_type',
         'reference_id',
         'memo',
@@ -63,6 +65,7 @@ class Journal extends BaseModel
         'journal_date' => 'date',
         'total_debit' => 'float',
         'total_credit' => 'float',
+        'exchange_rate' => 'float',
         'posted_at' => 'datetime',
     ];
 

@@ -31,13 +31,15 @@
         'code' => strtoupper(str_replace('-', ' ', $tenantSlug)),
         'plan' => $tenantPlan,
         'branch' => $resolvedBranch?->name ?? ($tenantSettings['branch'] ?? 'Main Office'),
-        'currency' => $tenantSettings['currency'] ?? 'INR',
+        // The ledger's currency belongs to the company, not the tenant.
+        'currency' => $resolvedCompany ? company_currency()['code'] : ($tenantSettings['currency'] ?? 'INR'),
         'year' => $currentPeriod?->fiscalYear?->name ?? ($tenantSettings['financial_year'] ?? 'FY ' . now()->format('Y')),
     ];
 
     $currentCompany = [
         'name' => $resolvedCompany?->company_name ?? 'No Company',
         'code' => $resolvedCompany?->gst_number ?? '',
+        'currency' => $currentTenant['currency'],
     ];
 
     $tenants = \Illuminate\Support\Facades\Schema::hasTable('tenants')
@@ -329,7 +331,7 @@
                                     </span>
                                     <span class="erp-tenant-copy">
                                         <strong>{{ $currentCompany['name'] }}</strong>
-                                        <small>{{ __('ui.switch_company') }}</small>
+                                        <small>{{ $currentCompany['currency'] }} · {{ __('ui.switch_company') }}</small>
                                     </span>
                                     <i class="feather-chevron-down ms-2"></i>
                                 </x-ui.button>

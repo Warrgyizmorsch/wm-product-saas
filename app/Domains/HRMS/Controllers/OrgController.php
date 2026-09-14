@@ -9,7 +9,9 @@ use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Repositories\OrgRepositoryInterface;
 use App\Http\Controllers\Controller;
+use App\Models\Currency;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OrgController extends Controller
 {
@@ -22,6 +24,8 @@ class OrgController extends Controller
         $this->authorize('viewAny', Company::class);
 
         $data = $this->orgRepository->getIndexData($request->all());
+        // ISO reference data (global, not tenant-owned) shared with the Accounting ledger.
+        $data['currencies'] = Currency::query()->where('is_active', true)->orderBy('code')->get(['code', 'name', 'symbol']);
 
         return view('modules.hrms.org-structure.org', $data);
     }
@@ -40,7 +44,7 @@ class OrgController extends Controller
             'pan_number' => 'nullable|max:255',
             'cin_number' => 'nullable|max:255',
             'registration_number' => 'nullable|max:255',
-            'currency' => 'required|max:10',
+            'currency' => ['required', Rule::exists('currencies', 'code')->where('is_active', true)],
             'time_zone' => 'required|max:50',
             'address' => 'nullable|max:500',
             'city' => 'nullable|max:100',
@@ -73,7 +77,7 @@ class OrgController extends Controller
             'pan_number' => 'nullable|max:255',
             'cin_number' => 'nullable|max:255',
             'registration_number' => 'nullable|max:255',
-            'currency' => 'required|max:10',
+            'currency' => ['required', Rule::exists('currencies', 'code')->where('is_active', true)],
             'time_zone' => 'required|max:50',
             'address' => 'nullable|max:500',
             'city' => 'nullable|max:100',

@@ -28,6 +28,8 @@ class JournalEntry extends BaseModel
         'party_id',
         'debit',
         'credit',
+        'foreign_debit',
+        'foreign_credit',
         'description',
         'is_reconciled',
         'reconciled_at',
@@ -37,6 +39,8 @@ class JournalEntry extends BaseModel
     protected $casts = [
         'debit' => 'float',
         'credit' => 'float',
+        'foreign_debit' => 'float',
+        'foreign_credit' => 'float',
         'is_reconciled' => 'boolean',
         'reconciled_at' => 'datetime',
     ];

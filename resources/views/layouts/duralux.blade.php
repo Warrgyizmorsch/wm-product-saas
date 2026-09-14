@@ -84,7 +84,16 @@
                         </div>
                     @endif
                     <div class="page-header-title">
-                        <h5 class="m-b-10">@yield('page-title', __('ui.dashboard'))</h5>
+                        <h5 class="m-b-10">
+                            @yield('page-title', __('ui.dashboard'))
+                            {{-- Ledger amounts carry no symbol of their own; say once, per page, what they are in. --}}
+                            @if (request()->routeIs('accounting.*') && ! request()->routeIs('accounting.exchange-rates.*') && company())
+                                @php($reportingCurrency = company_currency())
+                                <span class="badge bg-soft-primary text-primary fs-11 fw-semibold ms-2 align-middle" title="{{ $reportingCurrency['name'] }} — the company's base currency">
+                                    Amounts in {{ $reportingCurrency['code'] }} ({{ $reportingCurrency['symbol'] }})
+                                </span>
+                            @endif
+                        </h5>
                     </div>
                     <ul class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('ui.home') }}</a></li>

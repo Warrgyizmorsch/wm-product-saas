@@ -13,6 +13,7 @@
             ['label' => 'Tenant Console', 'icon' => 'feather-grid', 'url' => '#', 'children' => [
                 ['label' => 'Tenants', 'route' => 'platform.tenants.index'],
                 ['label' => 'Plans', 'route' => 'platform.plans.index'],
+                ['label' => 'Currencies', 'route' => 'platform.currencies.index'],
                 ['label' => 'Subscriptions'],
                 ['label' => 'Usage Limits', 'route' => 'platform.usage.index'],
                 ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
@@ -207,6 +208,7 @@
                 ['label' => 'Bank Reconciliation', 'route' => 'accounting.bank-reconciliation.index'],
                 ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index'],
                 ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index'],
+                ['label' => 'Exchange Rates', 'route' => 'accounting.exchange-rates.index'],
                 ['label' => 'Day Book', 'route' => 'accounting.reports.day-book'],
                 ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
                 ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],

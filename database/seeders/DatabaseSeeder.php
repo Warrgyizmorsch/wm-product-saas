@@ -47,6 +47,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             RbacSeeder::class,
+            CurrencySeeder::class,
             AccountingChartOfAccountsSeeder::class,
             PaymentTermSeeder::class,
             InventoryMasterDemoSeeder::class,

@@ -324,6 +324,11 @@ class RbacSeeder extends Seeder
             'accounting.budgets.create' => $permissions['accounting.budgets.create'],
             'accounting.budgets.update' => $permissions['accounting.budgets.update'],
             'accounting.budgets.delete' => $permissions['accounting.budgets.delete'],
+            // Deleting a rate stays with tenant_owner/company_admin, like tax rates.
+            'accounting.exchange_rates.view' => $permissions['accounting.exchange_rates.view'],
+            'accounting.exchange_rates.create' => $permissions['accounting.exchange_rates.create'],
+            'accounting.exchange_rates.update' => $permissions['accounting.exchange_rates.update'],
+            'accounting.exchange_rates.sync' => $permissions['accounting.exchange_rates.sync'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
             'fixed_assets.categories.create' => $permissions['fixed_assets.categories.create'],
             'fixed_assets.categories.edit' => $permissions['fixed_assets.categories.edit'],
@@ -358,6 +363,7 @@ class RbacSeeder extends Seeder
             'accounting.vouchers.debit_note.view' => $permissions['accounting.vouchers.debit_note.view'],
             'accounting.bank_reconciliation.view' => $permissions['accounting.bank_reconciliation.view'],
             'accounting.budgets.view' => $permissions['accounting.budgets.view'],
+            'accounting.exchange_rates.view' => $permissions['accounting.exchange_rates.view'],
             'fixed_assets.categories.view' => $permissions['fixed_assets.categories.view'],
             'fixed_assets.assets.view' => $permissions['fixed_assets.assets.view'],
             'fixed_assets.depreciation.view' => $permissions['fixed_assets.depreciation.view'],
@@ -376,6 +382,7 @@ class RbacSeeder extends Seeder
         $definitions = [
             ['name' => 'platform.tenants.manage', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'manage'],
             ['name' => 'platform.plans.manage', 'module' => 'platform', 'entity' => 'plans', 'action' => 'manage'],
+            ['name' => 'platform.currencies.manage', 'module' => 'platform', 'entity' => 'currencies', 'action' => 'manage'],
             ['name' => 'platform.usage.view', 'module' => 'platform', 'entity' => 'usage', 'action' => 'view'],
             ['name' => 'access.roles.manage', 'module' => 'access', 'entity' => 'roles', 'action' => 'manage'],
             ['name' => 'access.permissions.manage', 'module' => 'access', 'entity' => 'permissions', 'action' => 'manage'],
@@ -632,6 +639,11 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.budgets.update', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'update'],
             ['name' => 'accounting.budgets.delete', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'delete'],
             ['name' => 'accounting.budgets.approve', 'module' => 'accounting', 'entity' => 'budgets', 'action' => 'approve'],
+            ['name' => 'accounting.exchange_rates.view', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'view'],
+            ['name' => 'accounting.exchange_rates.create', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'create'],
+            ['name' => 'accounting.exchange_rates.update', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'update'],
+            ['name' => 'accounting.exchange_rates.delete', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'delete'],
+            ['name' => 'accounting.exchange_rates.sync', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'sync'],
         ];
 
         $permissions = [];

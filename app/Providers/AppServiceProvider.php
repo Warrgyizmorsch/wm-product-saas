@@ -288,6 +288,18 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Repositories\BudgetRepositoryInterface::class,
             \App\Domains\Accounting\Repositories\BudgetRepository::class
         );
+
+        // ── Accounting: Exchange Rate ──────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\ExchangeRateRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\ExchangeRateRepository::class
+        );
+
+        // ── Accounting: Exchange Rate feed (swap for another provider here) ────
+        $this->app->bind(
+            \App\Domains\Accounting\Services\ExchangeRates\ExchangeRateProvider::class,
+            \App\Domains\Accounting\Services\ExchangeRates\FrankfurterProvider::class
+        );
     }
 
     public function boot(): void
@@ -634,6 +646,16 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Accounting\Models\Budget::class,
             \App\Domains\Accounting\Policies\BudgetPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\ExchangeRate::class,
+            \App\Domains\Accounting\Policies\ExchangeRatePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Models\Currency::class,
+            \App\Domains\Platform\Policies\CurrencyPolicy::class
         );
 
         // ── HRMS Policies ────────────────────────────────────────────────────
