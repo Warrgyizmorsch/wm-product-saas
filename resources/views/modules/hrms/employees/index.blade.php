@@ -5,6 +5,15 @@
 @section('breadcrumb', 'HRMS / Employees')
 
 @section('page-actions')
+    @php
+        $authUser = auth()->user();
+        $accessService = app(\App\Services\Access\AccessService::class);
+        $tenantId = $authUser?->tenant_id;
+        
+        $canCreateEmployee = $authUser && $accessService->allows($authUser, 'hrms.employees.create', ['tenant_id' => $tenantId]);
+        $canUpdateEmployee = $authUser && $accessService->allows($authUser, 'hrms.employees.update', ['tenant_id' => $tenantId]);
+        $canDeleteEmployee = $authUser && $accessService->allows($authUser, 'hrms.employees.delete', ['tenant_id' => $tenantId]);
+    @endphp
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <x-ui.button variant="outline-primary" icon="feather-award" href="{{ route('hrms.probation.index') }}" class="fw-semibold">
             Probation Reviews
@@ -12,15 +21,17 @@
         <x-ui.button variant="outline-secondary" icon="feather-log-out" href="{{ route('hrms.exits.index') }}" class="fw-semibold">
             Exit & Offboarding
         </x-ui.button>
-        <x-ui.import-export-dropdown 
-            type="employee" 
-            :exportRoute="route('hrms.employees.export')" 
-            :downloadTemplateRoute="route('hrms.employees.import.template')" 
-            importModalTarget="#importEmployeeModal" 
-        />
-        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addEmployeeModal" class="fw-bold text-uppercase">
-            {{ __('hrms.employees.create_employee') }}
-        </x-ui.button>
+        @if($canCreateEmployee)
+            <x-ui.import-export-dropdown 
+                type="employee" 
+                :exportRoute="route('hrms.employees.export')" 
+                :downloadTemplateRoute="route('hrms.employees.import.template')" 
+                importModalTarget="#importEmployeeModal" 
+            />
+            <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addEmployeeModal" class="fw-bold text-uppercase">
+                {{ __('hrms.employees.create_employee') }}
+            </x-ui.button>
+        @endif
     </div>
 @endsection
 
@@ -617,75 +628,79 @@
                                                     <span>{{ __('hrms.employees.act_view_profile') }}</span>
                                                 </a>
                                             </li>
-                                            <li>
-                                                <button type="button" class="dropdown-item employee-edit-trigger" data-employee="{{ base64_encode(json_encode([
-                                                    'id'                        => $employee->id,
-                                                    'employee_id'               => $employee->employee_id,
-                                                    'full_name'                 => $employee->full_name,
-                                                    'nick_name'                 => $employee->nick_name,
-                                                    'job_title'                 => $employee->job_title ?: ($employee->designation?->name ?? ''),
-                                                    'photo'                     => $employee->photo,
-                                                    'company_id'                => $employee->company_id,
-                                                    'business_unit_id'          => $employee->business_unit_id,
-                                                    'branch_id'                 => $employee->branch_id,
-                                                    'department_id'             => $employee->department_id,
-                                                    'designation_id'            => $employee->designation_id,
-                                                    'reporting_manager_id'      => $employee->reporting_manager_id,
-                                                    'shift_id'                  => $employee->shift_id,
-                                                    'pay_group_id'              => $employee->pay_group_id,
-                                                    'leave_plan_id'             => $employee->leave_plan_id,
-                                                    'user_id'                   => $employee->user_id,
-                                                    'role_id'                   => $employee->user?->role_id ?? $employee->user?->roles->first()?->id ?? '',
-                                                    'employment_type'           => $employee->employment_type,
-                                                    'employee_stage'            => $employee->employee_stage,
-                                                    'date_of_joining'           => $employee->date_of_joining ? (is_string($employee->date_of_joining) ? substr($employee->date_of_joining, 0, 10) : $employee->date_of_joining->format('Y-m-d')) : '',
-                                                    'date_of_birth'             => $employee->date_of_birth ? (is_string($employee->date_of_birth) ? substr($employee->date_of_birth, 0, 10) : $employee->date_of_birth->format('Y-m-d')) : '',
-                                                    'probation_end_date'        => $employee->probation_end_date ? (is_string($employee->probation_end_date) ? substr($employee->probation_end_date, 0, 10) : $employee->probation_end_date->format('Y-m-d')) : '',
-                                                    'confirmation_date'         => $employee->confirmation_date ? (is_string($employee->confirmation_date) ? substr($employee->confirmation_date, 0, 10) : $employee->confirmation_date->format('Y-m-d')) : '',
-                                                    'gender'                    => $employee->gender,
-                                                    'marital_status'            => $employee->marital_status,
-                                                    'blood_group'               => $employee->blood_group,
-                                                    'diet_preference'           => $employee->diet_preference,
-                                                    'office'                    => $employee->office ?: 'office',
-                                                    'wfh_latitude'              => $employee->wfh_latitude,
-                                                    'wfh_longitude'             => $employee->wfh_longitude,
-                                                    'personal_mobile_number'    => $employee->personal_mobile_number,
-                                                    'personal_email'            => $employee->personal_email,
-                                                    'office_email'              => $employee->office_email,
-                                                    'home_phone'                => $employee->home_phone,
-                                                    'city'                      => $employee->city,
-                                                    'postal_code'               => $employee->postal_code,
-                                                    'aadhaar_card_number'       => $employee->aadhaar_card_number,
-                                                    'pan_card_number'           => $employee->pan_card_number,
-                                                    'emergency_contact_name'    => $employee->emergency_contact_name,
-                                                    'emergency_contact_number'  => $employee->emergency_contact_number,
-                                                    'emergency_contact_relation'=> $employee->emergency_contact_relation,
-                                                    'present_address'           => $employee->present_address,
-                                                    'permanent_address'         => $employee->permanent_address,
-                                                    'bank_name'                 => $employee->bank_name,
-                                                    'account_number'            => $employee->account_number,
-                                                    'ifsc_code'                 => $employee->ifsc_code,
-                                                    'experience'                => $employee->experience,
-                                                    'current_salary'            => $employee->current_salary,
-                                                    'qualification'             => $employee->qualification,
-                                                    'source_of_hire'            => $employee->source_of_hire,
-                                                    'skill_set'                 => $employee->skill_set,
-                                                    'status'                    => $employee->status,
-                                                ])) }}">
-                                                    <i class="feather feather-edit me-3"></i>
-                                                    <span>{{ __('hrms.common.edit') }}</span>
-                                                </button>
-                                            </li>
-                                            <li>
-                                                <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete') }}', { title: 'Delete Employee Profile', variant: 'danger', confirmButtonText: 'Delete' })">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="feather feather-trash-2 me-3 text-danger"></i>
-                                                        <span>{{ __('hrms.common.delete') }}</span>
+                                            @if($canUpdateEmployee)
+                                                <li>
+                                                    <button type="button" class="dropdown-item employee-edit-trigger" data-employee="{{ base64_encode(json_encode([
+                                                        'id'                        => $employee->id,
+                                                        'employee_id'               => $employee->employee_id,
+                                                        'full_name'                 => $employee->full_name,
+                                                        'nick_name'                 => $employee->nick_name,
+                                                        'job_title'                 => $employee->job_title ?: ($employee->designation?->name ?? ''),
+                                                        'photo'                     => $employee->photo,
+                                                        'company_id'                => $employee->company_id,
+                                                        'business_unit_id'          => $employee->business_unit_id,
+                                                        'branch_id'                 => $employee->branch_id,
+                                                        'department_id'             => $employee->department_id,
+                                                        'designation_id'            => $employee->designation_id,
+                                                        'reporting_manager_id'      => $employee->reporting_manager_id,
+                                                        'shift_id'                  => $employee->shift_id,
+                                                        'pay_group_id'              => $employee->pay_group_id,
+                                                        'leave_plan_id'             => $employee->leave_plan_id,
+                                                        'user_id'                   => $employee->user_id,
+                                                        'role_id'                   => $employee->user?->role_id ?? $employee->user?->roles->first()?->id ?? '',
+                                                        'employment_type'           => $employee->employment_type,
+                                                        'employee_stage'            => $employee->employee_stage,
+                                                        'date_of_joining'           => $employee->date_of_joining ? (is_string($employee->date_of_joining) ? substr($employee->date_of_joining, 0, 10) : $employee->date_of_joining->format('Y-m-d')) : '',
+                                                        'date_of_birth'             => $employee->date_of_birth ? (is_string($employee->date_of_birth) ? substr($employee->date_of_birth, 0, 10) : $employee->date_of_birth->format('Y-m-d')) : '',
+                                                        'probation_end_date'        => $employee->probation_end_date ? (is_string($employee->probation_end_date) ? substr($employee->probation_end_date, 0, 10) : $employee->probation_end_date->format('Y-m-d')) : '',
+                                                        'confirmation_date'         => $employee->confirmation_date ? (is_string($employee->confirmation_date) ? substr($employee->confirmation_date, 0, 10) : $employee->confirmation_date->format('Y-m-d')) : '',
+                                                        'gender'                    => $employee->gender,
+                                                        'marital_status'            => $employee->marital_status,
+                                                        'blood_group'               => $employee->blood_group,
+                                                        'diet_preference'           => $employee->diet_preference,
+                                                        'office'                    => $employee->office ?: 'office',
+                                                        'wfh_latitude'              => $employee->wfh_latitude,
+                                                        'wfh_longitude'             => $employee->wfh_longitude,
+                                                        'personal_mobile_number'    => $employee->personal_mobile_number,
+                                                        'personal_email'            => $employee->personal_email,
+                                                        'office_email'              => $employee->office_email,
+                                                        'home_phone'                => $employee->home_phone,
+                                                        'city'                      => $employee->city,
+                                                        'postal_code'               => $employee->postal_code,
+                                                        'aadhaar_card_number'       => $employee->aadhaar_card_number,
+                                                        'pan_card_number'           => $employee->pan_card_number,
+                                                        'emergency_contact_name'    => $employee->emergency_contact_name,
+                                                        'emergency_contact_number'  => $employee->emergency_contact_number,
+                                                        'emergency_contact_relation'=> $employee->emergency_contact_relation,
+                                                        'present_address'           => $employee->present_address,
+                                                        'permanent_address'         => $employee->permanent_address,
+                                                        'bank_name'                 => $employee->bank_name,
+                                                        'account_number'            => $employee->account_number,
+                                                        'ifsc_code'                 => $employee->ifsc_code,
+                                                        'experience'                => $employee->experience,
+                                                        'current_salary'            => $employee->current_salary,
+                                                        'qualification'             => $employee->qualification,
+                                                        'source_of_hire'            => $employee->source_of_hire,
+                                                        'skill_set'                 => $employee->skill_set,
+                                                        'status'                    => $employee->status,
+                                                    ])) }}">
+                                                        <i class="feather feather-edit me-3"></i>
+                                                        <span>{{ __('hrms.common.edit') }}</span>
                                                     </button>
-                                                </form>
-                                            </li>
+                                                </li>
+                                            @endif
+                                            @if($canDeleteEmployee)
+                                                <li>
+                                                    <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete') }}', { title: 'Delete Employee Profile', variant: 'danger', confirmButtonText: 'Delete' })">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="dropdown-item text-danger">
+                                                            <i class="feather feather-trash-2 me-3 text-danger"></i>
+                                                            <span>{{ __('hrms.common.delete') }}</span>
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            @endif
                                         </x-ui.action-dropdown>
                                     </td>
                                 </tr>

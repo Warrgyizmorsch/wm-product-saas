@@ -9,9 +9,17 @@
         <x-ui.button href="{{ route('hrms.employees.index') }}" variant="light" icon="feather-arrow-left">
             {{ __('hrms.employees.back_to_registry') }}
         </x-ui.button>
-        <x-ui.button type="button" variant="primary" icon="feather-edit-3" data-bs-toggle="modal" data-bs-target="#editEmployeeModal">
-            Edit Employee
-        </x-ui.button>
+        @php
+            $authUser = auth()->user();
+            $isHrOrAdmin = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
+            $isOwnProfile = $authUser?->employee?->id == $employee->id;
+            $canEditProfile = $isHrOrAdmin || $isOwnProfile;
+        @endphp
+        @if($canEditProfile)
+            <x-ui.button type="button" variant="primary" icon="feather-edit-3" data-bs-toggle="modal" data-bs-target="#editEmployeeModal">
+                Edit Profile
+            </x-ui.button>
+        @endif
     </div>
 @endsection
 
@@ -1007,32 +1015,6 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'leaves' ? 'active' : '' }}" id="leaves-tab" data-bs-toggle="tab" data-bs-target="#leaves-pane" type="button" role="tab" aria-controls="leaves-pane" aria-selected="{{ $activeTabName === 'leaves' ? 'true' : 'false' }}">
-                    <i class="feather-calendar"></i> {{ __('hrms.employees.tab_leaves') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'wfh' ? 'active' : '' }}" id="wfh-tab" data-bs-toggle="tab" data-bs-target="#wfh-pane" type="button" role="tab" aria-controls="wfh-pane" aria-selected="{{ $activeTabName === 'wfh' ? 'true' : 'false' }}">
-                    <i class="feather-home"></i> {{ __('hrms.wfh.title') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ in_array($activeTabName, ['shift_overtime', 'shift-overtime']) ? 'active' : '' }}" id="shift-overtime-tab" data-bs-toggle="tab" data-bs-target="#shift-overtime-pane" type="button" role="tab" aria-controls="shift-overtime-pane" aria-selected="{{ in_array($activeTabName, ['shift_overtime', 'shift-overtime']) ? 'true' : 'false' }}">
-                    <i class="feather-clock"></i> {{ __('hrms.employees.tab_shift_overtime') }}
-                </button>
-            </li>
-
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'assets' ? 'active' : '' }}" id="assets-tab" data-bs-toggle="tab" data-bs-target="#assets-pane" type="button" role="tab" aria-controls="assets-pane" aria-selected="{{ $activeTabName === 'assets' ? 'true' : 'false' }}">
-                    <i class="feather-package"></i> {{ __('hrms.employees.tab_assets') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'attendance' ? 'active' : '' }}" id="attendance-tab" data-bs-toggle="tab" data-bs-target="#attendance-pane" type="button" role="tab" aria-controls="attendance-pane" aria-selected="{{ $activeTabName === 'attendance' ? 'true' : 'false' }}">
-                    <i class="feather-clock"></i> Attendance
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
                 <button class="nav-link {{ $activeTabName === 'probation' ? 'active' : '' }}" id="probation-tab" data-bs-toggle="tab" data-bs-target="#probation-pane" type="button" role="tab" aria-controls="probation-pane" aria-selected="{{ $activeTabName === 'probation' ? 'true' : 'false' }}">
                     <i class="feather-award"></i> Probation
                 </button>
@@ -1054,13 +1036,8 @@
             @include('modules.hrms.employees.tabs.overview')
             @include('modules.hrms.employees.tabs.compensation')
             @include('modules.hrms.employees.tabs.documents')
-            @include('modules.hrms.employees.tabs.leaves')
-            @include('modules.hrms.employees.tabs.wfh')
-            @include('modules.hrms.employees.tabs.shift-overtime')
             @include('modules.hrms.employees.tabs.penalization')
 
-            @include('modules.hrms.employees.tabs.assets')
-            @include('modules.hrms.employees.tabs.attendance')
             @include('modules.hrms.employees.tabs.probation')
             @include('modules.hrms.employees.tabs.exit-clearance')
             @include('modules.hrms.employees.tabs.pip')
@@ -1073,7 +1050,7 @@
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold" id="editEmployeeModalLabel">
-                        <i class="feather-edit-3 me-2 text-primary"></i>{{ __('hrms.employees.lbl_edit_employee') }}
+                        <i class="feather-edit-3 me-2 text-primary"></i>Edit Profile
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -1082,16 +1059,17 @@
                     action="{{ route('hrms.employees.update', ['employee' => $employee->id]) }}"
                     method="POST"
                     enctype="multipart/form-data"
+                    style="display: flex; flex-direction: column; max-height: calc(100vh - 3.5rem); overflow: hidden;"
                 >
                     @csrf
                     <input type="hidden" name="form_mode" value="edit">
                     <input type="hidden" name="editing_employee_id" id="editing_employee_id" value="{{ $employee->id }}">
-                    <div class="modal-body p-4">
-                        @include('modules.hrms.employees.form-fields', ['mode' => 'edit', 'employee' => $employee])
+                    <div class="modal-body p-4" style="overflow-y: auto; max-height: calc(85vh - 120px);">
+                        @include('modules.hrms.employees.form-fields', ['mode' => 'edit', 'employee' => $employee, 'isHrOrAdmin' => $isHrOrAdmin])
                     </div>
                     <div class="modal-footer bg-light py-2">
                         <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                        <button type="submit" class="btn btn-primary">{{ __('hrms.employees.mdl_btn_update_employee') }}</button>
+                        <button type="submit" class="btn btn-primary">Update Profile</button>
                     </div>
                 </form>
             </div>
@@ -1112,27 +1090,14 @@
                 $('#editEmployeeModal').appendTo('body');
                 $('#addAdhocModal').appendTo('body');
                 $('#addPenaltyModal').appendTo('body');
-                $('[id^="leaveRulesModal"]').appendTo('body');
                 $('#requestDocumentModal').appendTo('body');
                 $('#uploadDocumentModal').appendTo('body');
                 $('#addHistoryModal').appendTo('body');
-                $('#returnAssetModal').appendTo('body');
                 $('#profileEvaluateModal').appendTo('body');
                 $('#profileExitModal').appendTo('body');
-                $('#viewAssetDetailsModal').appendTo('body');
-                $('#requestAssetModal').appendTo('body');
-                $('#empApplyLeaveModal').appendTo('body');
-                $('#empApplyEncashmentModal').appendTo('body');
-                $('#empApplyWfhModal').appendTo('body');
-                $('#wfhCancellationModal').appendTo('body');
-                $('#rejectWfhModal').appendTo('body');
-                $('#empApplyShiftChangeModal').appendTo('body');
-                $('#empApplyOvertimeModal').appendTo('body');
-                $('#empApproveOvertimeModal').appendTo('body');
-                $('#empRejectOvertimeModal').appendTo('body');
 
-                // Initialize select2 inside modals with dropdownParent to fix Bootstrap focus/typing issue
-                $('#editEmployeeModal select, #empApplyShiftChangeModal select.odoo-select2, #empApplyOvertimeModal select.odoo-select2').each(function() {
+                // Initialize select2 inside edit modal with dropdownParent to fix Bootstrap focus/typing issue
+                $('#editEmployeeModal select').each(function() {
                     var $select = $(this);
                     if ($select.hasClass('select2-hidden-accessible')) {
                         $select.select2('destroy');
@@ -1140,530 +1105,6 @@
                     if ($.fn.select2) {
                         $select.select2({
                             dropdownParent: $select.closest('.modal-content')
-                        });
-                    }
-                });
-
-                // Shift & Overtime Profile Event Listeners & Functions (Select2 compatible)
-                $(document).on('change', '#profile_shift_change_type', function() {
-                    const val = $(this).val();
-                    const $endDateContainer = $('#profile_end_date_container');
-                    const $recurringContainer = $('#profile_recurring_days_container');
-
-                    if (val === 'temporary') {
-                        $endDateContainer.removeClass('d-none');
-                        $recurringContainer.addClass('d-none');
-                    } else if (val === 'permanent') {
-                        $endDateContainer.addClass('d-none');
-                        $recurringContainer.addClass('d-none');
-                    } else if (val === 'recurring') {
-                        $endDateContainer.addClass('d-none');
-                        $recurringContainer.removeClass('d-none');
-                    }
-                });
-
-                // Auto-fill end date when start date is selected (matching Leave and WFH)
-                $('#profile_shift_start_date').on('change', function() {
-                    var startDate = $(this).val();
-                    if (startDate) {
-                        $('#profile_shift_end_date').val(startDate);
-                    }
-                });
-
-                window.handleEmpShiftDecision = function(action, requestId) {
-                    const form = $('<form>', {
-                        method: 'POST',
-                        action: `{{ url('hrms/shift-change') }}/${requestId}/update-status`
-                    });
-                    form.append($('<input>', { type: 'hidden', name: '_token', value: '{{ csrf_token() }}' }));
-                    form.append($('<input>', { type: 'hidden', name: 'action', value: action === 'approve' ? 'approved' : (action === 'reject' ? 'rejected' : 'pending') }));
-                    if (action === 'reject') {
-                        const reason = prompt('Please enter a rejection reason:');
-                        if (reason === null) return;
-                        form.append($('<input>', { type: 'hidden', name: 'rejection_reason', value: reason }));
-                    }
-                    $('body').append(form);
-                    form.submit();
-                };
-
-                var _pendingEmpOvertimeDecisionId = null;
-
-                window.handleEmpOvertimeDecision = function(action, requestId, requestedHours) {
-                    _pendingEmpOvertimeDecisionId = requestId;
-
-                    if (action === 'approve') {
-                        $('#empApproveHoursInput').val(requestedHours);
-                        var modal = new bootstrap.Modal(document.getElementById('empApproveOvertimeModal'));
-                        modal.show();
-                    } else if (action === 'reject') {
-                        $('#empRejectReasonInput').val('');
-                        var modal = new bootstrap.Modal(document.getElementById('empRejectOvertimeModal'));
-                        modal.show();
-                    } else if (action === 'pending') {
-                        submitEmpOvertimeForm('pending', '', '');
-                    }
-                };
-
-                function submitEmpOvertimeForm(action, approvedHours, reason) {
-                    const form = $('<form>', {
-                        method: 'POST',
-                        action: `{{ url('hrms/overtime') }}/${_pendingEmpOvertimeDecisionId}/update-status`
-                    });
-                    form.append($('<input>', { type: 'hidden', name: '_token', value: '{{ csrf_token() }}' }));
-                    form.append($('<input>', { type: 'hidden', name: 'action', value: action }));
-                    form.append($('<input>', { type: 'hidden', name: 'approved_duration_hours', value: approvedHours }));
-                    form.append($('<input>', { type: 'hidden', name: 'rejection_reason', value: reason }));
-                    $('body').append(form);
-                    form.submit();
-                }
-
-                $('#confirmEmpApproveBtn').on('click', function() {
-                    const hoursVal = parseFloat($('#empApproveHoursInput').val());
-                    if (isNaN(hoursVal) || hoursVal <= 0) {
-                        alert('Please enter a valid positive number for hours.');
-                        return;
-                    }
-                    bootstrap.Modal.getInstance(document.getElementById('empApproveOvertimeModal')).hide();
-                    submitEmpOvertimeForm('approved', hoursVal, '');
-                });
-
-                $('#confirmEmpRejectBtn').on('click', function() {
-                    const reason = $('#empRejectReasonInput').val().trim();
-                    bootstrap.Modal.getInstance(document.getElementById('empRejectOvertimeModal')).hide();
-                    submitEmpOvertimeForm('rejected', '', reason);
-                });
-
-                // Initialize Select2 dropdowns inside Apply Leave & Encashment modals
-                function initEmpModalSelects() {
-                    $('.emp-odoo-select2-custom').each(function() {
-                        var $select = $(this);
-                        if ($select.hasClass('select2-hidden-accessible')) {
-                            $select.select2('destroy');
-                        }
-                        $select.select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: $select.closest('.modal-content'),
-                            width: '100%'
-                        });
-                    });
-                }
-
-                initEmpModalSelects();
-
-                // Populate leave types for the employee dynamically from employeeDataMap
-                var empId = "{{ $employee->id }}";
-                if (empId && empProfileDataMap[empId]) {
-                    var $leaveTypeSelect = $('#emp_leave_type_select');
-                    $leaveTypeSelect.empty().append('<option value="">{{ __("hrms.leave.app.select_leave_type") }}</option>');
-                    var types = empProfileDataMap[empId];
-                    types.forEach(function(t) {
-                        var text = t.name + ' ({{ __("hrms.leave.app.remaining") }}: ' + t.remaining + ' / ' + t.quota + ' {{ __("hrms.leave.days") }})';
-                        var option = $('<option>', {
-                            value: t.id,
-                            text: text
-                        });
-                        option.attr('data-rules', JSON.stringify(t.rules));
-                        option.attr('data-type', t.type);
-                        $leaveTypeSelect.append(option);
-                    });
-                    $leaveTypeSelect.trigger('change');
-                }
-
-                // Leave type change handler — apply attachment / advance rules
-                $('#emp_leave_type_select').on('change', function() {
-                    var selectedOption = $(this).find('option:selected');
-                    var rulesStr = selectedOption.attr('data-rules');
-                    if (!rulesStr) return;
-
-                    try {
-                        var rules = JSON.parse(rulesStr);
-                        var appRules = rules.application || {};
-
-                        // Apply in Advance & Disable invalid dates
-                        if (appRules.apply_in_advance) {
-                            var advanceDays = parseInt(appRules.advance_days || 3);
-                            var minDate = new Date();
-                            minDate.setDate(minDate.getDate() + advanceDays);
-                            var minDateStr = minDate.getFullYear() + '-' + String(minDate.getMonth() + 1).padStart(2, '0') + '-' + String(minDate.getDate()).padStart(2, '0');
-                            $('#emp_start_date').attr('min', minDateStr);
-                            $('#emp_end_date').attr('min', minDateStr);
-                            if ($('#emp_start_date').val() && $('#emp_start_date').val() < minDateStr) { $('#emp_start_date').val(''); }
-                            if ($('#emp_end_date').val() && $('#emp_end_date').val() < minDateStr) { $('#emp_end_date').val(''); }
-                        } else {
-                            $('#emp_start_date').removeAttr('min');
-                            $('#emp_end_date').removeAttr('min');
-                        }
-
-                        empCalculateExpectedDuration();
-                    } catch (e) {
-                        console.error("Error parsing leave rules", e);
-                    }
-                });
-
-                // Block form submission if dynamic attachment requirement is violated
-                $('#empApplyLeaveForm').on('submit', function(e) {
-                    var selectedOption = $('#emp_leave_type_select').find('option:selected');
-                    var rulesStr = selectedOption.attr('data-rules');
-                    if (!rulesStr) return;
-
-                    try {
-                        var rules = JSON.parse(rulesStr);
-                        var appRules = rules.application || {};
-                        if (appRules.require_attachment) {
-                            var attachmentDays = parseInt(appRules.attachment_days || 3);
-                            var duration = empCalculateExpectedDuration();
-                            var hasFile = $('#emp_attachment').val();
-
-                            if (duration >= attachmentDays && !hasFile) {
-                                e.preventDefault();
-                                alert("{{ __('hrms.leave.app.attachment_required_alert', ['days' => '__days__']) }}".replace('__days__', attachmentDays));
-                                return false;
-                            }
-                        }
-                    } catch (err) {
-                        console.error("Error running form submit validation", err);
-                    }
-                });
-
-                // Handle date range select types
-                $('#emp_start_date_type, #emp_end_date_type').on('change', function() {
-                    empCalculateExpectedDuration();
-                });
-
-                $('#emp_start_date, #emp_end_date').on('change', function() {
-                    var startDateVal = $('#emp_start_date').val();
-                    var endDateVal = $('#emp_end_date').val();
-                    if (startDateVal && !endDateVal) {
-                        $('#emp_end_date').val(startDateVal);
-                    }
-                    empCalculateExpectedDuration();
-                });
-
-                function empCalculateExpectedDuration() {
-                    var startDateStr = $('#emp_start_date').val();
-                    var endDateStr = $('#emp_end_date').val();
-                    var startType = $('#emp_start_date_type').val() || 'full_day';
-                    var endType = $('#emp_end_date_type').val() || 'full_day';
-
-                    if (!startDateStr || !endDateStr) return 0;
-
-                    var start = new Date(startDateStr);
-                    var end = new Date(endDateStr);
-
-                    if (end < start) {
-                        $('#emp_calculated_duration_display').text("{{ __('hrms.leave.app.date_validation_error') }}");
-                        return 0;
-                    }
-
-                    var duration = 0;
-                    var current = new Date(start);
-
-                    if (start.getTime() === end.getTime()) {
-                        if (start.getDay() !== 0) {
-                            duration = (startType === 'full_day') ? 1.0 : 0.5;
-                        }
-                    } else {
-                        while (current <= end) {
-                            if (current.getDay() !== 0) {
-                                var isStart = current.getTime() === start.getTime();
-                                var isEnd = current.getTime() === end.getTime();
-
-                                if (isStart) {
-                                    duration += (startType === 'full_day') ? 1.0 : 0.5;
-                                } else if (isEnd) {
-                                    duration += (endType === 'full_day') ? 1.0 : 0.5;
-                                } else {
-                                    duration += 1.0;
-                                }
-                            }
-                            current.setDate(current.getDate() + 1);
-                        }
-                    }
-
-                    $('#emp_calculated_duration_display').html("{{ __('hrms.leave.app.estimated_duration', ['duration' => '__duration__']) }}".replace('__duration__', '<strong>' + duration + '</strong>'));
-
-                    // Real-time dynamic attachment warning
-                    var selectedOption = $('#emp_leave_type_select').find('option:selected');
-                    var rulesStr = selectedOption.attr('data-rules');
-                    if (rulesStr) {
-                        try {
-                            var rules = JSON.parse(rulesStr);
-                            var appRules = rules.application || {};
-                            if (appRules.require_attachment) {
-                                var attachmentDays = parseInt(appRules.attachment_days || 3);
-                                if (duration >= attachmentDays) {
-                                    $('#emp_attachment_required_warning').removeClass('d-none');
-                                    $('#emp_attachment').prop('required', true);
-                                } else {
-                                    $('#emp_attachment_required_warning').addClass('d-none');
-                                    $('#emp_attachment').prop('required', false);
-                                }
-                            } else {
-                                $('#emp_attachment_required_warning').addClass('d-none');
-                                $('#emp_attachment').prop('required', false);
-                            }
-                        } catch (e) {}
-                    }
-
-                    return duration;
-                }
-
-                @if($errors->any() && !$errors->has('location') && !$errors->has('selfie'))
-                    setTimeout(function() {
-                        var modalEl = document.getElementById('empApplyLeaveModal');
-                        if (modalEl) {
-                            var bsModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-                            bsModal.show();
-                        }
-                    }, 200);
-                @endif
-
-                // Dynamic Encashment Leave Type Population (filtered by encashment-enabled rules)
-                function empUpdateEncashmentLeaveTypes() {
-                    var $select = $('#emp_encashment_leave_type_id');
-                    $select.empty().append('<option value="">' + "{{ __('hrms.leave.encashment_app.select_leave_type') }}" + '</option>');
-
-                    if (empId && empProfileDataMap[empId]) {
-                        var types = empProfileDataMap[empId];
-                        types.forEach(function(t) {
-                            var encashRules = (t.rules && t.rules.encashment) ? t.rules.encashment : {};
-                            var isEnabled = encashRules.enabled === true || encashRules.enabled === '1' || encashRules.enabled === 'true';
-
-                            if (isEnabled) {
-                                var text = t.name + ' ({{ __("hrms.leave.app.remaining") }}: ' + t.remaining + ' / ' + t.quota + ' {{ __("hrms.leave.days") }})';
-                                var option = $('<option>', { value: t.id, text: text });
-                                $select.append(option);
-                            }
-                        });
-                    }
-                    $select.trigger('change');
-                }
-
-                $('#empApplyEncashmentModal').on('show.bs.modal', function() {
-                    empUpdateEncashmentLeaveTypes();
-                });
-
-                empUpdateEncashmentLeaveTypes();
-
-                // Theme Select2 initializer for Request Asset Modal
-                function initReqModalSelect2(modal) {
-                    modal.find('.req-item-select, select[select2-selector="default"]').each(function() {
-                        if ($(this).hasClass('select2-hidden-accessible')) {
-                            $(this).select2('destroy');
-                        }
-                        $(this).select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: modal,
-                            placeholder: $(this).attr('placeholder') || "{{ __('hrms.employees.mdl_select_item') }}",
-                            width: '100%'
-                        });
-                    });
-                }
-
-                $('#requestAssetModal').on('shown.bs.modal', function() {
-                    initReqModalSelect2($(this));
-                });
-
-                // Dynamic row management for Multi-Item Asset Request
-                let reqItemIndex = 1;
-
-                $('#btn-add-req-item-row').on('click', function() {
-                    let tbody = $('#req-items-tbody');
-                    let firstSelect = tbody.find('select').first();
-                    let firstSelectOptions = '';
-
-                    if (firstSelect.hasClass('select2-hidden-accessible')) {
-                        firstSelect.select2('destroy');
-                        firstSelectOptions = firstSelect.html();
-                        initReqModalSelect2($('#requestAssetModal'));
-                    } else {
-                        firstSelectOptions = firstSelect.html();
-                    }
-
-                    let rowHtml = `
-                        <tr>
-                            <td class="py-2 px-3">
-                                <select name="items[${reqItemIndex}][asset_item_id]" class="form-select form-select-sm req-item-select" required>
-                                    ${firstSelectOptions}
-                                </select>
-                            </td>
-                            <td class="py-2 text-center">
-                                <input type="number" name="items[${reqItemIndex}][quantity]" class="form-control form-control-sm text-center req-qty-input" min="1" value="1" required style="width: 65px; height: 32px; margin: 0 auto; font-weight: 600;">
-                            </td>
-                            <td class="py-2 text-center px-2">
-                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-req-item-row" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-trash-2"></i></button>
-                            </td>
-                        </tr>
-                    `;
-                    tbody.append(rowHtml);
-                    reqItemIndex++;
-                    toggleReqItemRemoveButtons();
-                    initReqModalSelect2($('#requestAssetModal'));
-                });
-
-                $(document).on('click', '.btn-remove-req-item-row', function() {
-                    let tbody = $('#req-items-tbody');
-                    if (tbody.children('tr').length > 1) {
-                        $(this).closest('tr').remove();
-                        toggleReqItemRemoveButtons();
-                    }
-                });
-
-                function toggleReqItemRemoveButtons() {
-                    let rows = $('#req-items-tbody tr');
-                    if (rows.length <= 1) {
-                        rows.find('.btn-remove-req-item-row').prop('disabled', true);
-                    } else {
-                        rows.find('.btn-remove-req-item-row').prop('disabled', false);
-                    }
-                }
-
-                // Inline validation for Multi-Item Request Form
-                $('#requestAssetMultiForm').on('submit', function(e) {
-                    let form = $(this);
-                    let invalid = false;
-
-                    form.find('select[name*="[asset_item_id]"]').each(function() {
-                        let parent = $(this).parent();
-                        if (!$(this).val()) {
-                            invalid = true;
-                            $(this).addClass('is-invalid');
-                            if (parent.find('.invalid-feedback').length === 0) {
-                                $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">{{ __("hrms.employees.err_item_required") }}</div>');
-                            }
-                        } else {
-                            $(this).removeClass('is-invalid');
-                            parent.find('.invalid-feedback').remove();
-                        }
-                    });
-
-                    form.find('input[name*="[quantity]"]').each(function() {
-                        let parent = $(this).parent();
-                        let val = parseInt($(this).val());
-                        if (isNaN(val) || val < 1) {
-                            invalid = true;
-                            $(this).addClass('is-invalid');
-                            if (parent.find('.invalid-feedback').length === 0) {
-                                $(this).after('<div class="invalid-feedback fs-11 text-center mt-1">{{ __("hrms.employees.err_qty_min") }}</div>');
-                            }
-                        } else {
-                            $(this).removeClass('is-invalid');
-                            parent.find('.invalid-feedback').remove();
-                        }
-                    });
-
-                    let reasonInput = form.find('textarea[name="reason"]');
-                    if (!reasonInput.val() || !reasonInput.val().trim()) {
-                        invalid = true;
-                        reasonInput.addClass('is-invalid');
-                        if (reasonInput.parent().find('.invalid-feedback').length === 0) {
-                            reasonInput.after('<div class="invalid-feedback fs-11 text-start mt-1">{{ __("hrms.employees.err_reason_required") }}</div>');
-                        }
-                    } else {
-                        reasonInput.removeClass('is-invalid');
-                        reasonInput.parent().find('.invalid-feedback').remove();
-                    }
-
-                    if (invalid) {
-                        e.preventDefault();
-                        return false;
-                    }
-                });
-
-                $(document).on('change input', '#requestAssetMultiForm select, #requestAssetMultiForm input, #requestAssetMultiForm textarea', function() {
-                    if ($(this).val()) {
-                        $(this).removeClass('is-invalid');
-                        $(this).parent().find('.invalid-feedback').remove();
-                    }
-                });
-
-                // Handle return modal details binding
-                $('#returnAssetModal').on('show.bs.modal', function(event) {
-                    var button = $(event.relatedTarget);
-                    var itemId = button.data('item-id');
-                    var itemName = button.data('item-name');
-                    var rawAssets = button.data('allocated-assets');
-
-                    var modal = $(this);
-                    modal.find('form').attr('action', '/hrms/assets/item/' + itemId + '/return');
-                    modal.find('#return_asset_name_display').val(itemName);
-
-                    var checklistDiv = modal.find('#return_assets_checklist');
-                    checklistDiv.empty();
-
-                    var assets = [];
-                    if (rawAssets) {
-                        assets = JSON.parse(atob(rawAssets));
-                    }
-
-                    if (assets.length === 0) {
-                        checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No active allocations found.</span>');
-                    } else {
-                        assets.forEach(function(asset) {
-                            var checkboxId = 'emp_return_asset_check_' + asset.id;
-                            var itemHtml = `
-                                <div class="form-check py-1 border-bottom-dashed d-flex align-items-center">
-                                    <input class="form-check-input return-allocated-asset-checkbox" type="checkbox" name="allocated_asset_ids[]" value="${asset.id}" id="${checkboxId}" style="cursor: pointer;">
-                                    <label class="form-check-label fs-12 ms-2 text-dark mb-0" for="${checkboxId}" style="cursor: pointer;">
-                                        <strong>Code:</strong> ${asset.asset_code} | <strong>Serial:</strong> ${asset.serial_number || 'N/A'}
-                                    </label>
-                                </div>
-                            `;
-                            checklistDiv.append(itemHtml);
-                        });
-                    }
-
-                    modal.find('form').off('submit').on('submit', function(e) {
-                        var checkedCount = modal.find('.return-allocated-asset-checkbox:checked').length;
-                        if (checkedCount === 0) {
-                            e.preventDefault();
-                            alert('Please select at least one physical asset/serial number to return.');
-                        }
-                    });
-                });
-
-                // Handle view asset details modal binding
-                $('#viewAssetDetailsModal').on('show.bs.modal', function(event) {
-                    var button = $(event.relatedTarget);
-                    var itemName = button.data('item-name');
-                    var rawAssets = button.data('allocated-assets');
-
-                    var modal = $(this);
-                    modal.find('#detail_asset_item_name').val(itemName);
-
-                    var tbody = modal.find('#detail_assets_table_body');
-                    tbody.empty();
-
-                    var assets = [];
-                    if (rawAssets) {
-                        assets = JSON.parse(atob(rawAssets));
-                    }
-
-                    if (assets.length === 0) {
-                        tbody.append('<tr><td colspan="5" class="py-3 text-muted">No units assigned.</td></tr>');
-                    } else {
-                        assets.forEach(function(asset) {
-                            var dateStr = asset.allocated_at ? new Date(asset.allocated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
-                            var condBadge = {
-                                'new': 'bg-soft-success text-success',
-                                'good': 'bg-soft-info text-info',
-                                'fair': 'bg-soft-warning text-warning',
-                                'damaged': 'bg-soft-danger text-danger',
-                                'scrapped': 'bg-soft-secondary text-secondary'
-                            };
-                            var badgeClass = condBadge[asset.condition] || 'bg-light text-muted';
-                            var rowHtml = `
-                                <tr>
-                                    <td class="text-start py-2 px-3 fw-bold text-dark"><code>${asset.asset_code}</code></td>
-                                    <td class="py-2">${asset.serial_number || 'N/A'}</td>
-                                    <td class="py-2 text-muted">${dateStr}</td>
-                                    <td class="py-2">
-                                        <span class="badge ${badgeClass} rounded-pill px-2 py-0.5" style="font-size: 11px;">${asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1)}</span>
-                                    </td>
-                                    <td class="py-2 px-3 text-muted text-truncate" style="max-width: 150px;" title="${asset.notes || ''}">${asset.notes || '-'}</td>
-                                </tr>
-                            `;
-                            tbody.append(rowHtml);
                         });
                     }
                 });

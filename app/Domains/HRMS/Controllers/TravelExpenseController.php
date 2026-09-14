@@ -546,6 +546,7 @@ class TravelExpenseController extends Controller
                     'merchant'            => $c['merchant'] ?? null,
                     'description'         => $c['desc'] ?? null,
                     'receipt_path'        => $receiptPath,
+                    'status'              => 'draft',
                 ]);
             }
         });
@@ -678,7 +679,6 @@ class TravelExpenseController extends Controller
                 'net_reimbursement'          => $netReimbursement,
                 'approved_amount'            => null,
                 'approved_net_reimbursement' => null,
-                'status'                     => 'submitted',
             ]);
 
             // Unlink any previously linked Cash Advance
@@ -737,7 +737,7 @@ class TravelExpenseController extends Controller
                 $claimId = $c['id'] ?? null;
                 $existingClaim = $claimId ? $existingClaimsMap->get($claimId) : null;
 
-                $claimStatus = 'pending';
+                $claimStatus = $expenseReport->status === 'draft' ? 'draft' : 'pending';
                 $approvedAmount = null;
 
                 if ($existingClaim && $existingClaim->status === 'approved') {
@@ -765,7 +765,7 @@ class TravelExpenseController extends Controller
         });
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
-            ->with('success', 'Expense report resubmitted successfully.');
+            ->with('success', 'Expense report updated successfully.');
     }
 
     public function submitExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
@@ -780,6 +780,7 @@ class TravelExpenseController extends Controller
         }
 
         $expenseReport->update(['status' => 'submitted']);
+        $expenseReport->claims()->update(['status' => 'submitted']);
         return redirect()->back()->with('success', 'Expense report submitted for approval.');
     }
 

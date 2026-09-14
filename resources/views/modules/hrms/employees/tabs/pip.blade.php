@@ -6,9 +6,15 @@
                 <h6 class="fw-bold text-dark mb-0"><i class="feather-trending-up text-primary me-1.5"></i> Performance Improvement Plans (PIP)</h6>
                 <small class="text-muted fs-12">Performance improvement history, objectives, and evaluation milestones for this employee.</small>
             </div>
-            <a href="{{ route('hrms.pip.index') }}" class="btn btn-sm btn-primary fw-bold px-3 py-1.5">
-                <i class="feather-plus me-1"></i> Initiate PIP
-            </a>
+            @php
+                $authUser = auth()->user();
+                $canInitiatePip = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
+            @endphp
+            @if($canInitiatePip)
+                <a href="{{ route('hrms.pip.index') }}" class="btn btn-sm btn-primary fw-bold px-3 py-1.5">
+                    <i class="feather-plus me-1"></i> Initiate PIP
+                </a>
+            @endif
         </div>
         <div class="card-body p-0">
             @php
@@ -75,9 +81,7 @@
                                     </span>
                                 </td>
                                 <td class="pe-3 text-end">
-                                    <a href="{{ route('hrms.pip.show', $pPlan->id) }}" class="btn btn-xs btn-outline-primary fw-bold px-2 py-1">
-                                        <i class="feather-eye me-1"></i> Details
-                                    </a>
+                                    <x-ui.action-dropdown viewUrl="{{ route('hrms.pip.show', $pPlan->id) }}" align="end" />
                                 </td>
                             </tr>
                         @empty

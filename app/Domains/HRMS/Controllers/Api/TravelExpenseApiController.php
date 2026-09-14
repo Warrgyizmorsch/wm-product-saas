@@ -325,6 +325,7 @@ class TravelExpenseApiController extends Controller
                 'merchant'            => $c->merchant,
                 'description'         => $c->description,
                 'receipt_path'        => $c->receipt_path,
+                'status'              => $c->status ?? 'draft',
             ])->values();
         }
 
@@ -980,13 +981,18 @@ class TravelExpenseApiController extends Controller
                     'merchant'            => $c['merchant'] ?? null,
                     'description'         => $c['desc'] ?? null,
                     'receipt_path'        => $receiptPath,
+                    'status'              => 'draft',
                 ]);
             }
 
             return $rep;
         });
 
-        return $this->sendSuccess($report->load('claims.category'), 'Expense report saved to drafts.', 201);
+        return $this->sendSuccess(
+            $this->transformExpenseReport($report->fresh()->load(['claims.category', 'employee', 'travelRequest', 'cashAdvance']), true),
+            'Expense report saved to drafts.',
+            201
+        );
     }
 
     /**
@@ -1127,6 +1133,7 @@ class TravelExpenseApiController extends Controller
                     'merchant'            => $c['merchant'] ?? null,
                     'description'         => $c['desc'] ?? null,
                     'receipt_path'        => $receiptPath,
+                    'status'              => $expenseReport->status ?? 'draft',
                 ]);
             }
         });
@@ -1149,6 +1156,7 @@ class TravelExpenseApiController extends Controller
         }
 
         $expenseReport->update(['status' => 'submitted']);
+        $expenseReport->claims()->update(['status' => 'submitted']);
         return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report submitted for approval.');
     }
 

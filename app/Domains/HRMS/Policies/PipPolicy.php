@@ -18,6 +18,16 @@ class PipPolicy
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $user->tenant_id]);
     }
 
+    public function view(User $user, \App\Domains\HRMS\Models\PerformanceImprovementPlan $pip): bool
+    {
+        $employee = \App\Domains\HRMS\Models\Employee::resolveForUser($user);
+        if ($employee && (int) $employee->id === (int) $pip->employee_id) {
+            return true;
+        }
+
+        return $this->viewAny($user);
+    }
+
     public function create(User $user): bool
     {
         return $this->access->allows($user, 'hrms.pip.manage', ['tenant_id' => $user->tenant_id])

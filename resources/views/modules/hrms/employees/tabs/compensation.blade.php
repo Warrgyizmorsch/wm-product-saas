@@ -133,9 +133,15 @@
             <div class="card-custom">
                 <div class="card-custom-header d-flex justify-content-between align-items-center py-3">
                     <h5 class="card-custom-title mb-0 fs-14 fw-bold"><i class="feather-plus-circle text-success me-1"></i> Ad-hoc Components</h5>
-                    <button type="button" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2.5 rounded-pill fs-11" data-bs-toggle="modal" data-bs-target="#addAdhocModal">
-                        <i class="feather-plus me-1"></i> Add
-                    </button>
+                    @php
+                        $authUser = auth()->user();
+                        $canManageCompensation = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
+                    @endphp
+                    @if($canManageCompensation)
+                        <button type="button" class="btn btn-xs btn-soft-primary fw-bold py-1 px-2.5 rounded-pill fs-11" data-bs-toggle="modal" data-bs-target="#addAdhocModal">
+                            <i class="feather-plus me-1"></i> Add
+                        </button>
+                    @endif
                 </div>
                 <div class="card-body p-0">
                     @if(($adhocComponents ?? collect())->isEmpty())

@@ -30,17 +30,23 @@
             </div>
             <div>
                 @if($employee->employee_stage === 'Probation')
-                    <div class="d-flex align-items-center gap-2">
-                        <x-ui.button variant="primary" size="sm" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#profileEvaluateModal" class="fw-semibold">
-                            Review & Evaluate
-                        </x-ui.button>
-                        <form method="POST" action="{{ route('hrms.probation.quick-confirm', $employee->id) }}" class="d-inline" onsubmit="return confirm('Confirm employee {{ $employee->full_name }}?');">
-                            @csrf
-                            <x-ui.button variant="outline-success" size="sm" icon="feather-award" type="submit" class="fw-semibold">
-                                Quick Confirm
+                    @php
+                        $authUser = auth()->user();
+                        $canEvaluate = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
+                    @endphp
+                    @if($canEvaluate)
+                        <div class="d-flex align-items-center gap-2">
+                            <x-ui.button variant="primary" size="sm" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#profileEvaluateModal" class="fw-semibold">
+                                Review & Evaluate
                             </x-ui.button>
-                        </form>
-                    </div>
+                            <form method="POST" action="{{ route('hrms.probation.quick-confirm', $employee->id) }}" class="d-inline" onsubmit="return confirm('Confirm employee {{ $employee->full_name }}?');">
+                                @csrf
+                                <x-ui.button variant="outline-success" size="sm" icon="feather-award" type="submit" class="fw-semibold">
+                                    Quick Confirm
+                                </x-ui.button>
+                            </form>
+                        </div>
+                    @endif
                 @elseif($employee->employee_stage === 'Confirmed')
                     <x-ui.badge soft variant="success" class="fs-12 px-3 py-1.5 fw-semibold">
                         <i class="feather-check-circle me-1"></i> Formally Confirmed Employee
@@ -120,19 +126,30 @@
 
             <!-- 2. Probation Period Milestone Progress (Visible during Probation) -->
             @if($employee->employee_stage === 'Probation' && $doj && $probationEnd)
-                <div class="p-3.5 bg-light rounded-3 border mb-4">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="fs-12 fw-bold text-dark">
-                            <i class="feather-trending-up text-primary me-1"></i> Probation Timeline Progress
+                <div class="p-4 bg-white rounded-3 border shadow-sm mb-4" style="border-color: #e2e8f0 !important;">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                        <span class="fs-13 fw-bold text-dark d-flex align-items-center gap-2">
+                            <span class="avatar-text avatar-xs bg-soft-primary text-primary rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
+                                <i class="feather-trending-up fs-13"></i>
+                            </span>
+                            Probation Timeline Progress
                         </span>
-                        <span class="fs-12 fw-bold text-primary">{{ $probationProgress }}% Completed ({{ $daysPassed }} of {{ $totalDays }} Days)</span>
+                        <span class="badge bg-soft-primary text-primary px-3 py-1.5 rounded-pill fs-12 fw-bold">
+                            {{ $probationProgress }}% Completed ({{ $daysPassed }} of {{ $totalDays }} Days)
+                        </span>
                     </div>
-                    <div class="progress" style="height: 7px;">
-                        <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(100, $probationProgress) }}%" aria-valuenow="{{ $probationProgress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div class="progress my-3" style="height: 10px; border-radius: 999px; background-color: #e2e8f0; overflow: hidden;">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(100, $probationProgress) }}%; border-radius: 999px; transition: width 0.6s ease;" aria-valuenow="{{ $probationProgress }}" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
-                    <div class="d-flex justify-content-between text-muted fs-11 mt-2">
-                        <span>Joined: <strong>{{ $doj->format('d M, Y') }}</strong></span>
-                        <span>Evaluation Due: <strong>{{ $probationEnd->format('d M, Y') }}</strong></span>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center text-muted fs-12 pt-2 border-top gap-2" style="border-color: #f1f5f9 !important;">
+                        <div class="d-flex align-items-center gap-1.5">
+                            <i class="feather-calendar text-muted fs-13"></i>
+                            <span>Joined: <strong class="text-dark">{{ $doj->format('d M, Y') }}</strong></span>
+                        </div>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <i class="feather-flag text-muted fs-13"></i>
+                            <span>Evaluation Due: <strong class="text-dark">{{ $probationEnd->format('d M, Y') }}</strong></span>
+                        </div>
                     </div>
                 </div>
             @endif
@@ -147,17 +164,17 @@
                 </span>
             </div>
 
-            <div class="table-responsive border rounded-3">
-                <table class="table table-hover align-middle mb-0 text-dark" style="font-size: 13px;">
+            <div class="border rounded-3 overflow-hidden">
+                <table class="table table-hover align-middle mb-0 text-dark" style="font-size: 13px; width: 100%;">
                     <thead class="table-light fs-11 text-uppercase tracking-wider">
                         <tr>
-                            <th class="ps-3 py-3">Review Date</th>
-                            <th class="py-3">Reviewer</th>
-                            <th class="py-3">Performance</th>
-                            <th class="py-3">Attendance</th>
-                            <th class="py-3">Culture Fit</th>
-                            <th class="py-3">Recommendation</th>
-                            <th class="pe-3 py-3">Remarks & Feedback</th>
+                            <th class="ps-3 py-3" style="width: 12%;">Review Date</th>
+                            <th class="py-3" style="width: 16%;">Reviewer</th>
+                            <th class="py-3 text-center" style="width: 12%;">Performance</th>
+                            <th class="py-3 text-center" style="width: 12%;">Attendance</th>
+                            <th class="py-3 text-center" style="width: 12%;">Culture Fit</th>
+                            <th class="py-3 text-center" style="width: 14%;">Recommendation</th>
+                            <th class="pe-3 py-3" style="width: 22%;">Remarks & Feedback</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -182,27 +199,27 @@
                                         <span>{{ $eval->reviewer->name ?? 'HR Admin' }}</span>
                                     </div>
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     <span class="badge bg-soft-warning text-dark border border-warning border-opacity-25 px-2 py-1 fs-11">
                                         ★ {{ $eval->performance_rating }}/5
                                     </span>
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     <span class="badge bg-soft-info text-dark border border-info border-opacity-25 px-2 py-1 fs-11">
                                         ★ {{ $eval->attendance_rating }}/5
                                     </span>
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     <span class="badge bg-soft-primary text-dark border border-primary border-opacity-25 px-2 py-1 fs-11">
                                         ★ {{ $eval->culture_rating }}/5
                                     </span>
                                 </td>
-                                <td>
+                                <td class="text-center">
                                     <x-ui.badge soft :variant="$recVariant" class="text-uppercase fs-11">
                                         {{ $eval->recommendation }}
                                     </x-ui.badge>
                                 </td>
-                                <td class="pe-3 text-muted fs-12" style="max-width: 250px;">
+                                <td class="pe-3 text-muted fs-12" style="white-space: normal !important; word-wrap: break-word !important; word-break: break-word !important;">
                                     {{ $eval->remarks ?: 'No remarks logged.' }}
                                 </td>
                             </tr>

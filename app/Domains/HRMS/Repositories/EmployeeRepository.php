@@ -128,7 +128,18 @@ class EmployeeRepository implements EmployeeRepositoryInterface
 
         $computedComponents = [];
         if ($salaryStructure) {
-            $items = $salaryStructure->items()->with('component')->get();
+            $items = $salaryStructure->items()->with('component')->get()->filter(function($i) {
+                if (!$i->component) {
+                    return false;
+                }
+                if (in_array($i->component->code, ['TE_RECOVERY', 'ADV_RECOVERY'])) {
+                    if (!$i->component->is_adhoc) {
+                        $i->component->update(['is_adhoc' => true]);
+                    }
+                    return false;
+                }
+                return !$i->component->is_adhoc;
+            });
             $ctc = (float) $employee->current_salary;
             // Find the "basic" item: first earning component that is fixed or % of CTC (code-agnostic)
             $basicItemFound = $items->first(function($i) {
@@ -150,7 +161,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             $balancingItem = null;
 
             foreach ($items as $item) {
-                if (!$item->component) {
+                if (!$item->component || $item->component->is_adhoc || in_array($item->component->code, ['TE_RECOVERY', 'ADV_RECOVERY'])) {
                     continue;
                 }
                 $amount = 0.0;
@@ -175,7 +186,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                 }
             }
 
-            if ($balancingItem && $balancingItem->component) {
+            if ($balancingItem && $balancingItem->component && !$balancingItem->component->is_adhoc && !in_array($balancingItem->component->code, ['TE_RECOVERY', 'ADV_RECOVERY'])) {
                 $balancingAmount = max(0.0, $ctc - $totalOtherEarnings);
                 $computedComponents[$balancingItem->id] = [
                     'item'   => $balancingItem,
@@ -190,96 +201,16 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             ->get();
         $penalties = \App\Domains\HRMS\Models\EmployeePenalty::where('employee_id', $employee->id)->get();
 
-        // Initialize missing leave balances for active types in the employee's assigned leave plan
-        if ($employee->leavePlan) {
-            foreach ($employee->leavePlan->types()->where('status', true)->get() as $lt) {
-                \App\Domains\HRMS\Models\LeaveBalance::firstOrCreate([
-                    'tenant_id'     => $employee->tenant_id,
-                    'company_id'    => $employee->company_id,
-                    'employee_id'   => $employee->id,
-                    'leave_type_id' => $lt->id,
-                ], [
-                    'allocated' => floatval($lt->quota),
-                    'used'      => 0.0,
-                ]);
-            }
-        }
-
-        // Leave balances (allowances) for the assigned leave plan
-        $leaveAllowances = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)
-            ->whereHas('leaveType', function ($query) {
-                $query->where('status', true);
-            })
-            ->with('leaveType')
-            ->get();
-
-        // Filtered & paginated leave requests
-        $leaveRequestsQuery = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
-            ->with('leaveType')
-            ->orderBy('created_at', 'desc');
-        if (!empty($inputs['leave_type'])) {
-            $leaveRequestsQuery->where('leave_type_id', (int) $inputs['leave_type']);
-        }
-        if (!empty($inputs['leave_status'])) {
-            $leaveRequestsQuery->where('status', $inputs['leave_status']);
-        }
-        if (!empty($inputs['leave_search'])) {
-            $leaveRequestsQuery->where('reason', 'like', '%' . $inputs['leave_search'] . '%');
-        }
-        $leaveRequests = $leaveRequestsQuery->paginate(10, ['*'], 'leave_page')->withQueryString();
-
-        $empLeaveRequests = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
-        $empLeaveEncashments = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
-        $encashmentRequests = $empLeaveEncashments;
-
-        $empWfhRequests = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
-        $empShiftChangeRequests = \App\Domains\HRMS\Models\ShiftChangeRequest::where('employee_id', $employee->id)->with(['currentShift', 'requestedShift'])->orderBy('created_at', 'desc')->get();
-        $empOvertimeRequests = \App\Domains\HRMS\Models\OvertimeRequest::where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
         $documents = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
             ->where('documentable_id', $employee->id)
             ->paginate(10, ['*'], 'doc_page')
             ->withQueryString();
-        $attendancePenalty = $employee->attendancePenalty;
-        $attendancePenalties = \App\Domains\HRMS\Models\AttendancePenalty::where('status', true)->get();
-        $empAttendances = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->with(['breaks', 'locationLogs'])->orderBy('date', 'desc')->get();
-        $todayAttendance = \App\Domains\HRMS\Models\Attendance::where('employee_id', $employee->id)->where('date', \Carbon\Carbon::today()->format('Y-m-d'))->first();
 
         $isAdminUser = true;
 
         $availableAdhocComponents = \App\Domains\HRMS\Models\SalaryComponent::adhoc()->where('status', true)->get();
         if ($availableAdhocComponents->isEmpty()) {
             $availableAdhocComponents = \App\Domains\HRMS\Models\SalaryComponent::where('status', true)->get();
-        }
-
-        $employeeDataMap = [];
-        $allEmpForMap = Employee::with(['leavePlan.types'])->get();
-        foreach ($allEmpForMap as $emp) {
-            $typesList = [];
-            if ($emp->leavePlan) {
-                foreach ($emp->leavePlan->types as $lt) {
-                    if ($lt->status) {
-                        $bal = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $emp->id)
-                            ->where('leave_type_id', $lt->id)
-                            ->first();
-
-                        $allocated = $bal ? floatval($bal->allocated) : floatval($lt->quota);
-                        $used = $bal ? floatval($bal->used) : 0;
-                        $remaining = max(0, $allocated - $used);
-
-                        $typesList[] = [
-                            'id'        => $lt->id,
-                            'name'      => $lt->name,
-                            'code'      => $lt->code,
-                            'type'      => $lt->type,
-                            'quota'     => $allocated,
-                            'used'      => $used,
-                            'remaining' => $remaining,
-                            'rules'     => $lt->rules ?? [],
-                        ];
-                    }
-                }
-            }
-            $employeeDataMap[$emp->id] = $typesList;
         }
 
         $options = $this->getDropdownOptions();
@@ -294,8 +225,8 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         return array_merge([
             'employee'                  => $employee,
             'pipPlans'                  => $pipPlans,
-            'availableAssets'           => $availableAssets,
-            'leaveTypes'                => $leaveTypes,
+            'availableAssets'           => collect(),
+            'leaveTypes'                => collect(),
             'documentMasters'           => $documentMasters,
             'allEmployees'              => $allEmployees,
             'salaryStructure'           => $salaryStructure,
@@ -303,22 +234,22 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'adhocComponents'           => $adhocComponents,
             'availableAdhocComponents'  => $availableAdhocComponents,
             'penalties'                 => $penalties,
-            'leaveAllowances'           => $leaveAllowances,
-            'leaveRequests'             => $leaveRequests,
-            'encashmentRequests'        => $encashmentRequests,
-            'empLeaveRequests'          => $empLeaveRequests,
-            'empLeaveEncashments'       => $empLeaveEncashments,
-            'empWfhRequests'            => $empWfhRequests,
-            'empShiftChangeRequests'    => $empShiftChangeRequests,
-            'empOvertimeRequests'       => $empOvertimeRequests,
+            'leaveAllowances'           => collect(),
+            'leaveRequests'             => collect(),
+            'encashmentRequests'        => collect(),
+            'empLeaveRequests'          => collect(),
+            'empLeaveEncashments'       => collect(),
+            'empWfhRequests'            => collect(),
+            'empShiftChangeRequests'    => collect(),
+            'empOvertimeRequests'       => collect(),
             'documents'                 => $documents,
-            'attendancePenalty'         => $attendancePenalty,
-            'attendancePenalties'       => $attendancePenalties,
-            'empAttendances'            => $empAttendances,
-            'todayAttendance'           => $todayAttendance,
+            'attendancePenalty'         => null,
+            'attendancePenalties'       => collect(),
+            'empAttendances'            => collect(),
+            'todayAttendance'           => null,
             'isAdminUser'               => $isAdminUser,
             'isAdmin'                   => $isAdminUser,
-            'employeeDataMap'           => $employeeDataMap,
+            'employeeDataMap'           => [],
             'activeTabName'             => $activeTabName,
         ], $options);
     }

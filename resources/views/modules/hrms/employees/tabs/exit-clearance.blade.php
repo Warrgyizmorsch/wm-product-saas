@@ -27,11 +27,17 @@
                     </h5>
                     <span class="text-muted fs-12">Track separation requests, multi-department clearances, and final relieving documents.</span>
                 </div>
-                <div>
-                    <x-ui.button variant="primary" size="sm" icon="feather-user-minus" data-bs-toggle="modal" data-bs-target="#profileExitModal" class="fw-semibold">
-                        Apply for Resignation / Exit
-                    </x-ui.button>
-                </div>
+                @php
+                    $authUser = auth()->user();
+                    $canInitiateExit = (isset($isOwnProfile) && $isOwnProfile) || ($authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]));
+                @endphp
+                @if($canInitiateExit)
+                    <div>
+                        <x-ui.button variant="primary" size="sm" icon="feather-user-minus" data-bs-toggle="modal" data-bs-target="#profileExitModal" class="fw-semibold">
+                            Apply for Resignation / Exit
+                        </x-ui.button>
+                    </div>
+                @endif
             </div>
             <div class="card-body p-5 text-center">
                 <div class="avatar-text avatar-lg bg-soft-success text-success rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center">
@@ -120,8 +126,8 @@
                                 <span class="fs-12 fw-bold text-primary">{{ $progress }}%</span>
                             </div>
                             <div>
-                                <div class="progress mb-1.5" style="height: 6px; background-color: #e2e8f0;">
-                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(100, $progress) }}%" aria-valuenow="{{ $progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                <div class="progress my-2" style="height: 8px; border-radius: 999px; background-color: #e2e8f0; overflow: hidden;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(100, $progress) }}%; border-radius: 999px;" aria-valuenow="{{ $progress }}" aria-valuemin="0" aria-valuemax="100"></div>
                                 </div>
                                 <span class="text-muted fs-11">{{ $clearedItems }} of {{ $totalItems }} Checkpoints Cleared</span>
                             </div>

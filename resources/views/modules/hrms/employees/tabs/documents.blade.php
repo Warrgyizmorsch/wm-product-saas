@@ -77,6 +77,10 @@
         color: #1e293b !important;
     }
 </style>
+@php
+    $authUser = auth()->user();
+    $canManageDocStatus = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
+@endphp
 <div class="tab-pane fade {{ $activeTabName === 'documents' ? 'show active' : '' }}" id="documents-pane" role="tabpanel" aria-labelledby="documents-tab">
     <div class="row">
         <div class="col-12">
@@ -155,11 +159,13 @@
                         <table class="table table-hover align-middle mb-0 documents-table" id="documentsTable" style="table-layout: fixed; width: 100%;">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3" style="width: 32%;">{{ __('hrms.employees.tbl_doc_title') }}</th>
-                                    <th style="width: 18%;">{{ __('hrms.employees.tbl_source_expiry') }}</th>
-                                    <th style="width: 26%;">{{ __('hrms.employees.tbl_file') }}</th>
-                                    <th style="width: 16%;">{{ __('hrms.employees.tbl_status') }}</th>
-                                    <th class="text-end pe-3" style="width: 8%;">{{ __('hrms.employees.tbl_actions') }}</th>
+                                    <th class="ps-3" style="width: {{ $canManageDocStatus ? '32%' : '35%' }};">{{ __('hrms.employees.tbl_doc_title') }}</th>
+                                    <th style="width: {{ $canManageDocStatus ? '18%' : '20%' }};">{{ __('hrms.employees.tbl_source_expiry') }}</th>
+                                    <th style="width: {{ $canManageDocStatus ? '26%' : '25%' }};">{{ __('hrms.employees.tbl_file') }}</th>
+                                    <th style="width: {{ $canManageDocStatus ? '16%' : '20%' }};">{{ __('hrms.employees.tbl_status') }}</th>
+                                    @if($canManageDocStatus)
+                                        <th class="text-end pe-3" style="width: 8%;">{{ __('hrms.employees.tbl_actions') }}</th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody>
@@ -371,13 +377,51 @@
                                                     <i class="feather-edit-3 fs-11"></i> Pending Signature
                                                 </span>
                                             @else
+                                                @php
+                                                    $authUser = auth()->user();
+                                                    $canManageDocStatus = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
+                                                @endphp
                                                 @if($requiresApproval)
-                                                    <div class="dropdown d-inline-block">
-                                                        <span class="dropdown-toggle doc-status-toggle fw-bold" 
-                                                              id="docStatusDropdown_{{ $doc->id }}" 
-                                                              data-bs-toggle="dropdown" 
-                                                              aria-expanded="false" 
-                                                              style="color: {{ $displayStatus === 'approved' ? '#10b981' : ($displayStatus === 'rejected' ? '#ef4444' : '#00bcd4') }};">
+                                                    @if($canManageDocStatus)
+                                                        <div class="dropdown d-inline-block">
+                                                            <span class="dropdown-toggle doc-status-toggle fw-bold" 
+                                                                  id="docStatusDropdown_{{ $doc->id }}" 
+                                                                  data-bs-toggle="dropdown" 
+                                                                  aria-expanded="false" 
+                                                                  style="color: {{ $displayStatus === 'approved' ? '#10b981' : ($displayStatus === 'rejected' ? '#ef4444' : '#00bcd4') }};">
+                                                                @if($displayStatus === 'approved')
+                                                                    Approved
+                                                                @elseif($displayStatus === 'rejected')
+                                                                    Rejected
+                                                                @else
+                                                                    Pending Verification
+                                                                @endif
+                                                            </span>
+                                                            <ul class="dropdown-menu dropdown-menu-start shadow-sm status-dropdown-menu mt-1" aria-labelledby="docStatusDropdown_{{ $doc->id }}" style="z-index: 1050;">
+                                                                <li>
+                                                                    <button type="button" class="dropdown-item fw-bold text-success d-flex align-items-center justify-content-between gap-2" 
+                                                                            onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'approved'); return false;"
+                                                                            style="background: transparent; border: none; width: 100%;">
+                                                                        Approved
+                                                                        @if($displayStatus === 'approved')
+                                                                            <i class="feather-check text-success fs-14"></i>
+                                                                        @endif
+                                                                    </button>
+                                                                </li>
+                                                                <li>
+                                                                    <button type="button" class="dropdown-item fw-bold text-danger d-flex align-items-center justify-content-between gap-2" 
+                                                                            onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'rejected'); return false;"
+                                                                            style="background: transparent; border: none; width: 100%;">
+                                                                        Rejected
+                                                                        @if($displayStatus === 'rejected')
+                                                                            <i class="feather-check text-danger fs-14"></i>
+                                                                        @endif
+                                                                    </button>
+                                                                </li>
+                                                            </ul>
+                                                        </div>
+                                                    @else
+                                                        <span class="fw-bold fs-13" style="color: {{ $displayStatus === 'approved' ? '#10b981' : ($displayStatus === 'rejected' ? '#ef4444' : '#00bcd4') }}; text-transform: uppercase;">
                                                             @if($displayStatus === 'approved')
                                                                 Approved
                                                             @elseif($displayStatus === 'rejected')
@@ -386,29 +430,7 @@
                                                                 Pending Verification
                                                             @endif
                                                         </span>
-                                                        <ul class="dropdown-menu dropdown-menu-start shadow-sm status-dropdown-menu mt-1" aria-labelledby="docStatusDropdown_{{ $doc->id }}" style="z-index: 1050;">
-                                                            <li>
-                                                                <button type="button" class="dropdown-item fw-bold text-success d-flex align-items-center justify-content-between gap-2" 
-                                                                        onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'approved'); return false;"
-                                                                        style="background: transparent; border: none; width: 100%;">
-                                                                    Approved
-                                                                    @if($displayStatus === 'approved')
-                                                                        <i class="feather-check text-success fs-14"></i>
-                                                                    @endif
-                                                                </button>
-                                                            </li>
-                                                            <li>
-                                                                <button type="button" class="dropdown-item fw-bold text-danger d-flex align-items-center justify-content-between gap-2" 
-                                                                        onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'rejected'); return false;"
-                                                                        style="background: transparent; border: none; width: 100%;">
-                                                                    Rejected
-                                                                    @if($displayStatus === 'rejected')
-                                                                        <i class="feather-check text-danger fs-14"></i>
-                                                                    @endif
-                                                                </button>
-                                                            </li>
-                                                        </ul>
-                                                    </div>
+                                                    @endif
                                                 @else
                                                     <span class="fw-bold fs-13" style="color: #10b981; font-weight: 700; text-transform: uppercase;">
                                                         Approved
@@ -423,30 +445,30 @@
                                                 @endif
                                             @endif
                                         </td>
-                                        <td class="text-end pe-3">
-                                            <div class="d-flex align-items-center justify-content-end gap-2">
-
-                                                
-                                                <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
-                                                        <i class="feather-trash-2 fs-13"></i>
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </td>
+                                        @if($canManageDocStatus)
+                                            <td class="text-end pe-3">
+                                                <div class="d-flex align-items-center justify-content-end gap-2">
+                                                    <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
+                                                            <i class="feather-trash-2 fs-13"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        @endif
                                     </tr>
                                 @empty
                                     <tr id="documentEmptyStateRow">
-                                        <td colspan="5" class="text-center py-5 text-muted fs-13">
+                                        <td colspan="{{ $canManageDocStatus ? 5 : 4 }}" class="text-center py-5 text-muted fs-13">
                                             <i class="feather-file-text d-block fs-32 text-light-muted mb-2" style="font-size: 28px;"></i>
                                             No documents found.
                                         </td>
                                     </tr>
                                 @endforelse
                                 <tr id="documentNoResultsRow" class="d-none">
-                                    <td colspan="5" class="text-center py-5 text-muted fs-13">
+                                    <td colspan="{{ $canManageDocStatus ? 5 : 4 }}" class="text-center py-5 text-muted fs-13">
                                         <i class="feather-folder-minus d-block fs-32 text-light-muted mb-2"></i>
                                         {{ __('hrms.employees.lbl_no_docs_match') }}
                                     </td>

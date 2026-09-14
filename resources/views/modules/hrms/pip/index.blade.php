@@ -332,7 +332,7 @@
                                     </x-ui.badge>
                                 </td>
                                 <td class="text-end pe-3">
-                                    <x-ui.action-dropdown id="pipActions{{ $plan->id }}">
+                                    <x-ui.action-dropdown id="pipActions{{ $plan->id }}" viewUrl="{{ route('hrms.pip.show', $plan->id) }}" align="end">
                                         <li>
                                             <a class="dropdown-item" href="{{ route('hrms.pip.show', $plan->id) }}">
                                                 <i class="feather-eye me-2 text-primary"></i> Open Workspace

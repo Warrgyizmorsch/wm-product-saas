@@ -28,6 +28,9 @@ use App\Domains\HRMS\Controllers\OrgStructureController;
 use App\Domains\HRMS\Controllers\HrmsDashboardController;
 use App\Domains\HRMS\Controllers\PipController;
 use App\Domains\HRMS\Controllers\BroadcastController;
+use App\Domains\HRMS\Controllers\HelpdeskTicketController;
+use App\Domains\HRMS\Controllers\HelpdeskCategoryController;
+use App\Domains\HRMS\Controllers\HelpdeskKbController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -477,6 +480,31 @@ Route::prefix('hrms')
             Route::delete('/category/{category}', [PipController::class, 'destroyCategory'])->name('category.destroy');
             Route::post('/template/store', [PipController::class, 'storeTemplate'])->name('template.store');
             Route::delete('/template/{template}', [PipController::class, 'destroyTemplate'])->name('template.destroy');
+        });
+
+        // Helpdesk & Support Module
+        Route::prefix('helpdesk')->name('helpdesk.')->group(function (): void {
+            Route::get('/', [HelpdeskTicketController::class, 'index'])->name('tickets.index');
+            Route::get('/tickets/create', [HelpdeskTicketController::class, 'create'])->name('tickets.create');
+            Route::post('/tickets/store', [HelpdeskTicketController::class, 'store'])->name('tickets.store');
+            Route::get('/tickets/{ticket}', [HelpdeskTicketController::class, 'show'])->name('tickets.show');
+            Route::post('/tickets/{ticket}/reply', [HelpdeskTicketController::class, 'reply'])->name('tickets.reply');
+            Route::post('/tickets/{ticket}/status', [HelpdeskTicketController::class, 'updateStatus'])->name('tickets.status');
+            Route::post('/tickets/{ticket}/csat', [HelpdeskTicketController::class, 'submitCsat'])->name('tickets.csat');
+
+            // Categories Management
+            Route::get('/categories', [HelpdeskCategoryController::class, 'index'])->name('categories.index');
+            Route::post('/categories/store', [HelpdeskCategoryController::class, 'store'])->name('categories.store');
+            Route::put('/categories/{category}', [HelpdeskCategoryController::class, 'update'])->name('categories.update');
+            Route::delete('/categories/{category}', [HelpdeskCategoryController::class, 'destroy'])->name('categories.destroy');
+
+            // Knowledge Base (FAQ)
+            Route::get('/kb', [HelpdeskKbController::class, 'index'])->name('kb.index');
+            Route::post('/kb/store', [HelpdeskKbController::class, 'store'])->name('kb.store');
+            Route::put('/kb/{id}', [HelpdeskKbController::class, 'update'])->name('kb.update');
+            Route::delete('/kb/{id}', [HelpdeskKbController::class, 'destroy'])->name('kb.destroy');
+            Route::get('/kb/suggest', [HelpdeskKbController::class, 'suggest'])->name('kb.suggest');
+            Route::get('/kb/{slug}', [HelpdeskKbController::class, 'show'])->name('kb.show');
         });
 
         // Company Broadcasts & Announcements Module
