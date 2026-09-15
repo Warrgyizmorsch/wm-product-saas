@@ -184,6 +184,7 @@
             $isHrAdmin ? ['label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index'] : null,
             ['label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index'],
             ['label' => 'Helpdesk', 'icon' => 'feather-life-buoy', 'route' => 'hrms.helpdesk.tickets.index'],
+            ['label' => 'Recruitment', 'icon' => 'feather-user-check', 'route' => 'hrms.recruitment.index'],
             ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => array_values(array_filter([
                 $isHrAdmin ? ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'] : null,
                 ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary'],
