@@ -14,31 +14,42 @@ return new class extends Migration
         if (Schema::hasTable('lead_statuses')) {
             $now = now();
 
-            // 1. Update any existing 'Converted' record where company_id or branch_id is NULL
-            DB::table('lead_statuses')
-                ->where('name', 'Converted')
-                ->where(function ($q) {
-                    $q->whereNull('company_id')->orWhereNull('branch_id');
-                })
-                ->update([
-                    'company_id' => 1,
-                    'branch_id'  => 1,
-                ]);
+            // Only fall back to company/branch #1 when those rows actually exist —
+            // on a fresh database (new install, test run) they don't, and the
+            // foreign keys would reject the value.
+            $defaultCompanyId = Schema::hasTable('companies') && DB::table('companies')->where('id', 1)->exists() ? 1 : null;
+            $defaultBranchId = Schema::hasTable('branches') && DB::table('branches')->where('id', 1)->exists() ? 1 : null;
 
-            // 2. Get distinct combinations of (tenant_id, company_id, branch_id) from lead_statuses
+            // 1. Update any existing 'Converted' record where company_id or branch_id is NULL
+            $defaults = array_filter([
+                'company_id' => $defaultCompanyId,
+                'branch_id'  => $defaultBranchId,
+            ]);
+
+            if ($defaults !== []) {
+                DB::table('lead_statuses')
+                    ->where('name', 'Converted')
+                    ->where(function ($q) {
+                        $q->whereNull('company_id')->orWhereNull('branch_id');
+                    })
+                    ->update($defaults);
+            }
+
+            // 2. Get distinct combinations of (tenant_id, company_id, branch_id) from lead_statuses.
+            // An empty table means nothing has been seeded yet, so there is nothing to add to.
             $combinations = DB::table('lead_statuses')
                 ->select('tenant_id', 'company_id', 'branch_id')
                 ->distinct()
                 ->get();
 
-            if ($combinations->isEmpty()) {
-                $combinations = collect([(object)['tenant_id' => 1, 'company_id' => 1, 'branch_id' => 1]]);
-            }
-
             foreach ($combinations as $combo) {
-                $tenantId  = $combo->tenant_id ?: 1;
-                $companyId = $combo->company_id ?: 1;
-                $branchId  = $combo->branch_id ?: 1;
+                if (! $combo->tenant_id) {
+                    continue;
+                }
+
+                $tenantId  = $combo->tenant_id;
+                $companyId = $combo->company_id ?: $defaultCompanyId;
+                $branchId  = $combo->branch_id ?: $defaultBranchId;
 
                 $exists = DB::table('lead_statuses')
                     ->where('tenant_id', $tenantId)
@@ -60,6 +71,8 @@ return new class extends Migration
                         'updated_at'   => $now,
                     ]);
                 }
+            }
+
             // Adjust sort order for Won and Lost so Converted stays at position #3
             DB::table('lead_statuses')->where('name', 'Won')->where('sort_order', '<', 4)->update(['sort_order' => 4]);
             DB::table('lead_statuses')->where('name', 'Lost')->where('sort_order', '<', 5)->update(['sort_order' => 5]);

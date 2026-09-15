@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
+use App\Core\Tenant\LoginTenantLocator;
+
 class LoginController extends Controller
 {
     public function create(Request $request): View|RedirectResponse
@@ -25,6 +27,19 @@ class LoginController extends Controller
             'email' => 'required|email',
             'password' => 'required|string',
         ]);
+
+        // On a shared host (localhost / a central domain) the URL doesn't identify
+        // the tenant, so take it from the account being signed into. TenantResolver
+        // reads it from the session on this and every following request, which also
+        // lets TenantAwareUserProvider accept the user for their own tenant.
+        if (! $request->hasHeader(config('tenancy.header'))
+            && in_array($request->getHost(), config('tenancy.central_domains'), true)) {
+            $tenantSlug = app(LoginTenantLocator::class)->slugFor($credentials['email'], $credentials['password']);
+
+            if ($tenantSlug !== null) {
+                $request->session()->put('tenant_slug', $tenantSlug);
+            }
+        }
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             return back()
