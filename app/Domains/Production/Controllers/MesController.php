@@ -585,13 +585,90 @@ class MesController extends Controller
         $tenantId = require_tenant_id();
         $userId = auth()->id();
 
-        $assignments = ProductionOperatorAssignment::with(['operation.order.product', 'operation.workCenter'])
+        $query = ProductionOperatorAssignment::with([
+            'operation.order.product',
+            'operation.workCenter',
+            'operation.machine',
+        ])
             ->where('tenant_id', $tenantId)
-            ->where('user_id', $userId)
-            ->orderBy('id', 'desc')
+            ->where('user_id', $userId);
+
+        // Filter by Assignment Status
+        if ($request->filled('assignment_status')) {
+            $query->where('status', $request->input('assignment_status'));
+        }
+
+        // Filter by Operation Status
+        if ($request->filled('operation_status')) {
+            $query->whereHas('operation', function ($q) use ($request) {
+                $q->where('status', $request->input('operation_status'));
+            });
+        }
+
+        // Filter by Production Order
+        if ($request->filled('production_order_id')) {
+            $query->whereHas('operation', function ($q) use ($request) {
+                $q->where('production_order_id', $request->input('production_order_id'));
+            });
+        }
+
+        // Search by Operation name, OP code, Order number, Work Center, or Machine
+        if ($request->filled('search')) {
+            $search = '%' . trim($request->input('search')) . '%';
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('operation', function ($opQ) use ($search) {
+                    $opQ->where('name', 'like', $search)
+                        ->orWhere('operation_number', 'like', $search)
+                        ->orWhereHas('order', function ($ordQ) use ($search) {
+                            $ordQ->where('order_number', 'like', $search)
+                                ->orWhereHas('product', function ($prodQ) use ($search) {
+                                    $prodQ->where('name', 'like', $search);
+                                });
+                        })
+                        ->orWhereHas('workCenter', function ($wcQ) use ($search) {
+                            $wcQ->where('name', 'like', $search);
+                        })
+                        ->orWhereHas('machine', function ($mQ) use ($search) {
+                            $mQ->where('name', 'like', $search);
+                        });
+                });
+            });
+        }
+
+        $assignments = $query->get();
+
+        // Group by Production Order, and sort operations within each order by sequence (then operation_number)
+        $groupedAssignments = $assignments
+            ->groupBy(function ($assign) {
+                return $assign->operation->production_order_id ?? 0;
+            })
+            ->map(function ($orderAssignments) {
+                return $orderAssignments->sortBy(function ($assign) {
+                    $seq = $assign->operation->sequence ?? 9999;
+                    $opNum = $assign->operation->operation_number ?? 'OP9999';
+                    return sprintf('%06d_%s', $seq, $opNum);
+                })->values();
+            })
+            ->sortBy(function ($orderAssignments) {
+                $first = $orderAssignments->first();
+                return $first->operation->order->order_number ?? 'ZZZZZ';
+            });
+
+        // Get distinct production orders for operator's assignments to populate filter dropdown
+        $userOrderIds = ProductionOperatorAssignment::where('production_operator_assignments.tenant_id', $tenantId)
+            ->where('production_operator_assignments.user_id', $userId)
+            ->join('production_order_operations', 'production_operator_assignments.production_order_operation_id', '=', 'production_order_operations.id')
+            ->pluck('production_order_operations.production_order_id')
+            ->filter()
+            ->unique();
+
+        $orders = \App\Domains\Production\Models\ProductionOrder::where('tenant_id', $tenantId)
+            ->whereIn('id', $userOrderIds)
+            ->with('product')
+            ->orderBy('order_number')
             ->get();
 
-        return view('modules.production.mes.operator.my-operations', compact('assignments'));
+        return view('modules.production.mes.operator.my-operations', compact('assignments', 'groupedAssignments', 'orders'));
     }
 
     /**

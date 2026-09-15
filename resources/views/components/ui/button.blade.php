@@ -29,7 +29,7 @@
             /* Comfortable padding scoped to the component (overrides the global
                .btn padding without touching raw buttons or icon-btns). */
             .btn.btn-animated {
-                padding: 8px 16px !important;
+                padding: 8px 12px !important;
                 letter-spacing: 0.01em;
             }
             .btn.btn-animated.btn-sm {
