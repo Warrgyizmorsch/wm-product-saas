@@ -32,9 +32,13 @@
                 @forelse ($disposals as $disposal)
                     <tr>
                         <td class="ps-4">
-                            <a href="{{ route('accounting.fixed-assets.show', $disposal->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                                {{ $disposal->asset->asset_code }}
-                            </a>
+                            @if ($disposal->asset)
+                                <a href="{{ route('accounting.fixed-assets.show', $disposal->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
+                                    {{ $disposal->asset->asset_code }}
+                                </a>
+                            @else
+                                <span class="fw-bold font-monospace text-muted">Deleted asset #{{ $disposal->asset_id }}</span>
+                            @endif
                         </td>
                         <td class="text-capitalize">{{ $disposal->disposal_type }}</td>
                         <td>{{ $disposal->disposal_date->format('d M Y') }}</td>
@@ -51,7 +55,7 @@
                                         <i class="feather-check-circle"></i>
                                     </button>
                                 </form>
-                                <button type="button" class="btn btn-xs btn-soft-danger border-0" title="Reject" onclick="openRejectModal('{{ route('accounting.fixed-assets.disposals.reject', $disposal) }}', '{{ $disposal->asset->asset_code }}')">
+                                <button type="button" class="btn btn-xs btn-soft-danger border-0" title="Reject" onclick="openRejectModal('{{ route('accounting.fixed-assets.disposals.reject', $disposal) }}', '{{ $disposal->asset?->asset_code ?? 'Deleted asset #'.$disposal->asset_id }}')">
                                     <i class="feather-x-circle"></i>
                                 </button>
                             @elseif ($disposal->status === 'approved' && $canApprove)

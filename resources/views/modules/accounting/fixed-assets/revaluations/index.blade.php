@@ -28,9 +28,13 @@
                 @forelse ($revaluations as $revaluation)
                     <tr>
                         <td class="ps-4">
-                            <a href="{{ route('accounting.fixed-assets.show', $revaluation->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                                {{ $revaluation->asset->asset_code }}
-                            </a>
+                            @if ($revaluation->asset)
+                                <a href="{{ route('accounting.fixed-assets.show', $revaluation->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
+                                    {{ $revaluation->asset->asset_code }}
+                                </a>
+                            @else
+                                <span class="fw-bold font-monospace text-muted">Deleted asset #{{ $revaluation->asset_id }}</span>
+                            @endif
                         </td>
                         <td>{{ $revaluation->revaluation_date->format('d M Y') }}</td>
                         <td class="text-end">{{ number_format($revaluation->previous_book_value, 2) }}</td>

@@ -254,6 +254,35 @@ class Asset extends BaseModel
     }
 
     /**
+     * Why this asset can't be deleted, or null if it can. depreciationSchedules
+     * has a cascading foreign key (deleting the asset silently deletes its
+     * schedules too, even posted ones already reflected in the ledger), so this
+     * is checked in application code rather than left to the database — unlike
+     * disposals/writeOffs/revaluations, whose foreign keys already restrict the
+     * delete outright.
+     */
+    public function blockingAccountingRecords(): ?string
+    {
+        if ($this->depreciationSchedules()->where('status', \App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule::STATUS_POSTED)->exists()) {
+            return 'it has depreciation already posted to the general ledger';
+        }
+
+        if ($this->disposals()->exists()) {
+            return 'it has a disposal record';
+        }
+
+        if ($this->writeOffs()->exists()) {
+            return 'it has a write-off record';
+        }
+
+        if ($this->revaluations()->exists()) {
+            return 'it has a revaluation record';
+        }
+
+        return null;
+    }
+
+    /**
      * The Production machine (if any) commissioned from this asset. Read-only
      * inverse of Machine::asset() — Production owns the write side of the link.
      */

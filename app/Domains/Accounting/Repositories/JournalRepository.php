@@ -42,9 +42,18 @@ class JournalRepository implements JournalRepositoryInterface
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
+            // Matches every column the list actually shows — number, date, source,
+            // who posted it, memo, both amounts and status — not just memo/number.
             $query->where(function ($q) use ($search): void {
                 $q->where('journal_number', 'like', "%{$search}%")
-                  ->orWhere('memo', 'like', "%{$search}%");
+                  ->orWhere('memo', 'like', "%{$search}%")
+                  ->orWhere('source', 'like', "%{$search}%")
+                  ->orWhere('status', 'like', "%{$search}%")
+                  // Decimal columns compare fine against LIKE as text on both MySQL and SQLite.
+                  ->orWhere('total_debit', 'like', "%{$search}%")
+                  ->orWhere('total_credit', 'like', "%{$search}%")
+                  // The From/To filters already cover the date column itself.
+                  ->orWhereHas('postedBy', fn ($posted) => $posted->where('name', 'like', "%{$search}%"));
             });
         }
 

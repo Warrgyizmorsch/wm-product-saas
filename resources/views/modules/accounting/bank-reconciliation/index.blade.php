@@ -30,7 +30,10 @@
             <x-ui.select label="Status" name="status" :selected="$filters['status'] ?? ''" :options="[
                 '' => 'All', 'in_progress' => 'In Progress', 'completed' => 'Completed',
             ]" />
-            <x-ui.button type="submit" variant="primary" size="sm" class="w-100">Apply</x-ui.button>
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                <x-ui.button href="{{ route('accounting.bank-reconciliation.index') }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+            </div>
         </form>
     </x-ui.filter>
     @can('create', \App\Domains\Accounting\Models\BankReconciliation::class)
@@ -47,6 +50,11 @@
                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                 <input type="text" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control border-0 bg-transparent p-0 fs-13"
                        placeholder="Search account code or name..." style="box-shadow: none; height: 32px;">
+                @if (!empty($filters['search']))
+                    <a href="{{ route('accounting.bank-reconciliation.index', collect($filters)->except('search')->filter()->all()) }}" class="text-muted ms-2" title="Clear search">
+                        <i class="feather-x" style="font-size: 14px;"></i>
+                    </a>
+                @endif
                 @if (!empty($filters['status']))
                     <input type="hidden" name="status" value="{{ $filters['status'] }}">
                 @endif

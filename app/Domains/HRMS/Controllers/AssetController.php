@@ -151,6 +151,10 @@ class AssetController extends Controller
             return redirect()->back()->with('error', "Cannot delete asset '{$asset->asset_code}' because it is currently allocated to an employee. Please return or deallocate it first.");
         }
 
+        if ($reason = $asset->blockingAccountingRecords()) {
+            return redirect()->back()->with('error', "Cannot delete asset '{$asset->asset_code}' because {$reason}.");
+        }
+
         $this->assetRepository->deleteAsset($asset);
 
         return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_deleted'));
