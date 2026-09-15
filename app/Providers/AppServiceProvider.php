@@ -382,6 +382,16 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
         );
 
+        // ── Accounting dashboard cache: any journal change can move a figure ──
+        $flushAccountingDashboard = function ($model): void {
+            if ($model->tenant_id) {
+                app(\App\Domains\Accounting\Services\Dashboard\DashboardCache::class)->flush((int) $model->tenant_id);
+            }
+        };
+        \App\Domains\Accounting\Models\Journal::saved($flushAccountingDashboard);
+        \App\Domains\Accounting\Models\Journal::deleted($flushAccountingDashboard);
+        \App\Domains\Accounting\Models\JournalEntry::created($flushAccountingDashboard);
+
         // ── Tenant provisioning: each module adds its own default masters ─────
         foreach ([
             \App\Domains\Accounting\Listeners\ProvisionChartOfAccounts::class,

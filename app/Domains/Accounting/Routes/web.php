@@ -39,6 +39,9 @@ Route::prefix('accounting')
     ->as('accounting.')
     ->group(function (): void {
         Route::get('dashboard', [AccountingDashboardController::class, 'index'])->name('dashboard');
+        Route::get('dashboard/export/{format}', [AccountingDashboardController::class, 'export'])
+            ->whereIn('format', ['pdf', 'xlsx'])
+            ->name('dashboard.export');
 
         Route::get('chart-of-accounts', [ChartOfAccountController::class, 'index'])->name('chart-of-accounts.index');
         Route::post('chart-of-accounts', [ChartOfAccountController::class, 'store'])->name('chart-of-accounts.store');

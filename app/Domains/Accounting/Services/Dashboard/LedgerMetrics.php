@@ -35,9 +35,9 @@ class LedgerMetrics
         return $this->journals->balancesAsOf($tenantId, $date->copy()->endOfDay());
     }
 
-    public function movements(int $tenantId, Carbon $from, Carbon $to): Collection
+    public function movements(int $tenantId, Carbon $from, Carbon $to, ?int $costCenterId = null): Collection
     {
-        return $this->journals->movementsBetween($tenantId, $from->copy()->startOfDay(), $to->copy()->endOfDay());
+        return $this->journals->movementsBetween($tenantId, $from->copy()->startOfDay(), $to->copy()->endOfDay(), $costCenterId);
     }
 
     /**
@@ -158,7 +158,7 @@ class LedgerMetrics
      *
      * @return array{labels: list<string>, income: list<float>, expense: list<float>}
      */
-    public function trend(int $tenantId, Carbon $end): array
+    public function trend(int $tenantId, Carbon $end, ?int $costCenterId = null): array
     {
         $start = $end->copy()->startOfMonth()->subMonthsNoOverflow(self::TREND_MONTHS - 1);
         $months = [];
@@ -168,7 +168,7 @@ class LedgerMetrics
             $months[$month->format('Y-m')] = ['label' => $month->format('M Y'), 'income' => 0.0, 'expense' => 0.0];
         }
 
-        foreach ($this->journals->dailyMovements($tenantId, $start, $end->copy()->endOfDay()) as $row) {
+        foreach ($this->journals->dailyMovements($tenantId, $start, $end->copy()->endOfDay(), $costCenterId) as $row) {
             $account = $row->account;
             $key = Carbon::parse($row->journal_date)->format('Y-m');
 
