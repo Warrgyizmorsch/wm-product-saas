@@ -65,6 +65,8 @@ return new class extends Migration
             DB::table('lead_statuses')->where('name', 'Lost')->where('sort_order', '<', 5)->update(['sort_order' => 5]);
         }
     }
+}
+
 
     /**
      * Reverse the migrations.
