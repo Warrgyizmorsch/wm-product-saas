@@ -101,6 +101,22 @@ class ChartOfAccountsService
      * SalesAccountingService::postInvoiceJournal). Every other row below is a
      * new ledger added to reach the sheet's full list.
      */
+    /**
+     * provisionDefaults() re-applies the template's names and types to existing
+     * codes, which would undo a tenant's renames — so tenant provisioning only
+     * runs it for a tenant that has no accounts yet.
+     */
+    public function provisionDefaultsIfMissing(int $tenantId): bool
+    {
+        if (ChartOfAccount::query()->where('tenant_id', $tenantId)->exists()) {
+            return false;
+        }
+
+        $this->provisionDefaults($tenantId);
+
+        return true;
+    }
+
     public function provisionDefaults(int $tenantId): void
     {
         $headers = [

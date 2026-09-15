@@ -328,7 +328,9 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                 ->where('tenant_id', auth()->user()?->tenant_id ?: 1)
                 ->orderBy('name')
                 ->get(),
-            'roles' => \App\Models\Access\Role::all(),
+            'roles' => auth()->check()
+                ? app(\App\Services\Access\AccessService::class)->assignableRoles(auth()->user(), tenant_id() ?? auth()->user()->tenant_id)
+                : collect(),
         ];
     }
 }

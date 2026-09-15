@@ -239,6 +239,10 @@ class EmployeeController extends Controller
         }
 
         if (!$isHrOrAdmin) {
+            // Self-service edits must never change the account's system role.
+            $request->offsetUnset('role_id');
+            $request->query->remove('role_id');
+
             $request->merge([
                 'employee_id' => $request->input('employee_id', $employee->employee_id),
                 'user_id' => $request->input('user_id', $employee->user_id),
@@ -315,7 +319,11 @@ class EmployeeController extends Controller
                     ->whereNull('deleted_at')
                     ->ignore($employeeId),
             ],
-            'role_id' => ['nullable', 'exists:roles,id'],
+            // role_id is written straight to users.role_id, so only roles the
+            // acting user may hand out are accepted (never super_admin for a non-super-admin).
+            'role_id' => ['nullable', Rule::in(auth()->check()
+                ? app(AccessService::class)->assignableRoles(auth()->user(), $tenantId)->pluck('id')->all()
+                : [])],
 
             'title' => ['nullable', 'string', 'max:50'],
             'full_name' => ['required', 'string', 'max:255'],

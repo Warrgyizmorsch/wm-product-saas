@@ -382,6 +382,17 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
         );
 
+        // ── Tenant provisioning: each module adds its own default masters ─────
+        foreach ([
+            \App\Domains\Accounting\Listeners\ProvisionChartOfAccounts::class,
+            \App\Domains\Platform\Listeners\ProvisionPaymentTerms::class,
+            \App\Domains\CRM\Listeners\ProvisionCrmDefaults::class,
+            \App\Domains\Inventory\Listeners\ProvisionInventoryDefaults::class,
+            \App\Domains\Production\Listeners\ProvisionProductionDefaults::class,
+        ] as $listener) {
+            \Illuminate\Support\Facades\Event::listen(\App\Core\Tenant\Events\TenantProvisioning::class, $listener);
+        }
+
         // ── Production Policies ───────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionKpiTarget::class,

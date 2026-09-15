@@ -75,4 +75,24 @@ class LoginTenantTest extends TestCase
 
         $this->assertGuest();
     }
+
+    /** @test */
+    public function the_same_email_in_a_second_tenant_signs_into_that_tenants_account(): void
+    {
+        // Created after the production owner, so it has the higher id — the
+        // lookup used to return the owner and reject this valid sign-in.
+        $demoAccount = User::create([
+            'tenant_id' => $this->demo->id,
+            'name' => 'Demo Account',
+            'email' => 'production@example.com',
+            'password' => bcrypt('demo-pass'),
+        ]);
+
+        $this->onFallbackTenant()
+            ->post(route('login.store'), ['email' => 'production@example.com', 'password' => 'demo-pass'])
+            ->assertRedirect(route('dashboard'))
+            ->assertSessionHas('tenant_slug', 'demo');
+
+        $this->assertAuthenticatedAs($demoAccount);
+    }
 }

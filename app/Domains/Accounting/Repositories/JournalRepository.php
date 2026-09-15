@@ -197,4 +197,33 @@ class JournalRepository implements JournalRepositoryInterface
             ->with('account')
             ->get();
     }
+
+    public function movementsBetween(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to): Collection
+    {
+        return JournalEntry::query()
+            ->select('chart_of_account_id')
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->whereHas('journal', fn ($q) => $q
+                ->where('tenant_id', $tenantId)
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->whereBetween('journal_date', [$from, $to]))
+            ->groupBy('chart_of_account_id')
+            ->with('account')
+            ->get();
+    }
+
+    public function dailyMovements(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to): Collection
+    {
+        return JournalEntry::query()
+            ->join('journals', 'journals.id', '=', 'journal_entries.journal_id')
+            ->where('journals.tenant_id', $tenantId)
+            ->whereIn('journals.status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+            ->whereNull('journals.deleted_at')
+            ->whereBetween('journals.journal_date', [$from, $to])
+            ->select('journal_entries.chart_of_account_id', 'journals.journal_date')
+            ->selectRaw('SUM(journal_entries.debit) as debit, SUM(journal_entries.credit) as credit')
+            ->groupBy('journal_entries.chart_of_account_id', 'journals.journal_date')
+            ->with('account')
+            ->get();
+    }
 }

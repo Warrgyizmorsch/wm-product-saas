@@ -59,6 +59,24 @@ interface JournalRepositoryInterface
     public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection;
 
     /**
+     * One row per account with summed debit/credit across every posted or
+     * reversed journal dated within [$from, $to] — a period's movement in one
+     * query, rather than the difference of two balancesAsOf() calls.
+     *
+     * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
+     */
+    public function movementsBetween(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to): Collection;
+
+    /**
+     * Summed debit/credit per account per journal date within [$from, $to].
+     * Callers bucket the dates themselves (e.g. by month), since date
+     * grouping functions differ between MySQL and SQLite.
+     *
+     * @return Collection<int, object{chart_of_account_id: int, journal_date: string, debit: float, credit: float}>
+     */
+    public function dailyMovements(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to): Collection;
+
+    /**
      * Every journal (posted or reversed — a Day Book is a chronological
      * record of what happened, not just what's still in force) dated on one
      * calendar day, with entries/account eager-loaded, for the Day Book report.

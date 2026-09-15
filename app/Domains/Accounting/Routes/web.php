@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\Accounting\Controllers\AccountingAuditLogController;
+use App\Domains\Accounting\Controllers\AccountingDashboardController;
 use App\Domains\Accounting\Controllers\AccountingPeriodController;
 use App\Domains\Accounting\Controllers\AccountingPostingFailureController;
 use App\Domains\Accounting\Controllers\ApAgingController;
@@ -37,6 +38,8 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('accounting')
     ->as('accounting.')
     ->group(function (): void {
+        Route::get('dashboard', [AccountingDashboardController::class, 'index'])->name('dashboard');
+
         Route::get('chart-of-accounts', [ChartOfAccountController::class, 'index'])->name('chart-of-accounts.index');
         Route::post('chart-of-accounts', [ChartOfAccountController::class, 'store'])->name('chart-of-accounts.store');
         Route::put('chart-of-accounts/{account}', [ChartOfAccountController::class, 'update'])->name('chart-of-accounts.update');

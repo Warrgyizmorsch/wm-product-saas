@@ -191,6 +191,7 @@
         ])),
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
+                ['label' => 'Dashboard', 'route' => 'accounting.dashboard'],
                 ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
                 ['label' => 'Cost Centers', 'route' => 'accounting.cost-centers.index'],
                 ['label' => 'Fixed Asset Register', 'route' => 'accounting.fixed-assets.index'],

@@ -33,7 +33,7 @@ class AccessService
         // platform-wide checks that have no tenant_id in context, which would
         // let a tenant owner browse or switch into another tenant entirely
         // (see TenantPolicy's own comment on this exact risk).
-        if ($user->role === 'admin' || $user->role === 'super_admin') {
+        if ($this->legacyAdminRoleTextAllows($user, $permissionName, $context)) {
             return true;
         }
 
@@ -217,6 +217,52 @@ class AccessService
         }
 
         return Role::query()->whereIn('id', $roleIds)->where('slug', $roleSlug)->exists();
+    }
+
+    /**
+     * Roles $actor may give a user in $tenantId: system roles plus that
+     * tenant's own, and super_admin only when the actor already holds it.
+     * Every screen that writes a role (users.role_id or user_roles) must limit
+     * its input to this list — otherwise anyone who can edit a user can make
+     * them a platform admin.
+     *
+     * @return Collection<int, Role>
+     */
+    public function assignableRoles(User $actor, ?int $tenantId): Collection
+    {
+        $query = Role::query()->where(function ($query) use ($tenantId): void {
+            $query->whereNull('tenant_id')
+                ->when($tenantId !== null, fn ($q) => $q->orWhere('tenant_id', $tenantId));
+        });
+
+        if (! $this->hasRole($actor, 'super_admin')) {
+            $query->where('slug', '!=', 'super_admin');
+        }
+
+        return $query->orderBy('level')->get();
+    }
+
+    /**
+     * The legacy users.role text column carries no tenant and is written
+     * outside the RBAC screens, so 'admin'/'super_admin' there only makes a
+     * platform admin on an account with no tenant. On a tenant-bound account
+     * it still opens everything inside that account's own tenant (Production
+     * relies on this), but never a platform.* permission or another tenant.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function legacyAdminRoleTextAllows(User $user, string $permissionName, array $context): bool
+    {
+        if (! in_array($user->role, ['admin', 'super_admin'], true)) {
+            return false;
+        }
+
+        if ($user->tenant_id === null) {
+            return true;
+        }
+
+        return ! str_starts_with($permissionName, 'platform.')
+            && $this->sameValue($context['tenant_id'] ?? $user->tenant_id, $user->tenant_id);
     }
 
     /**
