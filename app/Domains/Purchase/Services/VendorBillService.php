@@ -389,7 +389,7 @@ class VendorBillService
                     'reference_type' => 'vendor_bill_advance_settlement',
                     'reference_id'   => $bill->id,
                     'memo'           => "Advance Credit Adjustment of ₹{$appliedAmount} for Bill {$bill->bill_number}",
-                    'posted_by'      => auth()->id() ?: 1,
+                    'posted_by'      => auth()->id(),
                 ]);
             }
         } catch (\Throwable $e) {

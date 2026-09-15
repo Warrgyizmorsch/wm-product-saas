@@ -34,6 +34,9 @@
                 '' => 'All', 'manual' => 'Manual', 'sales' => 'Sales', 'purchase' => 'Purchase',
                 'inventory' => 'Inventory', 'production' => 'Production', 'payroll' => 'Payroll',
             ]" />
+            <x-ui.select label="Posted by" name="posted_by" :selected="$filters['posted_by'] ?? ''" :options="['' => 'Anyone', 'system' => 'System (auto-posted)'] + $posters->pluck('name', 'id')->all()" />
+            <x-ui.input label="From" name="from" type="date" :value="$filters['from'] ?? ''" />
+            <x-ui.input label="To" name="to" type="date" :value="$filters['to'] ?? ''" />
             <x-ui.button type="submit" variant="primary" size="sm" class="w-100">Apply</x-ui.button>
         </form>
     </x-ui.filter>
@@ -55,9 +58,11 @@
                 @if (!empty($filters['status']))
                     <input type="hidden" name="status" value="{{ $filters['status'] }}">
                 @endif
-                @if (!empty($filters['source']))
-                    <input type="hidden" name="source" value="{{ $filters['source'] }}">
-                @endif
+                @foreach (['source', 'posted_by', 'from', 'to'] as $kept)
+                    @if (!empty($filters[$kept]))
+                        <input type="hidden" name="{{ $kept }}" value="{{ $filters[$kept] }}">
+                    @endif
+                @endforeach
             </form>
         </div>
 
@@ -75,6 +80,7 @@
                         </a>
                     </th>
                     <th>Source</th>
+                    <th>Posted by</th>
                     <th>Memo</th>
                     <th class="text-end">
                         <a href="{{ $sortUrl('total_debit') }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1">
@@ -100,6 +106,7 @@
                         <td class="ps-4 fw-bold font-monospace">{{ $journal->journal_number }}</td>
                         <td>{{ $journal->journal_date->format('d M Y') }}</td>
                         <td class="text-capitalize">{{ $journal->source }}</td>
+                        <td>{{ $journal->postedBy?->name ?? 'System' }}</td>
                         <td class="text-muted text-truncate" style="max-width: 220px;">{{ $journal->memo ?: '—' }}</td>
                         <td class="text-end">{{ number_format($journal->total_debit, 2) }}</td>
                         <td class="text-end">{{ number_format($journal->total_credit, 2) }}</td>
@@ -118,7 +125,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center py-5 text-muted">
+                        <td colspan="9" class="text-center py-5 text-muted">
                             <i class="feather-book-open fs-1 mb-2 d-block"></i>
                             No journals found.
                         </td>

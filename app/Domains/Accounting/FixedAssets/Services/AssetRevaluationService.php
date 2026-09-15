@@ -8,6 +8,7 @@ use App\Domains\Accounting\FixedAssets\Models\AssetRevaluation;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Support\AccountCode;
 use App\Domains\HRMS\Models\Asset;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -21,8 +22,8 @@ use InvalidArgumentException;
  */
 class AssetRevaluationService
 {
-    private const FALLBACK_REVALUATION_RESERVE_CODE = '3200';
-    private const FALLBACK_IMPAIRMENT_LOSS_CODE = '5920';
+    private const FALLBACK_REVALUATION_RESERVE_CODE = AccountCode::REVALUATION_RESERVE;
+    private const FALLBACK_IMPAIRMENT_LOSS_CODE = AccountCode::IMPAIRMENT_LOSS;
 
     public function __construct(
         private readonly JournalService $journals,
@@ -101,7 +102,7 @@ class AssetRevaluationService
             $category = $asset->category;
             $tenantId = $asset->tenant_id;
 
-            $fixedAssetAccount = $category?->chartOfAccount ?? $this->accounts->findByCode('1500', $tenantId);
+            $fixedAssetAccount = $category?->chartOfAccount ?? $this->accounts->findByCode(AccountCode::FIXED_ASSETS, $tenantId);
             if ($fixedAssetAccount === null) {
                 throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: no fixed asset account configured.");
             }

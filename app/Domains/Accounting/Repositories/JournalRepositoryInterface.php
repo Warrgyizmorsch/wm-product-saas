@@ -8,7 +8,26 @@ use Illuminate\Database\Eloquent\Collection;
 
 interface JournalRepositoryInterface
 {
+    /**
+     * Filters: status, source, voucher_type, posted_by (user id, or 'system' for
+     * auto-postings without a user), from / to (journal date), search, sort, direction.
+     */
     public function paginateAll(array $filters = [], int $perPage = 15): LengthAwarePaginator;
+
+    /**
+     * Users who have posted at least one journal, by name, for posted-by filters.
+     *
+     * @return \Illuminate\Support\Collection<int, \App\Models\User>
+     */
+    public function posters(): \Illuminate\Support\Collection;
+
+    /**
+     * Posted and reversed journals dated within [$from, $to], counted and summed
+     * per poster, voucher type and status.
+     *
+     * @return \Illuminate\Support\Collection<int, object{posted_by: ?int, voucher_type: ?string, status: string, documents: int, amount: float}>
+     */
+    public function activityByPoster(\DateTimeInterface $from, \DateTimeInterface $to): \Illuminate\Support\Collection;
 
     public function find(int $id): ?Journal;
 
