@@ -32,7 +32,7 @@ return [
             ['label' => 'Document Master', 'route' => 'hrms.documents-master.index'],
             ['label' => 'Holiday Calendar', 'route' => 'hrms.holidays.index'],
             ['label' => 'Expense Policies', 'route' => 'hrms.expense-policy.index'],
-            ['label' => 'Expense Categories', 'route' => 'hrms.expense-categories.index'],
+            ['label' => 'Expense Categories', 'route' => 'hrms.expense-categories.index', 'permission' => 'hrms.expense_policies.manage'],
             ['label' => 'Offboarding Policies', 'route' => 'hrms.offboarding-policies.index'],
         ],
     ],
@@ -44,7 +44,7 @@ return [
         'section' => 'hrms', 'order' => 35,
         'label' => 'Employee Lifecycle', 'icon' => 'feather-user-check',
         'children' => [
-            ['label' => 'Probation', 'route' => 'hrms.probation.index', 'permission' => array_merge(['hrms.probation.manage'], $hrAdmin)],
+            ['label' => 'Probation', 'route' => 'hrms.probation.index', 'permission' => 'hrms.employees.view'],
             ['label' => 'Employee Exits', 'route' => 'hrms.exits.index', 'permission' => 'hrms.employee_exits.view'],
         ],
     ],

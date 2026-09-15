@@ -318,6 +318,17 @@ class AccessService
             if ($legacyRoleIsUsable) {
                 $roleIds->push($user->role_id);
             }
+        } elseif (filled($user->role) && ! in_array($user->role, ['admin', 'super_admin'], true)) {
+            // Older accounts carry only the users.role text (e.g. 'production_engineer').
+            // Resolve it to the system role of that slug so its real grants apply,
+            // rather than the legacy Production permission map. admin/super_admin
+            // text is never resolved here: legacyAdminRoleTextAllows() handles it
+            // and keeps it inside the user's own tenant.
+            $textRoleId = Role::query()->whereNull('tenant_id')->where('slug', $user->role)->value('id');
+
+            if ($textRoleId !== null) {
+                $roleIds->push($textRoleId);
+            }
         }
 
         $assignedRoleIds = UserRole::query()
@@ -371,6 +382,13 @@ class AccessService
         return $left !== null && $right !== null && (string) $left === (string) $right;
     }
 
+    /**
+     * Deprecated fallback: config('production.permissions') maps permission names
+     * to role slugs. Every entry is now seeded as a real Permission granted to the
+     * same roles, and users.role text resolves to its system role (roleIdsFor()),
+     * so this only decides anything where permissions were never seeded (older
+     * Production tests). Remove once those tests seed RbacSeeder.
+     */
     private function allowsLegacyProductionPermission(User $user, string $permissionName): bool
     {
         $permissionMap = config('production.permissions', []);

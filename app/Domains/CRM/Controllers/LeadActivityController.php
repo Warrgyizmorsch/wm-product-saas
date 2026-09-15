@@ -12,6 +12,9 @@ class LeadActivityController extends Controller
 {
     public function index(Request $request)
     {
+        // The activity calendar shows every lead's follow-ups — same access as the leads list.
+        $this->authorize('viewAny', Lead::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $view = $request->input('view', 'month'); // month, week, day

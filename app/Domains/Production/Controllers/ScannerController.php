@@ -42,6 +42,9 @@ class ScannerController extends Controller
      */
     public function index()
     {
+        // Same gate as the other shop-floor (MES) screens.
+        abort_unless(auth()->user()?->hasProductionPermission('production.mes.execute'), 403);
+
         return view('modules.production.mes.operator.scanner');
     }
 
