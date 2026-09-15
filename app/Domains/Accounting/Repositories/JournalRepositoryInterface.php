@@ -65,7 +65,7 @@ interface JournalRepositoryInterface
      *
      * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
      */
-    public function movementsBetween(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to): Collection;
+    public function movementsBetween(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to, ?int $costCenterId = null): Collection;
 
     /**
      * Summed debit/credit per account per journal date within [$from, $to].
@@ -74,7 +74,7 @@ interface JournalRepositoryInterface
      *
      * @return Collection<int, object{chart_of_account_id: int, journal_date: string, debit: float, credit: float}>
      */
-    public function dailyMovements(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to): Collection;
+    public function dailyMovements(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to, ?int $costCenterId = null): Collection;
 
     /**
      * Every journal (posted or reversed — a Day Book is a chronological

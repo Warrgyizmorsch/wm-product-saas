@@ -35,9 +35,9 @@ class LedgerMetrics
         return $this->journals->balancesAsOf($tenantId, $date->copy()->endOfDay());
     }
 
-    public function movements(int $tenantId, Carbon $from, Carbon $to): Collection
+    public function movements(int $tenantId, Carbon $from, Carbon $to, ?int $costCenterId = null): Collection
     {
-        return $this->journals->movementsBetween($tenantId, $from->copy()->startOfDay(), $to->copy()->endOfDay());
+        return $this->journals->movementsBetween($tenantId, $from->copy()->startOfDay(), $to->copy()->endOfDay(), $costCenterId);
     }
 
     /**
@@ -134,21 +134,27 @@ class LedgerMetrics
     }
 
     /**
+     * DSO and DPO use the same open invoices and bills as the aging panels
+     * (outstanding ÷ amount invoiced or billed in the period), so a ratio can
+     * never contradict the aging shown beside it. A negative inventory balance
+     * (stock issued without receipts posted) is not subtracted — that would push
+     * the quick ratio above the current ratio; CloseChecklist flags it instead.
+     *
+     * @param array{invoiced: float, billed: float} $billing
      * @return array{gross_margin: ?float, net_margin: ?float, current_ratio: ?float, quick_ratio: ?float, working_capital: float, dso: ?int, dpo: ?int}
      */
-    public function ratios(array $position, array $profitAndLoss, int $days): array
+    public function ratios(array $position, array $profitAndLoss, int $days, float $openReceivables, float $openPayables, array $billing): array
     {
         $currentLiabilities = $position['current_liabilities'];
-        $purchases = $profitAndLoss['cogs'] > 0 ? $profitAndLoss['cogs'] : $profitAndLoss['expense'];
 
         return [
             'gross_margin' => $profitAndLoss['gross_margin'],
             'net_margin' => $profitAndLoss['net_margin'],
             'current_ratio' => $currentLiabilities > 0 ? round($position['current_assets'] / $currentLiabilities, 2) : null,
-            'quick_ratio' => $currentLiabilities > 0 ? round(($position['current_assets'] - $position['inventory']) / $currentLiabilities, 2) : null,
+            'quick_ratio' => $currentLiabilities > 0 ? round(($position['current_assets'] - max($position['inventory'], 0)) / $currentLiabilities, 2) : null,
             'working_capital' => round($position['current_assets'] - $currentLiabilities, 2),
-            'dso' => $profitAndLoss['income'] > 0 ? (int) round($position['receivables'] / $profitAndLoss['income'] * $days) : null,
-            'dpo' => $purchases > 0 ? (int) round($position['payables'] / $purchases * $days) : null,
+            'dso' => $billing['invoiced'] > 0 ? (int) round($openReceivables / $billing['invoiced'] * $days) : null,
+            'dpo' => $billing['billed'] > 0 ? (int) round($openPayables / $billing['billed'] * $days) : null,
         ];
     }
 
@@ -158,7 +164,7 @@ class LedgerMetrics
      *
      * @return array{labels: list<string>, income: list<float>, expense: list<float>}
      */
-    public function trend(int $tenantId, Carbon $end): array
+    public function trend(int $tenantId, Carbon $end, ?int $costCenterId = null): array
     {
         $start = $end->copy()->startOfMonth()->subMonthsNoOverflow(self::TREND_MONTHS - 1);
         $months = [];
@@ -168,7 +174,7 @@ class LedgerMetrics
             $months[$month->format('Y-m')] = ['label' => $month->format('M Y'), 'income' => 0.0, 'expense' => 0.0];
         }
 
-        foreach ($this->journals->dailyMovements($tenantId, $start, $end->copy()->endOfDay()) as $row) {
+        foreach ($this->journals->dailyMovements($tenantId, $start, $end->copy()->endOfDay(), $costCenterId) as $row) {
             $account = $row->account;
             $key = Carbon::parse($row->journal_date)->format('Y-m');
 

@@ -2,10 +2,13 @@
 
 namespace App\Domains\Accounting\Services;
 
+use App\Core\Company\CompanyScopeRunner;
 use App\Domains\Accounting\Models\AccountingPostingFailure;
 use App\Domains\Accounting\Models\Budget;
+use App\Domains\Accounting\Models\CostCenter;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Services\Dashboard\CloseChecklist;
+use App\Domains\Accounting\Services\Dashboard\DashboardCache;
 use App\Domains\Accounting\Services\Dashboard\LedgerMetrics;
 use App\Domains\Accounting\Services\Dashboard\PartyBalances;
 use App\Domains\Accounting\Support\DashboardPeriod;
@@ -34,6 +37,8 @@ class AccountingDashboardService
         private readonly GstSummaryService $gst,
         private readonly BudgetService $budgets,
         private readonly FiscalPeriodService $periods,
+        private readonly DashboardCache $cache,
+        private readonly CompanyScopeRunner $companies,
     ) {
     }
 
@@ -42,28 +47,72 @@ class AccountingDashboardService
         return $this->periods->periodForDate($today)?->fiscalYear?->start_date?->copy();
     }
 
-    public function summary(int $tenantId, DashboardPeriod $period, ?Carbon $today = null): array
+    public function refresh(int $tenantId): void
+    {
+        $this->cache->flush($tenantId);
+    }
+
+    /**
+     * summary(), cached until a journal changes or DashboardCache::TTL_SECONDS pass.
+     */
+    public function cachedSummary(int $tenantId, DashboardPeriod $period, bool $consolidated = false, ?int $costCenterId = null, ?Carbon $today = null): array
     {
         $today = ($today ?? Carbon::today())->copy()->startOfDay();
+
+        return $this->cache->remember($tenantId, [
+            'company' => $consolidated ? 'all' : company_id(),
+            'branch' => $consolidated ? 'all' : branch_id(),
+            'cost_center' => $costCenterId,
+            'from' => $period->from->toDateString(),
+            'to' => $period->to->toDateString(),
+            'today' => $today->toDateString(),
+        ], fn () => $this->summary($tenantId, $period, $consolidated, $costCenterId, $today) + ['generatedAt' => now()]);
+    }
+
+    /**
+     * @param bool $consolidated every company and branch of the tenant, instead of the selected one
+     * @param int|null $costCenterId limits income, expense, trend and budget figures; balances stay company-wide
+     */
+    public function summary(int $tenantId, DashboardPeriod $period, bool $consolidated = false, ?int $costCenterId = null, ?Carbon $today = null): array
+    {
+        $today = ($today ?? Carbon::today())->copy()->startOfDay();
+        $build = fn () => $this->build($tenantId, $period, $consolidated, $costCenterId, $today);
+
+        return $consolidated ? $this->companies->acrossCompanies($build) : $build();
+    }
+
+    private function build(int $tenantId, DashboardPeriod $period, bool $consolidated, ?int $costCenterId, Carbon $today): array
+    {
         $asOf = $period->to->copy()->startOfDay()->min($today);
 
         $position = $this->ledger->position($this->ledger->balancesAsOf($tenantId, $asOf));
-        $movements = $this->ledger->movements($tenantId, $period->from, $period->to);
+        $movements = $this->ledger->movements($tenantId, $period->from, $period->to, $costCenterId);
         $profitAndLoss = $this->ledger->profitAndLoss($movements);
-        $previous = $this->ledger->profitAndLoss($this->ledger->movements($tenantId, $period->previousFrom, $period->previousTo));
-        $trend = $this->ledger->trend($tenantId, $asOf);
+        $previous = $this->ledger->profitAndLoss($this->ledger->movements($tenantId, $period->previousFrom, $period->previousTo, $costCenterId));
+        $trend = $this->ledger->trend($tenantId, $asOf, $costCenterId);
 
         $cashToday = $asOf->equalTo($today)
             ? $position['cash']
             : $this->ledger->position($this->ledger->balancesAsOf($tenantId, $today))['cash'];
         $receivables = $this->parties->receivables($today, self::FORECAST_DAYS);
         $payables = $this->parties->payables($today, self::FORECAST_DAYS);
-        $checklist = $this->checklist->build($today, $position, AccountingPostingFailure::query()->unresolved()->count());
+        $billing = $this->parties->billedBetween($period->from, $period->to);
+        $checklist = $this->checklist->build(
+            $today,
+            $position,
+            AccountingPostingFailure::query()->unresolved()->count(),
+            $receivables['total'],
+            $payables['total'],
+        );
 
         return [
             'period' => $period,
             'asOf' => $asOf,
             'today' => $today,
+            'filters' => [
+                'consolidated' => $consolidated,
+                'cost_center' => $costCenterId ? CostCenter::query()->find($costCenterId) : null,
+            ],
             'kpis' => [
                 'income' => $this->compare($profitAndLoss['income'], $previous['income']),
                 'expense' => $this->compare($profitAndLoss['expense'], $previous['expense']),
@@ -71,7 +120,7 @@ class AccountingDashboardService
             ],
             'profitAndLoss' => $profitAndLoss,
             'cash' => ['total' => $position['cash'], 'accounts' => $position['cash_accounts']],
-            'ratios' => $this->ledger->ratios($position, $profitAndLoss, $period->days()),
+            'ratios' => $this->ledger->ratios($position, $profitAndLoss, $period->days(), $receivables['total'], $payables['total'], $billing),
             'burn' => $this->ledger->burn($trend, $cashToday),
             'trend' => $trend,
             'expenseBreakdown' => $this->ledger->expenseBreakdown($movements),
@@ -86,7 +135,7 @@ class AccountingDashboardService
             ],
             'gst' => $this->gstPosition($today),
             'tdsPayable' => $position['tds_payable'],
-            'budgetAlerts' => $this->budgetAlerts($today),
+            'budgetAlerts' => $this->budgetAlerts($today, $costCenterId),
             'checklist' => $checklist['items'],
             'bankAccounts' => $checklist['bank_accounts'],
             'recentJournals' => Journal::query()
@@ -139,7 +188,7 @@ class AccountingDashboardService
      *
      * @return list<array{budget: string, account: ?string, cost_center: ?string, budgeted: float, actual: float, percent: float, status: string}>
      */
-    private function budgetAlerts(Carbon $today): array
+    private function budgetAlerts(Carbon $today, ?int $costCenterId): array
     {
         return Budget::query()
             ->with(['fiscalYear', 'lines.account', 'lines.costCenter'])
@@ -149,7 +198,9 @@ class AccountingDashboardService
                 ->whereDate('end_date', '>=', $today))
             ->get()
             ->flatMap(fn (Budget $budget) => collect($this->budgets->actualVsBudget($budget, $today->copy()->endOfDay()))
-                ->filter(fn (array $row) => $row['has_actuals'] && $row['status'] !== BudgetService::STATUS_OK)
+                ->filter(fn (array $row) => $row['has_actuals']
+                    && $row['status'] !== BudgetService::STATUS_OK
+                    && ($costCenterId === null || (int) $row['line']->cost_center_id === $costCenterId))
                 ->map(fn (array $row) => [
                     'budget' => $budget->name,
                     'account' => $row['line']->account?->name,

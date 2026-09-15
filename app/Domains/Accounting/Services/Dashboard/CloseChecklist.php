@@ -28,10 +28,12 @@ class CloseChecklist
     }
 
     /**
-     * @param array{suspense: float, trial_balance_difference: float} $position
+     * @param array{suspense: float, trial_balance_difference: float, inventory: float, receivables: float, payables: float} $position
+     * @param float $openReceivables open customer invoices (the AR aging total)
+     * @param float $openPayables open vendor bills (the AP aging total)
      * @return array{items: array<string, array{label: string, ok: bool, detail: string, route: string}>, bank_accounts: list<array{account: ChartOfAccount, last_reconciled: ?Carbon, in_progress: bool, stale: bool}>}
      */
-    public function build(Carbon $today, array $position, int $postingFailures): array
+    public function build(Carbon $today, array $position, int $postingFailures, float $openReceivables = 0.0, float $openPayables = 0.0): array
     {
         $items = [];
 
@@ -86,6 +88,20 @@ class CloseChecklist
             'route' => 'accounting.reports.trial-balance',
         ];
 
+        $items['inventory'] = [
+            'label' => 'Inventory balance not negative',
+            'ok' => $position['inventory'] >= -0.005,
+            'detail' => $position['inventory'] >= -0.005
+                ? 'Stock accounts are in order'
+                : 'Inventory is '.number_format($position['inventory'], 2).' — stock issued without receipts posted',
+            'route' => 'accounting.reports.trial-balance',
+        ];
+
+        // The ledger control accounts should equal the open documents behind them;
+        // a gap means invoices/bills were never posted, or journals bypassed them.
+        $items['receivables_ledger'] = $this->subledgerItem('Receivables ledger matches open invoices', $position['receivables'], $openReceivables, 'accounting.reports.ar-aging');
+        $items['payables_ledger'] = $this->subledgerItem('Payables ledger matches open bills', $position['payables'], $openPayables, 'accounting.reports.ap-aging');
+
         $bankAccounts = $this->bankAccounts($today);
         $stale = collect($bankAccounts)->where('stale', true)->count();
         $items['bank_reconciliation'] = [
@@ -109,6 +125,25 @@ class CloseChecklist
             'label' => $label,
             'ok' => $count === 0,
             'detail' => $count === 0 ? 'Nothing pending' : "{$count} {$noun}",
+            'route' => $route,
+        ];
+    }
+
+    /**
+     * @return array{label: string, ok: bool, detail: string, route: string}
+     */
+    private function subledgerItem(string $label, float $ledger, float $documents, string $route): array
+    {
+        // A rupee of tolerance absorbs per-line rounding on invoices and bills.
+        $difference = round($ledger - $documents, 2);
+        $matches = abs($difference) < 1.0;
+
+        return [
+            'label' => $label,
+            'ok' => $matches,
+            'detail' => $matches
+                ? 'Ledger and documents agree'
+                : 'Ledger '.number_format($ledger, 2).' vs documents '.number_format($documents, 2).' (difference '.number_format($difference, 2).')',
             'route' => $route,
         ];
     }

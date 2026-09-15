@@ -198,7 +198,7 @@ class JournalRepository implements JournalRepositoryInterface
             ->get();
     }
 
-    public function movementsBetween(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to): Collection
+    public function movementsBetween(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to, ?int $costCenterId = null): Collection
     {
         return JournalEntry::query()
             ->select('chart_of_account_id')
@@ -207,12 +207,13 @@ class JournalRepository implements JournalRepositoryInterface
                 ->where('tenant_id', $tenantId)
                 ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
                 ->whereBetween('journal_date', [$from, $to]))
+            ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
             ->groupBy('chart_of_account_id')
             ->with('account')
             ->get();
     }
 
-    public function dailyMovements(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to): Collection
+    public function dailyMovements(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to, ?int $costCenterId = null): Collection
     {
         return JournalEntry::query()
             ->join('journals', 'journals.id', '=', 'journal_entries.journal_id')
@@ -220,6 +221,7 @@ class JournalRepository implements JournalRepositoryInterface
             ->whereIn('journals.status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
             ->whereNull('journals.deleted_at')
             ->whereBetween('journals.journal_date', [$from, $to])
+            ->when($costCenterId, fn ($q) => $q->where('journal_entries.cost_center_id', $costCenterId))
             ->select('journal_entries.chart_of_account_id', 'journals.journal_date')
             ->selectRaw('SUM(journal_entries.debit) as debit, SUM(journal_entries.credit) as credit')
             ->groupBy('journal_entries.chart_of_account_id', 'journals.journal_date')
