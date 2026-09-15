@@ -35,6 +35,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Branching::class);
         $this->app->singleton(BranchContext::class, fn ($app) => $app->make(Branching::class));
 
+        // Loads every module's Routes/menu.php once per request.
+        $this->app->singleton(\App\Core\Navigation\MenuRegistry::class);
+
         \Illuminate\Support\Facades\Auth::provider('tenant-eloquent', function ($app, array $config) {
             return new \App\Support\Auth\TenantAwareUserProvider($app['hash'], $config['model']);
         });

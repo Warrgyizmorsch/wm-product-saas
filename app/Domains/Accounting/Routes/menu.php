@@ -1,0 +1,56 @@
+<?php
+
+// Accounting sidebar entries. See App\Core\Navigation\MenuRegistry.
+
+return [
+    [
+        'section' => 'finance', 'order' => 10,
+        'label' => 'Accounting', 'icon' => 'feather-credit-card',
+        'children' => [
+            ['label' => 'Dashboard', 'route' => 'accounting.dashboard'],
+            ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
+            ['label' => 'Cost Centers', 'route' => 'accounting.cost-centers.index'],
+            ['label' => 'Fixed Asset Register', 'route' => 'accounting.fixed-assets.index'],
+            ['label' => 'Asset Categories', 'route' => 'accounting.fixed-assets.categories.index'],
+            ['label' => 'Depreciation', 'route' => 'accounting.fixed-assets.depreciation.index'],
+            ['label' => 'Asset Disposals', 'route' => 'accounting.fixed-assets.disposals.index'],
+            ['label' => 'Asset Write-offs', 'route' => 'accounting.fixed-assets.write-offs.index'],
+            ['label' => 'Asset Revaluations', 'route' => 'accounting.fixed-assets.revaluations.index'],
+            ['label' => 'Budgets', 'route' => 'accounting.budgets.index'],
+            ['label' => 'Journals', 'route' => 'accounting.journals.index'],
+            ['label' => 'Payment Vouchers', 'route' => 'accounting.vouchers.payment.index'],
+            ['label' => 'Receipt Vouchers', 'route' => 'accounting.vouchers.receipt.index'],
+            ['label' => 'Contra Vouchers', 'route' => 'accounting.vouchers.contra.index'],
+            ['label' => 'Credit Notes', 'route' => 'accounting.vouchers.credit_note.index'],
+            ['label' => 'Debit Notes', 'route' => 'accounting.vouchers.debit_note.index'],
+            ['label' => 'Bank Reconciliation', 'route' => 'accounting.bank-reconciliation.index'],
+            ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index'],
+            ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index'],
+            ['label' => 'Exchange Rates', 'route' => 'accounting.exchange-rates.index'],
+            ['label' => 'Day Book', 'route' => 'accounting.reports.day-book'],
+            ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
+            ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
+            ['label' => 'Party Ledger', 'route' => 'accounting.reports.party-ledger'],
+            ['label' => 'Balance Sheet', 'route' => 'accounting.reports.balance-sheet'],
+            ['label' => 'Profit & Loss', 'route' => 'accounting.reports.profit-loss'],
+            ['label' => 'AR Aging', 'route' => 'accounting.reports.ar-aging'],
+            ['label' => 'AP Aging', 'route' => 'accounting.reports.ap-aging'],
+            ['label' => 'Cash Flow', 'route' => 'accounting.reports.cash-flow'],
+            ['label' => 'GST Summary', 'route' => 'accounting.reports.gst-summary'],
+            ['label' => 'GSTR-1', 'route' => 'accounting.reports.gstr1'],
+            ['label' => 'GSTR-3B', 'route' => 'accounting.reports.gstr3b'],
+            ['label' => 'Audit Trail', 'route' => 'accounting.reports.audit-trail'],
+            ['label' => 'Budget vs Actual', 'route' => 'accounting.reports.budget-vs-actual'],
+        ],
+    ],
+    [
+        'section' => 'finance', 'order' => 20,
+        'label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2',
+        'children' => [
+            ['label' => 'Financials'],
+            ['label' => 'Sales Analytics'],
+            ['label' => 'Inventory Aging'],
+            ['label' => 'Payroll Summary'],
+        ],
+    ],
+];

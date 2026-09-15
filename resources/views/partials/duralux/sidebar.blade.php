@@ -4,325 +4,9 @@
     $tenantPlan = ucfirst((string) ($resolvedTenant?->plan ?? 'Starter'));
     $branding = tenant_branding($resolvedTenant);
 
-    $authUser = auth()->user();
-    $isHrAdmin = $authUser && ($authUser->hasHrPermission('hr.settings.manage') || $authUser->hasHrPermission('hrms.leave_requests.approve'));
-
-    $modules = [
-        __('ui.workspace') => [
-            ['label' => __('ui.executive_dashboard'), 'icon' => 'feather-home', 'route' => 'dashboard'],
-            ['label' => 'Tenant Console', 'icon' => 'feather-grid', 'url' => '#', 'children' => [
-                ['label' => 'Tenants', 'route' => 'platform.tenants.index'],
-                ['label' => 'Plans', 'route' => 'platform.plans.index'],
-                ['label' => 'Currencies', 'route' => 'platform.currencies.index'],
-                ['label' => 'Subscriptions'],
-                ['label' => 'Usage Limits', 'route' => 'platform.usage.index'],
-                ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
-                ['label' => 'Email & SMTP Setup', 'route' => 'crm.emailSettings.index'],
-                ['label' => 'WhatsApp Web Setup', 'route' => 'crm.whatsappSettings.index'],
-            ]],
-            ['label' => __('ui.approvals_center'), 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
-        ],
-        'Revenue Cycle' => [
-            ['label' => __('ui.crm'), 'icon' => 'feather-users', 'url' => '#', 'children' => [
-                ['label' => __('crm.leads') ?: 'Leads', 'route' => 'crm.leads.index'],
-                ['label' => __('crm.deals_sidebar') ?: 'Deals (Pipeline)', 'route' => 'crm.deals.index'],
-                ['label' => __('crm.accounts_sidebar') ?: 'Accounts (Companies)', 'route' => 'crm.accounts.index'],
-                ['label' => __('crm.customers_sidebar') ?: 'Customers', 'route' => 'crm.customers.index'],
-                ['label' => __('crm.track_status_sidebar') ?: 'Track Status', 'route' => 'crm.leads.trackStatus'],
-            ]],
-            ['label' => __('crm.crm_masters_sidebar') ?: 'CRM Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
-                ['label' => __('crm.lead_status_master') ?: 'Lead Status Master', 'route' => 'crm.masters.lead-statuses.index'],
-                ['label' => __('crm.deal_stage_master') ?: 'Deal Stage Master', 'route' => 'crm.masters.deal-statuses.index'],
-                ['label' => __('crm.crm_sales_settings') ?: 'CRM & Sales Settings', 'route' => 'crm.settings.index'],
-                ['label' => 'Email & SMTP Accounts', 'route' => 'crm.emailSettings.index'],
-                ['label' => 'WhatsApp Web Setup', 'route' => 'crm.whatsappSettings.index'],
-            ]],
-            ['label' => 'Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
-                ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],
-            ]],
-             ['label' => __('ui.sales'), 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
-                ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
-                ['label' => 'Sales Orders', 'route' => 'sales.orders.index'],
-                ['label' => 'Invoices', 'route' => 'sales.invoices.index'],
-                ['label' => 'Receipts (Payments)', 'route' => 'sales.payments.index'],
-                ['label' => 'Sales Returns', 'route' => 'sales.returns.index'],
-            ]],
-            ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [
-                ['label' => __('ui.projects'), 'route' => 'projects.index'],
-                ['label' => __('projects.milestones'), 'route' => 'projects.milestones.index'],
-                'Tasks',
-                'Timesheets',
-            ]],
-        ],
-        __('ui.supply_chain') => [
-            ['label' => 'Store', 'icon' => 'feather-archive', 'url' => '#', 'children' => [
-                ['label' => 'Material Requirements', 'route' => 'inventory.material-requirements.index'],
-                ['label' => 'MRP & Shortage Analysis', 'route' => 'inventory.mrp-shortage.index'],
-                ['label' => 'Material Requests (Prod)', 'route' => 'inventory.material-requests.index'],
-                ['label' => 'Dispatch Orders', 'route' => 'inventory.dispatches.index'],
-                ['label' => 'Transporters Master', 'route' => 'platform.transporters.index'],
-            ]],
-            ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => [
-                ['label' => __('inventory.products'), 'route' => 'inventory.products.index'],
-                ['label' => __('inventory.warehouses'), 'route' => 'inventory.warehouses.index'],
-                ['label' => __('inventory.serial_numbers'), 'route' => 'inventory.serial-numbers.index'],
-                ['label' => __('inventory.batches_fefo'), 'route' => 'inventory.batches.index'],
-                ['label' => 'Stock Transfers', 'route' => 'inventory.transfers.index'],
-                ['label' => 'Stock Adjustments', 'route' => 'inventory.adjustments.index'],
-                ['label' => 'Stock Ledger History', 'route' => 'inventory.transactions.index'],
-                ['label' => 'Stock Reservations', 'route' => 'inventory.reservations.index'],
-                ['label' => 'Barcode Labels', 'route' => 'inventory.barcodes.index'],
-                ['label' => 'Low Stock Report', 'route' => 'inventory.reports.low-stock'],
-                ['label' => 'Stock Valuation Report', 'route' => 'inventory.reports.valuation'],
-            ]],
-            ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => [
-                ['label' => 'Vendors / Suppliers', 'route' => 'purchase.vendors.index'],
-                ['label' => __('purchase.savings_dashboard'), 'route' => 'purchase.rfqs.savings'],
-                ['label' => __('ui.purchase_requests') ?: __('purchase.purchase_requests'), 'route' => 'purchase.requisitions.index'],
-                ['label' => __('purchase.pending_pr_items'), 'route' => 'purchase.requisitions.pending-items'],
-                ['label' => __('purchase.rfqs'), 'route' => 'purchase.rfqs.index'],
-                ['label' => __('purchase.purchase_orders'), 'route' => 'purchase.orders.index'],
-                ['label' => 'Landed Cost Vouchers', 'route' => 'purchase.landed-costs.index'],
-                ['label' => __('purchase.vendor_bills'), 'route' => 'purchase.bills.index'],
-                ['label' => __('purchase.vendor_payments'), 'route' => 'purchase.payments.index'],
-                ['label' => 'Purchase Returns', 'route' => 'purchase.returns.index'],
-            ]],
-            ['label' => 'GRN (Goods Receipts)', 'icon' => 'feather-package', 'url' => '#', 'children' => [
-                ['label' => __('purchase.pending_grns'), 'route' => 'grns.pending'],
-                ['label' => __('purchase.all_goods_receipts'), 'route' => 'grns.index'],
-                ['label' => 'New Goods Receipt', 'route' => 'grns.create'],
-            ]],
-            ['label' => 'Purchase Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
-                ['label' => 'PR Approvals', 'route' => 'purchase.pr-approvals.index'],
-                ['label' => 'PO Approvals', 'route' => 'purchase.po-approvals.index'],
-            ]],
-        ],
-        __('ui.production') => [
-            ['label' => 'Production Dashboard', 'icon' => 'feather-grid', 'route' => 'production.dashboard'],
-            ['label' => 'Execution', 'icon' => 'feather-play-circle', 'url' => '#', 'children' => [
-                ['label' => 'Production Orders',     'route' => 'production.orders.index'],
-                ['label' => 'Shop Floor (MES)',       'route' => 'production.mes.dashboard'],
-                ['label' => 'Work-in-Progress (WIP)', 'route' => 'production.wip.index'],
-                ['label' => 'Job Cards / Operations', 'route' => 'production.mes.operator.my-operations'],
-            ]],
-            ['label' => 'Quality Management', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
-                ['label' => 'Quality Dashboard',    'route' => 'production.quality.dashboard'],
-                ['label' => 'Quality Inspections',  'route' => 'production.inspections.index'],
-                ['label' => 'NCR',                  'route' => 'production.ncrs.index'],
-                ['label' => 'CAPA',                 'route' => 'production.capas.index'],
-                ['label' => 'Rework Orders',        'route' => 'production.rework.index'],
-                ['label' => 'Scrap Disposals',      'route' => 'production.scrap.index'],
-            ]],
-            ['label' => 'Subcontracting', 'icon' => 'feather-truck', 'url' => '#', 'children' => [
-                ['label' => 'Delivery Challans / Gate Passes', 'route' => 'production.subcontract.delivery-challans.index'],
-                ['label' => 'Vendor SLA & Analytics',          'route' => 'production.subcontract.analytics'],
-                ['label' => 'Subcontract Settings',            'route' => 'production.settings.index'],
-            ]],
-            ['label' => 'Engineering', 'icon' => 'feather-settings', 'url' => '#', 'children' => [
-                ['label' => __('production.bom'),                 'route' => 'production.boms.index'],
-                ['label' => __('production.routing'),              'route' => 'production.routing.index'],
-                ['label' => 'ECO / Engineering Changes',           'route' => 'production.ecos.index'],
-                ['label' => __('production.work_centers'),         'route' => 'production.work-centers.index'],
-                ['label' => __('production.machines'),             'route' => 'production.machines.index'],
-                ['label' => 'Operator Skills',                     'route' => 'production.operator-skills.index'],
-                ['label' => __('production.shifts_sidebar'),       'route' => 'production.shifts.index'],
-                ['label' => __('production.calendars_sidebar'),    'route' => 'production.calendars.index'],
-            ]],
-            ['label' => 'Performance', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => [
-                ['label' => 'Variance & Performance',  'route' => 'production.variances.index'],
-                ['label' => 'Executive Dashboard',     'route' => 'production.intelligence.dashboard'],
-                ['label' => 'Live Andon Board',        'route' => 'production.intelligence.andon'],
-                ['label' => 'Manufacturing Reports',   'route' => 'production.intelligence.reports.index'],
-            ]],
-            ['label' => 'Machine Maintenance', 'icon' => 'feather-tool', 'url' => '#', 'children' => [
-                ['label' => 'Maintenance Dashboard', 'route' => 'production.maintenance.dashboard'],
-                ['label' => 'Work Orders',           'route' => 'production.maintenance.work-orders.index'],
-                ['label' => 'PM Schedules',          'route' => 'production.maintenance.schedules.index'],
-            ]],
-            ['label' => 'Advanced Planning', 'icon' => 'feather-cpu', 'url' => '#', 'children' => [
-                ['label' => 'Production Plans',                'route' => 'production.plans.index'],
-                ['label' => 'Production Schedules',            'route' => 'production.schedules.index'],
-                ['label' => 'Calendar Schedule View',            'route' => 'production.schedules.calendar'],
-                ['label' => 'Capacity Planning',               'route' => 'production.capacity.index'],
-                ['label' => 'Planning Scenarios / What-if',    'route' => 'production.schedules.scenarios.index'],
-                ['label' => 'Planning Exceptions / At-Risk',   'route' => 'production.planning-exceptions.index'],
-            ]],
-        ],
-        'HRMS' => array_values(array_filter([
-            ['label' => 'HRMS Dashboard', 'icon' => 'feather-home', 'route' => 'hrms.dashboard'],
-            $isHrAdmin ? ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => array_values(array_filter([
-                ['label' => 'Org Structure', 'route' => 'hrms.org.index'],
-                ['label' => 'Salary Structure', 'route' => 'hrms.salary-structure.index'],
-                ['label' => 'Leave Structure', 'route' => 'hrms.leave-structure.index'],
-                ['label' => 'Shift Roster', 'route' => 'hrms.roster.index'],
-                ['label' => 'Penalization Policy', 'route' => 'hrms.penalization-policy.index'],
-                (\App\Domains\HRMS\Models\AttendanceRule::where('office_biometric', true)
-                    ->when($resolvedTenant, fn($q) => $q->where('tenant_id', $resolvedTenant->id))
-                    ->exists())
-                    ? ['label' => 'Biometric Devices', 'route' => 'hrms.biometric-devices.index']
-                    : null,
-                ['label' => 'Asset Management', 'route' => 'hrms.assets.index'],
-                ['label' => 'Document Master', 'route' => 'hrms.documents-master.index'],
-                ['label' => 'Holiday Calendar', 'route' => 'hrms.holidays.index'],
-                ['label' => 'Expense Policies', 'route' => 'hrms.expense-policy.index'],
-                ['label' => 'Offboarding Policies', 'route' => 'hrms.offboarding-policies.index'],
-            ]))] : null,
-            $isHrAdmin ? ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'] : null,
-            $isHrAdmin ? ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'] : null,
-            ['label' => 'Assets', 'icon' => 'feather-package', 'url' => '#', 'children' => array_values(array_filter([
-                $isHrAdmin ? ['label' => 'Employees Assets', 'route' => 'hrms.assets-module.index'] : null,
-                ['label' => 'My Assets', 'route' => 'hrms.assets-module.my-assets'],
-            ]))],
-            ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#', 'children' => array_values(array_filter([
-                $isHrAdmin ? ['label' => 'Employees Attendance', 'route' => 'hrms.attendance.index'] : null,
-                ['label' => 'My Attendance', 'route' => 'hrms.attendance.myAttendance'],
-            ]))],
-            ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
-            ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
-            ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
-            ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
-            $isHrAdmin ? ['label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index'] : null,
-            ['label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index'],
-            ['label' => 'Helpdesk', 'icon' => 'feather-life-buoy', 'route' => 'hrms.helpdesk.tickets.index'],
-            ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => array_values(array_filter([
-                $isHrAdmin ? ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'] : null,
-                ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary'],
-            ]))],
-        ])),
-        'Finance & People' => [
-            ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
-                ['label' => 'Dashboard', 'route' => 'accounting.dashboard'],
-                ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
-                ['label' => 'Cost Centers', 'route' => 'accounting.cost-centers.index'],
-                ['label' => 'Fixed Asset Register', 'route' => 'accounting.fixed-assets.index'],
-                ['label' => 'Asset Categories', 'route' => 'accounting.fixed-assets.categories.index'],
-                ['label' => 'Depreciation', 'route' => 'accounting.fixed-assets.depreciation.index'],
-                ['label' => 'Asset Disposals', 'route' => 'accounting.fixed-assets.disposals.index'],
-                ['label' => 'Asset Write-offs', 'route' => 'accounting.fixed-assets.write-offs.index'],
-                ['label' => 'Asset Revaluations', 'route' => 'accounting.fixed-assets.revaluations.index'],
-                ['label' => 'Budgets', 'route' => 'accounting.budgets.index'],
-                ['label' => 'Journals', 'route' => 'accounting.journals.index'],
-                ['label' => 'Payment Vouchers', 'route' => 'accounting.vouchers.payment.index'],
-                ['label' => 'Receipt Vouchers', 'route' => 'accounting.vouchers.receipt.index'],
-                ['label' => 'Contra Vouchers', 'route' => 'accounting.vouchers.contra.index'],
-                ['label' => 'Credit Notes', 'route' => 'accounting.vouchers.credit_note.index'],
-                ['label' => 'Debit Notes', 'route' => 'accounting.vouchers.debit_note.index'],
-                ['label' => 'Bank Reconciliation', 'route' => 'accounting.bank-reconciliation.index'],
-                ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index'],
-                ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index'],
-                ['label' => 'Exchange Rates', 'route' => 'accounting.exchange-rates.index'],
-                ['label' => 'Day Book', 'route' => 'accounting.reports.day-book'],
-                ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
-                ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
-                ['label' => 'Party Ledger', 'route' => 'accounting.reports.party-ledger'],
-                ['label' => 'Balance Sheet', 'route' => 'accounting.reports.balance-sheet'],
-                ['label' => 'Profit & Loss', 'route' => 'accounting.reports.profit-loss'],
-                ['label' => 'AR Aging', 'route' => 'accounting.reports.ar-aging'],
-                ['label' => 'AP Aging', 'route' => 'accounting.reports.ap-aging'],
-                ['label' => 'Cash Flow', 'route' => 'accounting.reports.cash-flow'],
-                ['label' => 'GST Summary', 'route' => 'accounting.reports.gst-summary'],
-                ['label' => 'GSTR-1', 'route' => 'accounting.reports.gstr1'],
-                ['label' => 'GSTR-3B', 'route' => 'accounting.reports.gstr3b'],
-                ['label' => 'Audit Trail', 'route' => 'accounting.reports.audit-trail'],
-                ['label' => 'Budget vs Actual', 'route' => 'accounting.reports.budget-vs-actual'],
-            ]],
-            ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
-        ],
-        __('ui.platform_admin') => [
-            ['label' => __('ui.access_control'), 'icon' => 'feather-shield', 'url' => '#', 'children' => [
-                ['label' => 'Users', 'route' => 'access.users.index'],
-                ['label' => 'Roles', 'route' => 'access.roles.index'],
-                ['label' => 'Permissions', 'route' => 'access.roles.index'],
-                'Teams',
-                'Policies',
-            ]],
-            ['label' => 'Automation', 'icon' => 'feather-zap', 'url' => '#', 'children' => ['Workflows', 'Alerts', 'Schedulers', 'Webhooks']],
-            ['label' => 'Audit & Settings', 'icon' => 'feather-settings', 'url' => '#', 'children' => ['Audit Logs', 'Localization', 'Currencies', 'System Settings']],
-        ],
-    ];
-
-    // Two independent filters, both must pass for a module to show:
-    // 1. tenant_allowed_modules() — is this module in the tenant's subscribed plan?
-    // 2. AccessService::allowedModulesFor() — does this user's role have any
-    //    permission grant in this module at all? A CRM-only plan with an
-    //    HR-role user viewing it would otherwise show CRM items that role
-    //    can't actually do anything with.
-    // Either returning null means "unrestricted" for that dimension.
-    $allowedModules = tenant_allowed_modules();
-    $allowedModulesForUser = auth()->user()
-        ? app(\App\Services\Access\AccessService::class)->allowedModulesFor(auth()->user())
-        : null;
-
-    if ($allowedModules !== null || $allowedModulesForUser !== null) {
-        $isRouteAllowed = function (?string $routeName) use ($allowedModules, $allowedModulesForUser) {
-            if ($routeName === null) {
-                return true;
-            }
-
-            $module = explode('.', $routeName)[0];
-
-            if (! in_array($module, \App\Http\Middleware\EnsureTenantModuleAccess::GATED_MODULES, true)) {
-                return true;
-            }
-
-            if ($allowedModules !== null && ! in_array($module, $allowedModules, true)) {
-                return false;
-            }
-
-            if ($allowedModulesForUser !== null && ! in_array($module, $allowedModulesForUser, true)) {
-                return false;
-            }
-
-            return true;
-        };
-
-        foreach ($modules as $caption => &$items) {
-            foreach ($items as $key => &$item) {
-                if (isset($item['children']) && !empty($item['children'])) {
-                    // A placeholder child with no 'route' (an unimplemented
-                    // link, e.g. 'Tasks') would otherwise always pass the
-                    // filter below regardless of module, keeping the whole
-                    // group visible even after every real route in it was
-                    // correctly hidden. Decide the group's module from the
-                    // first routed child instead, and drop the entire group
-                    // — placeholders included — if that module is disallowed.
-                    $firstRoute = null;
-
-                    foreach ($item['children'] as $child) {
-                        if (is_array($child) && isset($child['route'])) {
-                            $firstRoute = $child['route'];
-                            break;
-                        }
-                    }
-
-                    if ($firstRoute !== null && ! $isRouteAllowed($firstRoute)) {
-                        unset($items[$key]);
-                        continue;
-                    }
-
-                    $item['children'] = array_values(array_filter($item['children'], function ($child) use ($isRouteAllowed) {
-                        $childRoute = is_array($child) ? ($child['route'] ?? null) : null;
-
-                        return $isRouteAllowed($childRoute);
-                    }));
-
-                    if (empty($item['children'])) {
-                        unset($items[$key]);
-                    }
-                } elseif (isset($item['route']) && ! $isRouteAllowed($item['route'])) {
-                    unset($items[$key]);
-                }
-            }
-            unset($item);
-
-            $items = array_values($items);
-
-            if (empty($items)) {
-                unset($modules[$caption]);
-            }
-        }
-        unset($items);
-    }
+    // Menu entries live in each module's Routes/menu.php and are filtered by plan,
+    // role, permission and route existence — see App\Core\Navigation\MenuBuilder.
+    $sections = app(\App\Core\Navigation\MenuBuilder::class)->build(auth()->user(), request()->route()?->getName());
 @endphp
 
 <nav class="nxl-navigation">
@@ -344,11 +28,10 @@
         </div>
         <div class="navbar-content">
             <ul class="nxl-navbar">
-                @foreach ($modules as $caption => $items)
-                    @php $modSlug = Str::slug($caption); @endphp
-                    <li class="nxl-item nxl-caption premium-module-header" data-module="{{ $modSlug }}" onclick="toggleModuleSidebar('{{ $modSlug }}', this)">
+                @foreach ($sections as $section)
+                    <li class="nxl-item nxl-caption premium-module-header" data-module="{{ $section['slug'] }}" onclick="toggleModuleSidebar('{{ $section['slug'] }}', this)">
                         <div class="premium-module-header-content">
-                            <span class="premium-module-header-title">{{ strtoupper($caption) }}</span>
+                            <span class="premium-module-header-title">{{ strtoupper($section['label']) }}</span>
                             <span class="premium-module-accordion-btn">
                                 <span class="premium-module-arrow-container">
                                     <i class="feather-chevron-right premium-module-arrow"></i>
@@ -356,28 +39,12 @@
                             </span>
                         </div>
                     </li>
-                    @foreach ($items as $item)
+                    @foreach ($section['items'] as $item)
                         @php
-                            $href = isset($item['route']) ? route($item['route']) : ($item['url'] ?? '#');
-                            $hasChildren = isset($item['children']) && !empty($item['children']);
-                            $isItemActive = isset($item['route']) && request()->routeIs($item['route']);
-                            $hasActiveChild = false;
-
-                            if ($hasChildren) {
-                                foreach ($item['children'] as $c) {
-                                    if (is_array($c) && isset($c['route']) && request()->routeIs($c['route'])) {
-                                        $hasActiveChild = true;
-                                        break;
-                                    }
-                                    if (is_array($c) && isset($c['url']) && request()->input('tab') === 'templates' && str_contains($c['url'], 'tab=templates')) {
-                                        $hasActiveChild = true;
-                                        break;
-                                    }
-                                }
-                            }
+                            $hasChildren = $item['children'] !== [];
                         @endphp
-                        <li class="nxl-item {{ $hasChildren ? 'nxl-hasmenu' : '' }} {{ ($isItemActive || $hasActiveChild) ? 'active nxl-trigger' : '' }} premium-module-child module-{{ $modSlug }}">
-                            <a href="{{ $hasChildren ? 'javascript:void(0);' : $href }}" class="nxl-link">
+                        <li class="nxl-item {{ $hasChildren ? 'nxl-hasmenu' : '' }} {{ $item['active'] ? 'active nxl-trigger' : '' }} premium-module-child module-{{ $section['slug'] }}">
+                            <a href="{{ $hasChildren ? 'javascript:void(0);' : $item['url'] }}" class="nxl-link">
                                 <span class="nxl-micon"><i class="{{ $item['icon'] }}"></i></span>
                                 <span class="nxl-mtext">{{ $item['label'] }}</span>
                                 @if ($hasChildren)
@@ -387,14 +54,8 @@
                             @if ($hasChildren)
                                 <ul class="nxl-submenu">
                                     @foreach ($item['children'] as $child)
-                                        @php
-                                            $child = is_array($child) ? $child : ['label' => $child];
-                                            $childHref = isset($child['route']) ? route($child['route']) : ($child['url'] ?? '#');
-                                            $childActive = (isset($child['route']) && request()->routeIs($child['route']) && request()->input('tab') !== 'templates')
-                                                || (isset($child['url']) && request()->input('tab') === 'templates' && str_contains($child['url'], 'tab=templates'));
-                                        @endphp
-                                        <li class="nxl-item {{ $childActive ? 'active' : '' }}">
-                                            <a class="nxl-link" href="{{ $childHref }}">{{ $child['label'] }}</a>
+                                        <li class="nxl-item {{ $child['active'] ? 'active' : '' }}">
+                                            <a class="nxl-link" href="{{ $child['url'] }}">{{ $child['label'] }}</a>
                                         </li>
                                     @endforeach
                                 </ul>
@@ -631,12 +292,12 @@
 <script>
 function toggleModuleSidebar(moduleName, headerEl) {
     const isCollapsed = headerEl.classList.contains('collapsed');
-    
+
     if (typeof jQuery !== 'undefined') {
         const $ = jQuery;
         const $header = $(headerEl);
         const $children = $('.premium-module-child.module-' + moduleName);
-        
+
         if (isCollapsed) {
             $header.removeClass('collapsed');
             $children.stop(true, true).slideDown(250);
@@ -662,19 +323,19 @@ function toggleModuleSidebar(moduleName, headerEl) {
 
 document.addEventListener("DOMContentLoaded", function () {
     const headers = document.querySelectorAll('.premium-module-header');
-    
+
     headers.forEach(function (header) {
         const moduleName = header.getAttribute('data-module');
         const savedState = localStorage.getItem('wm_sidebar_module_' + moduleName);
         const children = document.querySelectorAll('.premium-module-child.module-' + moduleName);
-        
+
         let hasActiveChild = false;
         children.forEach(function (child) {
             if (child.classList.contains('active') || child.querySelector('.active') !== null) {
                 hasActiveChild = true;
             }
         });
-        
+
         if (hasActiveChild) {
             header.classList.remove('collapsed');
             children.forEach(c => c.style.display = 'block');
