@@ -129,10 +129,28 @@ class WhatsAppService
                 ]);
 
             if ($response->successful()) {
+                $resData = $response->json();
+                try {
+                    \App\Models\WhatsAppMessage::create([
+                        'tenant_id'     => $config->tenant_id,
+                        'company_id'    => $config->company_id,
+                        'branch_id'     => $config->branch_id,
+                        'session_key'   => $config->session_key,
+                        'sender_number' => $cleanNumber,
+                        'sender_name'   => 'Outbound ERP',
+                        'direction'     => 'outbound',
+                        'message_type'  => 'text',
+                        'message_body'  => $message,
+                        'message_id'    => $resData['messageId'] ?? null,
+                        'status'        => 'sent',
+                        'received_at'   => now(),
+                    ]);
+                } catch (\Throwable $e) {}
+
                 return [
                     'success' => true,
                     'message' => "✓ WhatsApp test message successfully sent to +{$cleanNumber}!",
-                    'data'    => $response->json(),
+                    'data'    => $resData,
                 ];
             }
 
@@ -177,10 +195,28 @@ class WhatsAppService
                 ]);
 
             if ($response->successful()) {
+                $resData = $response->json();
+                try {
+                    \App\Models\WhatsAppMessage::create([
+                        'tenant_id'     => $config->tenant_id,
+                        'company_id'    => $config->company_id,
+                        'branch_id'     => $config->branch_id,
+                        'session_key'   => $config->session_key,
+                        'sender_number' => $cleanNumber,
+                        'sender_name'   => 'Outbound ERP',
+                        'direction'     => 'outbound',
+                        'message_type'  => 'document',
+                        'message_body'  => "[Document: {$filename}] " . $caption,
+                        'message_id'    => $resData['messageId'] ?? null,
+                        'status'        => 'sent',
+                        'received_at'   => now(),
+                    ]);
+                } catch (\Throwable $e) {}
+
                 return [
                     'success' => true,
                     'message' => "✓ WhatsApp document successfully sent to +{$cleanNumber}!",
-                    'data'    => $response->json(),
+                    'data'    => $resData,
                 ];
             }
 

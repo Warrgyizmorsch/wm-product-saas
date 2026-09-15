@@ -154,6 +154,100 @@
             </div>
         </div>
     </div>
+
+    <!-- WHATSAPP MESSAGES LOG / INBOX TABLE CARD -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm" style="border-radius: 8px;">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-1">
+                            <i class="feather-inbox text-primary me-2"></i>WhatsApp Messages Log & Live Inbox
+                        </h6>
+                        <p class="text-muted fs-12 mb-0">Live view of incoming customer messages and outbound sent notifications.</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="liveBadge" class="badge bg-soft-success text-success border border-success fs-11 px-2.5 py-1">
+                            <i class="feather-radio me-1 spin"></i>Live Auto-Refresh ON
+                        </span>
+                        <button type="button" id="btnRefreshMessages" class="btn btn-sm btn-outline-primary fw-bold px-3 py-1.5 fs-12">
+                            <i class="feather-refresh-cw me-1"></i>Refresh Messages
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="waMessagesTable">
+                            <thead class="bg-light fs-12 text-uppercase text-muted">
+                                <tr>
+                                    <th class="ps-4 py-3" style="width: 50px;">#</th>
+                                    <th class="py-3">Type / Direction</th>
+                                    <th class="py-3">Mobile Number</th>
+                                    <th class="py-3">Sender Name</th>
+                                    <th class="py-3" style="min-width: 250px;">Message Content</th>
+                                    <th class="py-3">Status</th>
+                                    <th class="pe-4 py-3 text-end">Date & Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="waMessagesTbody" class="fs-13">
+                                @forelse($messages as $index => $msg)
+                                <tr>
+                                    <td class="ps-4 fw-semibold text-muted">{{ $index + 1 }}</td>
+                                    <td>
+                                        @if($msg->direction === 'inbound')
+                                            <span class="badge bg-soft-success text-success border border-success-subtle px-2.5 py-1 fs-11 fw-bold">
+                                                <i class="feather-arrow-down-left me-1"></i>Incoming
+                                            </span>
+                                        @else
+                                            <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2.5 py-1 fs-11 fw-bold">
+                                                <i class="feather-arrow-up-right me-1"></i>Outbound
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <strong class="text-dark font-monospace">+{{ $msg->sender_number }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="fw-medium text-dark">{{ $msg->sender_name ?: 'Unknown' }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="text-wrap" style="max-width: 380px; word-break: break-word;">
+                                            @if($msg->message_type === 'document')
+                                                <span class="badge bg-light text-dark border me-1"><i class="feather-file-text me-1 text-danger"></i>Document</span>
+                                            @elseif($msg->message_type === 'image')
+                                                <span class="badge bg-light text-dark border me-1"><i class="feather-image me-1 text-info"></i>Image</span>
+                                            @endif
+                                            <span class="text-secondary">{{ $msg->message_body }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if($msg->status === 'received')
+                                            <span class="badge bg-success-subtle text-success px-2 py-0.5 fs-11">Received</span>
+                                        @elseif($msg->status === 'sent' || $msg->status === 'delivered')
+                                            <span class="badge bg-info-subtle text-info px-2 py-0.5 fs-11">Sent</span>
+                                        @else
+                                            <span class="badge bg-secondary-subtle text-secondary px-2 py-0.5 fs-11">{{ ucfirst($msg->status) }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="pe-4 text-end text-muted fs-12">
+                                        {{ $msg->created_at ? $msg->created_at->format('d M Y, h:i A') : '--' }}
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr id="emptyMsgRow">
+                                    <td colspan="7" class="text-center py-5 text-muted">
+                                        <i class="feather-inbox fs-32 d-block mb-2 text-secondary"></i>
+                                        <span>No WhatsApp messages logged yet. Incoming & Outbound messages will automatically appear here.</span>
+                                    </td>
+                                </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- TEST RESULT NOTIFICATION MODAL -->
@@ -354,6 +448,83 @@
                     showResultModal(false, "Save Failed", errMsg);
                 }
             });
+        });
+
+        // WHATSAPP MESSAGES LOG FETCHING & AUTO-POLLING
+        function fetchMessagesList() {
+            $.ajax({
+                url: "{{ route('crm.whatsapp.messages') }}",
+                method: "GET",
+                success: function(res) {
+                    if (res.success && res.messages) {
+                        renderMessagesTable(res.messages);
+                    }
+                }
+            });
+        }
+
+        function renderMessagesTable(messages) {
+            if (!messages || messages.length === 0) {
+                $('#waMessagesTbody').html(`
+                    <tr id="emptyMsgRow">
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="feather-inbox fs-32 d-block mb-2 text-secondary"></i>
+                            <span>No WhatsApp messages logged yet. Incoming & Outbound messages will automatically appear here.</span>
+                        </td>
+                    </tr>
+                `);
+                return;
+            }
+
+            let rowsHtml = '';
+            messages.forEach(function(msg, idx) {
+                const isIncoming = msg.direction === 'inbound';
+                const dirBadge = isIncoming
+                    ? `<span class="badge bg-soft-success text-success border border-success-subtle px-2.5 py-1 fs-11 fw-bold"><i class="feather-arrow-down-left me-1"></i>Incoming</span>`
+                    : `<span class="badge bg-soft-primary text-primary border border-primary-subtle px-2.5 py-1 fs-11 fw-bold"><i class="feather-arrow-up-right me-1"></i>Outbound</span>`;
+                
+                let typeBadge = '';
+                if (msg.message_type === 'document') {
+                    typeBadge = `<span class="badge bg-light text-dark border me-1"><i class="feather-file-text me-1 text-danger"></i>Document</span>`;
+                } else if (msg.message_type === 'image') {
+                    typeBadge = `<span class="badge bg-light text-dark border me-1"><i class="feather-image me-1 text-info"></i>Image</span>`;
+                }
+
+                const statusBadge = isIncoming
+                    ? `<span class="badge bg-success-subtle text-success px-2 py-0.5 fs-11">Received</span>`
+                    : `<span class="badge bg-info-subtle text-info px-2 py-0.5 fs-11">Sent</span>`;
+
+                rowsHtml += `
+                    <tr>
+                        <td class="ps-4 fw-semibold text-muted">${idx + 1}</td>
+                        <td>${dirBadge}</td>
+                        <td><strong class="text-dark font-monospace">+${msg.sender_number}</strong></td>
+                        <td><span class="fw-medium text-dark">${msg.sender_name}</span></td>
+                        <td>
+                            <div class="text-wrap" style="max-width: 380px; word-break: break-word;">
+                                ${typeBadge}
+                                <span class="text-secondary">${msg.message_body || ''}</span>
+                            </div>
+                        </td>
+                        <td>${statusBadge}</td>
+                        <td class="pe-4 text-end text-muted fs-12">${msg.time_formatted || '--'}</td>
+                    </tr>
+                `;
+            });
+
+            $('#waMessagesTbody').html(rowsHtml);
+        }
+
+        // Auto Poll Messages every 5 seconds
+        setInterval(fetchMessagesList, 5000);
+
+        $('#btnRefreshMessages').on('click', function() {
+            const btn = $(this);
+            btn.addClass('disabled').find('i').addClass('spin');
+            fetchMessagesList();
+            setTimeout(function() {
+                btn.removeClass('disabled').find('i').removeClass('spin');
+            }, 800);
         });
     });
 </script>

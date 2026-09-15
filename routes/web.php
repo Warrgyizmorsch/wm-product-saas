@@ -19,6 +19,9 @@ Route::middleware(['tenant'])->group(function (): void {
     Route::get('/purchase/rfq-portal/{token}', [\App\Domains\Purchase\Controllers\PurchaseRfqController::class, 'showPortal'])->name('purchase.rfqs.portal');
     Route::post('/purchase/rfq-portal/{token}/submit', [\App\Domains\Purchase\Controllers\PurchaseRfqController::class, 'submitPortal'])->name('purchase.rfqs.portal-submit');
 
+    // Public WhatsApp Webhook Route for Node.js Bridge
+    Route::post('/crm/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('crm.whatsapp.webhook');
+
     Route::middleware(['auth', 'company', 'branch'])->group(function (): void {
         Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 

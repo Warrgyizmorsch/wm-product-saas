@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
+use Illuminate\Validation\Rule;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Database\QueryException;
 
 class EmailSettingController extends Controller
 {
@@ -37,10 +40,15 @@ class EmailSettingController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
+        $rules = [
             'id'                  => 'nullable|exists:email_configurations,id',
             'name'                => 'required|string|max:100',
-            'email_address'       => 'required|email|max:191',
+            'email_address'       => [
+                'required',
+                'email',
+                'max:191',
+                Rule::unique('email_configurations', 'email_address')->ignore($request->input('id')),
+            ],
             'from_name'           => 'nullable|string|max:191',
             'host'                => 'required|string|max:191',
             'port'                => 'required|integer',
@@ -55,29 +63,54 @@ class EmailSettingController extends Controller
             'company_id'          => 'nullable|exists:companies,id',
             'branch_id'           => 'nullable|exists:branches,id',
             'is_default'          => 'nullable|boolean',
-        ]);
+        ];
+
+        $messages = [
+            'email_address.unique' => 'An SMTP configuration with this email address already exists. Please use a unique email address or edit the existing account.',
+        ];
+
+        $data = $request->validate($rules, $messages);
 
         $data['tenant_id'] = current_tenant_id() ?? 1;
         $data['company_id'] = $request->input('company_id') ?: current_company_id();
         $data['branch_id'] = $request->input('branch_id') ?: current_branch_id();
         $data['is_default'] = $request->boolean('is_default');
 
-        if ($data['is_default']) {
-            EmailConfiguration::where('tenant_id', $data['tenant_id'])
-                ->where('company_id', $data['company_id'])
-                ->update(['is_default' => false]);
-        }
+        try {
+            if ($data['is_default']) {
+                EmailConfiguration::where('tenant_id', $data['tenant_id'])
+                    ->where('company_id', $data['company_id'])
+                    ->update(['is_default' => false]);
+            }
 
-        if (!empty($data['id'])) {
-            $config = EmailConfiguration::findOrFail($data['id']);
-            $config->update($data);
-            $msg = 'Database Email SMTP Configuration updated successfully!';
-        } else {
-            EmailConfiguration::create($data);
-            $msg = 'Database Email SMTP Configuration saved successfully!';
-        }
+            if (!empty($data['id'])) {
+                $config = EmailConfiguration::findOrFail($data['id']);
+                $config->update($data);
+                $msg = 'Database Email SMTP Configuration updated successfully!';
+            } else {
+                EmailConfiguration::create($data);
+                $msg = 'Database Email SMTP Configuration saved successfully!';
+            }
 
-        return redirect()->route('crm.emailSettings.index')->with('success', $msg);
+            return redirect()->route('crm.emailSettings.index')->with('success', $msg);
+        } catch (UniqueConstraintViolationException | QueryException $e) {
+            return redirect()->back()->withInput()->with('error', 'Duplicate Entry: An account with email address "' . $data['email_address'] . '" already exists.');
+        } catch (\Throwable $e) {
+            return redirect()->back()->withInput()->with('error', 'Failed to save SMTP configuration: ' . $e->getMessage());
+        }
+    }
+
+    public function destroy(int $id): RedirectResponse
+    {
+        try {
+            $config = EmailConfiguration::findOrFail($id);
+            $accountName = $config->name;
+            $config->delete();
+
+            return redirect()->route('crm.emailSettings.index')->with('success', "SMTP Email Account '{$accountName}' deleted successfully!");
+        } catch (\Throwable $e) {
+            return redirect()->route('crm.emailSettings.index')->with('error', "Failed to delete account: " . $e->getMessage());
+        }
     }
 
     public function testConnection(int $id): JsonResponse

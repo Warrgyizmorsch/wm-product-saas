@@ -30,6 +30,26 @@
         <x-ui.toast :auto="true" title="{{ session('success') }}" type="success" delay="5000" />
     @endif
 
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-3" role="alert">
+            <i class="feather-alert-circle fs-18 me-2"></i>
+            <div>{{ session('error') }}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+            <div class="fw-bold mb-1"><i class="feather-alert-triangle me-1"></i>Please fix the following validation errors:</div>
+            <ul class="mb-0 ps-3 fs-13">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <!-- Table Section with Common Table Component -->
     <div class="table-responsive flex-grow-1">
         <x-ui.odoo-form-ui type="table" id="emailAccountsTable" class="mb-0">
@@ -79,6 +99,13 @@
                                 <button type="button" class="btn btn-xs btn-outline-success fw-bold btn-open-test-mail-modal px-2.5 py-1" data-account-id="{{ $acc->id }}" data-account-name="{{ $acc->name }}" data-email-address="{{ $acc->email_address }}">
                                     <i class="feather-send me-1"></i>Send Test Email
                                 </button>
+                                <form action="{{ route('crm.emailSettings.destroy', $acc->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete SMTP account \'{{ $acc->name }}\' ({{ $acc->email_address }})?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-xs btn-outline-danger fw-bold px-2.5 py-1">
+                                        <i class="feather-trash-2 me-1"></i>Delete
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>

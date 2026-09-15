@@ -485,11 +485,6 @@
                             <i class="feather-edit me-1.5 text-muted"></i> Edit Deal Details
                         </a>
                     </li>
-                    <li>
-                        <a class="dropdown-item py-2" href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}">
-                            <i class="feather-file-text me-1.5 text-muted"></i> Add New Quotation
-                        </a>
-                    </li>
                 </x-ui.action-dropdown>
                 
                 <!-- Pagination Arrows -->

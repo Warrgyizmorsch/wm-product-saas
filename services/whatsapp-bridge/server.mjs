@@ -23,6 +23,7 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 const sessions = new Map();
+const lidToPhoneMap = new Map();
 const logger = pino({ level: 'silent' });
 
 // Token Authentication Middleware (Validates requests dispatched from ERP Database)
@@ -89,6 +90,105 @@ async function initSession(key, force = false) {
     sessionObj.sock = sock;
 
     sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('contacts.upsert', (contacts) => {
+      try {
+        for (const c of contacts) {
+          if (c.id && c.lid) {
+            const phone = c.id.replace(/@.*$/, '');
+            const lid = c.lid.replace(/@.*$/, '');
+            lidToPhoneMap.set(lid, phone);
+            lidToPhoneMap.set(c.lid, phone);
+          }
+        }
+      } catch (e) {}
+    });
+
+    sock.ev.on('contacts.update', (updates) => {
+      try {
+        for (const c of updates) {
+          if (c.id && c.lid) {
+            const phone = c.id.replace(/@.*$/, '');
+            const lid = c.lid.replace(/@.*$/, '');
+            lidToPhoneMap.set(lid, phone);
+            lidToPhoneMap.set(c.lid, phone);
+          }
+        }
+      } catch (e) {}
+    });
+
+    sock.ev.on('messages.upsert', async (m) => {
+      try {
+        if (!m.messages || !Array.isArray(m.messages)) return;
+        for (const msg of m.messages) {
+          const jid = msg.key.remoteJid || '';
+
+          // STRICT FILTER: Ignore Groups, Newsletters, Channels, Status Broadcasts
+          if (!jid || jid === 'status@broadcast' || jid.endsWith('@g.us') || jid.endsWith('@newsletter') || jid.includes('newsletter')) {
+            continue;
+          }
+
+          console.log(`[Baileys ${key}] Incoming human chat msg.key:`, msg.key);
+
+          let msgObj = msg.message;
+          if (msgObj.ephemeralMessage) msgObj = msgObj.ephemeralMessage.message || msgObj;
+          if (msgObj.viewOnceMessage) msgObj = msgObj.viewOnceMessage.message || msgObj;
+          if (msgObj.viewOnceMessageV2) msgObj = msgObj.viewOnceMessageV2.message || msgObj;
+
+          const bodyText = msgObj.conversation ||
+                           msgObj.extendedTextMessage?.text ||
+                           msgObj.imageMessage?.caption ||
+                           msgObj.videoMessage?.caption ||
+                           msgObj.documentMessage?.caption ||
+                           '';
+
+          // Extract Real Phone Number JID (senderPn > remoteJidAlt > remoteJid)
+          let senderJid = msg.key.senderPn || msg.key.remoteJidAlt || jid;
+          if (senderJid.endsWith('@lid')) {
+            if (msg.key.senderPn) {
+              senderJid = msg.key.senderPn;
+            } else if (msg.key.remoteJidAlt) {
+              senderJid = msg.key.remoteJidAlt;
+            }
+          }
+
+          let senderNumber = senderJid.replace(/@.*$/, '');
+          if (senderJid.endsWith('@lid')) {
+            senderNumber = senderJid; // Keep full @lid JID if no PN found
+          }
+
+          const isDocument = !!msgObj.documentMessage;
+          const isImage = !!msgObj.imageMessage;
+          const isVideo = !!msgObj.videoMessage;
+
+          const payload = {
+            session_key: key,
+            sender_number: senderNumber,
+            sender_name: msg.pushName || senderNumber,
+            message_body: bodyText || (isDocument ? '[Document Attached]' : (isImage ? '[Photo]' : (isVideo ? '[Video]' : '[WhatsApp Message]'))),
+            message_id: msg.key.id,
+            direction: msg.key.fromMe ? 'outbound' : 'inbound',
+            message_type: isDocument ? 'document' : (isImage ? 'image' : 'text')
+          };
+
+          console.log(`[Baileys ${key}] Human message (${payload.direction}) from ${senderNumber}: "${bodyText || payload.message_body}"`);
+
+          try {
+            const resp = await fetch('http://127.0.0.1:8000/crm/whatsapp/webhook', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const resData = await resp.json();
+            console.log(`[Baileys ${key}] Webhook response:`, resData);
+          } catch (err) {
+            console.error(`[Baileys ${key}] Webhook POST error:`, err.message);
+          }
+        }
+      } catch (err) {
+        console.error(`[Baileys ${key}] Error processing messages.upsert:`, err);
+      }
+    });
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -207,23 +307,39 @@ app.post('/sessions/:key/send-message', async (req, res) => {
     return res.status(400).json({ status: 'disconnected', message: 'WhatsApp session is not connected. Please scan QR code first.' });
   }
 
-  let cleanNum = String(number).replace(/\D/g, '');
-  if (cleanNum.startsWith('0')) {
-    cleanNum = cleanNum.replace(/^0+/, '');
-  }
-  if (cleanNum.length === 10) {
-    cleanNum = '91' + cleanNum;
-  }
-
   try {
+    let rawInput = String(number).trim();
+
+    // Check if input is direct JID (ends with @s.whatsapp.net or @lid or @c.us)
+    if (rawInput.includes('@')) {
+      console.log(`[Baileys ${key}] Direct JID message dispatch to ${rawInput}: "${message.substring(0, 30)}..."`);
+      const sentMsg = await session.sock.sendMessage(rawInput, { text: message });
+      console.log(`[Baileys ${key}] ✓ Direct JID message sent! ID:`, sentMsg?.key?.id);
+      return res.json({
+        status: 'success',
+        message: `WhatsApp message successfully sent to ${rawInput}`,
+        messageId: sentMsg?.key?.id
+      });
+    }
+
+    let cleanNum = rawInput.replace(/\D/g, '');
+    if (cleanNum.startsWith('0')) {
+      cleanNum = cleanNum.replace(/^0+/, '');
+    }
+    if (cleanNum.length === 10) {
+      cleanNum = '91' + cleanNum;
+    }
+
     let targetJid = `${cleanNum}@s.whatsapp.net`;
     if (session.sock && session.sock.onWhatsApp) {
-      const results = await session.sock.onWhatsApp(cleanNum);
-      console.log(`[Baileys ${key}] onWhatsApp lookup for ${cleanNum}:`, results);
-      if (results && results.length > 0 && results[0].exists) {
-        targetJid = results[0].jid;
-      } else {
-        return res.status(404).json({ status: 'error', message: `Mobile number +${cleanNum} is not registered on WhatsApp.` });
+      try {
+        const results = await session.sock.onWhatsApp(cleanNum);
+        console.log(`[Baileys ${key}] onWhatsApp lookup for ${cleanNum}:`, results);
+        if (results && results.length > 0 && results[0].exists) {
+          targetJid = results[0].jid;
+        }
+      } catch (err) {
+        console.warn(`[Baileys ${key}] onWhatsApp lookup warning:`, err.message);
       }
     }
 
