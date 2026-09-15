@@ -98,6 +98,20 @@ class NavigationMenuTest extends TestCase
         $this->assertNotContains('Plans', $labels);
     }
 
+    public function test_screens_that_had_no_menu_link_are_listed_for_users_allowed_to_open_them(): void
+    {
+        $ownerLabels = $this->labels($this->menu($this->owner));
+
+        foreach (['Audit Logs', 'Posting Failures', 'Activities', 'Employee Exits', 'Advance Payments', 'Knowledge Base', 'Lot Traceability', 'Quality Plans', 'KPI Targets'] as $label) {
+            $this->assertContains($label, $ownerLabels);
+        }
+
+        $staffLabels = $this->labels($this->menu($this->makeUser('staff2@acme.test', null)));
+        $this->assertContains('Tickets', $staffLabels);
+        $this->assertNotContains('Knowledge Base', $staffLabels);
+        $this->assertNotContains('Employee Exits', $staffLabels);
+    }
+
     public function test_modules_outside_the_tenants_plan_are_hidden(): void
     {
         $plan = Plan::create(['name' => 'CRM Only', 'slug' => 'crm-only', 'features' => ['crm'], 'is_active' => true]);

@@ -18,6 +18,7 @@ return [
             ['label' => 'Asset Revaluations', 'route' => 'accounting.fixed-assets.revaluations.index'],
             ['label' => 'Budgets', 'route' => 'accounting.budgets.index'],
             ['label' => 'Journals', 'route' => 'accounting.journals.index'],
+            ['label' => 'Posting Failures', 'route' => 'accounting.posting-failures.index', 'permission' => 'accounting.journals.view'],
             ['label' => 'Payment Vouchers', 'route' => 'accounting.vouchers.payment.index'],
             ['label' => 'Receipt Vouchers', 'route' => 'accounting.vouchers.receipt.index'],
             ['label' => 'Contra Vouchers', 'route' => 'accounting.vouchers.contra.index'],

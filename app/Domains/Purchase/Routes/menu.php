@@ -16,6 +16,7 @@ return [
             ['label' => 'Landed Cost Vouchers', 'route' => 'purchase.landed-costs.index'],
             ['label' => 'purchase.vendor_bills', 'default' => 'Vendor Bills', 'route' => 'purchase.bills.index'],
             ['label' => 'purchase.vendor_payments', 'default' => 'Vendor Payments', 'route' => 'purchase.payments.index'],
+            ['label' => 'Advance Payments', 'route' => 'purchase.advance-payments.index', 'permission' => 'purchase.advances.view'],
             ['label' => 'Purchase Returns', 'route' => 'purchase.returns.index'],
         ],
     ],

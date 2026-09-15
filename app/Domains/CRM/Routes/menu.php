@@ -11,6 +11,7 @@ return [
             ['label' => 'crm.deals_sidebar', 'default' => 'Deals (Pipeline)', 'route' => 'crm.deals.index'],
             ['label' => 'crm.accounts_sidebar', 'default' => 'Accounts (Companies)', 'route' => 'crm.accounts.index'],
             ['label' => 'crm.customers_sidebar', 'default' => 'Customers', 'route' => 'crm.customers.index'],
+            ['label' => 'Activities', 'route' => 'crm.activities.index'],
             ['label' => 'crm.track_status_sidebar', 'default' => 'Track Status', 'route' => 'crm.leads.trackStatus'],
         ],
     ],

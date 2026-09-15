@@ -28,7 +28,7 @@ return [
         'section' => 'platform_admin', 'order' => 30,
         'label' => 'Audit & Settings', 'icon' => 'feather-settings',
         'children' => [
-            ['label' => 'Audit Logs'],
+            ['label' => 'Audit Logs', 'route' => 'access.audit-log.index', 'permission' => 'audit.logs.view'],
             ['label' => 'Localization'],
             ['label' => 'Currencies'],
             ['label' => 'System Settings'],

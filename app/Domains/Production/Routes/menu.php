@@ -15,6 +15,13 @@ return [
             ['label' => 'Shop Floor (MES)', 'route' => 'production.mes.dashboard'],
             ['label' => 'Work-in-Progress (WIP)', 'route' => 'production.wip.index'],
             ['label' => 'Job Cards / Operations', 'route' => 'production.mes.operator.my-operations'],
+            ['label' => 'Operator Dashboard', 'route' => 'production.mes.operator.dashboard', 'permission' => 'production.mes.execute'],
+            ['label' => 'Barcode Scanner', 'route' => 'production.mes.scanner.index', 'permission' => 'production.mes.execute'],
+            ['label' => 'Work Center Board', 'route' => 'production.mes.work-centers.index', 'permission' => 'production.mes.execute'],
+            ['label' => 'Machine Board', 'route' => 'production.mes.machines.index', 'permission' => 'production.mes.execute'],
+            ['label' => 'Production Timeline', 'route' => 'production.mes.timeline.index', 'permission' => 'production.mes.execute'],
+            ['label' => 'Lot Traceability', 'route' => 'production.mes.traceability.index', 'permission' => 'production.mes.execute'],
+            ['label' => 'Scan Logs', 'route' => 'production.scan-logs.index', 'permission' => 'production.mes.execute'],
         ],
     ],
     [
@@ -22,7 +29,9 @@ return [
         'label' => 'Quality Management', 'icon' => 'feather-check-circle',
         'children' => [
             ['label' => 'Quality Dashboard', 'route' => 'production.quality.dashboard'],
+            ['label' => 'Quality Plans', 'route' => 'production.quality-plans.index', 'permission' => 'production.quality.manage'],
             ['label' => 'Quality Inspections', 'route' => 'production.inspections.index'],
+            ['label' => 'Deviations', 'route' => 'production.deviations.index', 'permission' => 'production.quality.manage'],
             ['label' => 'NCR', 'route' => 'production.ncrs.index'],
             ['label' => 'CAPA', 'route' => 'production.capas.index'],
             ['label' => 'Rework Orders', 'route' => 'production.rework.index'],
@@ -60,6 +69,8 @@ return [
             ['label' => 'Executive Dashboard', 'route' => 'production.intelligence.dashboard'],
             ['label' => 'Live Andon Board', 'route' => 'production.intelligence.andon'],
             ['label' => 'Manufacturing Reports', 'route' => 'production.intelligence.reports.index'],
+            ['label' => 'Production Alerts', 'route' => 'production.intelligence.alerts.index', 'permission' => 'production.intelligence.view'],
+            ['label' => 'KPI Targets', 'route' => 'production.kpi-targets.index', 'permission' => 'production.intelligence.view'],
         ],
     ],
     [

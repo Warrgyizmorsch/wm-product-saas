@@ -32,12 +32,21 @@ return [
             ['label' => 'Document Master', 'route' => 'hrms.documents-master.index'],
             ['label' => 'Holiday Calendar', 'route' => 'hrms.holidays.index'],
             ['label' => 'Expense Policies', 'route' => 'hrms.expense-policy.index'],
+            ['label' => 'Expense Categories', 'route' => 'hrms.expense-categories.index'],
             ['label' => 'Offboarding Policies', 'route' => 'hrms.offboarding-policies.index'],
         ],
     ],
     [
         'section' => 'hrms', 'order' => 30, 'permission' => $hrAdmin,
         'label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index',
+    ],
+    [
+        'section' => 'hrms', 'order' => 35,
+        'label' => 'Employee Lifecycle', 'icon' => 'feather-user-check',
+        'children' => [
+            ['label' => 'Probation', 'route' => 'hrms.probation.index', 'permission' => array_merge(['hrms.probation.manage'], $hrAdmin)],
+            ['label' => 'Employee Exits', 'route' => 'hrms.exits.index', 'permission' => 'hrms.employee_exits.view'],
+        ],
     ],
     [
         'section' => 'hrms', 'order' => 40, 'permission' => $hrAdmin,
@@ -68,7 +77,15 @@ return [
         'label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index',
     ],
     ['section' => 'hrms', 'order' => 120, 'label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index'],
-    ['section' => 'hrms', 'order' => 130, 'label' => 'Helpdesk', 'icon' => 'feather-life-buoy', 'route' => 'hrms.helpdesk.tickets.index'],
+    [
+        'section' => 'hrms', 'order' => 130,
+        'label' => 'Helpdesk', 'icon' => 'feather-life-buoy',
+        'children' => [
+            ['label' => 'Tickets', 'route' => 'hrms.helpdesk.tickets.index'],
+            ['label' => 'Categories', 'route' => 'hrms.helpdesk.categories.index', 'permission' => ['hrms.helpdesk.manage', 'hr.settings.manage']],
+            ['label' => 'Knowledge Base', 'route' => 'hrms.helpdesk.kb.index', 'permission' => ['hrms.helpdesk.manage', 'hr.settings.manage']],
+        ],
+    ],
     [
         'section' => 'hrms', 'order' => 140,
         'label' => 'Payroll', 'icon' => 'feather-dollar-sign',
