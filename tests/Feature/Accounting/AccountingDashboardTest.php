@@ -178,6 +178,37 @@ class AccountingDashboardTest extends TestCase
         $this->assertFalse($checklist['bank_reconciliation']['ok']);
     }
 
+    public function test_checklist_flags_negative_inventory_and_a_ledger_that_does_not_match_documents(): void
+    {
+        $account = fn (string $code, string $name) => ChartOfAccount::create([
+            'tenant_id' => $this->tenant->id, 'code' => $code, 'name' => $name,
+            'type' => ChartOfAccount::TYPE_ASSET, 'subtype' => ChartOfAccount::SUBTYPE_CURRENT_ASSET,
+            'normal_balance' => ChartOfAccount::BALANCE_DEBIT,
+        ]);
+        $inventory = $account('1200', 'Inventory');
+        $receivable = $account('1100', 'Accounts Receivable');
+        $a = $this->accounts;
+
+        $this->postJournal($this->tenant, $a['bank'], $a['income'], 2000);
+        $this->postJournal($this->tenant, $receivable, $a['income'], 1000);   // no invoice behind it
+        $this->postJournal($this->tenant, $a['cogs'], $inventory, 500);       // stock issued, never received
+        $this->postJournal($this->tenant, $a['rent'], $a['tds'], 1000);
+
+        $response = $this->dashboard()->assertOk();
+
+        $checklist = $response->viewData('checklist');
+        $this->assertFalse($checklist['inventory']['ok']);
+        $this->assertFalse($checklist['receivables_ledger']['ok']);
+        $this->assertTrue($checklist['payables_ledger']['ok']);
+
+        // Current assets 2,500 (bank 2,000 + AR 1,000 − inventory 500); liabilities 1,000.
+        // Negative inventory is not subtracted, so quick never exceeds current.
+        $ratios = $response->viewData('ratios');
+        $this->assertEquals(2.5, $ratios['current_ratio']);
+        $this->assertEquals(2.5, $ratios['quick_ratio']);
+        $this->assertNull($ratios['dso']);
+    }
+
     public function test_budget_alerts_list_lines_at_or_over_the_warning_threshold(): void
     {
         $fiscalYear = FiscalYear::query()->where('name', 'FY '.now()->year)->firstOrFail();

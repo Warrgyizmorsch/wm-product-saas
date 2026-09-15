@@ -96,7 +96,14 @@ class AccountingDashboardService
             : $this->ledger->position($this->ledger->balancesAsOf($tenantId, $today))['cash'];
         $receivables = $this->parties->receivables($today, self::FORECAST_DAYS);
         $payables = $this->parties->payables($today, self::FORECAST_DAYS);
-        $checklist = $this->checklist->build($today, $position, AccountingPostingFailure::query()->unresolved()->count());
+        $billing = $this->parties->billedBetween($period->from, $period->to);
+        $checklist = $this->checklist->build(
+            $today,
+            $position,
+            AccountingPostingFailure::query()->unresolved()->count(),
+            $receivables['total'],
+            $payables['total'],
+        );
 
         return [
             'period' => $period,
@@ -113,7 +120,7 @@ class AccountingDashboardService
             ],
             'profitAndLoss' => $profitAndLoss,
             'cash' => ['total' => $position['cash'], 'accounts' => $position['cash_accounts']],
-            'ratios' => $this->ledger->ratios($position, $profitAndLoss, $period->days()),
+            'ratios' => $this->ledger->ratios($position, $profitAndLoss, $period->days(), $receivables['total'], $payables['total'], $billing),
             'burn' => $this->ledger->burn($trend, $cashToday),
             'trend' => $trend,
             'expenseBreakdown' => $this->ledger->expenseBreakdown($movements),

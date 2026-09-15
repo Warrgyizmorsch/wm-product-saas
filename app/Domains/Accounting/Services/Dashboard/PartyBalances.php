@@ -55,6 +55,29 @@ class PartyBalances
     }
 
     /**
+     * Amount invoiced to customers and billed by vendors within a date range —
+     * the denominators for days sales / payables outstanding.
+     *
+     * @return array{invoiced: float, billed: float}
+     */
+    public function billedBetween(Carbon $from, Carbon $to): array
+    {
+        $range = [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
+
+        return [
+            'invoiced' => round((float) Invoice::query()
+                ->whereNotIn('status', ['Draft', 'Cancelled'])
+                ->whereBetween('invoice_date', $range)
+                ->sum('total_amount'), 2),
+            // vendor_bills stores its total in grand_total (there is no total_amount column).
+            'billed' => round((float) VendorBill::query()
+                ->whereNotIn('status', ['Draft', 'Cancelled'])
+                ->whereBetween('bill_date', $range)
+                ->sum('grand_total'), 2),
+        ];
+    }
+
+    /**
      * A document with no due date is treated as due now.
      *
      * @param iterable<array{party: string, due_date: mixed, amount: float}> $documents

@@ -89,16 +89,21 @@ final class DashboardReport
             ],
         ];
 
+        // A negative net figure is input credit carried forward, not a negative liability.
+        $gstLine = fn (string $what, float $amount) => $amount < 0
+            ? ["Input credit carried forward ({$what})", abs($amount)]
+            : ["Net GST payable ({$what})", $amount];
+
         $sections[] = [
             'title' => 'GST & TDS',
             'header' => ['Line', 'Amount'],
             'rows' => [
                 ["Output GST ({$data['gst']['return_month']})", $data['gst']['output']],
                 ["Input tax credit ({$data['gst']['return_month']})", $data['gst']['input']],
-                ["Net GST payable ({$data['gst']['return_month']})", $data['gst']['payable']],
+                $gstLine($data['gst']['return_month'], $data['gst']['payable']),
                 ['GSTR-1 due', $data['gst']['gstr1_due']->format('d M Y')],
                 ['GSTR-3B due', $data['gst']['gstr3b_due']->format('d M Y')],
-                ["GST building up ({$data['gst']['accruing_month']})", $data['gst']['accruing_payable']],
+                $gstLine($data['gst']['accruing_month'].' so far', $data['gst']['accruing_payable']),
                 ['TDS payable', $data['tdsPayable']],
             ],
         ];
