@@ -106,27 +106,38 @@ class WhatsAppService
         }
     }
 
-    public function sendMessage(string $mobile, string $message): array
+    public function sendMessage(string $mobile, string $message, ?string $quotedMsgId = null): array
     {
-        $cleanNumber = preg_replace('/\D/', '', $mobile);
-        if (str_starts_with($cleanNumber, '0')) {
-            $cleanNumber = preg_replace('/^0+/', '', $cleanNumber);
-        }
-        if (strlen($cleanNumber) === 10) {
-            $cleanNumber = '91' . $cleanNumber;
+        $mobileTrim = trim($mobile);
+        if (str_contains($mobileTrim, '@lid') || str_contains($mobileTrim, '@s.whatsapp.net')) {
+            $targetNumber = $mobileTrim;
+        } else {
+            $cleanNumber = preg_replace('/\D/', '', $mobileTrim);
+            if (str_starts_with($cleanNumber, '0')) {
+                $cleanNumber = preg_replace('/^0+/', '', $cleanNumber);
+            }
+            if (strlen($cleanNumber) === 10) {
+                $cleanNumber = '91' . $cleanNumber;
+            }
+            $targetNumber = $cleanNumber;
         }
 
         $config = $this->getConfig();
         $url = $this->getBridgeUrl() . '/sessions/' . $config->session_key . '/send-message';
 
+        $payload = [
+            'number'  => $targetNumber,
+            'message' => $message,
+        ];
+        if ($quotedMsgId) {
+            $payload['message_id'] = $quotedMsgId;
+        }
+
         try {
             $response = Http::acceptJson()
                 ->withToken($this->getBridgeToken())
                 ->timeout(30)
-                ->post($url, [
-                    'number'  => $cleanNumber,
-                    'message' => $message,
-                ]);
+                ->post($url, $payload);
 
             if ($response->successful()) {
                 $resData = $response->json();
@@ -136,7 +147,7 @@ class WhatsAppService
                         'company_id'    => $config->company_id,
                         'branch_id'     => $config->branch_id,
                         'session_key'   => $config->session_key,
-                        'sender_number' => $cleanNumber,
+                        'sender_number' => $targetNumber,
                         'sender_name'   => 'Outbound ERP',
                         'direction'     => 'outbound',
                         'message_type'  => 'text',
@@ -149,7 +160,7 @@ class WhatsAppService
 
                 return [
                     'success' => true,
-                    'message' => "✓ WhatsApp test message successfully sent to +{$cleanNumber}!",
+                    'message' => "✓ WhatsApp test message successfully sent to {$targetNumber}!",
                     'data'    => $resData,
                 ];
             }
@@ -171,12 +182,18 @@ class WhatsAppService
 
     public function sendDocument(string $mobile, string $binary, string $filename, string $caption = '', string $mimetype = 'application/pdf'): array
     {
-        $cleanNumber = preg_replace('/\D/', '', $mobile);
-        if (str_starts_with($cleanNumber, '0')) {
-            $cleanNumber = preg_replace('/^0+/', '', $cleanNumber);
-        }
-        if (strlen($cleanNumber) === 10) {
-            $cleanNumber = '91' . $cleanNumber;
+        $mobileTrim = trim($mobile);
+        if (str_contains($mobileTrim, '@lid') || str_contains($mobileTrim, '@s.whatsapp.net')) {
+            $targetNumber = $mobileTrim;
+        } else {
+            $cleanNumber = preg_replace('/\D/', '', $mobileTrim);
+            if (str_starts_with($cleanNumber, '0')) {
+                $cleanNumber = preg_replace('/^0+/', '', $cleanNumber);
+            }
+            if (strlen($cleanNumber) === 10) {
+                $cleanNumber = '91' . $cleanNumber;
+            }
+            $targetNumber = $cleanNumber;
         }
 
         $config = $this->getConfig();
@@ -187,7 +204,7 @@ class WhatsAppService
                 ->withToken($this->getBridgeToken())
                 ->timeout(45)
                 ->post($url, [
-                    'number'   => $cleanNumber,
+                    'number'   => $targetNumber,
                     'filename' => $filename,
                     'mimetype' => $mimetype,
                     'caption'  => $caption,
@@ -202,7 +219,7 @@ class WhatsAppService
                         'company_id'    => $config->company_id,
                         'branch_id'     => $config->branch_id,
                         'session_key'   => $config->session_key,
-                        'sender_number' => $cleanNumber,
+                        'sender_number' => $targetNumber,
                         'sender_name'   => 'Outbound ERP',
                         'direction'     => 'outbound',
                         'message_type'  => 'document',
@@ -215,7 +232,7 @@ class WhatsAppService
 
                 return [
                     'success' => true,
-                    'message' => "✓ WhatsApp document successfully sent to +{$cleanNumber}!",
+                    'message' => "✓ WhatsApp document successfully sent to {$targetNumber}!",
                     'data'    => $resData,
                 ];
             }
