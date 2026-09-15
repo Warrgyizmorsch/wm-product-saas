@@ -28,7 +28,7 @@ class WhatsAppBotService
     /**
      * Process incoming message for interactive B2B/B2C lead qualification flow
      */
-    public function handleIncomingMessage(WhatsAppConfiguration $config, string $senderNumber, string $senderName, string $messageBody): void
+    public function handleIncomingMessage(WhatsAppConfiguration $config, string $senderNumber, string $senderName, string $messageBody, ?string $messageId = null): void
     {
         $trimMsg = trim(strtolower($messageBody));
 
@@ -66,7 +66,7 @@ class WhatsAppBotService
                       . "2️⃣ Personal / Retail Purchase (B2C)";
 
             $session->update(['current_step' => 1]);
-            $this->waService->sendMessage($senderNumber, $greeting);
+            $this->waService->sendMessage($senderNumber, $greeting, $messageId);
             return;
         }
 
@@ -77,17 +77,17 @@ class WhatsAppBotService
                     'category'     => 'b2b',
                     'current_step' => 2,
                 ]);
-                $this->waService->sendMessage($senderNumber, "Great! Business Enquiry selected. 🏢\n\nAapka Full Name (Contact Person) kya hai?");
+                $this->waService->sendMessage($senderNumber, "Great! Business Enquiry selected. 🏢\n\nAapka Full Name (Contact Person) kya hai?", $messageId);
                 return;
             } elseif ($trimMsg === '2' || str_contains($trimMsg, 'b2c') || str_contains($trimMsg, 'personal') || str_contains($trimMsg, 'retail')) {
                 $session->update([
                     'category'     => 'b2c',
                     'current_step' => 2,
                 ]);
-                $this->waService->sendMessage($senderNumber, "Great! Retail Purchase selected. 👤\n\nAapka Full Name kya hai?");
+                $this->waService->sendMessage($senderNumber, "Great! Retail Purchase selected. 👤\n\nAapka Full Name kya hai?", $messageId);
                 return;
             } else {
-                $this->waService->sendMessage($senderNumber, "⚠️ Kripya valid option number reply karein:\n\n1️⃣ Business / Wholesale (B2B)\n2️⃣ Personal / Retail (B2C)");
+                $this->waService->sendMessage($senderNumber, "⚠️ Kripya valid option number reply karein:\n\n1️⃣ Business / Wholesale (B2B)\n2️⃣ Personal / Retail (B2C)", $messageId);
                 return;
             }
         }
@@ -101,9 +101,9 @@ class WhatsAppBotService
             ]);
 
             if ($session->category === 'b2b') {
-                $this->waService->sendMessage($senderNumber, "Aapki Company / Business ka Naam aur GST Number (optional) kya hai?");
+                $this->waService->sendMessage($senderNumber, "Aapki Company / Business ka Naam aur GST Number (optional) kya hai?", $messageId);
             } else {
-                $this->waService->sendMessage($senderNumber, "Aapko konsa Product ya Service khareedna hai?");
+                $this->waService->sendMessage($senderNumber, "Aapko konsa Product ya Service khareedna hai?", $messageId);
             }
             return;
         }
@@ -116,14 +116,14 @@ class WhatsAppBotService
                     'collected_data' => $collected,
                     'current_step'   => 4,
                 ]);
-                $this->waService->sendMessage($senderNumber, "Aapko kis Product/Service ki Wholesale / Bulk Quantity me requirement hai?");
+                $this->waService->sendMessage($senderNumber, "Aapko kis Product/Service ki Wholesale / Bulk Quantity me requirement hai?", $messageId);
             } else {
                 $collected['product'] = trim($messageBody);
                 $session->update([
                     'collected_data' => $collected,
                     'current_step'   => 4,
                 ]);
-                $this->waService->sendMessage($senderNumber, "Aap kis City / Location se hain?");
+                $this->waService->sendMessage($senderNumber, "Aap kis City / Location se hain?", $messageId);
             }
             return;
         }
@@ -136,14 +136,14 @@ class WhatsAppBotService
                     'collected_data' => $collected,
                     'current_step'   => 5,
                 ]);
-                $this->waService->sendMessage($senderNumber, "Aapki Company kis City / Location me sthit hai?");
+                $this->waService->sendMessage($senderNumber, "Aapki Company kis City / Location me sthit hai?", $messageId);
             } else {
                 $collected['city'] = trim($messageBody);
                 $session->update([
                     'collected_data' => $collected,
                     'current_step'   => 5,
                 ]);
-                $this->waService->sendMessage($senderNumber, "Quotation & Product Catalogue bhejne ke liye aapka valid Email ID kya hai? (e.g. name@example.com)");
+                $this->waService->sendMessage($senderNumber, "Quotation & Product Catalogue bhejne ke liye aapka valid Email ID kya hai? (e.g. name@example.com)", $messageId);
             }
             return;
         }
@@ -156,12 +156,12 @@ class WhatsAppBotService
                     'collected_data' => $collected,
                     'current_step'   => 6,
                 ]);
-                $this->waService->sendMessage($senderNumber, "Official Commercial Quotation aur Tax Invoice bhejne ke liye aapka Email ID kya hai? (e.g. info@company.com)");
+                $this->waService->sendMessage($senderNumber, "Official Commercial Quotation aur Tax Invoice bhejne ke liye aapka Email ID kya hai? (e.g. info@company.com)", $messageId);
                 return;
             } else {
                 // B2C Email Validation
                 if (!self::isValidEmail($messageBody)) {
-                    $this->waService->sendMessage($senderNumber, "⚠️ Email ID galat lag rahi hai!\nKripya ek valid Email ID enter karein (e.g. name@example.com):");
+                    $this->waService->sendMessage($senderNumber, "⚠️ Email ID galat lag rahi hai!\nKripya ek valid Email ID enter karein (e.g. name@example.com):", $messageId);
                     return;
                 }
 
@@ -171,7 +171,7 @@ class WhatsAppBotService
                     'is_completed'   => true,
                 ]);
 
-                $this->createCrmLead($config, $senderNumber, $session, $collected);
+                $this->createCrmLead($config, $senderNumber, $session, $collected, $messageId);
                 return;
             }
         }
@@ -179,7 +179,7 @@ class WhatsAppBotService
         // STEP 6: B2B Email Validation & Lead Creation
         if ($session->current_step === 6 && $session->category === 'b2b') {
             if (!self::isValidEmail($messageBody)) {
-                $this->waService->sendMessage($senderNumber, "⚠️ Official Email ID galat lag rahi hai!\nKripya ek valid Email ID enter karein (e.g. sales@company.com):");
+                $this->waService->sendMessage($senderNumber, "⚠️ Official Email ID galat lag rahi hai!\nKripya ek valid Email ID enter karein (e.g. sales@company.com):", $messageId);
                 return;
             }
 
@@ -189,7 +189,7 @@ class WhatsAppBotService
                 'is_completed'   => true,
             ]);
 
-            $this->createCrmLead($config, $senderNumber, $session, $collected);
+            $this->createCrmLead($config, $senderNumber, $session, $collected, $messageId);
             return;
         }
     }
@@ -197,7 +197,7 @@ class WhatsAppBotService
     /**
      * Create Lead in CRM database and send final confirmation on WhatsApp
      */
-    protected function createCrmLead(WhatsAppConfiguration $config, string $senderNumber, WhatsAppChatSession $session, array $collected): void
+    protected function createCrmLead(WhatsAppConfiguration $config, string $senderNumber, WhatsAppChatSession $session, array $collected, ?string $messageId = null): void
     {
         try {
             $isB2b = ($session->category === 'b2b');
@@ -234,10 +234,10 @@ class WhatsAppBotService
                             . "Humari Customer Executive aapse jald hi WhatsApp & Email par details share karegi!";
             }
 
-            $this->waService->sendMessage($senderNumber, $confirmMsg);
+            $this->waService->sendMessage($senderNumber, $confirmMsg, $messageId);
         } catch (\Throwable $e) {
             Log::error('Failed to auto-create Lead from WhatsApp Bot:', ['error' => $e->getMessage()]);
-            $this->waService->sendMessage($senderNumber, "Thank you! Aapki information receive ho gayi hai. Humari team aapse contact karegi.");
+            $this->waService->sendMessage($senderNumber, "Thank you! Aapki information receive ho gayi hai. Humari team aapse contact karegi.", $messageId);
         }
     }
 }

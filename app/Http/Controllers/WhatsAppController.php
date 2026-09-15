@@ -94,7 +94,7 @@ class WhatsAppController extends Controller
         // Trigger Interactive WhatsApp Bot for Inbound Messages
         if ($direction === 'inbound' && !empty($senderNumber) && !empty($messageBody)) {
             try {
-                $this->botService->handleIncomingMessage($config, $senderNumber, $senderName, $messageBody);
+                $this->botService->handleIncomingMessage($config, $senderNumber, $senderName, $messageBody, $messageId);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::error('WhatsApp Bot Execution Error: ' . $e->getMessage());
             }
