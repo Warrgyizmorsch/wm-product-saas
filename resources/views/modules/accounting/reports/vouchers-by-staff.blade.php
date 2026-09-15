@@ -4,6 +4,10 @@
 @section('page-title', 'Vouchers by Staff')
 @section('breadcrumb', 'Accounting / Reports / Vouchers by Staff')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'vouchers-by-staff'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end">

@@ -4,6 +4,10 @@
 @section('page-title', 'Budget vs Actual')
 @section('breadcrumb', 'Accounting / Reports / Budget vs Actual')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'budget-vs-actual'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end">

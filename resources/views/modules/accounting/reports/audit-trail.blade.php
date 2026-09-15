@@ -47,6 +47,7 @@
             <x-ui.button type="submit" variant="primary" size="sm" class="w-100">Apply</x-ui.button>
         </form>
     </x-ui.filter>
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'audit-trail'])
 @endsection
 
 @section('content')

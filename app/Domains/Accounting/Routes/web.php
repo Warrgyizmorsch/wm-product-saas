@@ -29,6 +29,7 @@ use App\Domains\Accounting\Controllers\Gstr3bController;
 use App\Domains\Accounting\Controllers\JournalController;
 use App\Domains\Accounting\Controllers\PartyLedgerController;
 use App\Domains\Accounting\Controllers\ProfitLossController;
+use App\Domains\Accounting\Controllers\ReportExportController;
 use App\Domains\Accounting\Controllers\StaffActivityReportController;
 use App\Domains\Accounting\Controllers\TaxRateController;
 use App\Domains\Accounting\Controllers\TrialBalanceController;
@@ -101,6 +102,9 @@ Route::prefix('accounting')
 
         Route::get('reports/day-book', [DayBookController::class, 'index'])->name('reports.day-book');
         Route::get('reports/vouchers-by-staff', [StaffActivityReportController::class, 'index'])->name('reports.vouchers-by-staff');
+        Route::get('reports/{report}/export/{format}', [ReportExportController::class, 'export'])
+            ->whereIn('format', ['pdf', 'xlsx'])
+            ->name('reports.export');
         Route::get('reports/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.trial-balance');
         Route::get('reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
         Route::get('reports/party-ledger', [PartyLedgerController::class, 'index'])->name('reports.party-ledger');
