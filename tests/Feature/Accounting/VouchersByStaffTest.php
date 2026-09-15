@@ -105,6 +105,21 @@ class VouchersByStaffTest extends TestCase
         $this->assertSame(0, $outOfRange->viewData('journals')->total());
     }
 
+    public function test_journal_search_matches_source_amount_and_posted_by_name_not_just_memo_or_number(): void
+    {
+        $bySource = $this->get_as($this->asha, route('accounting.journals.index', ['search' => 'manual']));
+        $this->assertGreaterThan(0, $bySource->viewData('journals')->total());
+
+        // SQLite (this test's DB) stores decimal columns without trailing zeros,
+        // unlike the real MySQL database, so match on the whole-number part only.
+        $byAmount = $this->get_as($this->asha, route('accounting.journals.index', ['search' => '300']));
+        $this->assertGreaterThan(0, $byAmount->viewData('journals')->total());
+
+        $byPoster = $this->get_as($this->asha, route('accounting.journals.index', ['search' => 'Bala']));
+        $this->assertGreaterThan(0, $byPoster->viewData('journals')->total());
+        $this->assertTrue($byPoster->viewData('journals')->every(fn ($journal) => $journal->postedBy?->name === 'Bala Accountant'));
+    }
+
     public function test_voucher_list_filters_by_poster(): void
     {
         $response = $this->get_as($this->bala, route('accounting.vouchers.payment.index', ['posted_by' => $this->bala->id]))->assertOk();

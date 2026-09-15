@@ -44,6 +44,16 @@ class HrmsDemoSeeder extends Seeder
      */
     public function run(): void
     {
+        // This wipes and rebuilds demo HR/asset data wholesale — safe on a local
+        // sandbox, destructive anywhere real data might exist. It previously ran
+        // against a shared database and orphaned depreciation schedules/disposals/
+        // write-offs/revaluations pointing at assets it had just truncated.
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command?->error('HrmsDemoSeeder only runs in local/testing environments — refusing on '.app()->environment().'.');
+
+            return;
+        }
+
         Schema::disableForeignKeyConstraints();
 
         // Truncate all related tables
@@ -59,6 +69,20 @@ class HrmsDemoSeeder extends Seeder
         DB::table('shift_rosters')->truncate();
         DB::table('asset_allocations')->truncate();
         DB::table('asset_requests')->truncate();
+        // Accounting records that point at assets — must go before assets itself,
+        // or truncating assets alone leaves these dangling on a deleted asset_id.
+        if (Schema::hasTable('asset_depreciation_schedules')) {
+            DB::table('asset_depreciation_schedules')->truncate();
+        }
+        if (Schema::hasTable('asset_disposals')) {
+            DB::table('asset_disposals')->truncate();
+        }
+        if (Schema::hasTable('asset_write_offs')) {
+            DB::table('asset_write_offs')->truncate();
+        }
+        if (Schema::hasTable('asset_revaluations')) {
+            DB::table('asset_revaluations')->truncate();
+        }
         DB::table('assets')->truncate();
         DB::table('asset_items')->truncate();
         DB::table('asset_categories')->truncate();

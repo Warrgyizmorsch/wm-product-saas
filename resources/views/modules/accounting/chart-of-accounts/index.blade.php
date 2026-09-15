@@ -17,7 +17,10 @@
             <x-ui.select label="Type" name="type" :selected="$filters['type'] ?? ''" :options="
                 ['' => 'All'] + collect(\App\Domains\Accounting\Models\ChartOfAccount::TYPES)->mapWithKeys(fn ($t) => [$t => ucfirst($t)])->all()
             " />
-            <x-ui.button type="submit" variant="primary" size="sm" class="w-100">Apply</x-ui.button>
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                <x-ui.button href="{{ route('accounting.chart-of-accounts.index') }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+            </div>
         </form>
     </x-ui.filter>
     @can('create', \App\Domains\Accounting\Models\ChartOfAccount::class)
