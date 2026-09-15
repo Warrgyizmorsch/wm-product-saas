@@ -25,12 +25,13 @@ class JournalController extends Controller
     {
         $this->authorize('viewAny', Journal::class);
 
-        $filters = $request->only(['status', 'source', 'search', 'sort', 'direction']);
+        $filters = $request->only(['status', 'source', 'posted_by', 'from', 'to', 'search', 'sort', 'direction']);
         $journals = $this->journals->paginate($filters, 15);
 
         return view('modules.accounting.journals.index', [
             'journals' => $journals,
             'filters' => $filters,
+            'posters' => $this->journals->posters(),
         ]);
     }
 

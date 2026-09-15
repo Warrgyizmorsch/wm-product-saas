@@ -86,7 +86,7 @@ class PurchaseAdvancePaymentService
                     'reference_type' => 'vendor_advance_payment',
                     'reference_id' => $advance->id,
                     'memo' => $memo,
-                    'posted_by' => auth()->id() ?: 1,
+                    'posted_by' => auth()->id(),
                 ]);
             }
         } catch (\Throwable $e) {

@@ -4,6 +4,10 @@
 @section('page-title', 'GSTR-3B')
 @section('breadcrumb', 'Accounting / Reports / GSTR-3B')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'gstr3b'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end">

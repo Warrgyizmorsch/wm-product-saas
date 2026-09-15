@@ -4,6 +4,10 @@
 @section('page-title', 'General Ledger')
 @section('breadcrumb', 'Accounting / Reports / General Ledger')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'general-ledger'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end">

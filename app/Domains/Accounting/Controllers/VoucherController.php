@@ -30,7 +30,7 @@ class VoucherController extends Controller
         $this->assertValidType($type);
         abort_unless($this->voucherPolicy->viewAny($request->user(), $type), 403);
 
-        $filters = $request->only(['status', 'search', 'sort', 'direction']);
+        $filters = $request->only(['status', 'posted_by', 'from', 'to', 'search', 'sort', 'direction']);
         $vouchers = $this->vouchers->paginate($type, $filters, 15);
 
         return view('modules.accounting.vouchers.index', [
@@ -38,6 +38,7 @@ class VoucherController extends Controller
             'label' => VoucherType::label($type),
             'vouchers' => $vouchers,
             'filters' => $filters,
+            'posters' => $this->journals->posters(),
         ]);
     }
 

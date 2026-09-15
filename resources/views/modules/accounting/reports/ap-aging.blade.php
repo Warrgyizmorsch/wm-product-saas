@@ -4,6 +4,10 @@
 @section('page-title', 'Accounts Payable Aging')
 @section('breadcrumb', 'Accounting / Reports / AP Aging')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'ap-aging'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end">

@@ -241,7 +241,9 @@ class PayrollAccountingService
             'reference_type'        => 'PayrollRun',
             'reference_id'          => $run->id,
             'memo'                  => "Payroll Journal entry for month {$run->payroll_month} (Run ID: {$run->id})",
-            'posted_by'             => auth()->id() ?? 1,
+            // Null when run without a signed-in user (queue/console) — shown as "System",
+            // rather than crediting user #1, who may not even belong to this tenant.
+            'posted_by'             => auth()->id(),
         ];
 
         return $this->journalService->post($lines, $meta);
@@ -337,7 +339,7 @@ class PayrollAccountingService
             'reference_type'        => 'PayrollRunPayout',
             'reference_id'          => $run->id,
             'memo'                  => "Bank salary disbursement for month {$run->payroll_month} (Run ID: {$run->id})",
-            'posted_by'             => auth()->id() ?? 1,
+            'posted_by'             => auth()->id(),
         ];
 
         return $this->journalService->post($lines, $meta);

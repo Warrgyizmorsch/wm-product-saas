@@ -29,6 +29,7 @@ return [
             ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index'],
             ['label' => 'Exchange Rates', 'route' => 'accounting.exchange-rates.index'],
             ['label' => 'Day Book', 'route' => 'accounting.reports.day-book'],
+            ['label' => 'Vouchers by Staff', 'route' => 'accounting.reports.vouchers-by-staff', 'permission' => 'accounting.reports.view'],
             ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
             ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
             ['label' => 'Party Ledger', 'route' => 'accounting.reports.party-ledger'],

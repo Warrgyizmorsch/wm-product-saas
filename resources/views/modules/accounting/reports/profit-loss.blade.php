@@ -4,6 +4,10 @@
 @section('page-title', 'Profit & Loss')
 @section('breadcrumb', 'Accounting / Reports / Profit & Loss')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'profit-loss'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end">

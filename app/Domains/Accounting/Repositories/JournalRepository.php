@@ -11,10 +11,25 @@ class JournalRepository implements JournalRepositoryInterface
 {
     public function paginateAll(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Journal::query()->with('period');
+        $query = Journal::query()->with(['period', 'postedBy']);
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
+        }
+
+        // 'system' = auto-postings made without a signed-in user.
+        if (($filters['posted_by'] ?? '') === 'system') {
+            $query->whereNull('posted_by');
+        } elseif (!empty($filters['posted_by'])) {
+            $query->where('posted_by', (int) $filters['posted_by']);
+        }
+
+        if (!empty($filters['from'])) {
+            $query->whereDate('journal_date', '>=', $filters['from']);
+        }
+
+        if (!empty($filters['to'])) {
+            $query->whereDate('journal_date', '<=', $filters['to']);
         }
 
         if (!empty($filters['source'])) {
@@ -38,6 +53,29 @@ class JournalRepository implements JournalRepositoryInterface
         $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
         return $query->orderBy($sort, $direction)->orderByDesc('id')->paginate($perPage);
+    }
+
+    public function posters(): \Illuminate\Support\Collection
+    {
+        $ids = Journal::query()->whereNotNull('posted_by')->distinct()->pluck('posted_by');
+
+        return \App\Models\User::query()
+            ->withoutGlobalScope('tenant')
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+    }
+
+    public function activityByPoster(\DateTimeInterface $from, \DateTimeInterface $to): \Illuminate\Support\Collection
+    {
+        return Journal::query()
+            ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+            ->whereBetween('journal_date', [$from, $to])
+            ->select('posted_by', 'voucher_type', 'status')
+            ->selectRaw('COUNT(*) as documents, SUM(total_debit) as amount')
+            ->groupBy('posted_by', 'voucher_type', 'status')
+            ->toBase()
+            ->get();
     }
 
     public function forDate(\DateTimeInterface $date): Collection

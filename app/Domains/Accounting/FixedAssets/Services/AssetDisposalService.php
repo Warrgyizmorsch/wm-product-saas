@@ -7,6 +7,7 @@ use App\Domains\Accounting\FixedAssets\Models\AssetDisposal;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Support\AccountCode;
 use App\Domains\HRMS\Models\Asset;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -128,7 +129,7 @@ class AssetDisposalService
             $tenantId = $asset->tenant_id;
 
             $fixedAssetAccount = $category?->chartOfAccount
-                ?? $this->accounts->findByCode('1500', $tenantId);
+                ?? $this->accounts->findByCode(AccountCode::FIXED_ASSETS, $tenantId);
 
             if ($fixedAssetAccount === null) {
                 throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: no fixed asset account configured.");
@@ -150,7 +151,7 @@ class AssetDisposalService
 
             if ((float) $disposal->accumulated_depreciation_at_disposal > 0) {
                 $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount
-                    ?? $this->accounts->findByCode('1510', $tenantId);
+                    ?? $this->accounts->findByCode(AccountCode::ACCUMULATED_DEPRECIATION, $tenantId);
                 if ($accumulatedDepreciationAccount === null) {
                     throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: accumulated depreciation account not found.");
                 }
@@ -165,7 +166,7 @@ class AssetDisposalService
 
             if ($gainLoss < 0) {
                 $lossAccount = $category?->lossOnDisposalAccount
-                    ?? $this->accounts->findByCode('5910', $tenantId)
+                    ?? $this->accounts->findByCode(AccountCode::LOSS_ON_ASSET_DISPOSAL, $tenantId)
                     ?? $this->accounts->findByCode('5900', $tenantId);
                 if ($lossAccount === null) {
                     throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: loss-on-disposal account not found.");
@@ -184,7 +185,9 @@ class AssetDisposalService
             ];
 
             if ($gainLoss > 0) {
+                // Miscellaneous Income (4900) only for charts that predate 4940.
                 $gainAccount = $category?->gainOnDisposalAccount
+                    ?? $this->accounts->findByCode(AccountCode::GAIN_ON_ASSET_DISPOSAL, $tenantId)
                     ?? $this->accounts->findByCode('4900', $tenantId);
                 if ($gainAccount === null) {
                     throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: gain-on-disposal account not found.");
