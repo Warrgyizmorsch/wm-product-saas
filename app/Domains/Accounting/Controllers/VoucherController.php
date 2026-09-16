@@ -39,6 +39,12 @@ class VoucherController extends Controller
             'vouchers' => $vouchers,
             'filters' => $filters,
             'posters' => $this->journals->posters(),
+            'summary' => [
+                'total' => Journal::query()->where('voucher_type', $type)->count(),
+                'posted' => Journal::query()->where('voucher_type', $type)->where('status', Journal::STATUS_POSTED)->count(),
+                'draft' => Journal::query()->where('voucher_type', $type)->where('status', Journal::STATUS_DRAFT)->count(),
+                'reversed' => Journal::query()->where('voucher_type', $type)->where('status', Journal::STATUS_REVERSED)->count(),
+            ],
         ]);
     }
 

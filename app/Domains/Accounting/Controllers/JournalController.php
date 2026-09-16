@@ -32,6 +32,12 @@ class JournalController extends Controller
             'journals' => $journals,
             'filters' => $filters,
             'posters' => $this->journals->posters(),
+            'summary' => [
+                'total' => Journal::query()->count(),
+                'posted' => Journal::query()->where('status', Journal::STATUS_POSTED)->count(),
+                'draft' => Journal::query()->where('status', Journal::STATUS_DRAFT)->count(),
+                'reversed' => Journal::query()->where('status', Journal::STATUS_REVERSED)->count(),
+            ],
         ]);
     }
 

@@ -52,6 +52,13 @@
 
 @section('content')
 
+    <div class="d-flex flex-wrap gap-3 mb-4">
+        <x-ui.stat-pill icon="feather-layers" :value="$summary['total']" label="Total Journals" color="primary" />
+        <x-ui.stat-pill icon="feather-check-circle" :value="$summary['posted']" label="Posted" color="success" />
+        <x-ui.stat-pill icon="feather-edit-3" :value="$summary['draft']" label="Draft" color="warning" />
+        <x-ui.stat-pill icon="feather-rotate-ccw" :value="$summary['reversed']" label="Reversed" color="secondary" />
+    </div>
+
     <x-ui.card bodyClass="p-0" class="accounting-dense">
         <div class="d-flex align-items-center gap-3 p-3 border-bottom">
             <form method="GET" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 280px; max-width: 360px;">
@@ -125,7 +132,7 @@
                             @endif
                         </td>
                         <td class="text-end pe-4">
-                            <x-ui.icon-btn href="{{ route('accounting.journals.show', $journal) }}" variant="soft-primary" icon="feather-eye" title="View" />
+                            <x-ui.row-actions :view-url="route('accounting.journals.show', $journal)" class="justify-content-end" />
                         </td>
                     </tr>
                 @empty
