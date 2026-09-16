@@ -213,25 +213,32 @@
                                     <small class="text-muted"><i class="feather-tag me-1"></i>{{ $ticket->category ? $ticket->category->name : 'General' }}</small>
                                 </td>
                                 <td>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="avatar-initials">
-                                            {{ strtoupper(substr($ticket->employee->first_name ?? 'E', 0, 1) . substr($ticket->employee->last_name ?? '', 0, 1)) }}
-                                        </div>
-                                        <div>
-                                            <div class="fw-semibold text-dark fs-7">{{ $ticket->employee ? $ticket->employee->first_name . ' ' . $ticket->employee->last_name : 'N/A' }}</div>
-                                            <small class="text-muted fs-8">{{ $ticket->employee ? $ticket->employee->employee_code : '' }}</small>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    @if($ticket->assignedAgent)
-                                        <span class="badge bg-light text-dark border">
-                                            <i class="feather-user me-1"></i> {{ $ticket->assignedAgent->first_name }} {{ $ticket->assignedAgent->last_name }}
-                                        </span>
-                                    @else
-                                        <span class="badge bg-secondary-subtle text-secondary">Unassigned</span>
-                                    @endif
-                                </td>
+                                     <div class="d-flex align-items-center gap-2">
+                                         <div class="avatar-initials flex-shrink-0">
+                                             {{ strtoupper(substr($ticket->employee->first_name ?? 'E', 0, 1) . substr($ticket->employee->last_name ?? '', 0, 1)) }}
+                                         </div>
+                                         <div>
+                                             <div class="fw-bold text-dark fs-13 lh-sm">{{ $ticket->employee ? ($ticket->employee->full_name ?: $ticket->employee->first_name . ' ' . $ticket->employee->last_name) : 'N/A' }}</div>
+                                             @if($ticket->employee && ($ticket->employee->employee_id || $ticket->employee->employee_code))
+                                                 <div class="text-muted fs-11 lh-xs">{{ $ticket->employee->employee_id ?: $ticket->employee->employee_code }}</div>
+                                             @endif
+                                         </div>
+                                     </div>
+                                 </td>
+                                 <td>
+                                     @if($ticket->assignedAgent)
+                                         <div class="d-flex align-items-center gap-2">
+                                             <div class="avatar-initials flex-shrink-0 bg-light text-primary" style="width: 28px; height: 28px; font-size: 11px;">
+                                                 {{ strtoupper(substr($ticket->assignedAgent->first_name ?? 'A', 0, 1) . substr($ticket->assignedAgent->last_name ?? '', 0, 1)) }}
+                                             </div>
+                                             <span class="fw-semibold text-dark fs-13">
+                                                 {{ $ticket->assignedAgent->full_name ?: ($ticket->assignedAgent->first_name . ' ' . $ticket->assignedAgent->last_name) }}
+                                             </span>
+                                         </div>
+                                     @else
+                                         <span class="badge bg-secondary-subtle text-secondary fs-12">Unassigned</span>
+                                     @endif
+                                 </td>
                                 <td>
                                     @if($ticket->priority === 'urgent')
                                         <x-ui.badge variant="danger" soft class="fw-bold text-uppercase">{{ $ticket->priority }}</x-ui.badge>
@@ -376,16 +383,24 @@
             });
         }
 
-        // Auto-submit search input on typing after delay
+        // Auto-submit search input on typing after delay (matching Knowledge Base exact behavior)
         const searchInput = document.getElementById('helpdeskSearchInput');
         const searchForm = document.getElementById('helpdeskSearchForm');
         let searchTimer;
+
         if (searchInput && searchForm) {
+            // Auto-focus search input if search query is present
+            if (searchInput.value) {
+                searchInput.focus();
+                const len = searchInput.value.length;
+                searchInput.setSelectionRange(len, len);
+            }
+
             searchInput.addEventListener('input', function() {
                 clearTimeout(searchTimer);
                 searchTimer = setTimeout(() => {
                     searchForm.submit();
-                }, 400);
+                }, 500);
             });
         }
     });

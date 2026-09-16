@@ -77,13 +77,20 @@ class HelpdeskTicketRepository
 
         // Search
         if (!empty($inputs['search'])) {
-            $search = $inputs['search'];
+            $search = trim($inputs['search']);
             $query->where(function ($q) use ($search) {
                 $q->where('ticket_number', 'like', "%{$search}%")
                   ->orWhere('subject', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
                   ->orWhereHas('employee', function ($eq) use ($search) {
-                      $eq->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%");
+                      $eq->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_id', 'like', "%{$search}%")
+                        ->orWhere('office_email', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('assignedAgent', function ($aq) use ($search) {
+                      $aq->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_id', 'like', "%{$search}%")
+                        ->orWhere('office_email', 'like', "%{$search}%");
                   });
             });
         }
@@ -129,7 +136,16 @@ class HelpdeskTicketRepository
         })->avg('rating') ?: 5.0;
 
         $categories = HelpdeskCategory::where('tenant_id', $tenantId)->where('is_active', true)->get();
-        $employees = Employee::where('tenant_id', $tenantId)->where('status', 'active')->get();
+
+        $employees = Employee::where('tenant_id', $tenantId)
+            ->where(function ($q) {
+                $q->where('status', true)->orWhere('status', 1)->orWhere('status', '1');
+            })
+            ->orderBy('full_name')
+            ->get();
+        if ($employees->isEmpty()) {
+            $employees = Employee::where('tenant_id', $tenantId)->orderBy('full_name')->get();
+        }
 
         return [
             'tickets'       => $tickets,

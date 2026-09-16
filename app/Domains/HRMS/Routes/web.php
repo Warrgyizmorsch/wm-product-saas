@@ -31,6 +31,7 @@ use App\Domains\HRMS\Controllers\BroadcastController;
 use App\Domains\HRMS\Controllers\HelpdeskTicketController;
 use App\Domains\HRMS\Controllers\HelpdeskCategoryController;
 use App\Domains\HRMS\Controllers\HelpdeskKbController;
+use App\Domains\HRMS\Controllers\RecruitmentController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -518,5 +519,31 @@ Route::prefix('hrms')
             Route::post('/{broadcast}/comment', [BroadcastController::class, 'storeComment'])->name('comment.store');
             Route::post('/comment/{comment}/pin', [BroadcastController::class, 'togglePinComment'])->name('comment.pin');
             Route::delete('/comment/{comment}', [BroadcastController::class, 'destroyComment'])->name('comment.destroy');
+        });
+
+        // Recruitment & Applicant Tracking System (ATS) Module
+        Route::prefix('recruitment')->name('recruitment.')->group(function (): void {
+            Route::get('/', [RecruitmentController::class, 'index'])->name('index');
+            
+            // Requisitions
+            Route::get('/requisitions', [RecruitmentController::class, 'requisitions'])->name('requisitions.index');
+            Route::post('/requisitions/store', [RecruitmentController::class, 'storeRequisition'])->name('requisitions.store');
+            Route::post('/requisitions/{requisition}/status', [RecruitmentController::class, 'updateRequisitionStatus'])->name('requisitions.status');
+
+            // Candidates
+            Route::get('/candidates', [RecruitmentController::class, 'candidates'])->name('candidates.index');
+            Route::post('/candidates/store', [RecruitmentController::class, 'storeCandidate'])->name('candidates.store');
+
+            // Pipeline & Kanban
+            Route::get('/pipeline/{requisition}', [RecruitmentController::class, 'pipeline'])->name('pipeline');
+            Route::post('/application/{application}/stage', [RecruitmentController::class, 'updateStage'])->name('stage.update');
+
+            // Interviews & Scorecards
+            Route::post('/application/{application}/interview', [RecruitmentController::class, 'scheduleInterview'])->name('interview.schedule');
+            Route::post('/interview/{interview}/scorecard', [RecruitmentController::class, 'submitScorecard'])->name('scorecard.submit');
+
+            // Offers & Employee Conversion
+            Route::post('/application/{application}/offer', [RecruitmentController::class, 'createOffer'])->name('offer.create');
+            Route::post('/offer/{offer}/convert-to-employee', [RecruitmentController::class, 'convertToEmployee'])->name('offer.convert');
         });
     });

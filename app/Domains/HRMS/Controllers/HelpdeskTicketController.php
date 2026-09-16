@@ -71,7 +71,15 @@ class HelpdeskTicketController extends Controller
             }
         }
 
-        $agents = Employee::where('tenant_id', $tenantId)->where('status', 'active')->get();
+        $agents = Employee::where('tenant_id', $tenantId)
+            ->where(function ($q) {
+                $q->where('status', true)->orWhere('status', 1)->orWhere('status', '1');
+            })
+            ->orderBy('full_name')
+            ->get();
+        if ($agents->isEmpty()) {
+            $agents = Employee::where('tenant_id', $tenantId)->orderBy('full_name')->get();
+        }
         $categories = HelpdeskCategory::where('tenant_id', $tenantId)->where('is_active', true)->get();
 
         return view('modules.hrms.helpdesk.show', compact('ticket', 'canManage', 'currentEmployee', 'agents', 'categories'));
