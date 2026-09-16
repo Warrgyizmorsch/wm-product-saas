@@ -43,11 +43,11 @@
             </div>
         </form>
     </x-ui.filter>
-    @can('post', \App\Domains\Accounting\Models\Journal::class)
-        <x-ui.button href="{{ route('accounting.journals.create') }}" variant="primary" icon="feather-plus">
+    @if ($canCreate)
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="offcanvas" data-bs-target="#journalCreateDrawer">
             New Journal
         </x-ui.button>
-    @endcan
+    @endif
 @endsection
 
 @section('content')
@@ -152,6 +152,22 @@
             :totalResults="$journals->total()"
             :perPage="$journals->perPage()" />
     </x-ui.card>
+
+    @if ($canCreate)
+        <x-ui.drawer id="journalCreateDrawer" title="New Journal" scroll style="--bs-offcanvas-width: min(820px, 92vw);">
+            @include('modules.accounting.journals._form', ['embedded' => true])
+        </x-ui.drawer>
+
+        @if ($errors->any())
+            @push('scripts')
+                <script>
+                    $(function () {
+                        new bootstrap.Offcanvas(document.getElementById('journalCreateDrawer')).show();
+                    });
+                </script>
+            @endpush
+        @endif
+    @endif
 @endsection
 
 @push('styles')
