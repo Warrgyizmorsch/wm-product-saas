@@ -36,11 +36,11 @@
             </div>
         </form>
     </x-ui.filter>
-    @can('create', \App\Domains\Accounting\Models\BankReconciliation::class)
-        <x-ui.button href="{{ route('accounting.bank-reconciliation.create') }}" variant="primary" icon="feather-plus">
+    @if ($canCreate)
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="offcanvas" data-bs-target="#bankReconciliationCreateDrawer">
             New Reconciliation
         </x-ui.button>
-    @endcan
+    @endif
 @endsection
 
 @section('content')
@@ -123,6 +123,22 @@
             :totalResults="$reconciliations->total()"
             :perPage="$reconciliations->perPage()" />
     </x-ui.card>
+
+    @if ($canCreate)
+        <x-ui.drawer id="bankReconciliationCreateDrawer" title="New Bank Reconciliation" scroll style="--bs-offcanvas-width: min(640px, 92vw);">
+            @include('modules.accounting.bank-reconciliation._form', ['embedded' => true])
+        </x-ui.drawer>
+
+        @if ($errors->any())
+            @push('scripts')
+                <script>
+                    $(function () {
+                        new bootstrap.Offcanvas(document.getElementById('bankReconciliationCreateDrawer')).show();
+                    });
+                </script>
+            @endpush
+        @endif
+    @endif
 @endsection
 
 @push('styles')
