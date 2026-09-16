@@ -3,8 +3,8 @@ Where each item stands
 Accounting sheet
 
 Item	Status in code	Size
-A/c Dashboard	Missing. No accounting dashboard exists, though all the data behind it does.	Medium
-A/c Reporting	Mostly built. 15 reports exist (Trial Balance, P&L, Balance Sheet, Cash Flow, GL, Party Ledger, Day Book, AR/AP Aging, GST Summary, GSTR-1, GSTR-3B, Budget vs Actual, Audit Trail). Only Balance Sheet has a PDF export; nothing exports to Excel.	Small–Medium
+A/c Dashboard	Done. Accounting Dashboard is built (AccountingDashboardController/Service, filters, consolidated view, caching) and merged (PR #258).	Medium
+A/c Reporting	Done. All 15 reports (Trial Balance, P&L, Balance Sheet, Cash Flow, GL, Party Ledger, Day Book, AR/AP Aging, GST Summary, GSTR-1, GSTR-3B, Budget vs Actual, Audit Trail) export to both PDF and Excel via one shared route (accounting.reports.export/{report}/{format}).	Small–Medium
 Tenant logo / module / platform owner	Partly built. The logo upload and display work, and a tenant has an owner. The plan decides which modules a tenant gets. Unclear what's still missing.	?
 
 Voucher-wise by staff, bank reconciliation	Mostly built. Bank statements import from Excel/CSV, with auto-match. Vouchers record who posted them, but you can't filter or report by staff member.	Small
