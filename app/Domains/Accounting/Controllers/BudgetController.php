@@ -29,9 +29,15 @@ class BudgetController extends Controller
     {
         $this->authorize('viewAny', Budget::class);
 
-        return view('modules.accounting.budgets.index', [
+        $canCreate = auth()->user()?->can('create', Budget::class) ?? false;
+
+        return view('modules.accounting.budgets.index', array_merge([
             'budgets' => $this->budgetRepository->all(),
-        ]);
+            'canCreate' => $canCreate,
+        ], $canCreate ? $this->formData() : [
+            'fiscalYears' => collect(), 'accounts' => collect(), 'costCenters' => collect(),
+            'departments' => collect(), 'projects' => collect(),
+        ]));
     }
 
     public function create(): View
