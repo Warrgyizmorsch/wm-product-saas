@@ -43,6 +43,28 @@
             .erp-filter-dropdown .odoo-table-input {
                 border-bottom: 1px solid #ced4da !important;
             }
+
+            /* Dark Mode Support */
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu,
+            html.app-skin-dark .theme-filter-dropdown-menu {
+                background-color: #0f172a !important;
+                border-color: #1b2436 !important;
+                color: #b1b4c0 !important;
+                box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.6) !important;
+            }
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu label,
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu .form-label,
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu h6,
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu .text-dark {
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .erp-filter-dropdown .odoo-table-input {
+                border-bottom: 1px solid #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .erp-filter-dropdown .dropdown-divider {
+                border-color: #1b2436 !important;
+            }
         </style>
     @endpush
 @endonce

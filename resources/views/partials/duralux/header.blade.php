@@ -493,10 +493,10 @@
                 </div>
 
                 <div class="nxl-h-item dark-light-theme">
-                    <a href="javascript:void(0);" class="nxl-head-link me-0 dark-button">
+                    <a href="javascript:void(0);" class="nxl-head-link me-0 dark-button" id="header-dark-mode-btn" title="Dark Mode" aria-label="Switch to dark mode">
                         <i class="feather-moon"></i>
                     </a>
-                    <a href="javascript:void(0);" class="nxl-head-link me-0 light-button" style="display: none">
+                    <a href="javascript:void(0);" class="nxl-head-link me-0 light-button" id="header-light-mode-btn" style="display: none" title="Light Mode" aria-label="Switch to light mode">
                         <i class="feather-sun"></i>
                     </a>
                 </div>

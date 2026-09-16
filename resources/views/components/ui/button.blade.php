@@ -105,6 +105,42 @@
             .btn-animated.btn-outline-dark:hover {
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
             }
+
+            /* Dark Mode Support */
+            html.app-skin-dark .btn.btn-animated.btn-light {
+                background-color: #1c2438 !important;
+                border-color: #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .btn.btn-animated.btn-light:hover {
+                background-color: #283c50 !important;
+                border-color: #334155 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .btn.btn-animated.btn-outline-light {
+                border-color: #334155 !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .btn.btn-animated.btn-outline-light:hover {
+                background-color: #1c2438 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .btn.btn-animated.btn-outline-secondary {
+                border-color: #475569 !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .btn.btn-animated.btn-outline-secondary:hover {
+                background-color: #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .btn.btn-animated.btn-outline-dark {
+                border-color: #64748b !important;
+                color: #f1f5f9 !important;
+            }
+            html.app-skin-dark .btn.btn-animated.btn-outline-dark:hover {
+                background-color: #334155 !important;
+                color: #ffffff !important;
+            }
         </style>
     @endpush
 @endonce

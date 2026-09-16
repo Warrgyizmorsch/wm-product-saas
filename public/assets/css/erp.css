@@ -1090,12 +1090,52 @@ a.btn:active {
    ERP SINGLE PANEL FULL-PAGE DESIGN
    ========================================== */
 .erp-single-panel {
-    background-color: #fff !important;
+    background-color: #fff;
     border-radius: 0 !important;
     box-shadow: none !important;
     margin: 0 !important;
     padding: 24px 32px !important;
     min-height: calc(100vh - 120px);
+}
+
+html.app-skin-dark .erp-single-panel,
+html.app-skin-dark .erp-single-panel.bg-white,
+html.app-skin-dark div.erp-single-panel {
+    background-color: #0f172a !important;
+    color: #b1b4c0 !important;
+    border-color: #1b2436 !important;
+}
+
+html.app-skin-dark .erp-single-panel h1,
+html.app-skin-dark .erp-single-panel h2,
+html.app-skin-dark .erp-single-panel h3,
+html.app-skin-dark .erp-single-panel h4,
+html.app-skin-dark .erp-single-panel h5,
+html.app-skin-dark .erp-single-panel h6,
+html.app-skin-dark .erp-single-panel .text-dark {
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .erp-single-panel .text-muted {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .erp-single-panel.border,
+html.app-skin-dark .erp-single-panel .border,
+html.app-skin-dark .erp-single-panel .border-bottom,
+html.app-skin-dark .erp-single-panel .border-top {
+    border-color: #1b2436 !important;
+}
+
+html.app-skin-dark .erp-form-label {
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .erp-form-input-col .form-control,
+html.app-skin-dark .erp-form-input-col .form-select {
+    border-color: #283c50 !important;
+    background-color: #121a2d !important;
+    color: #ffffff !important;
 }
 
 @media (max-width: 768px) {
@@ -1455,4 +1495,313 @@ a.btn:active {
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
     vertical-align: middle;
     margin: 0 2px;
+}
+
+/* ==========================================================================
+   Global Dark Mode Support for ERP Components
+   ========================================================================== */
+
+/* Pagination Component in Dark Mode */
+html.app-skin-dark .erp-pagination-container {
+    border-top-color: #1b2436 !important;
+}
+html.app-skin-dark .erp-pagination .page-link {
+    border-color: #283c50 !important;
+    background-color: #1c2438 !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .erp-pagination .page-link:hover {
+    background-color: color-mix(in srgb, var(--bs-primary) 20%, #1c2438) !important;
+    border-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .erp-pagination .page-item.active .page-link {
+    background-color: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 10px color-mix(in srgb, var(--bs-primary) 35%, transparent) !important;
+}
+html.app-skin-dark .erp-pagination .page-item.disabled .page-link {
+    background-color: #121a2d !important;
+    border-color: #1b2436 !important;
+    color: #475569 !important;
+}
+html.app-skin-dark .erp-pagination-info {
+    color: #94a3b8 !important;
+}
+
+/* Filter Component in Dark Mode */
+html.app-skin-dark .erp-filter-dropdown .dropdown-menu,
+html.app-skin-dark .theme-filter-dropdown-menu {
+    background-color: #0f172a !important;
+    border-color: #1b2436 !important;
+    color: #b1b4c0 !important;
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.6) !important;
+}
+html.app-skin-dark .erp-filter-dropdown .dropdown-menu label,
+html.app-skin-dark .erp-filter-dropdown .dropdown-menu .form-label,
+html.app-skin-dark .erp-filter-dropdown .dropdown-menu h6,
+html.app-skin-dark .erp-filter-dropdown .dropdown-menu .text-dark {
+    color: #ffffff !important;
+}
+html.app-skin-dark .erp-filter-dropdown .odoo-table-input {
+    border-bottom: 1px solid #283c50 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .erp-filter-dropdown .dropdown-divider {
+    border-color: #1b2436 !important;
+}
+
+/* Button Component (Animated) in Dark Mode */
+html.app-skin-dark .btn.btn-animated.btn-light {
+    background-color: #1c2438 !important;
+    border-color: #283c50 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .btn.btn-animated.btn-light:hover {
+    background-color: #283c50 !important;
+    border-color: #334155 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .btn.btn-animated.btn-outline-light {
+    border-color: #334155 !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .btn.btn-animated.btn-outline-light:hover {
+    background-color: #1c2438 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .btn.btn-animated.btn-outline-secondary {
+    border-color: #475569 !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .btn.btn-animated.btn-outline-secondary:hover {
+    background-color: #283c50 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .btn.btn-animated.btn-outline-dark {
+    border-color: #64748b !important;
+    color: #f1f5f9 !important;
+}
+html.app-skin-dark .btn.btn-animated.btn-outline-dark:hover {
+    background-color: #334155 !important;
+    color: #ffffff !important;
+}
+
+/* Icon-Btn Component in Dark Mode */
+html.app-skin-dark .erp-icon-btn--transparent-dark {
+    background-color: #1c2438 !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .erp-icon-btn--transparent-dark:hover,
+html.app-skin-dark .erp-icon-btn--transparent-dark:focus,
+html.app-skin-dark .erp-icon-btn--transparent-dark:active {
+    background-color: #283c50 !important;
+    border-color: #475569 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .erp-icon-btn--light {
+    background-color: #1c2438 !important;
+    border-color: #283c50 !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .erp-icon-btn--light:hover,
+html.app-skin-dark .erp-icon-btn--light:focus {
+    background-color: #283c50 !important;
+    border-color: #334155 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .erp-icon-btn--secondary {
+    background-color: rgba(148, 163, 184, 0.12) !important;
+    border-color: rgba(148, 163, 184, 0.25) !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .erp-icon-btn--secondary:hover,
+html.app-skin-dark .erp-icon-btn--secondary:focus {
+    background-color: #334155 !important;
+    border-color: #475569 !important;
+    color: #ffffff !important;
+}
+
+/* Action-Dropdown Component in Dark Mode */
+html.app-skin-dark .action-dropdown-btn {
+    border-color: #283c50 !important;
+    background-color: #1c2438 !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .action-dropdown-btn:hover,
+html.app-skin-dark .action-dropdown-btn.active {
+    background-color: color-mix(in srgb, var(--bs-primary) 25%, #1c2438) !important;
+    border-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+}
+
+/* Odoo Form UI Component in Dark Mode */
+html.app-skin-dark .odoo-sheet,
+html.app-skin-dark .odoo-sheet.bg-white {
+    background: #0f172a !important;
+    background-color: #0f172a !important;
+    color: #b1b4c0 !important;
+}
+html.app-skin-dark .odoo-form-label {
+    color: #94a3b8 !important;
+}
+html.app-skin-dark .odoo-form-control {
+    color: #ffffff !important;
+    border-bottom: 1px solid #283c50 !important;
+    background-color: transparent !important;
+}
+html.app-skin-dark textarea.odoo-form-control {
+    border: 1px solid #283c50 !important;
+    background-color: #121a2d !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .erp-custom-file-upload .file-upload-label {
+    border: 2px dashed #283c50 !important;
+    background-color: #121a2d !important;
+    color: #94a3b8 !important;
+}
+html.app-skin-dark .select2-container--bootstrap-5 .select2-selection {
+    border-bottom: 1px solid #283c50 !important;
+    background-color: transparent !important;
+}
+html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+    color: #ffffff !important;
+}
+html.app-skin-dark .select2-container--bootstrap-5 .select2-dropdown {
+    background-color: #0f172a !important;
+    border-color: #1b2436 !important;
+}
+html.app-skin-dark body .select2-results__option[role=group],
+html.app-skin-dark body .select2-results__option[role=group].select2-results__option--highlighted,
+html.app-skin-dark body .select2-results__option[role=group]:hover {
+    background-color: #0f172a !important;
+    background: #0f172a !important;
+}
+html.app-skin-dark body .select2-results__group {
+    background-color: #162038 !important;
+    background: #162038 !important;
+    color: #94a3b8 !important;
+    border-bottom: 1px solid #1b2436 !important;
+}
+html.app-skin-dark body .select2-results__option:not([role=group]) {
+    background-color: #0f172a !important;
+    background: #0f172a !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark body .select2-results__option:not([role=group]).select2-results__option--highlighted {
+    background-color: #1c2438 !important;
+    background: #1c2438 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .custom-s2-search,
+html.app-skin-dark .custom-s2-search.bg-white {
+    background-color: #0f172a !important;
+    border-bottom-color: #1b2436 !important;
+}
+html.app-skin-dark .custom-s2-search input {
+    background-color: #121a2d !important;
+    border: 1px solid #283c50 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .odoo-table thead,
+html.app-skin-dark .odoo-table th {
+    background-color: #162038 !important;
+    color: #94a3b8 !important;
+    border-bottom: 2px solid #1b2436 !important;
+}
+html.app-skin-dark .odoo-table td {
+    border-bottom: 1px solid #1b2436 !important;
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .odoo-table-input,
+html.app-skin-dark .odoo-table-select {
+    border-bottom: 1px solid #283c50 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .odoo-editor-wrapper {
+    border: 1px solid #283c50 !important;
+    background-color: #121a2d !important;
+}
+html.app-skin-dark .odoo-editor-wrapper .ql-toolbar.ql-snow {
+    border-bottom: 1px solid #283c50 !important;
+    background-color: #162038 !important;
+}
+html.app-skin-dark .odoo-editor-wrapper .ql-toolbar .ql-stroke {
+    stroke: #cbd5e1 !important;
+}
+html.app-skin-dark .odoo-editor-wrapper .ql-toolbar .ql-fill {
+    fill: #cbd5e1 !important;
+}
+html.app-skin-dark .odoo-editor-wrapper .ql-toolbar .ql-picker {
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .odoo-editor-wrapper .ql-container.ql-snow {
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple {
+    border-bottom: 1px solid #283c50 !important;
+}
+html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+    background-color: rgba(52, 84, 209, 0.2) !important;
+    border-color: rgba(52, 84, 209, 0.4) !important;
+    color: #93c5fd !important;
+}
+
+/* Production Workflow Strip in Dark Mode */
+html.app-skin-dark .production-workflow-card,
+html.app-skin-dark .production-workflow-card.bg-white {
+    background-color: #0f172a !important;
+    border-color: #1b2436 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+html.app-skin-dark .production-workflow-card .border-bottom {
+    border-color: #1b2436 !important;
+}
+html.app-skin-dark .production-workflow-card .btn-light {
+    background-color: #1c2438 !important;
+    border-color: #283c50 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .production-workflow-card .btn-light:hover {
+    background-color: #283c50 !important;
+    border-color: #334155 !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .production-flow-tab-item.future-step {
+    background-color: #162038 !important;
+    color: #cbd5e1 !important;
+    border-color: #283c50 !important;
+}
+html.app-skin-dark .production-flow-tab-item.future-step:hover {
+    background-color: color-mix(in srgb, var(--bs-primary) 22%, #162038) !important;
+    color: #ffffff !important;
+    border-color: var(--bs-primary) !important;
+}
+html.app-skin-dark .production-flow-tab-item.passed-step {
+    background-color: color-mix(in srgb, var(--bs-primary) 18%, #121a2d) !important;
+    color: #93c5fd !important;
+    border-color: color-mix(in srgb, var(--bs-primary) 35%, transparent) !important;
+}
+html.app-skin-dark .production-flow-tab-item.passed-step:hover {
+    background-color: color-mix(in srgb, var(--bs-primary) 28%, #121a2d) !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .production-flow-tab-item.passed-step .step-circle-badge {
+    background-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+}
+html.app-skin-dark .production-flow-tab-item.active-step {
+    background-color: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--bs-primary) 45%, transparent) !important;
+}
+html.app-skin-dark .production-flow-tab-item.active-step .step-circle-badge {
+    background-color: #ffffff !important;
+    color: var(--bs-primary) !important;
+}
+html.app-skin-dark .production-workflow-card .step-connector-arrow i {
+    color: #475569 !important;
 }

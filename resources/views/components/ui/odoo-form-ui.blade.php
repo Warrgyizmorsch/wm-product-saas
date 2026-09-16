@@ -396,6 +396,125 @@
                 border-color: #dc3545 !important;
                 color: #dc3545 !important;
             }
+
+            /* Dark Mode Support for Odoo Form UI */
+            html.app-skin-dark .odoo-sheet,
+            html.app-skin-dark .odoo-sheet.bg-white {
+                background: #0f172a !important;
+                background-color: #0f172a !important;
+                color: #b1b4c0 !important;
+            }
+            html.app-skin-dark .odoo-form-label {
+                color: #94a3b8 !important;
+            }
+            html.app-skin-dark .odoo-form-control {
+                color: #ffffff !important;
+                border-bottom: 1px solid #283c50 !important;
+                background-color: transparent !important;
+            }
+            html.app-skin-dark textarea.odoo-form-control {
+                border: 1px solid #283c50 !important;
+                background-color: #121a2d !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .form-check-input {
+                border-color: #334155 !important;
+                background-color: #121a2d !important;
+            }
+            html.app-skin-dark .form-check-label {
+                color: #e2e8f0 !important;
+            }
+            html.app-skin-dark .erp-custom-file-upload .file-upload-label {
+                border: 2px dashed #283c50 !important;
+                background-color: #121a2d !important;
+                color: #94a3b8 !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-selection {
+                border-bottom: 1px solid #283c50 !important;
+                background-color: transparent !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-dropdown {
+                background-color: #0f172a !important;
+                border-color: #1b2436 !important;
+            }
+            html.app-skin-dark body .select2-results__option[role=group],
+            html.app-skin-dark body .select2-results__option[role=group].select2-results__option--highlighted,
+            html.app-skin-dark body .select2-results__option[role=group]:hover {
+                background-color: #0f172a !important;
+                background: #0f172a !important;
+            }
+            html.app-skin-dark body .select2-results__group {
+                background-color: #162038 !important;
+                background: #162038 !important;
+                color: #94a3b8 !important;
+                border-bottom: 1px solid #1b2436 !important;
+            }
+            html.app-skin-dark body .select2-results__option:not([role=group]) {
+                background-color: #0f172a !important;
+                background: #0f172a !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark body .select2-results__option:not([role=group]).select2-results__option--highlighted {
+                background-color: #1c2438 !important;
+                background: #1c2438 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .custom-s2-search,
+            html.app-skin-dark .custom-s2-search.bg-white {
+                background-color: #0f172a !important;
+                border-bottom-color: #1b2436 !important;
+            }
+            html.app-skin-dark .custom-s2-search input {
+                background-color: #121a2d !important;
+                border: 1px solid #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .odoo-table thead,
+            html.app-skin-dark .odoo-table th {
+                background-color: #162038 !important;
+                color: #94a3b8 !important;
+                border-bottom: 2px solid #1b2436 !important;
+            }
+            html.app-skin-dark .odoo-table td {
+                border-bottom: 1px solid #1b2436 !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .odoo-table-input,
+            html.app-skin-dark .odoo-table-select {
+                border-bottom: 1px solid #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper {
+                border: 1px solid #283c50 !important;
+                background-color: #121a2d !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-toolbar.ql-snow {
+                border-bottom: 1px solid #283c50 !important;
+                background-color: #162038 !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-toolbar .ql-stroke {
+                stroke: #cbd5e1 !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-toolbar .ql-fill {
+                fill: #cbd5e1 !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-toolbar .ql-picker {
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-container.ql-snow {
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple {
+                border-bottom: 1px solid #283c50 !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+                background-color: rgba(52, 84, 209, 0.2) !important;
+                border-color: rgba(52, 84, 209, 0.4) !important;
+                color: #93c5fd !important;
+            }
         </style>
     @endpush
     @push('scripts')
