@@ -19,6 +19,7 @@ use App\Domains\Production\Services\ProductionOrderService;
 use App\Domains\Production\Services\RoutingService;
 use App\Domains\Production\Services\SchedulingService;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -33,6 +34,8 @@ class MultiModelPhase2Test extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->seed(RbacSeeder::class);
 
         \App\Models\Tenant::factory()->create([
             'id' => $this->tenantId,

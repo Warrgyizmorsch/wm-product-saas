@@ -290,6 +290,17 @@ class RbacSeeder extends Seeder
             'hrms.shift_roster.manage' => $permissions['hrms.shift_roster.manage'],
         ], RolePermission::SCOPE_TENANT);
 
+        // Employee Self-Service (own Leave/WFH/Attendance/Travel-Expense/Payslip/
+        // Broadcasts/Helpdesk) — every real working-staff role gets it, since any
+        // employee needs to manage their own HR record regardless of job function.
+        // Excludes auditor/read_only (reviewer accounts, not working staff) and the
+        // three admin-tier roles above, which already hold every permission.
+        foreach (['production_manager', 'production_engineer', 'sales_manager', 'sales_executive', 'inventory_manager', 'purchase_manager', 'hr_manager', 'accountant'] as $roleSlug) {
+            $this->grant($roles[$roleSlug], [
+                'hrms.self_service.use' => $permissions['hrms.self_service.use'],
+            ], RolePermission::SCOPE_TENANT);
+        }
+
         // Day-to-day bookkeeping only — deleting accounts/tax rates, closing fiscal
         // years/periods, and reversing posted journals or vouchers stay reserved for
         // tenant_owner/company_admin (segregation of duties over the ledger).
@@ -478,6 +489,7 @@ class RbacSeeder extends Seeder
             ['name' => 'hrms.leave_structures.manage', 'module' => 'hrms', 'entity' => 'leave_structures', 'action' => 'manage'],
             ['name' => 'hrms.leave_encashments.view', 'module' => 'hrms', 'entity' => 'leave_encashments', 'action' => 'view'],
             ['name' => 'hrms.leave_encashments.approve', 'module' => 'hrms', 'entity' => 'leave_encashments', 'action' => 'approve'],
+            ['name' => 'hrms.self_service.use', 'module' => 'hrms', 'entity' => 'self_service', 'action' => 'use'],
             ['name' => 'fixed_assets.categories.view', 'module' => 'fixed_assets', 'entity' => 'categories', 'action' => 'view'],
             ['name' => 'fixed_assets.categories.create', 'module' => 'fixed_assets', 'entity' => 'categories', 'action' => 'create'],
             ['name' => 'fixed_assets.categories.edit', 'module' => 'fixed_assets', 'entity' => 'categories', 'action' => 'edit'],

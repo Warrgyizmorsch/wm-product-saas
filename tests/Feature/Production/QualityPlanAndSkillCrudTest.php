@@ -4,8 +4,11 @@ namespace Tests\Feature\Production;
 
 use App\Models\User;
 use App\Models\Tenant;
+use App\Models\Access\Role;
+use App\Models\Access\UserRole;
 use App\Domains\Production\Models\ProductionQualityPlan;
 use App\Domains\Production\Models\ProductionOperatorSkill;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -30,11 +33,13 @@ class QualityPlanAndSkillCrudTest extends TestCase
             'role' => 'production_manager',
         ]);
 
-        // Mock supervisor permissions to pass authorization checks
-        $this->user->roles()->create([
+        $this->seed(RbacSeeder::class);
+
+        $productionManagerRole = Role::query()->whereNull('tenant_id')->where('slug', 'production_manager')->firstOrFail();
+        UserRole::create([
+            'user_id' => $this->user->id,
+            'role_id' => $productionManagerRole->id,
             'tenant_id' => $this->tenantId,
-            'name' => 'Production Manager',
-            'slug' => 'production_manager'
         ]);
 
         $this->actingAs($this->user);

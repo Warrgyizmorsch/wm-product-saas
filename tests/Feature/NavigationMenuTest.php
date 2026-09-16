@@ -106,10 +106,14 @@ class NavigationMenuTest extends TestCase
             $this->assertContains($label, $ownerLabels);
         }
 
-        $staffLabels = $this->labels($this->menu($this->makeUser('staff2@acme.test', null)));
+        $staffLabels = $this->labels($this->menu($this->makeUser('staff2@acme.test', 'sales_executive')));
         $this->assertContains('Tickets', $staffLabels);
         $this->assertNotContains('Knowledge Base', $staffLabels);
         $this->assertNotContains('Employee Exits', $staffLabels);
+
+        // A user with no role at all (so no hrms.self_service.use grant) gets none of the self-service HRMS screens.
+        $noRoleLabels = $this->labels($this->menu($this->makeUser('staff3@acme.test', null)));
+        $this->assertNotContains('Tickets', $noRoleLabels);
     }
 
     public function test_modules_outside_the_tenants_plan_are_hidden(): void
@@ -129,14 +133,141 @@ class NavigationMenuTest extends TestCase
 
     public function test_hr_admin_entries_need_an_hr_admin_permission(): void
     {
-        $employee = $this->makeUser('staff@acme.test', null);
+        $staff = $this->makeUser('staff@acme.test', 'sales_executive');
 
-        $labels = $this->labels($this->menu($employee));
+        $labels = $this->labels($this->menu($staff));
 
         $this->assertContains('My Attendance', $labels);
         $this->assertNotContains('HRMS Masters', $labels);
         $this->assertNotContains('Employees Attendance', $labels);
         $this->assertNotContains('Users', $labels);
+    }
+
+    public function test_hrms_self_service_screens_need_an_explicit_permission(): void
+    {
+        $noRoleUser = $this->makeUser('bare@acme.test', null);
+        $noRoleLabels = $this->labels($this->menu($noRoleUser));
+
+        foreach (['HRMS Dashboard', 'My Attendance', 'My Assets', 'Leave', 'WFH', 'Shift & Overtime', 'Travel & Expenses', 'Broadcasts', 'Tickets', 'My Payslips'] as $label) {
+            $this->assertNotContains($label, $noRoleLabels);
+        }
+
+        // Any working-staff role (seeded with hrms.self_service.use) sees the full self-service set.
+        $staffUser = $this->makeUser('staffer@acme.test', 'sales_executive');
+        $staffLabels = $this->labels($this->menu($staffUser));
+
+        foreach (['HRMS Dashboard', 'My Attendance', 'My Assets', 'Leave', 'WFH', 'Shift & Overtime', 'Travel & Expenses', 'Broadcasts', 'Tickets', 'My Payslips'] as $label) {
+            $this->assertContains($label, $staffLabels);
+        }
+
+        // An HR admin sees the self-service screens too via hr.settings.manage, without needing the self-service grant itself.
+        $hrManager = $this->makeUser('hr-manager@acme.test', 'hr_manager');
+        $this->assertContains('HRMS Dashboard', $this->labels($this->menu($hrManager)));
+    }
+
+    public function test_accountant_does_not_see_purchase_or_hrms_admin_screens(): void
+    {
+        $accountant = $this->makeUser('accountant@acme.test', 'accountant');
+
+        $labels = $this->labels($this->menu($accountant));
+
+        $this->assertContains('Chart of Accounts', $labels);
+
+        foreach ([
+            'Vendors / Suppliers', 'purchase.rfqs', 'ui.purchase_requests', 'purchase.purchase_orders',
+            'purchase.vendor_bills', 'purchase.vendor_payments', 'Purchase Returns', 'Landed Cost Vouchers',
+            'GRN (Goods Receipts)', 'Purchase Approvals',
+            'HRMS Masters', 'Employees', 'Documents', 'Employees Attendance', 'Employees Assets', 'Payroll Processing',
+        ] as $label) {
+            $this->assertNotContains($label, $labels);
+        }
+
+        // An Accountant is still a working-staff member (hrms.self_service.use is
+        // seeded to every functional role), so their own Leave/Attendance/Payslip
+        // self-service screens stay visible — just none of the HRMS/Purchase admin screens.
+        $this->assertContains('My Attendance', $labels);
+        $this->assertContains('My Payslips', $labels);
+        $this->assertContains('Leave', $labels);
+    }
+
+    public function test_purchase_manager_sees_purchase_and_grn_screens_gated_by_permission(): void
+    {
+        $manager = $this->makeUser('purchasing@acme.test', 'purchase_manager');
+
+        $labels = $this->labels($this->menu($manager));
+
+        $this->assertContains('Vendors / Suppliers', $labels);
+        $this->assertContains('GRN (Goods Receipts)', $labels);
+    }
+
+    public function test_crm_and_sales_entries_are_gated_by_permission(): void
+    {
+        // sales_executive holds crm.leads.view and sales.orders.view only at
+        // SCOPE_OWN (RbacSeeder) — this also exercises MenuBuilder::permitted()
+        // supplying the user's own id/branch/department/company as context, since
+        // a sidebar link has no specific record to check an OWN-scoped grant against.
+        $salesExecutive = $this->makeUser('sales-exec@acme.test', 'sales_executive');
+        $salesLabels = $this->labels($this->menu($salesExecutive));
+
+        foreach (['Leads', 'Customers', 'Quotations', 'Sales Orders', 'Invoices', 'Receipts (Payments)', 'Sales Returns'] as $label) {
+            $this->assertContains($label, $salesLabels);
+        }
+
+        $accountant = $this->makeUser('accountant-crm@acme.test', 'accountant');
+        $accountantLabels = $this->labels($this->menu($accountant));
+
+        foreach (['Leads', 'Customers', 'Quotations', 'Sales Orders', 'Invoices', 'Receipts (Payments)', 'Sales Returns'] as $label) {
+            $this->assertNotContains($label, $accountantLabels);
+        }
+    }
+
+    public function test_inventory_entries_are_gated_by_permission(): void
+    {
+        $inventoryManager = $this->makeUser('inventory-mgr@acme.test', 'inventory_manager');
+        $inventoryLabels = $this->labels($this->menu($inventoryManager));
+
+        $this->assertContains('Products', $inventoryLabels);
+        $this->assertContains('Warehouses', $inventoryLabels);
+
+        $accountant = $this->makeUser('accountant-inv@acme.test', 'accountant');
+        $accountantLabels = $this->labels($this->menu($accountant));
+
+        $this->assertNotContains('Products', $accountantLabels);
+        $this->assertNotContains('Warehouses', $accountantLabels);
+    }
+
+    public function test_accounting_entries_need_accounting_permission(): void
+    {
+        $accountant = $this->makeUser('accountant-acc@acme.test', 'accountant');
+        $accountantLabels = $this->labels($this->menu($accountant));
+
+        foreach (['Chart of Accounts', 'Journals', 'Payment Vouchers', 'Trial Balance'] as $label) {
+            $this->assertContains($label, $accountantLabels);
+        }
+
+        $productionManager = $this->makeUser('production-acc@acme.test', 'production_manager');
+        $productionLabels = $this->labels($this->menu($productionManager));
+
+        foreach (['Chart of Accounts', 'Journals', 'Payment Vouchers', 'Trial Balance'] as $label) {
+            $this->assertNotContains($label, $productionLabels);
+        }
+    }
+
+    public function test_production_entries_are_gated_by_permission(): void
+    {
+        $productionManager = $this->makeUser('production-mgr@acme.test', 'production_manager');
+        $productionLabels = $this->labels($this->menu($productionManager));
+
+        foreach (['Production Dashboard', 'Quality Dashboard', 'NCR', 'Shop Floor (MES)', 'Live Andon Board'] as $label) {
+            $this->assertContains($label, $productionLabels);
+        }
+
+        $accountant = $this->makeUser('accountant-prod@acme.test', 'accountant');
+        $accountantLabels = $this->labels($this->menu($accountant));
+
+        foreach (['Production Dashboard', 'Quality Dashboard', 'NCR', 'Shop Floor (MES)'] as $label) {
+            $this->assertNotContains($label, $accountantLabels);
+        }
     }
 
     public function test_placeholders_are_hidden_unless_switched_on(): void

@@ -54,7 +54,7 @@ class AccessService
             ->first();
 
         if ($permission === null) {
-            return $this->allowsLegacyProductionPermission($user, $permissionName);
+            return false;
         }
 
         $override = $this->matchingOverride($user, $permission->id, $context);
@@ -82,7 +82,7 @@ class AccessService
         // queries now that the legacy role_id is tenant-validated, so it is not
         // worth repeating.
         if ($roleIds->isEmpty()) {
-            return $this->allowsLegacyProductionPermission($user, $permissionName);
+            return false;
         }
 
         $grants = RolePermission::query()
@@ -96,7 +96,7 @@ class AccessService
             }
         }
 
-        return $this->allowsLegacyProductionPermission($user, $permissionName);
+        return false;
     }
 
     /**
@@ -170,22 +170,6 @@ class AccessService
                 ->pluck('permissions.name');
 
             $modules = $modules->merge($permissionNames->map(fn (string $name) => explode('.', $name)[0]));
-        }
-
-        // Legacy Production permission map (config('production.permissions'),
-        // permission-name => [allowed legacy role slugs]) isn't expressed as
-        // Permission/RolePermission rows at all, so a user relying on it would
-        // otherwise show zero modules — check it the same way
-        // allowsLegacyProductionPermission() does, for the 'production' module only.
-        $legacyRole = $user->role ?: ($user->primaryRole->slug ?? null);
-
-        if ($legacyRole !== null) {
-            foreach (config('production.permissions', []) as $allowedRoles) {
-                if (in_array($legacyRole, $allowedRoles, true)) {
-                    $modules->push('production');
-                    break;
-                }
-            }
         }
 
         // Only actually restrict modules we trust the Permission table's
@@ -365,14 +349,14 @@ class AccessService
             RolePermission::SCOPE_BRANCH => $this->sameValue($context['branch_id'] ?? null, $user->branch_id),
             RolePermission::SCOPE_DEPARTMENT => $this->sameValue($context['department_id'] ?? null, $user->department_id),
             RolePermission::SCOPE_OWN => $this->sameValue($context['owner_id'] ?? null, $user->id),
-            // SCOPE_TEAM is deliberately identical to SCOPE_OWN for now: there
-            // is no team or reporting-line relation on users to resolve a team
-            // from (HRMS's Employee.reporting_manager_id is a domain-module
-            // concern this shared service must not reach into). Treating it as
-            // "own" keeps it strictly narrower than intended rather than wider,
-            // so it can never over-grant — but a 'team' grant made in the role
-            // admin UI will behave as 'own' until a real team relation exists.
-            RolePermission::SCOPE_TEAM => $this->sameValue($context['owner_id'] ?? null, $user->id),
+            // SCOPE_TEAM is aliased to the user's department for now: there is
+            // no dedicated team_id/Team relation in the schema (HRMS's
+            // Employee.reporting_manager_id is a domain-module concern this
+            // shared service must not reach into), but users.department_id
+            // already exists as a scope anchor. Kept as its own match arm
+            // (not merged into SCOPE_DEPARTMENT) so it can be redefined later
+            // without touching department-scoped grants.
+            RolePermission::SCOPE_TEAM => $this->sameValue($context['department_id'] ?? null, $user->department_id),
             default => false,
         };
     }
@@ -380,26 +364,5 @@ class AccessService
     private function sameValue(mixed $left, mixed $right): bool
     {
         return $left !== null && $right !== null && (string) $left === (string) $right;
-    }
-
-    /**
-     * Deprecated fallback: config('production.permissions') maps permission names
-     * to role slugs. Every entry is now seeded as a real Permission granted to the
-     * same roles, and users.role text resolves to its system role (roleIdsFor()),
-     * so this only decides anything where permissions were never seeded (older
-     * Production tests). Remove once those tests seed RbacSeeder.
-     */
-    private function allowsLegacyProductionPermission(User $user, string $permissionName): bool
-    {
-        $permissionMap = config('production.permissions', []);
-        $allowedRoles = $permissionMap[$permissionName] ?? [];
-
-        if (empty($allowedRoles)) {
-            return false;
-        }
-
-        $legacyRole = $user->role ?: ($user->primaryRole->slug ?? null);
-
-        return $legacyRole !== null && in_array($legacyRole, $allowedRoles, true);
     }
 }
