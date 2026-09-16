@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/vendors.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/theme.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/erp.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/production.css') }}">
     
     <style>
         :root {
@@ -166,23 +167,23 @@
         {{-- Top Action Controls --}}
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 no-print gap-2">
             <div>
-                <x-ui.button href="javascript:window.close();" variant="light" size="sm" icon="feather-x" class="border shadow-sm">
+                <x-ui.button href="javascript:window.close();" variant="light"  icon="feather-x" class="border shadow-sm">
                     {{ __('production.close_window') ?? 'Close Window' }}
                 </x-ui.button>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <!-- Custom Filter Component (just like used in BOM) -->
                 <form method="GET" action="{{ route('production.intelligence.reports.show', $type) }}" class="d-inline">
-                    <x-ui.filter :label="__('ui.filter')" offset="0, 5">
+                    <x-ui.filter :label="__('ui.filter')"  offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('production.filter_options') }}</h6>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_start') ?? 'Start Date' }}</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_start') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date_start" :value="request('date_start', $reportData['period_start'])" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_end') ?? 'End Date' }}</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_end') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date_end" :value="request('date_end', $reportData['period_end'])" />
                         </div>
 
@@ -207,21 +208,21 @@
                         @endif
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <x-ui.button href="{{ route('production.intelligence.reports.show', $type) }}" variant="light" size="sm" class="border">
+                            <x-ui.button href="{{ route('production.intelligence.reports.show', $type) }}" variant="light"  class="border">
                                 {{ __('production.reset') }}
                             </x-ui.button>
-                            <x-ui.button type="submit" variant="primary" size="sm">
+                            <x-ui.button type="submit" variant="primary" >
                                 {{ __('production.apply_filters') }}
                             </x-ui.button>
                         </div>
                     </x-ui.filter>
                 </form>
 
-                <x-ui.button href="{{ route('production.intelligence.reports.export', array_merge(['type' => $type], request()->all())) }}" variant="light" size="sm" icon="feather-download" class="border shadow-sm">
+                <x-ui.button href="{{ route('production.intelligence.reports.export', array_merge(['type' => $type], request()->all())) }}" variant="light"  icon="feather-download" class="border shadow-sm">
                     {{ __('production.export_csv') ?? 'Export CSV' }}
                 </x-ui.button>
 
-                <x-ui.button onclick="window.print();" variant="primary" size="sm" icon="feather-printer" class="shadow-sm">
+                <x-ui.button onclick="window.print();" variant="primary"  icon="feather-printer" class="shadow-sm">
                     {{ __('production.print_report') ?? 'Print Report' }}
                 </x-ui.button>
             </div>
@@ -720,5 +721,6 @@
     <script src="{{ asset('assets/vendors/js/vendors.min.js') }}"></script>
     <script src="{{ asset('assets/js/common-init.min.js') }}"></script>
     @stack('scripts')
+    @stack('styles')
 </body>
 </html>

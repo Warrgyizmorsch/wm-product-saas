@@ -4,7 +4,9 @@
     'type' => 'button',
     'href' => null,
     'icon' => null,
-    'iconPosition' => 'left'
+    'iconPosition' => 'left',
+    'badge' => null,
+    'badgeClass' => null
 ])
 
 @php
@@ -14,6 +16,9 @@
     }
     if ($size) {
         $classes .= ' btn-' . $size;
+    }
+    if ($badge !== null && $badge !== '') {
+        $classes .= ' btn-badge-container';
     }
 @endphp
 
@@ -113,6 +118,9 @@
         @if($icon && $iconPosition === 'right')
             <i class="{{ $icon }} ms-2"></i>
         @endif
+        @if($badge !== null && $badge !== '')
+            <span class="btn-badge-count {{ $badgeClass }}">{{ $badge }}</span>
+        @endif
     </a>
 @else
     <button type="{{ $type }}" {{ $attributes->class([$classes]) }}>
@@ -122,6 +130,9 @@
         {{ $slot }}
         @if($icon && $iconPosition === 'right')
             <i class="{{ $icon }} ms-2"></i>
+        @endif
+        @if($badge !== null && $badge !== '')
+            <span class="btn-badge-count {{ $badgeClass }}">{{ $badge }}</span>
         @endif
     </button>
 @endif

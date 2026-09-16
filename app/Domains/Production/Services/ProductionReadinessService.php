@@ -125,17 +125,21 @@ class ProductionReadinessService
             $overallStatus = $readyQty > 0.0 ? self::STATUS_PARTIALLY_READY : self::STATUS_BLOCKED;
         }
 
-        return [
-            'operation_id' => $operation->id,
-            'operation_number' => $operation->operation_number,
-            'operation_name' => $operation->name,
-            'sequence' => $operation->sequence,
-            'overall_status' => $overallStatus,
-            'target_qty' => $orderQty,
-            'ready_qty' => $readyQty,
-            'blocked_qty' => $blockedQty,
-            'claimed_qty' => (float) ($operation->quantity_claimed ?? 0.0),
-            'remaining_executable_qty' => max(0.0, round($readyQty - (float) ($operation->quantity_claimed ?? 0.0), 4)),
+            $totalProcessed = (float) ($operation->quantity_produced ?? 0.0) + (float) ($operation->quantity_rejected ?? 0.0) + (float) ($operation->quantity_scrapped ?? 0.0);
+            $effectiveClaimed = max((float) ($operation->quantity_claimed ?? 0.0), $totalProcessed);
+            $remainingExecutable = ($operation->status === 'completed') ? 0.0 : max(0.0, round($readyQty - $effectiveClaimed, 4));
+
+            return [
+                'operation_id' => $operation->id,
+                'operation_number' => $operation->operation_number,
+                'operation_name' => $operation->name,
+                'sequence' => $operation->sequence,
+                'overall_status' => $overallStatus,
+                'target_qty' => $orderQty,
+                'ready_qty' => $readyQty,
+                'blocked_qty' => $blockedQty,
+                'claimed_qty' => $effectiveClaimed,
+                'remaining_executable_qty' => $remainingExecutable,
             'material' => $materialEval,
             'dependency' => $dependencyEval,
             'machine' => $machineEval,
