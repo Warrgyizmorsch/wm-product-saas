@@ -26,28 +26,55 @@
             </div>
         @endunless
 
-        <div class="row g-4 fs-13 text-dark">
-            <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" inputType="date" label="{{ $label }} Date" name="voucher_date" :value="old('voucher_date', date('Y-m-d'))" :required="true" />
+        @if ($embedded)
+            {{-- odoo-form-ui's label is a fixed 130px regardless of container width, which
+                 crams and wraps once it's inside a narrower drawer column instead of the
+                 full page — use label-above icon-input fields here instead. --}}
+            <div class="row g-3 fs-13 text-dark">
+                <div class="col-md-6">
+                    <x-ui.icon-input label="{{ $label }} Date" icon="feather-calendar" type="date" name="voucher_date" :value="old('voucher_date', date('Y-m-d'))" :required="true" />
+                </div>
+                <div class="col-md-6">
+                    <x-ui.icon-input label="Party Name" icon="feather-user" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                </div>
+                <div class="col-md-6">
+                    <x-ui.icon-input label="Reference No." icon="feather-hash" name="reference_no" :value="old('reference_no')" placeholder="Cheque / UTR / UPI ref" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold fs-13 text-dark mb-2">Payment Method</label>
+                    <x-ui.select name="payment_method" :selected="old('payment_method')" :options="[
+                        '' => '— Select —', 'cash' => 'Cash', 'bank_transfer' => 'Bank Transfer',
+                        'cheque' => 'Cheque', 'upi' => 'UPI', 'card' => 'Card', 'other' => 'Other',
+                    ]" />
+                </div>
+                <div class="col-12">
+                    <x-ui.icon-input label="Memo" icon="feather-file-text" name="memo" :value="old('memo')" placeholder="Short description of this entry" />
+                </div>
             </div>
-            <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Party Name" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+        @else
+            <div class="row g-4 fs-13 text-dark">
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ $label }} Date" name="voucher_date" :value="old('voucher_date', date('Y-m-d'))" :required="true" />
+                </div>
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="input" label="Party Name" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                </div>
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="input" label="Reference No." name="reference_no" :value="old('reference_no')" placeholder="Cheque / UTR / UPI ref" />
+                </div>
             </div>
-            <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Reference No." name="reference_no" :value="old('reference_no')" placeholder="Cheque / UTR / UPI ref" />
+            <div class="row g-4 fs-13 text-dark mt-1">
+                <div class="col-md-4">
+                    <x-ui.select label="Payment Method" name="payment_method" :selected="old('payment_method')" :options="[
+                        '' => '— Select —', 'cash' => 'Cash', 'bank_transfer' => 'Bank Transfer',
+                        'cheque' => 'Cheque', 'upi' => 'UPI', 'card' => 'Card', 'other' => 'Other',
+                    ]" />
+                </div>
+                <div class="col-md-8">
+                    <x-ui.odoo-form-ui type="input" label="Memo" name="memo" :value="old('memo')" placeholder="Short description of this entry" />
+                </div>
             </div>
-        </div>
-        <div class="row g-4 fs-13 text-dark mt-1">
-            <div class="col-md-4">
-                <x-ui.select label="Payment Method" name="payment_method" :selected="old('payment_method')" :options="[
-                    '' => '— Select —', 'cash' => 'Cash', 'bank_transfer' => 'Bank Transfer',
-                    'cheque' => 'Cheque', 'upi' => 'UPI', 'card' => 'Card', 'other' => 'Other',
-                ]" />
-            </div>
-            <div class="col-md-8">
-                <x-ui.odoo-form-ui type="input" label="Memo" name="memo" :value="old('memo')" placeholder="Short description of this entry" />
-            </div>
-        </div>
+        @endif
 
         <div class="border-top pt-4 mt-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
