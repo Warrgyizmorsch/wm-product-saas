@@ -4,6 +4,10 @@
 @section('page-title', 'Day Book')
 @section('breadcrumb', 'Accounting / Reports / Day Book')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'day-book'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end">

@@ -8,7 +8,26 @@ use Illuminate\Database\Eloquent\Collection;
 
 interface JournalRepositoryInterface
 {
+    /**
+     * Filters: status, source, voucher_type, posted_by (user id, or 'system' for
+     * auto-postings without a user), from / to (journal date), search, sort, direction.
+     */
     public function paginateAll(array $filters = [], int $perPage = 15): LengthAwarePaginator;
+
+    /**
+     * Users who have posted at least one journal, by name, for posted-by filters.
+     *
+     * @return \Illuminate\Support\Collection<int, \App\Models\User>
+     */
+    public function posters(): \Illuminate\Support\Collection;
+
+    /**
+     * Posted and reversed journals dated within [$from, $to], counted and summed
+     * per poster, voucher type and status.
+     *
+     * @return \Illuminate\Support\Collection<int, object{posted_by: ?int, voucher_type: ?string, status: string, documents: int, amount: float}>
+     */
+    public function activityByPoster(\DateTimeInterface $from, \DateTimeInterface $to): \Illuminate\Support\Collection;
 
     public function find(int $id): ?Journal;
 
@@ -57,6 +76,24 @@ interface JournalRepositoryInterface
      * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
      */
     public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection;
+
+    /**
+     * One row per account with summed debit/credit across every posted or
+     * reversed journal dated within [$from, $to] — a period's movement in one
+     * query, rather than the difference of two balancesAsOf() calls.
+     *
+     * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
+     */
+    public function movementsBetween(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to, ?int $costCenterId = null): Collection;
+
+    /**
+     * Summed debit/credit per account per journal date within [$from, $to].
+     * Callers bucket the dates themselves (e.g. by month), since date
+     * grouping functions differ between MySQL and SQLite.
+     *
+     * @return Collection<int, object{chart_of_account_id: int, journal_date: string, debit: float, credit: float}>
+     */
+    public function dailyMovements(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to, ?int $costCenterId = null): Collection;
 
     /**
      * Every journal (posted or reversed — a Day Book is a chronological

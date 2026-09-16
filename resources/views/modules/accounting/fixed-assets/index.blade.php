@@ -49,7 +49,10 @@
                 'written_off' => 'Written Off',
                 'lost' => 'Lost',
             ]" />
-            <x-ui.button type="submit" variant="primary" size="sm" class="w-100">Apply</x-ui.button>
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                <x-ui.button href="{{ route('accounting.fixed-assets.index') }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+            </div>
         </form>
     </x-ui.filter>
 @endsection
@@ -61,6 +64,11 @@
                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                 <input type="text" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control border-0 bg-transparent p-0 fs-13"
                        placeholder="Search asset code, name, serial..." style="box-shadow: none; height: 32px;">
+                @if (!empty($filters['search']))
+                    <a href="{{ route('accounting.fixed-assets.index', collect($filters)->except('search')->filter()->all()) }}" class="text-muted ms-2" title="Clear search">
+                        <i class="feather-x" style="font-size: 14px;"></i>
+                    </a>
+                @endif
                 @if (!empty($filters['status']))
                     <input type="hidden" name="status" value="{{ $filters['status'] }}">
                 @endif

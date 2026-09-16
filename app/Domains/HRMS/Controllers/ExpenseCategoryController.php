@@ -13,6 +13,8 @@ class ExpenseCategoryController extends Controller
 {
     public function index(Request $request): RedirectResponse
     {
+        $this->authorizeManage();
+
         return redirect()->route('hrms.expense-policy.index', [
             'tab'        => 'categories',
             'cat_search' => $request->query('search', ''),
@@ -23,6 +25,8 @@ class ExpenseCategoryController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeManage();
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -48,6 +52,8 @@ class ExpenseCategoryController extends Controller
 
     public function update(Request $request, ExpenseCategory $category): RedirectResponse
     {
+        $this->authorizeManage();
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -74,6 +80,8 @@ class ExpenseCategoryController extends Controller
 
     public function destroy(ExpenseCategory $category): RedirectResponse
     {
+        $this->authorizeManage();
+
         // Check if category has claims before deleting
         if ($category->claims()->exists()) {
             return redirect()->route('hrms.expense-policy.index', ['tab' => 'categories'])
@@ -84,5 +92,21 @@ class ExpenseCategoryController extends Controller
 
         return redirect()->route('hrms.expense-policy.index', ['tab' => 'categories'])
             ->with('success', 'Expense category deleted successfully.');
+    }
+
+    /**
+     * Expense categories are HR policy master data; every action here used to
+     * be open to any signed-in user.
+     */
+    private function authorizeManage(): void
+    {
+        $user = auth()->user();
+
+        abort_unless(
+            $user && app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.expense_policies.manage', [
+                'tenant_id' => $user->tenant_id,
+            ]),
+            403
+        );
     }
 }

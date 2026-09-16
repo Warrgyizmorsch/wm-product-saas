@@ -27,9 +27,13 @@
                 @forelse ($writeOffs as $writeOff)
                     <tr>
                         <td class="ps-4">
-                            <a href="{{ route('accounting.fixed-assets.show', $writeOff->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                                {{ $writeOff->asset->asset_code }}
-                            </a>
+                            @if ($writeOff->asset)
+                                <a href="{{ route('accounting.fixed-assets.show', $writeOff->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
+                                    {{ $writeOff->asset->asset_code }}
+                                </a>
+                            @else
+                                <span class="fw-bold font-monospace text-muted">Deleted asset #{{ $writeOff->asset_id }}</span>
+                            @endif
                         </td>
                         <td>{{ $writeOff->write_off_date->format('d M Y') }}</td>
                         <td class="text-muted text-truncate" style="max-width: 260px;">{{ $writeOff->reason }}</td>

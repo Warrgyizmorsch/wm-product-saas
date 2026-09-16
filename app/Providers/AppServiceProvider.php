@@ -35,6 +35,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Branching::class);
         $this->app->singleton(BranchContext::class, fn ($app) => $app->make(Branching::class));
 
+        // Loads every module's Routes/menu.php once per request.
+        $this->app->singleton(\App\Core\Navigation\MenuRegistry::class);
+
         \Illuminate\Support\Facades\Auth::provider('tenant-eloquent', function ($app, array $config) {
             return new \App\Support\Auth\TenantAwareUserProvider($app['hash'], $config['model']);
         });
@@ -381,6 +384,27 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Purchase\Events\GrnAssetLineReceived::class,
             \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
         );
+
+        // ── Accounting dashboard cache: any journal change can move a figure ──
+        $flushAccountingDashboard = function ($model): void {
+            if ($model->tenant_id) {
+                app(\App\Domains\Accounting\Services\Dashboard\DashboardCache::class)->flush((int) $model->tenant_id);
+            }
+        };
+        \App\Domains\Accounting\Models\Journal::saved($flushAccountingDashboard);
+        \App\Domains\Accounting\Models\Journal::deleted($flushAccountingDashboard);
+        \App\Domains\Accounting\Models\JournalEntry::created($flushAccountingDashboard);
+
+        // ── Tenant provisioning: each module adds its own default masters ─────
+        foreach ([
+            \App\Domains\Accounting\Listeners\ProvisionChartOfAccounts::class,
+            \App\Domains\Platform\Listeners\ProvisionPaymentTerms::class,
+            \App\Domains\CRM\Listeners\ProvisionCrmDefaults::class,
+            \App\Domains\Inventory\Listeners\ProvisionInventoryDefaults::class,
+            \App\Domains\Production\Listeners\ProvisionProductionDefaults::class,
+        ] as $listener) {
+            \Illuminate\Support\Facades\Event::listen(\App\Core\Tenant\Events\TenantProvisioning::class, $listener);
+        }
 
         // ── Production Policies ───────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(

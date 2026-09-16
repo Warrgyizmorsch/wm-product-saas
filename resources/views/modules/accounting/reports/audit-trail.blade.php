@@ -44,9 +44,13 @@
                 <label class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark">To</label>
                 <input type="date" name="to" value="{{ $filters['to'] ?? '' }}" class="form-control">
             </div>
-            <x-ui.button type="submit" variant="primary" size="sm" class="w-100">Apply</x-ui.button>
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                <x-ui.button href="{{ route('accounting.reports.audit-trail') }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+            </div>
         </form>
     </x-ui.filter>
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'audit-trail'])
 @endsection
 
 @section('content')
@@ -56,6 +60,11 @@
                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                 <input type="text" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control border-0 bg-transparent p-0 fs-13"
                        placeholder="Search title or description..." style="box-shadow: none; height: 32px;">
+                @if (!empty($filters['search']))
+                    <a href="{{ route('accounting.reports.audit-trail', collect($filters)->except('search')->filter()->all()) }}" class="text-muted ms-2" title="Clear search">
+                        <i class="feather-x" style="font-size: 14px;"></i>
+                    </a>
+                @endif
                 @foreach (['subject_type', 'event_type', 'from', 'to'] as $carry)
                     @if (!empty($filters[$carry]))
                         <input type="hidden" name="{{ $carry }}" value="{{ $filters[$carry] }}">

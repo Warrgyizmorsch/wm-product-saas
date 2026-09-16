@@ -323,6 +323,9 @@
         }
         unset($items);
     }
+    // Menu entries live in each module's Routes/menu.php and are filtered by plan,
+    // role, permission and route existence — see App\Core\Navigation\MenuBuilder.
+    $sections = app(\App\Core\Navigation\MenuBuilder::class)->build(auth()->user(), request()->route()?->getName());
 @endphp
 
 <nav class="nxl-navigation">
@@ -344,11 +347,10 @@
         </div>
         <div class="navbar-content">
             <ul class="nxl-navbar">
-                @foreach ($modules as $caption => $items)
-                    @php $modSlug = Str::slug($caption); @endphp
-                    <li class="nxl-item nxl-caption premium-module-header" data-module="{{ $modSlug }}" onclick="toggleModuleSidebar('{{ $modSlug }}', this)">
+                @foreach ($sections as $section)
+                    <li class="nxl-item nxl-caption premium-module-header" data-module="{{ $section['slug'] }}" onclick="toggleModuleSidebar('{{ $section['slug'] }}', this)">
                         <div class="premium-module-header-content">
-                            <span class="premium-module-header-title">{{ strtoupper($caption) }}</span>
+                            <span class="premium-module-header-title">{{ strtoupper($section['label']) }}</span>
                             <span class="premium-module-accordion-btn">
                                 <span class="premium-module-arrow-container">
                                     <i class="feather-chevron-right premium-module-arrow"></i>
@@ -356,28 +358,12 @@
                             </span>
                         </div>
                     </li>
-                    @foreach ($items as $item)
+                    @foreach ($section['items'] as $item)
                         @php
-                            $href = isset($item['route']) ? route($item['route']) : ($item['url'] ?? '#');
-                            $hasChildren = isset($item['children']) && !empty($item['children']);
-                            $isItemActive = isset($item['route']) && request()->routeIs($item['route']);
-                            $hasActiveChild = false;
-
-                            if ($hasChildren) {
-                                foreach ($item['children'] as $c) {
-                                    if (is_array($c) && isset($c['route']) && request()->routeIs($c['route'])) {
-                                        $hasActiveChild = true;
-                                        break;
-                                    }
-                                    if (is_array($c) && isset($c['url']) && request()->input('tab') === 'templates' && str_contains($c['url'], 'tab=templates')) {
-                                        $hasActiveChild = true;
-                                        break;
-                                    }
-                                }
-                            }
+                            $hasChildren = $item['children'] !== [];
                         @endphp
-                        <li class="nxl-item {{ $hasChildren ? 'nxl-hasmenu' : '' }} {{ ($isItemActive || $hasActiveChild) ? 'active nxl-trigger' : '' }} premium-module-child module-{{ $modSlug }}">
-                            <a href="{{ $hasChildren ? 'javascript:void(0);' : $href }}" class="nxl-link">
+                        <li class="nxl-item {{ $hasChildren ? 'nxl-hasmenu' : '' }} {{ $item['active'] ? 'active nxl-trigger' : '' }} premium-module-child module-{{ $section['slug'] }}">
+                            <a href="{{ $hasChildren ? 'javascript:void(0);' : $item['url'] }}" class="nxl-link">
                                 <span class="nxl-micon"><i class="{{ $item['icon'] }}"></i></span>
                                 <span class="nxl-mtext">{{ $item['label'] }}</span>
                                 @if ($hasChildren)
@@ -387,14 +373,8 @@
                             @if ($hasChildren)
                                 <ul class="nxl-submenu">
                                     @foreach ($item['children'] as $child)
-                                        @php
-                                            $child = is_array($child) ? $child : ['label' => $child];
-                                            $childHref = isset($child['route']) ? route($child['route']) : ($child['url'] ?? '#');
-                                            $childActive = (isset($child['route']) && request()->routeIs($child['route']) && request()->input('tab') !== 'templates')
-                                                || (isset($child['url']) && request()->input('tab') === 'templates' && str_contains($child['url'], 'tab=templates'));
-                                        @endphp
-                                        <li class="nxl-item {{ $childActive ? 'active' : '' }}">
-                                            <a class="nxl-link" href="{{ $childHref }}">{{ $child['label'] }}</a>
+                                        <li class="nxl-item {{ $child['active'] ? 'active' : '' }}">
+                                            <a class="nxl-link" href="{{ $child['url'] }}">{{ $child['label'] }}</a>
                                         </li>
                                     @endforeach
                                 </ul>
@@ -631,12 +611,12 @@
 <script>
 function toggleModuleSidebar(moduleName, headerEl) {
     const isCollapsed = headerEl.classList.contains('collapsed');
-    
+
     if (typeof jQuery !== 'undefined') {
         const $ = jQuery;
         const $header = $(headerEl);
         const $children = $('.premium-module-child.module-' + moduleName);
-        
+
         if (isCollapsed) {
             $header.removeClass('collapsed');
             $children.stop(true, true).slideDown(250);
@@ -662,19 +642,19 @@ function toggleModuleSidebar(moduleName, headerEl) {
 
 document.addEventListener("DOMContentLoaded", function () {
     const headers = document.querySelectorAll('.premium-module-header');
-    
+
     headers.forEach(function (header) {
         const moduleName = header.getAttribute('data-module');
         const savedState = localStorage.getItem('wm_sidebar_module_' + moduleName);
         const children = document.querySelectorAll('.premium-module-child.module-' + moduleName);
-        
+
         let hasActiveChild = false;
         children.forEach(function (child) {
             if (child.classList.contains('active') || child.querySelector('.active') !== null) {
                 hasActiveChild = true;
             }
         });
-        
+
         if (hasActiveChild) {
             header.classList.remove('collapsed');
             children.forEach(c => c.style.display = 'block');

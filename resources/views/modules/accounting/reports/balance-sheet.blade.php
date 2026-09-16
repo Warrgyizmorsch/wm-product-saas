@@ -4,6 +4,10 @@
 @section('page-title', 'Balance Sheet')
 @section('breadcrumb', 'Accounting / Reports / Balance Sheet')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'balance-sheet'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end">

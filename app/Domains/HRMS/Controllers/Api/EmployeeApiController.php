@@ -978,7 +978,10 @@ class EmployeeApiController extends Controller
             'leave_transition_unused'     => ['nullable', 'string', 'in:carry,lapse'],
             'employee_id'                 => ['nullable', 'string', 'max:255', Rule::unique('employees', 'employee_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
             'user_id'                     => ['required', Rule::unique('employees', 'user_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
-            'role_id'                     => ['nullable', 'exists:roles,id'],
+            // Written straight to users.role_id — only roles the acting user may hand out.
+            'role_id'                     => ['nullable', Rule::in(auth()->check()
+                ? app(\App\Services\Access\AccessService::class)->assignableRoles(auth()->user(), $tenantId)->pluck('id')->all()
+                : [])],
             'full_name'                   => ['required', 'string', 'max:255'],
             'nick_name'                   => ['nullable', 'string', 'max:255'],
             'blood_group'                 => ['nullable', Rule::in(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])],

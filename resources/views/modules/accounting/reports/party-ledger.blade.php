@@ -4,6 +4,10 @@
 @section('page-title', 'Party Ledger')
 @section('breadcrumb', 'Accounting / Reports / Party Ledger')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'party-ledger'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end" id="partyLedgerForm">

@@ -313,6 +313,10 @@ class AssetApiController extends Controller
             return $this->sendError("Cannot delete asset '{$asset->asset_code}' because it is currently allocated to an employee. Please return or deallocate it first.", [], 422);
         }
 
+        if ($reason = $asset->blockingAccountingRecords()) {
+            return $this->sendError("Cannot delete asset '{$asset->asset_code}' because {$reason}.", [], 422);
+        }
+
         $asset->delete();
 
         return $this->sendSuccess(['id' => (int)$id], 'Asset deleted successfully');

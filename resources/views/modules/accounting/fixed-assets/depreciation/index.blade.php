@@ -69,10 +69,14 @@
                 @forelse ($schedules as $schedule)
                     <tr>
                         <td class="ps-4">
-                            <a href="{{ route('accounting.fixed-assets.show', $schedule->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                                {{ $schedule->asset->asset_code }}
-                            </a>
-                            <div class="text-muted fs-11">{{ $schedule->asset->name }}</div>
+                            @if ($schedule->asset)
+                                <a href="{{ route('accounting.fixed-assets.show', $schedule->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
+                                    {{ $schedule->asset->asset_code }}
+                                </a>
+                                <div class="text-muted fs-11">{{ $schedule->asset->name }}</div>
+                            @else
+                                <span class="fw-bold font-monospace text-muted">Deleted asset #{{ $schedule->asset_id }}</span>
+                            @endif
                         </td>
                         <td class="text-end">{{ number_format($schedule->opening_book_value, 2) }}</td>
                         <td class="text-end">{{ number_format($schedule->depreciation_amount, 2) }}</td>

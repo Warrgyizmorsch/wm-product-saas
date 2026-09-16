@@ -48,6 +48,27 @@ final class AccountCode
      */
     public const FX_LOSS = '5740';
 
+    /** Fixed Assets — gross block, used when an asset category has no account of its own. */
+    public const FIXED_ASSETS = '1500';
+
+    /** Accumulated Depreciation — contra-asset, credit-normal, child of 1000. */
+    public const ACCUMULATED_DEPRECIATION = '1510';
+
+    /** Revaluation Reserve — equity, credited with asset revaluation surpluses. */
+    public const REVALUATION_RESERVE = '3200';
+
+    /** Gain on Sale of Fixed Assets — indirect income. */
+    public const GAIN_ON_ASSET_DISPOSAL = '4940';
+
+    /** Depreciation Expense — indirect expense. */
+    public const DEPRECIATION_EXPENSE = '5400';
+
+    /** Loss on Sale of Fixed Assets — indirect expense, for disposals and write-offs. */
+    public const LOSS_ON_ASSET_DISPOSAL = '5910';
+
+    /** Impairment Loss — indirect expense, for revaluation deficits. */
+    public const IMPAIRMENT_LOSS = '5920';
+
     private function __construct()
     {
     }

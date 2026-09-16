@@ -19,6 +19,8 @@ class ProbationController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorizeHrms('hrms.employees.view');
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $today = Carbon::today();
         $in15Days = Carbon::today()->addDays(15);

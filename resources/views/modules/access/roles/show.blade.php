@@ -4,7 +4,8 @@
     $groups = collect($matrix)->groupBy(fn ($row) => $row['permission']->module);
     $scopeLabels = [
         \App\Models\Access\RolePermission::SCOPE_OWN => 'Own',
-        \App\Models\Access\RolePermission::SCOPE_TEAM => 'Team',
+        // Teams don't exist yet; AccessService evaluates a 'team' grant exactly like 'own'.
+        \App\Models\Access\RolePermission::SCOPE_TEAM => 'Team (same as Own for now)',
         \App\Models\Access\RolePermission::SCOPE_DEPARTMENT => 'Department',
         \App\Models\Access\RolePermission::SCOPE_BRANCH => 'Branch',
         \App\Models\Access\RolePermission::SCOPE_TENANT => 'Tenant',

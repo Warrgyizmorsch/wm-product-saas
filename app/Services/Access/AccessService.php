@@ -33,7 +33,7 @@ class AccessService
         // platform-wide checks that have no tenant_id in context, which would
         // let a tenant owner browse or switch into another tenant entirely
         // (see TenantPolicy's own comment on this exact risk).
-        if ($user->role === 'admin' || $user->role === 'super_admin') {
+        if ($this->legacyAdminRoleTextAllows($user, $permissionName, $context)) {
             return true;
         }
 
@@ -220,6 +220,52 @@ class AccessService
     }
 
     /**
+     * Roles $actor may give a user in $tenantId: system roles plus that
+     * tenant's own, and super_admin only when the actor already holds it.
+     * Every screen that writes a role (users.role_id or user_roles) must limit
+     * its input to this list — otherwise anyone who can edit a user can make
+     * them a platform admin.
+     *
+     * @return Collection<int, Role>
+     */
+    public function assignableRoles(User $actor, ?int $tenantId): Collection
+    {
+        $query = Role::query()->where(function ($query) use ($tenantId): void {
+            $query->whereNull('tenant_id')
+                ->when($tenantId !== null, fn ($q) => $q->orWhere('tenant_id', $tenantId));
+        });
+
+        if (! $this->hasRole($actor, 'super_admin')) {
+            $query->where('slug', '!=', 'super_admin');
+        }
+
+        return $query->orderBy('level')->get();
+    }
+
+    /**
+     * The legacy users.role text column carries no tenant and is written
+     * outside the RBAC screens, so 'admin'/'super_admin' there only makes a
+     * platform admin on an account with no tenant. On a tenant-bound account
+     * it still opens everything inside that account's own tenant (Production
+     * relies on this), but never a platform.* permission or another tenant.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function legacyAdminRoleTextAllows(User $user, string $permissionName, array $context): bool
+    {
+        if (! in_array($user->role, ['admin', 'super_admin'], true)) {
+            return false;
+        }
+
+        if ($user->tenant_id === null) {
+            return true;
+        }
+
+        return ! str_starts_with($permissionName, 'platform.')
+            && $this->sameValue($context['tenant_id'] ?? $user->tenant_id, $user->tenant_id);
+    }
+
+    /**
      * @param array<string, mixed> $context
      */
     private function matchingOverride(User $user, int $permissionId, array $context): ?UserPermissionOverride
@@ -271,6 +317,17 @@ class AccessService
 
             if ($legacyRoleIsUsable) {
                 $roleIds->push($user->role_id);
+            }
+        } elseif (filled($user->role) && ! in_array($user->role, ['admin', 'super_admin'], true)) {
+            // Older accounts carry only the users.role text (e.g. 'production_engineer').
+            // Resolve it to the system role of that slug so its real grants apply,
+            // rather than the legacy Production permission map. admin/super_admin
+            // text is never resolved here: legacyAdminRoleTextAllows() handles it
+            // and keeps it inside the user's own tenant.
+            $textRoleId = Role::query()->whereNull('tenant_id')->where('slug', $user->role)->value('id');
+
+            if ($textRoleId !== null) {
+                $roleIds->push($textRoleId);
             }
         }
 
@@ -325,6 +382,13 @@ class AccessService
         return $left !== null && $right !== null && (string) $left === (string) $right;
     }
 
+    /**
+     * Deprecated fallback: config('production.permissions') maps permission names
+     * to role slugs. Every entry is now seeded as a real Permission granted to the
+     * same roles, and users.role text resolves to its system role (roleIdsFor()),
+     * so this only decides anything where permissions were never seeded (older
+     * Production tests). Remove once those tests seed RbacSeeder.
+     */
     private function allowsLegacyProductionPermission(User $user, string $permissionName): bool
     {
         $permissionMap = config('production.permissions', []);

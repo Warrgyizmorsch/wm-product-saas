@@ -168,6 +168,14 @@ class JournalService
         return $this->journals->paginateAll($filters, $perPage);
     }
 
+    /**
+     * @return \Illuminate\Support\Collection<int, \App\Models\User>
+     */
+    public function posters(): \Illuminate\Support\Collection
+    {
+        return $this->journals->posters();
+    }
+
     public function trialBalance(AccountingPeriod $period, ?int $costCenterId = null): Collection
     {
         return $this->journals->trialBalance($period->id, $costCenterId);

@@ -177,10 +177,12 @@ Route::prefix('crm')
         Route::post('whatsapp/connect', [\App\Http\Controllers\WhatsAppController::class, 'connect'])->name('whatsapp.connect');
         Route::delete('whatsapp/disconnect', [\App\Http\Controllers\WhatsAppController::class, 'disconnect'])->name('whatsapp.disconnect');
         Route::post('whatsapp/send-message', [\App\Http\Controllers\WhatsAppController::class, 'sendMessage'])->name('whatsapp.sendMessage');
+        Route::get('whatsapp/messages', [\App\Http\Controllers\WhatsAppController::class, 'messages'])->name('whatsapp.messages');
 
         // SMTP Email Settings Routes
         Route::get('email-settings', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'index'])->name('emailSettings.index');
         Route::post('email-settings/store', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'store'])->name('emailSettings.store');
         Route::post('email-settings/{id}/test', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'testConnection'])->name('emailSettings.test');
         Route::post('email-settings/{id}/send-test-email', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'sendTestMail'])->name('emailSettings.sendTestMail');
+        Route::delete('email-settings/{id}', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'destroy'])->name('emailSettings.destroy');
     });

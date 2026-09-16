@@ -4,6 +4,10 @@
 @section('page-title', 'Cash Flow Statement')
 @section('breadcrumb', 'Accounting / Reports / Cash Flow')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'cash-flow'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
         <form method="GET" class="row g-3 align-items-end">

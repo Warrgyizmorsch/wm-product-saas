@@ -32,15 +32,7 @@ class UserService
      */
     public function assignableRoles(User $actor, int $tenantId): Collection
     {
-        $query = Role::query()->where(function ($q) use ($tenantId) {
-            $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId);
-        });
-
-        if (! $this->access->hasRole($actor, 'super_admin')) {
-            $query->where('slug', '!=', 'super_admin');
-        }
-
-        return $query->orderBy('level')->get();
+        return $this->access->assignableRoles($actor, $tenantId);
     }
 
     /**
