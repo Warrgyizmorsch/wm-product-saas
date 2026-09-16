@@ -90,12 +90,12 @@
                 <x-ui.odoo-form-ui type="table" id="itemsTable">
                     <thead>
                         <tr>
-                            <th style="width: 26%;">Account</th>
-                            <th style="width: 17%;">Cost Center</th>
-                            <th style="width: 19%;">Description</th>
-                            <th class="text-end" style="width: 13%;">Debit</th>
-                            <th class="text-end" style="width: 13%;">Credit</th>
-                            <th class="text-center" style="width: 12%;">Actions</th>
+                            <th style="width: 24%;">Account</th>
+                            <th style="width: 15%;">Cost Center</th>
+                            <th style="width: 17%;">Description</th>
+                            <th class="text-end" style="width: 14%;">Debit</th>
+                            <th class="text-end" style="width: 14%;">Credit</th>
+                            <th class="text-center" style="width: 16%;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -187,10 +187,10 @@
                                 <input type="text" name="items[${index}][description]" class="odoo-table-input description-input" placeholder="Line description..." value="${escapeHtml(values.description || '')}">
                             </td>
                             <td>
-                                <input type="number" name="items[${index}][debit]" class="odoo-table-input text-end debit-input" value="${values.debit ?? '0.00'}" min="0" step="0.01" style="width: 110px; margin-left: auto;">
+                                <input type="number" name="items[${index}][debit]" class="odoo-table-input text-end debit-input" value="${values.debit ?? '0.00'}" min="0" step="0.01">
                             </td>
                             <td>
-                                <input type="number" name="items[${index}][credit]" class="odoo-table-input text-end credit-input" value="${values.credit ?? '0.00'}" min="0" step="0.01" style="width: 110px; margin-left: auto;">
+                                <input type="number" name="items[${index}][credit]" class="odoo-table-input text-end credit-input" value="${values.credit ?? '0.00'}" min="0" step="0.01">
                             </td>
                             <td class="text-center">
                                 <div class="d-flex align-items-center justify-content-center gap-2">

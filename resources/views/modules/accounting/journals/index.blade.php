@@ -154,7 +154,7 @@
     </x-ui.card>
 
     @if ($canCreate)
-        <x-ui.drawer id="journalCreateDrawer" title="New Journal" scroll style="--bs-offcanvas-width: min(820px, 92vw);">
+        <x-ui.drawer id="journalCreateDrawer" title="New Journal" scroll style="--bs-offcanvas-width: min(920px, 94vw);">
             @include('modules.accounting.journals._form', ['embedded' => true])
         </x-ui.drawer>
 

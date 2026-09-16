@@ -117,7 +117,7 @@
                             </select>
                         </td>
                         <td>
-                            <input type="number" name="lines[${index}][amount]" class="odoo-table-input text-end amount-input" value="${line.amount ?? ''}" min="0.01" step="0.01" style="width: 130px; margin-left: auto;" required>
+                            <input type="number" name="lines[${index}][amount]" class="odoo-table-input text-end amount-input" value="${line.amount ?? ''}" min="0.01" step="0.01" required>
                         </td>
                         <td class="text-center">
                             <div class="d-flex align-items-center justify-content-center gap-2">

@@ -206,10 +206,10 @@
                                 <input type="text" name="" class="odoo-table-input description-input" placeholder="Line description..." value="${escapeHtmlVoucherLine(values.description || '')}">
                             </td>
                             <td>
-                                <input type="number" name="" class="odoo-table-input text-end debit-input" value="${values.debit ?? '0.00'}" min="0" step="0.01" style="width: 110px; margin-left: auto;">
+                                <input type="number" name="" class="odoo-table-input text-end debit-input" value="${values.debit ?? '0.00'}" min="0" step="0.01">
                             </td>
                             <td>
-                                <input type="number" name="" class="odoo-table-input text-end credit-input" value="${values.credit ?? '0.00'}" min="0" step="0.01" style="width: 110px; margin-left: auto;">
+                                <input type="number" name="" class="odoo-table-input text-end credit-input" value="${values.credit ?? '0.00'}" min="0" step="0.01">
                             </td>
                             <td class="text-center">
                                 <div class="d-flex align-items-center justify-content-center gap-2">
