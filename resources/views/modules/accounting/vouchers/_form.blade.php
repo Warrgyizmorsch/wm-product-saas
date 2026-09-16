@@ -4,6 +4,41 @@
      already supplies its own header/footer chrome. --}}
 @php $embedded = $embedded ?? false; @endphp
 
+@once
+    @push('styles')
+        <style>
+            .voucher-line-action-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 30px;
+                height: 30px;
+                border-radius: 8px;
+                border: 1.5px solid #cbd5e1;
+                background-color: #ffffff;
+                color: #475569;
+                transition: all 0.2s ease;
+                flex-shrink: 0;
+            }
+            .voucher-line-action-btn:hover {
+                background-color: color-mix(in srgb, var(--bs-primary) 12%, transparent);
+                border-color: var(--bs-primary);
+                color: var(--bs-primary);
+            }
+            .voucher-line-action-btn--danger:hover {
+                background-color: color-mix(in srgb, var(--bs-danger) 12%, transparent);
+                border-color: var(--bs-danger);
+                color: var(--bs-danger);
+            }
+            .voucher-line-action-btn:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+                pointer-events: none;
+            }
+        </style>
+    @endpush
+@endonce
+
 @if ($errors->any())
     <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible class="mb-4">
         <h6 class="alert-heading fw-bold mb-1">Cannot post this {{ strtolower($label) }}</h6>
@@ -177,12 +212,14 @@
                                 <input type="number" name="" class="odoo-table-input text-end credit-input" value="${values.credit ?? '0.00'}" min="0" step="0.01" style="width: 110px; margin-left: auto;">
                             </td>
                             <td class="text-center">
-                                <button type="button" class="btn btn-icon btn-sm clone-row-btn" title="Clone this line" data-bs-toggle="tooltip">
-                                    <i class="feather-copy fs-13"></i>
-                                </button>
-                                <button type="button" class="btn btn-icon btn-sm text-danger remove-row-btn" title="Remove this line" data-bs-toggle="tooltip">
-                                    <i class="feather-trash-2 fs-13"></i>
-                                </button>
+                                <div class="d-flex align-items-center justify-content-center gap-2">
+                                    <button type="button" class="voucher-line-action-btn clone-row-btn" title="Clone this line" data-bs-toggle="tooltip">
+                                        <i class="feather-copy fs-13"></i>
+                                    </button>
+                                    <button type="button" class="voucher-line-action-btn voucher-line-action-btn--danger remove-row-btn" title="Remove this line" data-bs-toggle="tooltip">
+                                        <i class="feather-trash-2 fs-13"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     `;
