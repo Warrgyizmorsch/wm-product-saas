@@ -32,6 +32,7 @@ class VoucherController extends Controller
 
         $filters = $request->only(['status', 'posted_by', 'from', 'to', 'search', 'sort', 'direction']);
         $vouchers = $this->vouchers->paginate($type, $filters, 15);
+        $canCreate = $this->voucherPolicy->post($request->user(), $type);
 
         return view('modules.accounting.vouchers.index', [
             'type' => $type,
@@ -39,6 +40,11 @@ class VoucherController extends Controller
             'vouchers' => $vouchers,
             'filters' => $filters,
             'posters' => $this->journals->posters(),
+            'canCreate' => $canCreate,
+            // Only fetched when the user can actually post — these back the
+            // create-voucher drawer opened from this same page.
+            'accounts' => $canCreate ? $this->accounts->active() : collect(),
+            'cashBankAccounts' => $canCreate ? $this->accounts->active()->where('is_cash_or_bank', true)->values() : collect(),
             'summary' => [
                 'total' => Journal::query()->where('voucher_type', $type)->count(),
                 'posted' => Journal::query()->where('voucher_type', $type)->where('status', Journal::STATUS_POSTED)->count(),
@@ -72,7 +78,7 @@ class VoucherController extends Controller
             'party_name' => ['nullable', 'string', 'max:255'],
             'payment_method' => ['nullable', 'string', 'max:50'],
             'reference_no' => ['nullable', 'string', 'max:100'],
-            'items' => ['required', 'array', 'min:2', 'max:2'],
+            'items' => ['required', 'array', 'min:2', 'max:20'],
             'items.*.chart_of_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
             'items.*.debit' => ['nullable', 'numeric', 'min:0'],
             'items.*.credit' => ['nullable', 'numeric', 'min:0'],
@@ -151,7 +157,7 @@ class VoucherController extends Controller
         $count = ChartOfAccount::whereIn('id', $ids)->where('is_cash_or_bank', true)->count();
 
         if ($count !== $ids->count()) {
-            throw new InvalidArgumentException('Both lines of a Contra voucher must be cash or bank accounts.');
+            throw new InvalidArgumentException('Every line of a Contra voucher must be a cash or bank account.');
         }
     }
 }

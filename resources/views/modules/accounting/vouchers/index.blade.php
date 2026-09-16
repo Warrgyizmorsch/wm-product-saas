@@ -39,9 +39,11 @@
             </div>
         </form>
     </x-ui.filter>
-    <x-ui.button href="{{ route('accounting.vouchers.' . $type . '.create') }}" variant="primary" icon="feather-plus">
-        New {{ $label }}
-    </x-ui.button>
+    @if ($canCreate)
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="offcanvas" data-bs-target="#voucherCreateDrawer-{{ $type }}">
+            New {{ $label }}
+        </x-ui.button>
+    @endif
 @endsection
 
 @section('content')
@@ -138,6 +140,22 @@
             :totalResults="$vouchers->total()"
             :perPage="$vouchers->perPage()" />
     </x-ui.card>
+
+    @if ($canCreate)
+        <x-ui.drawer id="voucherCreateDrawer-{{ $type }}" title="New {{ $label }}" scroll style="--bs-offcanvas-width: min(760px, 92vw);">
+            @include('modules.accounting.vouchers._form', ['embedded' => true])
+        </x-ui.drawer>
+
+        @if ($errors->any())
+            @push('scripts')
+                <script>
+                    $(function () {
+                        new bootstrap.Offcanvas(document.getElementById('voucherCreateDrawer-{{ $type }}')).show();
+                    });
+                </script>
+            @endpush
+        @endif
+    @endif
 @endsection
 
 @push('styles')
