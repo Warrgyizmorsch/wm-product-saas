@@ -470,6 +470,7 @@
                 </div>
 
                 <script src="{{ asset('assets/js/global-search.js') }}" defer></script>
+                <script src="{{ asset('assets/js/approval-center.js') }}" defer></script>
 
                 @include('partials.duralux.language-switcher')
                 {{-- Currency is auto-resolved from tenant settings via SetCurrency middleware. --}}
@@ -500,29 +501,24 @@
                     </a>
                 </div>
 
-                <div class="dropdown nxl-h-item">
-                    <a href="javascript:void(0);" class="nxl-head-link me-0" data-bs-toggle="dropdown" role="button" data-bs-auto-close="outside">
+                <div class="dropdown nxl-h-item" id="header-approvals-dropdown">
+                    <a href="javascript:void(0);" class="nxl-head-link me-0" data-bs-toggle="dropdown" role="button" data-bs-auto-close="outside" id="header-approvals-trigger" title="{{ __('ui.approvals') }}">
                         <i class="feather-check-square"></i>
-                        <span class="badge bg-success nxl-h-badge">7</span>
+                        <span class="badge bg-success nxl-h-badge d-none" id="header-approvals-badge">0</span>
                     </a>
-                    <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-timesheets-menu">
-                        <div class="d-flex justify-content-between align-items-center timesheets-head">
+                    <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-timesheets-menu" style="min-width: 330px;">
+                        <div class="d-flex justify-content-between align-items-center timesheets-head px-3 py-2 border-bottom">
                             <h6 class="fw-bold text-dark mb-0">{{ __('ui.approvals') }}</h6>
-                            <a href="javascript:void(0);" class="fs-11 text-success text-end ms-auto">
-                                <i class="feather-clock"></i>
-                                <span>{{ __('ui.due_today') }}</span>
-                            </a>
+                            <span class="fs-11 text-muted text-end ms-auto" id="header-approvals-status-text"></span>
                         </div>
-                        <div class="timesheets-body erp-approval-list">
-                            @foreach (['Vendor bill over limit', 'Payroll finalization', 'Stock transfer request'] as $approval)
-                                <a href="javascript:void(0);" class="d-flex align-items-center justify-content-between py-2">
-                                    <span class="fs-12 fw-semibold text-dark">{{ $approval }}</span>
-                                    <i class="feather-chevron-right"></i>
-                                </a>
-                            @endforeach
+                        <div class="timesheets-body erp-approval-list p-0" id="header-approvals-list" style="max-height: 350px; overflow-y: auto;">
+                            <div class="text-center py-4 text-muted" id="header-approvals-loading">
+                                <span class="spinner-border spinner-border-sm text-primary me-1" role="status" aria-hidden="true"></span>
+                                <span class="fs-12">Loading approvals...</span>
+                            </div>
                         </div>
-                        <div class="text-center timesheets-footer">
-                            <a href="javascript:void(0);" class="fs-13 fw-semibold text-dark">{{ __('ui.all_approvals') }}</a>
+                        <div class="text-center timesheets-footer py-2 border-top" id="header-approvals-footer">
+                            <span class="fs-12 text-muted fw-semibold" id="header-approvals-footer-text">{{ __('ui.approvals') }}</span>
                         </div>
                     </div>
                 </div>
