@@ -48,6 +48,15 @@ class HelpdeskTicketController extends Controller
         $files = $request->file('attachments');
         $ticket = $this->ticketRepository->createTicket($request->all(), $files);
 
+        // Send Notification to HR / Support Admins
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: "New Ticket #{$ticket->ticket_number}",
+            message: "Ticket created: {$ticket->subject}",
+            actionUrl: route('hrms.helpdesk.tickets.show', $ticket->id),
+            type: 'helpdesk_ticket',
+            iconClass: 'feather-help-circle'
+        );
+
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
             ->with('success', "Helpdesk Ticket #{$ticket->ticket_number} created successfully.");
     }
@@ -107,6 +116,29 @@ class HelpdeskTicketController extends Controller
         $files = $request->file('attachments');
         $this->ticketRepository->addReply($ticket, $request->all(), $files);
 
+        // Trigger Notification on Reply
+        if (!$request->boolean('is_internal_note')) {
+            if ($canManage && $ticket->employee) {
+                \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                    employee: $ticket->employee,
+                    title: "Reply on Ticket #{$ticket->ticket_number}",
+                    message: "Support staff replied to your ticket: {$ticket->subject}",
+                    actionUrl: route('hrms.helpdesk.tickets.show', $ticket->id),
+                    type: 'helpdesk_reply',
+                    iconClass: 'feather-message-square'
+                );
+            } elseif ($ticket->assignedAgent) {
+                \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                    employee: $ticket->assignedAgent,
+                    title: "User replied on Ticket #{$ticket->ticket_number}",
+                    message: "New message on ticket {$ticket->ticket_number}",
+                    actionUrl: route('hrms.helpdesk.tickets.show', $ticket->id),
+                    type: 'helpdesk_reply',
+                    iconClass: 'feather-message-square'
+                );
+            }
+        }
+
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
             ->with('success', $request->boolean('is_internal_note') ? 'Internal note added.' : 'Reply posted successfully.');
     }
@@ -128,6 +160,19 @@ class HelpdeskTicketController extends Controller
             $request->input('assigned_to'),
             $request->input('priority')
         );
+
+        // Notify employee on status change
+        if ($ticket->employee) {
+            $statusLabel = ucfirst(str_replace('_', ' ', $request->input('status')));
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employee: $ticket->employee,
+                title: "Ticket #{$ticket->ticket_number} Updated",
+                message: "Your ticket status has been updated to {$statusLabel}.",
+                actionUrl: route('hrms.helpdesk.tickets.show', $ticket->id),
+                type: 'helpdesk_status',
+                iconClass: 'feather-check-circle'
+            );
+        }
 
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
             ->with('success', 'Ticket updated successfully.');

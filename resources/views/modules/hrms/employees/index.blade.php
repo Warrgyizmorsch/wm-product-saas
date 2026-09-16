@@ -793,6 +793,12 @@
                 <form action="{{ route('hrms.employees.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <input type="hidden" name="form_mode" value="create">
+                    @if(request('convert_offer_id'))
+                        <input type="hidden" name="convert_offer_id" value="{{ request('convert_offer_id') }}">
+                    @endif
+                    @if(request('account_id'))
+                        <input type="hidden" name="account_id" value="{{ request('account_id') }}">
+                    @endif
                     <div class="modal-body p-4">
                         @include('modules.hrms.employees.form-fields', ['mode' => 'create'])
                     </div>
@@ -1411,6 +1417,49 @@
             if (formMode === 'edit') {
                 initModalSelects(editEmployeeModal);
                 bootstrap.Modal.getOrCreateInstance(editEmployeeModal).show();
+            }
+
+            @php
+                $convertDept = isset($convertOffer) ? $convertOffer->department : null;
+                $hrEmp = auth()->user()?->employee;
+                $candObj = isset($convertOffer) ? $convertOffer->application?->candidate : null;
+
+                $convertOfferPayload = (isset($convertOffer) && $convertOffer) ? [
+                    'user_id' => request('user_id'),
+                    'full_name' => $candObj?->full_name,
+                    'personal_email' => $candObj?->email,
+                    'personal_mobile_number' => $candObj?->phone,
+                    'company_id' => $convertDept?->company_id ?? $hrEmp?->company_id,
+                    'business_unit_id' => $convertDept?->business_unit_id ?? $hrEmp?->business_unit_id,
+                    'branch_id' => $convertDept?->branch_id ?? $hrEmp?->branch_id,
+                    'department_id' => $convertOffer->offered_department_id,
+                    'designation_id' => $convertOffer->offered_designation_id,
+                    'date_of_joining' => optional($convertOffer->joining_date)->format('Y-m-d'),
+                    'resume_path' => $candObj?->resume_path,
+                ] : null;
+            @endphp
+
+            const convertOfferData = @json($convertOfferPayload);
+
+            if (convertOfferData && addEmployeeModal) {
+                if (convertOfferData.full_name) $('#create_full_name').val(convertOfferData.full_name);
+                if (convertOfferData.personal_email) $('#create_personal_email').val(convertOfferData.personal_email);
+                if (convertOfferData.personal_mobile_number) $('#create_personal_mobile_number').val(convertOfferData.personal_mobile_number);
+                if (convertOfferData.user_id && $('#create_user_id').length) $('#create_user_id').val(convertOfferData.user_id).trigger('change');
+                if (convertOfferData.company_id && $('#create_company_id').length) $('#create_company_id').val(convertOfferData.company_id).trigger('change');
+                if (convertOfferData.business_unit_id && $('#create_business_unit_id').length) $('#create_business_unit_id').attr('data-selected-value', convertOfferData.business_unit_id).val(convertOfferData.business_unit_id).trigger('change');
+                if (convertOfferData.branch_id && $('#create_branch_id').length) $('#create_branch_id').attr('data-selected-value', convertOfferData.branch_id).val(convertOfferData.branch_id).trigger('change');
+                if (convertOfferData.department_id && $('#create_department_id').length) $('#create_department_id').attr('data-selected-value', convertOfferData.department_id).val(convertOfferData.department_id).trigger('change');
+                if (convertOfferData.designation_id && $('#create_designation_id').length) $('#create_designation_id').attr('data-selected-value', convertOfferData.designation_id).val(convertOfferData.designation_id).trigger('change');
+                if (convertOfferData.date_of_joining && $('#create_date_of_joining').length) $('#create_date_of_joining').val(convertOfferData.date_of_joining);
+                if (convertOfferData.resume_path && $('#create_existing_resume_path').length) {
+                    $('#create_existing_resume_path').val(convertOfferData.resume_path);
+                    $('#create_resume_preview_link').attr('href', '{{ asset("storage") }}/' + convertOfferData.resume_path);
+                    $('#create_resume_preview_container').removeClass('d-none');
+                }
+
+                initModalSelects(addEmployeeModal);
+                bootstrap.Modal.getOrCreateInstance(addEmployeeModal).show();
             }
 
             const employeeIndexUrl = @json(route('hrms.employees.index'));

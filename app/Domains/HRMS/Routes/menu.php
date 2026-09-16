@@ -78,6 +78,10 @@ return [
     ],
     ['section' => 'hrms', 'order' => 120, 'label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index'],
     [
+        'section' => 'hrms', 'order' => 125, 'permission' => ['hrms.recruitment.view', 'hrms.recruitment.manage', 'hr.settings.manage'],
+        'label' => 'Recruitment', 'icon' => 'feather-user-check', 'route' => 'hrms.recruitment.index',
+    ],
+    [
         'section' => 'hrms', 'order' => 130,
         'label' => 'Helpdesk', 'icon' => 'feather-life-buoy',
         'children' => [

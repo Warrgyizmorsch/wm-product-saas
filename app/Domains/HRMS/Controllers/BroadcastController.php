@@ -230,7 +230,16 @@ class BroadcastController extends Controller
         $validated['send_push'] = $request->boolean('send_push');
         $validated['show_banner'] = $request->boolean('show_banner', true);
 
-        $this->broadcastService->createBroadcast($validated);
+        $broadcast = $this->broadcastService->createBroadcast($validated);
+
+        // Notify all active employees
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToAllEmployees(
+            title: "Announcement: {$validated['title']}",
+            message: \Illuminate\Support\Str::limit(strip_tags($validated['content']), 100),
+            actionUrl: route('hrms.broadcasts.index'),
+            type: 'broadcast',
+            iconClass: 'feather-volume-2'
+        );
 
         return redirect()->route('hrms.broadcasts.index')
             ->with('success', 'Broadcast announcement created successfully.');

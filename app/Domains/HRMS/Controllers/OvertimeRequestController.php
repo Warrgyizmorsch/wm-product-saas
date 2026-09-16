@@ -87,6 +87,14 @@ class OvertimeRequestController extends Controller
 
         $this->overtimeRepository->storeOvertimeRequest($validated, $request);
 
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: 'New Overtime Request',
+            message: "{$employee->full_name} submitted an overtime request for {$durationHours} hrs.",
+            actionUrl: route('hrms.overtime.index'),
+            type: 'overtime_request',
+            iconClass: 'feather-clock'
+        );
+
         return redirect()->back()->with('success', __('hrms.overtime.submitted_successfully'));
     }
 
@@ -131,6 +139,17 @@ class OvertimeRequestController extends Controller
             'rejection_reason'        => $reason,
             'approved_duration_hours' => $approvedHours,
         ], $request);
+
+        if ($overtimeRequest->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $overtimeRequest->employee_id,
+                title: 'Overtime Request ' . ucfirst($action),
+                message: "Your overtime request for {$overtimeRequest->date} has been {$action}.",
+                actionUrl: route('hrms.overtime.index'),
+                type: 'overtime_' . $action,
+                iconClass: $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle'
+            );
+        }
 
         return redirect()->back()->with('success', __('hrms.overtime.status_updated'));
     }
