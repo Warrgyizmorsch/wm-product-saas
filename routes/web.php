@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BranchSwitchController;
 use App\Http\Controllers\CompanySwitchController;
+use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\TenantSwitchController;
 use Illuminate\Support\Facades\Route;
@@ -45,6 +46,9 @@ Route::middleware(['tenant'])->group(function (): void {
         Route::get('/dashboard', function () {
             return view('dashboard');
         })->name('dashboard');
+
+        Route::get('/global-search', [GlobalSearchController::class, 'search'])
+            ->name('global-search');
 
         Route::middleware(['module.access'])->group(function (): void {
             foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/web.php'))) as $moduleRoutes) {

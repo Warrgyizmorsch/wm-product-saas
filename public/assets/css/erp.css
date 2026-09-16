@@ -1420,3 +1420,39 @@ a.btn:active {
     80% { transform: scale(1.15); }
     100% { transform: scale(1); opacity: 1; }
 }
+
+/* ==========================================================================
+   Global Intelligence Search
+   ========================================================================== */
+.global-search-item {
+    transition: background-color 0.15s ease-in-out;
+}
+.global-search-item:hover,
+.global-search-item.global-search-selected {
+    background-color: #f1f5f9 !important;
+}
+.search-spin-animate {
+    display: inline-block;
+    animation: search-spin 0.8s linear infinite;
+}
+@keyframes search-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.search-kbd-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #0f172a !important;
+    background-color: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+    vertical-align: middle;
+    margin: 0 2px;
+}
