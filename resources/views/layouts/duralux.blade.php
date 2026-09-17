@@ -28,6 +28,10 @@
             }
         })();
         (function () {
+            var savedSkin = localStorage.getItem('app-skin-dark') || localStorage.getItem('app-skin');
+            if (savedSkin === 'app-skin-dark') {
+                document.documentElement.classList.add('app-skin-dark');
+            }
             var savedColor = localStorage.getItem('erp_primary_color');
             if (savedColor) {
                 document.documentElement.style.setProperty('--bs-primary', savedColor);
@@ -61,6 +65,9 @@
     <style>
         .nxl-container .nxl-content .main-content {
             padding: 10px !important;
+        }
+        .dark-light-theme .light-button {
+            display: none;
         }
     </style>
     @stack('styles')
@@ -221,6 +228,38 @@
                     localStorage.setItem('erp_primary_color', color);
                 });
             }
+        });
+
+        // Dark / Light Mode Toggle Handler
+        $(document).ready(function () {
+            function syncThemeUI(isDark) {
+                if (isDark) {
+                    $('.dark-button').hide().addClass('active');
+                    $('.light-button').show().removeClass('active');
+                } else {
+                    $('.light-button').hide().removeClass('active');
+                    $('.dark-button').show().removeClass('active');
+                }
+            }
+
+            var initialDark = $('html').hasClass('app-skin-dark');
+            syncThemeUI(initialDark);
+
+            $(document).on('click', '.dark-button', function (e) {
+                e.preventDefault();
+                $('html').addClass('app-skin-dark');
+                localStorage.setItem('app-skin-dark', 'app-skin-dark');
+                localStorage.setItem('app-skin', 'app-skin-dark');
+                syncThemeUI(true);
+            });
+
+            $(document).on('click', '.light-button', function (e) {
+                e.preventDefault();
+                $('html').removeClass('app-skin-dark');
+                localStorage.setItem('app-skin-dark', 'app-skin-light');
+                localStorage.setItem('app-skin', 'app-skin-light');
+                syncThemeUI(false);
+            });
         });
 
         // Generic Quick Create Master Dropdown handler (Supports Single & Multiselect)

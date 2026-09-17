@@ -18,12 +18,12 @@
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('production.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_start') ?? 'Start Date' }}</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_start') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date_start" :value="request('date_start', now()->subMonth()->toDateString())" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_end') ?? 'End Date' }}</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.date_end') }}</label>
                             <x-ui.odoo-form-ui type="input" inputType="date" name="date_end" :value="request('date_end', now()->toDateString())" />
                         </div>
 

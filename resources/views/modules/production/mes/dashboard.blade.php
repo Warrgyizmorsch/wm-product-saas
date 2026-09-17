@@ -521,11 +521,11 @@
                                                                 @if($isQcRequired)
                                                                     @if($pendingQcQty > 0)
                                                                         <button type="button"
-                                                                            class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
+                                                                            class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
                                                                             data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
                                                                             title="Run Quality Inspection on Received Subcontract Goods">
                                                                             <i class="feather-shield-check fs-11"></i>Run QC
-                                                                            ({{ number_format($pendingQcQty, 0) }})
+                                                                            <span class="btn-badge-count">{{ number_format($pendingQcQty, 0) }}</span>
                                                                         </button>
                                                                     @elseif($isCompleted)
                                                                         <span
@@ -543,11 +543,11 @@
                                                                 @endif
                                                                 @if($rejectedQty > 0)
                                                                     <button type="button"
-                                                                        class="btn btn-xs btn-danger text-white fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
+                                                                        class="btn btn-xs btn-danger text-white fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
                                                                         data-bs-toggle="modal" data-bs-target="#dispositionModal{{ $op->id }}"
                                                                         title="Disposition Rejected Qty">
                                                                         <i class="feather-alert-triangle fs-11"></i>Rework / Scrap
-                                                                        ({{ number_format($rejectedQty, 0) }})
+                                                                        <span class="btn-badge-count">{{ number_format($rejectedQty, 0) }}</span>
                                                                     </button>
                                                                 @endif
                                                             </div>
@@ -638,11 +638,11 @@
                                                                 @if($isQcRequired)
                                                                     @if($pendingQcQty > 0)
                                                                         <button type="button"
-                                                                            class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
+                                                                            class="btn btn-xs btn-warning text-dark fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
                                                                             data-bs-toggle="modal" data-bs-target="#qcModal{{ $op->id }}"
                                                                             title="Run Quality Inspection">
                                                                             <i class="feather-shield-check fs-11"></i>Run QC
-                                                                            ({{ number_format($pendingQcQty, 0) }})
+                                                                            <span class="btn-badge-count">{{ number_format($pendingQcQty, 0) }}</span>
                                                                         </button>
                                                                     @elseif($isCompleted)
                                                                         <span
@@ -660,11 +660,11 @@
                                                                 @endif
                                                                 @if($rejectedQty > 0)
                                                                     <button type="button"
-                                                                        class="btn btn-xs btn-danger text-white fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap"
+                                                                        class="btn btn-xs btn-danger text-white fw-bold p-1 px-1.5 fs-10 d-inline-flex align-items-center gap-1 shadow-sm text-nowrap btn-badge-container"
                                                                         data-bs-toggle="modal" data-bs-target="#dispositionModal{{ $op->id }}"
                                                                         title="Disposition Rejected Qty">
                                                                         <i class="feather-alert-triangle fs-11"></i>Rework / Scrap
-                                                                        ({{ number_format($rejectedQty, 0) }})
+                                                                        <span class="btn-badge-count">{{ number_format($rejectedQty, 0) }}</span>
                                                                     </button>
                                                                 @endif
                                                             </div>
@@ -1168,15 +1168,51 @@
                                             {{ number_format($activePendingQcQty, 0) }}</span>
                                     </div>
 
+                                    @php
+                                        $selectedPlanId = null;
+                                        // 1. Prioritize source product quality plan if operation processes an SFG
+                                        if ($activeOp->source_product_id) {
+                                            foreach ($qualityPlans ?? [] as $qp) {
+                                                if ($qp->product_id == $activeOp->source_product_id) {
+                                                    $selectedPlanId = $qp->id;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        // 2. Prioritize in_process quality plan for order finished good
+                                        if (!$selectedPlanId) {
+                                            foreach ($qualityPlans ?? [] as $qp) {
+                                                if ($qp->product_id == $order->product_id && ($qp->type ?? '') === 'in_process') {
+                                                    $selectedPlanId = $qp->id;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        // 3. Match any plan for order finished good
+                                        if (!$selectedPlanId) {
+                                            foreach ($qualityPlans ?? [] as $qp) {
+                                                if ($qp->product_id == $order->product_id) {
+                                                    $selectedPlanId = $qp->id;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        // 4. Default to first available plan
+                                        if (!$selectedPlanId && count($qualityPlans ?? []) > 0) {
+                                            $selectedPlanId = $qualityPlans->first()->id;
+                                        }
+                                    @endphp
+
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <x-ui.odoo-form-ui type="select" label="Quality Plan" name="quality_plan_id"
                                                 id="quality_plan_id_{{ $activeOp->id }}" class="quality-plan-select"
                                                 data-op-id="{{ $activeOp->id }}" :required="true">
-                                                <option value="">-- Standard In-Process Quality Plan --</option>
+                                                <option value="">-- Select Quality Plan --</option>
                                                 @foreach($qualityPlans as $qp)
-                                                    <option value="{{ $qp->id }}">{{ $qp->name }}
-                                                        ({{ strtoupper($qp->type ?? 'in_process') }})</option>
+                                                    <option value="{{ $qp->id }}" @selected($selectedPlanId == $qp->id)>
+                                                        {{ $qp->name }} ({{ strtoupper($qp->type ?? 'in_process') }})
+                                                    </option>
                                                 @endforeach
                                             </x-ui.odoo-form-ui>
                                         </div>
@@ -1195,27 +1231,63 @@
                                             <label class="form-label fw-semibold fs-11 text-uppercase text-dark mb-1"><i
                                                     class="feather-check-square text-primary me-1"></i>Quality Specification Checklist
                                                 Parameters</label>
-                                            <div class="p-2.5 border rounded bg-light fs-11"
+                                            <div class="p-3 border rounded bg-light fs-11"
                                                 id="qualityChecklistContainer_{{ $activeOp->id }}">
-                                                <div class="form-check mb-1.5">
-                                                    <input class="form-check-input" type="checkbox" checked
-                                                        id="chkVisual{{ $activeOp->id }}">
-                                                    <label class="form-check-label fw-medium" for="chkVisual{{ $activeOp->id }}">Visual
-                                                        Surface Finish & Coating Inspection (Pass)</label>
+                                                {{-- Standard Fallback Checklist (Uses odoo-form-ui) --}}
+                                                <div class="qc-plan-group" id="qc_plan_group_{{ $activeOp->id }}_none" style="{{ empty($selectedPlanId) ? '' : 'display: none;' }}">
+                                                    <x-ui.odoo-form-ui type="checkbox" label="Visual Finish" name="parameter_values[visual]" value="pass" placeholder="Visual Surface Finish & Coating Inspection (Pass)" :checked="true" :disabled="!empty($selectedPlanId)" />
+                                                    <x-ui.odoo-form-ui type="checkbox" label="Dimensional Spec" name="parameter_values[dimensional]" value="pass" placeholder="Dimensional & Thickness Tolerance Within Specification (Pass)" :checked="true" :disabled="!empty($selectedPlanId)" />
+                                                    <x-ui.odoo-form-ui type="checkbox" label="Structural Test" name="parameter_values[structural]" value="pass" placeholder="Assembly & Structural Integrity Test (Pass)" :checked="true" :disabled="!empty($selectedPlanId)" />
                                                 </div>
-                                                <div class="form-check mb-1.5">
-                                                    <input class="form-check-input" type="checkbox" checked
-                                                        id="chkDim{{ $activeOp->id }}">
-                                                    <label class="form-check-label fw-medium"
-                                                        for="chkDim{{ $activeOp->id }}">Dimensional & Thickness Tolerance Within
-                                                        Specification (Pass)</label>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" checked
-                                                        id="chkFunc{{ $activeOp->id }}">
-                                                    <label class="form-check-label fw-medium" for="chkFunc{{ $activeOp->id }}">Assembly
-                                                        & Structural Integrity Test (Pass)</label>
-                                                </div>
+
+                                                {{-- Dynamic Quality Plan Checklist Parameters (All using odoo-form-ui) --}}
+                                                @foreach($qualityPlans as $qp)
+                                                    @php
+                                                        $isThisPlanActive = ($selectedPlanId == $qp->id);
+                                                    @endphp
+                                                    <div class="qc-plan-group" id="qc_plan_group_{{ $activeOp->id }}_{{ $qp->id }}" style="{{ $isThisPlanActive ? '' : 'display: none;' }}">
+                                                        @forelse($qp->parameters as $param)
+                                                            @php
+                                                                $uom = $param->unit_of_measure ?? '';
+                                                                $hasMin = $param->min_value !== null && $param->min_value !== '';
+                                                                $hasMax = $param->max_value !== null && $param->max_value !== '';
+                                                                $specInfo = ($hasMin || $hasMax) ? ' [Spec: ' . ($hasMin ? $param->min_value : '') . ' - ' . ($hasMax ? $param->max_value : '') . ($uom ? ' ' . $uom : '') . ']' : ($uom ? ' (' . $uom . ')' : '');
+                                                                $paramLabel = $param->name . $specInfo;
+                                                                $measuredPlaceholder = 'Enter measured value' . ($uom ? ' (' . $uom . ')' : '');
+                                                            @endphp
+                                                            @if($param->type === 'numeric')
+                                                                <x-ui.odoo-form-ui type="input" inputType="number" step="any"
+                                                                    label="{{ $paramLabel }}"
+                                                                    name="parameter_values[{{ $param->id }}]"
+                                                                    id="param_{{ $activeOp->id }}_{{ $param->id }}"
+                                                                    :placeholder="$measuredPlaceholder"
+                                                                    :required="$param->is_mandatory"
+                                                                    :disabled="!$isThisPlanActive" />
+                                                            @elseif($param->type === 'text')
+                                                                <x-ui.odoo-form-ui type="input" inputType="text"
+                                                                    label="{{ $paramLabel }}"
+                                                                    name="parameter_values[{{ $param->id }}]"
+                                                                    id="param_{{ $activeOp->id }}_{{ $param->id }}"
+                                                                    placeholder="Enter observation / inspection notes..."
+                                                                    :required="$param->is_mandatory"
+                                                                    :disabled="!$isThisPlanActive" />
+                                                            @else
+                                                                <x-ui.odoo-form-ui type="checkbox"
+                                                                    label="{{ $param->name }}"
+                                                                    name="parameter_values[{{ $param->id }}]"
+                                                                    id="param_{{ $activeOp->id }}_{{ $param->id }}"
+                                                                    value="pass"
+                                                                    placeholder="{{ $param->name }} (Pass)"
+                                                                    :checked="true"
+                                                                    :disabled="!$isThisPlanActive" />
+                                                            @endif
+                                                        @empty
+                                                            <div class="text-muted fs-12 py-1">
+                                                                <i class="feather-info text-primary me-1"></i> Quality Plan <strong>{{ $qp->name }}</strong> has no custom checklist parameters configured.
+                                                            </div>
+                                                        @endforelse
+                                                    </div>
+                                                @endforeach
                                             </div>
                                         </div>
 
@@ -1488,6 +1560,39 @@
                     const opId = container.id.replace('qualityChecklistContainer_', '');
                     const planId = selectEl.value;
 
+                    // Toggle pre-rendered odoo-form-ui parameter groups
+                    const allGroups = container.querySelectorAll('.qc-plan-group');
+                    if (allGroups.length > 0) {
+                        allGroups.forEach(group => {
+                            group.style.display = 'none';
+                            group.querySelectorAll('input, select, textarea').forEach(input => {
+                                input.disabled = true;
+                            });
+                        });
+
+                        const targetGroup = planId
+                            ? container.querySelector('#qc_plan_group_' + opId + '_' + planId)
+                            : container.querySelector('#qc_plan_group_' + opId + '_none');
+
+                        if (targetGroup) {
+                            targetGroup.style.display = 'block';
+                            targetGroup.querySelectorAll('input, select, textarea').forEach(input => {
+                                input.disabled = false;
+                            });
+                            return;
+                        }
+
+                        const fallback = container.querySelector('#qc_plan_group_' + opId + '_none');
+                        if (fallback) {
+                            fallback.style.display = 'block';
+                            fallback.querySelectorAll('input, select, textarea').forEach(input => {
+                                input.disabled = false;
+                            });
+                            return;
+                        }
+                    }
+
+                    // Dynamic fallback using identical odoo-form-ui structure
                     const plan = qualityPlansMap[planId];
                     if (plan && plan.parameters && plan.parameters.length > 0) {
                         let html = '';
@@ -1496,32 +1601,41 @@
                             const uom = param.unit_of_measure || param.uom || '';
                             const hasMin = param.min_value !== null && param.min_value !== undefined && param.min_value !== '';
                             const hasMax = param.max_value !== null && param.max_value !== undefined && param.max_value !== '';
-                            const minMaxStr = (hasMin || hasMax)
-                                ? `<span class="badge bg-soft-info text-info fs-10 ms-1">Spec: ${hasMin ? param.min_value : ''} - ${hasMax ? param.max_value : ''} ${uom}</span>`
-                                : '';
+                            const specInfo = (hasMin || hasMax) ? ` [Spec: ${hasMin ? param.min_value : ''} - ${hasMax ? param.max_value : ''} ${uom}]` : (uom ? ` (${uom})` : '');
+                            const label = `${param.name}${specInfo}`;
 
                             if (param.type === 'numeric') {
                                 html += `
-                                <div class="mb-2 p-2 border rounded bg-white">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <label class="form-label fw-semibold fs-11 text-dark mb-0">${param.name} ${isMandatory}</label>
-                                        ${minMaxStr}
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">
+                                        ${label} ${isMandatory}
+                                    </label>
+                                    <div class="flex-grow-1">
+                                        <input type="number" step="any" class="odoo-form-control" name="parameter_values[${param.id}]" id="param_${opId}_${param.id}" placeholder="Enter measured value (${uom})" ${param.is_mandatory ? 'required' : ''}>
                                     </div>
-                                    <input type="number" step="any" class="form-control form-control-sm" name="parameter_values[${param.id}]" placeholder="Enter measured value (${uom})" ${param.is_mandatory ? 'required' : ''}>
                                 </div>
                             `;
                             } else if (param.type === 'text') {
                                 html += `
-                                <div class="mb-2 p-2 border rounded bg-white">
-                                    <label class="form-label fw-semibold fs-11 text-dark mb-1">${param.name} ${isMandatory}</label>
-                                    <input type="text" class="form-control form-control-sm" name="parameter_values[${param.id}]" placeholder="Enter observation / inspection notes..." ${param.is_mandatory ? 'required' : ''}>
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">
+                                        ${label} ${isMandatory}
+                                    </label>
+                                    <div class="flex-grow-1">
+                                        <input type="text" class="odoo-form-control" name="parameter_values[${param.id}]" id="param_${opId}_${param.id}" placeholder="Enter observation / inspection notes..." ${param.is_mandatory ? 'required' : ''}>
+                                    </div>
                                 </div>
                             `;
                             } else {
                                 html += `
-                                <div class="form-check mb-1.5 p-2 border rounded bg-white ms-0 ps-4">
-                                    <input class="form-check-input ms--3" type="checkbox" checked name="parameter_values[${param.id}]" value="pass" id="param_${opId}_${param.id}">
-                                    <label class="form-check-label fw-medium fs-11" for="param_${opId}_${param.id}">${param.name} (Pass)</label>
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">${param.name}</label>
+                                    <div class="flex-grow-1">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" checked name="parameter_values[${param.id}]" value="pass" id="param_${opId}_${param.id}">
+                                            <label class="form-check-label" for="param_${opId}_${param.id}">${param.name} (Pass)</label>
+                                        </div>
+                                    </div>
                                 </div>
                             `;
                             }
@@ -1529,17 +1643,32 @@
                         container.innerHTML = html;
                     } else {
                         container.innerHTML = `
-                        <div class="form-check mb-1.5">
-                            <input class="form-check-input" type="checkbox" checked id="chkVisual${opId}">
-                            <label class="form-check-label fw-medium" for="chkVisual${opId}">Visual Surface Finish & Coating Inspection (Pass)</label>
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label" for="chkVisual${opId}">Visual Finish</label>
+                            <div class="flex-grow-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[visual]" value="pass" id="chkVisual${opId}">
+                                    <label class="form-check-label" for="chkVisual${opId}">Visual Surface Finish & Coating Inspection (Pass)</label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-check mb-1.5">
-                            <input class="form-check-input" type="checkbox" checked id="chkDim${opId}">
-                            <label class="form-check-label fw-medium" for="chkDim${opId}">Dimensional & Thickness Tolerance Within Specification (Pass)</label>
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label" for="chkDim${opId}">Dimensional Spec</label>
+                            <div class="flex-grow-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[dimensional]" value="pass" id="chkDim${opId}">
+                                    <label class="form-check-label" for="chkDim${opId}">Dimensional & Thickness Tolerance Within Specification (Pass)</label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" checked id="chkFunc${opId}">
-                            <label class="form-check-label fw-medium" for="chkFunc${opId}">Assembly & Structural Integrity Test (Pass)</label>
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label" for="chkFunc${opId}">Structural Test</label>
+                            <div class="flex-grow-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[structural]" value="pass" id="chkFunc${opId}">
+                                    <label class="form-check-label" for="chkFunc${opId}">Assembly & Structural Integrity Test (Pass)</label>
+                                </div>
+                            </div>
                         </div>
                     `;
                     }

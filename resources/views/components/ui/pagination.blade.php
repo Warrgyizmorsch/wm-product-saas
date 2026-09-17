@@ -67,6 +67,35 @@
             font-size: 12px;
             color: #64748b;
         }
+
+        /* Dark Mode Support */
+        html.app-skin-dark .erp-pagination-container {
+            border-top-color: #1b2436 !important;
+        }
+        html.app-skin-dark .erp-pagination .page-link {
+            border-color: #283c50 !important;
+            background-color: #1c2438 !important;
+            color: #cbd5e1 !important;
+        }
+        html.app-skin-dark .erp-pagination .page-link:hover {
+            background-color: color-mix(in srgb, var(--bs-primary) 20%, #1c2438) !important;
+            border-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+        }
+        html.app-skin-dark .erp-pagination .page-item.active .page-link {
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 10px color-mix(in srgb, var(--bs-primary) 35%, transparent) !important;
+        }
+        html.app-skin-dark .erp-pagination .page-item.disabled .page-link {
+            background-color: #121a2d !important;
+            border-color: #1b2436 !important;
+            color: #475569 !important;
+        }
+        html.app-skin-dark .erp-pagination-info {
+            color: #94a3b8 !important;
+        }
     </style>
 @endonce
 

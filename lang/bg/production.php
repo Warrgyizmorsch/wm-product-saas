@@ -1259,6 +1259,8 @@ return [
     'print_report' => 'Разпечатай доклада',
     'period_start' => 'Начало на периода',
     'period_end' => 'Край на периода',
+    'date_start' => 'Начална дата',
+    'date_end' => 'Крайна дата',
     'generated_at' => 'Генериран на',
     'total_units' => 'Общо единици',
     'downtime_events_log' => 'Лог на събитията за престой',

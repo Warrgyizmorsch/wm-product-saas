@@ -43,6 +43,19 @@
                 transform: none !important;
                 margin-top: 4px !important;
             }
+
+            /* Dark Mode Support */
+            html.app-skin-dark .action-dropdown-btn {
+                border-color: #283c50 !important;
+                background-color: #1c2438 !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .action-dropdown-btn:hover,
+            html.app-skin-dark .action-dropdown-btn.active {
+                background-color: color-mix(in srgb, var(--bs-primary) 25%, #1c2438) !important;
+                border-color: var(--bs-primary) !important;
+                color: #ffffff !important;
+            }
         </style>
     @endpush
 @endonce

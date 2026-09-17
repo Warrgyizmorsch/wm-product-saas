@@ -56,6 +56,42 @@
                 border-color: #94a3b8 !important;
                 color: #0f172a !important;
             }
+
+            /* Dark Mode Support */
+            html.app-skin-dark .erp-icon-btn--transparent-dark {
+                background-color: #1c2438 !important;
+                border-color: #283c50 !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .erp-icon-btn--transparent-dark:hover,
+            html.app-skin-dark .erp-icon-btn--transparent-dark:focus,
+            html.app-skin-dark .erp-icon-btn--transparent-dark:active {
+                background-color: #283c50 !important;
+                border-color: #475569 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .erp-icon-btn--light {
+                background-color: #1c2438 !important;
+                border-color: #283c50 !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .erp-icon-btn--light:hover,
+            html.app-skin-dark .erp-icon-btn--light:focus {
+                background-color: #283c50 !important;
+                border-color: #334155 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .erp-icon-btn--secondary {
+                background-color: rgba(148, 163, 184, 0.12) !important;
+                border-color: rgba(148, 163, 184, 0.25) !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .erp-icon-btn--secondary:hover,
+            html.app-skin-dark .erp-icon-btn--secondary:focus {
+                background-color: #334155 !important;
+                border-color: #475569 !important;
+                color: #ffffff !important;
+            }
         </style>
     @endpush
 @endonce
