@@ -58,17 +58,53 @@ class ShiftChangeRequestApiController extends Controller
     }
 
 
+    /**
+     * Helper to check if current user is HR Admin / Roster Manager.
+     */
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return (bool) (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage')
+        );
+    }
+
+    /**
+     * Helper to resolve current authenticated user's employee record.
+     */
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)->first()
+            ?? Employee::where(function ($q) use ($user) {
+                $q->where('office_email', $user->email)
+                  ->orWhere('personal_email', $user->email);
+            })->first();
+    }
+
     public function summary(): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        $employee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
 
         $query = ShiftChangeRequest::query();
+        if (!$isHrAdmin) {
+            $query->where('employee_id', $employee?->id ?? 0);
+        }
 
         $totalRequests   = (clone $query)->count();
         $pendingRequests = (clone $query)->where('status', 'pending')->count();
@@ -100,10 +136,17 @@ class ShiftChangeRequestApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
         $shiftChangeRequest = ShiftChangeRequest::with(['employee', 'currentShift', 'requestedShift', 'approvedByEmployee'])->find($id);
 
         if (!$shiftChangeRequest) {
             return $this->sendError("Shift Change request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isHrAdmin && $shiftChangeRequest->employee_id !== $employee?->id) {
+            return $this->sendError('Unauthorized access to shift change request.', 403);
         }
 
         return $this->sendSuccess($shiftChangeRequest, 'Shift Change request details loaded');
@@ -114,8 +157,6 @@ class ShiftChangeRequestApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
-
-
 
         $validated = $request->validate([
             'employee_id'        => 'required|exists:employees,id',
@@ -129,7 +170,17 @@ class ShiftChangeRequestApiController extends Controller
             'attachment'         => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
         ]);
 
-        $employee = Employee::find($validated['employee_id']);
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError('Employee record not found.', 404);
+            }
+            $validated['employee_id'] = $employee->id;
+        } else {
+            $employee = Employee::find($validated['employee_id']);
+        }
 
         if (!$employee) {
             return $this->sendError('Employee record not found.', 404);
@@ -174,6 +225,10 @@ class ShiftChangeRequestApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Only HR Admins can update shift change request status.', 403);
+        }
+
         $shiftChangeRequest = ShiftChangeRequest::find($id);
         if (!$shiftChangeRequest) {
             return $this->sendError("Shift Change request with ID '{$id}' not found.", 404);
@@ -209,9 +264,16 @@ class ShiftChangeRequestApiController extends Controller
             return $authError;
         }
 
+        $employee = $this->getAuthenticatedEmployee();
+        $isHrAdmin = $this->isHrAdmin();
+
         $shiftChangeRequest = ShiftChangeRequest::find($id);
         if (!$shiftChangeRequest) {
             return $this->sendError("Shift Change request with ID '{$id}' not found.", 404);
+        }
+
+        if (!$isHrAdmin && $shiftChangeRequest->employee_id !== $employee?->id) {
+            return $this->sendError('Unauthorized action.', 403);
         }
 
         if ($shiftChangeRequest->status === 'approved') {

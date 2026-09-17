@@ -103,6 +103,71 @@
                     </form>
                 </div>
             </div>
+
+            <!-- Quotation Approval Policy Card -->
+            <div class="card border-0 shadow-sm rounded-3 mt-4">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <h6 class="fw-bold mb-0 text-dark">
+                        <i class="feather-check-square me-2 text-primary"></i>Quotation Approval Policy
+                    </h6>
+                    <span class="badge bg-soft-info text-info font-monospace fs-11">Approval Automation</span>
+                </div>
+                <div class="card-body p-4">
+                    <form action="{{ route('crm.settings.update-quotation-approval-policy') }}" method="POST">
+                        @csrf
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-dark fs-13">Select Quotation Approval Mode</label>
+                            <p class="text-muted fs-12 mb-3">
+                                Controls whether newly created or updated quotations require explicit approval or are auto-approved upon creation.
+                            </p>
+
+                            <div class="row g-3">
+                                <!-- Option 1: Approval Required (Standard Approval Workflow) -->
+                                <div class="col-md-12">
+                                    <div class="form-check custom-option-card border rounded p-3 @if(($quotationApprovalPolicy ?? 'approval_required') === 'approval_required') border-primary bg-soft-primary-light @endif">
+                                        <input class="form-check-input mt-1" type="radio" name="quotation_approval_policy" id="policy_approval_req" value="approval_required" @checked(($quotationApprovalPolicy ?? 'approval_required') === 'approval_required')>
+                                        <label class="form-check-label ms-2 cursor-pointer w-100" for="policy_approval_req">
+                                            <div class="d-flex align-items-center justify-content-between">
+                                                <span class="fw-bold text-dark fs-14">
+                                                    <i class="feather-shield me-1.5 text-primary"></i>Require Approval (Standard Workflow)
+                                                </span>
+                                                <span class="badge bg-soft-primary text-primary fs-11">Multi-Stage Approval</span>
+                                            </div>
+                                            <div class="text-muted fs-12 mt-1">
+                                                Quotations must start as Draft / Pending Approval and go through manager approval. All standard quotation status stages (Pending Approval, Approved, Rejected, etc.) are strictly maintained.
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Option 2: Auto-Approve (Direct Approval) -->
+                                <div class="col-md-12">
+                                    <div class="form-check custom-option-card border rounded p-3 @if(($quotationApprovalPolicy ?? 'approval_required') === 'auto_approve') border-success bg-soft-success-light @endif">
+                                        <input class="form-check-input mt-1" type="radio" name="quotation_approval_policy" id="policy_auto_approve" value="auto_approve" @checked(($quotationApprovalPolicy ?? 'approval_required') === 'auto_approve')>
+                                        <label class="form-check-label ms-2 cursor-pointer w-100" for="policy_auto_approve">
+                                            <div class="d-flex align-items-center justify-content-between">
+                                                <span class="fw-bold text-dark fs-14">
+                                                    <i class="feather-check-circle me-1.5 text-success"></i>Auto-Approve (Direct Approval)
+                                                </span>
+                                                <span class="badge bg-soft-success text-success fs-11">Fast-Track Mode</span>
+                                            </div>
+                                            <div class="text-muted fs-12 mt-1">
+                                                Bypasses manual approval. Quotations are automatically saved with status "Approved" immediately upon creation, allowing instant sharing and conversion.
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end pt-3 border-top">
+                            <button type="submit" class="btn btn-primary fw-semibold px-4">
+                                <i class="feather-save me-1.5"></i>Save Approval Policy
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <div class="col-lg-4">
@@ -116,6 +181,19 @@
                         <li class="mb-2"><strong>Order-Based:</strong> Best for prepayments, advance billing, or services.</li>
                         <li class="mb-2"><strong>Delivery-Based:</strong> Best for physical goods manufacturing & trading where billing depends on actual dispatched quantities.</li>
                         <li><strong>Flexible Mode:</strong> Recommended if your business uses a mix of both workflows.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-3 mt-4">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold text-dark mb-3"><i class="feather-help-circle me-2 text-info"></i>Approval Policy Summary</h6>
+                    <p class="text-muted fs-12 leading-relaxed mb-3">
+                        Configure quotation approval based on your sales authority structure:
+                    </p>
+                    <ul class="text-muted fs-12 ps-3 mb-0">
+                        <li class="mb-2"><strong>Standard Approval:</strong> Requires managerial check before quotes can be dispatched or accepted.</li>
+                        <li><strong>Auto-Approve:</strong> Ideal for flat teams or fast-paced sales where representatives issue quotes directly.</li>
                     </ul>
                 </div>
             </div>

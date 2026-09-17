@@ -7,6 +7,7 @@ use App\Domains\Accounting\FixedAssets\Models\AssetWriteOff;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Support\AccountCode;
 use App\Domains\HRMS\Models\Asset;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -104,10 +105,10 @@ class AssetWriteOffService
             $category = $asset->category;
             $tenantId = $asset->tenant_id;
 
-            $fixedAssetAccount = $category?->chartOfAccount ?? $this->accounts->findByCode('1500', $tenantId);
-            $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount ?? $this->accounts->findByCode('1510', $tenantId);
+            $fixedAssetAccount = $category?->chartOfAccount ?? $this->accounts->findByCode(AccountCode::FIXED_ASSETS, $tenantId);
+            $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount ?? $this->accounts->findByCode(AccountCode::ACCUMULATED_DEPRECIATION, $tenantId);
             $lossAccount = $category?->lossOnDisposalAccount
-                ?? $this->accounts->findByCode('5910', $tenantId)
+                ?? $this->accounts->findByCode(AccountCode::LOSS_ON_ASSET_DISPOSAL, $tenantId)
                 ?? $this->accounts->findByCode('5900', $tenantId);
 
             if ($fixedAssetAccount === null || $accumulatedDepreciationAccount === null || $lossAccount === null) {

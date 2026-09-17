@@ -19,6 +19,8 @@ class ProbationController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorizeHrms('hrms.employees.view');
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $today = Carbon::today();
         $in15Days = Carbon::today()->addDays(15);
@@ -114,6 +116,8 @@ class ProbationController extends Controller
 
     public function evaluate(Request $request, Employee $employee): RedirectResponse
     {
+        $this->authorizeHrms('hrms.employees.update');
+
         $validated = $request->validate([
             'performance_rating' => 'required|integer|min:1|max:5',
             'attendance_rating' => 'required|integer|min:1|max:5',
@@ -209,6 +213,8 @@ class ProbationController extends Controller
 
     public function quickConfirm(Request $request, Employee $employee): RedirectResponse
     {
+        $this->authorizeHrms('hrms.employees.update');
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $confirmationDate = $request->filled('confirmation_date') 
             ? Carbon::parse($request->input('confirmation_date'))->format('Y-m-d') 
@@ -234,5 +240,16 @@ class ProbationController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Employee {$employee->full_name} confirmed successfully.");
+    }
+
+    private function authorizeHrms(string $permission): void
+    {
+        $user = auth()->user();
+        abort_unless(
+            $user && app(\App\Services\Access\AccessService::class)->allows($user, $permission, [
+                'tenant_id' => $user->tenant_id,
+            ]),
+            403
+        );
     }
 }

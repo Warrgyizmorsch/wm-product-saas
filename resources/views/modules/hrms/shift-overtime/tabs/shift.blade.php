@@ -229,16 +229,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
-                    @if($isAdmin)
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.shift_change.employee') }}" name="employee_id" id="shift_employee_id" :required="true">
-                                <option value="">{{ __('hrms.shift_change.select_employee') }}</option>
-                                @foreach($employees as $emp)
-                                    <option value="{{ $emp->id }}" data-shift-id="{{ $emp->shift_id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        </div>
-                    @endif
+                    <input type="hidden" name="employee_id" id="shift_employee_id" value="{{ $employee ? $employee->id : '' }}">
 
                     <div class="mb-3">
                         <x-ui.odoo-form-ui type="select" label="{{ __('hrms.shift_change.change_type') }}" name="type" id="shift_change_type" :required="true">

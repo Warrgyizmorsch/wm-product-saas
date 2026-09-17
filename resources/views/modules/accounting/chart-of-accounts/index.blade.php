@@ -17,7 +17,10 @@
             <x-ui.select label="Type" name="type" :selected="$filters['type'] ?? ''" :options="
                 ['' => 'All'] + collect(\App\Domains\Accounting\Models\ChartOfAccount::TYPES)->mapWithKeys(fn ($t) => [$t => ucfirst($t)])->all()
             " />
-            <x-ui.button type="submit" variant="primary" size="sm" class="w-100">Apply</x-ui.button>
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                <x-ui.button href="{{ route('accounting.chart-of-accounts.index') }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+            </div>
         </form>
     </x-ui.filter>
     @can('create', \App\Domains\Accounting\Models\ChartOfAccount::class)
@@ -29,27 +32,12 @@
 
 @section('content')
 
-    <div class="row g-4 mb-4">
-        <div class="col-xxl-3 col-md-6">
-            <x-ui.card>
-                <span class="text-muted fs-12 text-uppercase">Total Accounts</span>
-                <h3 class="mb-0 mt-2 fw-bold text-dark">{{ $summary['total'] }}</h3>
-            </x-ui.card>
-        </div>
-        <div class="col-xxl-3 col-md-6">
-            <x-ui.card>
-                <span class="text-muted fs-12 text-uppercase">Active Accounts</span>
-                <h3 class="mb-0 mt-2 fw-bold text-dark">{{ $summary['active'] }}</h3>
-            </x-ui.card>
-        </div>
-        @foreach (['asset' => 'Assets', 'liability' => 'Liabilities', 'income' => 'Income'] as $type => $label)
-            <div class="col-xxl-2 col-md-4">
-                <x-ui.card>
-                    <span class="text-muted fs-12 text-uppercase">{{ $label }}</span>
-                    <h3 class="mb-0 mt-2 fw-bold text-dark">{{ $summary['by_type'][$type] ?? 0 }}</h3>
-                </x-ui.card>
-            </div>
-        @endforeach
+    <div class="d-flex flex-wrap gap-3 mb-4">
+        <x-ui.stat-pill icon="feather-list" :value="$summary['total']" label="Total Accounts" color="primary" />
+        <x-ui.stat-pill icon="feather-check-circle" :value="$summary['active']" label="Active Accounts" color="success" />
+        <x-ui.stat-pill icon="feather-briefcase" :value="$summary['by_type']['asset'] ?? 0" label="Assets" color="info" />
+        <x-ui.stat-pill icon="feather-credit-card" :value="$summary['by_type']['liability'] ?? 0" label="Liabilities" color="warning" />
+        <x-ui.stat-pill icon="feather-trending-up" :value="$summary['by_type']['income'] ?? 0" label="Income" color="teal" />
     </div>
 
     <x-ui.card title="Accounts" bodyClass="p-0" class="accounting-dense">

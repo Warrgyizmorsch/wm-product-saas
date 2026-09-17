@@ -56,6 +56,33 @@ class EmployeeApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.employees.manage')
+            || $user->hasHrPermission('hrms.employees.manage');
+    }
+
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)
+            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
+            ->first()
+            ?? Employee::where('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->first();
+    }
+
     /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
@@ -127,8 +154,21 @@ class EmployeeApiController extends Controller
         $status       = $request->filled('status') ? $request->string('status')->value() : null;
         $sort         = $request->string('sort')->value() ?: 'name_asc';
 
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+
         $query = Employee::query()
-            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan', 'user']);
+            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan', 'defaultShift', 'shift', 'user']);
+
+        if (!$isHrAdmin) {
+            if (!$authEmployee) {
+                return $this->sendError('Employee profile not found.', 404);
+            }
+            $query->where(function ($q) use ($authEmployee) {
+                $q->where('id', $authEmployee->id)
+                  ->orWhere('reporting_manager_id', $authEmployee->id);
+            });
+        }
 
         if ($search !== '') {
             $query->where(function ($inner) use ($search) {
@@ -176,6 +216,14 @@ class EmployeeApiController extends Controller
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $authEmployee) {
+            if ((int)$employee->id !== (int)$authEmployee->id && (int)$employee->reporting_manager_id !== (int)$authEmployee->id) {
+                return $this->sendError('Unauthorized action. You can only view your own employee profile.', 403);
+            }
+        }
+
         // Dynamically resolve Salary Structure slab based on current_salary and pay_group_id
         $salaryStructure = null;
         if ($employee->pay_group_id) {
@@ -188,7 +236,20 @@ class EmployeeApiController extends Controller
         }
 
         // Calculate components breakdown
-        $items = $salaryStructure ? $salaryStructure->items()->with('component')->get() : collect();
+        $rawItems = $salaryStructure ? $salaryStructure->items()->with('component')->get() : collect();
+        $items = $rawItems->filter(function($i) {
+            if (!$i->component) {
+                return false;
+            }
+            if (in_array($i->component->code, ['TE_RECOVERY', 'ADV_RECOVERY'])) {
+                if (!$i->component->is_adhoc) {
+                    $i->component->update(['is_adhoc' => true]);
+                }
+                return false;
+            }
+            return !$i->component->is_adhoc;
+        });
+
         $ctc = (float) $employee->current_salary;
         $computedComponents = [];
         $basicAmount = 0.0;
@@ -208,6 +269,9 @@ class EmployeeApiController extends Controller
         $balancingItem = null;
 
         foreach ($items as $item) {
+            if (!$item->component || $item->component->is_adhoc || in_array($item->component->code, ['TE_RECOVERY', 'ADV_RECOVERY'])) {
+                continue;
+            }
             $amount = 0.0;
             if ($item->calculation_type === 'fixed') {
                 $amount = (float) $item->value;
@@ -232,7 +296,7 @@ class EmployeeApiController extends Controller
             }
         }
 
-        if ($balancingItem) {
+        if ($balancingItem && $balancingItem->component && !$balancingItem->component->is_adhoc && !in_array($balancingItem->component->code, ['TE_RECOVERY', 'ADV_RECOVERY'])) {
             $balancingAmount = max(0.0, $ctc - $totalOtherEarnings);
             $computedComponents[$balancingItem->id] = [
                 'component_name' => $balancingItem->component->name,
@@ -244,10 +308,10 @@ class EmployeeApiController extends Controller
 
         $employee->load([
             'company', 'businessUnit', 'branch', 'department', 'designation',
-            'payGroup', 'leavePlan', 'documents.requestedBy', 'employmentHistories', 'user'
+            'payGroup', 'leavePlan', 'defaultShift', 'shift', 'documents.requestedBy', 'employmentHistories', 'user'
         ]);
 
-        $adhocComponents = EmployeeAdhocComponent::where('employee_id', $employee->id)->with('component')->get();
+        $adhocComponents = EmployeeAdhocComponent::where('employee_id', $employee->id)->where('status', 'pending')->with('component')->get();
         $penalties       = EmployeePenalty::where('employee_id', $employee->id)->get();
 
         return $this->sendSuccess([
@@ -263,6 +327,10 @@ class EmployeeApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to create employee profile.', 403);
         }
 
         try {
@@ -302,6 +370,10 @@ class EmployeeApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update employee profile.', 403);
         }
 
         $employee = Employee::find($id);
@@ -352,6 +424,10 @@ class EmployeeApiController extends Controller
                 $employee->migrateToLeavePlan($oldPlanId, $newPlanId, $action, $unusedAction);
             }
 
+            if ($newPlanId !== null && (int)$oldPlanId !== $newPlanId) {
+                app(\App\Domains\HRMS\Services\LeaveBalanceService::class)->recalculateBalancesForEmployee($employee->fresh());
+            }
+
             return $this->sendSuccess($employee->load(['company', 'department', 'designation']), 'Employee updated successfully');
         } catch (ValidationException $e) {
             return $this->sendError('Validation failed', 422, $e->errors());
@@ -362,6 +438,10 @@ class EmployeeApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to delete employee profile.', 403);
         }
 
         $employee = Employee::find($id);
@@ -898,7 +978,10 @@ class EmployeeApiController extends Controller
             'leave_transition_unused'     => ['nullable', 'string', 'in:carry,lapse'],
             'employee_id'                 => ['nullable', 'string', 'max:255', Rule::unique('employees', 'employee_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
             'user_id'                     => ['required', Rule::unique('employees', 'user_id')->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($employee?->id)],
-            'role_id'                     => ['nullable', 'exists:roles,id'],
+            // Written straight to users.role_id — only roles the acting user may hand out.
+            'role_id'                     => ['nullable', Rule::in(auth()->check()
+                ? app(\App\Services\Access\AccessService::class)->assignableRoles(auth()->user(), $tenantId)->pluck('id')->all()
+                : [])],
             'full_name'                   => ['required', 'string', 'max:255'],
             'nick_name'                   => ['nullable', 'string', 'max:255'],
             'blood_group'                 => ['nullable', Rule::in(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])],

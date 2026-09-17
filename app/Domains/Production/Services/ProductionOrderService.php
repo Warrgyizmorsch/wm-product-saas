@@ -249,9 +249,6 @@ class ProductionOrderService
                             'dependency_type' => 'FS',
                         ]);
                     }
-                } elseif ($rOp && array_key_exists('previous_operation_id', $rOp->getAttributes()) && $rOp->previous_operation_id === null) {
-                    $currentOrderOp->previous_operation_id = null;
-                    $currentOrderOp->status = ProductionOrderOperation::STATUS_READY;
                 } else {
                     $currentOrderOp->previous_operation_id = $createdOps[$i - 1]->id;
                 }
@@ -1304,9 +1301,6 @@ class ProductionOrderService
                             'dependency_type' => 'FS',
                         ]);
                     }
-                } elseif ($rOp && array_key_exists('previous_operation_id', $rOp->getAttributes()) && $rOp->previous_operation_id === null) {
-                    $currentOrderOp->previous_operation_id = null;
-                    $currentOrderOp->status = ProductionOrderOperation::STATUS_READY;
                 } else {
                     $currentOrderOp->previous_operation_id = $sortedOps[$i - 1]->id;
                 }

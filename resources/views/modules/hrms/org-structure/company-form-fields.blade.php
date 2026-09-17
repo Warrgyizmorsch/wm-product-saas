@@ -36,7 +36,13 @@
                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.legal_name') }}" name="legal_name" id="{{ $prefix }}_legal_name" :required="true" :errorText="$errors->first('legal_name')" />
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.currency') }}" name="currency" id="{{ $prefix }}_currency" :required="true" placeholder="e.g. INR, USD" :errorText="$errors->first('currency')" />
+                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.currency') }}" name="currency" id="{{ $prefix }}_currency" select2-selector="default" :required="true" :errorText="$errors->first('currency')">
+                    <option value="">Select Currency</option>
+                    @foreach($currencies ?? [] as $currencyOption)
+                        {{-- Edit mode is filled in by the edit-modal script, so only preselect on Add. --}}
+                        <option value="{{ $currencyOption->code }}" @selected(! $isEdit && old('currency', 'INR') === $currencyOption->code)>{{ $currencyOption->code }} — {{ $currencyOption->name }} ({{ $currencyOption->symbol }})</option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.timezone') }}" name="time_zone" id="{{ $prefix }}_timezone" select2-selector="tzone" class="geo-timezone" :required="true" :errorText="$errors->first('time_zone')" data-initial-value="{{ $isEdit ? '' : old('time_zone', 'Asia/Kolkata') }}">

@@ -4,21 +4,20 @@
 @section('page-title', 'GST Summary')
 @section('breadcrumb', 'Accounting / Reports / GST Summary')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'gst-summary'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark">From</label>
+        <x-ui.filter-toolbar :resetUrl="route('accounting.reports.gst-summary')">
+            <x-ui.filter-field label="From" col="col-md-4">
                 <input type="date" name="from" value="{{ $from->toDateString() }}" class="form-control">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark">To</label>
+            </x-ui.filter-field>
+            <x-ui.filter-field label="To" col="col-md-4">
                 <input type="date" name="to" value="{{ $to->toDateString() }}" class="form-control">
-            </div>
-            <div class="col-md-4">
-                <x-ui.button type="submit" variant="primary" size="md">Apply</x-ui.button>
-            </div>
-        </form>
+            </x-ui.filter-field>
+        </x-ui.filter-toolbar>
     </x-ui.card>
 
     <x-ui.card class="mb-3">

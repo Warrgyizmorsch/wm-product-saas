@@ -215,6 +215,7 @@
                         <th style="width: 12%; background-color: #e8ecf1 !important;" class="text-end pe-3">EST. VALUE (₹)</th>
                         <th style="width: 13%; background-color: #e8ecf1 !important;">CLOSING DATE & STATUS</th>
                         <th style="width: 12%; background-color: #e8ecf1 !important;">STAGE</th>
+                        <th style="width: 10%; background-color: #e8ecf1 !important;">HEALTH %</th>
                         <th style="width: 4%; background-color: #e8ecf1 !important;" class="text-end pe-3">ACTIONS</th>
                     </tr>
                 </thead>
@@ -383,7 +384,45 @@
                                     </div>
                                 @endif
                             </td>
+                            <td>
+                                @if(!$deal->health_synced_at && !$deal->health_score)
+                                    <span class="badge bg-light text-muted border px-2 py-1 fs-11 fw-medium">
+                                        <i class="feather-clock me-1"></i>Not Synced
+                                    </span>
+                                @else
+                                    @php
+                                        $riskVal = ucfirst(strtolower($deal->risk_level ?: 'Low'));
+                                        $badgeStyle = match($riskVal) {
+                                            'High' => 'bg-danger text-white',
+                                            'Medium' => 'bg-warning text-dark',
+                                            'Low' => 'bg-success text-white',
+                                            default => 'bg-secondary text-white',
+                                        };
+                                        $scoreDisplay = $deal->health_score ?: 'N/A';
+                                        if (is_numeric($scoreDisplay)) {
+                                            $scoreDisplay .= '%';
+                                        }
+                                    @endphp
+                                    <span class="badge {{ $badgeStyle }} px-2 py-1 fs-11 fw-bold d-inline-flex align-items-center" title="{{ $deal->next_best_action ?: 'AI Deal Health Score' }}">
+                                        @if($riskVal === 'High')
+                                            <i class="feather-alert-octagon me-1"></i>
+                                        @elseif($riskVal === 'Medium')
+                                            <i class="feather-alert-circle me-1"></i>
+                                        @else
+                                            <i class="feather-check-circle me-1"></i>
+                                        @endif
+                                        {{ $scoreDisplay }} ({{ $riskVal }})
+                                    </span>
+                                @endif
+                            </td>
                             <td class="text-end pe-3">
+                                @php
+                                    $activeQuotation = $deal->quotations->firstWhere('is_current', true) ?: $deal->quotations->first();
+                                    $hasAcceptedQuotation = $deal->quotations->contains(fn($q) => in_array($q->status, ['Accepted', 'Converted', 'Won']));
+                                    $hasCustomer = !empty($deal->account?->customer_id);
+                                    $acceptedQuote = $deal->quotations->firstWhere('status', 'Accepted') ?: ($deal->quotations->firstWhere('status', 'Converted') ?: $activeQuotation);
+                                @endphp
+
                                 <x-ui.action-dropdown :viewUrl="route('crm.deals.show', $deal)">
                                     <x-slot:extraActions>
                                         <button type="button" 
@@ -403,12 +442,76 @@
                                             <i class="feather-calendar me-2 text-primary fs-12"></i>Log & Schedule Followup
                                         </a>
                                     </li>
+
+                                    @if($activeQuotation)
+                                        @if($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework')
+                                            <li>
+                                                <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <input type="hidden" name="status" value="Pending Approval">
+                                                    <button type="submit" class="dropdown-item fw-bold text-warning-emphasis">
+                                                        <i class="feather-send me-2 text-warning fs-12"></i>Submit Approval (Quotation)
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @elseif($activeQuotation->status === 'Approved')
+                                            <li>
+                                                <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <input type="hidden" name="status" value="Quotation Sent">
+                                                    <button type="submit" class="dropdown-item fw-bold text-primary">
+                                                        <i class="feather-send me-2 text-primary fs-12"></i>Mark Quotation as Sent
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @elseif($activeQuotation->status === 'Quotation Sent' || $activeQuotation->status === 'Sent')
+                                            <li>
+                                                <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <input type="hidden" name="status" value="Accepted">
+                                                    <button type="submit" class="dropdown-item fw-bold text-success">
+                                                        <i class="feather-check-circle me-2 text-success fs-12"></i>Accept Quotation
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <input type="hidden" name="status" value="Rejected">
+                                                    <button type="submit" class="dropdown-item fw-bold text-danger">
+                                                        <i class="feather-x-circle me-2 text-danger fs-12"></i>Reject Quotation
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
+                                    @endif
+
+                                    @if($hasAcceptedQuotation && !$hasCustomer)
+                                        <li>
+                                            <a href="{{ route('crm.deals.showConvertForm', $deal->id) }}" class="dropdown-item fw-bold text-warning-emphasis">
+                                                <i class="feather-user-check me-2 text-warning fs-12"></i>Convert to Customer
+                                            </a>
+                                        </li>
+                                    @endif
+
+                                    @if($hasCustomer && $acceptedQuote && in_array($acceptedQuote->status, ['Accepted', 'Converted', 'Won']))
+                                        <li>
+                                            <a href="{{ route('sales.orders.create', ['quotation_id' => $acceptedQuote->id]) }}" class="dropdown-item fw-bold text-success">
+                                                <i class="feather-shopping-cart me-2 text-success fs-12"></i>Convert to Sales Order
+                                            </a>
+                                        </li>
+                                    @endif
+
+                                    <li><hr class="dropdown-divider"></li>
                                     <li>
                                         <a href="{{ route('crm.deals.edit', $deal) }}" class="dropdown-item">
-                                            <i class="feather-edit me-2 text-muted fs-12"></i>Edit Deal
+                                            <i class="feather-edit me-2 text-muted fs-12"></i>Edit Deal Details
                                         </a>
                                     </li>
-                                    <li><hr class="dropdown-divider"></li>
                                     <li>
                                         <form action="{{ route('crm.deals.destroy', $deal->id) }}" method="POST" id="deleteDealForm_{{ $deal->id }}">
                                             @csrf

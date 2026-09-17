@@ -46,7 +46,8 @@ class SubTaskController extends Controller
     {
         $this->authorize('update', $task);
 
-        $this->subTasks->toggleComplete($subTask);
+        $force = $request->has('is_completed') ? $request->boolean('is_completed') : null;
+        $this->subTasks->toggleComplete($subTask, $force);
 
         return $this->respond($request, $project, $task, __('projects.subtask_updated'));
     }

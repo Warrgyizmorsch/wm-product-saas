@@ -5,6 +5,10 @@
 @section('breadcrumb', 'CRM / ' . __('crm.leads') . ' / ' . __('crm.profile'))
 
 @section('content')
+    @php
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+    @endphp
     <style>
         .requirement-clickable-box {
             cursor: pointer;
@@ -64,13 +68,26 @@
                         </h4>
                         
                         @php
-                            $statusKey = $lead->status === 'Converted' ? 'Won' : ($lead->status ?: 'New');
-                            $statusClass = 'bg-soft-primary text-primary';
-                            if($statusKey === 'Qualified') $statusClass = 'bg-soft-teal text-teal';
-                            elseif($statusKey === 'Won') $statusClass = 'bg-soft-success text-success';
-                            elseif($statusKey === 'Lost') $statusClass = 'bg-soft-danger text-danger';
+                            $statusKey = $lead->status ?: 'New';
+                            $presetSoftClasses = [
+                                'bg-soft-primary text-primary',
+                                'bg-soft-info text-info',
+                                'bg-soft-teal text-teal',
+                                'bg-soft-success text-success',
+                                'bg-soft-warning text-warning',
+                                'bg-soft-danger text-danger',
+                                'bg-soft-secondary text-secondary',
+                            ];
+                            $statusClass = match(strtolower($statusKey)) {
+                                'new' => 'bg-soft-primary text-primary',
+                                'qualified' => 'bg-soft-teal text-teal',
+                                'converted' => 'bg-soft-info text-info',
+                                'won' => 'bg-soft-success text-success',
+                                'lost' => 'bg-soft-danger text-danger',
+                                default => $presetSoftClasses[abs(crc32($statusKey)) % count($presetSoftClasses)],
+                            };
                         @endphp
-                        <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ __('crm.statuses.' . $statusKey) }}</span>
+                        <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ __('crm.statuses.' . $statusKey) ?? $statusKey }}</span>
                         @if($lead->segment && $lead->segment !== 'Select an Option')
                             <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span>
                         @endif
@@ -95,7 +112,7 @@
                     <a href="{{ route('crm.deals.show', $lead->crm_deal_id) }}" class="btn btn-xs btn-soft-success fw-bold py-1 px-2 rounded shadow-2xs d-inline-flex align-items-center" style="font-size: 11px;">
                         <i class="feather-git-branch me-1"></i> View Deal
                     </a>
-                @elseif(strtolower($lead->status ?: '') === 'qualified')
+                @else
                     <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST" class="d-inline m-0 p-0">
                         @csrf
                         @method('PATCH')
@@ -1621,10 +1638,12 @@
                                                 <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expiration')" name="expiry_date"
                                                     :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :errorText="$errors->first('expiry_date')" />
 
-                                                <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" :required="true" :errorText="$errors->first('status')">
-                                                     <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
-                                                     <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>{{ __('crm.quotation_statuses.Pending Approval') }}</option>
-                                                 </x-ui.odoo-form-ui>
+                                                @if(!$isQuotationAutoApprove)
+                                                    <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" :required="true" :errorText="$errors->first('status')">
+                                                         <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
+                                                         <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>{{ __('crm.quotation_statuses.Pending Approval') }}</option>
+                                                     </x-ui.odoo-form-ui>
+                                                @endif
                                             </div>
                                         </div>
 
@@ -1691,7 +1710,7 @@
                                 </div>
                             </div>
 
-                        @elseif ((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation)
+                        @elseif ((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation && $activeQuotation->status !== 'Accepted')
                             <!-- EDIT QUOTATION FORM -->
                             <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
                                 <div class="card-body p-3">
@@ -1742,10 +1761,12 @@
                                                 <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expiration')" name="expiry_date"
                                                     :value="old('expiry_date', $activeQuotation->expiry_date ? $activeQuotation->expiry_date->format('Y-m-d') : '')" :errorText="$errors->first('expiry_date')" />
 
-                                                <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" :required="true" :errorText="$errors->first('status')">
-                                                     <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
-                                                     <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.quotation_statuses.Pending Approval') }}</option>
-                                                </x-ui.odoo-form-ui>
+                                                @if(!$isQuotationAutoApprove)
+                                                    <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" :required="true" :errorText="$errors->first('status')">
+                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
+                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.quotation_statuses.Pending Approval') }}</option>
+                                                    </x-ui.odoo-form-ui>
+                                                @endif
                                             </div>
                                         </div>
 
@@ -1820,7 +1841,9 @@
                                             <div class="d-flex flex-wrap gap-2">
                                                 <a href="{{ route('crm.quotations.download', $activeQuotation->id) }}" class="btn btn-sm btn-primary" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-printer me-1"></i>{{ __('crm.print_download') }}</a>
                                                 <a href="{{ route('crm.quotations.show', $activeQuotation->id) }}" class="btn btn-sm btn-light border"><i class="feather-eye me-1"></i>{{ __('crm.view_full_quotation') }}</a>
-                                                <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_quotation' => 1]) }}" class="btn btn-sm btn-light border"><i class="feather-edit-2 me-1"></i>{{ __('crm.edit_quotation') }}</a>
+                                                @if ($activeQuotation->status !== 'Accepted')
+                                                     <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_quotation' => 1]) }}" class="btn btn-sm btn-light border"><i class="feather-edit-2 me-1"></i>{{ __('crm.edit_quotation') }}</a>
+                                                @endif
                                                 @if ($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework')
                                                      <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
                                                          @csrf
@@ -2871,7 +2894,7 @@
                             <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="max-width: 80px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="max-width: 120px; margin-left: auto; text-align: right;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0.01" step="0.01" required style="max-width: 120px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
                             <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="max-width: 80px; margin-left: auto; text-align: right;">

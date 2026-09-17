@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Requests;
 
+use App\Domains\Projects\Models\SubTask;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -27,6 +28,10 @@ class UpdateSubTaskRequest extends FormRequest
                     ->where('project_id', $project?->id)
                     ->where('is_active', true),
             ],
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'estimated_hours' => ['nullable', 'numeric', 'min:0'],
+            'status' => ['nullable', 'string', Rule::in(SubTask::STATUSES)],
         ];
     }
 }

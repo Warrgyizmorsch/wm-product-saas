@@ -542,71 +542,13 @@ class PayrollRunController extends Controller
                 ->update(['status' => 'processed']);
         }
 
-        // Integrate with Accounting (Consolidated Single Journal Entry)
-        $tenantId = $run->tenant_id ?? (tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id());
-        $totalEarnings = 0.00;
-        $totalDeductions = 0.00;
-        $totalNetPayout = 0.00;
-
-        foreach ($employees as $employee) {
-            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
-            $summary = $calc['summary'] ?? [];
-            $totalEarnings += floatval($summary['total_earnings'] ?? 0.00);
-            $totalDeductions += floatval($summary['total_deductions'] ?? 0.00);
-            $totalNetPayout += floatval($summary['net_payout'] ?? 0.00);
-        }
-
-        if ($totalNetPayout > 0 || $totalEarnings > 0) {
-            $expenseAccount = $this->getOrCreateAccount($tenantId, '5100', 'Salary & Wages - Staff', 'expense', 'debit', 'indirect_expense');
-            $statutoryAccount = $this->getOrCreateAccount($tenantId, '2080', 'Statutory Dues Payable', 'liability', 'credit', 'current_liability');
-            $bankAccount = $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', 'asset', 'debit', 'current_asset');
-
-            $lines = [];
-
-            // 1. DR Salary Expense
-            if ($totalEarnings > 0) {
-                $lines[] = [
-                    'chart_of_account_id' => $expenseAccount->id,
-                    'debit' => $totalEarnings,
-                    'credit' => 0.00,
-                    'description' => "Salary Expense for payroll run: " . $run->payroll_month
-                ];
-            }
-
-            // 2. CR Statutory Payables
-            if ($totalDeductions > 0) {
-                $lines[] = [
-                    'chart_of_account_id' => $statutoryAccount->id,
-                    'debit' => 0.00,
-                    'credit' => $totalDeductions,
-                    'description' => "Employee deductions for payroll run: " . $run->payroll_month
-                ];
-            }
-
-            // 3. CR Bank Account (Cash Out)
-            if ($totalNetPayout > 0) {
-                $lines[] = [
-                    'chart_of_account_id' => $bankAccount->id,
-                    'debit' => 0.00,
-                    'credit' => $totalNetPayout,
-                    'description' => "Bank Transfer payment for payroll run: " . $run->payroll_month
-                ];
-            }
-
-            try {
-                $journalService = app(\App\Domains\Accounting\Services\JournalService::class);
-                $journalService->post($lines, [
-                    'tenant_id' => $tenantId,
-                    'journal_date' => now(),
-                    'source' => 'payroll',
-                    'reference_type' => 'PayrollRun',
-                    'reference_id' => $run->id,
-                    'memo' => "Payroll Payout for month: " . $run->payroll_month,
-                    'posted_by' => auth()->id(),
-                ]);
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error("Payroll Payout Journal Posting Failed: " . $e->getMessage());
-            }
+        // Integrate with Accounting (Dynamic Double-Entry Journal Posting)
+        try {
+            $payrollAccountingService = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
+            $payrollAccountingService->postPayrollRunJournal($run);
+            $payrollAccountingService->postPayrollPayoutJournal($run);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Payroll Accounting Journal Posting Failed on Payout: " . $e->getMessage());
         }
 
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll payouts released successfully.');

@@ -48,7 +48,7 @@ class RoleController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $role = $this->roles->create(tenant_id(), $validated);
+        $role = $this->roles->create(auth()->user(), tenant_id(), $validated);
 
         return redirect()
             ->route('access.roles.show', $role)
@@ -74,7 +74,7 @@ class RoleController extends Controller
             'grants' => ['nullable', 'array'],
         ]);
 
-        $this->roles->syncPermissions($role, $validated['grants'] ?? []);
+        $this->roles->syncPermissions(auth()->user(), $role, $validated['grants'] ?? []);
 
         return redirect()
             ->route('access.roles.show', $role)

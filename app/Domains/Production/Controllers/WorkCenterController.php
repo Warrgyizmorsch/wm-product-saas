@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 use App\Domains\Production\Models\ProductionShift;
+use App\Domains\Production\Models\ProductionCalendar;
 
 class WorkCenterController extends Controller
 {
@@ -43,7 +44,8 @@ class WorkCenterController extends Controller
         $shifts = $this->repository->getActiveShifts($tenantId);
         $workCenterTypes = config('production.work_center_types', []);
         $parentOptions = $this->repository->getAllOrderedByName();
-        return view('modules.production.work-centers.create', compact('workCenterTypes', 'parentOptions', 'shifts'));
+        $calendars = ProductionCalendar::where('tenant_id', $tenantId)->orderBy('name')->get();
+        return view('modules.production.work-centers.create', compact('workCenterTypes', 'parentOptions', 'shifts', 'calendars'));
     }
 
     public function store(StoreWorkCenterRequest $request): RedirectResponse
@@ -96,7 +98,8 @@ class WorkCenterController extends Controller
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->orderBy('name')->get();
         $workCenterTypes = config('production.work_center_types', []);
         $parentOptions = WorkCenter::where('id', '!=', $id)->orderBy('name')->get();
-        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'parentOptions', 'shifts'));
+        $calendars = ProductionCalendar::where('tenant_id', $tenantId)->orderBy('name')->get();
+        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'parentOptions', 'shifts', 'calendars'));
     }
 
     public function update(UpdateWorkCenterRequest $request, int $id): RedirectResponse

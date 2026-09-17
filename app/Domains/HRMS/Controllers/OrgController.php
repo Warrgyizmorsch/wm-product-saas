@@ -9,7 +9,9 @@ use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Repositories\OrgRepositoryInterface;
 use App\Http\Controllers\Controller;
+use App\Models\Currency;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OrgController extends Controller
 {
@@ -19,13 +21,19 @@ class OrgController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Company::class);
+
         $data = $this->orgRepository->getIndexData($request->all());
+        // ISO reference data (global, not tenant-owned) shared with the Accounting ledger.
+        $data['currencies'] = Currency::query()->where('is_active', true)->orderBy('code')->get(['code', 'name', 'symbol']);
 
         return view('modules.hrms.org-structure.org', $data);
     }
 
     public function storeCompany(Request $request)
     {
+        $this->authorize('create', Company::class);
+
         $validated = $request->validate([
             'company_name' => 'required|max:255',
             'legal_name' => 'required|max:255',
@@ -36,7 +44,7 @@ class OrgController extends Controller
             'pan_number' => 'nullable|max:255',
             'cin_number' => 'nullable|max:255',
             'registration_number' => 'nullable|max:255',
-            'currency' => 'required|max:10',
+            'currency' => ['required', Rule::exists('currencies', 'code')->where('is_active', true)],
             'time_zone' => 'required|max:50',
             'address' => 'nullable|max:500',
             'city' => 'nullable|max:100',
@@ -57,6 +65,8 @@ class OrgController extends Controller
 
     public function updateCompany(Request $request, Company $company)
     {
+        $this->authorize('update', $company);
+
         $validated = $request->validate([
             'company_name' => 'required|max:255',
             'legal_name' => 'required|max:255',
@@ -67,7 +77,7 @@ class OrgController extends Controller
             'pan_number' => 'nullable|max:255',
             'cin_number' => 'nullable|max:255',
             'registration_number' => 'nullable|max:255',
-            'currency' => 'required|max:10',
+            'currency' => ['required', Rule::exists('currencies', 'code')->where('is_active', true)],
             'time_zone' => 'required|max:50',
             'address' => 'nullable|max:500',
             'city' => 'nullable|max:100',
@@ -86,8 +96,10 @@ class OrgController extends Controller
         return redirect()->route('hrms.org.index', ['tab' => 'legal-entities'])->with('success', __('hrms.org.company_updated'));
     }
 
-    public function destroyCompany(Company $company)
+    public function destroyCompany(Request $request, Company $company)
     {
+        $this->authorize('delete', $company);
+
         $this->orgRepository->destroyCompany($company);
 
         return redirect()->route('hrms.org.index', ['tab' => 'legal-entities'])->with('success', __('hrms.org.company_deleted'));
@@ -95,6 +107,8 @@ class OrgController extends Controller
 
     public function storeBusinessUnit(Request $request)
     {
+        $this->authorize('create', Company::class);
+
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|max:255',
@@ -112,6 +126,8 @@ class OrgController extends Controller
 
     public function updateBusinessUnit(Request $request, BusinessUnit $businessUnit)
     {
+        $this->authorize('update', Company::class);
+
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|max:255',
@@ -127,8 +143,10 @@ class OrgController extends Controller
         return redirect()->route('hrms.org.index', ['tab' => 'business-units'])->with('success', __('hrms.org.bu_updated'));
     }
 
-    public function destroyBusinessUnit(BusinessUnit $businessUnit)
+    public function destroyBusinessUnit(Request $request, BusinessUnit $businessUnit)
     {
+        $this->authorize('delete', Company::class);
+
         $this->orgRepository->destroyBusinessUnit($businessUnit);
 
         return redirect()->route('hrms.org.index', ['tab' => 'business-units'])->with('success', __('hrms.org.bu_deleted'));
@@ -136,6 +154,8 @@ class OrgController extends Controller
 
     public function storeBranch(Request $request)
     {
+        $this->authorize('create', Company::class);
+
         $validated = $request->validate([
             'company_id' => 'required_without:business_unit_id|nullable|exists:companies,id',
             'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
@@ -167,6 +187,8 @@ class OrgController extends Controller
 
     public function updateBranch(Request $request, Branch $branch)
     {
+        $this->authorize('update', Company::class);
+
         $validated = $request->validate([
             'company_id' => 'required_without:business_unit_id|nullable|exists:companies,id',
             'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
@@ -196,8 +218,10 @@ class OrgController extends Controller
         return redirect()->route('hrms.org.index', ['tab' => 'branches'])->with('success', __('hrms.org.branch_updated'));
     }
 
-    public function destroyBranch(Branch $branch)
+    public function destroyBranch(Request $request, Branch $branch)
     {
+        $this->authorize('delete', Company::class);
+
         $this->orgRepository->destroyBranch($branch);
 
         return redirect()->route('hrms.org.index', ['tab' => 'branches'])->with('success', __('hrms.org.branch_deleted'));
@@ -205,6 +229,8 @@ class OrgController extends Controller
 
     public function storeDepartment(Request $request)
     {
+        $this->authorize('create', Company::class);
+
         $validated = $request->validate([
             'company_id' => 'required_without_all:business_unit_id,branch_id|nullable|exists:companies,id',
             'business_unit_id' => 'required_without_all:company_id,branch_id|nullable|exists:business_units,id',
@@ -239,6 +265,8 @@ class OrgController extends Controller
 
     public function updateDepartment(Request $request, Department $department)
     {
+        $this->authorize('update', Company::class);
+
         $validated = $request->validate([
             'company_id' => 'required_without_all:business_unit_id,branch_id|nullable|exists:companies,id',
             'business_unit_id' => 'required_without_all:company_id,branch_id|nullable|exists:business_units,id',
@@ -271,8 +299,10 @@ class OrgController extends Controller
         return redirect()->route('hrms.org.index', ['tab' => 'departments'])->with('success', __('hrms.org.dept_updated'));
     }
 
-    public function destroyDepartment(Department $department)
+    public function destroyDepartment(Request $request, Department $department)
     {
+        $this->authorize('delete', Company::class);
+
         $this->orgRepository->destroyDepartment($department);
 
         return redirect()->route('hrms.org.index', ['tab' => 'departments'])->with('success', __('hrms.org.dept_deleted'));
@@ -280,6 +310,8 @@ class OrgController extends Controller
 
     public function storeDesignation(Request $request)
     {
+        $this->authorize('create', Company::class);
+
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
@@ -295,6 +327,8 @@ class OrgController extends Controller
 
     public function updateDesignation(Request $request, Designation $designation)
     {
+        $this->authorize('update', Company::class);
+
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
@@ -308,8 +342,10 @@ class OrgController extends Controller
         return redirect()->route('hrms.org.index', ['tab' => 'designations'])->with('success', __('hrms.org.desig_updated'));
     }
 
-    public function destroyDesignation(Designation $designation)
+    public function destroyDesignation(Request $request, Designation $designation)
     {
+        $this->authorize('delete', Company::class);
+
         $this->orgRepository->destroyDesignation($designation);
 
         return redirect()->route('hrms.org.index', ['tab' => 'designations'])->with('success', __('hrms.org.desig_deleted'));
@@ -365,6 +401,8 @@ class OrgController extends Controller
 
     public function storeSalaryComponent(\Illuminate\Http\Request $request)
     {
+        $this->authorize('create', Company::class);
+
         $validated = $request->validate([
             'pay_group_id' => 'nullable|exists:pay_groups,id',
             'name'         => 'required|string|max:255',
@@ -389,6 +427,8 @@ class OrgController extends Controller
 
     public function updateSalaryComponent(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
     {
+        $this->authorize('update', Company::class);
+
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'code'        => 'required|string|max:50',
@@ -403,8 +443,10 @@ class OrgController extends Controller
         return redirect()->route('hrms.org.index')->with('success', 'Salary component updated successfully.');
     }
 
-    public function destroySalaryComponent(\App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
+    public function destroySalaryComponent(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
     {
+        $this->authorize('delete', Company::class);
+
         $salaryComponent->delete();
 
         return redirect()->route('hrms.org.index')->with('success', 'Salary component deleted successfully.');

@@ -42,9 +42,13 @@ class BankReconciliationController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $canCreate = auth()->user()?->can('create', BankReconciliation::class) ?? false;
+
         return view('modules.accounting.bank-reconciliation.index', [
             'reconciliations' => $reconciliations,
             'filters' => $filters,
+            'canCreate' => $canCreate,
+            'cashBankAccounts' => $canCreate ? $this->accounts->active()->where('is_cash_or_bank', true)->values() : collect(),
         ]);
     }
 

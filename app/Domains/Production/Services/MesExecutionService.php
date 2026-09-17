@@ -529,6 +529,10 @@ class MesExecutionService
 
                 $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
 
+                if ($rejected > 0 && !$isQcRequired) {
+                    throw new InvalidArgumentException('Rejected quantity cannot be logged directly on operations where Quality Check is not required.');
+                }
+
                 // Create progress log
                 ProductionOrderProgressLog::create([
                     'tenant_id' => $schedOp->order->tenant_id,
@@ -807,6 +811,11 @@ class MesExecutionService
 
             if ($produced < 0 || $rejected < 0 || $scrapped < 0) {
                 throw new InvalidArgumentException('Quantities cannot be negative.');
+            }
+
+            $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
+            if ($rejected > 0 && !$isQcRequired) {
+                throw new InvalidArgumentException('Rejected quantity cannot be logged directly on operations where Quality Check is not required.');
             }
 
             $batchId = !empty($data['production_batch_id']) ? (int) $data['production_batch_id'] : (!empty($data['batch_id']) ? (int) $data['batch_id'] : null);

@@ -42,6 +42,15 @@ class WfhRequestController extends Controller
             'notified_contacts.*' => 'exists:employees,id',
         ]);
 
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        if (!$isHrAdmin) {
+            $currentEmp = Employee::resolveForUser($user);
+            if ($currentEmp) {
+                $validated['employee_id'] = $currentEmp->id;
+            }
+        }
+
         $employee = Employee::findOrFail($validated['employee_id']);
 
         if (!$employee) {
@@ -93,6 +102,14 @@ class WfhRequestController extends Controller
 
         $this->wfhRequestRepository->storeWfhRequest($validated, $request);
 
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: 'New WFH Request',
+            message: "{$employee->full_name} applied for {$duration} day(s) WFH.",
+            actionUrl: route('hrms.wfh.index'),
+            type: 'wfh_request',
+            iconClass: 'feather-home'
+        );
+
         return redirect()->back()->with('success', 'WFH application submitted successfully.');
     }
 
@@ -131,6 +148,19 @@ class WfhRequestController extends Controller
             'rejection_reason' => $reason,
         ], $request);
 
+        if ($wfhRequest->employee) {
+            $statusText = ucfirst($action);
+            $iconClass = $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle';
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employee: $wfhRequest->employee,
+                title: "WFH Request {$statusText}",
+                message: "Your WFH request status is now {$statusText}.",
+                actionUrl: route('hrms.wfh.index'),
+                type: 'wfh_' . $action,
+                iconClass: $iconClass
+            );
+        }
+
         $msg = match($action) {
             'approved' => 'WFH request approved successfully.',
             'rejected' => 'WFH request rejected successfully.',
@@ -146,6 +176,15 @@ class WfhRequestController extends Controller
 
     public function withdraw(Request $request, WfhRequest $wfhRequest): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $wfhRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
         if (!$wfhRequest->canWithdraw()) {
             return redirect()->back()->with('error', 'Only pending applications can be withdrawn.');
         }
@@ -161,6 +200,15 @@ class WfhRequestController extends Controller
 
     public function requestCancellation(Request $request, WfhRequest $wfhRequest): RedirectResponse
     {
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        if (!$isHrAdmin) {
+            $employee = Employee::resolveForUser($user);
+            if (!$employee || $wfhRequest->employee_id !== $employee->id) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
         if (!$wfhRequest->canRequestCancellation()) {
             return redirect()->back()->with('error', 'Only approved applications can have a cancellation requested.');
         }
@@ -221,19 +269,14 @@ class WfhRequestController extends Controller
     public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $user = auth()->user();
-
-        $employee = Employee::where('personal_email', $user->email)
-            ->orWhere('office_email', $user->email)
-            ->first();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $employee = Employee::resolveForUser($user);
 
         $query = WfhRequest::with('employee')->orderBy('created_at', 'desc');
 
         // Non-admin: scope to own records only
-        if ($employee) {
-            $isAdmin = $employee->is_admin ?? false;
-            if (!$isAdmin) {
-                $query->where('employee_id', $employee->id);
-            }
+        if (!$isHrAdmin) {
+            $query->where('employee_id', $employee ? $employee->id : 0);
         }
 
         $rows = $query->get();

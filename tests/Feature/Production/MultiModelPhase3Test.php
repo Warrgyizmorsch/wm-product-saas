@@ -30,6 +30,7 @@ use App\Domains\Purchase\Services\GoodsReceiptNoteService;
 use App\Domains\Purchase\Services\PurchaseOrderService;
 use App\Domains\Purchase\Services\PurchaseRequisitionService;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -44,6 +45,8 @@ class MultiModelPhase3Test extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->seed(RbacSeeder::class);
 
         \App\Models\Tenant::factory()->create([
             'id' => $this->tenantId,

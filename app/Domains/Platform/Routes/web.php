@@ -1,5 +1,6 @@
 <?php
 
+use App\Domains\Platform\Controllers\CurrencyController;
 use App\Domains\Platform\Controllers\PlanController;
 use App\Domains\Platform\Controllers\TenantController;
 use App\Domains\Platform\Controllers\TransporterController;
@@ -35,6 +36,15 @@ Route::prefix('platform')
 
         Route::get('usage', [UsageOverviewController::class, 'index'])
             ->name('usage.index');
+
+        Route::get('currencies', [CurrencyController::class, 'index'])
+            ->name('currencies.index');
+        Route::post('currencies', [CurrencyController::class, 'store'])
+            ->name('currencies.store');
+        Route::put('currencies/{currency}', [CurrencyController::class, 'update'])
+            ->name('currencies.update');
+        Route::patch('currencies/{currency}/status', [CurrencyController::class, 'toggleStatus'])
+            ->name('currencies.status');
 
         Route::post('payment-terms/{paymentTerm}/toggle-status', [\App\Domains\Platform\Controllers\PaymentTermController::class, 'toggleStatus'])
             ->name('payment-terms.toggle-status');

@@ -86,6 +86,8 @@
         <div class="tenant-name">{{ tenant()?->name }}</div>
         <div class="report-title">Balance Sheet</div>
         <div class="report-subtitle">as at {{ \Illuminate\Support\Carbon::parse($period->end_date)->format('d M Y') }} (end of {{ $period->name }})</div>
+        {{-- Code only: the PDF font has no glyph for some symbols (e.g. ₹). --}}
+        <div class="report-subtitle">Amounts in {{ company_currency()['code'] }}</div>
     </div>
 
     <div class="status {{ $isBalanced ? 'balanced' : 'unbalanced' }}">

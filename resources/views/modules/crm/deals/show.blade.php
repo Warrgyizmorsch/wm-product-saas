@@ -364,6 +364,11 @@
 @endphp
 
 @section('content')
+    @php
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+    @endphp
+
     <!-- Hidden Stage Change Form -->
     <form id="dealStageForm" action="{{ route('crm.deals.updateStage', $deal) }}" method="POST" style="display: none;">
         @csrf
@@ -483,11 +488,6 @@
                     <li>
                         <a class="dropdown-item py-2" href="{{ route('crm.deals.edit', $deal) }}">
                             <i class="feather-edit me-1.5 text-muted"></i> Edit Deal Details
-                        </a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item py-2" href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}">
-                            <i class="feather-file-text me-1.5 text-muted"></i> Add New Quotation
                         </a>
                     </li>
                 </x-ui.action-dropdown>
@@ -714,6 +714,90 @@
                                             {{ $deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A') }}
                                         </span>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AI DEAL HEALTH & INTELLIGENCE CARD -->
+                        @php
+                            $isSynced = !empty($deal->health_synced_at);
+                            $riskVal = $isSynced ? ucfirst(strtolower($deal->risk_level ?: 'Low')) : 'Not Synced';
+                            $riskBadgeStyle = match($riskVal) {
+                                'High' => 'bg-danger text-white',
+                                'Medium' => 'bg-warning text-dark',
+                                'Low' => 'bg-success text-white',
+                                default => 'bg-secondary text-white',
+                            };
+                            $scoreVal = $isSynced ? ($deal->health_score ?: 'N/A') : 'Not Synced';
+                            if (is_numeric($scoreVal)) {
+                                $scoreVal .= '%';
+                            }
+                        @endphp
+                        <div class="card border shadow-sm mb-3" style="border-radius: 6px; border-color: #cbd5e1 !important; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
+                                    <h5 class="fs-13 text-dark fw-bold mb-0 d-flex align-items-center gap-1.5">
+                                        <i class="feather-cpu text-primary fs-16"></i>
+                                        <span>AI Deal Health & Action Intelligence</span>
+                                    </h5>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <a href="https://love14-deal-health-scoring.hf.space/auth/login?user_id={{ auth()->id() ?? 1 }}&next={{ urlencode(url()->current()) }}" 
+                                           id="googleAuthBadge" 
+                                           target="_blank" 
+                                           class="badge bg-secondary text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center"
+                                           title="Google OAuth Connection Status">
+                                            <i class="feather-loader spin me-1"></i>Checking Gmail Auth...
+                                        </a>
+                                        <button type="button" id="btnSyncHealth" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 fs-11 rounded-1">
+                                            <i class="feather-refresh-cw me-1"></i>Sync AI Health
+                                        </button>
+                                        <button type="button" id="btnGenerateDraft" class="btn btn-xs btn-primary fw-bold px-2.5 py-1 fs-11 rounded-1">
+                                            <i class="feather-mail me-1"></i>Generate AI Draft Reply
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 align-items-center mb-3">
+                                    <div class="col-md-4">
+                                        <div class="p-2.5 rounded border bg-white d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <span class="fs-11 text-muted fw-bold d-block text-uppercase">Deal Health Score</span>
+                                                <span class="fs-18 fw-extrabold text-dark" id="healthScoreDisplay">{{ $scoreVal }}</span>
+                                            </div>
+                                            <span class="badge {{ $riskBadgeStyle }} px-2.5 py-1 fs-11 fw-bold" id="riskLevelDisplay">
+                                                {{ $isSynced ? ($riskVal . ' Risk') : 'Not Synced' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2.5 rounded border bg-white">
+                                            <span class="fs-11 text-muted fw-bold d-block text-uppercase">Client Sentiment</span>
+                                            <span class="fs-13 fw-bold text-dark" id="sentimentDisplay">
+                                                <i class="feather-smile text-primary me-1"></i>{{ $isSynced ? ($deal->sentiment_score ?: 'Neutral') : 'Not Synced' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2.5 rounded border bg-white">
+                                            <span class="fs-11 text-muted fw-bold d-block text-uppercase">Last AI Sync</span>
+                                            <span class="fs-12 fw-semibold text-muted" id="syncedAtDisplay">
+                                                <i class="feather-clock me-1"></i>{{ $isSynced ? $deal->health_synced_at->diffForHumans() : 'Never Synced' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="p-3 rounded border bg-soft-info border-info-subtle">
+                                    <div class="fw-bold text-info-emphasis fs-12 mb-1 d-flex align-items-center gap-1">
+                                        <i class="feather-zap me-1"></i>AI Recommended Next Best Action:
+                                    </div>
+                                    <div class="fs-12 text-dark fw-medium" id="nextActionDisplay">
+                                        {{ $isSynced ? ($deal->next_best_action ?: 'No specific action recommended by AI.') : 'Click "Sync AI Health" above to fetch live AI evaluation from API.' }}
+                                    </div>
+                                </div>
+
+                                <div id="syncDiagnosticNotice" class="alert alert-light border fs-11 text-muted p-2 mt-2.5 mb-0 d-none">
+                                    <i class="feather-info text-primary me-1"></i><span id="syncDiagnosticText"></span>
                                 </div>
                             </div>
                         </div>
@@ -1096,7 +1180,7 @@
                         
                         @if (request()->has('create_quotation') || old('form_type') === 'quotation_create')
                             <!-- CREATE QUOTATION INLINE FORM -->
-                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
+                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
                                 <div class="card-body p-4">
                                     <form action="{{ route('crm.quotations.store') }}" method="POST" id="quotationForm" novalidate>
                                         @csrf
@@ -1130,10 +1214,12 @@
                                                 <x-ui.odoo-form-ui type="input" inputType="date" label="Expiration Date" name="expiry_date"
                                                     :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :errorText="$errors->first('expiry_date')" />
 
-                                                <x-ui.odoo-form-ui type="select" label="Initial Status" name="status" :required="true" :errorText="$errors->first('status')">
-                                                     <option value="Draft" @selected(old('status') === 'Draft')>Draft</option>
-                                                     <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Sent for Approval</option>
-                                                 </x-ui.odoo-form-ui>
+                                                @if(!$isQuotationAutoApprove)
+                                                    <x-ui.odoo-form-ui type="select" label="Initial Status" name="status" :required="true" :errorText="$errors->first('status')">
+                                                         <option value="Draft" @selected(old('status') === 'Draft')>Draft</option>
+                                                         <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Sent for Approval</option>
+                                                     </x-ui.odoo-form-ui>
+                                                @endif
                                             </div>
                                         </div>
 
@@ -1200,9 +1286,9 @@
                                 </div>
                             </div>
 
-                        @elseif ((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation)
+                        @elseif ((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation && $activeQuotation->status !== 'Accepted')
                             <!-- EDIT QUOTATION INLINE FORM -->
-                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
+                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
                                 <div class="card-body p-4">
                                     <form action="{{ route('crm.quotations.update', $activeQuotation->id) }}" method="POST" id="quotationForm" novalidate>
                                         @csrf
@@ -1237,10 +1323,12 @@
                                                 <x-ui.odoo-form-ui type="input" inputType="date" label="Expiration Date" name="expiry_date"
                                                     :value="old('expiry_date', $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('Y-m-d') : '')" :errorText="$errors->first('expiry_date')" />
 
-                                                <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true" :errorText="$errors->first('status')">
-                                                     <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
-                                                     <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>Sent for Approval</option>
-                                                </x-ui.odoo-form-ui>
+                                                @if(!$isQuotationAutoApprove)
+                                                    <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true" :errorText="$errors->first('status')">
+                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
+                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>Sent for Approval</option>
+                                                    </x-ui.odoo-form-ui>
+                                                @endif
                                             </div>
                                         </div>
 
@@ -1317,39 +1405,91 @@
                                             <span class="badge bg-light text-dark border font-monospace mt-1">Revision {{ $activeQuotation->revision_number }}</span>
                                         </div>
 
-                                        <div class="d-flex flex-wrap gap-2">
-                                            <a href="{{ route('crm.quotations.download', $activeQuotation->id) }}" class="btn btn-xs btn-primary"><i class="feather-printer me-1"></i>Print / Download</a>
-                                            <a href="{{ route('crm.quotations.show', $activeQuotation->id) }}" class="btn btn-xs btn-light border"><i class="feather-eye me-1"></i>View Full Quote</a>
-                                            <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'edit_quotation' => 1, 'quotation_id' => $activeQuotation->id]) }}" class="btn btn-xs btn-warning text-dark fw-bold"><i class="feather-edit-2 me-1"></i>Edit Quotation</a>
-                                            
+                                        <div class="d-flex align-items-center flex-wrap gap-2">
+                                            <!-- WhatsApp Action Button (listing index page action button style) -->
+                                            <button type="button" 
+                                                    class="action-dropdown-btn action-btn-wa btn-open-send-quote-wa-modal" 
+                                                    data-quotation-id="{{ $activeQuotation->id }}" 
+                                                    data-quotation-num="{{ $activeQuotation->quotation_number }}" 
+                                                    data-client-phone="{{ $activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)) }}" 
+                                                    data-deal-title="{{ addslashes($deal->title) }}"
+                                                    title="Send PDF via WhatsApp" data-bs-toggle="tooltip">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
+                                            </button>
+
+                                            <!-- Send Email Action Button (listing index page action button style) -->
+                                            <button type="button" 
+                                                    class="action-dropdown-btn action-btn-email btn-open-send-quote-modal" 
+                                                    data-quotation-id="{{ $activeQuotation->id }}" 
+                                                    data-quotation-num="{{ $activeQuotation->quotation_number }}" 
+                                                    data-client-email="{{ $activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)) }}" 
+                                                    data-deal-title="{{ addslashes($deal->title) }}"
+                                                    title="Send PDF via Email" data-bs-toggle="tooltip">
+                                                <i class="feather-mail text-primary fs-14"></i>
+                                            </button>
+
+                                            <!-- Download PDF Action Button (listing index page action button style) -->
+                                            <a href="{{ route('crm.quotations.download', $activeQuotation->id) }}" 
+                                               class="action-dropdown-btn action-btn-pdf" 
+                                               title="Download PDF Document" data-bs-toggle="tooltip">
+                                                <i class="feather-download text-danger fs-14"></i>
+                                            </a>
+
+                                            <!-- Status / Workflow Action Buttons -->
                                             @if ($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework')
                                                 <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
                                                     @csrf
                                                     @method('PATCH')
                                                     <input type="hidden" name="status" value="Pending Approval">
-                                                    <button type="submit" class="btn btn-xs btn-warning text-dark fw-bold"><i class="feather-send me-1"></i>Send for Approval</button>
+                                                    <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Submit Approval</button>
                                                 </form>
                                             @elseif ($activeQuotation->status === 'Approved')
                                                 <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
                                                     @csrf
                                                     @method('PATCH')
                                                     <input type="hidden" name="status" value="Quotation Sent">
-                                                    <button type="submit" class="btn btn-xs btn-primary fw-bold"><i class="feather-send me-1"></i>Mark as Sent</button>
+                                                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Mark as Sent</button>
                                                 </form>
                                             @elseif ($activeQuotation->status === 'Quotation Sent' || $activeQuotation->status === 'Sent')
                                                 <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
                                                     @csrf
                                                     @method('PATCH')
                                                     <input type="hidden" name="status" value="Accepted">
-                                                    <button type="submit" class="btn btn-xs btn-success fw-bold"><i class="feather-check-circle me-1"></i>Accept Quote</button>
+                                                    <button type="submit" class="btn btn-sm btn-success fw-bold px-2.5 py-1.5"><i class="feather-check-circle me-1"></i>Accept Quote</button>
                                                 </form>
                                                 <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
                                                     @csrf
                                                     @method('PATCH')
                                                     <input type="hidden" name="status" value="Rejected">
-                                                    <button type="submit" class="btn btn-xs btn-soft-danger fw-bold"><i class="feather-x-circle me-1"></i>Reject</button>
+                                                    <button type="submit" class="btn btn-sm btn-soft-danger fw-bold px-2.5 py-1.5"><i class="feather-x-circle me-1"></i>Reject</button>
                                                 </form>
                                             @endif
+
+                                            <!-- Dropdown Menu for More Options (At Very End) -->
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-light border fw-bold px-2.5 py-1.5 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Quotation Actions">
+                                                    <i class="feather-more-horizontal me-1"></i>More
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 fs-12">
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('crm.quotations.show', $activeQuotation->id) }}">
+                                                            <i class="feather-eye me-2 text-info"></i>View Full Quotation Sheet
+                                                        </a>
+                                                    </li>
+                                                    @if ($activeQuotation->status !== 'Accepted')
+                                                        <li>
+                                                            <a class="dropdown-item" href="{{ route('crm.deals.show', ['deal' => $deal->id, 'edit_quotation' => 1, 'quotation_id' => $activeQuotation->id]) }}">
+                                                                <i class="feather-edit-2 me-2 text-warning"></i>Edit Quotation
+                                                            </a>
+                                                        </li>
+                                                    @endif
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ route('crm.quotations.download', $activeQuotation->id) }}?print=1" target="_blank">
+                                                            <i class="feather-printer me-2 text-secondary"></i>Print Quotation
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1365,11 +1505,39 @@
                                             <div class="row">
                                                 <div class="col-6">
                                                     <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Contact Email</label>
-                                                    <div class="fs-12 text-primary">{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}</div>
+                                                    <div class="fs-12 text-primary d-flex align-items-center flex-nowrap gap-1">
+                                                        <span class="fw-semibold text-truncate" title="{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}">{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}</span>
+                                                        @if ($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)))
+                                                            <button type="button" 
+                                                                    class="action-dropdown-btn action-btn-email btn-open-send-quote-modal ms-1 flex-shrink-0" 
+                                                                    data-quotation-id="{{ $activeQuotation->id }}" 
+                                                                    data-quotation-num="{{ $activeQuotation->quotation_number }}" 
+                                                                    data-client-email="{{ $activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)) }}" 
+                                                                    data-deal-title="{{ addslashes($deal->title) }}" 
+                                                                    title="Send Quotation PDF via Email" data-bs-toggle="tooltip"
+                                                                    style="width: 24px !important; height: 24px !important; min-width: 24px !important; border-radius: 6px !important;">
+                                                                <i class="feather-mail text-primary fs-11"></i>
+                                                            </button>
+                                                        @endif
+                                                    </div>
                                                 </div>
                                                 <div class="col-6">
                                                     <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Contact Phone</label>
-                                                    <div class="fs-12 text-dark">{{ $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '—')) }}</div>
+                                                    <div class="fs-12 text-dark d-flex align-items-center flex-nowrap gap-1">
+                                                        <span class="fw-semibold text-truncate">{{ $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '—')) }}</span>
+                                                        @if ($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)))
+                                                            <button type="button" 
+                                                                    class="action-dropdown-btn action-btn-wa btn-open-send-quote-wa-modal ms-1 flex-shrink-0" 
+                                                                    data-quotation-id="{{ $activeQuotation->id }}" 
+                                                                    data-quotation-num="{{ $activeQuotation->quotation_number }}" 
+                                                                    data-client-phone="{{ $activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)) }}" 
+                                                                    data-deal-title="{{ addslashes($deal->title) }}" 
+                                                                    title="Send Quotation PDF via WhatsApp" data-bs-toggle="tooltip"
+                                                                    style="width: 24px !important; height: 24px !important; min-width: 24px !important; border-radius: 6px !important;">
+                                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
+                                                            </button>
+                                                        @endif
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1470,7 +1638,7 @@
                                 </div>
                             </div>
                         @else
-                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
+                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
                                 <div class="card-body p-4 text-center">
                                     <i class="feather-file-text fs-36 text-muted mb-2 d-block opacity-50"></i>
                                     <h5 class="fw-bold text-dark fs-14">No Quotation Created Yet</h5>
@@ -2227,7 +2395,7 @@
                             <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0.01" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
                             <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
@@ -2449,6 +2617,14 @@
             // Tab state persistence logic
             var activeTabKey = 'deal_active_tab_' + {{ $deal->id }};
             var activeSubTabKey = 'deal_active_subtab_' + {{ $deal->id }};
+
+            const isQTabActive = @json($isQuotationTabActive);
+            const isSOTabActive = @json($isSalesOrdersTabActive);
+            if (isQTabActive) {
+                localStorage.setItem(activeTabKey, 'quotations-tab');
+            } else if (isSOTabActive) {
+                localStorage.setItem(activeTabKey, 'salesorders-tab');
+            }
 
             // Check URL Hash first if present
             var hash = window.location.hash;
@@ -2724,6 +2900,436 @@
 
         $('#dealFollowupOffcanvas').on('shown.bs.offcanvas', function () {
             initDealTagUserSelect2();
+        });
+
+        // Auto-check Google Auth Status on Page Load
+        function checkGoogleAuthStatus() {
+            $.ajax({
+                url: "{{ route('crm.deals.googleAuthStatus') }}",
+                method: "GET",
+                data: {
+                    user_id: "{{ request('user_id', auth()->id() ?? 1) }}"
+                },
+                success: function (res) {
+                    const badge = $('#googleAuthBadge');
+                    if (res && res.is_connected) {
+                        const emailLabel = res.connected_email ? ' (' + res.connected_email + ')' : '';
+                        badge.attr('class', 'badge bg-success text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                             .attr('href', (res && res.login_url) ? res.login_url : '#')
+                             .attr('title', 'Connected Email: ' + (res.connected_email || 'Google Workspace') + ' (Click to Re-connect or Manage)')
+                             .html('<i class="feather-check-circle me-1"></i>Gmail Connected' + emailLabel);
+                    } else {
+                        badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                             .attr('href', (res && res.login_url) ? res.login_url : '#')
+                             .attr('title', 'Click to authenticate Google Account')
+                             .html('<i class="feather-alert-triangle me-1"></i>Gmail Disconnected (Click to Connect)');
+                    }
+                },
+                error: function () {
+                    const badge = $('#googleAuthBadge');
+                    badge.attr('class', 'badge bg-warning text-dark text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                         .html('<i class="feather-alert-circle me-1"></i>Auth Check Error');
+                }
+            });
+        }
+        checkGoogleAuthStatus();
+
+        // Handle AI Health Sync
+        $('#btnSyncHealth').on('click', function () {
+            const btn = $(this);
+            const origHtml = btn.html();
+            btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Syncing...');
+
+            $.ajax({
+                url: "{{ route('crm.deals.syncHealth', $deal->id) }}",
+                method: "POST",
+                data: {
+                    _token: "{{ csrf_token() }}"
+                },
+                success: function (res) {
+                    btn.prop('disabled', false).html(origHtml);
+
+                    if (res.message) {
+                        $('#syncDiagnosticText').html('<strong>Sync Diagnostic:</strong> ' + res.message);
+                        $('#syncDiagnosticNotice').removeClass('d-none');
+                    }
+
+                    if (res.success) {
+                        $('#healthScoreDisplay').text(res.health_score);
+                        $('#sentimentDisplay').html('<i class="feather-smile text-success me-1"></i>' + res.sentiment_score);
+                        $('#nextActionDisplay').text(res.next_best_action);
+                        $('#syncedAtDisplay').html('<i class="feather-clock me-1"></i>' + res.health_synced_at);
+
+                        const risk = (res.risk_level || 'Low').toLowerCase();
+                        let badgeClass = 'bg-success text-white';
+                        if (risk === 'high') badgeClass = 'bg-danger text-white';
+                        else if (risk === 'medium') badgeClass = 'bg-warning text-dark';
+
+                        $('#riskLevelDisplay').attr('class', 'badge px-2.5 py-1 fs-11 fw-bold ' + badgeClass).text(res.risk_level + ' Risk');
+
+                        // Silent update on success without opening modal popup
+                    } else {
+                        if (res.auth_connected === false) {
+                            const badge = $('#googleAuthBadge');
+                            badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                                 .attr('href', res.login_url || '#')
+                                 .attr('target', '_blank')
+                                 .attr('title', 'Token Expired - Click to Re-authenticate Google Account')
+                                 .html('<i class="feather-alert-triangle me-1"></i>Gmail Expired (Click to Re-connect)');
+                        }
+                        showNotificationModal(false, 'AI Sync Notification', res.message || 'API Sync Failed.');
+                    }
+                },
+                error: function () {
+                    btn.prop('disabled', false).html(origHtml);
+                    showNotificationModal(false, 'Connection Error', 'API Server Error: Could not connect to Deal Health Engine.');
+                }
+            });
+        });
+
+        // Handle AI Email Draft Generation
+        $('#btnGenerateDraft').on('click', function () {
+            const btn = $(this);
+            const origHtml = btn.html();
+            btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Generating Draft...');
+
+            $.ajax({
+                url: "{{ route('crm.deals.generateDraftReply', $deal->id) }}",
+                method: "POST",
+                data: {
+                    _token: "{{ csrf_token() }}"
+                },
+                success: function (res) {
+                    btn.prop('disabled', false).html(origHtml);
+                    if (res.success) {
+                        $('#aiDraftSubject').val(res.subject);
+                        $('#aiDraftBody').val(res.body);
+                        const draftModal = new bootstrap.Modal(document.getElementById('aiDraftModal'));
+                        draftModal.show();
+                    }
+                },
+                error: function () {
+                    btn.prop('disabled', false).html(origHtml);
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error('Failed to generate AI Draft Reply.');
+                    }
+                }
+            });
+        });
+
+        // Handle Copy to Clipboard
+        $('#btnCopyDraft').on('click', function () {
+            const text = $('#aiDraftBody').val();
+            navigator.clipboard.writeText(text).then(function() {
+                if (typeof toastr !== 'undefined') {
+                    toastr.success('AI Draft copied to clipboard!');
+                } else {
+                    alert('Copied to clipboard!');
+                }
+            });
+        });
+    </script>
+
+    <!-- AI EMAIL DRAFT MODAL -->
+    <x-ui.modal id="aiDraftModal" title="<i class='feather-mail text-primary me-1.5'></i>AI Generated Email Reply Draft" size="lg" :centered="true" :showFooter="false">
+        <div class="mb-3">
+            <x-ui.modal-form-ui type="input" label="Subject" id="aiDraftSubject" readonly="true" />
+        </div>
+        <div class="mb-3">
+            <x-ui.modal-form-ui type="textarea" label="Message Body" id="aiDraftBody" rows="10" />
+        </div>
+        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+            <span class="fs-11 text-muted"><i class="feather-info me-1"></i>You can edit the message before sending or copying.</span>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">Close</button>
+                <button type="button" id="btnCopyDraft" class="btn btn-sm btn-primary fw-bold">
+                    <i class="feather-copy me-1"></i>Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </x-ui.modal>
+
+    <!-- SEND QUOTATION EMAIL MODAL WITH PDF ATTACHMENT -->
+    <x-ui.modal id="sendQuotationEmailModal" title="<i class='feather-send text-success me-1.5'></i>Send Quotation PDF Email to Client" size="lg" :centered="true" :showFooter="false">
+        <form id="sendQuotationEmailForm" action="" method="POST">
+            @csrf
+            @php
+                $availableSmtps = \App\Models\EmailConfiguration::where('is_active', true)->orderByDesc('is_default')->get();
+            @endphp
+            @if($availableSmtps->isNotEmpty())
+                <div class="mb-3">
+                    <x-ui.modal-form-ui type="select" label="From SMTP Account" name="account_id" :searchable="false">
+                        @foreach($availableSmtps as $s)
+                            <option value="{{ $s->id }}" @selected($s->is_default)>{{ $s->name }} ({{ $s->email_address }})</option>
+                        @endforeach
+                    </x-ui.modal-form-ui>
+                </div>
+            @endif
+
+            <div class="mb-3">
+                <x-ui.modal-form-ui type="input" inputType="email" label="Client Email Address (To)" name="to_email" id="sendQuoteToEmail" placeholder="client@company.com" :required="true" />
+            </div>
+
+            <div class="mb-3">
+                <x-ui.modal-form-ui type="input" label="Subject" name="subject" id="sendQuoteSubject" :required="true" />
+            </div>
+
+            <div class="p-2.5 rounded border bg-light-subtle mb-3 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-paperclip text-primary fs-16"></i>
+                    <span class="fs-12 fw-bold text-dark" id="sendQuotePdfBadge">Quotation.pdf</span>
+                    <span class="badge bg-soft-danger text-danger border px-1.5 py-0.5 fs-10">PDF Attached</span>
+                </div>
+                <span class="fs-11 text-muted">Auto-generated via DomPDF</span>
+            </div>
+
+            <div class="mb-3">
+                <x-ui.modal-form-ui type="textarea" label="Message Body" name="body_html" id="sendQuoteBody" rows="6" :required="true" />
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                <span class="fs-11 text-muted"><i class="feather-info me-1"></i>Email will be dispatched immediately via SMTP server.</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="btnSubmitSendQuoteEmail" class="btn btn-sm btn-success fw-bold px-4">
+                        <i class="feather-send me-1"></i>Send Email Now
+                    </button>
+                </div>
+            </div>
+        </form>
+    </x-ui.modal>
+
+    <!-- SEND QUOTATION WHATSAPP MODAL -->
+    <x-ui.modal id="sendQuotationWhatsAppModal" title="<i class='feather-message-circle text-success me-1.5'></i>Send Quotation PDF via WhatsApp" size="lg" :centered="true" :showFooter="false">
+        <form id="sendQuotationWhatsAppForm" action="" method="POST">
+            @csrf
+            
+            <!-- WhatsApp Connection Status Banner -->
+            <div id="waStatusContainer" class="p-3 rounded border mb-3 text-start fs-12 bg-light">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="waStatusBadge" class="badge bg-secondary">Checking WhatsApp...</span>
+                        <span id="waStatusText" class="text-muted fs-11">Connecting to WhatsApp Baileys bridge...</span>
+                    </div>
+                    <button type="button" id="btnConnectWA" class="btn btn-xs btn-outline-success fw-bold d-none">
+                        <i class="feather-smartphone me-1"></i>Connect / QR Scan
+                    </button>
+                </div>
+                <div id="waQrContainer" class="text-center mt-3 d-none">
+                    <p class="fs-12 fw-bold text-dark mb-1">Scan QR Code from WhatsApp app (Linked Devices)</p>
+                    <img id="waQrImg" src="" alt="WhatsApp QR Code" class="img-thumbnail" style="max-width: 200px;">
+                    <p class="fs-11 text-muted mt-1">Open WhatsApp on your phone -> Settings/Menu -> Linked Devices -> Link a Device</p>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <x-ui.modal-form-ui type="input" label="Recipient Mobile / WhatsApp Number" name="phone" id="sendWaPhone" placeholder="9876543210 (Country code 91 auto-added)" :required="true" />
+            </div>
+
+            <div class="p-2.5 rounded border bg-light-subtle mb-3 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-paperclip text-success fs-16"></i>
+                    <span class="fs-12 fw-bold text-dark" id="sendWaPdfBadge">Quotation.pdf</span>
+                    <span class="badge bg-soft-success text-success border px-1.5 py-0.5 fs-10">PDF Attached</span>
+                </div>
+                <span class="fs-11 text-muted">Base64 PDF Attachment</span>
+            </div>
+
+            <div class="mb-3">
+                <x-ui.modal-form-ui type="textarea" label="Caption / Message Text" name="caption" id="sendWaCaption" rows="5" :required="true" />
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                <span class="fs-11 text-muted"><i class="feather-info me-1"></i>Document will be sent directly via linked WhatsApp account.</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="btnSubmitSendQuoteWA" class="btn btn-sm btn-success fw-bold px-4">
+                        <i class="feather-send me-1"></i>Send WhatsApp PDF
+                    </button>
+                </div>
+            </div>
+        </form>
+    </x-ui.modal>
+
+    <!-- RESULT NOTIFICATION MODAL (COMMON COMPONENT) -->
+    <x-ui.modal id="waResultModal" title="<i class='feather-info me-1.5 text-primary'></i>System Notification" size="lg" :centered="true" :showFooter="false">
+        <div class="py-4 px-3 text-center">
+            <div id="waResultIcon" class="mb-3 d-flex justify-content-center"></div>
+            <h4 id="waResultTitle" class="fw-bold text-dark mb-3 fs-18"></h4>
+            <div id="waResultMessage" class="alert alert-light border text-center fs-13 mb-4 font-monospace p-3.5 text-break shadow-2xs rounded-3 mx-auto" style="max-width: 520px; background-color: #f8fafc; border-color: #e2e8f0 !important; color: #334155; line-height: 1.6;"></div>
+            <div class="d-flex justify-content-center mt-3">
+                <button type="button" class="btn btn-primary fw-bold px-5 py-2 fs-13 shadow-2xs rounded-3" data-bs-dismiss="modal" style="min-width: 140px;">OK</button>
+            </div>
+        </div>
+    </x-ui.modal>
+
+    <script>
+        function showNotificationModal(isSuccess, title, message) {
+            const iconHtml = isSuccess 
+                ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
+                : '<div class="avatar avatar-xl bg-soft-danger text-danger rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(239, 68, 68, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
+            
+            $('#waResultIcon').html(iconHtml);
+            $('#waResultTitle').text(title).attr('class', isSuccess ? 'fw-bold text-success mb-2 fs-18' : 'fw-bold text-danger mb-2 fs-18');
+            $('#waResultMessage').text(message);
+            
+            const modalEl = document.getElementById('waResultModal');
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+
+        function checkWhatsAppStatus() {
+            $.ajax({
+                url: "/crm/whatsapp/status",
+                method: "GET",
+                success: function(res) {
+                    if (res.status === 'connected') {
+                        $('#waStatusBadge').attr('class', 'badge bg-success').text('Connected');
+                        const userName = res.user ? (res.user.name || res.user.id || 'Linked Account') : 'Linked Account';
+                        $('#waStatusText').text('Connected: ' + userName);
+                        $('#waQrContainer').addClass('d-none');
+                        $('#btnConnectWA').addClass('d-none');
+                        $('#btnSubmitSendQuoteWA').prop('disabled', false);
+                    } else if (res.status === 'qr' && res.qr) {
+                        $('#waStatusBadge').attr('class', 'badge bg-warning text-dark').text('Scan QR');
+                        $('#waStatusText').text('Open WhatsApp app on your phone to scan QR code');
+                        $('#waQrImg').attr('src', res.qr);
+                        $('#waQrContainer').removeClass('d-none');
+                        $('#btnConnectWA').addClass('d-none');
+                        $('#btnSubmitSendQuoteWA').prop('disabled', true);
+                    } else if (res.status === 'connecting') {
+                        $('#waStatusBadge').attr('class', 'badge bg-info text-dark').text('Connecting...');
+                        $('#waStatusText').text('Initializing Baileys socket...');
+                        $('#waQrContainer').addClass('d-none');
+                        $('#btnConnectWA').addClass('d-none');
+                        $('#btnSubmitSendQuoteWA').prop('disabled', true);
+                    } else {
+                        $('#waStatusBadge').attr('class', 'badge bg-danger').text('Disconnected');
+                        $('#waStatusText').text(res.message || 'No WhatsApp account linked.');
+                        $('#waQrContainer').addClass('d-none');
+                        $('#btnConnectWA').removeClass('d-none');
+                        $('#btnSubmitSendQuoteWA').prop('disabled', true);
+                    }
+                },
+                error: function() {
+                    $('#waStatusBadge').attr('class', 'badge bg-danger').text('Bridge Offline');
+                    $('#waStatusText').text('Node.js WhatsApp bridge is offline. Start Node.js server (services/whatsapp-bridge).');
+                    $('#btnConnectWA').removeClass('d-none');
+                }
+            });
+        }
+
+        $(document).on('click', '#btnConnectWA', function() {
+            $('#waStatusBadge').attr('class', 'badge bg-info text-dark').text('Connecting...');
+            $('#waStatusText').text('Requesting QR code connection...');
+            $.ajax({
+                url: "/crm/whatsapp/connect",
+                method: "POST",
+                data: { _token: "{{ csrf_token() }}" },
+                success: function() {
+                    setTimeout(checkWhatsAppStatus, 1500);
+                }
+            });
+        });
+
+        $(document).on('click', '.btn-open-send-quote-wa-modal', function () {
+            const qId = $(this).attr('data-quotation-id');
+            const qNum = $(this).attr('data-quotation-num');
+            const cPhone = $(this).attr('data-client-phone') || '';
+            const dTitle = $(this).attr('data-deal-title') || '{{ addslashes($deal->title) }}';
+
+            $('#sendQuotationWhatsAppForm').attr('action', '/crm/quotations/' + qId + '/send-whatsapp');
+            $('#sendWaPhone').val(cPhone);
+            $('#sendWaPdfBadge').text('Quotation_' + qNum + '.pdf');
+
+            const defaultCaption = "Dear Valued Client,\n\nPlease find attached Quotation *" + qNum + "* for your review regarding " + dTitle + ".\n\nThank you,\nSales Team";
+            $('#sendWaCaption').val(defaultCaption);
+
+            const sendWaModal = new bootstrap.Modal(document.getElementById('sendQuotationWhatsAppModal'));
+            sendWaModal.show();
+            checkWhatsAppStatus();
+        });
+
+        $(document).on('submit', '#sendQuotationWhatsAppForm', function (e) {
+            e.preventDefault();
+            const form = $(this);
+            const btn = $('#btnSubmitSendQuoteWA');
+            const origHtml = btn.html();
+
+            btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Sending WhatsApp...');
+
+            $.ajax({
+                url: form.attr('action'),
+                method: "POST",
+                data: form.serialize(),
+                success: function (res) {
+                    btn.prop('disabled', false).html(origHtml);
+                    const modalEl = document.getElementById('sendQuotationWhatsAppModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    showNotificationModal(true, "WhatsApp Message Delivered!", res.message);
+                },
+                error: function (xhr) {
+                    btn.prop('disabled', false).html(origHtml);
+                    const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to send WhatsApp document.';
+                    const modalEl = document.getElementById('sendQuotationWhatsAppModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    showNotificationModal(false, "WhatsApp Dispatch Failed", errMsg);
+                }
+            });
+        });
+
+        $(document).on('click', '.btn-open-send-quote-modal', function () {
+            const qId = $(this).attr('data-quotation-id');
+            const qNum = $(this).attr('data-quotation-num');
+            const cEmail = $(this).attr('data-client-email') || '';
+            const dTitle = $(this).attr('data-deal-title') || '{{ addslashes($deal->title) }}';
+
+            $('#sendQuotationEmailForm').attr('action', '/crm/quotations/' + qId + '/send-email');
+            $('#sendQuoteToEmail').val(cEmail);
+            $('#sendQuoteSubject').val('Quotation ' + qNum + ' - ' + dTitle);
+            $('#sendQuotePdfBadge').text('Quotation_' + qNum + '.pdf');
+
+            const defaultBody = "Dear Valued Client,\n\nPlease find attached Quotation " + qNum + " for your review regarding " + dTitle + ".\n\nWe look forward to your feedback. Please let us know if you have any questions.\n\nBest regards,\nSales Team";
+            $('#sendQuoteBody').val(defaultBody);
+
+            const sendModal = new bootstrap.Modal(document.getElementById('sendQuotationEmailModal'));
+            sendModal.show();
+        });
+
+        $(document).on('submit', '#sendQuotationEmailForm', function (e) {
+            e.preventDefault();
+            const form = $(this);
+            const btn = $('#btnSubmitSendQuoteEmail');
+            const origHtml = btn.html();
+
+            btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Sending Email...');
+
+            $.ajax({
+                url: form.attr('action'),
+                method: "POST",
+                data: form.serialize(),
+                success: function (res) {
+                    btn.prop('disabled', false).html(origHtml);
+                    const modalEl = document.getElementById('sendQuotationEmailModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    showNotificationModal(true, "Quotation Email Dispatched!", res.message);
+                },
+                error: function (xhr) {
+                    btn.prop('disabled', false).html(origHtml);
+                    const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to send Quotation Email.';
+                    const modalEl = document.getElementById('sendQuotationEmailModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    showNotificationModal(false, "Email Dispatch Failed", errMsg);
+                }
+            });
         });
     </script>
     @endpush

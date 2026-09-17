@@ -147,11 +147,10 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         }
 
         $user = auth()->user();
-        $isAdmin = true;
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $isAdmin = $isHrAdmin;
 
-        $employee = Employee::where('personal_email', $user->email)
-            ->orWhere('office_email', $user->email)
-            ->first();
+        $employee = Employee::resolveForUser($user);
 
         $allEmployees = Employee::where('status', true)->get();
 
@@ -194,6 +193,13 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
 
         $query = LeaveRequest::query()->with(['employee', 'leaveType']);
         $encashQuery = LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
+
+        // 🔒 Restrict ordinary employees to their OWN records only
+        if (!$isHrAdmin) {
+            $empId = $employee ? $employee->id : 0;
+            $query->where('employee_id', $empId);
+            $encashQuery->where('employee_id', $empId);
+        }
 
         // Apply filters to Leave Requests
         if (!empty($leavesEmployeeId)) {

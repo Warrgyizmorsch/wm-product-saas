@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BranchSwitchController;
 use App\Http\Controllers\CompanySwitchController;
+use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\TenantSwitchController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +20,9 @@ Route::middleware(['tenant'])->group(function (): void {
     // Public RFQ Vendor Portal
     Route::get('/purchase/rfq-portal/{token}', [\App\Domains\Purchase\Controllers\PurchaseRfqController::class, 'showPortal'])->name('purchase.rfqs.portal');
     Route::post('/purchase/rfq-portal/{token}/submit', [\App\Domains\Purchase\Controllers\PurchaseRfqController::class, 'submitPortal'])->name('purchase.rfqs.portal-submit');
+
+    // Public WhatsApp Webhook Route for Node.js Bridge
+    Route::post('/crm/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'handleWebhook'])->name('crm.whatsapp.webhook');
 
     Route::middleware(['auth', 'company', 'branch'])->group(function (): void {
         Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
@@ -42,6 +47,12 @@ Route::middleware(['tenant'])->group(function (): void {
         Route::get('/dashboard', function () {
             return view('dashboard');
         })->name('dashboard');
+
+        Route::get('/global-search', [GlobalSearchController::class, 'search'])
+            ->name('global-search');
+
+        Route::get('/global-approvals', [ApprovalController::class, 'index'])
+            ->name('global-approvals');
 
         Route::middleware(['module.access'])->group(function (): void {
             foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/web.php'))) as $moduleRoutes) {

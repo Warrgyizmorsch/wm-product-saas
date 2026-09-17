@@ -11,15 +11,22 @@ use App\Domains\CRM\Controllers\LeadStatusController;
 use App\Domains\CRM\Controllers\DealStatusController;
 use App\Domains\CRM\Controllers\QuotationController;
 use App\Domains\CRM\Controllers\CrmSettingsController;
+use App\Domains\CRM\Controllers\CrmDashboardController;
 use App\Domains\CRM\Controllers\GoogleCalendarController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('crm')
     ->as('crm.')
     ->group(function (): void {
+        // CRM Executive Dashboard Routes
+        Route::get('/', fn () => redirect()->route('crm.dashboard'));
+        Route::get('dashboard', [CrmDashboardController::class, 'index'])->name('dashboard');
+        Route::get('dashboard/export/{format}', [CrmDashboardController::class, 'export'])->name('dashboard.export');
+
         // CRM Settings Routes
         Route::get('settings', [CrmSettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/invoicing-policy', [CrmSettingsController::class, 'updateInvoicingPolicy'])->name('settings.update-invoicing-policy');
+        Route::post('settings/quotation-approval-policy', [CrmSettingsController::class, 'updateQuotationApprovalPolicy'])->name('settings.update-quotation-approval-policy');
         // CRM Masters Routes
         Route::prefix('masters')->as('masters.')->group(function (): void {
             Route::get('lead-statuses', [LeadStatusController::class, 'index'])->name('lead-statuses.index');
@@ -54,6 +61,7 @@ Route::prefix('crm')
         Route::get('deals/kanban', [CrmDealController::class, 'kanban'])->name('deals.kanban');
         Route::get('deals/activities', [DealActivityController::class, 'index'])->name('deals.activities');
         Route::get('deals/create', [CrmDealController::class, 'create'])->name('deals.create');
+        Route::get('deals/google-auth-status', [CrmDealController::class, 'checkGoogleAuth'])->name('deals.googleAuthStatus');
         Route::post('deals', [CrmDealController::class, 'store'])->name('deals.store');
         Route::get('deals/{deal}', [CrmDealController::class, 'show'])->name('deals.show');
         Route::get('deals/{deal}/convert-customer', [CrmDealController::class, 'showConvertForm'])->name('deals.showConvertForm');
@@ -65,6 +73,8 @@ Route::prefix('crm')
         Route::delete('deals/{deal}', [CrmDealController::class, 'destroy'])->name('deals.destroy');
         Route::post('deals/{deal}/documents', [CrmDealController::class, 'uploadDocuments'])->name('deals.documents.upload');
         Route::post('deals/{deal}/followups', [LeadFollowupController::class, 'storeDealFollowup'])->name('deals.followups.store');
+        Route::post('deals/{deal}/sync-health', [CrmDealController::class, 'syncHealth'])->name('deals.syncHealth');
+        Route::post('deals/{deal}/generate-draft-reply', [CrmDealController::class, 'generateDraftReply'])->name('deals.generateDraftReply');
         Route::get('leads/create', [LeadController::class, 'create'])
             ->name('leads.create');
         Route::get('leads', [LeadController::class, 'index'])
@@ -155,6 +165,8 @@ Route::prefix('crm')
         Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->name('quotations.show');
         Route::get('quotations/{quotation}/detail-partial', [QuotationController::class, 'detailPartial'])->name('quotations.detail-partial');
         Route::get('quotations/{quotation}/download', [QuotationController::class, 'downloadPdf'])->name('quotations.download');
+        Route::post('quotations/{quotation}/send-email', [QuotationController::class, 'sendEmail'])->name('quotations.sendEmail');
+        Route::post('quotations/{quotation}/send-whatsapp', [QuotationController::class, 'sendWhatsApp'])->name('quotations.sendWhatsApp');
         Route::get('quotations/{quotation}/edit', [QuotationController::class, 'edit'])->name('quotations.edit');
         Route::put('quotations/{quotation}', [QuotationController::class, 'update'])->name('quotations.update');
         Route::patch('quotations/{quotation}/status', [QuotationController::class, 'updateStatus'])->name('quotations.updateStatus');
@@ -163,4 +175,20 @@ Route::prefix('crm')
         Route::post('quotations/{quotation}/approve', [QuotationController::class, 'approve'])->name('quotations.approve');
         Route::post('quotations/{quotation}/reject', [QuotationController::class, 'reject'])->name('quotations.reject');
         Route::delete('quotations/{quotation}', [QuotationController::class, 'destroy'])->name('quotations.destroy');
+
+        // WhatsApp Bridge Integration Routes
+        Route::get('whatsapp-settings', [\App\Http\Controllers\WhatsAppController::class, 'index'])->name('whatsappSettings.index');
+        Route::post('whatsapp/config', [\App\Http\Controllers\WhatsAppController::class, 'updateConfig'])->name('whatsapp.updateConfig');
+        Route::get('whatsapp/status', [\App\Http\Controllers\WhatsAppController::class, 'status'])->name('whatsapp.status');
+        Route::post('whatsapp/connect', [\App\Http\Controllers\WhatsAppController::class, 'connect'])->name('whatsapp.connect');
+        Route::delete('whatsapp/disconnect', [\App\Http\Controllers\WhatsAppController::class, 'disconnect'])->name('whatsapp.disconnect');
+        Route::post('whatsapp/send-message', [\App\Http\Controllers\WhatsAppController::class, 'sendMessage'])->name('whatsapp.sendMessage');
+        Route::get('whatsapp/messages', [\App\Http\Controllers\WhatsAppController::class, 'messages'])->name('whatsapp.messages');
+
+        // SMTP Email Settings Routes
+        Route::get('email-settings', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'index'])->name('emailSettings.index');
+        Route::post('email-settings/store', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'store'])->name('emailSettings.store');
+        Route::post('email-settings/{id}/test', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'testConnection'])->name('emailSettings.test');
+        Route::post('email-settings/{id}/send-test-email', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'sendTestMail'])->name('emailSettings.sendTestMail');
+        Route::delete('email-settings/{id}', [\App\Domains\CRM\Controllers\EmailSettingController::class, 'destroy'])->name('emailSettings.destroy');
     });

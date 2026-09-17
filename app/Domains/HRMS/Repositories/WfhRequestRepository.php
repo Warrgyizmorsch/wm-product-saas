@@ -22,14 +22,10 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
         }
 
         $user = auth()->user();
-        $isAdmin = true;
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $isAdmin = $isHrAdmin;
 
-        $employee = null;
-        if ($user && $user->email) {
-            $employee = Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
-        }
+        $employee = Employee::resolveForUser($user);
 
         $wfhSearch = $inputs['wfh_search'] ?? $inputs['search'] ?? '';
         $wfhEmployeeId = $inputs['wfh_employee_id'] ?? $inputs['employee_id'] ?? '';
@@ -37,6 +33,14 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
         $wfhSort = $inputs['wfh_sort'] ?? $inputs['sort'] ?? 'newest';
 
         $query = WfhRequest::query()->with(['employee', 'approvedByEmployee']);
+        $summaryQuery = WfhRequest::query();
+
+        // 🔒 Restrict ordinary employees to their OWN records only
+        if (!$isHrAdmin) {
+            $empId = $employee ? $employee->id : 0;
+            $query->where('employee_id', $empId);
+            $summaryQuery->where('employee_id', $empId);
+        }
 
         if (!empty($wfhEmployeeId)) {
             $query->where('employee_id', $wfhEmployeeId);
@@ -66,8 +70,6 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
         $requests = $query->paginate(10, ['*'], 'wfh_page')->withQueryString();
 
         // Metric Counts
-        $summaryQuery = WfhRequest::query();
-
         $totalRequests    = (clone $summaryQuery)->count();
         $pendingRequests  = (clone $summaryQuery)->where('status', 'pending')->count();
         $approvedRequests = (clone $summaryQuery)->where('status', 'approved')->count();

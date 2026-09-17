@@ -4,23 +4,29 @@
 @section('page-title', 'General Ledger')
 @section('breadcrumb', 'Accounting / Reports / General Ledger')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'general-ledger'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-5">
-                <x-ui.select label="Accounting Period" name="period_id" :options="$allPeriods->mapWithKeys(fn ($p) => [
-                    $p->id => ($p->fiscalYear?->name) . ' — ' . $p->name . ' (' . $p->status . ')',
-                ])->all()" :selected="$period?->id" />
-            </div>
-            <div class="col-md-5">
-                <x-ui.select label="Account" name="chart_of_account_id" :options="['' => 'Select Account...'] + $accounts->mapWithKeys(fn ($a) => [
-                    $a->id => $a->code . ' - ' . $a->name,
-                ])->all()" :selected="$account?->id" />
-            </div>
-            <div class="col-md-2">
-                <x-ui.button type="submit" variant="primary" class="w-100">View</x-ui.button>
-            </div>
-        </form>
+        <x-ui.filter-toolbar :resetUrl="route('accounting.reports.general-ledger')" searchLabel="View">
+            <x-ui.filter-field label="Accounting Period" col="col-md-5">
+                <select name="period_id" class="form-select form-select-sm">
+                    @foreach ($allPeriods as $p)
+                        <option value="{{ $p->id }}" @selected($period?->id == $p->id)>{{ $p->fiscalYear?->name }} — {{ $p->name }} ({{ $p->status }})</option>
+                    @endforeach
+                </select>
+            </x-ui.filter-field>
+            <x-ui.filter-field label="Account" col="col-md-5">
+                <select name="chart_of_account_id" class="form-select form-select-sm">
+                    <option value="">Select Account...</option>
+                    @foreach ($accounts as $a)
+                        <option value="{{ $a->id }}" @selected($account?->id == $a->id)>{{ $a->code }} - {{ $a->name }}</option>
+                    @endforeach
+                </select>
+            </x-ui.filter-field>
+        </x-ui.filter-toolbar>
     </x-ui.card>
 
     <x-ui.card bodyClass="{{ $account ? 'p-0' : '' }}">

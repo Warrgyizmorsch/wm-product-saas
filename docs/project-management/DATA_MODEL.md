@@ -175,7 +175,7 @@ erDiagram
 ---
 
 ### 1.6 `project_sub_tasks`
-- **Purpose:** Subtasks and itemized checklist under parent tasks.
+- **Purpose:** Subtasks and itemized checklist under parent tasks with execution metadata.
 - **Model:** [`App\Domains\Projects\Models\SubTask`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Projects/Models/SubTask.php)
 - **Primary Key:** `id` (bigint unsigned)
 - **Tenant Ownership:** `tenant_id`, `company_id`, `branch_id`
@@ -184,11 +184,16 @@ erDiagram
   - `assignee_id` -> `users(id)` ON DELETE SET NULL
 - **Key Columns:**
   - `title`: string
-  - `is_completed`: boolean, default false
+  - `status`: string, default 'Open' (`Open`, `In Progress`, `Review`, `On Hold`, `Completed`, `Cancelled`)
+  - `is_completed`: boolean, default false (synchronized: `status === 'Completed'`)
+  - `start_date`: date, nullable
+  - `due_date`: date, nullable
+  - `estimated_hours`: decimal(8,2), nullable
   - `position`: unsigned integer, default 0
-  - `completed_at`: timestamp, nullable
+  - `completed_at`: timestamp, nullable (synchronized: set on Completed, cleared otherwise)
 - **Constraints & Indexes:**
   - INDEX: `['tenant_id', 'task_id']`
+  - INDEX: `['tenant_id', 'status']`
   - INDEX: `['task_id', 'position']`
 - **Soft Deletes:** Yes (`deleted_at`)
 - **Status:** **ACTIVE / IN USE**
@@ -196,7 +201,7 @@ erDiagram
 ---
 
 ### 1.7 `project_task_dependencies`
-- **Purpose:** Directed dependency edge between tasks (Task A depends on Task B).
+- **Purpose:** Directed dependency edge between tasks (Task A depends on Task B) with relationship classification.
 - **Model:** [`App\Domains\Projects\Models\TaskDependency`](file:///c:/Users/windo/Documents/GitHub/wm-product-saas/app/Domains/Projects/Models/TaskDependency.php)
 - **Primary Key:** `id` (bigint unsigned)
 - **Tenant Ownership:** `tenant_id`, `company_id`, `branch_id`
@@ -204,9 +209,12 @@ erDiagram
   - `project_id` -> `projects(id)` ON DELETE CASCADE
   - `task_id` -> `project_tasks(id)` ON DELETE CASCADE
   - `depends_on_task_id` -> `project_tasks(id)` ON DELETE CASCADE
+- **Key Columns:**
+  - `dependency_type`: string, default 'Finish-to-Start' (`Finish-to-Start`, `Start-to-Start`, `Finish-to-Finish`, `Start-to-Finish`)
 - **Constraints & Indexes:**
   - UNIQUE: `['task_id', 'depends_on_task_id']`
   - INDEX: `['tenant_id', 'project_id']`
+  - INDEX: `['tenant_id', 'dependency_type']`
 - **Soft Deletes:** None
 - **Status:** **ACTIVE / IN USE**
 

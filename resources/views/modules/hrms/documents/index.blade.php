@@ -305,14 +305,17 @@
                                                             </small>
                                                         </div>
                                                     </div>
-                                                    <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
-                                                        <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="View Copy">
-                                                            <i class="feather-eye fs-11"></i>
-                                                        </a>
-                                                        <a href="{{ asset('storage/' . $doc->file_path) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="Download Copy">
-                                                            <i class="feather-download fs-11"></i>
-                                                        </a>
-                                                    </div>
+                                                     <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
+                                                         @php
+                                                             $activeDocFile = ($doc->is_signed && $doc->signed_file_path) ? $doc->signed_file_path : $doc->file_path;
+                                                         @endphp
+                                                         <a href="{{ $doc->is_signed ? route('hrms.employees.documents.view-signed', $doc->id) : asset('storage/' . $activeDocFile) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? 'View Signed Document' : 'View Copy' }}">
+                                                             <i class="{{ $doc->is_signed ? 'feather-check-circle text-success' : 'feather-eye' }} fs-11"></i>
+                                                         </a>
+                                                         <a href="{{ asset('storage/' . $activeDocFile) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? 'Download Signed Copy' : 'Download Copy' }}">
+                                                             <i class="feather-download fs-11"></i>
+                                                         </a>
+                                                     </div>
                                                 </div>
                                             @else
                                                 <span class="text-muted fs-12" style="font-style: italic; font-weight: 500; padding-left: 8px;">

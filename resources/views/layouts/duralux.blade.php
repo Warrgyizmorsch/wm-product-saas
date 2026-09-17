@@ -28,6 +28,10 @@
             }
         })();
         (function () {
+            var savedSkin = localStorage.getItem('app-skin-dark') || localStorage.getItem('app-skin');
+            if (savedSkin === 'app-skin-dark') {
+                document.documentElement.classList.add('app-skin-dark');
+            }
             var savedColor = localStorage.getItem('erp_primary_color');
             if (savedColor) {
                 document.documentElement.style.setProperty('--bs-primary', savedColor);
@@ -62,6 +66,9 @@
         .nxl-container .nxl-content .main-content {
             padding: 10px !important;
         }
+        .dark-light-theme .light-button {
+            display: none;
+        }
     </style>
     @stack('styles')
 </head>
@@ -84,7 +91,16 @@
                         </div>
                     @endif
                     <div class="page-header-title">
-                        <h5 class="m-b-10">@yield('page-title', __('ui.dashboard'))</h5>
+                        <h5 class="m-b-10">
+                            @yield('page-title', __('ui.dashboard'))
+                            {{-- Ledger amounts carry no symbol of their own; say once, per page, what they are in. --}}
+                            @if (request()->routeIs('accounting.*') && ! request()->routeIs('accounting.exchange-rates.*') && company())
+                                @php($reportingCurrency = company_currency())
+                                <span class="badge bg-soft-primary text-primary fs-11 fw-semibold ms-2 align-middle" title="{{ $reportingCurrency['name'] }} — the company's base currency">
+                                    Amounts in {{ $reportingCurrency['code'] }} ({{ $reportingCurrency['symbol'] }})
+                                </span>
+                            @endif
+                        </h5>
                     </div>
                     <ul class="breadcrumb">
                         <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('ui.home') }}</a></li>
@@ -212,6 +228,38 @@
                     localStorage.setItem('erp_primary_color', color);
                 });
             }
+        });
+
+        // Dark / Light Mode Toggle Handler
+        $(document).ready(function () {
+            function syncThemeUI(isDark) {
+                if (isDark) {
+                    $('.dark-button').hide().addClass('active');
+                    $('.light-button').show().removeClass('active');
+                } else {
+                    $('.light-button').hide().removeClass('active');
+                    $('.dark-button').show().removeClass('active');
+                }
+            }
+
+            var initialDark = $('html').hasClass('app-skin-dark');
+            syncThemeUI(initialDark);
+
+            $(document).on('click', '.dark-button', function (e) {
+                e.preventDefault();
+                $('html').addClass('app-skin-dark');
+                localStorage.setItem('app-skin-dark', 'app-skin-dark');
+                localStorage.setItem('app-skin', 'app-skin-dark');
+                syncThemeUI(true);
+            });
+
+            $(document).on('click', '.light-button', function (e) {
+                e.preventDefault();
+                $('html').removeClass('app-skin-dark');
+                localStorage.setItem('app-skin-dark', 'app-skin-light');
+                localStorage.setItem('app-skin', 'app-skin-light');
+                syncThemeUI(false);
+            });
         });
 
         // Generic Quick Create Master Dropdown handler (Supports Single & Multiselect)

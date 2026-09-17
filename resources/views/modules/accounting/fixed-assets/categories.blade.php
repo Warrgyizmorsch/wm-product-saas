@@ -13,31 +13,38 @@
             Add Category
         </x-ui.button>
     </div>
+    <x-ui.filter label="Filters">
+        <form method="GET">
+            <x-ui.input label="Search" name="search" :value="request('search')" placeholder="Category name or description..." />
+            <x-ui.select label="Company" name="company_id" :selected="request('company_id')" :options="
+                ['' => 'All Companies'] + $companies->pluck('company_name', 'id')->all()
+            " />
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                <x-ui.button href="{{ route('accounting.fixed-assets.categories.index') }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+            </div>
+        </form>
+    </x-ui.filter>
 @endsection
 
 @section('content')
-    <x-ui.card class="mb-4">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label fw-semibold fs-12 text-uppercase text-muted mb-1">Search</label>
-                <input type="text" name="search" class="form-control form-control-sm" placeholder="Category name or description..." value="{{ request('search') }}">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold fs-12 text-uppercase text-muted mb-1">Company</label>
-                <select name="company_id" class="form-select form-select-sm">
-                    <option value="">All Companies</option>
-                    @foreach($companies as $company)
-                        <option value="{{ $company->id }}" @selected(request('company_id') == $company->id)>{{ $company->company_name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-sm btn-light border w-100">Apply</button>
-            </div>
-        </form>
-    </x-ui.card>
-
     <x-ui.card bodyClass="p-0">
+        <div class="d-flex align-items-center gap-3 p-3 border-bottom">
+            <form method="GET" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 280px; max-width: 360px;">
+                <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                <input type="text" name="search" value="{{ request('search') }}" class="form-control border-0 bg-transparent p-0 fs-13"
+                       placeholder="Search category name or description..." style="box-shadow: none; height: 32px;">
+                @if (!empty(request('search')))
+                    <a href="{{ route('accounting.fixed-assets.categories.index', collect(request()->query())->except('search')->filter()->all()) }}" class="text-muted ms-2" title="Clear search">
+                        <i class="feather-x" style="font-size: 14px;"></i>
+                    </a>
+                @endif
+                @if (!empty(request('company_id')))
+                    <input type="hidden" name="company_id" value="{{ request('company_id') }}">
+                @endif
+            </form>
+        </div>
+
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
@@ -131,52 +138,32 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" label="Company" name="company_id" :required="true">
-                                    <option value="">Select company...</option>
-                                    @foreach($companies as $company)
-                                        <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Company" name="company_id" :required="true" :options="['' => 'Select company...'] + $companies->pluck('company_name', 'id')->all()" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="Category Name" name="name" placeholder="e.g. IT Hardware, Plant Machinery" :required="true" />
+                                <x-ui.icon-input label="Category Name" icon="feather-tag" name="name" placeholder="e.g. IT Hardware, Plant Machinery" :required="true" />
                             </div>
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Brief details about what items go into this category..." />
                             </div>
-                            <div class="col-md-4">
-                                <x-ui.odoo-form-ui type="select" label="Fixed Asset Account" name="fixed_asset_account_id">
-                                    <option value="">Use default (1500)</option>
-                                    @foreach($chartOfAccounts as $acc)
-                                        <option value="{{ $acc->id }}">{{ $acc->code }} - {{ $acc->name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="col-md-4">
-                                <x-ui.odoo-form-ui type="select" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id">
-                                    <option value="">Use default (1510)</option>
-                                    @foreach($chartOfAccounts as $acc)
-                                        <option value="{{ $acc->id }}">{{ $acc->code }} - {{ $acc->name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="col-md-4">
-                                <x-ui.odoo-form-ui type="select" label="Depreciation Expense Account" name="depreciation_expense_account_id">
-                                    <option value="">Use default (5800)</option>
-                                    @foreach($chartOfAccounts as $acc)
-                                        <option value="{{ $acc->id }}">{{ $acc->code }} - {{ $acc->name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
+                            <div class="col-md-6">
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" :options="['' => 'Use default (1500)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" label="Default Depreciation Method" name="default_depreciation_method">
-                                    <option value="">Straight Line (default)</option>
-                                    <option value="straight_line">Straight Line</option>
-                                    <option value="wdv">Written Down Value (WDV)</option>
-                                </x-ui.odoo-form-ui>
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id" :options="['' => 'Use default (1510)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" inputType="number" label="Default Useful Life (months)" name="default_useful_life_months" placeholder="e.g. 36" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Depreciation Expense Account" name="depreciation_expense_account_id" :options="['' => 'Use default (5800)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Default Depreciation Method" name="default_depreciation_method" :options="[
+                                    '' => 'Straight Line (default)',
+                                    'straight_line' => 'Straight Line',
+                                    'wdv' => 'Written Down Value (WDV)',
+                                ]" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.icon-input label="Default Useful Life (months)" icon="feather-clock" type="number" name="default_useful_life_months" placeholder="e.g. 36" />
                             </div>
                             <div class="col-12">
                                 <div class="form-check">
@@ -203,52 +190,32 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" label="Company" name="company_id" id="edit_category_company_id" :required="true">
-                                    <option value="">Select company...</option>
-                                    @foreach($companies as $company)
-                                        <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Company" name="company_id" id="edit_category_company_id" :required="true" :options="['' => 'Select company...'] + $companies->pluck('company_name', 'id')->all()" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="Category Name" name="name" id="edit_category_name" :required="true" />
+                                <x-ui.icon-input label="Category Name" icon="feather-tag" name="name" id="edit_category_name" :required="true" />
                             </div>
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_category_description" />
                             </div>
-                            <div class="col-md-4">
-                                <x-ui.odoo-form-ui type="select" label="Fixed Asset Account" name="fixed_asset_account_id" id="edit_category_fixed_asset_account_id">
-                                    <option value="">Use default (1500)</option>
-                                    @foreach($chartOfAccounts as $acc)
-                                        <option value="{{ $acc->id }}">{{ $acc->code }} - {{ $acc->name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="col-md-4">
-                                <x-ui.odoo-form-ui type="select" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id" id="edit_category_accumulated_depreciation_account_id">
-                                    <option value="">Use default (1510)</option>
-                                    @foreach($chartOfAccounts as $acc)
-                                        <option value="{{ $acc->id }}">{{ $acc->code }} - {{ $acc->name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="col-md-4">
-                                <x-ui.odoo-form-ui type="select" label="Depreciation Expense Account" name="depreciation_expense_account_id" id="edit_category_depreciation_expense_account_id">
-                                    <option value="">Use default (5800)</option>
-                                    @foreach($chartOfAccounts as $acc)
-                                        <option value="{{ $acc->id }}">{{ $acc->code }} - {{ $acc->name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
+                            <div class="col-md-6">
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" id="edit_category_fixed_asset_account_id" :options="['' => 'Use default (1500)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" label="Default Depreciation Method" name="default_depreciation_method" id="edit_category_default_depreciation_method">
-                                    <option value="">Straight Line (default)</option>
-                                    <option value="straight_line">Straight Line</option>
-                                    <option value="wdv">Written Down Value (WDV)</option>
-                                </x-ui.odoo-form-ui>
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id" id="edit_category_accumulated_depreciation_account_id" :options="['' => 'Use default (1510)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" inputType="number" label="Default Useful Life (months)" name="default_useful_life_months" id="edit_category_default_useful_life_months" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Depreciation Expense Account" name="depreciation_expense_account_id" id="edit_category_depreciation_expense_account_id" :options="['' => 'Use default (5800)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Default Depreciation Method" name="default_depreciation_method" id="edit_category_default_depreciation_method" :options="[
+                                    '' => 'Straight Line (default)',
+                                    'straight_line' => 'Straight Line',
+                                    'wdv' => 'Written Down Value (WDV)',
+                                ]" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.icon-input label="Default Useful Life (months)" icon="feather-clock" type="number" name="default_useful_life_months" id="edit_category_default_useful_life_months" />
                             </div>
                             <div class="col-12">
                                 <div class="form-check">

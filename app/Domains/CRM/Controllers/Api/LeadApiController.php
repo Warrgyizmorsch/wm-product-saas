@@ -23,21 +23,23 @@ class LeadApiController extends Controller
 {
     /**
      * Shared validation rules with dynamic conditional checks:
-     * 1) If company_name is present => company_email is REQUIRED; contact_person & email are OPTIONAL.
-     * 2) If company_name is NOT present => company_email is OPTIONAL; contact_person & email are REQUIRED.
+     * 1) B2B (Company Lead): If company_name OR company_email is provided => BOTH company_name AND company_email are REQUIRED.
+     * 2) B2C (Individual Lead): If company details are NOT provided => BOTH contact_person AND email are REQUIRED.
      */
     private function leadRules(array $data = []): array
     {
-        $hasCompany = !empty(trim($data['company_name'] ?? ''));
+        $hasCompanyName  = !empty(trim($data['company_name'] ?? ''));
+        $hasCompanyEmail = !empty(trim($data['company_email'] ?? ''));
+        $isB2B           = $hasCompanyName || $hasCompanyEmail;
 
         return [
-            'company_name'       => 'nullable|string|max:255',
+            'company_name'       => $isB2B ? 'required|string|max:255' : 'nullable|string|max:255',
             'gstin'              => 'nullable|string|max:100',
-            'company_email'      => $hasCompany ? 'required|email|max:255' : 'nullable|email|max:255',
+            'company_email'      => $isB2B ? 'required|email|max:255' : 'nullable|email|max:255',
             'company_phone'      => 'nullable|string|max:50',
-            'contact_person'     => $hasCompany ? 'nullable|string|max:255' : 'required|string|max:255',
+            'contact_person'     => $isB2B ? 'nullable|string|max:255' : 'required|string|max:255',
             'designation'        => 'nullable|string|max:255',
-            'email'              => $hasCompany ? 'nullable|email|max:255' : 'required|email|max:255',
+            'email'              => $isB2B ? 'nullable|email|max:255' : 'required|email|max:255',
             'phone'              => 'nullable|string|max:50',
             'lead_owner_id'      => 'nullable|integer',
             'expected_sale_date' => 'nullable|date',
@@ -66,9 +68,10 @@ class LeadApiController extends Controller
     private function leadValidationMessages(): array
     {
         return [
+            'company_name.required'  => 'company_name is required when company_email is provided.',
             'company_email.required' => 'company_email is required when company_name is provided.',
-            'contact_person.required' => 'contact_person is required when company_name is not provided.',
-            'email.required'          => 'email (contact email) is required when company_name is not provided.',
+            'contact_person.required' => 'contact_person is required for B2C leads (when company details are not provided).',
+            'email.required'          => 'email (contact email) is required for B2C leads (when company details are not provided).',
         ];
     }
 

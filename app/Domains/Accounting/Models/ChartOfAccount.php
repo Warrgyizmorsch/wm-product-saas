@@ -117,6 +117,8 @@ class ChartOfAccount extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'code',
         'name',
         'type',

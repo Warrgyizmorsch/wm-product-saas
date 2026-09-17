@@ -15,6 +15,8 @@ class DocumentController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', \App\Domains\HRMS\Models\DocumentType::class);
+
         $activeTab = $request->query('tab', 'employee');
 
         $query = Document::with(['documentable', 'documentMaster', 'requestedBy'])
@@ -109,6 +111,8 @@ class DocumentController extends Controller
 
     public function bulkUpload(Request $request): RedirectResponse
     {
+        $this->authorize('create', \App\Domains\HRMS\Models\DocumentType::class);
+
         $uploadMode = $request->input('upload_mode', 'file');
 
         if (in_array($uploadMode, ['generate', 'generate_template'])) {
@@ -251,6 +255,15 @@ class DocumentController extends Controller
                     'status'             => $docStatus,
                     'requested_by_id'    => auth()->id(),
                 ]);
+
+                \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                    employeeId: $employee->id,
+                    title: 'New Document Issued',
+                    message: "A new document '{$title}' has been issued to your document vault.",
+                    actionUrl: route('hrms.documents.index'),
+                    type: 'document_issued',
+                    iconClass: 'feather-file-text'
+                );
             }
 
             return redirect()->route('hrms.documents.index')->with('success', 'Documents generated from template successfully.');
@@ -312,6 +325,7 @@ class DocumentController extends Controller
 
     public function updateDocumentStatus(Request $request, Document $document): RedirectResponse
     {
+        $this->authorize('update', \App\Domains\HRMS\Models\DocumentType::class);
         $validated = $request->validate([
             'status' => 'required|string|in:approved,rejected,uploaded,expired,pending_signature',
         ]);

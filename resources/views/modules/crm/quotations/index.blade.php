@@ -163,7 +163,7 @@
                                     @endif
 
                                     <x-ui.action-dropdown :viewUrl="route('crm.quotations.show', $quotation->id)">
-                                        @if ($quotation->lead_id)
+                                        @if ($quotation->lead_id && $quotation->status !== 'Accepted')
                                             <li>
                                                 <a href="{{ route('crm.leads.show', ['lead' => $quotation->lead_id, 'edit_quotation' => 1, 'active_quotation_id' => $quotation->id]) }}" class="dropdown-item">
                                                     <i class="feather-edit me-2 text-muted fs-12"></i>Edit Quotation

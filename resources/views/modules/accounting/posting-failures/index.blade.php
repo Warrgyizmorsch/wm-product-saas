@@ -28,7 +28,10 @@
         <form method="GET">
             <input type="hidden" name="search" value="{{ $filters['search'] ?? '' }}">
             <x-ui.select label="Source" name="model_class" :selected="$filters['model_class'] ?? ''" :options="['' => 'All'] + $modelClasses->mapWithKeys(fn ($c) => [$c => class_basename($c)])->all()" />
-            <x-ui.button type="submit" variant="primary" size="sm" class="w-100">Apply</x-ui.button>
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                <x-ui.button href="{{ route('accounting.posting-failures.index') }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+            </div>
         </form>
     </x-ui.filter>
 @endsection
@@ -51,6 +54,11 @@
                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                 <input type="text" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control border-0 bg-transparent p-0 fs-13"
                        placeholder="Search reason or source..." style="box-shadow: none; height: 32px;">
+                @if (!empty($filters['search']))
+                    <a href="{{ route('accounting.posting-failures.index', collect($filters)->except('search')->filter()->all()) }}" class="text-muted ms-2" title="Clear search">
+                        <i class="feather-x" style="font-size: 14px;"></i>
+                    </a>
+                @endif
                 @if (!empty($filters['model_class']))
                     <input type="hidden" name="model_class" value="{{ $filters['model_class'] }}">
                 @endif
@@ -86,14 +94,14 @@
                             @endif
                         </td>
                         <td class="text-muted">{{ $failure->message }}</td>
-                        <td class="text-end pe-4">
-                            <form method="POST" action="{{ route('accounting.posting-failures.retry', $failure) }}" class="d-inline">
+                        <td class="text-end pe-4" style="white-space: nowrap;">
+                            <form method="POST" action="{{ route('accounting.posting-failures.retry', $failure) }}" class="d-inline-block me-2">
                                 @csrf
                                 <x-ui.button type="submit" variant="primary" size="sm" icon="feather-refresh-cw" :disabled="$model === null">
                                     Retry
                                 </x-ui.button>
                             </form>
-                            <form method="POST" action="{{ route('accounting.posting-failures.dismiss', $failure) }}" class="d-inline"
+                            <form method="POST" action="{{ route('accounting.posting-failures.dismiss', $failure) }}" class="d-inline-block"
                                   onsubmit="return confirm('Dismiss without posting a journal? Only do this if you already corrected the books manually.');">
                                 @csrf
                                 <x-ui.button type="submit" variant="light" size="sm" class="border">

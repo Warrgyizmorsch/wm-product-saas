@@ -193,7 +193,11 @@ class RoutingOperation extends BaseModel
     public function estimatedCostPerUnit(): float
     {
         $totalMinutes = $this->setup_time_minutes + $this->processing_time_minutes;
-        return ($totalMinutes * $this->labor_cost_rate)
+        $laborRate = (float) $this->labor_cost_rate > 0.0
+            ? (float) $this->labor_cost_rate
+            : ($this->workCenter ? ((float) $this->workCenter->cost_per_hour / 60.0) : 0.0);
+
+        return ($totalMinutes * $laborRate)
              + ($totalMinutes * $this->machine_cost_rate);
     }
 }

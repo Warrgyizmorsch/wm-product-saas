@@ -32,10 +32,17 @@ class AssetWriteOffController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $canCreate = $this->policy->create($request->user());
+
         return view('modules.accounting.fixed-assets.write-offs.index', [
             'writeOffs' => $writeOffs,
             'status' => $status,
             'canApprove' => $this->policy->approve($request->user()),
+            'canCreate' => $canCreate,
+            'assets' => $canCreate ? Asset::whereNotIn('status', [
+                Asset::STATUS_DISPOSED, Asset::STATUS_SOLD, Asset::STATUS_SCRAPPED,
+                Asset::STATUS_WRITTEN_OFF, Asset::STATUS_LOST,
+            ])->orderBy('asset_code')->get() : collect(),
         ]);
     }
 

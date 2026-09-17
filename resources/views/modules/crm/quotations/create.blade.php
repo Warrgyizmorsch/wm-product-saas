@@ -161,10 +161,17 @@
                             <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expiration')" name="expiry_date"
                                 :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" required="true">
-                                <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
-                                <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Sent for Approval</option>
-                            </x-ui.odoo-form-ui>
+                            @php
+                                $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+                                $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+                            @endphp
+
+                            @if(!$isQuotationAutoApprove)
+                                <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" required="true">
+                                    <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
+                                    <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Sent for Approval</option>
+                                </x-ui.odoo-form-ui>
+                            @endif
                         </div>
                     </div>
 
@@ -278,7 +285,7 @@
                             <input type="number" name="items[${itemIndex}][quantity]" class="odoo-table-input item-qty text-end" value="${qty}" min="1" required>
                         </td>
                         <td class="text-end">
-                            <input type="number" name="items[${itemIndex}][unit_price]" class="odoo-table-input item-price text-end" value="${price}" step="0.01" min="0" required>
+                            <input type="number" name="items[${itemIndex}][unit_price]" class="odoo-table-input item-price text-end" value="${price}" step="0.01" min="0.01" required>
                         </td>
                         <td class="text-end">
                             <input type="number" name="items[${itemIndex}][tax_rate]" class="odoo-table-input item-tax text-end" value="${taxRate}" step="0.01" min="0">

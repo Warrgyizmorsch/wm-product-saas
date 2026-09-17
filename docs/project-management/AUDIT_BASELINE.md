@@ -70,13 +70,13 @@ All models extend [`App\Core\Database\BaseModel`](file:///c:/Users/windo/Documen
 | **Project Members & Rates** | **FULLY IMPLEMENTED** | Staffing with billable rate, cost rate, budget hours, and removal safeguards. |
 | **Collaborator Invariant** | **FULLY IMPLEMENTED** | Auto-ensures role holders are active collaborators; blocks removing active role holders. |
 | **Milestone Management** | **FULLY IMPLEMENTED** | CRUD, Milestone Workspace, schedule health calculation (`on_track`, `at_risk`, `off_track`, `blocked`). |
-| **Milestone Progress Rollup** | **PARTIALLY IMPLEMENTED** | Progress is manually input; does not yet roll up automatically from child tasks. |
+| **Milestone Progress Rollup** | **FULLY IMPLEMENTED** | Dynamic rollup from non-cancelled tasks (`completed / eligible * 100`), auto-recalculating on task creation, update, delete, and milestone move. |
 | **Task List Management** | **FULLY IMPLEMENTED** | Positional sequence ordering (`moveUp`, `moveDown`), inline create. |
 | **Task Workspace & CRUD** | **FULLY IMPLEMENTED** | Dedicated workspace, sequential codes (`PRJ-0001-T-001`), assignees/reviewers. |
 | **Task Status FSM** | **FULLY IMPLEMENTED** | State transitions (`Open` -> `In Progress` -> `Review` -> `Completed`). |
-| **Task Dependency Graph** | **PARTIALLY IMPLEMENTED** | DFS cycle prevention works, but lacks FS/SS/FF types and does not shift dates. |
-| **Task Dependency Enforcement** | **INCORRECT FLOW** | Blocker badge displays in UI, but `updateStatus()` does **not** block moving a blocked task to completed. |
-| **Sub Tasks** | **PARTIALLY IMPLEMENTED** | Supports title + boolean completed toggle; lacks start/due dates, hours, and status enum. |
+| **Task Dependency Graph** | **FULLY IMPLEMENTED** | 4 dependency types (`Finish-to-Start`, `Start-to-Start`, `Finish-to-Finish`, `Start-to-Finish`), in-memory cycle detection. |
+| **Task Dependency Enforcement** | **FULLY IMPLEMENTED** | Server-side transition enforcement in `TaskService::updateStatus()` blocks invalid transitions based on predecessor state. |
+| **Sub Tasks** | **FULLY IMPLEMENTED** | Execution metadata (`start_date`, `due_date`, `estimated_hours`, `status`) and canonical synchronization (`status = Completed` $\iff$ `is_completed = true`). |
 | **Time Tracking / Timesheets** | **MISSING** | No `project_time_logs` table, model, controller, or time logging UI. |
 | **Timesheet Approval** | **MISSING** | No approval queue or logic. Top navbar has placeholder HTML. |
 | **Issue / Bug Management** | **MISSING** | No `project_issues` table, model, controller, or retest lifecycle. |

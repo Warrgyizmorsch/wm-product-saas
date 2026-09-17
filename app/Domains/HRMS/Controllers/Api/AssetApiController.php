@@ -44,6 +44,38 @@ class AssetApiController extends Controller
     }
 
     /**
+     * Helper to check if current user has HR Admin / Assets permissions.
+     */
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hrms.assets.manage');
+    }
+
+    /**
+     * Helper to get authenticated employee context.
+     */
+    private function getAuthenticatedEmployee(): ?Employee
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        return Employee::where('user_id', $user->id)
+            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
+            ->first()
+            ?? Employee::where('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->first();
+    }
+
+    /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
     private function authorizeUser(): ?JsonResponse
@@ -74,11 +106,19 @@ class AssetApiController extends Controller
             return $authError;
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
+        $pendingRequestsQuery = AssetRequest::where('status', 'pending');
+        if (!$isHrAdmin && $employee) {
+            $pendingRequestsQuery->where('employee_id', $employee->id);
+        }
+
         return $this->sendSuccess([
             'total_assets'           => Asset::count(),
             'available_assets_count' => Asset::where('status', 'available')->count(),
             'allocated_assets_count' => Asset::where('status', 'allocated')->count(),
-            'pending_requests_count' => AssetRequest::where('status', 'pending')->count(),
+            'pending_requests_count' => $pendingRequestsQuery->count(),
             'categories'             => AssetCategory::orderBy('name')->get(),
             'companies'              => Company::where('status', true)->orderBy('company_name')->get(),
             'available_assets'       => Asset::where('status', 'available')->orderBy('name')->get(),
@@ -271,6 +311,10 @@ class AssetApiController extends Controller
 
         if ($asset->status === 'allocated' || $asset->assigned_employee_id !== null) {
             return $this->sendError("Cannot delete asset '{$asset->asset_code}' because it is currently allocated to an employee. Please return or deallocate it first.", [], 422);
+        }
+
+        if ($reason = $asset->blockingAccountingRecords()) {
+            return $this->sendError("Cannot delete asset '{$asset->asset_code}' because {$reason}.", [], 422);
         }
 
         $asset->delete();
@@ -749,7 +793,17 @@ class AssetApiController extends Controller
             return $authError;
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $employee = $this->getAuthenticatedEmployee();
+
         $query = AssetRequest::query()->with(['company', 'employee', 'category', 'allocatedAsset', 'requestedAsset']);
+
+        if (!$isHrAdmin) {
+            if (!$employee) {
+                return $this->sendError('Employee profile not found.', 404);
+            }
+            $query->where('employee_id', $employee->id);
+        }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -795,6 +849,13 @@ class AssetApiController extends Controller
             'asset_category_ids'    => 'nullable|array',
             'asset_category_id'     => 'nullable|exists:asset_categories,id',
         ]);
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+
+        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only submit asset requests for yourself.', 403);
+        }
 
         $categoryIds = [];
         if ($request->has('asset_category_ids')) {
@@ -855,6 +916,10 @@ class AssetApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to reject asset requests.', 403);
+        }
+
         $assetRequest = AssetRequest::find($id);
         if (!$assetRequest) {
             return $this->sendError("Asset request with ID '{$id}' not found.", 404);
@@ -876,6 +941,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to allocate asset requests.', 403);
         }
 
         $assetRequest = AssetRequest::find($id);
@@ -937,6 +1006,10 @@ class AssetApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to allocate asset requests.', 403);
+        }
+
         $validated = $request->validate([
             'allocations'          => 'required|array',
             'allocations.*'        => 'nullable|exists:assets,id',
@@ -990,6 +1063,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to allocate asset requests.', 403);
         }
 
         $assetRequest = AssetRequest::find($id);
@@ -1047,6 +1124,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to reject asset requests.', 403);
         }
 
         $validated = $request->validate([
@@ -1129,6 +1210,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to allocate assets directly.', 403);
         }
 
         $validated = $request->validate([

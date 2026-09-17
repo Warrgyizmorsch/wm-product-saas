@@ -8,7 +8,9 @@ use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\DealStatus;
+use App\Domains\CRM\Services\DealHealthService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -381,6 +383,11 @@ class CrmDealController extends Controller
             if (!$hasAcceptedQuote) {
                 return back()->withErrors(['stage' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.'])->withInput();
             }
+
+            $hasCustomer = !empty($deal->account?->customer_id);
+            if (!$hasCustomer) {
+                return back()->withErrors(['stage' => 'Customer conversion required! Please click "Convert to Customer" button first before marking Deal as Won.'])->withInput();
+            }
         }
 
         $targetStatus = $dealStatuses->firstWhere('name', $stage);
@@ -443,6 +450,18 @@ class CrmDealController extends Controller
             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
             if (!$hasAcceptedQuote) {
                 $errMsg = 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.';
+                if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $errMsg
+                    ], 422);
+                }
+                return redirect()->back()->with('error', $errMsg);
+            }
+
+            $hasCustomer = !empty($deal->account?->customer_id);
+            if (!$hasCustomer) {
+                $errMsg = 'Customer conversion required! Please click "Convert to Customer" button first before marking Deal as Won.';
                 if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
                     return response()->json([
                         'success' => false,
@@ -654,23 +673,41 @@ class CrmDealController extends Controller
         if ($mode === 'existing' && $existingCustomerId) {
             $customer = Customer::find($existingCustomerId);
 
-            if ($account) {
-                $account->update([
-                    'customer_id' => $customer->id,
-                    'status'      => 'active',
-                ]);
-            } else {
-                $account = CrmAccount::create([
-                    'tenant_id'   => $tenantId,
-                    'customer_id' => $customer->id,
-                    'name'        => $customer->name,
-                    'email'       => $customer->email,
-                    'phone'       => $customer->phone,
-                    'gstin'       => $customer->gstin,
-                    'status'      => 'active',
-                    'owner_id'    => auth()->id() ?: 1,
-                ]);
+            // Find existing account attached to this customer
+            $targetAccount = CrmAccount::where('tenant_id', $tenantId)
+                ->where('customer_id', $customer->id)
+                ->first();
+
+            if (!$targetAccount) {
+                // If customer has no account yet, search by email/phone/name or create one
+                $targetAccount = CrmAccount::where('tenant_id', $tenantId)
+                    ->where(function($q) use ($customer) {
+                        if (!empty($customer->email)) $q->orWhere('email', $customer->email);
+                        if (!empty($customer->phone)) $q->orWhere('phone', $customer->phone);
+                        if (!empty($customer->name)) $q->orWhere('name', $customer->name);
+                    })->first();
+
+                if (!$targetAccount) {
+                    $targetAccount = CrmAccount::create([
+                        'tenant_id'   => $tenantId,
+                        'customer_id' => $customer->id,
+                        'name'        => $customer->name,
+                        'email'       => $customer->email,
+                        'phone'       => $customer->phone,
+                        'gstin'       => $customer->gstin,
+                        'status'      => 'active',
+                        'owner_id'    => auth()->id() ?: 1,
+                    ]);
+                } else {
+                    $targetAccount->update([
+                        'customer_id' => $customer->id,
+                        'status'      => 'active',
+                    ]);
+                }
             }
+
+            $oldAccount = $account; // The temporary lead account, if any
+            $account = $targetAccount;
 
             $deal->update([
                 'crm_account_id' => $account->id,
@@ -688,8 +725,28 @@ class CrmDealController extends Controller
                 ]);
             }
 
-            // Sync lead contacts → account
+            // Sync all quotations linked to this deal or lead
+            Quotation::where('crm_deal_id', $deal->id)
+                ->orWhere(function($q) use ($leadObj) {
+                    if ($leadObj) $q->where('lead_id', $leadObj->id);
+                })
+                ->update([
+                    'crm_account_id' => $account->id,
+                ]);
+
+            // Sync lead contacts → existing account
             $this->syncLeadContactsToAccount($account, $leadObj, $tenantId);
+
+            // Clean up temporary lead account if it is now orphaned
+            if ($oldAccount && $oldAccount->id !== $account->id) {
+                $hasDeals = CrmDeal::where('crm_account_id', $oldAccount->id)->exists();
+                $hasQuotations = Quotation::where('crm_account_id', $oldAccount->id)->exists();
+                if (!$hasDeals && !$hasQuotations) {
+                    CrmContact::where('crm_account_id', $oldAccount->id)
+                        ->update(['crm_account_id' => $account->id]);
+                    $oldAccount->delete();
+                }
+            }
 
             return redirect()->route('crm.deals.show', $deal->id)
                 ->with('success', "Deal #{$deal->deal_number} marked as Won and linked to existing customer '{$customer->name}'!");
@@ -818,5 +875,33 @@ class CrmDealController extends Controller
                 ]);
             }
         }
+    }
+
+    /**
+     * AJAX action to check Google OAuth Connection Status
+     */
+    public function checkGoogleAuth(DealHealthService $service): JsonResponse
+    {
+        $userId = request('user_id') ?: (auth()->id() ?? 1);
+        $status = $service->checkAuthStatus((int) $userId);
+        return response()->json($status);
+    }
+
+    /**
+     * AJAX action to sync AI Deal Health
+     */
+    public function syncHealth(CrmDeal $deal, DealHealthService $service): JsonResponse
+    {
+        $result = $service->syncDealHealth($deal);
+        return response()->json($result);
+    }
+
+    /**
+     * AJAX action to generate AI email draft reply
+     */
+    public function generateDraftReply(CrmDeal $deal, DealHealthService $service): JsonResponse
+    {
+        $result = $service->generateDraftReply($deal);
+        return response()->json($result);
     }
 }

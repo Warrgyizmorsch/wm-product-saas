@@ -236,7 +236,11 @@ class MilestoneService
                 && ! in_array($milestone->status, [Milestone::STATUS_COMPLETED, Milestone::STATUS_CLOSED], true);
         })->count();
 
-        $totalTasks = (int) $milestones->sum('tasks_count');
+        $totalTasks = (int) $milestones->sum('eligible_tasks_count');
+        if ($totalTasks === 0 && (int) $milestones->sum('tasks_count') > 0) {
+            // fallback if eligible_tasks_count was not eager loaded
+            $totalTasks = (int) $milestones->sum('tasks_count');
+        }
         $completedTasks = (int) $milestones->sum('completed_tasks_count');
 
         return [
@@ -246,5 +250,42 @@ class MilestoneService
             'completed' => $milestones->where('status', Milestone::STATUS_COMPLETED)->count(),
             'overall_progress' => $totalTasks > 0 ? (int) round(($completedTasks / $totalTasks) * 100) : 0,
         ];
+    }
+
+    /**
+     * Recalculate milestone completion percentage based on non-cancelled tasks:
+     * eligible = all milestone tasks where status != Cancelled
+     * progress = completed eligible / total eligible * 100
+     * If there are zero eligible tasks, progress is 0%.
+     */
+    public function recalculateProgress(int|Milestone|null $milestone): int
+    {
+        if (! $milestone) {
+            return 0;
+        }
+
+        $model = is_int($milestone) ? $this->find($milestone) : $milestone;
+        if (! $model) {
+            return 0;
+        }
+
+        $tasks = \App\Domains\Projects\Models\Task::query()
+            ->where('milestone_id', $model->id)
+            ->get(['id', 'status']);
+
+        $eligibleTasks = $tasks->where('status', '!=', \App\Domains\Projects\Models\Task::STATUS_CANCELLED);
+        $totalEligible = $eligibleTasks->count();
+        $completedCount = $eligibleTasks->where('status', \App\Domains\Projects\Models\Task::STATUS_COMPLETED)->count();
+
+        $percentage = $totalEligible > 0 ? (int) round(($completedCount / $totalEligible) * 100) : 0;
+
+        if ($model->completion_percentage !== $percentage) {
+            $this->milestones->update($model->id, [
+                'completion_percentage' => $percentage,
+            ]);
+            $model->completion_percentage = $percentage;
+        }
+
+        return $percentage;
     }
 }

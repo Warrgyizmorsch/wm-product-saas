@@ -59,6 +59,17 @@ class SalaryStructureApiController extends Controller
         return in_array($str, ['1', 'true', 'active', 'success', 'yes', 'on'], true);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.payroll.manage');
+    }
+
     /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
@@ -280,6 +291,10 @@ class SalaryStructureApiController extends Controller
                 return $authError;
             }
 
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to manage pay groups.', 403);
+            }
+
             if ($request->has('company_id') && (empty($request->company_id) || $request->company_id === 'null' || $request->company_id === 0 || $request->company_id === '0')) {
                 $request->merge(['company_id' => null]);
             }
@@ -317,6 +332,10 @@ class SalaryStructureApiController extends Controller
         try {
             if ($authError = $this->authorizeUser()) {
                 return $authError;
+            }
+
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to manage pay groups.', 403);
             }
 
             $model = $payGroup instanceof PayGroup ? $payGroup : PayGroup::find($payGroup);
@@ -363,6 +382,10 @@ class SalaryStructureApiController extends Controller
                 return $authError;
             }
 
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to delete pay groups.', 403);
+            }
+
             $model = $payGroup instanceof PayGroup ? $payGroup : PayGroup::find($payGroup);
             if (!$model) {
                 return $this->sendError('Pay group not found', 404);
@@ -381,6 +404,10 @@ class SalaryStructureApiController extends Controller
         try {
             if ($authError = $this->authorizeUser()) {
                 return $authError;
+            }
+
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to manage pay group rules.', 403);
             }
 
             $model = $payGroup instanceof PayGroup ? $payGroup : PayGroup::find($payGroup);
@@ -500,6 +527,10 @@ class SalaryStructureApiController extends Controller
                 return $authError;
             }
 
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to manage salary components.', 403);
+            }
+
             if ($request->has('pay_group_id') && (empty($request->pay_group_id) || $request->pay_group_id === 'null' || $request->pay_group_id === 0 || $request->pay_group_id === '0')) {
                 $request->merge(['pay_group_id' => null]);
             }
@@ -558,6 +589,10 @@ class SalaryStructureApiController extends Controller
         try {
             if ($authError = $this->authorizeUser()) {
                 return $authError;
+            }
+
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to manage salary components.', 403);
             }
 
             $model = $salaryComponent instanceof SalaryComponent ? $salaryComponent : SalaryComponent::find($salaryComponent);
@@ -623,6 +658,10 @@ class SalaryStructureApiController extends Controller
         try {
             if ($authError = $this->authorizeUser()) {
                 return $authError;
+            }
+
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to delete salary components.', 403);
             }
 
             $model = $salaryComponent instanceof SalaryComponent ? $salaryComponent : SalaryComponent::find($salaryComponent);
@@ -708,6 +747,10 @@ class SalaryStructureApiController extends Controller
         try {
             if ($authError = $this->authorizeUser()) {
                 return $authError;
+            }
+
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to manage salary structures.', 403);
             }
 
             if ($request->has('pay_group_id') && (empty($request->pay_group_id) || $request->pay_group_id === 'null' || $request->pay_group_id === 0 || $request->pay_group_id === '0')) {
@@ -820,6 +863,10 @@ class SalaryStructureApiController extends Controller
         try {
             if ($authError = $this->authorizeUser()) {
                 return $authError;
+            }
+
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to manage salary structures.', 403);
             }
 
             $model = $salaryStructure instanceof SalaryStructure ? $salaryStructure : SalaryStructure::find($salaryStructure);
@@ -941,6 +988,10 @@ class SalaryStructureApiController extends Controller
         try {
             if ($authError = $this->authorizeUser()) {
                 return $authError;
+            }
+
+            if (!$this->isHrAdmin()) {
+                return $this->sendError('Unauthorized action. You do not have permission to delete salary structures.', 403);
             }
 
             $model = $salaryStructure instanceof SalaryStructure ? $salaryStructure : SalaryStructure::find($salaryStructure);

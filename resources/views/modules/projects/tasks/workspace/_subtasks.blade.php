@@ -96,9 +96,12 @@
                         });
                 };
 
+                var titleWrapper = document.createElement('div');
+                titleWrapper.className = 'd-flex flex-column flex-grow-1 overflow-hidden';
+
                 var title = document.createElement('input');
                 title.type = 'text';
-                title.className = 'form-control form-control-sm border-0 bg-transparent flex-grow-1';
+                title.className = 'form-control form-control-sm border-0 bg-transparent p-0';
                 title.value = subtask.title;
                 title.readOnly = !canManage;
                 if (subtask.isCompleted) title.style.textDecoration = 'line-through';
@@ -113,9 +116,30 @@
                             });
                     }
                 };
+                titleWrapper.appendChild(title);
+
+                if (subtask.status || subtask.assigneeName || subtask.dueDate) {
+                    var meta = document.createElement('div');
+                    meta.className = 'fs-11 text-muted d-flex align-items-center gap-2 mt-1';
+                    var statusBadge = document.createElement('span');
+                    statusBadge.className = 'badge bg-soft-secondary text-secondary fs-10';
+                    statusBadge.textContent = subtask.status || (subtask.isCompleted ? 'Completed' : 'Open');
+                    meta.appendChild(statusBadge);
+                    if (subtask.assigneeName) {
+                        var assigneeSpan = document.createElement('span');
+                        assigneeSpan.innerHTML = '<i class="feather-user me-1"></i>' + subtask.assigneeName;
+                        meta.appendChild(assigneeSpan);
+                    }
+                    if (subtask.dueDate) {
+                        var dueSpan = document.createElement('span');
+                        dueSpan.innerHTML = '<i class="feather-calendar me-1"></i>' + subtask.dueDate;
+                        meta.appendChild(dueSpan);
+                    }
+                    titleWrapper.appendChild(meta);
+                }
 
                 row.appendChild(checkbox);
-                row.appendChild(title);
+                row.appendChild(titleWrapper);
 
                 if (canManage) {
                     var remove = document.createElement('button');

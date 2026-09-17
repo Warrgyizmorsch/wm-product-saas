@@ -7,9 +7,11 @@
 @section('content')
     <x-ui.card title="Budgets" bodyClass="p-0">
         <x-slot name="headerAction">
-            <x-ui.button href="{{ route('accounting.budgets.create') }}" variant="primary" size="sm">
-                <i class="feather-plus me-1"></i>New Budget
-            </x-ui.button>
+            @if ($canCreate)
+                <x-ui.button type="button" variant="primary" size="sm" data-bs-toggle="offcanvas" data-bs-target="#budgetCreateDrawer">
+                    <i class="feather-plus me-1"></i>New Budget
+                </x-ui.button>
+            @endif
         </x-slot>
 
         <x-ui.table hoverable>
@@ -72,4 +74,24 @@
     </x-ui.card>
 
     <x-ui.confirm-modal />
+
+    @if ($canCreate)
+        <x-ui.drawer id="budgetCreateDrawer" title="New Budget" scroll style="--bs-offcanvas-width: min(820px, 92vw);">
+            <form action="{{ route('accounting.budgets.store') }}" method="POST" id="budgetForm">
+                @csrf
+                @include('modules.accounting.budgets._form', ['submitLabel' => 'Create Budget', 'embedded' => true])
+            </form>
+        </x-ui.drawer>
+        @include('modules.accounting.budgets._form-scripts')
+
+        @if ($errors->any())
+            @push('scripts')
+                <script>
+                    $(function () {
+                        new bootstrap.Offcanvas(document.getElementById('budgetCreateDrawer')).show();
+                    });
+                </script>
+            @endpush
+        @endif
+    @endif
 @endsection

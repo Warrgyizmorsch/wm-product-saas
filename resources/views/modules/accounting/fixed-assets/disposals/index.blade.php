@@ -9,9 +9,11 @@
         '' => 'All Statuses', 'pending_approval' => 'Pending Approval', 'approved' => 'Approved',
         'rejected' => 'Rejected', 'posted' => 'Posted',
     ]" name="status" onchange="window.location = updateQueryParam('status', this.value)" />
-    <x-ui.button href="{{ route('accounting.fixed-assets.disposals.create') }}" variant="primary" icon="feather-plus">
-        New Disposal
-    </x-ui.button>
+    @if ($canCreate)
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="offcanvas" data-bs-target="#disposalCreateDrawer">
+            New Disposal
+        </x-ui.button>
+    @endif
 @endsection
 
 @section('content')
@@ -32,9 +34,13 @@
                 @forelse ($disposals as $disposal)
                     <tr>
                         <td class="ps-4">
-                            <a href="{{ route('accounting.fixed-assets.show', $disposal->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                                {{ $disposal->asset->asset_code }}
-                            </a>
+                            @if ($disposal->asset)
+                                <a href="{{ route('accounting.fixed-assets.show', $disposal->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
+                                    {{ $disposal->asset->asset_code }}
+                                </a>
+                            @else
+                                <span class="fw-bold font-monospace text-muted">Deleted asset #{{ $disposal->asset_id }}</span>
+                            @endif
                         </td>
                         <td class="text-capitalize">{{ $disposal->disposal_type }}</td>
                         <td>{{ $disposal->disposal_date->format('d M Y') }}</td>
@@ -51,7 +57,7 @@
                                         <i class="feather-check-circle"></i>
                                     </button>
                                 </form>
-                                <button type="button" class="btn btn-xs btn-soft-danger border-0" title="Reject" onclick="openRejectModal('{{ route('accounting.fixed-assets.disposals.reject', $disposal) }}', '{{ $disposal->asset->asset_code }}')">
+                                <button type="button" class="btn btn-xs btn-soft-danger border-0" title="Reject" onclick="openRejectModal('{{ route('accounting.fixed-assets.disposals.reject', $disposal) }}', '{{ $disposal->asset?->asset_code ?? 'Deleted asset #'.$disposal->asset_id }}')">
                                     <i class="feather-x-circle"></i>
                                 </button>
                             @elseif ($disposal->status === 'approved' && $canApprove)
@@ -97,6 +103,22 @@
             </div>
         </form>
     </x-ui.modal>
+
+    @if ($canCreate)
+        <x-ui.drawer id="disposalCreateDrawer" title="New Disposal" scroll style="--bs-offcanvas-width: min(640px, 92vw);">
+            @include('modules.accounting.fixed-assets.disposals._form', ['embedded' => true])
+        </x-ui.drawer>
+
+        @if ($errors->any())
+            @push('scripts')
+                <script>
+                    $(function () {
+                        new bootstrap.Offcanvas(document.getElementById('disposalCreateDrawer')).show();
+                    });
+                </script>
+            @endpush
+        @endif
+    @endif
 @endsection
 
 @push('scripts')

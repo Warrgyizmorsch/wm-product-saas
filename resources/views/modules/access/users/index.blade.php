@@ -47,12 +47,17 @@
                         <td>
                             @if ($user->primaryRole)
                                 <x-ui.badge variant="info" soft>{{ $user->primaryRole->name }}</x-ui.badge>
+                                @php $extraRoleCount = $user->roles->where('id', '!=', $user->primaryRole->id)->count(); @endphp
+                                @if ($extraRoleCount > 0)
+                                    <x-ui.badge variant="secondary" soft title="{{ $user->roles->where('id', '!=', $user->primaryRole->id)->pluck('name')->implode(', ') }}">+{{ $extraRoleCount }}</x-ui.badge>
+                                @endif
                             @else
                                 <span class="text-muted fs-12">No role assigned</span>
                             @endif
                         </td>
                         <td class="text-end pe-4">
                             <x-ui.icon-btn href="{{ route('access.users.edit', $user) }}" variant="soft-info" size="md" icon="feather-edit-3" data-bs-toggle="modal" data-bs-target="#editUserModal{{ $user->id }}" aria-label="Edit {{ $user->name }}" />
+                            <x-ui.icon-btn href="{{ route('access.users.overrides.edit', $user) }}" variant="soft-warning" size="md" icon="feather-sliders" aria-label="Permission overrides for {{ $user->name }}" title="Permission overrides" />
                         </td>
                     </tr>
                 @empty

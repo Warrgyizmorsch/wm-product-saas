@@ -4,15 +4,21 @@
     $tenantPlan = ucfirst((string) ($resolvedTenant?->plan ?? 'Starter'));
     $branding = tenant_branding($resolvedTenant);
 
+    $authUser = auth()->user();
+    $isHrAdmin = $authUser && ($authUser->hasHrPermission('hr.settings.manage') || $authUser->hasHrPermission('hrms.leave_requests.approve'));
+
     $modules = [
         __('ui.workspace') => [
             ['label' => __('ui.executive_dashboard'), 'icon' => 'feather-home', 'route' => 'dashboard'],
             ['label' => 'Tenant Console', 'icon' => 'feather-grid', 'url' => '#', 'children' => [
                 ['label' => 'Tenants', 'route' => 'platform.tenants.index'],
                 ['label' => 'Plans', 'route' => 'platform.plans.index'],
+                ['label' => 'Currencies', 'route' => 'platform.currencies.index'],
                 ['label' => 'Subscriptions'],
                 ['label' => 'Usage Limits', 'route' => 'platform.usage.index'],
                 ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index'],
+                ['label' => 'Email & SMTP Setup', 'route' => 'crm.emailSettings.index'],
+                ['label' => 'WhatsApp Web Setup', 'route' => 'crm.whatsappSettings.index'],
             ]],
             ['label' => __('ui.approvals_center'), 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
         ],
@@ -28,16 +34,11 @@
                 ['label' => __('crm.lead_status_master') ?: 'Lead Status Master', 'route' => 'crm.masters.lead-statuses.index'],
                 ['label' => __('crm.deal_stage_master') ?: 'Deal Stage Master', 'route' => 'crm.masters.deal-statuses.index'],
                 ['label' => __('crm.crm_sales_settings') ?: 'CRM & Sales Settings', 'route' => 'crm.settings.index'],
+                ['label' => 'Email & SMTP Accounts', 'route' => 'crm.emailSettings.index'],
+                ['label' => 'WhatsApp Web Setup', 'route' => 'crm.whatsappSettings.index'],
             ]],
             ['label' => 'Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],
-            ]],
-             ['label' => __('ui.sales'), 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
-                ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
-                ['label' => 'Sales Orders', 'route' => 'sales.orders.index'],
-                ['label' => 'Invoices', 'route' => 'sales.invoices.index'],
-                ['label' => 'Receipts (Payments)', 'route' => 'sales.payments.index'],
-                ['label' => 'Sales Returns', 'route' => 'sales.returns.index'],
             ]],
             ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [
                 ['label' => __('ui.projects'), 'route' => 'projects.index'],
@@ -47,6 +48,14 @@
             ]],
         ],
         __('ui.supply_chain') => [
+            ['label' => 'Supply Chain Dashboard', 'icon' => 'feather-grid', 'route' => 'supply-chain.dashboard'],
+            ['label' => __('ui.sales'), 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
+                ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
+                ['label' => 'Sales Orders', 'route' => 'sales.orders.index'],
+                ['label' => 'Invoices', 'route' => 'sales.invoices.index'],
+                ['label' => 'Receipts (Payments)', 'route' => 'sales.payments.index'],
+                ['label' => 'Sales Returns', 'route' => 'sales.returns.index'],
+            ]],
             ['label' => 'Store', 'icon' => 'feather-archive', 'url' => '#', 'children' => [
                 ['label' => 'Material Requirements', 'route' => 'inventory.material-requirements.index'],
                 ['label' => 'MRP & Shortage Analysis', 'route' => 'inventory.mrp-shortage.index'],
@@ -140,9 +149,9 @@
                 ['label' => 'Planning Exceptions / At-Risk',   'route' => 'production.planning-exceptions.index'],
             ]],
         ],
-        'HRMS' => [
+        'HRMS' => array_values(array_filter([
             ['label' => 'HRMS Dashboard', 'icon' => 'feather-home', 'route' => 'hrms.dashboard'],
-            ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => array_filter([
+            $isHrAdmin ? ['label' => 'HRMS Masters', 'icon' => 'feather-settings', 'url' => '#', 'children' => array_values(array_filter([
                 ['label' => 'Org Structure', 'route' => 'hrms.org.index'],
                 ['label' => 'Salary Structure', 'route' => 'hrms.salary-structure.index'],
                 ['label' => 'Leave Structure', 'route' => 'hrms.leave-structure.index'],
@@ -158,28 +167,30 @@
                 ['label' => 'Holiday Calendar', 'route' => 'hrms.holidays.index'],
                 ['label' => 'Expense Policies', 'route' => 'hrms.expense-policy.index'],
                 ['label' => 'Offboarding Policies', 'route' => 'hrms.offboarding-policies.index'],
-            ])],
-            ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
-            ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'],
-            ['label' => 'Assets', 'icon' => 'feather-package', 'url' => '#', 'children' => [
-                ['label' => 'Employees Assets', 'route' => 'hrms.assets-module.index'],
+            ]))] : null,
+            $isHrAdmin ? ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'] : null,
+            $isHrAdmin ? ['label' => 'Documents', 'icon' => 'feather-file-text', 'route' => 'hrms.documents.index'] : null,
+            ['label' => 'Assets', 'icon' => 'feather-package', 'url' => '#', 'children' => array_values(array_filter([
+                $isHrAdmin ? ['label' => 'Employees Assets', 'route' => 'hrms.assets-module.index'] : null,
                 ['label' => 'My Assets', 'route' => 'hrms.assets-module.my-assets'],
-            ]],
-             ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#', 'children' => [
-                 ['label' => 'Employees Attendance', 'route' => 'hrms.attendance.index'],
-                 ['label' => 'My Attendance', 'route' => 'hrms.attendance.myAttendance'],
-             ]],
+            ]))],
+            ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#', 'children' => array_values(array_filter([
+                $isHrAdmin ? ['label' => 'Employees Attendance', 'route' => 'hrms.attendance.index'] : null,
+                ['label' => 'My Attendance', 'route' => 'hrms.attendance.myAttendance'],
+            ]))],
             ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
             ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
             ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
             ['label' => 'Travel & Expenses', 'icon' => 'feather-navigation', 'route' => 'hrms.travel-expense.index'],
-            ['label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index'],
+            $isHrAdmin ? ['label' => 'PIP (Performance)', 'icon' => 'feather-trending-up', 'route' => 'hrms.pip.index'] : null,
             ['label' => 'Broadcasts', 'icon' => 'feather-radio', 'route' => 'hrms.broadcasts.index'],
-            ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => [
-                ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'],
+            ['label' => 'Helpdesk', 'icon' => 'feather-life-buoy', 'route' => 'hrms.helpdesk.tickets.index'],
+            ['label' => 'Recruitment', 'icon' => 'feather-user-check', 'route' => 'hrms.recruitment.index'],
+            ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#', 'children' => array_values(array_filter([
+                $isHrAdmin ? ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index'] : null,
                 ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary'],
-            ]],
-        ],
+            ]))],
+        ])),
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
                 ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
@@ -200,6 +211,7 @@
                 ['label' => 'Bank Reconciliation', 'route' => 'accounting.bank-reconciliation.index'],
                 ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index'],
                 ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index'],
+                ['label' => 'Exchange Rates', 'route' => 'accounting.exchange-rates.index'],
                 ['label' => 'Day Book', 'route' => 'accounting.reports.day-book'],
                 ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
                 ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
@@ -312,6 +324,9 @@
         }
         unset($items);
     }
+    // Menu entries live in each module's Routes/menu.php and are filtered by plan,
+    // role, permission and route existence — see App\Core\Navigation\MenuBuilder.
+    $sections = app(\App\Core\Navigation\MenuBuilder::class)->build(auth()->user(), request()->route()?->getName());
 @endphp
 
 <nav class="nxl-navigation">
@@ -333,11 +348,10 @@
         </div>
         <div class="navbar-content">
             <ul class="nxl-navbar">
-                @foreach ($modules as $caption => $items)
-                    @php $modSlug = Str::slug($caption); @endphp
-                    <li class="nxl-item nxl-caption premium-module-header" data-module="{{ $modSlug }}" onclick="toggleModuleSidebar('{{ $modSlug }}', this)">
+                @foreach ($sections as $section)
+                    <li class="nxl-item nxl-caption premium-module-header" data-module="{{ $section['slug'] }}" onclick="toggleModuleSidebar('{{ $section['slug'] }}', this)">
                         <div class="premium-module-header-content">
-                            <span class="premium-module-header-title">{{ strtoupper($caption) }}</span>
+                            <span class="premium-module-header-title">{{ strtoupper($section['label']) }}</span>
                             <span class="premium-module-accordion-btn">
                                 <span class="premium-module-arrow-container">
                                     <i class="feather-chevron-right premium-module-arrow"></i>
@@ -345,28 +359,12 @@
                             </span>
                         </div>
                     </li>
-                    @foreach ($items as $item)
+                    @foreach ($section['items'] as $item)
                         @php
-                            $href = isset($item['route']) ? route($item['route']) : ($item['url'] ?? '#');
-                            $hasChildren = isset($item['children']) && !empty($item['children']);
-                            $isItemActive = isset($item['route']) && request()->routeIs($item['route']);
-                            $hasActiveChild = false;
-
-                            if ($hasChildren) {
-                                foreach ($item['children'] as $c) {
-                                    if (is_array($c) && isset($c['route']) && request()->routeIs($c['route'])) {
-                                        $hasActiveChild = true;
-                                        break;
-                                    }
-                                    if (is_array($c) && isset($c['url']) && request()->input('tab') === 'templates' && str_contains($c['url'], 'tab=templates')) {
-                                        $hasActiveChild = true;
-                                        break;
-                                    }
-                                }
-                            }
+                            $hasChildren = $item['children'] !== [];
                         @endphp
-                        <li class="nxl-item {{ $hasChildren ? 'nxl-hasmenu' : '' }} {{ ($isItemActive || $hasActiveChild) ? 'active nxl-trigger' : '' }} premium-module-child module-{{ $modSlug }}">
-                            <a href="{{ $hasChildren ? 'javascript:void(0);' : $href }}" class="nxl-link">
+                        <li class="nxl-item {{ $hasChildren ? 'nxl-hasmenu' : '' }} {{ $item['active'] ? 'active nxl-trigger' : '' }} premium-module-child module-{{ $section['slug'] }}">
+                            <a href="{{ $hasChildren ? 'javascript:void(0);' : $item['url'] }}" class="nxl-link">
                                 <span class="nxl-micon"><i class="{{ $item['icon'] }}"></i></span>
                                 <span class="nxl-mtext">{{ $item['label'] }}</span>
                                 @if ($hasChildren)
@@ -376,14 +374,8 @@
                             @if ($hasChildren)
                                 <ul class="nxl-submenu">
                                     @foreach ($item['children'] as $child)
-                                        @php
-                                            $child = is_array($child) ? $child : ['label' => $child];
-                                            $childHref = isset($child['route']) ? route($child['route']) : ($child['url'] ?? '#');
-                                            $childActive = (isset($child['route']) && request()->routeIs($child['route']) && request()->input('tab') !== 'templates')
-                                                || (isset($child['url']) && request()->input('tab') === 'templates' && str_contains($child['url'], 'tab=templates'));
-                                        @endphp
-                                        <li class="nxl-item {{ $childActive ? 'active' : '' }}">
-                                            <a class="nxl-link" href="{{ $childHref }}">{{ $child['label'] }}</a>
+                                        <li class="nxl-item {{ $child['active'] ? 'active' : '' }}">
+                                            <a class="nxl-link" href="{{ $child['url'] }}">{{ $child['label'] }}</a>
                                         </li>
                                     @endforeach
                                 </ul>
@@ -620,12 +612,12 @@
 <script>
 function toggleModuleSidebar(moduleName, headerEl) {
     const isCollapsed = headerEl.classList.contains('collapsed');
-    
+
     if (typeof jQuery !== 'undefined') {
         const $ = jQuery;
         const $header = $(headerEl);
         const $children = $('.premium-module-child.module-' + moduleName);
-        
+
         if (isCollapsed) {
             $header.removeClass('collapsed');
             $children.stop(true, true).slideDown(250);
@@ -651,19 +643,19 @@ function toggleModuleSidebar(moduleName, headerEl) {
 
 document.addEventListener("DOMContentLoaded", function () {
     const headers = document.querySelectorAll('.premium-module-header');
-    
+
     headers.forEach(function (header) {
         const moduleName = header.getAttribute('data-module');
         const savedState = localStorage.getItem('wm_sidebar_module_' + moduleName);
         const children = document.querySelectorAll('.premium-module-child.module-' + moduleName);
-        
+
         let hasActiveChild = false;
         children.forEach(function (child) {
             if (child.classList.contains('active') || child.querySelector('.active') !== null) {
                 hasActiveChild = true;
             }
         });
-        
+
         if (hasActiveChild) {
             header.classList.remove('collapsed');
             children.forEach(c => c.style.display = 'block');

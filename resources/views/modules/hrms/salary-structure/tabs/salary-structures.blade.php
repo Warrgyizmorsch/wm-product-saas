@@ -1,56 +1,44 @@
 @php
     $selectedPayGroup = $selectedPayGroup ?? null;
 
-    // Self-Healing: Ensure PF, ESI, and SPL components exist in the database
-    $requiredComponents = [
-        'SPL' => ['name' => 'Special Allowance', 'type' => 'earning', 'calculation_type' => 'balancing', 'default_value' => '0', 'description' => 'System-calculated balancing component', 'is_adhoc' => false],
-        'PF'  => ['name' => 'Provident Fund', 'type' => 'deduction', 'calculation_type' => 'fixed', 'default_value' => '1800', 'description' => 'Employee PF contribution', 'is_adhoc' => false],
-        'ESI' => ['name' => 'Employee State Insurance', 'type' => 'deduction', 'calculation_type' => 'fixed', 'default_value' => '0', 'description' => 'Employee ESI contribution', 'is_adhoc' => false]
-    ];
-
-    $statutoryCodes = ['SPL', 'PF', 'ESI'];
-    $statutoryComponents = \App\Domains\HRMS\Models\SalaryComponent::whereIn('code', $statutoryCodes)->get()->keyBy('code');
-
-    foreach ($statutoryCodes as $code) {
-        if (!isset($statutoryComponents[$code])) {
-            $company = \App\Domains\HRMS\Models\Company::first();
-            $payGroup = $selectedPayGroup ?: \App\Domains\HRMS\Models\PayGroup::first();
-            $data = $requiredComponents[$code];
-            
-            $newComp = \App\Domains\HRMS\Models\SalaryComponent::create([
-                'tenant_id' => auth()->user()->tenant_id ?? 1,
-                'company_id' => $company ? $company->id : null,
-                'pay_group_id' => $payGroup ? $payGroup->id : null,
-                'name' => $data['name'],
-                'code' => $code,
-                'type' => $data['type'],
-                'calculation_type' => $data['calculation_type'],
-                'default_value' => $data['default_value'],
-                'description' => $data['description'],
-                'is_adhoc' => $data['is_adhoc'],
-                'status' => true
-            ]);
-            $statutoryComponents[$code] = $newComp;
-        }
-    }
-
-    // Load other active recurring components for the current pay group (excluding the statutory ones)
-    $otherComponents = \App\Domains\HRMS\Models\SalaryComponent::where('status', true)
-        ->whereNotIn('code', $statutoryCodes)
+    // Load active recurring salary components created for the current pay group (or general)
+    $recurringComponentsForStructure = \App\Domains\HRMS\Models\SalaryComponent::where('status', true)
+        ->where('is_adhoc', false)
         ->where(function($q) use ($selectedPayGroup) {
-            $q->whereNull('pay_group_id');
             if ($selectedPayGroup) {
-                $q->orWhere('pay_group_id', $selectedPayGroup->id);
+                $q->where('pay_group_id', $selectedPayGroup->id)
+                  ->orWhereNull('pay_group_id');
             }
         })
+        ->orderBy('name', 'asc')
         ->get();
 
-    // Always force prepend SPL, PF, and ESI to the recurring components list
-    $recurringComponentsForStructure = collect([
-        $statutoryComponents['SPL'],
-        $statutoryComponents['PF'],
-        $statutoryComponents['ESI']
-    ])->concat($otherComponents->filter(fn($component) => !($component->is_adhoc ?? false)));
+    // Ensure a fixed balancing component ("Other Allowance") exists in every salary structure
+    $hasOtherComponent = $recurringComponentsForStructure->contains(function($c) {
+        $cCode = strtoupper($c->code);
+        $cName = strtolower($c->name);
+        return in_array($cCode, ['OTHER', 'OTHER_ALLOWANCE', 'SA', 'SPECIAL_ALLOWANCE']) 
+            || \Illuminate\Support\Str::contains($cName, ['other', 'special allowance', 'balancing']);
+    });
+
+    if (!$hasOtherComponent) {
+        $otherComp = \App\Domains\HRMS\Models\SalaryComponent::firstOrCreate(
+            [
+                'code' => 'OTHER',
+                'pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : null,
+                'is_adhoc' => false,
+            ],
+            [
+                'company_id' => $selectedPayGroup ? $selectedPayGroup->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+                'name' => 'Other Allowance',
+                'type' => 'earning',
+                'calculation_type' => 'balancing',
+                'status' => true,
+                'description' => 'Fixed balance remainder component'
+            ]
+        );
+        $recurringComponentsForStructure->push($otherComp);
+    }
 
     $salaryStructures = $salaryStructures ?? collect();
     $rules = $selectedPayGroup->payroll_rules ?? [];
@@ -312,7 +300,12 @@
 
                     <!-- Component Configuration Table -->
                     <div class="mt-4">
-                        <h6 class="fw-bold border-bottom pb-2 mb-3">{{ __('hrms.salary.configure_rules') }}</h6>
+                        <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
+                            <h6 class="fw-bold mb-0">{{ __('hrms.salary.configure_rules') }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-semibold fs-11 px-2.5 py-1" data-bs-toggle="modal" data-bs-target="#quickAddComponentModal">
+                                <i class="feather-plus me-1"></i>Add Component
+                            </button>
+                        </div>
                         <div class="table-responsive border rounded bg-light">
                             <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
                                 <thead class="table-light">
@@ -325,6 +318,16 @@
                                 </thead>
                                 <tbody>
                                     @forelse($recurringComponentsForStructure as $comp)
+                                        @php
+                                            $cCode = strtoupper($comp->code);
+                                            $cName = strtolower($comp->name);
+                                            
+                                            $isBasic = in_array($cCode, ['BASIC', 'BASIC_PAY']) || \Illuminate\Support\Str::contains($cName, 'basic');
+                                            $isDefaultBalancing = !$isBasic && (
+                                                in_array($cCode, ['OTHER', 'OTHER_ALLOWANCE', 'SA', 'SPECIAL_ALLOWANCE', 'BALANCING']) || 
+                                                \Illuminate\Support\Str::contains($cName, ['other', 'special allowance', 'balancing', 'remainder'])
+                                            );
+                                        @endphp
                                         <tr>
                                             <td>
                                                 <span class="fw-bold">{{ $comp->name }}</span>
@@ -338,34 +341,18 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                @if($comp->code === 'PF' && $isPfEnabled)
-                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
-                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (PF rule active)
-                                                    </div>
-                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="not_included">
-                                                @elseif($comp->code === 'ESI' && $isEsiEnabled)
-                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
-                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (ESI rule active)
-                                                    </div>
-                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="not_included">
-                                                @elseif($comp->code === 'SPL')
-                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
-                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (Balancing component)
-                                                    </div>
-                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="balancing">
-                                                @else
                                                     <x-ui.odoo-form-ui type="select"
                                                             name="components[{{ $comp->id }}][calculation_type]"
                                                             class="add-calc-type-select"
                                                             data-comp-id="{{ $comp->id }}"
                                                             id="add-calc-type-{{ $comp->id }}"
                                                             onchange="handleCalcTypeChange('add', {{ $comp->id }})">
-                                                        <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
+                                                        <option value="not_included" @selected(!$isDefaultBalancing)>{{ __('hrms.salary.not_included') }}</option>
                                                         <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
                                                         <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
                                                         <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
+                                                        <option value="balancing" @selected($isDefaultBalancing)>Auto-calculated (Balancing component)</option>
                                                     </x-ui.odoo-form-ui>
-                                                @endif
                                             </td>
                                             <td>
                                                 <x-ui.odoo-form-ui type="input"
@@ -432,7 +419,12 @@
 
                     <!-- Component Configuration Table -->
                     <div class="mt-4">
-                        <h6 class="fw-bold border-bottom pb-2 mb-3">{{ __('hrms.salary.configure_rules') }}</h6>
+                        <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
+                            <h6 class="fw-bold mb-0">{{ __('hrms.salary.configure_rules') }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-semibold fs-11 px-2.5 py-1" data-bs-toggle="modal" data-bs-target="#quickAddComponentModal">
+                                <i class="feather-plus me-1"></i>Add Component
+                            </button>
+                        </div>
                         <div class="table-responsive border rounded bg-light">
                             <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
                                 <thead class="table-light">
@@ -458,22 +450,6 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                @if($comp->code === 'PF' && $isPfEnabled)
-                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
-                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (PF rule active)
-                                                    </div>
-                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="not_included">
-                                                @elseif($comp->code === 'ESI' && $isEsiEnabled)
-                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
-                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (ESI rule active)
-                                                    </div>
-                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="not_included">
-                                                @elseif($comp->code === 'SPL')
-                                                    <div class="text-success fw-bold py-1" style="font-size: 11px;">
-                                                        <i class="feather-check-circle me-1"></i>Auto-calculated (Balancing component)
-                                                    </div>
-                                                    <input type="hidden" name="components[{{ $comp->id }}][calculation_type]" value="balancing">
-                                                @else
                                                     <x-ui.odoo-form-ui type="select"
                                                             name="components[{{ $comp->id }}][calculation_type]"
                                                             class="edit-calc-type-select"
@@ -484,8 +460,8 @@
                                                         <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
                                                         <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
                                                         <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
+                                                        <option value="balancing">Auto-calculated (Balancing component)</option>
                                                     </x-ui.odoo-form-ui>
-                                                @endif
                                             </td>
                                             <td>
                                                 <x-ui.odoo-form-ui type="input"
@@ -549,7 +525,122 @@
     </x-slot>
 </x-ui.drawer>
 
+<!-- QUICK ADD COMPONENT MODAL -->
+<x-ui.modal id="quickAddComponentModal" title="<i class='feather-plus-circle text-primary me-2'></i>Add New Salary Component" size="md" :centered="true" :showFooter="false">
+    <form id="quickAddComponentForm" action="{{ route('hrms.salary-structure.store') }}" method="POST">
+        @csrf
+        <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
+        <input type="hidden" name="redirect_tab" value="structures">
+        <input type="hidden" name="is_adhoc" value="0">
+        <input type="hidden" name="status" value="1">
+        
+        <div class="mb-3">
+            <x-ui.modal-form-ui type="input" label="Component Name" name="name" placeholder="e.g. Special Allowance" :required="true" />
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <x-ui.modal-form-ui type="input" label="Component Code" name="code" placeholder="e.g. SA" :required="true" />
+            </div>
+            <div class="col-md-6">
+                <x-ui.modal-form-ui type="select" label="Component Type" name="type" :required="true">
+                    <option value="earning">Earning (+)</option>
+                    <option value="deduction">Deduction (-)</option>
+                </x-ui.modal-form-ui>
+            </div>
+        </div>
+        <div class="mb-3">
+            <x-ui.modal-form-ui type="input" label="Description" name="description" placeholder="Brief component description" />
+        </div>
+
+        <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top">
+            <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold"><i class="feather-check-circle me-1"></i> Create Component</button>
+        </div>
+    </form>
+</x-ui.modal>
+
 <script>
+    // Handle Quick Add Component form submission via AJAX (keeps parent Salary Structure modal open)
+    $(document).on('submit', '#quickAddComponentForm', function(e) {
+        e.preventDefault();
+        let form = $(this);
+        let submitBtn = form.find('button[type="submit"]');
+        let originalBtnText = submitBtn.html();
+        submitBtn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i> Creating...');
+
+        $.ajax({
+            url: form.attr('action'),
+            method: 'POST',
+            data: form.serialize(),
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(response) {
+                submitBtn.prop('disabled', false).html(originalBtnText);
+                if (response.success) {
+                    $('#quickAddComponentModal').modal('hide');
+                    form[0].reset();
+
+                    if (response.component) {
+                        let c = response.component;
+                        let isEarning = c.type === 'earning';
+                        let badgeClass = isEarning ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning';
+                        let badgeLabel = isEarning ? '{{ __("hrms.org.earning") }}' : '{{ __("hrms.org.deduction") }}';
+
+                        let newRowHtml = `
+                            <tr>
+                                <td>
+                                    <span class="fw-bold">${c.name}</span>
+                                    <code class="ms-1">${c.code}</code>
+                                </td>
+                                <td>
+                                    <span class="badge ${badgeClass}">${badgeLabel}</span>
+                                </td>
+                                <td>
+                                    <select name="components[${c.id}][calculation_type]" 
+                                            class="form-select form-select-sm add-calc-type-select" 
+                                            data-comp-id="${c.id}" 
+                                            id="add-calc-type-${c.id}" 
+                                            onchange="handleCalcTypeChange('add', ${c.id})">
+                                        <option value="not_included">{{ __("hrms.salary.not_included") }}</option>
+                                        <option value="fixed">{{ __("hrms.salary.fixed_amount") }}</option>
+                                        <option value="percentage_of_ctc">{{ __("hrms.salary.percentage_of_ctc") }}</option>
+                                        <option value="percentage_of_basic">{{ __("hrms.salary.percentage_of_basic") }}</option>
+                                        <option value="balancing">Auto-calculated (Balancing component)</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" 
+                                           name="components[${c.id}][value]" 
+                                           class="form-control form-control-sm add-value-input" 
+                                           id="add-value-${c.id}" 
+                                           placeholder="0.00" disabled>
+                                </td>
+                            </tr>
+                        `;
+
+                        $('#addSalaryStructureModal tbody tr:has(td[colspan]), #editSalaryStructureModal tbody tr:has(td[colspan])').remove();
+                        $('#addSalaryStructureModal tbody, #editSalaryStructureModal tbody').append(newRowHtml);
+                    }
+
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success(response.message || 'Component created successfully!');
+                    }
+                }
+            },
+            error: function(xhr) {
+                submitBtn.prop('disabled', false).html(originalBtnText);
+                let errorMsg = 'Error creating component.';
+                if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    errorMsg = Object.values(xhr.responseJSON.errors).flat().join('\n');
+                } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                alert(errorMsg);
+            }
+        });
+    });
+
     // Enable/disable rule value fields depending on the selected calculation type
     function handleCalcTypeChange(prefix, compId) {
         let select = $(`#${prefix}-calc-type-${compId}`);

@@ -17,12 +17,17 @@ class CreateRbacUser extends Command
         {--role= : Role slug to assign}
         {--name= : Full name}
         {--email= : Login email}
-        {--password= : Plain-text password (auto-generated if omitted)}';
+        {--password= : Plain-text password (auto-generated if omitted)}
+        {--platform : Create a platform administrator (no tenant, super_admin role) instead of a tenant user}';
 
-    protected $description = 'Create a user for a tenant and assign them an RBAC role';
+    protected $description = 'Create a user for a tenant and assign them an RBAC role, or a platform administrator with --platform';
 
     public function handle(): int
     {
+        if ($this->option('platform')) {
+            return $this->createPlatformAdmin();
+        }
+
         $tenant = $this->resolveTenant();
 
         if ($tenant === null) {
@@ -71,6 +76,54 @@ class CreateRbacUser extends Command
         ]);
 
         $this->info("Created user [{$user->email}] in tenant [{$tenant->slug}] with role [{$role->slug}].");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * A platform administrator belongs to no tenant and holds the system
+     * super_admin role, which is what lets them manage and switch into tenants.
+     */
+    private function createPlatformAdmin(): int
+    {
+        $role = Role::query()->whereNull('tenant_id')->where('slug', 'super_admin')->first();
+
+        if ($role === null) {
+            $this->error('The super_admin role does not exist yet — run the RbacSeeder first.');
+
+            return self::FAILURE;
+        }
+
+        $name = $this->option('name') ?: $this->ask('Full name');
+        $email = $this->option('email') ?: $this->ask('Email');
+
+        $validator = Validator::make(
+            ['name' => $name, 'email' => $email],
+            ['name' => 'required|string|max:255', 'email' => 'required|email|unique:users,email'],
+        );
+
+        if ($validator->fails()) {
+            $this->error(implode(' ', $validator->errors()->all()));
+
+            return self::FAILURE;
+        }
+
+        $password = $this->option('password');
+
+        if (blank($password)) {
+            $password = Str::password(16);
+            $this->comment("Generated password: {$password}");
+        }
+
+        $user = User::create([
+            'tenant_id' => null,
+            'role_id' => $role->id,
+            'name' => $name,
+            'email' => $email,
+            'password' => $password,
+        ]);
+
+        $this->info("Created platform administrator [{$user->email}].");
 
         return self::SUCCESS;
     }

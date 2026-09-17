@@ -32,7 +32,7 @@ return [
             'code' => 'INR',
             'name' => 'Indian Rupee',
             'symbol' => '₹',
-            'rate' => 83.5000,
+            'rate' => 85,
             'position' => 'prefix', // ₹8,350.00
         ],
         'BGN' => [

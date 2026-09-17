@@ -23,7 +23,7 @@ class RosterController extends Controller
 
     public function index(Request $request): View
     {
-        $this->authorizeHrms('hrms.rosters.view');
+        $this->authorize('viewAny', \App\Domains\HRMS\Models\Roster::class);
 
         $data = $this->rosterRepository->getIndexData($request->all());
 
@@ -32,7 +32,7 @@ class RosterController extends Controller
 
     public function storeShift(Request $request): RedirectResponse
     {
-        $this->authorizeHrms('hrms.rosters.create');
+        $this->authorize('create', \App\Domains\HRMS\Models\Roster::class);
 
         $validated = $request->validate([
             'company_id'            => 'required|exists:companies,id',
@@ -58,7 +58,7 @@ class RosterController extends Controller
 
     public function updateShift(Request $request, ProductionShift $shift): RedirectResponse
     {
-        $this->authorizeHrms('hrms.rosters.update');
+        $this->authorize('update', \App\Domains\HRMS\Models\Roster::class);
 
         $validated = $request->validate([
             'company_id'           => 'required|exists:companies,id',
@@ -84,7 +84,7 @@ class RosterController extends Controller
 
     public function destroyShift(ProductionShift $shift): RedirectResponse
     {
-        $this->authorizeHrms('hrms.rosters.update');
+        $this->authorize('delete', \App\Domains\HRMS\Models\Roster::class);
 
         $this->rosterRepository->deleteShift($shift);
 

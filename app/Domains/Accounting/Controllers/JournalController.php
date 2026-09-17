@@ -25,12 +25,23 @@ class JournalController extends Controller
     {
         $this->authorize('viewAny', Journal::class);
 
-        $filters = $request->only(['status', 'source', 'search', 'sort', 'direction']);
+        $filters = $request->only(['status', 'source', 'posted_by', 'from', 'to', 'search', 'sort', 'direction']);
         $journals = $this->journals->paginate($filters, 15);
+        $canCreate = auth()->user()?->can('post', Journal::class) ?? false;
 
         return view('modules.accounting.journals.index', [
             'journals' => $journals,
             'filters' => $filters,
+            'posters' => $this->journals->posters(),
+            'canCreate' => $canCreate,
+            'accounts' => $canCreate ? $this->accounts->active() : collect(),
+            'costCenters' => $canCreate ? CostCenter::active()->orderBy('code')->get() : collect(),
+            'summary' => [
+                'total' => Journal::query()->count(),
+                'posted' => Journal::query()->where('status', Journal::STATUS_POSTED)->count(),
+                'draft' => Journal::query()->where('status', Journal::STATUS_DRAFT)->count(),
+                'reversed' => Journal::query()->where('status', Journal::STATUS_REVERSED)->count(),
+            ],
         ]);
     }
 

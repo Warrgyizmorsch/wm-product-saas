@@ -19,6 +19,8 @@ class ExitClearancePolicyController extends Controller
 
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', \App\Domains\HRMS\Models\ExitClearanceItem::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $selectedCompanyId = $request->input('company_id');
         $selectedCategory = $request->input('category');
@@ -108,6 +110,7 @@ class ExitClearancePolicyController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', \App\Domains\HRMS\Models\ExitClearanceItem::class);
         if (empty($request->input('clearance_category')) && $request->filled('clearance_category_select')) {
             $request->merge(['clearance_category' => $request->input('clearance_category_select')]);
         }
@@ -193,6 +196,7 @@ class ExitClearancePolicyController extends Controller
 
     public function update(Request $request, ExitClearanceTemplate $template): RedirectResponse
     {
+        $this->authorize('update', \App\Domains\HRMS\Models\ExitClearanceItem::class);
         $validated = $request->validate([
             'company_id' => 'nullable|exists:companies,id',
             'clearance_category' => 'required|string|max:100',
@@ -223,6 +227,7 @@ class ExitClearancePolicyController extends Controller
 
     public function destroy(ExitClearanceTemplate $template): RedirectResponse
     {
+        $this->authorize('delete', \App\Domains\HRMS\Models\ExitClearanceItem::class);
         $name = $template->item_name;
         $companyId = $template->company_id;
         $template->delete();

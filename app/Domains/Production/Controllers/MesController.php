@@ -585,13 +585,90 @@ class MesController extends Controller
         $tenantId = require_tenant_id();
         $userId = auth()->id();
 
-        $assignments = ProductionOperatorAssignment::with(['operation.order.product', 'operation.workCenter'])
+        $query = ProductionOperatorAssignment::with([
+            'operation.order.product',
+            'operation.workCenter',
+            'operation.machine',
+        ])
             ->where('tenant_id', $tenantId)
-            ->where('user_id', $userId)
-            ->orderBy('id', 'desc')
+            ->where('user_id', $userId);
+
+        // Filter by Assignment Status
+        if ($request->filled('assignment_status')) {
+            $query->where('status', $request->input('assignment_status'));
+        }
+
+        // Filter by Operation Status
+        if ($request->filled('operation_status')) {
+            $query->whereHas('operation', function ($q) use ($request) {
+                $q->where('status', $request->input('operation_status'));
+            });
+        }
+
+        // Filter by Production Order
+        if ($request->filled('production_order_id')) {
+            $query->whereHas('operation', function ($q) use ($request) {
+                $q->where('production_order_id', $request->input('production_order_id'));
+            });
+        }
+
+        // Search by Operation name, OP code, Order number, Work Center, or Machine
+        if ($request->filled('search')) {
+            $search = '%' . trim($request->input('search')) . '%';
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('operation', function ($opQ) use ($search) {
+                    $opQ->where('name', 'like', $search)
+                        ->orWhere('operation_number', 'like', $search)
+                        ->orWhereHas('order', function ($ordQ) use ($search) {
+                            $ordQ->where('order_number', 'like', $search)
+                                ->orWhereHas('product', function ($prodQ) use ($search) {
+                                    $prodQ->where('name', 'like', $search);
+                                });
+                        })
+                        ->orWhereHas('workCenter', function ($wcQ) use ($search) {
+                            $wcQ->where('name', 'like', $search);
+                        })
+                        ->orWhereHas('machine', function ($mQ) use ($search) {
+                            $mQ->where('name', 'like', $search);
+                        });
+                });
+            });
+        }
+
+        $assignments = $query->get();
+
+        // Group by Production Order, and sort operations within each order by sequence (then operation_number)
+        $groupedAssignments = $assignments
+            ->groupBy(function ($assign) {
+                return $assign->operation->production_order_id ?? 0;
+            })
+            ->map(function ($orderAssignments) {
+                return $orderAssignments->sortBy(function ($assign) {
+                    $seq = $assign->operation->sequence ?? 9999;
+                    $opNum = $assign->operation->operation_number ?? 'OP9999';
+                    return sprintf('%06d_%s', $seq, $opNum);
+                })->values();
+            })
+            ->sortBy(function ($orderAssignments) {
+                $first = $orderAssignments->first();
+                return $first->operation->order->order_number ?? 'ZZZZZ';
+            });
+
+        // Get distinct production orders for operator's assignments to populate filter dropdown
+        $userOrderIds = ProductionOperatorAssignment::where('production_operator_assignments.tenant_id', $tenantId)
+            ->where('production_operator_assignments.user_id', $userId)
+            ->join('production_order_operations', 'production_operator_assignments.production_order_operation_id', '=', 'production_order_operations.id')
+            ->pluck('production_order_operations.production_order_id')
+            ->filter()
+            ->unique();
+
+        $orders = \App\Domains\Production\Models\ProductionOrder::where('tenant_id', $tenantId)
+            ->whereIn('id', $userOrderIds)
+            ->with('product')
+            ->orderBy('order_number')
             ->get();
 
-        return view('modules.production.mes.operator.my-operations', compact('assignments'));
+        return view('modules.production.mes.operator.my-operations', compact('assignments', 'groupedAssignments', 'orders'));
     }
 
     /**
@@ -621,6 +698,47 @@ class MesController extends Controller
         // Try mapping the schedule operation if it exists
         $scheduleOp = ProductionScheduleOperation::where('production_order_operation_id', $opId)->first();
 
+        // Shared MES Master Data for aligned QC, Scrap, and Rework workflows
+        $qualityPlans = \App\Domains\Production\Models\ProductionQualityPlan::where('tenant_id', $tenantId)
+            ->whereIn('status', ['approved', 'draft', 'active'])
+            ->with('parameters')
+            ->get();
+        $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->where(function($q) { $q->where('status', 'active')->orWhereNull('status'); })->get();
+        $machines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->get();
+        $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($opId);
+
+        // Unified production execution progress metrics (identical to Shopfloor dashboard calculations)
+        $targetQty = 0.0;
+        if ((float) ($op->target_produced_qty ?? 0) > 0) {
+            $targetQty = (float) $op->target_produced_qty;
+        } elseif ($op->source_product_id && (int) $op->source_product_id !== (int) $order->product_id) {
+            $bomItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $tenantId)
+                ->where('bom_id', $order->bom_id)
+                ->where('material_id', $op->source_product_id)
+                ->first();
+            $ratio = ($bomItem && (float) $bomItem->quantity > 0) ? (float) $bomItem->quantity : 1.0;
+            $targetQty = (float) $order->quantity_ordered * $ratio;
+        } else {
+            $targetQty = (float) ($order->quantity_ordered ?? 0.0);
+        }
+
+        $doneQty = (float) ($op->quantity_produced ?? 0.0);
+        $outputPid = $op->product_id ?? $op->source_product_id ?? $order->product_id;
+        $scrapQty = max(
+            (float) ($op->quantity_scrapped ?? 0.0),
+            (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $tenantId)
+                ->where('production_order_id', $op->production_order_id)
+                ->where('production_order_operation_id', $op->id)
+                ->where(function ($q) use ($outputPid) {
+                    $q->where('product_id', $outputPid)
+                        ->orWhereNull('product_id');
+                })
+                ->sum('quantity')
+        );
+        $rejectedQty = (float) ($op->quantity_rejected ?? 0.0);
+        $remainingQty = max(0.0, $targetQty - ($doneQty + $scrapQty + $rejectedQty));
+        $progressPercent = $targetQty > 0 ? min(100.0, round(($doneQty / $targetQty) * 100, 1)) : ($op->status === 'completed' ? 100.0 : 0.0);
+
         return view('modules.production.mes.operator.operation-execution', compact(
             'op',
             'order',
@@ -629,7 +747,17 @@ class MesController extends Controller
             'serials',
             'assignment',
             'operators',
-            'scheduleOp'
+            'scheduleOp',
+            'qualityPlans',
+            'workCenters',
+            'machines',
+            'pendingQcQty',
+            'targetQty',
+            'doneQty',
+            'scrapQty',
+            'rejectedQty',
+            'remainingQty',
+            'progressPercent'
         ));
     }
 }

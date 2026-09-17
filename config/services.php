@@ -39,4 +39,9 @@ return [
         'key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+    // Exchange-rate feed (ECB reference rates). No API key required.
+    'frankfurter' => [
+        'url' => env('FRANKFURTER_URL', 'https://api.frankfurter.app'),
+    ],
+
 ];

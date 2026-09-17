@@ -71,7 +71,8 @@ class Employee extends BaseModel
         'emergency_contact_relation',
 
         'status',
-        'weekly_pattern'
+        'weekly_pattern',
+        'resume_path'
     ];
 
     protected $casts = [
@@ -526,5 +527,50 @@ class Employee extends BaseModel
     public function revisions(): HasMany
     {
         return $this->hasMany(SalaryRevision::class, 'employee_id')->orderBy('effective_date', 'desc');
+    }
+
+    /**
+     * Multi-tier resolution of Employee profile for a given User model.
+     */
+    public static function resolveForUser(?\App\Models\User $user): ?self
+    {
+        if (!$user) {
+            return null;
+        }
+
+        // 1. Primary check: by user_id link
+        $employee = static::where('user_id', $user->id)->first();
+        if ($employee) {
+            return $employee;
+        }
+
+        // 2. Secondary check: case-insensitive email match (office_email or personal_email)
+        if (!empty($user->email)) {
+            $employee = static::where(function ($q) use ($user) {
+                $q->whereRaw('LOWER(office_email) = ?', [strtolower($user->email)])
+                  ->orWhereRaw('LOWER(personal_email) = ?', [strtolower($user->email)]);
+            })->first();
+
+            if ($employee) {
+                // Auto-link user_id for instant future lookups
+                if (!$employee->user_id) {
+                    $employee->updateQuietly(['user_id' => $user->id]);
+                }
+                return $employee;
+            }
+        }
+
+        // 3. Tertiary check: match full_name with user name if available
+        if (!empty($user->name)) {
+            $employee = static::whereRaw('LOWER(full_name) = ?', [strtolower($user->name)])->first();
+            if ($employee) {
+                if (!$employee->user_id) {
+                    $employee->updateQuietly(['user_id' => $user->id]);
+                }
+                return $employee;
+            }
+        }
+
+        return null;
     }
 }

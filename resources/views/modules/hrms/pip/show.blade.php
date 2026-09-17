@@ -5,11 +5,22 @@
 @section('breadcrumb', 'HRMS / PIP / Workspace')
 
 @section('page-actions')
+    @php
+        $authUser = auth()->user();
+        $accessService = app(\App\Services\Access\AccessService::class);
+        $canManagePip = $authUser && ($accessService->allows($authUser, 'hrms.pip.manage', ['tenant_id' => $authUser->tenant_id]) || $accessService->allows($authUser, 'hrms.performance.manage', ['tenant_id' => $authUser->tenant_id]) || $accessService->allows($authUser, 'hr.settings.manage', ['tenant_id' => $authUser->tenant_id]));
+    @endphp
     <div class="d-flex align-items-center gap-2">
-        <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.pip.index') }}" class="border text-dark fw-semibold">
-            Back to PIP Plans
-        </x-ui.button>
-        @if(in_array($pip->status, ['active', 'under_review', 'extended']))
+        @if($canManagePip)
+            <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.pip.index') }}" class="border text-dark fw-semibold">
+                Back to PIP Plans
+            </x-ui.button>
+        @else
+            <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.employees.show', ['employee' => $pip->employee_id, 'tab' => 'pip']) }}" class="border text-dark fw-semibold">
+                Back to Profile
+            </x-ui.button>
+        @endif
+        @if($canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
             <x-ui.button variant="primary" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#addCheckinModal" class="fw-bold">
                 Log Check-in
             </x-ui.button>
@@ -149,7 +160,7 @@
         <div class="p-3 bg-light rounded border mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-target me-1 text-primary"></i> SMART Objectives & Deliverables</h6>
-                @if(in_array($pip->status, ['active', 'under_review', 'extended']))
+                @if(isset($canManagePip) && $canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
                     <x-ui.button variant="outline-primary" icon="feather-plus" size="sm" data-bs-toggle="modal" data-bs-target="#addObjectiveModal" class="fw-semibold">
                         Add Objective
                     </x-ui.button>
@@ -207,7 +218,7 @@
                                     </x-ui.badge>
                                 </td>
                                 <td class="text-end pe-3 py-2.5">
-                                    @if(in_array($pip->status, ['active', 'under_review', 'extended']))
+                                    @if(isset($canManagePip) && $canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
                                         <div class="d-inline-flex align-items-center gap-3">
                                             <form action="{{ route('hrms.pip.objective.status', [$pip->id, $obj->id]) }}" method="POST" class="d-inline me-1">
                                                 @csrf
@@ -334,7 +345,7 @@
                                     {{ $checkin->manager_comments }}
                                 </td>
                                 <td class="text-end pe-3">
-                                    @if(in_array($pip->status, ['active', 'under_review', 'extended']))
+                                    @if(isset($canManagePip) && $canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
                                         <x-ui.action-dropdown id="chkActions{{ $checkin->id }}">
                                             <li>
                                                 <a class="dropdown-item" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#editCheckinModal_{{ $checkin->id }}">
@@ -407,6 +418,7 @@
     </div>
 </div>
 
+@if(isset($canManagePip) && $canManagePip)
 <!-- LOG CHECK-IN MODAL (Outside single panel) -->
 <div class="modal fade" id="addCheckinModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -510,6 +522,7 @@
         </div>
     </div>
 </div>
+@endif
 
 <x-ui.confirmation-modal />
 

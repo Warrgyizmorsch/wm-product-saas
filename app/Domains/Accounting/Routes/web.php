@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\Accounting\Controllers\AccountingAuditLogController;
+use App\Domains\Accounting\Controllers\AccountingDashboardController;
 use App\Domains\Accounting\Controllers\AccountingPeriodController;
 use App\Domains\Accounting\Controllers\AccountingPostingFailureController;
 use App\Domains\Accounting\Controllers\ApAgingController;
@@ -12,6 +13,7 @@ use App\Domains\Accounting\Controllers\BudgetVsActualController;
 use App\Domains\Accounting\Controllers\CashFlowController;
 use App\Domains\Accounting\Controllers\ChartOfAccountController;
 use App\Domains\Accounting\Controllers\CostCenterController;
+use App\Domains\Accounting\Controllers\ExchangeRateController;
 use App\Domains\Accounting\Controllers\FixedAssets\AssetCategoryController;
 use App\Domains\Accounting\Controllers\FixedAssets\AssetDepreciationController;
 use App\Domains\Accounting\Controllers\FixedAssets\AssetDisposalController;
@@ -27,6 +29,8 @@ use App\Domains\Accounting\Controllers\Gstr3bController;
 use App\Domains\Accounting\Controllers\JournalController;
 use App\Domains\Accounting\Controllers\PartyLedgerController;
 use App\Domains\Accounting\Controllers\ProfitLossController;
+use App\Domains\Accounting\Controllers\ReportExportController;
+use App\Domains\Accounting\Controllers\StaffActivityReportController;
 use App\Domains\Accounting\Controllers\TaxRateController;
 use App\Domains\Accounting\Controllers\TrialBalanceController;
 use App\Domains\Accounting\Controllers\VoucherController;
@@ -36,6 +40,11 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('accounting')
     ->as('accounting.')
     ->group(function (): void {
+        Route::get('dashboard', [AccountingDashboardController::class, 'index'])->name('dashboard');
+        Route::get('dashboard/export/{format}', [AccountingDashboardController::class, 'export'])
+            ->whereIn('format', ['pdf', 'xlsx'])
+            ->name('dashboard.export');
+
         Route::get('chart-of-accounts', [ChartOfAccountController::class, 'index'])->name('chart-of-accounts.index');
         Route::post('chart-of-accounts', [ChartOfAccountController::class, 'store'])->name('chart-of-accounts.store');
         Route::put('chart-of-accounts/{account}', [ChartOfAccountController::class, 'update'])->name('chart-of-accounts.update');
@@ -58,6 +67,15 @@ Route::prefix('accounting')
         Route::post('tax-rates', [TaxRateController::class, 'store'])->name('tax-rates.store');
         Route::put('tax-rates/{taxRate}', [TaxRateController::class, 'update'])->name('tax-rates.update');
         Route::delete('tax-rates/{taxRate}', [TaxRateController::class, 'destroy'])->name('tax-rates.destroy');
+
+        // settings/sync are registered before the {exchangeRate} routes so the
+        // wildcard never captures them.
+        Route::get('exchange-rates', [ExchangeRateController::class, 'index'])->name('exchange-rates.index');
+        Route::post('exchange-rates', [ExchangeRateController::class, 'store'])->name('exchange-rates.store');
+        Route::put('exchange-rates/settings', [ExchangeRateController::class, 'updateSettings'])->name('exchange-rates.settings');
+        Route::post('exchange-rates/sync', [ExchangeRateController::class, 'syncNow'])->name('exchange-rates.sync');
+        Route::put('exchange-rates/{exchangeRate}', [ExchangeRateController::class, 'update'])->name('exchange-rates.update');
+        Route::delete('exchange-rates/{exchangeRate}', [ExchangeRateController::class, 'destroy'])->name('exchange-rates.destroy');
 
         Route::get('bank-reconciliation', [BankReconciliationController::class, 'index'])->name('bank-reconciliation.index');
         Route::get('bank-reconciliation/create', [BankReconciliationController::class, 'create'])->name('bank-reconciliation.create');
@@ -83,6 +101,10 @@ Route::prefix('accounting')
         Route::post('journals/{journal}/reverse', [JournalController::class, 'reverse'])->name('journals.reverse');
 
         Route::get('reports/day-book', [DayBookController::class, 'index'])->name('reports.day-book');
+        Route::get('reports/vouchers-by-staff', [StaffActivityReportController::class, 'index'])->name('reports.vouchers-by-staff');
+        Route::get('reports/{report}/export/{format}', [ReportExportController::class, 'export'])
+            ->whereIn('format', ['pdf', 'xlsx'])
+            ->name('reports.export');
         Route::get('reports/trial-balance', [TrialBalanceController::class, 'index'])->name('reports.trial-balance');
         Route::get('reports/general-ledger', [GeneralLedgerController::class, 'index'])->name('reports.general-ledger');
         Route::get('reports/party-ledger', [PartyLedgerController::class, 'index'])->name('reports.party-ledger');

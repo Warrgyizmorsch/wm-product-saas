@@ -609,20 +609,7 @@
                         </div>
                     @endif
 
-                    @if($isAdmin)
-                        <div class="row mb-3">
-                            <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.wfh.employee') }}" name="employee_id" id="wfh_employee_select" :required="true" class="odoo-select2-custom">
-                                    <option value="">-- {{ __('hrms.wfh.select_employee') }} --</option>
-                                    @foreach($employees as $emp)
-                                        <option value="{{ $emp->id }}" {{ (old('employee_id') == $emp->id || ($employee && $employee->id == $emp->id)) ? 'selected' : '' }}>
-                                            {{ $emp->full_name }} ({{ $emp->employee_id }})
-                                        </option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-                        </div>
-                    @endif
+                    <input type="hidden" name="employee_id" id="wfh_employee_select" value="{{ $employee ? $employee->id : '' }}">
 
                     <div class="row mb-3">
                         <div class="col-md-6">

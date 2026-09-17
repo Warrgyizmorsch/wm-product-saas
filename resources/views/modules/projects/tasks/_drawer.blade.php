@@ -107,6 +107,12 @@
                         <select name="depends_on_task_id" id="taskDependencyOptions" class="form-select form-select-sm" required>
                             <option value="">{{ __('projects.select_option') }}</option>
                         </select>
+                        <select name="dependency_type" id="taskDependencyType" class="form-select form-select-sm" style="max-width: 140px;">
+                            <option value="Finish-to-Start">Finish-to-Start</option>
+                            <option value="Start-to-Start">Start-to-Start</option>
+                            <option value="Finish-to-Finish">Finish-to-Finish</option>
+                            <option value="Start-to-Finish">Start-to-Finish</option>
+                        </select>
                         <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">{{ __('projects.add') }}</button>
                     </form>
                 </div>
@@ -277,9 +283,12 @@
                     });
             };
 
+            var titleWrapper = document.createElement('div');
+            titleWrapper.className = 'd-flex flex-column flex-grow-1 overflow-hidden';
+
             var title = document.createElement('input');
             title.type = 'text';
-            title.className = 'form-control form-control-sm border-0 bg-transparent flex-grow-1';
+            title.className = 'form-control form-control-sm border-0 bg-transparent p-0';
             title.value = subtask.title;
             if (subtask.isCompleted) title.style.textDecoration = 'line-through';
             title.onblur = function () {
@@ -295,6 +304,27 @@
                         });
                 }
             };
+            titleWrapper.appendChild(title);
+
+            if (subtask.status || subtask.assigneeName || subtask.dueDate) {
+                var meta = document.createElement('div');
+                meta.className = 'fs-11 text-muted d-flex align-items-center gap-2 mt-1';
+                var statusBadge = document.createElement('span');
+                statusBadge.className = 'badge bg-soft-secondary text-secondary fs-10';
+                statusBadge.textContent = subtask.status || (subtask.isCompleted ? 'Completed' : 'Open');
+                meta.appendChild(statusBadge);
+                if (subtask.assigneeName) {
+                    var assigneeSpan = document.createElement('span');
+                    assigneeSpan.innerHTML = '<i class="feather-user me-1"></i>' + subtask.assigneeName;
+                    meta.appendChild(assigneeSpan);
+                }
+                if (subtask.dueDate) {
+                    var dueSpan = document.createElement('span');
+                    dueSpan.innerHTML = '<i class="feather-calendar me-1"></i>' + subtask.dueDate;
+                    meta.appendChild(dueSpan);
+                }
+                titleWrapper.appendChild(meta);
+            }
 
             var remove = document.createElement('button');
             remove.type = 'button';
@@ -314,7 +344,7 @@
             };
 
             row.appendChild(checkbox);
-            row.appendChild(title);
+            row.appendChild(titleWrapper);
             row.appendChild(remove);
             list.appendChild(row);
         });
@@ -352,9 +382,20 @@
             var row = document.createElement('div');
             row.className = 'd-flex align-items-center justify-content-between gap-2 border-bottom py-1';
 
+            var left = document.createElement('div');
+            left.className = 'd-flex align-items-center gap-2';
+
+            var typeBadge = document.createElement('span');
+            typeBadge.className = 'badge bg-soft-info text-info fs-11';
+            typeBadge.textContent = dependency.dependencyType || 'Finish-to-Start';
+
             var label = document.createElement('span');
             label.className = 'fs-12';
             label.textContent = dependency.label;
+
+            left.appendChild(typeBadge);
+            left.appendChild(label);
+            row.appendChild(left);
 
             var remove = document.createElement('button');
             remove.type = 'button';
@@ -373,7 +414,6 @@
                 });
             };
 
-            row.appendChild(label);
             row.appendChild(remove);
             list.appendChild(row);
         });
@@ -466,11 +506,15 @@
         event.preventDefault();
         var form = event.target;
         var select = form.querySelector('select[name="depends_on_task_id"]');
+        var typeSelect = form.querySelector('select[name="dependency_type"]');
         var button = form.querySelector('button[type="submit"]');
         if (!select.value || !form.action) return;
 
         button.disabled = true;
-        drawerRequest(form.action, 'POST', { depends_on_task_id: select.value })
+        drawerRequest(form.action, 'POST', {
+            depends_on_task_id: select.value,
+            dependency_type: typeSelect ? typeSelect.value : 'Finish-to-Start'
+        })
             .then(function (result) {
                 applyDependenciesResult(result);
                 select.value = '';

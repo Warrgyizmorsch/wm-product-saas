@@ -6,14 +6,16 @@
         $fallback = ($isEdit && $empObj && isset($empObj->$field)) ? $empObj->$field : $default;
         return old($field, $fallback);
     };
-    // Prepared for future role-based lock: when $isEmployeeSelfService is true, HR fields become readonly/disabled
-    $isEmployeeSelfService = $isEmployeeSelfService ?? false;
+    $authUser = auth()->user();
+    $isHrOrAdmin = $isHrOrAdmin ?? ($authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]));
+    $isEmployeeSelfService = $isEmployeeSelfService ?? !$isHrOrAdmin;
 @endphp
 @once
 <script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.key') }}&libraries=places"></script>
 @endonce
 
 <div class="employee-form-container">
+    @if($isHrOrAdmin)
     <!-- ══════════════════════════════════════════════════════════════════════════ -->
     <!-- SECTION 1: OFFICIAL & COMPANY MANAGED FIELDS                            -->
     <!-- ══════════════════════════════════════════════════════════════════════════ -->
@@ -33,6 +35,30 @@
             </x-ui.badge>
         </div>
         <div class="card-body p-4">
+            <!-- Candidate Resume / CV Document Upload -->
+            <div class="p-3 bg-light border rounded-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle bg-soft-primary text-primary" style="width: 36px; height: 36px; min-width: 36px;">
+                        <i class="feather-file-text fs-16"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0 fs-13">Candidate Resume / CV Document</h6>
+                        <span class="text-muted fs-11">Attach official resume file (PDF, DOC, DOCX - max 5MB).</span>
+                    </div>
+                </div>
+                <div style="min-width: 280px;" class="flex-grow-1 flex-md-grow-0">
+                    <input type="file" name="resume" id="{{ $prefix }}_resume" class="form-control form-control-sm" accept=".pdf,.doc,.docx" data-field-group="hr_admin" {{ $isEmployeeSelfService ? 'disabled' : '' }}>
+                    <input type="hidden" name="existing_resume_path" id="{{ $prefix }}_existing_resume_path" value="{{ $fieldValue('resume_path', $convertOfferPayload['resume_path'] ?? '') }}">
+                    
+                    @php
+                        $existingResume = $fieldValue('resume_path', $convertOfferPayload['resume_path'] ?? '');
+                    @endphp
+                    <div id="{{ $prefix }}_resume_preview_container" class="mt-1 fs-11 text-muted {{ !empty($existingResume) ? '' : 'd-none' }}">
+                        Attached Resume: <a href="{{ !empty($existingResume) ? asset('storage/' . $existingResume) : '#' }}" id="{{ $prefix }}_resume_preview_link" target="_blank" class="text-primary fw-semibold"><i class="feather-paperclip me-1"></i>View Candidate Resume</a>
+                    </div>
+                </div>
+            </div>
+
             <!-- 1.1 Organizational Mapping -->
             <div class="employee-modal-section-title mt-0">{{ __('hrms.employees.org_mapping') }}</div>
             <div class="row g-3 mb-4">
@@ -249,6 +275,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <!-- ══════════════════════════════════════════════════════════════════════════ -->
     <!-- SECTION 2: PERSONAL & EMPLOYEE SELF-SERVICE PROFILE                     -->
@@ -274,13 +301,72 @@
                 <div class="col-xl-3 employee-photo-col">
                     <div class="employee-photo-panel">
                         <div class="employee-photo-preview" id="{{ $prefix }}_photo_preview">
-                            {{ $isEdit ? 'EM' : strtoupper(substr((string) old('full_name', 'Employee'), 0, 2)) }}
+                            @if($isEdit && !empty($employee?->profile_photo_url))
+                                <img src="{{ asset('storage/' . $employee->profile_photo_url) }}" alt="{{ $employee->full_name }}">
+                            @elseif($isEdit && !empty($employee?->photo))
+                                <img src="{{ asset('storage/' . $employee->photo) }}" alt="{{ $employee->full_name }}">
+                            @else
+                                {{ ($isEdit && !empty($employee?->full_name)) ? strtoupper(substr($employee->full_name, 0, 2)) : strtoupper(substr((string) old('full_name', 'Employee'), 0, 2)) }}
+                            @endif
                         </div>
                         <div class="fw-semibold text-dark mb-1">{{ __('hrms.employees.frm_profile_photo') }}</div>
                         <div class="text-muted fs-12 mb-3">{{ __('hrms.employees.frm_photo_help') }}</div>
-                        <input type="file" class="form-control" name="photo" id="{{ $prefix }}_photo" accept=".png,.jpg,.jpeg,.webp" data-field-group="employee">
+                        <input type="file" class="form-control form-control-sm" name="photo" id="{{ $prefix }}_photo" accept=".png,.jpg,.jpeg,.webp" data-field-group="employee">
                     </div>
                 </div>
+
+                <style>
+                    .employee-photo-panel {
+                        border: 2px dashed #cbd5e1;
+                        border-radius: 16px;
+                        padding: 20px 16px;
+                        text-align: center;
+                        background-color: #f8fafc;
+                        transition: all 0.3s ease;
+                    }
+                    .employee-photo-panel:hover {
+                        border-color: var(--bs-primary);
+                        background-color: #ffffff;
+                    }
+                    .employee-photo-preview {
+                        width: 100px;
+                        height: 100px;
+                        border-radius: 50%;
+                        overflow: hidden;
+                        margin: 0 auto 12px;
+                        background: linear-gradient(135deg, rgba(13, 110, 253, 0.18), rgba(13, 110, 253, 0.05));
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: var(--bs-primary);
+                        font-size: 30px;
+                        font-weight: 800;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+                        border: 2px solid #ffffff;
+                    }
+                    .employee-photo-preview img {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                    }
+                </style>
+                <script>
+                    document.addEventListener('change', function(e) {
+                        if (e.target && (e.target.id === 'edit_photo' || e.target.id === 'create_photo')) {
+                            const file = e.target.files && e.target.files[0];
+                            if (!file) return;
+                            const prefix = e.target.id.replace('_photo', '');
+                            const reader = new FileReader();
+                            reader.onload = function(loadEvent) {
+                                const preview = document.getElementById(prefix + '_photo_preview');
+                                if (preview) {
+                                    preview.innerHTML = `<img src="${loadEvent.target.result}" alt="Preview">`;
+                                }
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    });
+                </script>
 
                 <!-- Personal Information -->
                 <div class="col-xl-9">

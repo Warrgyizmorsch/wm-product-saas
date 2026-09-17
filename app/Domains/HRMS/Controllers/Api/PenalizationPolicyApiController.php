@@ -43,6 +43,18 @@ class PenalizationPolicyApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.attendance.manage')
+            || $user->hasHrPermission('hrms.penalties.manage');
+    }
+
     /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
@@ -144,6 +156,10 @@ class PenalizationPolicyApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage penalization policy rules.', 403);
         }
 
         $validationRules = [
@@ -268,6 +284,10 @@ class PenalizationPolicyApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to delete penalization policy rules.', 403);
+        }
+
         $attendancePenalty = AttendancePenalty::find($id);
         if (!$attendancePenalty) {
             return $this->sendError("Penalization policy rule with ID '{$id}' not found.", 404);
@@ -304,6 +324,10 @@ class PenalizationPolicyApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. You do not have permission to manage attendance rules.', 403);
         }
 
         $validated = $request->validate([

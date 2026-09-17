@@ -22,6 +22,8 @@ class BiometricDeviceController extends Controller
 
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', BiometricDevice::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $hasBiometricRule = \App\Domains\HRMS\Models\AttendanceRule::where('office_biometric', true)
             ->where('tenant_id', $tenantId)
@@ -38,6 +40,8 @@ class BiometricDeviceController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', BiometricDevice::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -66,6 +70,8 @@ class BiometricDeviceController extends Controller
 
     public function update(Request $request, BiometricDevice $biometricDevice): RedirectResponse
     {
+        $this->authorize('update', $biometricDevice);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -94,6 +100,8 @@ class BiometricDeviceController extends Controller
 
     public function destroy(BiometricDevice $biometricDevice): RedirectResponse
     {
+        $this->authorize('delete', $biometricDevice);
+
         $this->repository->deleteDevice($biometricDevice);
 
         return redirect()->route('hrms.biometric-devices.index')

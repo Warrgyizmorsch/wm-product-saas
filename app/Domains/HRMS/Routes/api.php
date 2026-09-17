@@ -283,9 +283,6 @@ Route::prefix('api/hrms/employees')
         Route::delete('/{employee}/employment-histories/{history}', [EmployeeApiController::class, 'destroyEmploymentHistory'])->name('employment-histories.destroy');
 
         Route::post('/{employee}/documents/upload', [EmployeeApiController::class, 'uploadDocument'])->name('documents.upload');
-        Route::patch('/documents/{document}/approve', [EmployeeApiController::class, 'approveDocument'])->name('documents.approve');
-        Route::patch('/documents/{document}/reject', [EmployeeApiController::class, 'rejectDocument'])->name('documents.reject');
-        Route::patch('/documents/{document}/status', [EmployeeApiController::class, 'updateDocumentStatus'])->name('documents.status.update');
         Route::delete('/documents/{document}', [EmployeeApiController::class, 'destroyDocument'])->name('documents.destroy');
     });
 
@@ -573,20 +570,30 @@ Route::prefix('api/hrms/documents')
     ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.documents.')
     ->group(function () {
+        // --- Shared / Masters & Templates Listing ---
         Route::get('/', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'index'])->name('index');
+        Route::get('/masters', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'listMasters'])->name('masters.index');
+        Route::get('/templates', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'listTemplates'])->name('templates.index');
+        Route::get('/templates/{template}', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'showTemplate'])->name('templates.show');
+
+        // --- HR Specific Endpoints ---
+        Route::post('/hr/upload', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'upload'])->name('hr.upload');
+        Route::post('/hr/generate-template', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'generateSignedTemplate'])->name('hr.generate-template');
+        Route::post('/hr/{document}/approve', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'approve'])->name('hr.approve');
+        Route::post('/hr/{document}/reject', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'reject'])->name('hr.reject');
+        Route::put('/hr/{document}/status', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'updateStatus'])->name('hr.status.update');
+
+        // --- Employee Specific Endpoints ---
+        Route::post('/employee/upload', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'employeeUpload'])->name('employee.upload');
+        Route::post('/employee/{document}/sign', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'sign'])->name('employee.sign');
+
+        // --- Standard Direct Action Aliases ---
         Route::post('/upload', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'upload'])->name('upload');
         Route::post('/{document}/approve', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'approve'])->name('approve');
         Route::post('/{document}/reject', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'reject'])->name('reject');
         Route::put('/{document}/status', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'updateStatus'])->name('status.update');
         Route::post('/{document}/sign', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'sign'])->name('sign');
         Route::post('/generate-signed-template', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'generateSignedTemplate'])->name('generate-signed-template');
-    });
-
-Route::prefix('api/hrms/user')
-    ->middleware(['auth:sanctum', 'throttle:60,1'])
-    ->name('api.hrms.user.')
-    ->group(function () {
-        Route::post('/signature', [\App\Domains\HRMS\Controllers\Api\DocumentApiController::class, 'updateUserSignature'])->name('signature.update');
     });
 
 // ==========================================

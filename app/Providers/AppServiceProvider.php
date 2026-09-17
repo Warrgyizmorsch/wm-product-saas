@@ -35,6 +35,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Branching::class);
         $this->app->singleton(BranchContext::class, fn ($app) => $app->make(Branching::class));
 
+        // Loads every module's Routes/menu.php once per request.
+        $this->app->singleton(\App\Core\Navigation\MenuRegistry::class);
+
         \Illuminate\Support\Facades\Auth::provider('tenant-eloquent', function ($app, array $config) {
             return new \App\Support\Auth\TenantAwareUserProvider($app['hash'], $config['model']);
         });
@@ -288,6 +291,18 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Repositories\BudgetRepositoryInterface::class,
             \App\Domains\Accounting\Repositories\BudgetRepository::class
         );
+
+        // ── Accounting: Exchange Rate ──────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\ExchangeRateRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\ExchangeRateRepository::class
+        );
+
+        // ── Accounting: Exchange Rate feed (swap for another provider here) ────
+        $this->app->bind(
+            \App\Domains\Accounting\Services\ExchangeRates\ExchangeRateProvider::class,
+            \App\Domains\Accounting\Services\ExchangeRates\FrankfurterProvider::class
+        );
     }
 
     public function boot(): void
@@ -369,6 +384,27 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Purchase\Events\GrnAssetLineReceived::class,
             \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
         );
+
+        // ── Accounting dashboard cache: any journal change can move a figure ──
+        $flushAccountingDashboard = function ($model): void {
+            if ($model->tenant_id) {
+                app(\App\Domains\Accounting\Services\Dashboard\DashboardCache::class)->flush((int) $model->tenant_id);
+            }
+        };
+        \App\Domains\Accounting\Models\Journal::saved($flushAccountingDashboard);
+        \App\Domains\Accounting\Models\Journal::deleted($flushAccountingDashboard);
+        \App\Domains\Accounting\Models\JournalEntry::created($flushAccountingDashboard);
+
+        // ── Tenant provisioning: each module adds its own default masters ─────
+        foreach ([
+            \App\Domains\Accounting\Listeners\ProvisionChartOfAccounts::class,
+            \App\Domains\Platform\Listeners\ProvisionPaymentTerms::class,
+            \App\Domains\CRM\Listeners\ProvisionCrmDefaults::class,
+            \App\Domains\Inventory\Listeners\ProvisionInventoryDefaults::class,
+            \App\Domains\Production\Listeners\ProvisionProductionDefaults::class,
+        ] as $listener) {
+            \Illuminate\Support\Facades\Event::listen(\App\Core\Tenant\Events\TenantProvisioning::class, $listener);
+        }
 
         // ── Production Policies ───────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
@@ -636,6 +672,16 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Policies\BudgetPolicy::class
         );
 
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\ExchangeRate::class,
+            \App\Domains\Accounting\Policies\ExchangeRatePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Models\Currency::class,
+            \App\Domains\Platform\Policies\CurrencyPolicy::class
+        );
+
         // ── HRMS Policies ────────────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\PayrollRun::class,
@@ -643,8 +689,58 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Company::class,
+            \App\Domains\HRMS\Policies\OrgPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\LeavePlan::class,
+            \App\Domains\HRMS\Policies\LeaveStructurePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Roster::class,
+            \App\Domains\HRMS\Policies\RosterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\AttendancePenaltyRule::class,
+            \App\Domains\HRMS\Policies\PenalizationPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\BiometricDevice::class,
+            \App\Domains\HRMS\Policies\BiometricDevicePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\DocumentType::class,
+            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\HolidayCalendar::class,
+            \App\Domains\HRMS\Policies\HolidayPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\ExpensePolicy::class,
+            \App\Domains\HRMS\Policies\ExpensePolicyPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\ExitClearanceItem::class,
+            \App\Domains\HRMS\Policies\ExitClearancePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\SalaryStructure::class,
             \App\Domains\HRMS\Policies\SalaryStructurePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\PerformanceImprovementPlan::class,
+            \App\Domains\HRMS\Policies\PipPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(
@@ -655,6 +751,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\Asset::class,
             \App\Domains\HRMS\Policies\AssetPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Broadcast::class,
+            \App\Domains\HRMS\Policies\BroadcastPolicy::class
         );
 
         // ── Fixed Asset Policies ────────────────────────────────────────────

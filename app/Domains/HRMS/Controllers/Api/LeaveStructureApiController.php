@@ -45,6 +45,18 @@ class LeaveStructureApiController extends Controller
         return response()->json($response, $statusCode);
     }
 
+    private function isHrAdmin(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hrms.leave_requests.approve')
+            || $user->hasHrPermission('hrms.leaves.manage');
+    }
+
     /**
      * Null-safe authorization check supporting Web Sessions & HTTP Basic Auth.
      */
@@ -59,7 +71,7 @@ class LeaveStructureApiController extends Controller
                     return $this->sendError('Invalid HTTP Basic Auth credentials.', 401);
                 }
             } else {
-                return $this->sendError('Unauthenticated access. Please provide valid credentials.', 401);
+                return $this->sendError('Unauthenticated access. Please log in or provide HTTP Basic Auth credentials.', 401);
             }
         }
 
@@ -218,6 +230,10 @@ class LeaveStructureApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to create leave plan.', 403);
+        }
+
         $validated = $request->validate([
             'name'           => 'required|string|max:255',
             'company_id'     => 'nullable|integer|exists:companies,id',
@@ -247,6 +263,10 @@ class LeaveStructureApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update leave plan.', 403);
         }
 
         $leavePlan = LeavePlan::find($id);
@@ -283,6 +303,10 @@ class LeaveStructureApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to delete leave plan.', 403);
         }
 
         $leavePlan = LeavePlan::find($id);
@@ -373,6 +397,10 @@ class LeaveStructureApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to create leave type.', 403);
+        }
+
         $validated = $request->validate([
             'leave_plan_id' => 'required|integer|exists:leave_plans,id',
             'name'          => 'required|string|max:255',
@@ -408,6 +436,10 @@ class LeaveStructureApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update leave type.', 403);
         }
 
         $leaveType = LeaveType::find($id);
@@ -452,6 +484,10 @@ class LeaveStructureApiController extends Controller
             return $authError;
         }
 
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to update leave policy rules.', 403);
+        }
+
         $leaveType = LeaveType::find($id);
         if (!$leaveType) {
             return $this->sendError("Leave type with ID '{$id}' not found.", 404);
@@ -476,6 +512,10 @@ class LeaveStructureApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if (!$this->isHrAdmin()) {
+            return $this->sendError('Unauthorized action. Admin permissions required to delete leave type.', 403);
         }
 
         $leaveType = LeaveType::find($id);

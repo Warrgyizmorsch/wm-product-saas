@@ -84,10 +84,21 @@
                         
                         <x-ui.odoo-form-ui type="input" :label="__('production.cost_per_hour') . ' (' . active_currency_symbol() . ')'" name="cost_per_hour" inputType="number" step="0.01" :value="old('cost_per_hour', number_format(convert_from_base($workCenter->cost_per_hour), 2, '.', ''))" :required="true" />
                         
+                        <x-ui.odoo-form-ui type="input" :label="__('production.overhead_cost_rate') . ' (' . active_currency_symbol() . ')'" name="overhead_rate" inputType="number" step="0.01" :value="old('overhead_rate', number_format(convert_from_base($workCenter->overhead_rate ?? 0), 2, '.', ''))" />
+                        
                         <x-ui.odoo-form-ui type="select" :label="__('production.active_shifts')" name="shifts[]" :multiple="true" :searchable="true">
                             @foreach($shifts as $shift)
                                 <option value="{{ $shift->id }}" @selected(in_array($shift->id, old('shifts', $workCenter->shifts->pluck('id')->toArray())))>
                                     {{ $shift->name }} ({{ substr($shift->start_time, 0, 5) }} - {{ substr($shift->end_time, 0, 5) }})
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                        
+                        <x-ui.odoo-form-ui type="select" label="Production Calendar" name="production_calendar_id">
+                            <option value="">-- Default Factory Calendar --</option>
+                            @foreach($calendars as $cal)
+                                <option value="{{ $cal->id }}" @selected(old('production_calendar_id', $workCenter->production_calendar_id) == $cal->id)>
+                                    {{ $cal->name }}{{ $cal->is_default ? ' (Default)' : '' }}
                                 </option>
                             @endforeach
                         </x-ui.odoo-form-ui>

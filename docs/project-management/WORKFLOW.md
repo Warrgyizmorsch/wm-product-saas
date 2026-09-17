@@ -82,8 +82,11 @@ flowchart TD
 - **Rules:**
   - Owner must be an active project collaborator.
   - Health is dynamically derived (`on_track`, `at_risk`, `off_track`, `blocked`).
-- **Target Improvement:** Automatically roll up milestone `completion_percentage` based on the completion of child tasks.
-- **Status:** **CURRENTLY IMPLEMENTED (MANUAL % COMPLETION).**
+- **Progress Rollup:** Automatically rolls up milestone `completion_percentage` based on the completion of child tasks:
+  - `eligible = all milestone tasks where status != Cancelled`
+  - `progress = completed eligible / total eligible * 100` (0% if total eligible = 0).
+  - Recalculates dynamically on task creation, status update, deletion, and reassignment between milestones.
+- **Status:** **CURRENTLY IMPLEMENTED (WITH AUTOMATIC PROGRESS ROLLUP).**
 
 ### Stage 5: Task List Organization
 - **Action:** Create task lists / board categories (e.g., Backlog, In Progress, Review, Done, or functional columns: UI/UX, Backend, QA).
@@ -98,18 +101,28 @@ flowchart TD
 - **Rules:**
   - Assignee and Reviewer must be active project members.
   - Tasks can be decomposed into Subtasks.
-- **Target Improvement:** Subtasks must support independent assignees, start/due dates, estimated hours, and status, rolling up completion into the parent task.
-- **Status:** **CURRENTLY IMPLEMENTED (SUBTASKS LIMITED TO TITLE + CHECKBOX).**
+- **Subtask Capabilities:**
+  - Independent execution metadata: `assignee_id`, `start_date`, `due_date`, `estimated_hours`, and `status`.
+  - Canonical Status/Completion synchronization:
+    - `status = Completed` $\iff$ `is_completed = true` and `completed_at = now()`.
+    - `status != Completed` $\iff$ `is_completed = false` and `completed_at = null`.
+    - `toggleComplete(true)` produces `Completed` / `true` / timestamp; `toggleComplete(false)` produces `Open` / `false` / null.
+  - Parent Task Autonomy: Subtask completion does not automatically mutate parent Task status.
+- **Status:** **CURRENTLY IMPLEMENTED.**
 
 ### Stage 7: Task Dependency Configuration
 - **Action:** Define predecessor/successor constraints between tasks.
 - **Rules:**
-  - Circular dependency detection rejects cycles before persistence.
-- **Target Improvement:**
-  - Support dependency types: Finish-to-Start (FS), Start-to-Start (SS), Finish-to-Finish (FF).
-  - Status transition enforcement: block moving task to `In Progress` or `Completed` if dependencies are incomplete.
-  - Date shifting: moving predecessor due date shifts successor start date.
-- **Status:** **CURRENTLY IMPLEMENTED (CYCLE DETECTION ONLY; ENFORCEMENT & TYPES MISSING).**
+  - In-memory cycle detection rejects direct and indirect circular dependency chains before persistence.
+  - Rejects self-dependencies, cross-project dependencies, and duplicate edges.
+- **Dependency Classification & Transition Enforcement:**
+  - Supports 4 dependency types:
+    - **Finish-to-Start (FS):** Task cannot start (`In Progress`, `Review`, `Completed`) until predecessor is Completed.
+    - **Start-to-Start (SS):** Task cannot start until predecessor has started.
+    - **Finish-to-Finish (FF):** Task can start, but cannot complete until predecessor is Completed.
+    - **Start-to-Finish (SF):** Task cannot complete until predecessor has started.
+  - Administrative transitions (`On Hold`, `Cancelled`) are always permitted.
+- **Status:** **CURRENTLY IMPLEMENTED (CYCLE DETECTION, DEPENDENCY TYPES, TRANSITION ENFORCEMENT).**
 
 ### Stage 8: Timeline, Scheduling & Gantt Planning
 - **Action:** View project schedule on an interactive Gantt chart.

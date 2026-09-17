@@ -23,6 +23,10 @@ class EmployeeController extends Controller
 
         $data = $this->employeeRepository->getDirectoryData($request->all());
 
+        if ($request->filled('convert_offer_id')) {
+            $data['convertOffer'] = \App\Domains\HRMS\Models\JobOffer::with(['application.candidate', 'department', 'designation'])->find($request->convert_offer_id);
+        }
+
         return view('modules.hrms.employees.index', $data);
     }
 
@@ -205,15 +209,96 @@ class EmployeeController extends Controller
         $validated = $this->validatePayload($request);
         $validated = $this->normalizeHierarchy($validated);
 
-        $this->employeeRepository->storeEmployee($validated, $request);
+        $employee = $this->employeeRepository->storeEmployee($validated, $request);
+
+        // Process Candidate Offer Conversion link if submitted from recruitment workflow
+        if ($request->filled('convert_offer_id')) {
+            $offer = \App\Domains\HRMS\Models\JobOffer::find($request->convert_offer_id);
+            if ($offer) {
+                $offer->update(['converted_employee_id' => $employee->id]);
+                $application = $offer->application;
+                if ($application) {
+                    $candidateObj = $application->candidate;
+                    if ($candidateObj) {
+                        $candidateObj->update(['status' => 'hired']);
+                        if (empty($employee->resume_path) && !empty($candidateObj->resume_path)) {
+                            $employee->update(['resume_path' => $candidateObj->resume_path]);
+                        }
+                    }
+                    $application->update([
+                        'current_stage' => 'hired',
+                        'stage_updated_at' => now(),
+                    ]);
+                    $req = $application->requisition;
+                    if ($req && $req->vacancies > 0) {
+                        $req->decrement('vacancies');
+                        if ($req->vacancies === 0) {
+                            $req->update(['status' => 'closed']);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Dispatch Welcome Email with Login Credentials to Employee
+        try {
+            $toEmail = $employee->personal_email ?: ($employee->office_email ?: $employee->user?->email);
+            if (!empty($toEmail)) {
+                $loginUrl = route('login');
+                $companyName = config('app.name', 'Our Company');
+                $welcomeHtml = "
+                    <div style='font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6; padding: 20px; background-color: #f8fafc;'>
+                        <div style='max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;'>
+                            <div style='background-color: #2563eb; padding: 20px; text-align: center; color: #ffffff;'>
+                                <h2 style='margin: 0; font-size: 20px;'>Welcome to {$companyName}! 🎉</h2>
+                            </div>
+                            <div style='padding: 24px;'>
+                                <p>Dear <strong>{$employee->full_name}</strong>,</p>
+                                <p>We are delighted to welcome you to the team as <strong>" . ($employee->designation?->name ?? 'Employee') . "</strong>!</p>
+                                <p>Your Employee Profile and ESS Self-Service Portal account have been set up. Here are your account login details:</p>
+                                <div style='background-color: #f1f5f9; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+                                    <p style='margin: 0 0 8px 0;'><strong>Portal Link:</strong> <a href='{$loginUrl}' style='color: #2563eb;'>{$loginUrl}</a></p>
+                                    <p style='margin: 0 0 8px 0;'><strong>Username / Email:</strong> <code>{$toEmail}</code></p>
+                                    <p style='margin: 0;'><strong>Initial Password:</strong> <code>12345678</code></p>
+                                </div>
+                                <p>Please log in to your Employee Portal and update your password under Account Settings upon first login.</p>
+                                <div style='text-align: center; margin-top: 25px;'>
+                                    <a href='{$loginUrl}' style='background-color: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;'>Login to Employee Portal</a>
+                                </div>
+                                <br>
+                                <p style='color: #64748b; font-size: 13px;'>If you have any questions, please contact the HR Department.</p>
+                            </div>
+                        </div>
+                    </div>
+                ";
+
+                /** @var \App\Services\EmailService $emailService */
+                $emailService = app(\App\Services\EmailService::class);
+                $emailService->sendEmail([
+                    'to'         => $toEmail,
+                    'subject'    => "Welcome to {$companyName} — Your Employee Login Credentials",
+                    'body_html'  => $welcomeHtml,
+                    'account_id' => $request->account_id,
+                ]);
+            }
+        } catch (\Throwable $emEx) {
+            \Illuminate\Support\Facades\Log::error("Failed to send Welcome Email to employee: " . $emEx->getMessage());
+        }
 
         return redirect()
             ->route('hrms.employees.index')
-            ->with('success', 'Employee created successfully.');
+            ->with('success', "🎉 Employee {$employee->full_name} created successfully and Welcome Email dispatched!");
     }
 
     public function show(Request $request, Employee $employee): View
     {
+        $authUser = auth()->user();
+        $isOwnProfile = $authUser && ($authUser->employee?->id === $employee->id || \App\Domains\HRMS\Models\Employee::resolveForUser($authUser)?->id === $employee->id);
+
+        if (!$isOwnProfile) {
+            $this->authorizeHrms('hrms.employees.view');
+        }
+
         $data = $this->employeeRepository->getProfileData($employee, $request->all());
 
         return view('modules.hrms.employees.show', $data);
@@ -221,7 +306,34 @@ class EmployeeController extends Controller
 
     public function update(Request $request, Employee $employee): RedirectResponse
     {
-        $this->authorizeHrms('hrms.employees.update');
+        $authUser = auth()->user();
+        $isHrOrAdmin = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', [
+            'tenant_id' => $authUser->tenant_id,
+        ]);
+        $isOwnProfile = $authUser?->employee?->id == $employee->id;
+
+        if (!$isHrOrAdmin && !$isOwnProfile) {
+            $this->authorizeHrms('hrms.employees.update');
+        }
+
+        if (!$isHrOrAdmin) {
+            // Self-service edits must never change the account's system role.
+            $request->offsetUnset('role_id');
+            $request->query->remove('role_id');
+
+            $request->merge([
+                'employee_id' => $request->input('employee_id', $employee->employee_id),
+                'user_id' => $request->input('user_id', $employee->user_id),
+                'company_id' => $request->input('company_id', $employee->company_id),
+                'department_id' => $request->input('department_id', $employee->department_id),
+                'designation_id' => $request->input('designation_id', $employee->designation_id),
+                'date_of_joining' => $request->input('date_of_joining', $employee->date_of_joining ? $employee->date_of_joining->format('Y-m-d') : null),
+                'gender' => $request->input('gender', $employee->gender),
+                'full_name' => $request->input('full_name', $employee->full_name),
+                'job_title' => $request->input('job_title', $employee->job_title),
+                'status' => $request->input('status', $employee->status),
+            ]);
+        }
 
         $oldPlanId = $employee->leave_plan_id;
 
@@ -250,8 +362,8 @@ class EmployeeController extends Controller
         $this->employeeRepository->updateEmployee($employee, $validated, $request);
 
         return redirect()
-            ->route('hrms.employees.index')
-            ->with('success', 'Employee updated successfully.');
+            ->back()
+            ->with('success', 'Profile updated successfully.');
     }
 
     public function destroy(Employee $employee): RedirectResponse
@@ -285,7 +397,11 @@ class EmployeeController extends Controller
                     ->whereNull('deleted_at')
                     ->ignore($employeeId),
             ],
-            'role_id' => ['nullable', 'exists:roles,id'],
+            // role_id is written straight to users.role_id, so only roles the
+            // acting user may hand out are accepted (never super_admin for a non-super-admin).
+            'role_id' => ['nullable', Rule::in(auth()->check()
+                ? app(AccessService::class)->assignableRoles(auth()->user(), $tenantId)->pluck('id')->all()
+                : [])],
 
             'title' => ['nullable', 'string', 'max:50'],
             'full_name' => ['required', 'string', 'max:255'],

@@ -7,6 +7,7 @@ use App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Support\AccountCode;
 use App\Domains\HRMS\Models\Asset;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,9 +21,15 @@ class AssetDepreciationService
      * configured — mirrors the findByCode-with-fallback convention already
      * used by PostPurchaseBillJournal for the fixed-asset account itself (code
      * 1500).
+     *
+     * The default chart seeds Depreciation Expense as 5400. The fallback used to
+     * be 5800, which the default chart never had, so depreciation failed for any
+     * category without its own accounts; 5800 is still tried after 5400 for
+     * tenants that created it by hand.
      */
-    private const FALLBACK_ACCUMULATED_DEPRECIATION_CODE = '1510';
-    private const FALLBACK_DEPRECIATION_EXPENSE_CODE = '5800';
+    private const FALLBACK_ACCUMULATED_DEPRECIATION_CODE = AccountCode::ACCUMULATED_DEPRECIATION;
+    private const FALLBACK_DEPRECIATION_EXPENSE_CODE = AccountCode::DEPRECIATION_EXPENSE;
+    private const LEGACY_DEPRECIATION_EXPENSE_CODE = '5800';
 
     public function __construct(
         private readonly JournalService $journals,
@@ -212,7 +219,8 @@ class AssetDepreciationService
             $tenantId = $asset->tenant_id;
 
             $depreciationExpenseAccount = $category?->depreciationExpenseAccount
-                ?? $this->accounts->findByCode(self::FALLBACK_DEPRECIATION_EXPENSE_CODE, $tenantId);
+                ?? $this->accounts->findByCode(self::FALLBACK_DEPRECIATION_EXPENSE_CODE, $tenantId)
+                ?? $this->accounts->findByCode(self::LEGACY_DEPRECIATION_EXPENSE_CODE, $tenantId);
             $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount
                 ?? $this->accounts->findByCode(self::FALLBACK_ACCUMULATED_DEPRECIATION_CODE, $tenantId);
 

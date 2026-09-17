@@ -27,6 +27,8 @@ class PipController extends Controller
      */
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', PerformanceImprovementPlan::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $activeTab = $request->input('active_tab', $request->input('tab', 'plans'));
         $search = $request->input('search');
@@ -113,6 +115,8 @@ class PipController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', PerformanceImprovementPlan::class);
+
         $validated = $request->validate([
             'employee_id'        => 'required|exists:employees,id',
             'manager_id'         => 'nullable|exists:employees,id',
@@ -130,7 +134,18 @@ class PipController extends Controller
         ]);
 
         $validated['hr_representative_id'] = auth()->id();
-        $this->pipService->createPip($validated);
+        $pip = $this->pipService->createPip($validated);
+
+        if (!empty($validated['employee_id'])) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: (int) $validated['employee_id'],
+                title: 'PIP Initiated',
+                message: 'A Performance Improvement Plan (PIP) has been initiated for you.',
+                actionUrl: route('hrms.pip.index'),
+                type: 'pip_initiated',
+                iconClass: 'feather-alert-triangle'
+            );
+        }
 
         return redirect()->route('hrms.pip.index')
             ->with('success', 'Performance Improvement Plan initiated successfully.');
@@ -141,6 +156,8 @@ class PipController extends Controller
      */
     public function show(PerformanceImprovementPlan $pip): View
     {
+        $this->authorize('view', $pip);
+
         $pip->load([
             'employee.department',
             'employee.designation',
@@ -160,6 +177,8 @@ class PipController extends Controller
      */
     public function update(Request $request, PerformanceImprovementPlan $pip): RedirectResponse
     {
+        $this->authorize('update', $pip);
+
         $validated = $request->validate([
             'pip_category_id'   => 'nullable|exists:pip_categories,id',
             'reason_details'    => 'required|string',
@@ -179,6 +198,8 @@ class PipController extends Controller
      */
     public function destroy(PerformanceImprovementPlan $pip): RedirectResponse
     {
+        $this->authorize('delete', $pip);
+
         $pip->objectives()->delete();
         $pip->checkins()->delete();
         $pip->delete();
@@ -340,6 +361,8 @@ class PipController extends Controller
      */
     public function storeCategory(Request $request): RedirectResponse
     {
+        $this->authorize('create', PerformanceImprovementPlan::class);
+
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'code'        => 'nullable|string|max:50',
@@ -360,6 +383,8 @@ class PipController extends Controller
      */
     public function storeTemplate(Request $request): RedirectResponse
     {
+        $this->authorize('create', PerformanceImprovementPlan::class);
+
         $validated = $request->validate([
             'name'              => 'required|string|max:255',
             'duration_days'     => 'required|integer|min:7|max:180',
@@ -381,6 +406,8 @@ class PipController extends Controller
      */
     public function destroyCategory(PipCategory $category): RedirectResponse
     {
+        $this->authorize('delete', PerformanceImprovementPlan::class);
+
         $category->delete();
 
         return redirect()->route('hrms.pip.index', ['active_tab' => 'categories'])
@@ -392,6 +419,8 @@ class PipController extends Controller
      */
     public function destroyTemplate(PipPolicyTemplate $template): RedirectResponse
     {
+        $this->authorize('delete', PerformanceImprovementPlan::class);
+
         $template->delete();
 
         return redirect()->route('hrms.pip.index', ['active_tab' => 'templates'])

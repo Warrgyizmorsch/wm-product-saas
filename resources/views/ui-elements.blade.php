@@ -56,6 +56,7 @@
             ['id' => 'tab-overlays', 'label' => 'Overlays & Toasts', 'active' => false, 'icon' => 'feather-layers'],
             ['id' => 'tab-tables', 'label' => 'Tables & Filters', 'active' => false, 'icon' => 'feather-database'],
             ['id' => 'tab-vertical-tabs', 'label' => 'Sidebar & Vertical Tabs', 'active' => false, 'icon' => 'feather-menu'],
+            ['id' => 'tab-hrm-reference', 'label' => 'HRM Reference UI', 'active' => false, 'icon' => 'feather-users'],
         ];
     @endphp
 
@@ -583,6 +584,11 @@
         <!-- Tab 6: Projects & Tasks UI Kit (Duralux Inspired) -->
         <div class="tab-pane fade" id="tab-projects-ui" role="tabpanel" aria-labelledby="tab-projects-ui-tab">
             @include('ui-elements._projects')
+        </div>
+
+        <!-- Tab 7: HRM Reference UI (patterns from an external HRM product) -->
+        <div class="tab-pane fade" id="tab-hrm-reference" role="tabpanel" aria-labelledby="tab-hrm-reference-tab">
+            @include('ui-elements._hrm-reference')
         </div>
 
     </div>

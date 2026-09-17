@@ -48,6 +48,8 @@ class Journal extends BaseModel
         'journal_date',
         'source',
         'voucher_type',
+        'currency_code',
+        'exchange_rate',
         'reference_type',
         'reference_id',
         'memo',
@@ -63,6 +65,7 @@ class Journal extends BaseModel
         'journal_date' => 'date',
         'total_debit' => 'float',
         'total_credit' => 'float',
+        'exchange_rate' => 'float',
         'posted_at' => 'datetime',
     ];
 
@@ -74,6 +77,16 @@ class Journal extends BaseModel
     public function entries(): HasMany
     {
         return $this->hasMany(JournalEntry::class, 'journal_id');
+    }
+
+    /**
+     * The person who posted it; null for auto-postings made without a signed-in
+     * user. Not tenant-scoped, so journals posted by a platform admin still show
+     * who did it.
+     */
+    public function postedBy(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'posted_by')->withoutGlobalScope('tenant');
     }
 
     public function reversedJournal(): BelongsTo

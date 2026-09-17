@@ -39,16 +39,19 @@
         </div>
     </div>
     <div class="col-md-12">
-        <x-ui.odoo-form-ui type="select" label="Role" name="role_id" :required="true" :searchable="false" class="@error('role_id') is-invalid @enderror">
-            @php $currentRoleId = old('role_id', $user->role_id); @endphp
-            <option value="">Select a role</option>
+        <x-ui.odoo-form-ui type="select" label="Roles" name="role_ids[]" :required="true" :multiple="true" :searchable="true" class="@error('role_ids') is-invalid @enderror @error('role_ids.*') is-invalid @enderror">
+            @php
+                $currentRoleIds = collect(old('role_ids', $user->roles->pluck('id')->all()))->map(fn ($id) => (string) $id)->all();
+            @endphp
             @foreach ($roles as $role)
-                <option value="{{ $role->id }}" @selected((string) $currentRoleId === (string) $role->id)>
+                <option value="{{ $role->id }}" @selected(in_array((string) $role->id, $currentRoleIds, true))>
                     {{ $role->name }} @if($role->tenant_id === null) (Global) @endif
                 </option>
             @endforeach
         </x-ui.odoo-form-ui>
-        @error('role_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        <div class="text-muted fs-11 mt-1">A user can hold more than one role. Their most senior role is used wherever a single "primary" role is shown.</div>
+        @error('role_ids')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        @error('role_ids.*')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
 </div>
 

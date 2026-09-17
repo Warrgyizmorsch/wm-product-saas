@@ -11,10 +11,25 @@ class JournalRepository implements JournalRepositoryInterface
 {
     public function paginateAll(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Journal::query()->with('period');
+        $query = Journal::query()->with(['period', 'postedBy']);
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
+        }
+
+        // 'system' = auto-postings made without a signed-in user.
+        if (($filters['posted_by'] ?? '') === 'system') {
+            $query->whereNull('posted_by');
+        } elseif (!empty($filters['posted_by'])) {
+            $query->where('posted_by', (int) $filters['posted_by']);
+        }
+
+        if (!empty($filters['from'])) {
+            $query->whereDate('journal_date', '>=', $filters['from']);
+        }
+
+        if (!empty($filters['to'])) {
+            $query->whereDate('journal_date', '<=', $filters['to']);
         }
 
         if (!empty($filters['source'])) {
@@ -27,9 +42,18 @@ class JournalRepository implements JournalRepositoryInterface
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
+            // Matches every column the list actually shows — number, date, source,
+            // who posted it, memo, both amounts and status — not just memo/number.
             $query->where(function ($q) use ($search): void {
                 $q->where('journal_number', 'like', "%{$search}%")
-                  ->orWhere('memo', 'like', "%{$search}%");
+                  ->orWhere('memo', 'like', "%{$search}%")
+                  ->orWhere('source', 'like', "%{$search}%")
+                  ->orWhere('status', 'like', "%{$search}%")
+                  // Decimal columns compare fine against LIKE as text on both MySQL and SQLite.
+                  ->orWhere('total_debit', 'like', "%{$search}%")
+                  ->orWhere('total_credit', 'like', "%{$search}%")
+                  // The From/To filters already cover the date column itself.
+                  ->orWhereHas('postedBy', fn ($posted) => $posted->where('name', 'like', "%{$search}%"));
             });
         }
 
@@ -38,6 +62,29 @@ class JournalRepository implements JournalRepositoryInterface
         $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
         return $query->orderBy($sort, $direction)->orderByDesc('id')->paginate($perPage);
+    }
+
+    public function posters(): \Illuminate\Support\Collection
+    {
+        $ids = Journal::query()->whereNotNull('posted_by')->distinct()->pluck('posted_by');
+
+        return \App\Models\User::query()
+            ->withoutGlobalScope('tenant')
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+    }
+
+    public function activityByPoster(\DateTimeInterface $from, \DateTimeInterface $to): \Illuminate\Support\Collection
+    {
+        return Journal::query()
+            ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+            ->whereBetween('journal_date', [$from, $to])
+            ->select('posted_by', 'voucher_type', 'status')
+            ->selectRaw('COUNT(*) as documents, SUM(total_debit) as amount')
+            ->groupBy('posted_by', 'voucher_type', 'status')
+            ->toBase()
+            ->get();
     }
 
     public function forDate(\DateTimeInterface $date): Collection
@@ -194,6 +241,37 @@ class JournalRepository implements JournalRepositoryInterface
                 ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
                 ->where('journal_date', '<=', $asOfDate))
             ->groupBy('chart_of_account_id')
+            ->with('account')
+            ->get();
+    }
+
+    public function movementsBetween(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to, ?int $costCenterId = null): Collection
+    {
+        return JournalEntry::query()
+            ->select('chart_of_account_id')
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->whereHas('journal', fn ($q) => $q
+                ->where('tenant_id', $tenantId)
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->whereBetween('journal_date', [$from, $to]))
+            ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
+            ->groupBy('chart_of_account_id')
+            ->with('account')
+            ->get();
+    }
+
+    public function dailyMovements(int $tenantId, \DateTimeInterface $from, \DateTimeInterface $to, ?int $costCenterId = null): Collection
+    {
+        return JournalEntry::query()
+            ->join('journals', 'journals.id', '=', 'journal_entries.journal_id')
+            ->where('journals.tenant_id', $tenantId)
+            ->whereIn('journals.status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+            ->whereNull('journals.deleted_at')
+            ->whereBetween('journals.journal_date', [$from, $to])
+            ->when($costCenterId, fn ($q) => $q->where('journal_entries.cost_center_id', $costCenterId))
+            ->select('journal_entries.chart_of_account_id', 'journals.journal_date')
+            ->selectRaw('SUM(journal_entries.debit) as debit, SUM(journal_entries.credit) as credit')
+            ->groupBy('journal_entries.chart_of_account_id', 'journals.journal_date')
             ->with('account')
             ->get();
     }

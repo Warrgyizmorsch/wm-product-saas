@@ -1,0 +1,4591 @@
+<?php $__env->startSection('title', $deal->title . ' | Zoho CRM Deals'); ?>
+<?php $__env->startSection('page-title', 'Deal Profile'); ?>
+<?php $__env->startSection('breadcrumb', 'CRM / Deals / ' . $deal->deal_number); ?>
+
+<?php $__env->startPush('styles'); ?>
+<style>
+    /* ==========================================================================
+       ZOHO CRM DEALS PREMIUM STYLING & DESIGN SYSTEM
+       ========================================================================== */
+
+    /* Related List Left Sidebar Navigation */
+    .zoho-sidebar-nav .nav-link {
+        font-size: 12px;
+        color: #475569;
+        border-radius: 4px;
+        padding: 7px 12px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .zoho-sidebar-nav .nav-link:hover {
+        background-color: #f1f5f9;
+        color: var(--bs-primary);
+    }
+    .zoho-sidebar-nav .nav-link.active {
+        background-color: var(--bs-primary) !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .zoho-sidebar-nav .nav-link.active i {
+        color: #ffffff !important;
+    }
+    .zoho-sidebar-nav .nav-link .badge {
+        margin-left: auto;
+        font-size: 10px;
+    }
+
+    /* Main Tab Navigation Header */
+    .zoho-nav-tabs {
+        gap: 6px;
+    }
+    .zoho-nav-tabs .nav-link {
+        border: 1px solid #cbd5e1;
+        background-color: #ffffff;
+        color: #475569;
+        padding: 6px 18px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 20px !important;
+        transition: all 0.2s ease;
+    }
+    .zoho-nav-tabs .nav-link:hover {
+        background-color: #f8fafc;
+        color: #0f172a;
+        border-color: #94a3b8;
+    }
+    .zoho-nav-tabs .nav-link.active {
+        background-color: var(--bs-primary) !important;
+        color: #ffffff !important;
+        border-color: var(--bs-primary) !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Timeline Subtabs */
+    .zoho-timeline-subtabs .nav-link {
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748b;
+        border-bottom: 2px solid transparent !important;
+        padding: 6px 16px !important;
+        background: transparent !important;
+        border-top: none !important;
+        border-left: none !important;
+        border-right: none !important;
+    }
+    .zoho-timeline-subtabs .nav-link.active {
+        color: var(--bs-primary) !important;
+        border-bottom: 2.5px solid var(--bs-primary) !important;
+    }
+
+    /* Dotted Field Rows */
+    .zoho-field-row {
+        display: flex;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px dotted #e2e8f0;
+    }
+    .zoho-field-label {
+        width: 40%;
+        font-size: 12px;
+        color: #64748b;
+        font-weight: 500;
+    }
+    .zoho-field-value {
+        width: 60%;
+        font-size: 13px;
+        color: #0f172a;
+    }
+
+    /* Zoho CRM Signature Deal Stage Chevron Pipeline Bar */
+    .zoho-deal-pipeline-strip {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 6px 16px;
+    }
+    .zoho-pipeline-chevron-container {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 6px 4px 6px 4px;
+    }
+    .zoho-pipeline-step {
+        flex: 1;
+        min-width: 135px;
+        padding: 7px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-align: center;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        user-select: none;
+        border: 1px solid #cbd5e1;
+        background-color: #ffffff;
+        color: #475569;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .zoho-pipeline-step:hover {
+        background-color: #f1f5f9;
+        border-color: var(--bs-primary);
+        color: #0f172a;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .zoho-pipeline-step.passed {
+        background-color: #f1f5f9;
+        color: var(--bs-primary);
+        border-color: #cbd5e1;
+    }
+    .zoho-pipeline-step.active {
+        background-color: var(--bs-primary) !important;
+        background: var(--bs-primary) !important;
+        color: #ffffff !important;
+        border-color: var(--bs-primary) !important;
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+    }
+    .zoho-pipeline-step.stage-won.active,
+    .zoho-pipeline-step.stage-closed-won.active,
+    .zoho-pipeline-step.active-won {
+        background: linear-gradient(135deg, #15803d 0%, #22c55e 100%);
+        color: #ffffff !important;
+        border-color: #15803d !important;
+        box-shadow: 0 3px 6px rgba(21, 128, 61, 0.25);
+    }
+    .zoho-pipeline-step.stage-lost.active,
+    .zoho-pipeline-step.stage-closed-lost.active,
+    .zoho-pipeline-step.active-lost {
+        background: var(--bs-primary) !important;
+        color: #ffffff !important;
+        border-color: transparent !important;
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Deal Metric KPI Snapshot Cards */
+    .deal-metric-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 12px 14px;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        height: 100% !important;
+        min-height: 72px;
+    }
+    .deal-metric-card:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        transform: translateY(-1px);
+    }
+    .deal-metric-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    /* Timeline Stream Styles */
+    .zoho-timeline-container {
+        position: relative;
+        padding-left: 20px;
+    }
+    .zoho-timeline-date-header {
+        font-size: 11px;
+        font-weight: 700;
+        color: #475569;
+        background: #f1f5f9;
+        padding: 2px 10px;
+        border-radius: 12px;
+        display: inline-block;
+        margin-bottom: 14px;
+        border: 1px solid #cbd5e1;
+    }
+    .zoho-timeline-event {
+        position: relative;
+        padding-left: 28px;
+        padding-bottom: 20px;
+    }
+    .zoho-timeline-line {
+        position: absolute;
+        left: 11px;
+        top: 24px;
+        bottom: 0;
+        width: 2px;
+        background: #e2e8f0;
+    }
+    .zoho-timeline-event:last-child .zoho-timeline-line {
+        display: none;
+    }
+    .zoho-timeline-icon {
+        position: absolute;
+        left: 0;
+        top: 2px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: #64748b;
+    }
+
+    /* Odoo Table UI Overrides */
+    .table.odoo-table {
+        margin-bottom: 0;
+    }
+    .table.odoo-table th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #475569;
+        background-color: #f8fafc;
+        border-bottom: 1.5px solid #cbd5e1;
+        padding: 10px 12px;
+        font-weight: 700;
+    }
+    .table.odoo-table td {
+        padding: 10px 12px;
+        vertical-align: top;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    /* Odoo Table Input Underlines (Referenced from Lead Quotations) */
+    .table.odoo-table .odoo-table-input {
+        border: none !important;
+        border-bottom: 1px solid #cbd5e1 !important;
+        background: transparent !important;
+        border-radius: 0 !important;
+        padding: 4px 2px !important;
+        width: 100%;
+        font-size: 13px !important;
+        transition: border-color 0.2s ease-in-out;
+    }
+    .table.odoo-table .odoo-table-input:hover {
+        border-bottom-color: #94a3b8 !important;
+    }
+    .table.odoo-table .odoo-table-input:focus {
+        border-bottom-color: var(--bs-primary) !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Borderless Select2 theme custom override for Odoo Table */
+    .table.odoo-table .select2-container--bootstrap-5 .select2-selection {
+        border: none !important;
+        border-bottom: 1px solid #ced4da !important;
+        border-radius: 0 !important;
+        background-color: transparent !important;
+        padding-left: 2px !important;
+        height: auto !important;
+        min-height: 28px !important;
+        box-shadow: none !important;
+    }
+    .table.odoo-table .select2-container--bootstrap-5 .select2-selection:focus,
+    .table.odoo-table .select2-container--bootstrap-5.select2-container--focus .select2-selection {
+        border-bottom-color: var(--bs-primary) !important;
+        box-shadow: none !important;
+    }
+    .table.odoo-table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        padding-left: 0 !important;
+        font-size: 13px !important;
+        color: #212529 !important;
+        line-height: 26px !important;
+    }
+
+    /* Hide number input spinners for clean right alignment */
+    .table.odoo-table input[type="number"]::-webkit-outer-spin-button,
+    .table.odoo-table input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+    }
+    .table.odoo-table input[type="number"] {
+        -moz-appearance: textfield !important;
+    }
+</style>
+<?php $__env->stopPush(); ?>
+
+<?php
+    $isQuotationTabActive = request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('quotation_id') || old('form_type') === 'quotation_create' || old('form_type') === 'quotation_edit';
+    $isSalesOrdersTabActive = request()->has('sales_orders_tab');
+    
+    // Stages array with probabilities dynamically built from DealStatus master
+    if (isset($dealStatuses) && $dealStatuses->isNotEmpty()) {
+        $allStages = [];
+        foreach ($dealStatuses as $st) {
+            $prob = $st->probability ?? match(strtolower($st->name)) {
+                'qualification' => 10,
+                'needs analysis' => 30,
+                'proposal' => 60,
+                'negotiation' => 80,
+                'won', 'closed won' => 100,
+                'lost', 'closed lost' => 0,
+                default => 50,
+            };
+            $allStages[$st->name] = $prob;
+        }
+    } else {
+        $allStages = [
+            'Qualification'  => 10,
+            'Needs Analysis' => 30,
+            'Proposal'       => 60,
+            'Negotiation'    => 80,
+            'Won'            => 100,
+            'Lost'           => 0,
+        ];
+    }
+    
+    $currentStageKey = $deal->stage;
+    if ($currentStageKey === 'New') $currentStageKey = 'Qualification';
+    if ($currentStageKey === 'Qualified') $currentStageKey = 'Needs Analysis';
+    if ($currentStageKey === 'Closed Won') $currentStageKey = 'Won';
+    if ($currentStageKey === 'Closed Lost') $currentStageKey = 'Lost';
+
+    $stageOrder = array_keys($allStages);
+    $currentIndex = array_search($currentStageKey, $stageOrder);
+    if ($currentIndex === false) $currentIndex = 0;
+
+    $expectedRevenue = $deal->estimated_value * ($deal->probability / 100);
+?>
+
+<?php $__env->startSection('content'); ?>
+    <!-- Hidden Stage Change Form -->
+    <form id="dealStageForm" action="<?php echo e(route('crm.deals.updateStage', $deal)); ?>" method="POST" style="display: none;">
+        <?php echo csrf_field(); ?>
+        <?php echo method_field('PATCH'); ?>
+        <input type="hidden" name="stage" id="dealStageInput">
+    </form>
+
+    <!-- Outer Card Container matching Zoho CRM Layout -->
+    <div class="card border-0 shadow-sm bg-white d-flex flex-column zoho-lead-card-container d-print-block" style="height: calc(100vh - 195px); min-height: 550px; overflow: hidden; border-radius: 6px;">
+        
+        <!-- ==================== STICKY TOP HEADER BANNER ==================== -->
+        <div class="zoho-header-banner p-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-3 d-print-none" style="flex-shrink: 0; background-color: #ffffff; z-index: 100;">
+            <div class="d-flex align-items-center">
+                <!-- Deal Profile Avatar with Initials -->
+                <div class="zoho-avatar bg-soft-primary text-primary fs-5 fw-bold me-3 text-uppercase shadow-sm d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 6px; border: 1px solid rgba(30,64,175,0.15); font-family: 'Inter', sans-serif;">
+                    <?php echo e(strtoupper(substr($deal->title, 0, 1))); ?>
+
+                </div>
+                
+                <!-- Title & Badges -->
+                <div>
+                    <div class="d-flex align-items-center flex-wrap gap-2">
+                        <h4 class="fw-bold text-dark mb-0 fs-16" style="font-family: 'Inter', sans-serif;">
+                            <?php echo e($deal->title); ?>
+
+                        </h4>
+                        
+                        <?php
+                            $stageColors = [
+                                'New'            => 'info',
+                                'Qualified'      => 'primary',
+                                'Qualification'  => 'info',
+                                'Needs Analysis' => 'primary',
+                                'Proposal'       => 'warning',
+                                'Negotiation'    => 'purple',
+                                'Won'            => 'success',
+                                'Closed Won'     => 'success',
+                                'Lost'           => 'secondary',
+                                'Closed Lost'    => 'secondary',
+                            ];
+                            $badgeColor = $stageColors[$deal->stage] ?? 'primary';
+                        ?>
+                        <span class="badge bg-soft-<?php echo e($badgeColor); ?> text-<?php echo e($badgeColor); ?> border border-<?php echo e($badgeColor); ?>-subtle px-2.5 py-1 fs-10 fw-bold">
+                            <?php echo e($deal->stage); ?> (<?php echo e($deal->probability); ?>%)
+                        </span>
+                        
+                        <?php if($deal->account): ?>
+                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold text-truncate d-inline-block align-middle ms-1" style="max-width: 180px;" title="<?php echo e($deal->account->name); ?>">
+                                <i class="feather-briefcase me-1"></i><?php echo e($deal->account->name); ?>
+
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Subhead Details -->
+                    <div class="mt-1 d-flex align-items-center gap-3 fs-11 text-muted">
+                        <span><strong class="text-dark">Deal #:</strong> <span class="font-monospace text-primary fw-bold"><?php echo e($deal->deal_number); ?></span></span>
+                        <span><strong class="text-dark">Deal Owner:</strong> <?php echo e($deal->owner?->name ?: ($deal->user?->name ?: 'Unassigned')); ?></span>
+                        <?php if($deal->contact): ?>
+                            <span><strong class="text-dark">Contact:</strong> <?php echo e($deal->contact->name); ?></span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Action Buttons Toolbar -->
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <a href="<?php echo e(route('crm.deals.index')); ?>" class="btn btn-xs btn-outline-secondary fw-bold py-1 px-2 rounded bg-white text-dark border-secondary d-inline-flex align-items-center" title="Back to Deals" style="font-size: 13px;">
+                    <i class="feather-arrow-left"></i>
+                </a>
+
+
+                <?php
+                    $hasAcceptedQuotation = $deal->quotations->contains(fn($q) => in_array($q->status, ['Accepted', 'Converted', 'Won']));
+                    $hasCustomer = !empty($deal->account?->customer_id);
+                    $acceptedQuote = $deal->quotations->firstWhere('status', 'Accepted') ?: ($deal->quotations->firstWhere('status', 'Converted') ?: $activeQuotation);
+                ?>
+
+                <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas">
+                    <i class="feather-calendar me-1"></i> + Followup
+                </button>
+
+                <?php if($deal->quotations->isEmpty()): ?>
+                    <a href="<?php echo e(route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1])); ?>" class="btn btn-xs btn-outline-primary fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                        <i class="feather-file-plus me-1"></i> Create Quotation
+                    </a>
+                <?php endif; ?>
+
+                <?php if($hasAcceptedQuotation && !$hasCustomer): ?>
+                    <a href="<?php echo e(route('crm.deals.showConvertForm', $deal->id)); ?>" class="btn btn-xs btn-warning text-dark fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                        <i class="feather-user-check me-1"></i> Convert to Customer
+                    </a>
+                <?php endif; ?>
+
+                <?php if($hasCustomer): ?>
+                    <span class="badge bg-soft-success text-success fw-bold px-2.5 py-1.5 fs-11 me-1">
+                        <i class="feather-check-circle me-1"></i> Customer Converted
+                    </span>
+                    <?php if($acceptedQuote && in_array($acceptedQuote->status, ['Accepted', 'Converted', 'Won'])): ?>
+                        <a href="<?php echo e(route('sales.orders.create', ['quotation_id' => $acceptedQuote->id])); ?>" class="btn btn-xs btn-success fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                            <i class="feather-shopping-cart me-1"></i> Convert to Sales Order
+                        </a>
+                    <?php endif; ?>
+                <?php endif; ?>
+
+
+                <!-- Action Dropdown -->
+                <?php if (isset($component)) { $__componentOriginalc48abe9031f6257c9f266c4816b70db0 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalc48abe9031f6257c9f266c4816b70db0 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.action-dropdown','data' => ['id' => 'dealProfileActionsDropdown']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.action-dropdown'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => 'dealProfileActionsDropdown']); ?>
+                    <li>
+                        <a class="dropdown-item py-2 btn-open-deal-followup-offcanvas" href="javascript:void(0)" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="log_note">
+                            <i class="feather-calendar me-1.5 text-muted"></i> Log Activity / Discussion
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item py-2 btn-open-deal-followup-offcanvas" href="javascript:void(0)" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas" data-mode="schedule">
+                            <i class="feather-clock me-1.5 text-muted"></i> Schedule Next Activity
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item py-2" href="<?php echo e(route('crm.deals.edit', $deal)); ?>">
+                            <i class="feather-edit me-1.5 text-muted"></i> Edit Deal Details
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item py-2" href="<?php echo e(route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1])); ?>">
+                            <i class="feather-file-text me-1.5 text-muted"></i> Add New Quotation
+                        </a>
+                    </li>
+                 <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalc48abe9031f6257c9f266c4816b70db0)): ?>
+<?php $attributes = $__attributesOriginalc48abe9031f6257c9f266c4816b70db0; ?>
+<?php unset($__attributesOriginalc48abe9031f6257c9f266c4816b70db0); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalc48abe9031f6257c9f266c4816b70db0)): ?>
+<?php $component = $__componentOriginalc48abe9031f6257c9f266c4816b70db0; ?>
+<?php unset($__componentOriginalc48abe9031f6257c9f266c4816b70db0); ?>
+<?php endif; ?>
+                
+                <!-- Pagination Arrows -->
+                <div class="d-flex align-items-center ms-1 border rounded px-1 py-0.5 bg-white">
+                    <?php if($prevDeal): ?>
+                        <a href="<?php echo e(route('crm.deals.show', $prevDeal)); ?>" class="btn btn-xs btn-link text-dark p-1 border-0 d-inline-flex align-items-center justify-content-center" title="Previous Deal">
+                            <i class="feather-chevron-left fs-12"></i>
+                        </a>
+                    <?php else: ?>
+                        <button class="btn btn-xs btn-link p-1 border-0 d-inline-flex align-items-center justify-content-center text-muted opacity-50" disabled>
+                            <i class="feather-chevron-left fs-12"></i>
+                        </button>
+                    <?php endif; ?>
+
+                    <?php if($nextDeal): ?>
+                        <a href="<?php echo e(route('crm.deals.show', $nextDeal)); ?>" class="btn btn-xs btn-link text-dark p-1 border-0 d-inline-flex align-items-center justify-content-center" title="Next Deal">
+                            <i class="feather-chevron-right fs-12"></i>
+                        </a>
+                    <?php else: ?>
+                        <button class="btn btn-xs btn-link p-1 border-0 d-inline-flex align-items-center justify-content-center text-muted opacity-50" disabled>
+                            <i class="feather-chevron-right fs-12"></i>
+                        </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== ZOHO CRM DEALS CHEVRON PIPELINE PROGRESS STRIP ==================== -->
+        <div class="zoho-deal-pipeline-strip d-print-none">
+            <div class="zoho-pipeline-chevron-container">
+                <?php $__currentLoopData = $allStages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $stg => $prob): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <?php
+                        $stgIndex = array_search($stg, $stageOrder);
+                        $stepClass = 'upcoming';
+                        $stgSlug = \Illuminate\Support\Str::slug($stg);
+                        
+                        if ($stg === $currentStageKey) {
+                            if ($stg === 'Won') $stepClass = 'active stage-won active-won';
+                            elseif ($stg === 'Lost') $stepClass = 'active stage-lost active-lost';
+                            else $stepClass = 'active stage-' . $stgSlug;
+                        } elseif ($currentStageKey !== 'Lost' && $stgIndex < $currentIndex) {
+                            $stepClass = 'passed';
+                        }
+                    ?>
+                    <div class="zoho-pipeline-step <?php echo e($stepClass); ?>" onclick="submitDealStage('<?php echo e($stg); ?>')" title="Click to update deal stage to <?php echo e($stg); ?> (<?php echo e($prob); ?>%)">
+                        <?php if($stepClass === 'passed'): ?>
+                            <i class="feather-check-circle fs-11"></i>
+                        <?php elseif(str_contains($stepClass, 'active')): ?>
+                            <i class="feather-disc fs-11"></i>
+                        <?php else: ?>
+                            <i class="feather-circle fs-10 opacity-50"></i>
+                        <?php endif; ?>
+                        <span><?php echo e($stg); ?> (<?php echo e($prob); ?>%)</span>
+                    </div>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </div>
+        </div>
+
+        <!-- Flash Toast Messages -->
+        <?php if(session('success')): ?>
+            <?php if (isset($component)) { $__componentOriginal339c7fedf680433726dbafc2f156956f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal339c7fedf680433726dbafc2f156956f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.toast','data' => ['auto' => true,'title' => ''.e(session('success')).'','type' => 'success','delay' => '5000']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.toast'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['auto' => true,'title' => ''.e(session('success')).'','type' => 'success','delay' => '5000']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal339c7fedf680433726dbafc2f156956f)): ?>
+<?php $attributes = $__attributesOriginal339c7fedf680433726dbafc2f156956f; ?>
+<?php unset($__attributesOriginal339c7fedf680433726dbafc2f156956f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal339c7fedf680433726dbafc2f156956f)): ?>
+<?php $component = $__componentOriginal339c7fedf680433726dbafc2f156956f; ?>
+<?php unset($__componentOriginal339c7fedf680433726dbafc2f156956f); ?>
+<?php endif; ?>
+        <?php endif; ?>
+
+        <?php if(session('error')): ?>
+            <?php if (isset($component)) { $__componentOriginal339c7fedf680433726dbafc2f156956f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal339c7fedf680433726dbafc2f156956f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.toast','data' => ['auto' => true,'title' => ''.e(session('error')).'','type' => 'error','delay' => '6000']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.toast'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['auto' => true,'title' => ''.e(session('error')).'','type' => 'error','delay' => '6000']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal339c7fedf680433726dbafc2f156956f)): ?>
+<?php $attributes = $__attributesOriginal339c7fedf680433726dbafc2f156956f; ?>
+<?php unset($__attributesOriginal339c7fedf680433726dbafc2f156956f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal339c7fedf680433726dbafc2f156956f)): ?>
+<?php $component = $__componentOriginal339c7fedf680433726dbafc2f156956f; ?>
+<?php unset($__componentOriginal339c7fedf680433726dbafc2f156956f); ?>
+<?php endif; ?>
+        <?php endif; ?>
+
+        <?php if($errors->any()): ?>
+            <?php if (isset($component)) { $__componentOriginal339c7fedf680433726dbafc2f156956f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal339c7fedf680433726dbafc2f156956f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.toast','data' => ['auto' => true,'title' => ''.e($errors->first()).'','type' => 'error','delay' => '6000']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.toast'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['auto' => true,'title' => ''.e($errors->first()).'','type' => 'error','delay' => '6000']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal339c7fedf680433726dbafc2f156956f)): ?>
+<?php $attributes = $__attributesOriginal339c7fedf680433726dbafc2f156956f; ?>
+<?php unset($__attributesOriginal339c7fedf680433726dbafc2f156956f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal339c7fedf680433726dbafc2f156956f)): ?>
+<?php $component = $__componentOriginal339c7fedf680433726dbafc2f156956f; ?>
+<?php unset($__componentOriginal339c7fedf680433726dbafc2f156956f); ?>
+<?php endif; ?>
+        <?php endif; ?>
+
+        <!-- ==================== TWO-COLUMN FLEX CONTENT ==================== -->
+        <div class="d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
+            
+            <!-- Left Sidebar Menu (STICKY RELATED LIST) -->
+            <div class="zoho-sidebar-col border-end bg-white d-print-none h-100 overflow-auto" style="width: 210px; flex-shrink: 0; user-select: none;">
+                <div class="p-3">
+                    <h6 class="text-uppercase fw-bold text-muted mb-3" style="font-size: 10px; letter-spacing: 0.8px;">Related List Navigation</h6>
+                    <ul class="nav flex-column zoho-sidebar-nav gap-1" id="zohoSidebarLinks">
+                        <li class="nav-item">
+                            <a href="#sectionDealInfo" class="nav-link active">
+                                <i class="feather-info fs-13 text-muted"></i> Deal Information
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionDealProducts" class="nav-link">
+                                <i class="feather-box fs-13 text-muted"></i> Products & Quantities
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionCustomerCard" class="nav-link">
+                                <i class="feather-users fs-13 text-muted"></i> Customer Details
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionNotes" class="nav-link">
+                                <i class="feather-grid fs-13 text-muted"></i> Notes & Requirements
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionQuotations" class="nav-link">
+                                <i class="feather-file-text fs-13 text-muted"></i> Quotations
+                                <span class="badge bg-soft-secondary text-muted border"><?php echo e($deal->quotations->count()); ?></span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionQuotationHistory" class="nav-link">
+                                <i class="feather-git-commit fs-13 text-muted"></i> Revision History
+                                <span class="badge bg-soft-secondary text-muted border"><?php echo e($deal->quotations->count()); ?></span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionSalesOrders" class="nav-link">
+                                <i class="feather-shopping-cart fs-13 text-muted"></i> Sales Orders
+                                <span class="badge bg-soft-secondary text-muted border"><?php echo e($deal->salesOrders->count()); ?></span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#subtab-interactions" class="nav-link">
+                                <i class="feather-calendar fs-13 text-muted"></i> Activities & Calls
+                                <span class="badge bg-soft-secondary text-muted border"><?php echo e($followups->count()); ?></span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#subtab-history" class="nav-link">
+                                <i class="feather-clock fs-13 text-muted"></i> History & Audit
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionDocuments" class="nav-link">
+                                <i class="feather-paperclip fs-13 text-muted"></i> Documents
+                                <span class="badge bg-soft-secondary text-muted border"><?php echo e($leadDocuments->count()); ?></span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Right Content Scrollable Column -->
+            <div class="zoho-main-col h-100 overflow-auto flex-grow-1" style="scroll-behavior: smooth; background-color: #f8fafc;" id="zohoMainScrollable">
+                
+                <!-- Sticky Top Tab Row -->
+                <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 flex-wrap gap-2 sticky-top" style="z-index: 90; background-color: #f8fafc;">
+                    <ul class="nav nav-pills zoho-nav-tabs" id="zohoDealTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 <?php echo e((!$isQuotationTabActive && !$isSalesOrdersTabActive) ? 'active' : ''); ?>" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
+                                <i class="feather-grid me-1"></i>Overview
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 <?php echo e($isQuotationTabActive ? 'active' : ''); ?>" id="quotations-tab" data-bs-toggle="tab" data-bs-target="#quotations-pane" type="button" role="tab">
+                                <i class="feather-file-text me-1"></i>Quotation & Proposals (<?php echo e($deal->quotations->count()); ?>)
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 <?php echo e($isSalesOrdersTabActive ? 'active' : ''); ?>" id="salesorders-tab" data-bs-toggle="tab" data-bs-target="#salesorders-pane" type="button" role="tab">
+                                <i class="feather-shopping-cart me-1"></i>Sales Orders (<?php echo e($deal->salesOrders->count()); ?>)
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab">
+                                <i class="feather-clock me-1"></i>Timeline & Audit
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="d-flex align-items-center text-muted fs-11 fw-medium" style="font-family: 'Inter', sans-serif;">
+                        <i class="feather-clock me-1.5 text-muted fs-12"></i> 
+                        Last Update : <?php echo e($deal->updated_at ? $deal->updated_at->diffForHumans() : 'Recently'); ?>
+
+                    </div>
+                </div>
+
+                <!-- Main Scrollable Tab Content View -->
+                <div class="pt-2 px-3 pb-3 tab-content" id="zohoDealTabsContent">
+                    
+                    <!-- ==================== TAB 1: OVERVIEW PANE ==================== -->
+                    <div class="tab-pane fade show <?php echo e((!$isQuotationTabActive && !$isSalesOrdersTabActive) ? 'active' : ''); ?>" id="overview-pane" role="tabpanel">
+                        
+                        <!-- ZOHO DEAL KPI METRICS CARDS STRIP -->
+                        <div class="row g-3 mb-3 align-items-stretch">
+                            <div class="col-md-3 col-sm-6 d-flex">
+                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100">
+                                    <div class="deal-metric-icon bg-soft-success text-success">
+                                        <i class="feather-dollar-sign"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-grow-1">
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Estimated Deal Value</span>
+                                        <span class="fs-14 fw-extrabold text-dark d-block">₹<?php echo e(number_format($deal->estimated_value, 2)); ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 d-flex">
+                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100">
+                                    <div class="deal-metric-icon bg-soft-primary text-primary">
+                                        <i class="feather-pie-chart"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-grow-1">
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Expected Revenue</span>
+                                        <span class="fs-14 fw-extrabold text-primary d-block">₹<?php echo e(number_format($expectedRevenue, 2)); ?> <span class="fs-10 text-muted">(<?php echo e($deal->probability); ?>%)</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 d-flex">
+                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100">
+                                    <div class="deal-metric-icon bg-soft-warning text-warning">
+                                        <i class="feather-calendar"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-grow-1">
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Target Closing Date</span>
+                                        <span class="fs-14 fw-extrabold text-dark d-block"><?php echo e($deal->closing_date ? $deal->closing_date->format('d M Y') : 'Not Set'); ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 d-flex">
+                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100 overflow-hidden" style="min-width: 0;">
+                                    <div class="deal-metric-icon bg-soft-purple text-purple flex-shrink-0">
+                                        <i class="feather-briefcase"></i>
+                                    </div>
+                                    <div class="min-w-0 flex-grow-1 overflow-hidden">
+                                        <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">Account / Customer</span>
+                                        <span class="fs-13 fw-extrabold text-dark text-truncate d-block" title="<?php echo e($deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A')); ?>">
+                                            <?php echo e($deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A')); ?>
+
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AI DEAL HEALTH & INTELLIGENCE CARD -->
+                        <?php
+                            $isSynced = !empty($deal->health_synced_at);
+                            $riskVal = $isSynced ? ucfirst(strtolower($deal->risk_level ?: 'Low')) : 'Not Synced';
+                            $riskBadgeStyle = match($riskVal) {
+                                'High' => 'bg-danger text-white',
+                                'Medium' => 'bg-warning text-dark',
+                                'Low' => 'bg-success text-white',
+                                default => 'bg-secondary text-white',
+                            };
+                            $scoreVal = $isSynced ? ($deal->health_score ?: 'N/A') : 'Not Synced';
+                            if (is_numeric($scoreVal)) {
+                                $scoreVal .= '%';
+                            }
+                        ?>
+                        <div class="card border shadow-sm mb-3" style="border-radius: 6px; border-color: #cbd5e1 !important; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
+                                    <h5 class="fs-13 text-dark fw-bold mb-0 d-flex align-items-center gap-1.5">
+                                        <i class="feather-cpu text-primary fs-16"></i>
+                                        <span>AI Deal Health & Action Intelligence</span>
+                                    </h5>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <a href="https://love14-deal-health-scoring.hf.space/auth/login?user_id=<?php echo e(auth()->id() ?? 1); ?>&next=<?php echo e(urlencode(url()->current())); ?>" 
+                                           id="googleAuthBadge" 
+                                           target="_blank" 
+                                           class="badge bg-secondary text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center"
+                                           title="Google OAuth Connection Status">
+                                            <i class="feather-loader spin me-1"></i>Checking Gmail Auth...
+                                        </a>
+                                        <button type="button" id="btnSyncHealth" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 fs-11 rounded-1">
+                                            <i class="feather-refresh-cw me-1"></i>Sync AI Health
+                                        </button>
+                                        <button type="button" id="btnGenerateDraft" class="btn btn-xs btn-primary fw-bold px-2.5 py-1 fs-11 rounded-1">
+                                            <i class="feather-mail me-1"></i>Generate AI Draft Reply
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 align-items-center mb-3">
+                                    <div class="col-md-4">
+                                        <div class="p-2.5 rounded border bg-white d-flex align-items-center justify-content-between">
+                                            <div>
+                                                <span class="fs-11 text-muted fw-bold d-block text-uppercase">Deal Health Score</span>
+                                                <span class="fs-18 fw-extrabold text-dark" id="healthScoreDisplay"><?php echo e($scoreVal); ?></span>
+                                            </div>
+                                            <span class="badge <?php echo e($riskBadgeStyle); ?> px-2.5 py-1 fs-11 fw-bold" id="riskLevelDisplay">
+                                                <?php echo e($isSynced ? ($riskVal . ' Risk') : 'Not Synced'); ?>
+
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2.5 rounded border bg-white">
+                                            <span class="fs-11 text-muted fw-bold d-block text-uppercase">Client Sentiment</span>
+                                            <span class="fs-13 fw-bold text-dark" id="sentimentDisplay">
+                                                <i class="feather-smile text-primary me-1"></i><?php echo e($isSynced ? ($deal->sentiment_score ?: 'Neutral') : 'Not Synced'); ?>
+
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2.5 rounded border bg-white">
+                                            <span class="fs-11 text-muted fw-bold d-block text-uppercase">Last AI Sync</span>
+                                            <span class="fs-12 fw-semibold text-muted" id="syncedAtDisplay">
+                                                <i class="feather-clock me-1"></i><?php echo e($isSynced ? $deal->health_synced_at->diffForHumans() : 'Never Synced'); ?>
+
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="p-3 rounded border bg-soft-info border-info-subtle">
+                                    <div class="fw-bold text-info-emphasis fs-12 mb-1 d-flex align-items-center gap-1">
+                                        <i class="feather-zap me-1"></i>AI Recommended Next Best Action:
+                                    </div>
+                                    <div class="fs-12 text-dark fw-medium" id="nextActionDisplay">
+                                        <?php echo e($isSynced ? ($deal->next_best_action ?: 'No specific action recommended by AI.') : 'Click "Sync AI Health" above to fetch live AI evaluation from API.'); ?>
+
+                                    </div>
+                                </div>
+
+                                <div id="syncDiagnosticNotice" class="alert alert-light border fs-11 text-muted p-2 mt-2.5 mb-0 d-none">
+                                    <i class="feather-info text-primary me-1"></i><span id="syncDiagnosticText"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Deal Information Card -->
+                        <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionDealInfo">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
+                                    <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0"><i class="feather-info text-info me-1.5"></i>Deal Information & Stage Controls</h5>
+                                </div>
+                                <div class="row g-0">
+                                    <div class="col-md-6 pe-md-4">
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Deal Title</div>
+                                            <div class="zoho-field-value text-dark fw-bold text-break"><?php echo e($deal->title); ?></div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Deal Number</div>
+                                            <div class="zoho-field-value text-primary font-monospace fw-bold"><?php echo e($deal->deal_number); ?></div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Account (Company)</div>
+                                            <div class="zoho-field-value text-dark fw-bold text-break">
+                                                <?php if($deal->account): ?>
+                                                    <a href="<?php echo e(route('crm.accounts.show', $deal->account)); ?>" class="text-primary hover-underline text-break" title="<?php echo e($deal->account->name); ?>"><?php echo e($deal->account->name); ?></a>
+                                                <?php elseif($linkedLead): ?>
+                                                    <a href="<?php echo e(route('crm.leads.show', $linkedLead->id)); ?>" class="text-primary hover-underline text-break" title="<?php echo e($linkedLead->company_name ?: $linkedLead->contact_person); ?>">
+                                                        <?php echo e($linkedLead->company_name ?: $linkedLead->contact_person); ?>
+
+                                                    </a>
+                                                <?php else: ?>
+                                                    —
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Contact Person</div>
+                                            <div class="zoho-field-value text-dark"><?php echo e($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->contact_person ?: $linkedLead->company_name) : '—')); ?></div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Designation / Role</div>
+                                            <div class="zoho-field-value text-dark"><?php echo e(($deal->contact && $deal->contact->designation) ? $deal->contact->designation : '—'); ?></div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Target Closing Date</div>
+                                            <div class="zoho-field-value text-dark"><?php echo e($deal->closing_date ? $deal->closing_date->format('d/m/Y') : '—'); ?></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6 ps-md-4">
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Closing Probability</div>
+                                            <div class="zoho-field-value text-info fw-bold"><?php echo e($deal->probability); ?>%</div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Estimated Revenue</div>
+                                            <div class="zoho-field-value text-dark fw-bold">₹<?php echo e(number_format($deal->estimated_value, 2)); ?></div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Actual Realized Revenue</div>
+                                            <div class="zoho-field-value text-success fw-bold">₹<?php echo e(number_format($deal->actual_value, 2)); ?></div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Lead Source</div>
+                                            <div class="zoho-field-value text-dark"><?php echo e(($deal->lead_source && !in_array($deal->lead_source, ['Select an Option', 'Select an option', 'Select Option'], true)) ? $deal->lead_source : '—'); ?></div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Deal Owner / Manager</div>
+                                            <div class="zoho-field-value text-dark fw-bold"><?php echo e($deal->owner?->name ?: ($deal->user?->name ?: 'Unassigned')); ?></div>
+                                        </div>
+
+                                        <div class="zoho-field-row">
+                                            <div class="zoho-field-label">Account Manager</div>
+                                            <div class="zoho-field-value text-primary fw-bold"><?php echo e($deal->account?->owner?->name ?: 'Unassigned'); ?></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Deal Interested Products & Quantities Section -->
+                        <?php
+                            $rawItems = $deal->product_items ?: [];
+                            if (empty($rawItems) && !empty($deal->product_ids)) {
+                                foreach ($deal->product_ids as $pid) {
+                                    $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
+                                }
+                            }
+                            if (empty($rawItems) && $linkedLead) {
+                                $rawItems = $linkedLead->product_items ?: [];
+                                if (empty($rawItems) && !empty($linkedLead->product_ids)) {
+                                    foreach ($linkedLead->product_ids as $pid) {
+                                        $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
+                                    }
+                                }
+                            }
+                        ?>
+                        <?php if(!empty($rawItems)): ?>
+                            <?php
+                                $pIds = array_column($rawItems, 'product_id');
+                                $dealProductsMap = \App\Domains\Inventory\Models\Product::whereIn('id', $pIds)->get()->keyBy('id');
+                            ?>
+                            <?php if($dealProductsMap->isNotEmpty()): ?>
+                                <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionDealProducts">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
+                                            <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0">
+                                                <i class="feather-box text-primary me-1.5"></i>Interested Products & Quantities for Deal
+                                            </h5>
+                                            <span class="badge bg-soft-primary text-primary fs-11 fw-semibold"><?php echo e(count($rawItems)); ?> Product(s) Selected</span>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered align-middle mb-0 fs-13">
+                                                <thead class="table-light text-muted">
+                                                    <tr>
+                                                        <th>Product / Item Name</th>
+                                                        <th>SKU</th>
+                                                        <th class="text-center">Quantity</th>
+                                                        <th class="text-end">Unit Price (₹)</th>
+                                                        <th class="text-end">Total Estimated Value (₹)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php $grandProductTotal = 0; ?>
+                                                    <?php $__currentLoopData = $rawItems; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                        <?php
+                                                            $pObj = $dealProductsMap->get($item['product_id']);
+                                                            if (!$pObj) continue;
+                                                            $pQty = floatval($item['quantity'] ?? 1);
+                                                            $pPrice = floatval($pObj->selling_price ?: $pObj->unit_cost ?: 0);
+                                                            $lineVal = $pQty * $pPrice;
+                                                            $grandProductTotal += $lineVal;
+                                                        ?>
+                                                        <tr>
+                                                            <td class="fw-bold text-dark">
+                                                                <a href="<?php echo e(route('inventory.products.show', $pObj)); ?>" class="text-dark hover-underline" target="_blank"><?php echo e($pObj->name); ?></a>
+                                                            </td>
+                                                            <td class="font-monospace text-muted"><?php echo e($pObj->sku); ?></td>
+                                                            <td class="text-center fw-bold text-primary"><?php echo e(number_format($pQty, 0)); ?> <?php echo e($pObj->uom?->code ?? 'Pcs'); ?></td>
+                                                            <td class="text-end">₹<?php echo e(number_format($pPrice, 2)); ?></td>
+                                                            <td class="text-end fw-bold text-success">₹<?php echo e(number_format($lineVal, 2)); ?></td>
+                                                        </tr>
+                                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                                </tbody>
+                                                <?php if($grandProductTotal > 0): ?>
+                                                    <tfoot class="table-light fw-bold">
+                                                        <tr>
+                                                            <td colspan="4" class="text-end text-uppercase fs-12">Total Deal Product Value:</td>
+                                                            <td class="text-end text-success fs-14">₹<?php echo e(number_format($grandProductTotal, 2)); ?></td>
+                                                        </tr>
+                                                    </tfoot>
+                                                <?php endif; ?>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <!-- CUSTOMER ACCOUNT & CONTACT QUICK CARD -->
+                        <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionCustomerCard">
+                            <div class="card-body p-3">
+                                <h5 class="fs-13 text-dark fw-bold mb-3"><i class="feather-users text-primary me-1.5"></i>Customer Account & Contact Information</h5>
+                                <div class="row g-3">
+                                    <div class="col-md-6 border-end">
+                                        <div class="p-3 bg-light-50 rounded border">
+                                            <div class="fw-bold text-dark fs-14 mb-1">
+                                                <?php echo e($deal->account ? $deal->account->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'No Account Linked')); ?>
+
+                                            </div>
+                                            <div class="fs-12 text-muted mb-2"><i class="feather-map-pin me-1"></i><?php echo e($deal->account ? ($deal->account->billing_address ?: 'Billing address not added') : ($linkedLead ? ($linkedLead->address ?: 'Address not added') : '—')); ?></div>
+                                            <?php
+                                                $accPhone = $deal->account?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone);
+                                                $accEmail = $deal->account?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email);
+                                            ?>
+                                            <?php if($accPhone): ?>
+                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i><?php echo e($accPhone); ?></div>
+                                            <?php endif; ?>
+                                            <?php if($accEmail): ?>
+                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i><?php echo e($accEmail); ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-light-50 rounded border">
+                                            <?php
+                                                $cName = $deal->contact?->name ?: ($linkedLead?->contact_person ?: $linkedLead?->company_name);
+                                                $cTitle = $deal->contact?->designation ?: ($deal->contact?->role ?: ($linkedLead?->designation ?: 'Primary Contact'));
+                                                $cPhone = $deal->contact?->phone ?: ($linkedLead?->phone ?: $linkedLead?->company_phone);
+                                                $cEmail = $deal->contact?->email ?: ($linkedLead?->email ?: $linkedLead?->company_email);
+                                            ?>
+                                            <div class="fw-bold text-dark fs-14 mb-1"><?php echo e($cName ?: 'No Contact Person'); ?></div>
+                                            <div class="fs-12 text-muted mb-2"><?php echo e($cTitle ?: '—'); ?></div>
+                                            <?php if($cPhone): ?>
+                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i><?php echo e($cPhone); ?></div>
+                                            <?php endif; ?>
+                                            <?php if($cEmail): ?>
+                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i><?php echo e($cEmail); ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Requirements / Notes Details Card (Click to Edit like Lead) -->
+                        <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionNotes">
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center justify-content-between pb-2 border-bottom mb-3">
+                                    <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="font-family: 'Inter', sans-serif; border-bottom: none;">
+                                        <i class="feather-file-text text-primary me-1.5"></i>Requirements Details
+                                    </h5>
+                                    <span class="text-muted fs-11 d-none d-sm-inline-block"><i class="feather-info me-1 text-primary"></i>Click box below to edit</span>
+                                </div>
+
+                                <?php
+                                    $currentReq = !empty($deal->notes) ? $deal->notes : (!empty($linkedLead?->requirement) ? $linkedLead->requirement : '');
+                                ?>
+
+                                <!-- View Mode (Clickable to Edit) -->
+                                <div id="viewDealRequirementBlock">
+                                    <?php if(!empty($currentReq)): ?>
+                                        <div class="position-relative requirement-clickable-box p-3 rounded shadow-2xs" onclick="enableDealRequirementEdit()" title="Click anywhere to edit requirement" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1; transition: all 0.2s ease;">
+                                            <div class="d-flex align-items-start justify-content-between gap-3">
+                                                <div class="text-dark fs-13 flex-grow-1" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;" id="viewDealRequirementText"><?php echo e($currentReq); ?></div>
+                                                <span class="badge bg-white text-primary border shadow-2xs px-2.5 py-1.5 fs-11 flex-shrink-0 edit-hint-badge" style="border-color: #cbd5e1 !important; transition: all 0.2s ease;">
+                                                    <i class="feather-edit-2 me-1"></i>Click to Edit
+                                                </span>
+                                            </div>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableDealRequirementEdit()" title="Click to add requirement" style="cursor: pointer; background: #f8fafc; border: 1px dashed #cbd5e1; transition: all 0.2s ease;">
+                                            <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2">
+                                                <i class="feather-edit-3 fs-5"></i>
+                                            </div>
+                                            <h6 class="fw-bold text-dark fs-13 mb-1">No Requirements Details Specified</h6>
+                                            <p class="text-muted fs-12 mb-0">Click here to add deal notes, requirements, or scope of work.</p>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+
+                                <!-- Edit Mode -->
+                                <div id="editDealRequirementBlock" style="display: none;">
+                                    <form id="ajaxDealRequirementForm" action="<?php echo e(route('crm.deals.updateRequirement', $deal->id)); ?>" method="POST">
+                                        <?php echo csrf_field(); ?>
+                                        <?php echo method_field('PATCH'); ?>
+                                        <div class="mb-2">
+                                            <textarea name="notes" id="dealRequirementInput" rows="4" class="form-control form-control-sm shadow-2xs fs-13" placeholder="Enter detailed requirements or specifications for this deal..." style="border-color: var(--bs-primary); border-radius: 6px; font-family: 'Inter', sans-serif;" oninput="updateDealReqCharCount(this)"><?php echo e(old('notes', $currentReq)); ?></textarea>
+                                        </div>
+                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                            <span class="text-muted fs-11">
+                                                <i class="feather-corner-down-left me-1"></i>Press <kbd class="bg-light text-dark border px-1 py-0.5 rounded fs-10">Ctrl + Enter</kbd> or click save
+                                            </span>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="text-muted fs-11 me-2" id="dealReqCharCounter">0 chars</span>
+                                                <button type="button" class="btn btn-xs btn-light border px-3 py-1.5 fw-bold rounded" onclick="cancelDealRequirementEdit()">CANCEL</button>
+                                                <button type="submit" id="btnSaveDealRequirement" class="btn btn-xs btn-primary px-3 py-1.5 fw-bold shadow-2xs text-white rounded d-inline-flex align-items-center" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
+                                                    <i class="feather-check me-1"></i> SAVE REQUIREMENT
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Documents Card -->
+                        <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionDocuments">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-folder me-2 text-primary"></i>Attached Documents & Files</h6>
+                                    <form action="<?php echo e(route('crm.deals.documents.upload', $deal->id)); ?>" method="POST" enctype="multipart/form-data" class="m-0 p-0" id="dealDocUploadForm">
+                                        <?php echo csrf_field(); ?>
+                                        <button type="button" class="btn btn-xs btn-primary fw-bold" onclick="document.getElementById('dealDocInput').click();" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-upload me-1"></i> Upload</button>
+                                        <input type="file" name="documents[]" id="dealDocInput" onchange="if (this.files &amp;&amp; this.files.length > 0) { document.getElementById('dealDocUploadForm').submit(); }" multiple style="display: none;">
+                                    </form>
+                                </div>
+
+                                <?php if($leadDocuments->isEmpty()): ?>
+                                    <div class="text-center py-4 border border-dashed rounded bg-light-subtle">
+                                        <i class="feather-file-text fs-24 text-muted mb-1 d-block opacity-50"></i>
+                                        <div class="text-muted fs-12">No documents attached yet for this deal.</div>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="row g-3">
+                                        <?php $__currentLoopData = $leadDocuments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $document): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                            <?php
+                                                $ext = strtolower(pathinfo($document->file_name, PATHINFO_EXTENSION) ?: $document->file_type);
+                                                $fileTypeCategory = 'other';
+
+                                                if (in_array($ext, ['xlsx', 'xls', 'csv'])) {
+                                                    $fileTypeCategory = 'excel';
+                                                } elseif ($ext === 'pdf') {
+                                                    $fileTypeCategory = 'pdf';
+                                                } elseif (in_array($ext, ['doc', 'docx'])) {
+                                                    $fileTypeCategory = 'word';
+                                                } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'])) {
+                                                    $fileTypeCategory = 'image';
+                                                } elseif (in_array($ext, ['zip', 'rar', '7z', 'tar', 'gz'])) {
+                                                    $fileTypeCategory = 'archive';
+                                                }
+                                            ?>
+                                            <div class="col-md-6">
+                                                <div class="p-3 border rounded-3 d-flex align-items-center justify-content-between h-100 shadow-2xs" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
+                                                    <div class="d-flex align-items-center overflow-hidden me-2" style="gap: 12px;">
+                                                        <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px;">
+                                                            <?php if($fileTypeCategory === 'excel'): ?>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#107C41"/>
+                                                                    <path d="M10.5 9L16.5 18L10.5 27H14.25L18 21.375L21.75 27H25.5L19.5 18L25.5 9H21.75L18 14.625L14.25 9H10.5Z" fill="white"/>
+                                                                </svg>
+                                                            <?php elseif($fileTypeCategory === 'word'): ?>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#185ABD"/>
+                                                                    <path d="M9 9L12.75 27H15.75L18 17.25L20.25 27H23.25L27 9H23.7L21.45 20.7L19.05 9H16.95L14.55 20.7L12.3 9H9Z" fill="white"/>
+                                                                </svg>
+                                                            <?php elseif($fileTypeCategory === 'pdf'): ?>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#E11D48"/>
+                                                                    <text x="50%" y="58%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="12" font-weight="900" font-family="'Inter', sans-serif" letter-spacing="0.5">PDF</text>
+                                                                </svg>
+                                                            <?php elseif($fileTypeCategory === 'image'): ?>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#0891B2"/>
+                                                                    <circle cx="13" cy="13" r="3" fill="white"/>
+                                                                    <path d="M7.5 27L14.25 18.75L18.75 24.75L24 16.5L28.5 27H7.5Z" fill="white"/>
+                                                                </svg>
+                                                            <?php elseif($fileTypeCategory === 'archive'): ?>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#D97706"/>
+                                                                    <path d="M18 6V21M18 21L12 15M18 21L24 15M9 27H27" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                </svg>
+                                                            <?php else: ?>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                    <rect width="36" height="36" rx="6" fill="#475569"/>
+                                                                    <path d="M10.5 9H25.5M10.5 15H25.5M10.5 21H19.5M10.5 27H16.5" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                                                                </svg>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                        <div class="overflow-hidden">
+                                                            <a href="<?php echo e(route('crm.leads.documents.view', $document->id)); ?>" target="_blank" class="fw-bold text-dark text-decoration-none hover-primary fs-12 text-truncate d-block mb-1" title="Click to view file: <?php echo e($document->file_name); ?>">
+                                                                <?php echo e($document->file_name); ?>
+
+                                                            </a>
+                                                            <div class="text-muted fs-11 d-flex align-items-center gap-1.5 flex-wrap">
+                                                                <span class="badge bg-white text-secondary border px-1.5 py-0.5 text-uppercase fw-semibold" style="font-size: 9px; border-color: #cbd5e1 !important;"><?php echo e(strtoupper($ext)); ?></span>
+                                                                <span><?php echo e(round($document->size / 1024, 2)); ?> KB</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                                        <a href="<?php echo e(route('crm.leads.documents.download', $document->id)); ?>" class="btn btn-xs btn-soft-success rounded-circle p-0 d-inline-flex align-items-center justify-content-center border" style="width: 30px; height: 30px; border-color: #bbf7d0 !important;" title="Download Document">
+                                                            <i class="feather-download fs-13 text-success"></i>
+                                                        </a>
+                                                        <form action="<?php echo e(route('crm.leads.documents.delete', $document->id)); ?>" method="POST" class="m-0 p-0" id="deleteDocForm_<?php echo e($document->id); ?>">
+                                                            <?php echo csrf_field(); ?>
+                                                            <?php echo method_field('DELETE'); ?>
+                                                            <button type="button" class="btn btn-xs btn-soft-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center border" style="width: 30px; height: 30px; border-color: #fecdd3 !important;" title="Delete Document" onclick="confirmAction({ title: 'Delete Document', message: 'Are you sure you want to delete this document?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteDocForm_<?php echo e($document->id); ?>').submit(); })">
+                                                                <i class="feather-trash-2 fs-13 text-danger"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== TAB 2: QUOTATIONS & PROPOSALS PANE ==================== -->
+                    <div class="tab-pane fade <?php echo e($isQuotationTabActive ? 'show active' : ''); ?>" id="quotations-pane" role="tabpanel">
+                        
+                        <?php if(request()->has('create_quotation') || old('form_type') === 'quotation_create'): ?>
+                            <!-- CREATE QUOTATION INLINE FORM -->
+                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
+                                <div class="card-body p-4">
+                                    <form action="<?php echo e(route('crm.quotations.store')); ?>" method="POST" id="quotationForm" novalidate>
+                                        <?php echo csrf_field(); ?>
+                                        <input type="hidden" name="crm_deal_id" value="<?php echo e($deal->id); ?>">
+                                        <input type="hidden" name="form_type" value="quotation_create">
+
+                                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                                            <h5 class="fw-bold text-dark mb-0 fs-16"><i class="feather-file-plus text-primary me-2"></i>New Quotation</h5>
+                                            <a href="<?php echo e(route('crm.deals.show', $deal->id)); ?>" class="btn btn-sm btn-light border">Cancel</a>
+                                        </div>
+
+                                        <div class="row g-4 mb-4 fs-13 text-dark">
+                                            <div class="col-md-6">
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','label' => 'Customer / Account','name' => '_customer_display','value' => $deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A')),'readonly' => 'true','style' => 'font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Customer / Account','name' => '_customer_display','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A'))),'readonly' => 'true','style' => 'font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','label' => 'Contact Email','name' => 'email','value' => old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')),'errorText' => $errors->first('email')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Contact Email','name' => 'email','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))),'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('email'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','label' => 'Contact Phone','name' => 'phone','value' => old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')),'errorText' => $errors->first('phone')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Contact Phone','name' => 'phone','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))),'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('phone'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','label' => 'Quotation Number','name' => 'quotation_number','value' => old('quotation_number', $nextQuotationNumber),'readonly' => 'true','style' => 'font-weight: bold; color: #495057;','errorText' => $errors->first('quotation_number')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Quotation Number','name' => 'quotation_number','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('quotation_number', $nextQuotationNumber)),'readonly' => 'true','style' => 'font-weight: bold; color: #495057;','errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('quotation_number'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','inputType' => 'date','label' => 'Quotation Date','name' => 'quotation_date','value' => old('quotation_date', date('Y-m-d')),'errorText' => $errors->first('quotation_date')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','inputType' => 'date','label' => 'Quotation Date','name' => 'quotation_date','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('quotation_date', date('Y-m-d'))),'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('quotation_date'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','inputType' => 'date','label' => 'Expiration Date','name' => 'expiry_date','value' => old('expiry_date', date('Y-m-d', strtotime('+30 days'))),'errorText' => $errors->first('expiry_date')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','inputType' => 'date','label' => 'Expiration Date','name' => 'expiry_date','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('expiry_date', date('Y-m-d', strtotime('+30 days')))),'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('expiry_date'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'select','label' => 'Initial Status','name' => 'status','required' => true,'errorText' => $errors->first('status')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'select','label' => 'Initial Status','name' => 'status','required' => true,'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('status'))]); ?>
+                                                     <option value="Draft" <?php if(old('status') === 'Draft'): echo 'selected'; endif; ?>>Draft</option>
+                                                     <option value="Pending Approval" <?php if(old('status') === 'Pending Approval'): echo 'selected'; endif; ?>>Sent for Approval</option>
+                                                  <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                            </div>
+                                        </div>
+
+                                        <!-- Order Lines Table -->
+                                        <div class="border-top pt-4">
+                                            <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                                            <div class="table-responsive">
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'table','id' => 'itemsTable']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'table','id' => 'itemsTable']); ?>
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 38%;">Product Description</th>
+                                                            <th class="text-end" style="width: 10%;">Qty</th>
+                                                            <th class="text-end" style="width: 18%;">Unit Price (₹)</th>
+                                                            <th class="text-end" style="width: 12%;">Taxes (%)</th>
+                                                            <th class="text-end pe-3" style="width: 17%;">Amount</th>
+                                                            <th class="text-center" style="width: 5%;"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Dynamically generated rows -->
+                                                    </tbody>
+                                                 <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                            </div>
+                                            <div class="mt-2.5">
+                                                <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
+                                                    <i class="feather-plus me-1"></i>Add a product
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Subtotal / Discount / Totals -->
+                                        <div class="row mt-4 pt-3 border-top text-dark fs-13">
+                                            <div class="col-md-8">
+                                                <div class="pe-md-4">
+                                                    <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'editor','label' => 'Terms & Conditions','name' => 'terms_conditions','editorHeight' => 'ht-150','errorText' => $errors->first('terms_conditions')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'editor','label' => 'Terms & Conditions','name' => 'terms_conditions','editorHeight' => 'ht-150','errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('terms_conditions'))]); ?><?php echo old('terms_conditions'); ?> <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                    <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'textarea','label' => 'Internal Notes','name' => 'notes','rows' => '2','placeholder' => 'Notes for internal view...','errorText' => $errors->first('notes')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'textarea','label' => 'Internal Notes','name' => 'notes','rows' => '2','placeholder' => 'Notes for internal view...','errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('notes'))]); ?><?php echo e(old('notes')); ?> <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Subtotal:</span>
+                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Taxes:</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                    <span class="text-muted fw-semibold me-2">Discount:</span>
+                                                    <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','name' => 'discount','id' => 'discountInput','inputType' => 'number','value' => old('discount', 0),'min' => '0','step' => '0.01','class' => 'text-end fw-bold','errorText' => $errors->first('discount')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','name' => 'discount','id' => 'discountInput','inputType' => 'number','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('discount', 0)),'min' => '0','step' => '0.01','class' => 'text-end fw-bold','errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('discount'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                </div>
+                                                <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
+                                                    <span class="text-dark fw-bold">Grand Total:</span>
+                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                                            <a href="<?php echo e(route('crm.deals.show', $deal->id)); ?>" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
+                                            <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12">Save Quotation</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                        <?php elseif((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation && $activeQuotation->status !== 'Accepted'): ?>
+                            <!-- EDIT QUOTATION INLINE FORM -->
+                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
+                                <div class="card-body p-4">
+                                    <form action="<?php echo e(route('crm.quotations.update', $activeQuotation->id)); ?>" method="POST" id="quotationForm" novalidate>
+                                        <?php echo csrf_field(); ?>
+                                        <?php echo method_field('PUT'); ?>
+                                        <input type="hidden" name="crm_deal_id" value="<?php echo e($deal->id); ?>">
+                                        <input type="hidden" name="form_type" value="quotation_edit">
+
+                                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                                            <h5 class="fw-bold text-dark mb-0 fs-16"><i class="feather-edit text-warning me-2"></i>Edit Quotation: <?php echo e($activeQuotation->quotation_number); ?></h5>
+                                            <a href="<?php echo e(route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $activeQuotation->id])); ?>" class="btn btn-sm btn-light border">Cancel</a>
+                                        </div>
+
+                                        <div class="row g-4 mb-4 fs-13 text-dark">
+                                            <div class="col-md-6">
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','label' => 'Customer / Account','name' => '_customer_display','value' => $deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A')),'readonly' => 'true','style' => 'font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Customer / Account','name' => '_customer_display','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A'))),'readonly' => 'true','style' => 'font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','label' => 'Contact Email','name' => 'email','value' => old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))),'errorText' => $errors->first('email')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Contact Email','name' => 'email','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')))),'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('email'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','label' => 'Contact Phone','name' => 'phone','value' => old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))),'errorText' => $errors->first('phone')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Contact Phone','name' => 'phone','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')))),'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('phone'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','label' => 'Quotation Number','name' => 'quotation_number','value' => $activeQuotation->quotation_number,'readonly' => 'true','style' => 'font-weight: bold; color: #495057;','errorText' => $errors->first('quotation_number')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Quotation Number','name' => 'quotation_number','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeQuotation->quotation_number),'readonly' => 'true','style' => 'font-weight: bold; color: #495057;','errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('quotation_number'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','inputType' => 'date','label' => 'Quotation Date','name' => 'quotation_date','value' => old('quotation_date', $activeQuotation->quotation_date ? \Illuminate\Support\Carbon::parse($activeQuotation->quotation_date)->format('Y-m-d') : date('Y-m-d')),'errorText' => $errors->first('quotation_date')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','inputType' => 'date','label' => 'Quotation Date','name' => 'quotation_date','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('quotation_date', $activeQuotation->quotation_date ? \Illuminate\Support\Carbon::parse($activeQuotation->quotation_date)->format('Y-m-d') : date('Y-m-d'))),'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('quotation_date'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','inputType' => 'date','label' => 'Expiration Date','name' => 'expiry_date','value' => old('expiry_date', $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('Y-m-d') : ''),'errorText' => $errors->first('expiry_date')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','inputType' => 'date','label' => 'Expiration Date','name' => 'expiry_date','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('expiry_date', $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('Y-m-d') : '')),'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('expiry_date'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'select','label' => 'Status','name' => 'status','required' => true,'errorText' => $errors->first('status')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'select','label' => 'Status','name' => 'status','required' => true,'errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('status'))]); ?>
+                                                     <option value="Draft" <?php if(old('status', $activeQuotation->status) === 'Draft'): echo 'selected'; endif; ?>>Draft</option>
+                                                     <option value="Pending Approval" <?php if(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined'): echo 'selected'; endif; ?>>Sent for Approval</option>
+                                                 <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                            </div>
+                                        </div>
+
+                                        <!-- Order Lines Table -->
+                                        <div class="border-top pt-4">
+                                            <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                                            <div class="table-responsive">
+                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'table','id' => 'itemsTable']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'table','id' => 'itemsTable']); ?>
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 38%;">Product Description</th>
+                                                            <th class="text-end" style="width: 10%;">Qty</th>
+                                                            <th class="text-end" style="width: 18%;">Unit Price (₹)</th>
+                                                            <th class="text-end" style="width: 12%;">Taxes (%)</th>
+                                                            <th class="text-end pe-3" style="width: 17%;">Amount</th>
+                                                            <th class="text-center" style="width: 5%;"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Dynamically generated rows -->
+                                                    </tbody>
+                                                 <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                            </div>
+                                            <div class="mt-2.5">
+                                                <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
+                                                    <i class="feather-plus me-1"></i>Add a product
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Subtotal / Discount / Totals -->
+                                        <div class="row mt-4 pt-3 border-top text-dark fs-13">
+                                            <div class="col-md-8">
+                                                <div class="pe-md-4">
+                                                    <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'editor','label' => 'Terms & Conditions','name' => 'terms_conditions','editorHeight' => 'ht-150','errorText' => $errors->first('terms_conditions')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'editor','label' => 'Terms & Conditions','name' => 'terms_conditions','editorHeight' => 'ht-150','errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('terms_conditions'))]); ?><?php echo old('terms_conditions', $activeQuotation->terms_conditions); ?> <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                    <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'textarea','label' => 'Internal Notes','name' => 'notes','rows' => '2','placeholder' => 'Notes for internal view...','errorText' => $errors->first('notes')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'textarea','label' => 'Internal Notes','name' => 'notes','rows' => '2','placeholder' => 'Notes for internal view...','errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('notes'))]); ?><?php echo e(old('notes', $activeQuotation->notes)); ?> <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Subtotal:</span>
+                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Taxes:</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                    <span class="text-muted fw-semibold me-2">Discount:</span>
+                                                    <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','name' => 'discount','id' => 'discountInput','inputType' => 'number','value' => old('discount', $activeQuotation->discount),'min' => '0','step' => '0.01','class' => 'text-end fw-bold','errorText' => $errors->first('discount')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','name' => 'discount','id' => 'discountInput','inputType' => 'number','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(old('discount', $activeQuotation->discount)),'min' => '0','step' => '0.01','class' => 'text-end fw-bold','errorText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($errors->first('discount'))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                </div>
+                                                <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
+                                                    <span class="text-dark fw-bold">Grand Total:</span>
+                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                                            <a href="<?php echo e(route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $activeQuotation->id])); ?>" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
+                                            <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12">Save Changes</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                        <?php elseif($activeQuotation): ?>
+                            <!-- ACTIVE QUOTATION DETAILS CARD VIEW -->
+                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
+                                <div class="card-body p-4">
+                                    <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4 flex-wrap gap-2">
+                                        <div>
+                                            <h4 class="fw-bold text-dark mb-0 fs-16">Quotation <?php echo e($activeQuotation->quotation_number); ?></h4>
+                                            <span class="badge bg-light text-dark border font-monospace mt-1">Revision <?php echo e($activeQuotation->revision_number); ?></span>
+                                        </div>
+
+                                        <div class="d-flex align-items-center flex-wrap gap-2">
+                                            <!-- Common Component <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?> for WhatsApp, Email, Download PDF -->
+                                            <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['variant' => 'success','size' => 'sm','icon' => 'feather-message-circle','class' => 'btn-open-send-quote-wa-modal','dataQuotationId' => ''.e($activeQuotation->id).'','dataQuotationNum' => ''.e($activeQuotation->quotation_number).'','dataClientPhone' => ''.e($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone))).'','dataDealTitle' => ''.e(addslashes($deal->title)).'','title' => 'Send PDF via WhatsApp']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'success','size' => 'sm','icon' => 'feather-message-circle','class' => 'btn-open-send-quote-wa-modal','data-quotation-id' => ''.e($activeQuotation->id).'','data-quotation-num' => ''.e($activeQuotation->quotation_number).'','data-client-phone' => ''.e($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone))).'','data-deal-title' => ''.e(addslashes($deal->title)).'','title' => 'Send PDF via WhatsApp']); ?>
+                                                Send WhatsApp
+                                             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+
+                                            <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['variant' => 'primary','size' => 'sm','icon' => 'feather-mail','class' => 'btn-open-send-quote-modal','dataQuotationId' => ''.e($activeQuotation->id).'','dataQuotationNum' => ''.e($activeQuotation->quotation_number).'','dataClientEmail' => ''.e($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email))).'','dataDealTitle' => ''.e(addslashes($deal->title)).'','title' => 'Send PDF via Email']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'primary','size' => 'sm','icon' => 'feather-mail','class' => 'btn-open-send-quote-modal','data-quotation-id' => ''.e($activeQuotation->id).'','data-quotation-num' => ''.e($activeQuotation->quotation_number).'','data-client-email' => ''.e($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email))).'','data-deal-title' => ''.e(addslashes($deal->title)).'','title' => 'Send PDF via Email']); ?>
+                                                Send Email
+                                             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+
+                                            <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['variant' => 'danger','size' => 'sm','icon' => 'feather-download','href' => ''.e(route('crm.quotations.download', $activeQuotation->id)).'','title' => 'Download PDF Document']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'danger','size' => 'sm','icon' => 'feather-download','href' => ''.e(route('crm.quotations.download', $activeQuotation->id)).'','title' => 'Download PDF Document']); ?>
+                                                Download PDF
+                                             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+
+                                            <!-- Status / Workflow Action Buttons -->
+                                            <?php if($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework'): ?>
+                                                <form action="<?php echo e(route('crm.quotations.updateStatus', $activeQuotation->id)); ?>" method="POST" class="d-inline m-0">
+                                                    <?php echo csrf_field(); ?>
+                                                    <?php echo method_field('PATCH'); ?>
+                                                    <input type="hidden" name="status" value="Pending Approval">
+                                                    <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','variant' => 'warning','size' => 'sm','icon' => 'feather-send']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','variant' => 'warning','size' => 'sm','icon' => 'feather-send']); ?>Submit Approval <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+                                                </form>
+                                            <?php elseif($activeQuotation->status === 'Approved'): ?>
+                                                <form action="<?php echo e(route('crm.quotations.updateStatus', $activeQuotation->id)); ?>" method="POST" class="d-inline m-0">
+                                                    <?php echo csrf_field(); ?>
+                                                    <?php echo method_field('PATCH'); ?>
+                                                    <input type="hidden" name="status" value="Quotation Sent">
+                                                    <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','variant' => 'primary','size' => 'sm','icon' => 'feather-send']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','variant' => 'primary','size' => 'sm','icon' => 'feather-send']); ?>Mark as Sent <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+                                                </form>
+                                            <?php elseif($activeQuotation->status === 'Quotation Sent' || $activeQuotation->status === 'Sent'): ?>
+                                                <form action="<?php echo e(route('crm.quotations.updateStatus', $activeQuotation->id)); ?>" method="POST" class="d-inline m-0">
+                                                    <?php echo csrf_field(); ?>
+                                                    <?php echo method_field('PATCH'); ?>
+                                                    <input type="hidden" name="status" value="Accepted">
+                                                    <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','variant' => 'success','size' => 'sm','icon' => 'feather-check-circle']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','variant' => 'success','size' => 'sm','icon' => 'feather-check-circle']); ?>Accept Quote <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+                                                </form>
+                                                <form action="<?php echo e(route('crm.quotations.updateStatus', $activeQuotation->id)); ?>" method="POST" class="d-inline m-0">
+                                                    <?php echo csrf_field(); ?>
+                                                    <?php echo method_field('PATCH'); ?>
+                                                    <input type="hidden" name="status" value="Rejected">
+                                                    <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','variant' => 'soft-danger','size' => 'sm','icon' => 'feather-x-circle']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','variant' => 'soft-danger','size' => 'sm','icon' => 'feather-x-circle']); ?>Reject <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+                                                </form>
+                                            <?php endif; ?>
+
+                                            <!-- Dropdown Menu for More Options (At Very End) -->
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-light border fw-bold px-2.5 py-1.5 dropdown-toggle btn-animated" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Quotation Actions">
+                                                    <i class="feather-more-horizontal me-1"></i>More
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 fs-12">
+                                                    <li>
+                                                        <a class="dropdown-item" href="<?php echo e(route('crm.quotations.show', $activeQuotation->id)); ?>">
+                                                            <i class="feather-eye me-2 text-info"></i>View Full Quotation Sheet
+                                                        </a>
+                                                    </li>
+                                                    <?php if($activeQuotation->status !== 'Accepted'): ?>
+                                                        <li>
+                                                            <a class="dropdown-item" href="<?php echo e(route('crm.deals.show', ['deal' => $deal->id, 'edit_quotation' => 1, 'quotation_id' => $activeQuotation->id])); ?>">
+                                                                <i class="feather-edit-2 me-2 text-warning"></i>Edit Quotation
+                                                            </a>
+                                                        </li>
+                                                    <?php endif; ?>
+                                                    <li>
+                                                        <a class="dropdown-item" href="<?php echo e(route('crm.quotations.download', $activeQuotation->id)); ?>?print=1" target="_blank">
+                                                            <i class="feather-printer me-2 text-secondary"></i>Print Quotation
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Quotation Header Grid -->
+                                    <div class="row g-4 mb-4 fs-13 text-dark">
+                                        <div class="col-md-6 border-end">
+                                            <div class="mb-3">
+                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Customer / Company</label>
+                                                <div class="fw-bold text-dark fs-14">
+                                                    <?php echo e($deal->account ? $deal->account->name : ($deal->contact ? $deal->contact->name : ($linkedLead ? ($linkedLead->company_name ?: $linkedLead->contact_person) : 'N/A'))); ?>
+
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-6">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Contact Email</label>
+                                                    <div class="fs-12 text-primary d-flex align-items-center flex-wrap gap-1">
+                                                        <span class="fw-semibold"><?php echo e($activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—'))); ?></span>
+                                                        <?php if($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email))): ?>
+                                                            <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['variant' => 'soft-primary','size' => 'sm','icon' => 'feather-mail','class' => 'btn-open-send-quote-modal ms-1','dataQuotationId' => ''.e($activeQuotation->id).'','dataQuotationNum' => ''.e($activeQuotation->quotation_number).'','dataClientEmail' => ''.e($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email))).'','dataDealTitle' => ''.e(addslashes($deal->title)).'','title' => 'Send Quotation PDF via Email']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'soft-primary','size' => 'sm','icon' => 'feather-mail','class' => 'btn-open-send-quote-modal ms-1','data-quotation-id' => ''.e($activeQuotation->id).'','data-quotation-num' => ''.e($activeQuotation->quotation_number).'','data-client-email' => ''.e($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email))).'','data-deal-title' => ''.e(addslashes($deal->title)).'','title' => 'Send Quotation PDF via Email']); ?>
+                                                                Send Email
+                                                             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Contact Phone</label>
+                                                    <div class="fs-12 text-dark d-flex align-items-center flex-wrap gap-1">
+                                                        <span class="fw-semibold"><?php echo e($activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '—'))); ?></span>
+                                                        <?php if($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone))): ?>
+                                                            <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['variant' => 'soft-success','size' => 'sm','icon' => 'feather-message-circle','class' => 'btn-open-send-quote-wa-modal ms-1','dataQuotationId' => ''.e($activeQuotation->id).'','dataQuotationNum' => ''.e($activeQuotation->quotation_number).'','dataClientPhone' => ''.e($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone))).'','dataDealTitle' => ''.e(addslashes($deal->title)).'','title' => 'Send Quotation PDF via WhatsApp']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'soft-success','size' => 'sm','icon' => 'feather-message-circle','class' => 'btn-open-send-quote-wa-modal ms-1','data-quotation-id' => ''.e($activeQuotation->id).'','data-quotation-num' => ''.e($activeQuotation->quotation_number).'','data-client-phone' => ''.e($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone))).'','data-deal-title' => ''.e(addslashes($deal->title)).'','title' => 'Send Quotation PDF via WhatsApp']); ?>
+                                                                Send WhatsApp
+                                                             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 ps-md-4">
+                                            <div class="row">
+                                                <div class="col-6 mb-3">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Quotation Date</label>
+                                                    <div class="fw-semibold text-dark"><?php echo e($activeQuotation->quotation_date ? \Illuminate\Support\Carbon::parse($activeQuotation->quotation_date)->format('d M Y') : '—'); ?></div>
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Expiration Date</label>
+                                                    <div class="fw-semibold text-danger"><?php echo e($activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('d M Y') : '—'); ?></div>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Quotation Status</label>
+                                                <?php
+                                                    $qColors = [
+                                                        'Draft' => 'secondary',
+                                                        'Approved' => 'info',
+                                                        'Sent' => 'primary',
+                                                        'Quotation Sent' => 'primary',
+                                                        'Accepted' => 'success',
+                                                        'Rejected' => 'danger',
+                                                    ];
+                                                    $qBadgeColor = $qColors[$activeQuotation->status] ?? 'secondary';
+                                                ?>
+                                                <span class="badge bg-soft-<?php echo e($qBadgeColor); ?> text-<?php echo e($qBadgeColor); ?> border border-<?php echo e($qBadgeColor); ?>-subtle px-2.5 py-1 fw-bold fs-12">
+                                                    <?php echo e($activeQuotation->status); ?>
+
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Order Lines Table -->
+                                    <h6 class="fw-bold text-dark mb-2 fs-13">Order Lines</h6>
+                                    <div class="table-responsive mb-4">
+                                        <table class="table odoo-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Product Description</th>
+                                                    <th class="text-end">Qty</th>
+                                                    <th class="text-end">Unit Price (₹)</th>
+                                                    <th class="text-end">Tax (%)</th>
+                                                    <th class="text-end">Amount (₹)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="fs-13 text-dark">
+                                                <?php $__empty_1 = true; $__currentLoopData = $activeQuotation->items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                                                    <tr>
+                                                        <td><?php echo e($loop->iteration); ?></td>
+                                                        <td>
+                                                            <strong class="text-dark"><?php echo e($item->product ? $item->product->name : ($item->description ?: 'Item')); ?></strong>
+                                                            <?php if($item->product && $item->product->sku): ?>
+                                                                <span class="text-muted fs-11 font-monospace ms-1">(SKU: <?php echo e($item->product->sku); ?>)</span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td class="text-end font-monospace fw-bold"><?php echo e($item->quantity); ?></td>
+                                                        <td class="text-end font-monospace">₹<?php echo e(number_format($item->unit_price, 2)); ?></td>
+                                                        <td class="text-end font-monospace"><?php echo e($item->tax_rate); ?>%</td>
+                                                        <td class="text-end font-monospace fw-bold text-success">₹<?php echo e(number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2)); ?></td>
+                                                    </tr>
+                                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                                                    <tr>
+                                                        <td colspan="6" class="text-center py-3 text-muted">No line items in this quotation.</td>
+                                                    </tr>
+                                                <?php endif; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Totals Summary -->
+                                    <div class="row pt-3 border-top text-dark fs-13">
+                                        <div class="col-md-7">
+                                            <?php if($activeQuotation->terms_conditions): ?>
+                                                <div class="mb-2">
+                                                    <strong class="text-muted fs-11 text-uppercase fw-bold d-block">Terms & Conditions:</strong>
+                                                    <div class="fs-12 text-muted mt-1"><?php echo $activeQuotation->terms_conditions; ?></div>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">Subtotal:</span>
+                                                <span class="fw-bold">₹<?php echo e(number_format($activeQuotation->subtotal ?? 0, 2)); ?></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">Tax Amount:</span>
+                                                <span class="fw-bold">₹<?php echo e(number_format($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0, 2)); ?></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1">
+                                                <span class="fw-bold text-dark">Grand Total:</span>
+                                                <span class="fw-extrabold text-primary">₹<?php echo e(number_format($activeQuotation->total_amount, 2)); ?></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotations">
+                                <div class="card-body p-4 text-center">
+                                    <i class="feather-file-text fs-36 text-muted mb-2 d-block opacity-50"></i>
+                                    <h5 class="fw-bold text-dark fs-14">No Quotation Created Yet</h5>
+                                    <p class="text-muted fs-12 mb-3">Create a quotation for this deal to generate quotation sheets and track revisions.</p>
+                                    <div class="d-flex justify-content-center">
+                                        <a href="<?php echo e(route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1])); ?>" class="btn btn-sm btn-success fw-bold px-4 py-2 d-inline-flex align-items-center justify-content-center shadow-xs" style="width: auto !important; max-width: fit-content !important;">
+                                            <i class="feather-plus me-1.5 fs-13"></i>Create Quotation Now
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- QUOTATION REVISION HISTORY CHIP CARDS -->
+                        <?php if($deal->quotations->count() > 0): ?>
+                            <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionQuotationHistory">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h5 class="fs-13 text-dark fw-bold mb-0">
+                                            <i class="feather-git-commit me-1.5 text-primary"></i>Quotation Revision History
+                                        </h5>
+                                    </div>
+
+                                    <?php
+                                        $revisions = $activeQuotation ? $activeQuotation->getRevisionHistory() : $deal->quotations;
+                                    ?>
+
+                                    <?php if($revisions->count() > 0): ?>
+                                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                                            <?php $__currentLoopData = $revisions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $rev): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                <div class="d-flex align-items-center gap-2 p-2 border rounded bg-white" style="min-width: 170px; border-color: <?php echo e($activeQuotation && $rev->id === $activeQuotation->id ? '#3b82f6 !important' : '#e2e8f0'); ?> !important; transition: all 0.2s; position: relative; <?php echo e($activeQuotation && $rev->id === $activeQuotation->id ? 'box-shadow: 0 0 0 1px rgba(59,130,246,0.1); background-color: #f0f9ff !important;' : ''); ?>">
+                                                    <?php if($activeQuotation && $rev->id === $activeQuotation->id): ?>
+                                                        <span class="position-absolute top-0 end-0 translate-middle-y badge rounded-pill bg-primary fs-8 text-uppercase px-1" style="font-size: 8px !important; margin-right: 10px;">Viewing</span>
+                                                    <?php endif; ?>
+                                                    <div class="avatar-text avatar-sm bg-soft-secondary text-secondary rounded-circle fw-bold d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; font-size: 10px;">
+                                                        R<?php echo e($rev->revision_number); ?>
+
+                                                    </div>
+                                                    <div class="d-flex flex-column fs-11" style="font-family: 'Inter', sans-serif;">
+                                                        <a href="<?php echo e(route('crm.deals.show', ['deal' => $deal->id, 'quotation_id' => $rev->id])); ?>" class="fw-bold text-dark text-decoration-none">
+                                                            <?php echo e($rev->quotation_number); ?>
+
+                                                        </a>
+                                                        <span class="text-muted mt-0.5" style="font-size: 9px;">₹<?php echo e(number_format($rev->total_amount, 2)); ?></span>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- ==================== TAB 3: SALES ORDERS & REVENUE REALIZATION PANE ==================== -->
+                    <div class="tab-pane fade <?php echo e($isSalesOrdersTabActive ? 'show active' : ''); ?>" id="salesorders-pane" role="tabpanel">
+                        <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionSalesOrders">
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4">
+                                    <div>
+                                        <h5 class="fs-15 text-dark fw-bold mb-0"><i class="feather-shopping-cart text-success me-2"></i>Converted Sales Orders & Realized Revenue</h5>
+                                        <span class="text-muted fs-12">Track sales orders, order status, and billing generated from this deal.</span>
+                                    </div>
+                                    <?php if($activeQuotation && $activeQuotation->status === 'Accepted'): ?>
+                                        <a href="<?php echo e(route('sales.orders.create', ['quotation_id' => $activeQuotation->id])); ?>" class="btn btn-sm btn-success fw-bold px-3">
+                                            <i class="feather-plus me-1"></i>New Sales Order
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+
+                                <?php if($deal->salesOrders->isEmpty()): ?>
+                                    <div class="text-center py-5 text-muted border border-dashed rounded bg-light-50">
+                                        <i class="feather-shopping-bag fs-36 text-muted mb-2 d-block opacity-50"></i>
+                                        <h6 class="fw-bold text-dark fs-13">No Sales Orders Generated Yet</h6>
+                                        <p class="fs-12 text-muted max-w-md mx-auto">When a customer accepts a quotation for this deal, convert it into a Sales Order to track fulfillment and invoicing.</p>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="table-responsive">
+                                        <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'table']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'table']); ?>
+                                            <thead>
+                                                <tr>
+                                                    <th>Sales Order #</th>
+                                                    <th>Order Date</th>
+                                                    <th>Customer Name</th>
+                                                    <th>Total Amount (₹)</th>
+                                                    <th>Order Status</th>
+                                                    <th class="text-end pe-3">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="fs-13 text-dark">
+                                                <?php $__currentLoopData = $deal->salesOrders; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $so): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                    <tr>
+                                                        <td class="font-monospace fw-bold text-primary"><?php echo e($so->order_number); ?></td>
+                                                        <td><?php echo e($so->order_date ? \Illuminate\Support\Carbon::parse($so->order_date)->format('d/m/Y') : '—'); ?></td>
+                                                        <td class="fw-bold text-dark"><?php echo e($so->customer_name); ?></td>
+                                                        <td class="fw-bold text-success font-monospace">₹<?php echo e(number_format($so->total_amount, 2)); ?></td>
+                                                        <td>
+                                                            <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold">
+                                                                <?php echo e($so->status); ?>
+
+                                                            </span>
+                                                        </td>
+                                                        <td class="text-end pe-3">
+                                                            <a href="<?php echo e(route('sales.orders.show', $so)); ?>" class="btn btn-xs btn-soft-primary fw-bold">
+                                                                <i class="feather-eye me-1"></i>View Order
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                            </tbody>
+                                         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ==================== TAB 4: TIMELINE & AUDIT LOG PANE ==================== -->
+                    <div class="tab-pane fade" id="timeline-pane" role="tabpanel">
+                        <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
+                            <div class="card-body p-3">
+                                
+                                <!-- Subtabs Selector Row -->
+                                <div class="border-bottom pb-1 mb-3">
+                                    <ul class="nav nav-tabs border-bottom-0 zoho-timeline-subtabs" id="zohoTimelineSubTabs" role="tablist">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab">
+                                                History & Audit Stream
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab">
+                                                Interactions & Scheduled Calls
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                                
+                                <!-- Subtabs Content -->
+                                <div class="tab-content" id="zohoTimelineSubTabsContent">
+                                    
+                                    <!-- SUBTAB 1: HISTORY TIMELINE -->
+                                    <div class="tab-pane fade show active" id="subtab-history" role="tabpanel">
+                                        <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <h5 class="fw-bold text-dark fs-14 mb-0">Timeline History & Audit Stream</h5>
+                                            </div>
+                                        </div>
+
+                                        <div class="zoho-timeline-container">
+                                            <?php
+                                                $groupedHistory = $histories->groupBy(function($item) {
+                                                    return $item->created_at ? $item->created_at->format('d/m/Y') : date('d/m/Y');
+                                                });
+                                            ?>
+
+                                            <?php if($groupedHistory->isEmpty()): ?>
+                                                <div class="text-center py-5 text-muted border border-dashed rounded bg-white fs-12">
+                                                    <i class="feather-clock fs-24 mb-1.5 d-block text-muted opacity-50"></i>
+                                                    No history events recorded yet.
+                                                </div>
+                                            <?php else: ?>
+                                                <?php $__currentLoopData = $groupedHistory; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $date => $items): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                    <!-- Date Header -->
+                                                    <div class="zoho-timeline-date-group">
+                                                        <div class="zoho-timeline-date-header"><?php echo e($date); ?></div>
+                                                        
+                                                        <?php $__currentLoopData = $items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                            <!-- Timeline Row -->
+                                                            <div class="zoho-timeline-event d-flex align-items-start">
+                                                                <div class="zoho-timeline-line"></div>
+                                                                
+                                                                <?php
+                                                                    $icon = 'feather-info';
+                                                                    if ($item->event_type === 'created') $icon = 'feather-plus';
+                                                                    elseif ($item->event_type === 'assigned') $icon = 'feather-user';
+                                                                    elseif ($item->event_type === 'status_changed' || $item->event_type === 'status_updated') $icon = 'feather-refresh-cw';
+                                                                    elseif ($item->event_type === 'quotation_created') $icon = 'feather-file-text';
+                                                                    elseif ($item->event_type === 'activity_scheduled') $icon = 'feather-calendar';
+                                                                ?>
+                                                                <div class="zoho-timeline-icon">
+                                                                    <i class="<?php echo e($icon); ?>"></i>
+                                                                </div>
+
+                                                                <div class="zoho-timeline-content d-flex align-items-center justify-content-between w-100 ms-2">
+                                                                    <div>
+                                                                        <span class="fs-13 fw-semibold text-dark">
+                                                                            <?php echo e($item->notes ?: ucwords(str_replace('_', ' ', $item->event_type))); ?>
+
+                                                                        </span>
+                                                                        <?php if($item->old_value || $item->new_value): ?>
+                                                                            <span class="fs-11 text-muted ms-2 bg-light px-1.5 py-0.5 rounded border">
+                                                                                <?php if($item->old_value): ?>
+                                                                                    <del><?php echo e($item->old_value); ?></del> <i class="feather-arrow-right mx-0.5"></i>
+                                                                                <?php endif; ?>
+                                                                                <strong class="text-success"><?php echo e($item->new_value); ?></strong>
+                                                                            </span>
+                                                                        <?php endif; ?>
+                                                                        <div class="text-muted fs-11 mt-0.5">
+                                                                            by <?php echo e($item->user?->name ?: 'Demo Admin'); ?> <?php echo e($item->created_at ? $item->created_at->format('d/m/Y') : ''); ?>
+
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="zoho-timeline-time text-muted fs-11 ms-3" style="white-space: nowrap;">
+                                                                        <?php echo e($item->created_at ? $item->created_at->format('h:i A') : ''); ?>
+
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                                    </div>
+                                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+
+                                    <!-- SUBTAB 2: INTERACTIONS & ACTIVITIES -->
+                                    <div class="tab-pane fade" id="subtab-interactions" role="tabpanel">
+                                        <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
+                                            <h5 class="fw-bold text-dark fs-14 mb-0">Interactions / Scheduled Activities</h5>
+                                        </div>
+
+                                        <?php
+                                            $groupedFollowups = $followups->reject(function($item) {
+                                                return $item->status === 'Rescheduled' && $item->rescheduledTo->isNotEmpty();
+                                            })->groupBy(function($item) {
+                                                return $item->followup_date->format('d/m/Y');
+                                            });
+                                        ?>
+
+                                        <?php if($groupedFollowups->isEmpty()): ?>
+                                            <div class="text-center py-5 text-muted border border-dashed rounded-3 bg-light fs-12" style="border-color:#cbd5e1!important;">
+                                                <i class="feather-calendar fs-28 d-block mb-2 opacity-40"></i>
+                                                <span class="fw-semibold">No activities scheduled yet.</span><br>
+                                                <span class="fs-11">Click &ldquo;Schedule Activity&rdquo; to add one.</span>
+                                            </div>
+                                        <?php else: ?>
+                                            <?php $__currentLoopData = $groupedFollowups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $date => $items): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                <?php
+                                                    $hasNotConnected = $items->contains(fn($i) => $i->status === 'Not Connected');
+                                                    $hasCancelled    = $items->contains(fn($i) => $i->status === 'Cancelled');
+                                                    $hasCompleted    = $items->contains(fn($i) => $i->status === 'Completed');
+                                                    $hasRescheduled  = $items->contains(fn($i) => $i->status === 'Rescheduled');
+
+                                                    $dateBadgeBg     = '#eff6ff';
+                                                    $dateBadgeColor  = '#1d4ed8';
+                                                    $dateBadgeBorder = '#93c5fd';
+
+                                                    if ($hasNotConnected) {
+                                                        $dateBadgeBg     = '#fff7ed';
+                                                        $dateBadgeColor  = '#c2410c';
+                                                        $dateBadgeBorder = '#fdba74';
+                                                    } elseif ($hasCancelled) {
+                                                        $dateBadgeBg     = '#fef2f2';
+                                                        $dateBadgeColor  = '#b91c1c';
+                                                        $dateBadgeBorder = '#fca5a5';
+                                                    } elseif ($hasCompleted) {
+                                                        $dateBadgeBg     = '#f0fdf4';
+                                                        $dateBadgeColor  = '#15803d';
+                                                        $dateBadgeBorder = '#86efac';
+                                                    } elseif ($hasRescheduled) {
+                                                        $dateBadgeBg     = '#faf5ff';
+                                                        $dateBadgeColor  = '#6b21a8';
+                                                        $dateBadgeBorder = '#d8b4fe';
+                                                    }
+                                                ?>
+
+                                                <!-- Date Header -->
+                                                <div class="activity-date-group mb-3">
+                                                    <div class="activity-date-badge mb-2" style="background: <?php echo e($dateBadgeBg); ?>; color: <?php echo e($dateBadgeColor); ?>; border: 1px solid <?php echo e($dateBadgeBorder); ?>; font-weight: 700;">
+                                                        <i class="feather-calendar fs-10 me-1"></i><?php echo e($date); ?>
+
+                                                    </div>
+
+                                                    <?php $__currentLoopData = $items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                        <?php
+                                                            $actIcon = 'feather-phone-call';
+                                                            $actIconBg = 'bg-soft-primary';
+                                                            $actIconColor = 'text-primary';
+                                                            if($item->type === 'Email')   { $actIcon = 'feather-mail';    $actIconBg = 'bg-soft-warning'; $actIconColor = 'text-warning'; }
+                                                            elseif($item->type === 'Meeting') { $actIcon = 'feather-users';  $actIconBg = 'bg-soft-purple';  $actIconColor = 'text-purple'; }
+                                                            elseif($item->type === 'Demo')    { $actIcon = 'feather-monitor'; $actIconBg = 'bg-soft-danger';  $actIconColor = 'text-danger'; }
+
+                                                            $statusBadgeClass = 'bg-primary text-white';
+                                                            $statusLabel = 'Pending';
+                                                            if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = 'Connected'; }
+                                                            elseif($item->status === 'Not Connected') { $statusBadgeClass = 'bg-warning text-white'; $statusLabel = 'Not Connected'; }
+                                                            elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-danger text-white'; $statusLabel = 'Cancelled'; }
+                                                            elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-purple text-white'; $statusLabel = 'Rescheduled'; }
+                                                        ?>
+
+                                                        <div class="activity-card mb-2">
+                                                            <div class="activity-card-inner">
+
+                                                                <!-- Top row: Icon + Type + Time + Status -->
+                                                                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                                                    <div class="activity-type-icon <?php echo e($actIconBg); ?> <?php echo e($actIconColor); ?> flex-shrink-0">
+                                                                        <i class="<?php echo e($actIcon); ?>"></i>
+                                                                    </div>
+                                                                    <span class="fw-bold text-dark fs-13"><?php echo e(__('crm.activity_types.' . $item->type) ?? $item->type); ?></span>
+                                                                    <span class="activity-time-chip"><i class="feather-clock fs-9 me-1"></i><?php echo e($item->followup_date->format('h:i A')); ?></span>
+                                                                    <span class="badge rounded-pill <?php echo e($statusBadgeClass); ?> px-2.5 py-1 fs-10 fw-semibold" <?php if($item->status !== 'Pending'): ?> title="Status updated on <?php echo e($item->updated_at->format('d/m/Y h:i A')); ?>" <?php endif; ?>><?php echo e($statusLabel); ?></span>
+
+                                                                    <?php
+                                                                        $lastRescheduledDate = $item->rescheduledFrom?->followup_date;
+                                                                    ?>
+                                                                    <?php if($lastRescheduledDate): ?>
+                                                                        <span class="badge bg-soft-info text-info border border-info border-opacity-25 px-2 py-1 fs-10 fw-semibold ms-auto" title="Rescheduled from <?php echo e($lastRescheduledDate->format('d/m/Y h:i A')); ?>">
+                                                                            <i class="feather-refresh-cw me-1 fs-9"></i>Rescheduled from <?php echo e($lastRescheduledDate->format('d/m/Y h:i A')); ?>
+
+                                                                        </span>
+                                                                    <?php endif; ?>
+                                                                </div>
+
+                                                                <!-- Notes & Meeting / Calendar Buttons -->
+                                                                <?php
+                                                                    $rawNotes = $item->notes ?? '';
+                                                                    $meetUrlFromNotes = null;
+                                                                    $cleanNotes = $rawNotes;
+                                                                    if (preg_match('/(Google Meet:\s*)(https?:\/\/\S+)/i', $rawNotes, $m)) {
+                                                                        $meetUrlFromNotes = $m[2];
+                                                                        $cleanNotes = trim(preg_replace('/\n?Google Meet:\s*https?:\/\/\S+/i', '', $rawNotes));
+                                                                    }
+                                                                    $meetLink = $item->google_meet_link ?? $meetUrlFromNotes;
+                                                                    $calEventLink = null;
+                                                                    if (!empty($item->google_event_id) && !str_starts_with($item->google_event_id, 'g_evt_')) {
+                                                                        $calEventLink = 'https://calendar.google.com/calendar/r';
+                                                                    }
+                                                                ?>
+
+                                                                <?php if($cleanNotes): ?>
+                                                                    <div class="activity-notes">
+                                                                        <?php echo e($cleanNotes); ?>
+
+                                                                    </div>
+                                                                <?php endif; ?>
+
+                                                                <?php if($meetLink && $item->is_google_meet && $item->status === 'Pending'): ?>
+                                                                    <div class="mt-2 d-inline-block me-2">
+                                                                        <a href="<?php echo e($meetLink); ?>" target="_blank"
+                                                                           class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
+                                                                           style="background: linear-gradient(135deg, #1a73e8, #0d47a1); box-shadow: 0 2px 6px rgba(26,115,232,0.35);">
+                                                                            <i class="feather-video me-1"></i> Join Google Meet
+                                                                        </a>
+                                                                    </div>
+                                                                <?php endif; ?>
+
+                                                                <?php if($calEventLink): ?>
+                                                                    <div class="mt-2 d-inline-block">
+                                                                        <a href="<?php echo e($calEventLink); ?>" target="_blank"
+                                                                           class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
+                                                                           style="background: linear-gradient(135deg, #34a853, #1e7e34); box-shadow: 0 2px 6px rgba(52,168,83,0.35);">
+                                                                            <i class="feather-calendar me-1"></i> View in Google Calendar
+                                                                        </a>
+                                                                    </div>
+                                                                <?php endif; ?>
+
+                                                                <!-- Attribution -->
+                                                                <div class="activity-by mt-1 d-flex align-items-center flex-wrap gap-2">
+                                                                    <span>
+                                                                        <i class="feather-user fs-9 me-1"></i>by <?php echo e($deal->owner?->name ?: ($linkedLead?->owner?->name ?: 'System')); ?> &bull; Scheduled: <?php echo e($item->followup_date->format('d M Y, h:i A')); ?>
+
+                                                                    </span>
+                                                                    <?php if($item->taggedUsers->isNotEmpty()): ?>
+                                                                        <?php $__currentLoopData = $item->taggedUsers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $tUser): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                                            <span class="badge bg-soft-info text-info fs-10 px-2 py-1 border border-info border-opacity-25" title="Tagged User">
+                                                                                <i class="feather-at-sign me-1"></i>Tagged: <strong><?php echo e($tUser->name); ?></strong>
+                                                                            </span>
+                                                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                                                    <?php endif; ?>
+                                                                    <?php if($item->status !== 'Pending'): ?>
+                                                                        <span class="text-muted ms-auto fs-10">
+                                                                            <i class="feather-clock fs-9 me-1 text-primary"></i>Status Updated: <strong class="text-dark"><?php echo e($item->updated_at->format('d M Y, h:i A')); ?></strong>
+                                                                        </span>
+                                                                    <?php endif; ?>
+                                                                </div>
+
+                                                                <!-- Action Buttons — horizontal row at bottom, only for Pending -->
+                                                                <?php if($item->status === 'Pending'): ?>
+                                                                    <div class="activity-footer-actions d-flex gap-2 mt-3 d-print-none">
+                                                                        <!-- Connected -->
+                                                                        <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'button','variant' => 'soft-success','size' => 'sm','icon' => 'feather-phone-call','dataBsToggle' => 'modal','dataBsTarget' => '#statusModal_'.e($item->id).'_Completed']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'button','variant' => 'soft-success','size' => 'sm','icon' => 'feather-phone-call','data-bs-toggle' => 'modal','data-bs-target' => '#statusModal_'.e($item->id).'_Completed']); ?>Connected <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+
+                                                                        <!-- Not Connected -->
+                                                                        <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'button','variant' => 'soft-warning','size' => 'sm','icon' => 'feather-phone-off','dataBsToggle' => 'modal','dataBsTarget' => '#statusModal_'.e($item->id).'_NotConnected']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'button','variant' => 'soft-warning','size' => 'sm','icon' => 'feather-phone-off','data-bs-toggle' => 'modal','data-bs-target' => '#statusModal_'.e($item->id).'_NotConnected']); ?>Not Connected <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+
+                                                                        <!-- Cancelled -->
+                                                                        <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'button','variant' => 'soft-danger','size' => 'sm','icon' => 'feather-x-circle','dataBsToggle' => 'modal','dataBsTarget' => '#statusModal_'.e($item->id).'_Cancelled']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'button','variant' => 'soft-danger','size' => 'sm','icon' => 'feather-x-circle','data-bs-toggle' => 'modal','data-bs-target' => '#statusModal_'.e($item->id).'_Cancelled']); ?>Cancelled <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+
+                                                                        <!-- Reschedule -->
+                                                                        <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'button','variant' => 'soft-primary','size' => 'sm','icon' => 'feather-refresh-cw','dataBsToggle' => 'modal','dataBsTarget' => '#rescheduleModal_'.e($item->id).'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'button','variant' => 'soft-primary','size' => 'sm','icon' => 'feather-refresh-cw','data-bs-toggle' => 'modal','data-bs-target' => '#rescheduleModal_'.e($item->id).'']); ?>Reschedule <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+                                                                    </div>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                        </div>
+
+                                                        <?php if($item->status === 'Pending'): ?>
+                                                            <?php
+                                                                $currentTaggedIds = $item->taggedUsers->pluck('id')->toArray();
+                                                            ?>
+
+                                                            <!-- Status Modal: Connected / Completed -->
+                                                            <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['id' => 'statusModal_' . $item->id . '_Completed','title' => 'Update Activity: Mark as Connected','size' => 'md','centered' => true,'formAction' => route('crm.followups.update', $item->id),'formMethod' => 'PUT','submitText' => 'Save &amp; Mark Connected','closeText' => __('crm.cancel')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute('statusModal_' . $item->id . '_Completed'),'title' => 'Update Activity: Mark as Connected','size' => 'md','centered' => true,'formAction' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(route('crm.followups.update', $item->id)),'formMethod' => 'PUT','submitText' => 'Save &amp; Mark Connected','closeText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(__('crm.cancel'))]); ?>
+                                                                <input type="hidden" name="status" value="Completed">
+                                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'select','label' => 'Tag / Assign Persons','name' => 'tagged_user_ids[]','multiple' => true,'searchable' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'select','label' => 'Tag / Assign Persons','name' => 'tagged_user_ids[]','multiple' => true,'searchable' => true]); ?>
+                                                                    <?php $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $u): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                                        <option value="<?php echo e($u->id); ?>" <?php if(in_array($u->id, $currentTaggedIds)): echo 'selected'; endif; ?>><?php echo e($u->name); ?> (<?php echo e($u->email); ?>)</option>
+                                                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                                                 <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'textarea','label' => 'Notes / Discussion Summary','name' => 'notes','rows' => '3','placeholder' => 'Enter notes or discussion outcome...']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'textarea','label' => 'Notes / Discussion Summary','name' => 'notes','rows' => '3','placeholder' => 'Enter notes or discussion outcome...']); ?><?php echo e($item->notes); ?> <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+
+                                                            <!-- Status Modal: Not Connected -->
+                                                            <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['id' => 'statusModal_' . $item->id . '_NotConnected','title' => 'Update Activity: Mark as Not Connected','size' => 'md','centered' => true,'formAction' => route('crm.followups.update', $item->id),'formMethod' => 'PUT','submitText' => 'Save Status','closeText' => __('crm.cancel')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute('statusModal_' . $item->id . '_NotConnected'),'title' => 'Update Activity: Mark as Not Connected','size' => 'md','centered' => true,'formAction' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(route('crm.followups.update', $item->id)),'formMethod' => 'PUT','submitText' => 'Save Status','closeText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(__('crm.cancel'))]); ?>
+                                                                <input type="hidden" name="status" value="Not Connected">
+                                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'select','label' => 'Tag / Assign Persons','name' => 'tagged_user_ids[]','multiple' => true,'searchable' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'select','label' => 'Tag / Assign Persons','name' => 'tagged_user_ids[]','multiple' => true,'searchable' => true]); ?>
+                                                                    <?php $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $u): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                                        <option value="<?php echo e($u->id); ?>" <?php if(in_array($u->id, $currentTaggedIds)): echo 'selected'; endif; ?>><?php echo e($u->name); ?> (<?php echo e($u->email); ?>)</option>
+                                                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                                                 <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'textarea','label' => 'Notes / Reason','name' => 'notes','rows' => '3','placeholder' => 'Reason / notes...']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'textarea','label' => 'Notes / Reason','name' => 'notes','rows' => '3','placeholder' => 'Reason / notes...']); ?><?php echo e($item->notes); ?> <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+
+                                                            <!-- Status Modal: Cancelled -->
+                                                            <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['id' => 'statusModal_' . $item->id . '_Cancelled','title' => 'Update Activity: Cancel Activity','size' => 'md','centered' => true,'formAction' => route('crm.followups.update', $item->id),'formMethod' => 'PUT','submitText' => 'Confirm Cancel','closeText' => __('crm.cancel')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute('statusModal_' . $item->id . '_Cancelled'),'title' => 'Update Activity: Cancel Activity','size' => 'md','centered' => true,'formAction' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(route('crm.followups.update', $item->id)),'formMethod' => 'PUT','submitText' => 'Confirm Cancel','closeText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(__('crm.cancel'))]); ?>
+                                                                <input type="hidden" name="status" value="Cancelled">
+                                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'select','label' => 'Tag / Assign Persons','name' => 'tagged_user_ids[]','multiple' => true,'searchable' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'select','label' => 'Tag / Assign Persons','name' => 'tagged_user_ids[]','multiple' => true,'searchable' => true]); ?>
+                                                                    <?php $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $u): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                                        <option value="<?php echo e($u->id); ?>" <?php if(in_array($u->id, $currentTaggedIds)): echo 'selected'; endif; ?>><?php echo e($u->name); ?> (<?php echo e($u->email); ?>)</option>
+                                                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                                                 <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'textarea','label' => 'Cancellation Note','name' => 'notes','rows' => '3','placeholder' => 'Reason for cancellation...']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'textarea','label' => 'Cancellation Note','name' => 'notes','rows' => '3','placeholder' => 'Reason for cancellation...']); ?><?php echo e($item->notes); ?> <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+
+                                                            <!-- Reschedule Modal -->
+                                                            <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['id' => 'rescheduleModal_' . $item->id,'title' => 'Reschedule Activity','size' => 'md','centered' => true,'formAction' => route('crm.followups.update', $item->id),'formMethod' => 'PUT','submitText' => 'Confirm Reschedule','closeText' => __('crm.cancel')]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute('rescheduleModal_' . $item->id),'title' => 'Reschedule Activity','size' => 'md','centered' => true,'formAction' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(route('crm.followups.update', $item->id)),'formMethod' => 'PUT','submitText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute('Confirm Reschedule'),'closeText' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(__('crm.cancel'))]); ?>
+                                                                <input type="hidden" name="is_reschedule" value="1">
+                                                                <p class="text-muted fs-11 mb-3">
+                                                                    <i class="<?php echo e($actIcon); ?> me-1"></i>
+                                                                    <?php echo e(__('crm.activity_types.' . $item->type) ?? $item->type); ?>
+
+                                                                    &bull; Current: <strong><?php echo e($item->followup_date->format('d M Y, h:i A')); ?></strong>
+                                                                </p>
+                                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'input','inputType' => 'datetime-local','label' => 'New Date & Time','name' => 'followup_date','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','inputType' => 'datetime-local','label' => 'New Date & Time','name' => 'followup_date','required' => true]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'select','label' => 'Tag / Assign Persons','name' => 'tagged_user_ids[]','multiple' => true,'searchable' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'select','label' => 'Tag / Assign Persons','name' => 'tagged_user_ids[]','multiple' => true,'searchable' => true]); ?>
+                                                                    <?php $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $u): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                                        <option value="<?php echo e($u->id); ?>" <?php if(in_array($u->id, $currentTaggedIds)): echo 'selected'; endif; ?>><?php echo e($u->name); ?> (<?php echo e($u->email); ?>)</option>
+                                                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                                                 <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                                <?php if (isset($component)) { $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.odoo-form-ui','data' => ['type' => 'textarea','label' => 'Note (optional)','name' => 'notes','rows' => '2','placeholder' => 'Reason for rescheduling...']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.odoo-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'textarea','label' => 'Note (optional)','name' => 'notes','rows' => '2','placeholder' => 'Reason for rescheduling...']); ?><?php echo e($item->notes); ?> <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $attributes = $__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__attributesOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6)): ?>
+<?php $component = $__componentOriginal97bd759350b8b718a90f0e091d8cfaa6; ?>
+<?php unset($__componentOriginal97bd759350b8b718a90f0e091d8cfaa6); ?>
+<?php endif; ?>
+                                                             <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+                                                        <?php endif; ?>
+                                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                                </div>
+                                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                        <?php endif; ?>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Offcanvas Drawer: Deal Followup / Schedule Activity -->
+    <div class="offcanvas offcanvas-end border-0 shadow-lg d-print-none" tabindex="-1" id="dealFollowupOffcanvas" aria-labelledby="dealFollowupOffcanvasLabel" style="width: 490px; max-width: 92vw;">
+        <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle">
+                    <i class="feather-calendar"></i>
+                </div>
+                <div>
+                    <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="dealFollowupOffcanvasTitle">Log / Schedule Activity for <?php echo e($deal->title); ?></h5>
+                    <span class="text-muted fs-11">Log interaction & next followup or schedule activity</span>
+                </div>
+            </div>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        
+        <div class="offcanvas-body p-4 bg-white">
+            <form action="<?php echo e(route('crm.deals.followups.store', $deal->id)); ?>" method="POST" id="dealFollowupForm" enctype="multipart/form-data">
+                <?php echo csrf_field(); ?>
+                <input type="hidden" name="action_mode" id="dealOffcanvasActionMode" value="log_note">
+
+                <!-- 2-Mode Switcher Tabs -->
+                <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
+                        LOG DISCUSSION & NEXT
+                    </button>
+                    <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn" data-mode="schedule" style="font-size: 12px; padding: 8px 6px; color: #64748b; background-color: transparent; border-radius: 6px; transition: all 0.2s ease;">
+                        DIRECT SCHEDULE ACTIVITY
+                    </button>
+                </div>
+
+                <!-- Past Interaction Section (Tab 1: Log Activity) -->
+                <div id="dealSectionPastInteraction">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up / Interaction Type</label>
+                        <select name="type" id="dealOffcanvasFollowupType" class="form-select form-select-sm shadow-2xs">
+                            <option value="Call">Call</option>
+                            <option value="Email">Email</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Follow Up Status / Outcome</label>
+                        <select name="status" id="dealOffcanvasFollowupStatus" class="form-select form-select-sm shadow-2xs">
+                            <option value="Connected">Connected</option>
+                            <option value="Not Connected">Not Connected</option>
+                            <option value="Not Answering">Not Answering</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Discussion Notes / Summary</label>
+                        <textarea name="notes" id="dealOffcanvasNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Write discussion notes..."></textarea>
+                    </div>
+
+                    <!-- Next Follow-up Section inside Log Mode -->
+                    <div class="border-top pt-3 mt-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="fs-12 fw-bold text-dark mb-0">
+                                <i class="feather-calendar text-primary me-1"></i> NEXT ACTIVITY SCHEDULE
+                            </h6>
+                            <button type="button" class="btn btn-xs btn-outline-primary fw-bold px-2.5 py-1 rounded-pill d-inline-flex align-items-center gap-1" id="btnToggleDealNextScheduleShow">
+                                <i class="feather-plus fs-11" id="iconToggleDealNextScheduleShow"></i>
+                                <span id="textToggleDealNextScheduleShow">Schedule Next Activity</span>
+                            </button>
+                        </div>
+                        
+                        <div id="containerDealNextScheduleFieldsShow" class="mt-3 p-3 bg-light rounded-3 border" style="display: none;">
+                            <div class="mb-2">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Title</label>
+                                <input type="text" name="next_title" id="dealOffcanvasNextTitle" class="form-control form-control-sm shadow-2xs" placeholder="e.g. Followup Call / Next Meeting" value="">
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-dark fs-12 mb-1">Next Activity Type</label>
+                                    <select name="next_activity_type" id="dealOffcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
+                                        <option value="Call">Call</option>
+                                        <option value="Meeting">Meeting</option>
+                                        <option value="Demo">Demo</option>
+                                        <option value="Email">Email</option>
+                                        <option value="WhatsApp">WhatsApp</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label fw-bold text-dark fs-12 mb-1">Next Duration (Mins)</label>
+                                    <select name="next_duration_minutes" id="dealOffcanvasNextDuration" class="form-select form-select-sm shadow-2xs">
+                                        <option value="15">15 Mins</option>
+                                        <option value="30" selected>30 Mins</option>
+                                        <option value="45">45 Mins</option>
+                                        <option value="60">60 Mins (1 Hr)</option>
+                                        <option value="90">90 Mins</option>
+                                        <option value="120">120 Mins</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">Next Follow-up Date & Time (Optional)</label>
+                                <input type="datetime-local" name="next_followup_date" id="dealOffcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs">
+                            </div>
+
+                            <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="dealOffcanvasNextSyncGoogle" style="cursor: pointer;">
+                                                <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                            </label>
+                                            <input type="hidden" name="next_sync_google_calendar" value="0">
+                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_sync_google_calendar" value="1" id="dealOffcanvasNextSyncGoogle" style="cursor: pointer;">
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-check form-switch mb-0 p-2 border rounded-2 bg-light d-flex align-items-center justify-content-between" style="min-height: 38px;">
+                                            <label class="form-check-label fw-bold fs-11 text-dark mb-0 pe-1" for="dealOffcanvasNextCreateMeet" style="cursor: pointer;">
+                                                <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                            </label>
+                                            <input type="hidden" name="next_create_meet_link" value="0">
+                                            <input class="form-check-input ms-0 mt-0" type="checkbox" name="next_create_meet_link" value="1" id="dealOffcanvasNextCreateMeet" style="cursor: pointer;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <?php if (isset($component)) { $__componentOriginaldf1f99de66ac317a6ea2e0e954484031 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal-form-ui','data' => ['type' => 'input','name' => 'next_guest_emails','id' => 'dealOffcanvasNextGuestEmails','label' => 'Guest / Attendee Emails','placeholder' => 'e.g. client@company.com (comma separated)']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','name' => 'next_guest_emails','id' => 'dealOffcanvasNextGuestEmails','label' => 'Guest / Attendee Emails','placeholder' => 'e.g. client@company.com (comma separated)']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $attributes = $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $component = $__componentOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+
+                            <div class="mt-3">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">Tag / Assign Persons</label>
+                                <select name="tagged_user_ids[]" id="dealOffcanvasTagUser" class="form-select form-select-sm shadow-2xs" multiple data-placeholder="Select persons to tag...">
+                                    <?php $__currentLoopData = ($users ?? \App\Models\User::orderBy('name')->get()); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $u): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($u->id); ?>"><?php echo e($u->name); ?> (<?php echo e($u->email); ?>)</option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direct Schedule Section (Tab 2: Schedule Activity) -->
+                <div id="dealSectionDirectSchedule" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Event / Meeting Title</label>
+                        <input type="text" name="title" id="dealOffcanvasEventTitle" class="form-control form-control-sm shadow-2xs" placeholder="e.g. CRM Followup Call / Client Demo" value="CRM Followup Call">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Activity Type <span class="text-danger">*</span></label>
+                        <select name="schedule_type" id="dealOffcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#dealOffcanvasFollowupType').val(this.value)">
+                            <option value="Call">Call</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Demo">Demo</option>
+                            <option value="Email">Email</option>
+                            <option value="WhatsApp">WhatsApp</option>
+                        </select>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Due Date & Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" name="followup_date" id="dealOffcanvasFollowupDate" class="form-control form-control-sm shadow-2xs">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold text-dark fs-12 mb-1">Duration (Minutes)</label>
+                            <select name="duration_minutes" id="dealOffcanvasDuration" class="form-select form-select-sm shadow-2xs">
+                                <option value="15">15 Mins</option>
+                                <option value="30" selected>30 Mins</option>
+                                <option value="45">45 Mins</option>
+                                <option value="60">60 Mins (1 Hr)</option>
+                                <option value="90">90 Mins</option>
+                                <option value="120">120 Mins</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border mb-3 shadow-2xs">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="sync_google_calendar" value="1" id="dealOffcanvasSyncGoogle" checked>
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasSyncGoogle">
+                                    <i class="feather-calendar text-danger me-1"></i> Google Calendar
+                                </label>
+                            </div>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" name="create_meet_link" value="1" id="dealOffcanvasCreateMeet">
+                                <label class="form-check-label fw-bold fs-12 text-dark" for="dealOffcanvasCreateMeet">
+                                    <i class="feather-video text-primary me-1"></i> Google Meet Video
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Guest / Attendee Emails</label>
+                        <input type="text" name="guest_emails" id="dealOffcanvasGuestEmails" class="form-control form-control-sm shadow-2xs" placeholder="e.g. client@company.com (comma separated)">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-12 mb-1">Description / Plan</label>
+                        <textarea name="schedule_notes" id="dealOffcanvasScheduleNotes" rows="3" class="form-control form-control-sm shadow-2xs" placeholder="Agenda / plan for upcoming activity..." oninput="$('#dealOffcanvasNotes').val(this.value)"></textarea>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark fs-12 mb-1">Deal Stage</label>
+                    <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
+                        <?php
+                            $dStatuses = $dealStatuses ?? \App\Domains\CRM\Models\DealStatus::getOrderedStatuses();
+                        ?>
+                        <?php $__currentLoopData = $dStatuses; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $stg): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($stg->name); ?>" <?php if(old('stage', $deal->stage) === $stg->name): echo 'selected'; endif; ?>><?php echo e($stg->name); ?></option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </select>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
+                    <button type="button" class="btn btn-light border px-4 py-2 fs-13 fw-bold text-uppercase" data-bs-dismiss="offcanvas">CLOSE</button>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fs-13 fw-bold text-uppercase shadow-sm">SAVE</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <?php $__env->startPush('scripts'); ?>
+    <script>
+        function submitDealStage(stageVal) {
+            document.getElementById('dealStageInput').value = stageVal;
+            document.getElementById('dealStageForm').submit();
+        }
+
+        $(document).ready(function() {
+            const crmProductsList = <?php echo json_encode($products ?? [], 15, 512) ?>;
+            let rowIndex = 0;
+
+            function buildProductOptions(selectedId = '') {
+                let opts = '<option value="">Select Product...</option>';
+                crmProductsList.forEach(function(p) {
+                    const sel = (p.id == selectedId) ? ' selected' : '';
+                    opts += `<option value="${p.id}" data-selling-price="${p.selling_price || 0}"${sel}>${p.name} ${p.sku ? '('+p.sku+')' : ''}</option>`;
+                });
+                return opts;
+            }
+
+            function getRowHtml(index, selectedId = '') {
+                return `
+                    <tr class="item-row" data-row-id="${index}">
+                        <td class="ps-2">
+                            <select name="items[${index}][product_id]" class="odoo-table-select odoo-select2 item-name-input erp-premium-select" required data-master="product" style="width:100%;">
+                                ${buildProductOptions(selectedId)}
+                            </select>
+                            <div class="description-container mt-2" id="desc-container-${index}" style="display: none;">
+                                <textarea name="items[${index}][description]" class="form-control odoo-table-input" placeholder="Scope details / custom specifications..." rows="2"></textarea>
+                            </div>
+                            <a href="javascript:void(0)" class="toggle-desc-btn text-primary fs-11 mt-1 d-inline-block" data-row-id="${index}">
+                                <i class="feather-plus me-1"></i>Add Description
+                            </a>
+                        </td>
+                        <td>
+                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
+                        </td>
+                        <td>
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
+                        </td>
+                        <td>
+                            <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
+                        </td>
+                        <td class="text-end fw-bold text-dark amount-display pe-3" style="font-size: 13px; padding-top: 8px;">
+                            ₹0.00
+                        </td>
+                        <td class="text-center" style="padding-top: 6px;">
+                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn">
+                                <i class="feather-trash-2"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            $(document).on('click', '.toggle-desc-btn', function(e) {
+                e.preventDefault();
+                const idx = $(this).data('row-id');
+                const container = $('#desc-container-' + idx);
+                if (container.is(':visible')) {
+                    container.slideUp(120);
+                    container.find('textarea').val('');
+                    $(this).html('<i class="feather-plus me-1"></i>Add Description');
+                } else {
+                    container.slideDown(120);
+                    $(this).html('<i class="feather-minus me-1"></i>Remove Description');
+                }
+            });
+
+            $(document).on('click', '.remove-row-btn', function() {
+                if ($('.item-row').length > 1) {
+                    $(this).closest('tr').remove();
+                    calculateTotals();
+                }
+            });
+
+            $(document).on('input change', '.qty-input, .price-input, .tax-input, #discountInput', function() {
+                calculateTotals();
+            });
+
+            function addRow(item = null) {
+                const selectedId = item ? (item.product_id || '') : '';
+                const newRow = $(getRowHtml(rowIndex, selectedId));
+                $('#itemsTable tbody').append(newRow);
+
+                newRow.find('.item-name-input').select2({
+                    theme: "bootstrap-5",
+                    width: "100%"
+                });
+
+                if (item) {
+                    newRow.find('textarea').val(item.description || '');
+                    if (item.description) {
+                        $('#desc-container-' + rowIndex).show();
+                        newRow.find('.toggle-desc-btn').html('<i class="feather-minus me-1"></i>Remove Description');
+                    }
+                    newRow.find('.qty-input').val(item.quantity);
+                    let finalUnitPrice = parseFloat(item.unit_price);
+                    if (isNaN(finalUnitPrice) || finalUnitPrice === 0) {
+                        const foundProd = crmProductsList.find(p => p.id == item.product_id);
+                        if (foundProd && parseFloat(foundProd.selling_price) > 0) {
+                            finalUnitPrice = parseFloat(foundProd.selling_price);
+                        } else {
+                            finalUnitPrice = 0.00;
+                        }
+                    }
+                    newRow.find('.price-input').val(finalUnitPrice.toFixed(2));
+                    newRow.find('.tax-input').val(item.tax_rate);
+                }
+
+                newRow.find('.item-name-input').on('change', function() {
+                    const selectedOption = $(this).find('option:selected');
+                    const sellingPrice = parseFloat(selectedOption.attr('data-selling-price')) || 0;
+                    $(this).closest('tr').find('.price-input').val(sellingPrice.toFixed(2));
+                    calculateTotals();
+                });
+
+                rowIndex++;
+                calculateTotals();
+            }
+
+            function calculateTotals() {
+                let subtotal = 0;
+                let taxTotal = 0;
+
+                $('.item-row').each(function() {
+                    const qty = parseInt($(this).find('.qty-input').val()) || 0;
+                    const price = parseFloat($(this).find('.price-input').val()) || 0;
+                    const taxRate = parseFloat($(this).find('.tax-input').val()) || 0;
+
+                    const amount = qty * price;
+                    const tax = amount * (taxRate / 100);
+
+                    subtotal += amount;
+                    taxTotal += tax;
+
+                    $(this).find('.amount-display').text('₹' + amount.toFixed(2));
+                });
+
+                const discount = parseFloat($('#discountInput').val()) || 0;
+                const grandTotal = subtotal + taxTotal - discount;
+
+                $('#calcSubtotal').text('₹' + subtotal.toFixed(2));
+                $('#calcTax').text('₹' + taxTotal.toFixed(2));
+                $('#calcTotal').text('₹' + Math.max(0, grandTotal).toFixed(2));
+            }
+
+            $('#addItemRow').on('click', function() { addRow(); });
+
+            const hasCreateQ = <?php echo json_encode(request()->has('create_quotation') || old('form_type') === 'quotation_create', 15, 512) ?>;
+            const hasEditQ = <?php echo json_encode(request()->has('edit_quotation') || old('form_type') === 'quotation_edit', 15, 512) ?>;
+            const prefilledDealItems = <?php echo json_encode($prefilledDealItems ?? [], 15, 512) ?>;
+            const existingItems = <?php echo json_encode(old('items') ?: (request()->has('create_quotation') && !empty($prefilledDealItems) ? $prefilledDealItems : (isset($activeQuotation) ? $activeQuotation->items : [])), 15, 512) ?>;
+
+            if (hasCreateQ || hasEditQ) {
+                if (existingItems && existingItems.length > 0) {
+                    existingItems.forEach(function(item) {
+                        addRow(item);
+                    });
+                } else {
+                    addRow();
+                }
+            }
+
+            // Scroll Spy for Overview Sections
+            let isManualClick = false;
+            $('#zohoMainScrollable').on('scroll', function() {
+                if (isManualClick) return;
+                const scrollContainer = this;
+                const containerTop = scrollContainer.getBoundingClientRect().top;
+                const stickyHeader = document.querySelector('.sticky-top');
+                const stickyHeaderHeight = stickyHeader ? stickyHeader.offsetHeight : 50;
+
+                const sections = ['#sectionDealInfo', '#sectionCustomerCard', '#sectionNotes', '#sectionDocuments'];
+                let currentSection = null;
+
+                sections.forEach(function(secId) {
+                    const el = document.querySelector(secId);
+                    if (el) {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.top - containerTop <= stickyHeaderHeight + 60) {
+                            currentSection = secId;
+                        }
+                    }
+                });
+
+                if (currentSection && $('#overview-pane').hasClass('active')) {
+                    $('#zohoSidebarLinks a').removeClass('active');
+                    $('#zohoSidebarLinks a[href="' + currentSection + '"]').addClass('active');
+                }
+            });
+
+            let pendingScrollTarget = null;
+
+            function scrollToTarget(targetHash) {
+                if (!targetHash) return;
+                const targetEl = document.querySelector(targetHash);
+                const scrollContainer = document.getElementById('zohoMainScrollable');
+                if (targetEl && scrollContainer) {
+                    const containerTop = scrollContainer.getBoundingClientRect().top;
+                    const targetTop = targetEl.getBoundingClientRect().top;
+                    const stickyHeader = document.querySelector('.sticky-top');
+                    const stickyHeaderHeight = stickyHeader ? (stickyHeader.offsetHeight + 10) : 65;
+                    const offset = targetTop - containerTop + scrollContainer.scrollTop - stickyHeaderHeight;
+                    scrollContainer.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+                } else if (scrollContainer && (targetHash === '#sectionQuotations' || targetHash === '#sectionSalesOrders')) {
+                    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
+
+            // Smooth Related List Sidebar Navigation & Tab Synchronization
+            $('#zohoSidebarLinks a').on('click', function(e) {
+                e.preventDefault();
+                const targetHash = $(this).attr('href');
+                
+                $('#zohoSidebarLinks a').removeClass('active');
+                $(this).addClass('active');
+                isManualClick = true;
+
+                // 1. Identify Target Main Tab and Subtab
+                let targetTabBtnId = null;
+                let targetSubtabBtnId = null;
+
+                if (['#sectionDealInfo', '#sectionCustomerCard', '#sectionNotes', '#sectionDocuments'].includes(targetHash)) {
+                    targetTabBtnId = 'overview-tab';
+                } else if (targetHash === '#sectionQuotations' || targetHash === '#sectionQuotationHistory') {
+                    targetTabBtnId = 'quotations-tab';
+                } else if (targetHash === '#sectionSalesOrders') {
+                    targetTabBtnId = 'salesorders-tab';
+                } else if (targetHash === '#subtab-interactions' || targetHash === '#subtab-history') {
+                    targetTabBtnId = 'timeline-tab';
+                    targetSubtabBtnId = (targetHash === '#subtab-interactions') ? 'subtab-interactions-tab' : 'subtab-history-tab';
+                }
+
+                // 2. Subtab handling if applicable
+                if (targetSubtabBtnId) {
+                    const subtabBtn = document.getElementById(targetSubtabBtnId);
+                    if (subtabBtn) {
+                        bootstrap.Tab.getOrCreateInstance(subtabBtn).show();
+                    }
+                }
+
+                // 3. Main Tab activation & Scrolling
+                const tabBtn = document.getElementById(targetTabBtnId);
+                const isAlreadyActive = tabBtn && tabBtn.classList.contains('active');
+
+                pendingScrollTarget = targetHash;
+
+                if (isAlreadyActive) {
+                    scrollToTarget(targetHash);
+                    pendingScrollTarget = null;
+                    setTimeout(function() { isManualClick = false; }, 400);
+                } else if (tabBtn) {
+                    bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+                }
+            });
+
+            // Tab state persistence logic
+            var activeTabKey = 'deal_active_tab_' + <?php echo e($deal->id); ?>;
+            var activeSubTabKey = 'deal_active_subtab_' + <?php echo e($deal->id); ?>;
+
+            const isQTabActive = <?php echo json_encode($isQuotationTabActive, 15, 512) ?>;
+            const isSOTabActive = <?php echo json_encode($isSalesOrdersTabActive, 15, 512) ?>;
+            if (isQTabActive) {
+                localStorage.setItem(activeTabKey, 'quotations-tab');
+            } else if (isSOTabActive) {
+                localStorage.setItem(activeTabKey, 'salesorders-tab');
+            }
+
+            // Check URL Hash first if present
+            var hash = window.location.hash;
+            if (hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
+                localStorage.setItem(activeTabKey, 'timeline-tab');
+                if (hash === '#subtab-interactions') {
+                    localStorage.setItem(activeSubTabKey, 'subtab-interactions-tab');
+                } else if (hash === '#subtab-history') {
+                    localStorage.setItem(activeSubTabKey, 'subtab-history-tab');
+                }
+            } else if (hash === '#overview' || hash === '#overview-pane') {
+                localStorage.setItem(activeTabKey, 'overview-tab');
+            } else if (hash === '#quotations' || hash === '#quotations-pane') {
+                localStorage.setItem(activeTabKey, 'quotations-tab');
+            } else if (hash === '#salesorders' || hash === '#salesorders-pane') {
+                localStorage.setItem(activeTabKey, 'salesorders-tab');
+            }
+
+            // Restore saved tab from localStorage
+            var savedTabId = localStorage.getItem(activeTabKey);
+            if (savedTabId && $('#' + savedTabId).length) {
+                setTimeout(function() {
+                    var mainTabEl = document.getElementById(savedTabId);
+                    if (mainTabEl) {
+                        bootstrap.Tab.getOrCreateInstance(mainTabEl).show();
+                    }
+                    
+                    if (savedTabId === 'timeline-tab') {
+                        var savedSubTabId = localStorage.getItem(activeSubTabKey) || 'subtab-interactions-tab';
+                        var subTabEl = document.getElementById(savedSubTabId);
+                        if (subTabEl) {
+                            bootstrap.Tab.getOrCreateInstance(subTabEl).show();
+                        }
+                    }
+                }, 50);
+            }
+
+            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], a[data-bs-toggle="tab"]', function (e) {
+                if (e.target.id) {
+                    if (['overview-tab', 'timeline-tab', 'quotations-tab', 'salesorders-tab'].includes(e.target.id)) {
+                        localStorage.setItem(activeTabKey, e.target.id);
+                    } else if (['subtab-history-tab', 'subtab-interactions-tab'].includes(e.target.id)) {
+                        localStorage.setItem(activeSubTabKey, e.target.id);
+                        localStorage.setItem(activeTabKey, 'timeline-tab');
+                    }
+                }
+            });
+
+            // Perform scroll once top tab is fully shown
+            $('#zohoDealTabs button[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {
+                if (pendingScrollTarget) {
+                    const targetToScroll = pendingScrollTarget;
+                    pendingScrollTarget = null;
+                    setTimeout(function() {
+                        scrollToTarget(targetToScroll);
+                        setTimeout(function() { isManualClick = false; }, 400);
+                    }, 60);
+                } else {
+                    const targetPaneId = $(e.target).attr('data-bs-target');
+                    if (targetPaneId === '#overview-pane') {
+                        $('#zohoSidebarLinks a').removeClass('active');
+                        $('#zohoSidebarLinks a[href="#sectionDealInfo"]').addClass('active');
+                    } else if (targetPaneId === '#quotations-pane') {
+                        $('#zohoSidebarLinks a').removeClass('active');
+                        $('#zohoSidebarLinks a[href="#sectionQuotations"]').addClass('active');
+                    } else if (targetPaneId === '#salesorders-pane') {
+                        $('#zohoSidebarLinks a').removeClass('active');
+                        $('#zohoSidebarLinks a[href="#sectionSalesOrders"]').addClass('active');
+                    } else if (targetPaneId === '#timeline-pane') {
+                        $('#zohoSidebarLinks a').removeClass('active');
+                        $('#zohoSidebarLinks a[href="#subtab-history"]').addClass('active');
+                    }
+                }
+            });
+
+            const dealDocUploadBtn = $('#dealDocUploadBtn');
+            const dealDocInput = $('#dealDocInput');
+
+            dealDocUploadBtn.on('click', function() {
+                dealDocInput.trigger('click');
+            });
+
+            dealDocInput.on('change', function() {
+                if (this.files.length > 0) {
+                    $(this).closest('form').submit();
+                }
+            });
+        });
+
+        window.enableDealRequirementEdit = function() {
+            $('#viewDealRequirementBlock').hide();
+            $('#editDealRequirementBlock').show();
+            var input = $('#dealRequirementInput');
+            input.focus();
+            if (input.val()) {
+                var len = input.val().length;
+                input[0].setSelectionRange(len, len);
+            }
+            updateDealReqCharCount(input[0]);
+        };
+
+        window.cancelDealRequirementEdit = function() {
+            $('#editDealRequirementBlock').hide();
+            $('#viewDealRequirementBlock').show();
+        };
+
+        window.updateDealReqCharCount = function(el) {
+            var len = el ? el.value.length : 0;
+            $('#dealReqCharCounter').text(len + ' chars');
+        };
+
+        function escapeDealHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        $(document).on('keydown', '#dealRequirementInput', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
+                e.preventDefault();
+                $('#ajaxDealRequirementForm').submit();
+            }
+        });
+
+        $(document).on('submit', '#ajaxDealRequirementForm', function(e) {
+            e.preventDefault();
+            var form = $(this);
+            var btn = $('#btnSaveDealRequirement');
+            var originalHtml = btn.html();
+
+            btn.attr('disabled', true).html('<i class="feather-loader me-1"></i> SAVING...');
+
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST',
+                data: form.serialize(),
+                dataType: 'json',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                success: function(res) {
+                    btn.attr('disabled', false).html(originalHtml);
+                    if (res.success) {
+                        var reqText = res.requirement || res.notes || '';
+                        var viewBlock = $('#viewDealRequirementBlock');
+
+                        if (reqText.trim().length > 0) {
+                            viewBlock.html(`
+                                <div class="position-relative requirement-clickable-box p-3 rounded shadow-2xs" onclick="enableDealRequirementEdit()" title="Click anywhere to edit requirement" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1; transition: all 0.2s ease;">
+                                    <div class="d-flex align-items-start justify-content-between gap-3">
+                                        <div class="text-dark fs-13 flex-grow-1" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;" id="viewDealRequirementText">${escapeDealHtml(reqText)}</div>
+                                        <span class="badge bg-white text-primary border shadow-2xs px-2.5 py-1.5 fs-11 flex-shrink-0 edit-hint-badge" style="border-color: #cbd5e1 !important; transition: all 0.2s ease;">
+                                            <i class="feather-edit-2 me-1"></i>Click to Edit
+                                        </span>
+                                    </div>
+                                </div>
+                            `);
+                        } else {
+                            viewBlock.html(`
+                                <div class="position-relative requirement-empty-box p-4 rounded text-center cursor-pointer" onclick="enableDealRequirementEdit()" title="Click to add requirement" style="cursor: pointer; background: #f8fafc; border: 1px dashed #cbd5e1; transition: all 0.2s ease;">
+                                    <div class="avatar-text avatar-md bg-soft-primary text-primary rounded-circle mx-auto mb-2">
+                                        <i class="feather-edit-3 fs-5"></i>
+                                    </div>
+                                    <h6 class="fw-bold text-dark fs-13 mb-1">No Requirements Details Specified</h6>
+                                    <p class="text-muted fs-12 mb-0">Click here to add deal notes, requirements, or scope of work.</p>
+                                </div>
+                            `);
+                        }
+
+                        cancelDealRequirementEdit();
+                        if (typeof Toast !== 'undefined' && Toast.fire) {
+                            Toast.fire({ icon: 'success', title: res.message || 'Requirements updated successfully!' });
+                        } else if (typeof toastr !== 'undefined') {
+                            toastr.success(res.message || 'Requirements updated successfully!');
+                        }
+                    }
+                },
+                error: function(xhr) {
+                    btn.attr('disabled', false).html(originalHtml);
+                    alert('Failed to save requirements. Please try again.');
+                }
+            });
+        });
+
+        window.submitDealStage = function(stage) {
+            var form = $('#dealStageForm');
+            if (form.length) {
+                $('#dealStageInput').val(stage);
+                form.submit();
+            }
+        };
+
+        // Toggle Offcanvas Mode (Exact replica of Lead switchOffcanvasMode)
+        function switchDealOffcanvasMode(mode) {
+            $('.deal-offcanvas-mode-btn').removeClass('active btn-primary text-white shadow-sm').css({'background-color': 'transparent', 'color': '#64748b', 'box-shadow': 'none'});
+            var activeBtn = $('.deal-offcanvas-mode-btn[data-mode="' + mode + '"]');
+            activeBtn.addClass('active btn-primary text-white shadow-sm').css({'background-color': 'var(--bs-primary)', 'color': '#ffffff', 'box-shadow': '0 2px 4px rgba(0,0,0,0.15)'});
+            
+            $('#dealOffcanvasActionMode').val(mode);
+
+            if (mode === 'log_note') {
+                $('#dealSectionPastInteraction, #dealSectionLogInteraction').show();
+                $('#dealSectionDirectSchedule').hide();
+                $('#dealOffcanvasFollowupDate').removeAttr('required');
+            } else if (mode === 'schedule') {
+                $('#dealSectionPastInteraction, #dealSectionLogInteraction').hide();
+                $('#dealSectionDirectSchedule').show();
+                $('#dealOffcanvasFollowupDate').attr('required', 'required');
+            }
+        }
+
+        $(document).on('click', '.deal-offcanvas-mode-btn', function() {
+            switchDealOffcanvasMode($(this).attr('data-mode'));
+        });
+
+        function initDealTagUserSelect2() {
+            if ($('#dealOffcanvasTagUser').length && $.fn.select2) {
+                if ($('#dealOffcanvasTagUser').hasClass('select2-hidden-accessible')) {
+                    $('#dealOffcanvasTagUser').select2('destroy');
+                }
+                $('#dealOffcanvasTagUser').select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Select persons to tag...',
+                    allowClear: true,
+                    dropdownParent: $('#dealFollowupOffcanvas'),
+                    width: '100%'
+                });
+            }
+        }
+
+        // Open and populate Offcanvas drawer for Deal Followup / Schedule Activity
+        $(document).on('click', '.btn-open-deal-followup-offcanvas', function() {
+            var dealId = $(this).attr('data-deal-id') || '<?php echo e($deal->id); ?>';
+            var dealTitle = $(this).attr('data-deal-title') || '<?php echo e(addslashes($deal->title)); ?>';
+            var mode = $(this).attr('data-mode') || 'log_note';
+
+            $('#dealFollowupOffcanvasTitle').text('Log / Schedule Activity for ' + dealTitle);
+            $('#dealFollowupForm').attr('action', '/crm/deals/' + dealId + '/followups');
+            $('#dealOffcanvasNotes, #dealOffcanvasScheduleNotes, #dealOffcanvasNextFollowupDate, #dealOffcanvasNextTitle, #dealOffcanvasNextGuestEmails').val('');
+            $('#dealOffcanvasNextSyncGoogle, #dealOffcanvasNextCreateMeet').prop('checked', false);
+
+            $('#containerDealNextScheduleFieldsShow').hide();
+            $('#iconToggleDealNextScheduleShow').removeClass('feather-minus').addClass('feather-plus');
+            $('#textToggleDealNextScheduleShow').text('Schedule Next Activity');
+
+            initDealTagUserSelect2();
+            if ($('#dealOffcanvasTagUser').hasClass('select2-hidden-accessible')) {
+                $('#dealOffcanvasTagUser').val(null).trigger('change');
+            }
+
+            switchDealOffcanvasMode(mode);
+        });
+
+        $(document).on('click', '#btnToggleDealNextScheduleShow', function() {
+            var container = $('#containerDealNextScheduleFieldsShow');
+            var icon = $('#iconToggleDealNextScheduleShow');
+            var text = $('#textToggleDealNextScheduleShow');
+            if (container.is(':visible')) {
+                container.slideUp(200);
+                icon.removeClass('feather-minus').addClass('feather-plus');
+                text.text('Schedule Next Activity');
+                $('#dealOffcanvasNextTitle, #dealOffcanvasNextFollowupDate, #dealOffcanvasNextGuestEmails').val('');
+                $('#dealOffcanvasNextSyncGoogle, #dealOffcanvasNextCreateMeet').prop('checked', false);
+            } else {
+                container.slideDown(200);
+                icon.removeClass('feather-plus').addClass('feather-minus');
+                text.text('Remove Next Activity');
+            }
+        });
+
+        $('#dealFollowupOffcanvas').on('shown.bs.offcanvas', function () {
+            initDealTagUserSelect2();
+        });
+
+        // Auto-check Google Auth Status on Page Load
+        function checkGoogleAuthStatus() {
+            $.ajax({
+                url: "<?php echo e(route('crm.deals.googleAuthStatus')); ?>",
+                method: "GET",
+                data: {
+                    user_id: "<?php echo e(request('user_id', auth()->id() ?? 1)); ?>"
+                },
+                success: function (res) {
+                    const badge = $('#googleAuthBadge');
+                    if (res && res.is_connected) {
+                        const emailLabel = res.connected_email ? ' (' + res.connected_email + ')' : '';
+                        badge.attr('class', 'badge bg-success text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                             .attr('href', 'javascript:void(0)')
+                             .attr('title', 'Connected Email: ' + (res.connected_email || 'Google Workspace'))
+                             .html('<i class="feather-check-circle me-1"></i>Gmail Connected' + emailLabel);
+                    } else {
+                        badge.attr('class', 'badge bg-danger text-white text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                             .attr('href', (res && res.login_url) ? res.login_url : '#')
+                             .attr('title', 'Click to authenticate Google Account')
+                             .html('<i class="feather-alert-triangle me-1"></i>Gmail Disconnected (Click to Connect)');
+                    }
+                },
+                error: function () {
+                    const badge = $('#googleAuthBadge');
+                    badge.attr('class', 'badge bg-warning text-dark text-decoration-none px-2.5 py-1 fs-11 fw-bold d-inline-flex align-items-center')
+                         .html('<i class="feather-alert-circle me-1"></i>Auth Check Error');
+                }
+            });
+        }
+        checkGoogleAuthStatus();
+
+        // Handle AI Health Sync
+        $('#btnSyncHealth').on('click', function () {
+            const btn = $(this);
+            const origHtml = btn.html();
+            btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Syncing...');
+
+            $.ajax({
+                url: "<?php echo e(route('crm.deals.syncHealth', $deal->id)); ?>",
+                method: "POST",
+                data: {
+                    _token: "<?php echo e(csrf_token()); ?>"
+                },
+                success: function (res) {
+                    btn.prop('disabled', false).html(origHtml);
+
+                    if (res.message) {
+                        $('#syncDiagnosticText').html('<strong>Sync Diagnostic:</strong> ' + res.message);
+                        $('#syncDiagnosticNotice').removeClass('d-none');
+                    }
+
+                    if (res.success) {
+                        $('#healthScoreDisplay').text(res.health_score);
+                        $('#sentimentDisplay').html('<i class="feather-smile text-success me-1"></i>' + res.sentiment_score);
+                        $('#nextActionDisplay').text(res.next_best_action);
+                        $('#syncedAtDisplay').html('<i class="feather-clock me-1"></i>' + res.health_synced_at);
+
+                        const risk = (res.risk_level || 'Low').toLowerCase();
+                        let badgeClass = 'bg-success text-white';
+                        if (risk === 'high') badgeClass = 'bg-danger text-white';
+                        else if (risk === 'medium') badgeClass = 'bg-warning text-dark';
+
+                        $('#riskLevelDisplay').attr('class', 'badge px-2.5 py-1 fs-11 fw-bold ' + badgeClass).text(res.risk_level + ' Risk');
+
+                        if (typeof toastr !== 'undefined') {
+                            toastr.success('AI Deal Health synced successfully!');
+                        }
+                    } else {
+                        if (typeof toastr !== 'undefined') {
+                            toastr.error(res.message || 'API Sync Failed.');
+                        } else {
+                            alert(res.message || 'API Sync Failed.');
+                        }
+                    }
+                },
+                error: function () {
+                    btn.prop('disabled', false).html(origHtml);
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error('API Server Error: Could not connect to Deal Health Engine.');
+                    } else {
+                        alert('API Server Error: Could not connect to Deal Health Engine.');
+                    }
+                }
+            });
+        });
+
+        // Handle AI Email Draft Generation
+        $('#btnGenerateDraft').on('click', function () {
+            const btn = $(this);
+            const origHtml = btn.html();
+            btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Generating Draft...');
+
+            $.ajax({
+                url: "<?php echo e(route('crm.deals.generateDraftReply', $deal->id)); ?>",
+                method: "POST",
+                data: {
+                    _token: "<?php echo e(csrf_token()); ?>"
+                },
+                success: function (res) {
+                    btn.prop('disabled', false).html(origHtml);
+                    if (res.success) {
+                        $('#aiDraftSubject').val(res.subject);
+                        $('#aiDraftBody').val(res.body);
+                        const draftModal = new bootstrap.Modal(document.getElementById('aiDraftModal'));
+                        draftModal.show();
+                    }
+                },
+                error: function () {
+                    btn.prop('disabled', false).html(origHtml);
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error('Failed to generate AI Draft Reply.');
+                    }
+                }
+            });
+        });
+
+        // Handle Copy to Clipboard
+        $('#btnCopyDraft').on('click', function () {
+            const text = $('#aiDraftBody').val();
+            navigator.clipboard.writeText(text).then(function() {
+                if (typeof toastr !== 'undefined') {
+                    toastr.success('AI Draft copied to clipboard!');
+                } else {
+                    alert('Copied to clipboard!');
+                }
+            });
+        });
+    </script>
+
+    <!-- AI EMAIL DRAFT MODAL -->
+    <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['id' => 'aiDraftModal','title' => '<i class=\'feather-mail text-primary me-1.5\'></i>AI Generated Email Reply Draft','size' => 'lg','centered' => true,'showFooter' => false]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => 'aiDraftModal','title' => '<i class=\'feather-mail text-primary me-1.5\'></i>AI Generated Email Reply Draft','size' => 'lg','centered' => true,'showFooter' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(false)]); ?>
+        <div class="mb-3">
+            <?php if (isset($component)) { $__componentOriginaldf1f99de66ac317a6ea2e0e954484031 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal-form-ui','data' => ['type' => 'input','label' => 'Subject','id' => 'aiDraftSubject','readonly' => 'true']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Subject','id' => 'aiDraftSubject','readonly' => 'true']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $attributes = $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $component = $__componentOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+        </div>
+        <div class="mb-3">
+            <?php if (isset($component)) { $__componentOriginaldf1f99de66ac317a6ea2e0e954484031 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal-form-ui','data' => ['type' => 'textarea','label' => 'Message Body','id' => 'aiDraftBody','rows' => '10']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'textarea','label' => 'Message Body','id' => 'aiDraftBody','rows' => '10']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $attributes = $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $component = $__componentOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+        </div>
+        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+            <span class="fs-11 text-muted"><i class="feather-info me-1"></i>You can edit the message before sending or copying.</span>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">Close</button>
+                <button type="button" id="btnCopyDraft" class="btn btn-sm btn-primary fw-bold">
+                    <i class="feather-copy me-1"></i>Copy to Clipboard
+                </button>
+            </div>
+        </div>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+
+    <!-- SEND QUOTATION EMAIL MODAL WITH PDF ATTACHMENT -->
+    <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['id' => 'sendQuotationEmailModal','title' => '<i class=\'feather-send text-success me-1.5\'></i>Send Quotation PDF Email to Client','size' => 'lg','centered' => true,'showFooter' => false]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => 'sendQuotationEmailModal','title' => '<i class=\'feather-send text-success me-1.5\'></i>Send Quotation PDF Email to Client','size' => 'lg','centered' => true,'showFooter' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(false)]); ?>
+        <form id="sendQuotationEmailForm" action="" method="POST">
+            <?php echo csrf_field(); ?>
+            <?php
+                $availableSmtps = \App\Models\EmailConfiguration::where('is_active', true)->orderByDesc('is_default')->get();
+            ?>
+            <?php if($availableSmtps->isNotEmpty()): ?>
+                <div class="mb-3">
+                    <?php if (isset($component)) { $__componentOriginaldf1f99de66ac317a6ea2e0e954484031 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal-form-ui','data' => ['type' => 'select','label' => 'From SMTP Account','name' => 'account_id','searchable' => false]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'select','label' => 'From SMTP Account','name' => 'account_id','searchable' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(false)]); ?>
+                        <?php $__currentLoopData = $availableSmtps; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $s): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($s->id); ?>" <?php if($s->is_default): echo 'selected'; endif; ?>><?php echo e($s->name); ?> (<?php echo e($s->email_address); ?>)</option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $attributes = $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $component = $__componentOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="mb-3">
+                <?php if (isset($component)) { $__componentOriginaldf1f99de66ac317a6ea2e0e954484031 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal-form-ui','data' => ['type' => 'input','inputType' => 'email','label' => 'Client Email Address (To)','name' => 'to_email','id' => 'sendQuoteToEmail','placeholder' => 'client@company.com','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','inputType' => 'email','label' => 'Client Email Address (To)','name' => 'to_email','id' => 'sendQuoteToEmail','placeholder' => 'client@company.com','required' => true]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $attributes = $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $component = $__componentOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+            </div>
+
+            <div class="mb-3">
+                <?php if (isset($component)) { $__componentOriginaldf1f99de66ac317a6ea2e0e954484031 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal-form-ui','data' => ['type' => 'input','label' => 'Subject','name' => 'subject','id' => 'sendQuoteSubject','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Subject','name' => 'subject','id' => 'sendQuoteSubject','required' => true]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $attributes = $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $component = $__componentOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+            </div>
+
+            <div class="p-2.5 rounded border bg-light-subtle mb-3 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-paperclip text-primary fs-16"></i>
+                    <span class="fs-12 fw-bold text-dark" id="sendQuotePdfBadge">Quotation.pdf</span>
+                    <span class="badge bg-soft-danger text-danger border px-1.5 py-0.5 fs-10">PDF Attached</span>
+                </div>
+                <span class="fs-11 text-muted">Auto-generated via DomPDF</span>
+            </div>
+
+            <div class="mb-3">
+                <?php if (isset($component)) { $__componentOriginaldf1f99de66ac317a6ea2e0e954484031 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal-form-ui','data' => ['type' => 'textarea','label' => 'Message Body','name' => 'body_html','id' => 'sendQuoteBody','rows' => '6','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'textarea','label' => 'Message Body','name' => 'body_html','id' => 'sendQuoteBody','rows' => '6','required' => true]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $attributes = $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $component = $__componentOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                <span class="fs-11 text-muted"><i class="feather-info me-1"></i>Email will be dispatched immediately via SMTP server.</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="btnSubmitSendQuoteEmail" class="btn btn-sm btn-success fw-bold px-4">
+                        <i class="feather-send me-1"></i>Send Email Now
+                    </button>
+                </div>
+            </div>
+        </form>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+
+    <!-- SEND QUOTATION WHATSAPP MODAL -->
+    <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['id' => 'sendQuotationWhatsAppModal','title' => '<i class=\'feather-message-circle text-success me-1.5\'></i>Send Quotation PDF via WhatsApp','size' => 'lg','centered' => true,'showFooter' => false]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => 'sendQuotationWhatsAppModal','title' => '<i class=\'feather-message-circle text-success me-1.5\'></i>Send Quotation PDF via WhatsApp','size' => 'lg','centered' => true,'showFooter' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(false)]); ?>
+        <form id="sendQuotationWhatsAppForm" action="" method="POST">
+            <?php echo csrf_field(); ?>
+            
+            <!-- WhatsApp Connection Status Banner -->
+            <div id="waStatusContainer" class="p-3 rounded border mb-3 text-start fs-12 bg-light">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="waStatusBadge" class="badge bg-secondary">Checking WhatsApp...</span>
+                        <span id="waStatusText" class="text-muted fs-11">Connecting to WhatsApp Baileys bridge...</span>
+                    </div>
+                    <button type="button" id="btnConnectWA" class="btn btn-xs btn-outline-success fw-bold d-none">
+                        <i class="feather-smartphone me-1"></i>Connect / QR Scan
+                    </button>
+                </div>
+                <div id="waQrContainer" class="text-center mt-3 d-none">
+                    <p class="fs-12 fw-bold text-dark mb-1">Scan QR Code from WhatsApp app (Linked Devices)</p>
+                    <img id="waQrImg" src="" alt="WhatsApp QR Code" class="img-thumbnail" style="max-width: 200px;">
+                    <p class="fs-11 text-muted mt-1">Open WhatsApp on your phone -> Settings/Menu -> Linked Devices -> Link a Device</p>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <?php if (isset($component)) { $__componentOriginaldf1f99de66ac317a6ea2e0e954484031 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal-form-ui','data' => ['type' => 'input','label' => 'Recipient Mobile / WhatsApp Number','name' => 'phone','id' => 'sendWaPhone','placeholder' => '9876543210 (Country code 91 auto-added)','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'input','label' => 'Recipient Mobile / WhatsApp Number','name' => 'phone','id' => 'sendWaPhone','placeholder' => '9876543210 (Country code 91 auto-added)','required' => true]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $attributes = $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $component = $__componentOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+            </div>
+
+            <div class="p-2.5 rounded border bg-light-subtle mb-3 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-paperclip text-success fs-16"></i>
+                    <span class="fs-12 fw-bold text-dark" id="sendWaPdfBadge">Quotation.pdf</span>
+                    <span class="badge bg-soft-success text-success border px-1.5 py-0.5 fs-10">PDF Attached</span>
+                </div>
+                <span class="fs-11 text-muted">Base64 PDF Attachment</span>
+            </div>
+
+            <div class="mb-3">
+                <?php if (isset($component)) { $__componentOriginaldf1f99de66ac317a6ea2e0e954484031 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal-form-ui','data' => ['type' => 'textarea','label' => 'Caption / Message Text','name' => 'caption','id' => 'sendWaCaption','rows' => '5','required' => true]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal-form-ui'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'textarea','label' => 'Caption / Message Text','name' => 'caption','id' => 'sendWaCaption','rows' => '5','required' => true]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $attributes = $__attributesOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__attributesOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031)): ?>
+<?php $component = $__componentOriginaldf1f99de66ac317a6ea2e0e954484031; ?>
+<?php unset($__componentOriginaldf1f99de66ac317a6ea2e0e954484031); ?>
+<?php endif; ?>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                <span class="fs-11 text-muted"><i class="feather-info me-1"></i>Document will be sent directly via linked WhatsApp account.</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="btnSubmitSendQuoteWA" class="btn btn-sm btn-success fw-bold px-4">
+                        <i class="feather-send me-1"></i>Send WhatsApp PDF
+                    </button>
+                </div>
+            </div>
+        </form>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+
+    <!-- RESULT NOTIFICATION MODAL (COMMON COMPONENT) -->
+    <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['id' => 'waResultModal','title' => '<i class=\'feather-info me-1.5 text-primary\'></i>System Notification','size' => 'md','centered' => true,'showFooter' => false]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['id' => 'waResultModal','title' => '<i class=\'feather-info me-1.5 text-primary\'></i>System Notification','size' => 'md','centered' => true,'showFooter' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(false)]); ?>
+        <div class="p-3 text-center">
+            <div id="waResultIcon" class="mb-3"></div>
+            <h5 id="waResultTitle" class="fw-bold text-dark mb-2 fs-16"></h5>
+            <div id="waResultMessage" class="alert alert-light border text-start fs-12 mb-4 font-monospace p-3 text-break"></div>
+            <button type="button" class="btn btn-primary fw-bold px-4" data-bs-dismiss="modal">OK</button>
+        </div>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+
+    <script>
+        function showNotificationModal(isSuccess, title, message) {
+            const iconHtml = isSuccess 
+                ? '<div class="avatar avatar-lg bg-soft-success text-success rounded-circle mx-auto mb-2" style="width: 50px; height: 50px; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-check-circle fs-28"></i></div>'
+                : '<div class="avatar avatar-lg bg-soft-danger text-danger rounded-circle mx-auto mb-2" style="width: 50px; height: 50px; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-alert-triangle fs-28"></i></div>';
+            
+            $('#waResultIcon').html(iconHtml);
+            $('#waResultTitle').text(title).attr('class', isSuccess ? 'fw-bold text-success mb-2 fs-16' : 'fw-bold text-danger mb-2 fs-16');
+            $('#waResultMessage').text(message);
+            
+            const modalEl = document.getElementById('waResultModal');
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+
+        function checkWhatsAppStatus() {
+            $.ajax({
+                url: "/crm/whatsapp/status",
+                method: "GET",
+                success: function(res) {
+                    if (res.status === 'connected') {
+                        $('#waStatusBadge').attr('class', 'badge bg-success').text('Connected');
+                        const userName = res.user ? (res.user.name || res.user.id || 'Linked Account') : 'Linked Account';
+                        $('#waStatusText').text('Connected: ' + userName);
+                        $('#waQrContainer').addClass('d-none');
+                        $('#btnConnectWA').addClass('d-none');
+                        $('#btnSubmitSendQuoteWA').prop('disabled', false);
+                    } else if (res.status === 'qr' && res.qr) {
+                        $('#waStatusBadge').attr('class', 'badge bg-warning text-dark').text('Scan QR');
+                        $('#waStatusText').text('Open WhatsApp app on your phone to scan QR code');
+                        $('#waQrImg').attr('src', res.qr);
+                        $('#waQrContainer').removeClass('d-none');
+                        $('#btnConnectWA').addClass('d-none');
+                        $('#btnSubmitSendQuoteWA').prop('disabled', true);
+                    } else if (res.status === 'connecting') {
+                        $('#waStatusBadge').attr('class', 'badge bg-info text-dark').text('Connecting...');
+                        $('#waStatusText').text('Initializing Baileys socket...');
+                        $('#waQrContainer').addClass('d-none');
+                        $('#btnConnectWA').addClass('d-none');
+                        $('#btnSubmitSendQuoteWA').prop('disabled', true);
+                    } else {
+                        $('#waStatusBadge').attr('class', 'badge bg-danger').text('Disconnected');
+                        $('#waStatusText').text(res.message || 'No WhatsApp account linked.');
+                        $('#waQrContainer').addClass('d-none');
+                        $('#btnConnectWA').removeClass('d-none');
+                        $('#btnSubmitSendQuoteWA').prop('disabled', true);
+                    }
+                },
+                error: function() {
+                    $('#waStatusBadge').attr('class', 'badge bg-danger').text('Bridge Offline');
+                    $('#waStatusText').text('Node.js WhatsApp bridge is offline. Start Node.js server (services/whatsapp-bridge).');
+                    $('#btnConnectWA').removeClass('d-none');
+                }
+            });
+        }
+
+        $(document).on('click', '#btnConnectWA', function() {
+            $('#waStatusBadge').attr('class', 'badge bg-info text-dark').text('Connecting...');
+            $('#waStatusText').text('Requesting QR code connection...');
+            $.ajax({
+                url: "/crm/whatsapp/connect",
+                method: "POST",
+                data: { _token: "<?php echo e(csrf_token()); ?>" },
+                success: function() {
+                    setTimeout(checkWhatsAppStatus, 1500);
+                }
+            });
+        });
+
+        $(document).on('click', '.btn-open-send-quote-wa-modal', function () {
+            const qId = $(this).attr('data-quotation-id');
+            const qNum = $(this).attr('data-quotation-num');
+            const cPhone = $(this).attr('data-client-phone') || '';
+            const dTitle = $(this).attr('data-deal-title') || '<?php echo e(addslashes($deal->title)); ?>';
+
+            $('#sendQuotationWhatsAppForm').attr('action', '/crm/quotations/' + qId + '/send-whatsapp');
+            $('#sendWaPhone').val(cPhone);
+            $('#sendWaPdfBadge').text('Quotation_' + qNum + '.pdf');
+
+            const defaultCaption = "Dear Valued Client,\n\nPlease find attached Quotation *" + qNum + "* for your review regarding " + dTitle + ".\n\nThank you,\nSales Team";
+            $('#sendWaCaption').val(defaultCaption);
+
+            const sendWaModal = new bootstrap.Modal(document.getElementById('sendQuotationWhatsAppModal'));
+            sendWaModal.show();
+            checkWhatsAppStatus();
+        });
+
+        $(document).on('submit', '#sendQuotationWhatsAppForm', function (e) {
+            e.preventDefault();
+            const form = $(this);
+            const btn = $('#btnSubmitSendQuoteWA');
+            const origHtml = btn.html();
+
+            btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Sending WhatsApp...');
+
+            $.ajax({
+                url: form.attr('action'),
+                method: "POST",
+                data: form.serialize(),
+                success: function (res) {
+                    btn.prop('disabled', false).html(origHtml);
+                    const modalEl = document.getElementById('sendQuotationWhatsAppModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    showNotificationModal(true, "WhatsApp Message Delivered!", res.message);
+                },
+                error: function (xhr) {
+                    btn.prop('disabled', false).html(origHtml);
+                    const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to send WhatsApp document.';
+                    const modalEl = document.getElementById('sendQuotationWhatsAppModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    showNotificationModal(false, "WhatsApp Dispatch Failed", errMsg);
+                }
+            });
+        });
+
+        $(document).on('click', '.btn-open-send-quote-modal', function () {
+            const qId = $(this).attr('data-quotation-id');
+            const qNum = $(this).attr('data-quotation-num');
+            const cEmail = $(this).attr('data-client-email') || '';
+            const dTitle = $(this).attr('data-deal-title') || '<?php echo e(addslashes($deal->title)); ?>';
+
+            $('#sendQuotationEmailForm').attr('action', '/crm/quotations/' + qId + '/send-email');
+            $('#sendQuoteToEmail').val(cEmail);
+            $('#sendQuoteSubject').val('Quotation ' + qNum + ' - ' + dTitle);
+            $('#sendQuotePdfBadge').text('Quotation_' + qNum + '.pdf');
+
+            const defaultBody = "Dear Valued Client,\n\nPlease find attached Quotation " + qNum + " for your review regarding " + dTitle + ".\n\nWe look forward to your feedback. Please let us know if you have any questions.\n\nBest regards,\nSales Team";
+            $('#sendQuoteBody').val(defaultBody);
+
+            const sendModal = new bootstrap.Modal(document.getElementById('sendQuotationEmailModal'));
+            sendModal.show();
+        });
+
+        $(document).on('submit', '#sendQuotationEmailForm', function (e) {
+            e.preventDefault();
+            const form = $(this);
+            const btn = $('#btnSubmitSendQuoteEmail');
+            const origHtml = btn.html();
+
+            btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Sending Email...');
+
+            $.ajax({
+                url: form.attr('action'),
+                method: "POST",
+                data: form.serialize(),
+                success: function (res) {
+                    btn.prop('disabled', false).html(origHtml);
+                    const modalEl = document.getElementById('sendQuotationEmailModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    showNotificationModal(true, "Quotation Email Dispatched!", res.message);
+                },
+                error: function (xhr) {
+                    btn.prop('disabled', false).html(origHtml);
+                    const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to send Quotation Email.';
+                    const modalEl = document.getElementById('sendQuotationEmailModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    showNotificationModal(false, "Email Dispatch Failed", errMsg);
+                }
+            });
+        });
+    </script>
+    <?php $__env->stopPush(); ?>
+
+    <?php $__env->startPush('styles'); ?>
+    <style>
+        .daterangepicker {
+            z-index: 99999 !important;
+        }
+
+        .activity-date-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #475569;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .activity-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #ffffff;
+            transition: box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .activity-card:hover {
+            box-shadow: 0 4px 16px rgba(30,64,175,0.07);
+            border-color: #bfdbfe;
+        }
+        .activity-card-inner {
+            padding: 12px 14px;
+        }
+
+        .activity-type-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            margin-top: 2px;
+        }
+
+        .activity-time-chip {
+            display: inline-flex;
+            align-items: center;
+            font-size: 10px;
+            font-weight: 600;
+            color: #64748b;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 2px 8px;
+        }
+
+        .activity-notes {
+            font-size: 12px;
+            font-weight: 500;
+            color: #334155;
+            background: #f8fafc;
+            border-left: 3px solid #93c5fd;
+            border-radius: 0 6px 6px 0;
+            padding: 5px 10px;
+            margin: 6px 0;
+            font-style: italic;
+            line-height: 1.5;
+        }
+        .activity-card--done .activity-notes {
+            border-left-color: #86efac;
+        }
+
+        .activity-by {
+            font-size: 10px;
+            color: #94a3b8;
+            font-weight: 500;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+        }
+
+        .activity-footer-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding-top: 10px;
+            border-top: 1px dashed #e2e8f0;
+        }
+    </style>
+
+
+    <?php $__env->stopPush(); ?>
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.duralux', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>

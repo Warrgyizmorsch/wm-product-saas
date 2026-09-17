@@ -1959,23 +1959,7 @@
                             </div>
                         @endif
 
-                        @if ($isAdmin)
-                            <div class="row mb-3">
-                                <div class="col-12">
-                                    <x-ui.odoo-form-ui type="select" :label="__('hrms.employees.tbl_employee') ?? 'Employee'" name="employee_id" id="employee_select" :required="true" class="odoo-select2-custom">
-                                        @foreach (($allEmployees ?? $employees ?? []) as $emp)
-                                            <option value="{{ $emp->id }}" {{ ($employee && $employee->id == $emp->id) ? 'selected' : '' }}>
-                                                {{ $emp->full_name }} ({{ $emp->employee_id }})
-                                            </option>
-                                        @endforeach
-                                    </x-ui.odoo-form-ui>
-                                </div>
-                            </div>
-                        @else
-                            @if ($employee)
-                                <input type="hidden" name="employee_id" value="{{ $employee->id }}">
-                            @endif
-                        @endif
+                        <input type="hidden" name="employee_id" id="employee_select" value="{{ $employee ? $employee->id : '' }}">
 
                         <div class="row">
                             <div class="col-12 mb-3">
@@ -2058,18 +2042,7 @@
                 <form method="POST" action="{{ route('hrms.leaves.encashment.store') }}">
                     @csrf
                     <div class="modal-body p-4">
-                        @if($isAdmin)
-                            <div class="mb-3">
-                                <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.encashment_app.select_employee')" name="employee_id" id="encashment_employee_id" :required="true" class="odoo-select2-custom">
-                                    <option value="">{{ __('hrms.leave.encashment_app.select_employee') }}...</option>
-                                    @foreach(($allEmployees ?? $employees ?? []) as $emp)
-                                        <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-                        @else
-                            <input type="hidden" name="employee_id" value="{{ $employee ? $employee->id : '' }}">
-                        @endif
+                        <input type="hidden" name="employee_id" id="encashment_employee_id" value="{{ $employee ? $employee->id : '' }}">
 
                         <div class="mb-3">
                             <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.encashment_app.select_leave_type')" name="leave_type_id" id="encashment_leave_type_id" :required="true" class="odoo-select2-custom">

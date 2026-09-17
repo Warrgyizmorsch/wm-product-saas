@@ -159,11 +159,12 @@ class ProjectService
         Collection $milestones,
         Collection $members,
     ): array {
-        $doneStatuses = [Task::STATUS_COMPLETED, Task::STATUS_CANCELLED];
         $inProgressStatuses = [Task::STATUS_IN_PROGRESS, Task::STATUS_REVIEW];
 
         $totalTasks = $allTasks->count();
-        $doneTasks = $allTasks->whereIn('status', $doneStatuses)->count();
+        $completedTasks = $allTasks->where('status', Task::STATUS_COMPLETED)->count();
+        $cancelledTasks = $allTasks->where('status', Task::STATUS_CANCELLED)->count();
+        $eligibleTasks = $allTasks->where('status', '!=', Task::STATUS_CANCELLED)->count();
         $inProgressTasks = $allTasks->whereIn('status', $inProgressStatuses)->count();
 
         $totalMilestones = $milestones->count();
@@ -179,25 +180,28 @@ class ProjectService
         $hoursTracked = (float) $allTasks->sum(fn (Task $task) => (float) $task->actual_hours);
         $budgetHours = (float) ($project->budget_hours ?? 0);
 
-        $taskListProgress = $taskLists->mapWithKeys(function (TaskList $taskList) use ($tasksByList, $doneStatuses) {
+        $taskListProgress = $taskLists->mapWithKeys(function (TaskList $taskList) use ($tasksByList) {
             $listTasks = $tasksByList->get($taskList->id, collect());
             $total = $listTasks->count();
-            $done = $listTasks->whereIn('status', $doneStatuses)->count();
+            $eligible = $listTasks->where('status', '!=', Task::STATUS_CANCELLED)->count();
+            $done = $listTasks->where('status', Task::STATUS_COMPLETED)->count();
 
             return [$taskList->id => [
-                'total'   => $total,
-                'done'    => $done,
-                'percent' => $total > 0 ? (int) round($done / $total * 100) : 0,
+                'total'    => $total,
+                'eligible' => $eligible,
+                'done'     => $done,
+                'percent'  => $eligible > 0 ? (int) round($done / $eligible * 100) : 0,
             ]];
         });
 
         return [
             'tasks' => [
                 'total'       => $totalTasks,
-                'done'        => $doneTasks,
+                'eligible'    => $eligibleTasks,
+                'done'        => $completedTasks,
                 'in_progress' => $inProgressTasks,
-                'todo'        => max($totalTasks - $doneTasks - $inProgressTasks, 0),
-                'percent'     => $totalTasks > 0 ? (int) round($doneTasks / $totalTasks * 100) : 0,
+                'todo'        => max($totalTasks - $completedTasks - $cancelledTasks - $inProgressTasks, 0),
+                'percent'     => $eligibleTasks > 0 ? (int) round($completedTasks / $eligibleTasks * 100) : 0,
             ],
             'milestones' => [
                 'total'     => $totalMilestones,

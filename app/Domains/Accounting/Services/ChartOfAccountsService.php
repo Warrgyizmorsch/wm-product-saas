@@ -101,7 +101,27 @@ class ChartOfAccountsService
      * SalesAccountingService::postInvoiceJournal). Every other row below is a
      * new ledger added to reach the sheet's full list.
      */
-    public function provisionDefaults(int $tenantId): void
+    /**
+     * provisionDefaults() re-applies the template's names and types to existing
+     * codes, which would undo a tenant's renames — so tenant provisioning only
+     * runs it for a tenant that has no accounts yet.
+     */
+    public function provisionDefaultsIfMissing(int $tenantId, ?int $companyId = null, ?int $branchId = null): bool
+    {
+        // withoutGlobalScopes(): existence must be checked tenant-wide, not
+        // filtered by the caller's company/branch scope — a tenant that
+        // already has a Chart of Accounts (even one seeded with no company
+        // assigned yet, see provisionDefaults()) must not get a second one.
+        if (ChartOfAccount::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->exists()) {
+            return false;
+        }
+
+        $this->provisionDefaults($tenantId, $companyId, $branchId);
+
+        return true;
+    }
+
+    public function provisionDefaults(int $tenantId, ?int $companyId = null, ?int $branchId = null): void
     {
         $headers = [
             ['code' => '1000', 'name' => 'Assets', 'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT],
@@ -114,12 +134,14 @@ class ChartOfAccountsService
         $headerIds = [];
 
         foreach ($headers as $header) {
-            $account = ChartOfAccount::query()->updateOrCreate(
+            $account = ChartOfAccount::query()->withoutGlobalScopes()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $header['code']],
                 [
                     'name' => $header['name'],
                     'type' => $header['type'],
                     'normal_balance' => $header['normal_balance'],
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'is_system' => true,
                     'is_active' => true,
                 ]
@@ -134,6 +156,7 @@ class ChartOfAccountsService
             ['code' => '3020', 'name' => 'Reserves & Surplus', 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'reserves_surplus', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
             ['code' => '3030', 'name' => "Partner's/Proprietor's Capital", 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'capital', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
             ['code' => '3040', 'name' => 'Drawings', 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'capital', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '3000'],
+            ['code' => '3200', 'name' => 'Revaluation Reserve', 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'reserves_surplus', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
 
             // --- Loans (Liability) (sheet rows 5-8) ---
             ['code' => '2400', 'name' => 'Secured Loans', 'type' => ChartOfAccount::TYPE_LIABILITY, 'subtype' => 'long_term_liability', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '2000'],
@@ -231,6 +254,8 @@ class ChartOfAccountsService
             ['code' => '4910', 'name' => 'Interest Received', 'type' => ChartOfAccount::TYPE_INCOME, 'subtype' => 'indirect_income', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
             ['code' => '4920', 'name' => 'Scrap Sale Income', 'type' => ChartOfAccount::TYPE_INCOME, 'subtype' => 'indirect_income', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
             ['code' => '4900', 'name' => 'Miscellaneous Income', 'type' => ChartOfAccount::TYPE_INCOME, 'subtype' => 'indirect_income', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
+            ['code' => '4930', 'name' => 'Foreign Exchange Gain', 'type' => ChartOfAccount::TYPE_INCOME, 'subtype' => 'indirect_income', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
+            ['code' => '4940', 'name' => 'Gain on Sale of Fixed Assets', 'type' => ChartOfAccount::TYPE_INCOME, 'subtype' => 'indirect_income', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '4000'],
 
             // --- Direct Expenses (sheet rows 67-70) ---
             ['code' => '5010', 'name' => 'Cost of Goods Sold', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'cogs', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
@@ -268,11 +293,14 @@ class ChartOfAccountsService
             ['code' => '5400', 'name' => 'Depreciation Expense', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
             ['code' => '5720', 'name' => 'Interest on Loan', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
             ['code' => '5730', 'name' => 'Round Off', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
+            ['code' => '5740', 'name' => 'Foreign Exchange Loss', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
             ['code' => '5900', 'name' => 'Other Expense', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
+            ['code' => '5910', 'name' => 'Loss on Sale of Fixed Assets', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
+            ['code' => '5920', 'name' => 'Impairment Loss', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
         ];
 
         foreach ($children as $child) {
-            ChartOfAccount::query()->updateOrCreate(
+            ChartOfAccount::query()->withoutGlobalScopes()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $child['code']],
                 [
                     'name' => $child['name'],
@@ -281,6 +309,8 @@ class ChartOfAccountsService
                     'normal_balance' => $child['normal_balance'],
                     'parent_id' => $headerIds[$child['parent']],
                     'is_cash_or_bank' => $child['is_cash_or_bank'] ?? false,
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'is_system' => true,
                     'is_active' => true,
                 ]

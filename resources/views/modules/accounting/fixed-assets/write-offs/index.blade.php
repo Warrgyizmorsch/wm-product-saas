@@ -5,9 +5,11 @@
 @section('breadcrumb', 'Accounting / Fixed Assets / Write-offs')
 
 @section('page-actions')
-    <x-ui.button href="{{ route('accounting.fixed-assets.write-offs.create') }}" variant="primary" icon="feather-plus">
-        New Write-off
-    </x-ui.button>
+    @if ($canCreate)
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="offcanvas" data-bs-target="#writeOffCreateDrawer">
+            New Write-off
+        </x-ui.button>
+    @endif
 @endsection
 
 @section('content')
@@ -27,9 +29,13 @@
                 @forelse ($writeOffs as $writeOff)
                     <tr>
                         <td class="ps-4">
-                            <a href="{{ route('accounting.fixed-assets.show', $writeOff->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
-                                {{ $writeOff->asset->asset_code }}
-                            </a>
+                            @if ($writeOff->asset)
+                                <a href="{{ route('accounting.fixed-assets.show', $writeOff->asset_id) }}" class="fw-bold font-monospace text-primary text-decoration-none">
+                                    {{ $writeOff->asset->asset_code }}
+                                </a>
+                            @else
+                                <span class="fw-bold font-monospace text-muted">Deleted asset #{{ $writeOff->asset_id }}</span>
+                            @endif
                         </td>
                         <td>{{ $writeOff->write_off_date->format('d M Y') }}</td>
                         <td class="text-muted text-truncate" style="max-width: 260px;">{{ $writeOff->reason }}</td>
@@ -78,4 +84,20 @@
             :totalResults="$writeOffs->total()"
             :perPage="$writeOffs->perPage()" />
     </x-ui.card>
+
+    @if ($canCreate)
+        <x-ui.drawer id="writeOffCreateDrawer" title="New Write-off" scroll style="--bs-offcanvas-width: min(640px, 92vw);">
+            @include('modules.accounting.fixed-assets.write-offs._form', ['embedded' => true])
+        </x-ui.drawer>
+
+        @if ($errors->any())
+            @push('scripts')
+                <script>
+                    $(function () {
+                        new bootstrap.Offcanvas(document.getElementById('writeOffCreateDrawer')).show();
+                    });
+                </script>
+            @endpush
+        @endif
+    @endif
 @endsection

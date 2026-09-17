@@ -33,7 +33,7 @@ class AccessService
         // platform-wide checks that have no tenant_id in context, which would
         // let a tenant owner browse or switch into another tenant entirely
         // (see TenantPolicy's own comment on this exact risk).
-        if ($user->role === 'admin' || $user->role === 'super_admin') {
+        if ($this->legacyAdminRoleTextAllows($user, $permissionName, $context)) {
             return true;
         }
 
@@ -54,20 +54,35 @@ class AccessService
             ->first();
 
         if ($permission === null) {
-            return $this->allowsLegacyProductionPermission($user, $permissionName);
+            return false;
         }
 
-        $tenantId = $context['tenant_id'] ?? $user->tenant_id;
         $override = $this->matchingOverride($user, $permission->id, $context);
 
         if ($override !== null) {
-            return $override->allowed;
+            // Deny and allow are deliberately asymmetric. A deny always applies:
+            // a revocation that silently stopped working because the caller
+            // omitted a context key would be the dangerous direction to fail in.
+            // An allow has to earn its scope the same way a role grant does, so
+            // an override written as "own" can't hand out tenant-wide access.
+            if (! $override->allowed) {
+                return false;
+            }
+
+            if ($this->scopeMatches($override->scope, $user, $context)) {
+                return true;
+            }
+
+            // An allow override that doesn't cover this record isn't a denial —
+            // fall through and let the user's role grants speak.
         }
 
-        $roleIds = $this->roleIdsFor($user, $tenantId);
-
+        // $roleIds was already resolved above for the platform-admin check and
+        // neither $user nor $tenantId has changed since — roleIdsFor() costs two
+        // queries now that the legacy role_id is tenant-validated, so it is not
+        // worth repeating.
         if ($roleIds->isEmpty()) {
-            return $this->allowsLegacyProductionPermission($user, $permissionName);
+            return false;
         }
 
         $grants = RolePermission::query()
@@ -81,7 +96,7 @@ class AccessService
             }
         }
 
-        return $this->allowsLegacyProductionPermission($user, $permissionName);
+        return false;
     }
 
     /**
@@ -98,19 +113,15 @@ class AccessService
     }
 
     /**
-     * Modules where permission-table naming actually lines up with the
-     * sidebar's route-based module prefixes, and coverage is broad enough to
-     * trust as a real signal (96-97 rows for production/sales/accounting, 53
-     * for crm, 36 for inventory, 11 for projects). HRMS and Purchase are
-     * deliberately excluded: HRMS has only 3 permission rows total, all
-     * prefixed 'hr.' (not 'hrms.', the route prefix), and Purchase has none
-     * at all (its only related rows are prefixed 'grns.' for the separate
-     * Goods Receipt Note workflow) — filtering on either would hide the
-     * entire module for users who legitimately have access through
-     * mechanisms other than the Permission table (legacy role checks,
-     * hasHrPermission's narrow gate, etc.), which is worse than not
-     * filtering at all. Revisit this list once those two modules get proper
-     * per-entity permissions seeded.
+     * Modules where permission-table naming lines up with the sidebar's
+     * route-based module prefixes, and coverage is broad enough to trust as
+     * a real signal (96-97 rows for production/sales/accounting, 53 for crm,
+     * 36 for inventory, 11 for projects, 47 for hrms, 34 for purchase — see
+     * RbacSeeder). HRMS also has a handful of legacy 'hr.'-prefixed rows
+     * (not 'hrms.', the route prefix) and Purchase has separate 'grns.'
+     * rows for the Goods Receipt Note workflow; neither affects this list,
+     * since a user only needs *a* granted 'hrms.*'/'purchase.*' permission
+     * to keep the module visible, and every seeded HR/Purchase role has one.
      */
     private const ROLE_FILTERABLE_MODULES = ['crm', 'sales', 'inventory', 'accounting', 'production', 'projects'];
 
@@ -161,22 +172,6 @@ class AccessService
             $modules = $modules->merge($permissionNames->map(fn (string $name) => explode('.', $name)[0]));
         }
 
-        // Legacy Production permission map (config('production.permissions'),
-        // permission-name => [allowed legacy role slugs]) isn't expressed as
-        // Permission/RolePermission rows at all, so a user relying on it would
-        // otherwise show zero modules — check it the same way
-        // allowsLegacyProductionPermission() does, for the 'production' module only.
-        $legacyRole = $user->role ?: ($user->primaryRole->slug ?? null);
-
-        if ($legacyRole !== null) {
-            foreach (config('production.permissions', []) as $allowedRoles) {
-                if (in_array($legacyRole, $allowedRoles, true)) {
-                    $modules->push('production');
-                    break;
-                }
-            }
-        }
-
         // Only actually restrict modules we trust the Permission table's
         // coverage for; every other gated module (hrms, purchase today)
         // is unioned in unconditionally so it never gets hidden by this filter.
@@ -206,6 +201,52 @@ class AccessService
         }
 
         return Role::query()->whereIn('id', $roleIds)->where('slug', $roleSlug)->exists();
+    }
+
+    /**
+     * Roles $actor may give a user in $tenantId: system roles plus that
+     * tenant's own, and super_admin only when the actor already holds it.
+     * Every screen that writes a role (users.role_id or user_roles) must limit
+     * its input to this list — otherwise anyone who can edit a user can make
+     * them a platform admin.
+     *
+     * @return Collection<int, Role>
+     */
+    public function assignableRoles(User $actor, ?int $tenantId): Collection
+    {
+        $query = Role::query()->where(function ($query) use ($tenantId): void {
+            $query->whereNull('tenant_id')
+                ->when($tenantId !== null, fn ($q) => $q->orWhere('tenant_id', $tenantId));
+        });
+
+        if (! $this->hasRole($actor, 'super_admin')) {
+            $query->where('slug', '!=', 'super_admin');
+        }
+
+        return $query->orderBy('level')->get();
+    }
+
+    /**
+     * The legacy users.role text column carries no tenant and is written
+     * outside the RBAC screens, so 'admin'/'super_admin' there only makes a
+     * platform admin on an account with no tenant. On a tenant-bound account
+     * it still opens everything inside that account's own tenant (Production
+     * relies on this), but never a platform.* permission or another tenant.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function legacyAdminRoleTextAllows(User $user, string $permissionName, array $context): bool
+    {
+        if (! in_array($user->role, ['admin', 'super_admin'], true)) {
+            return false;
+        }
+
+        if ($user->tenant_id === null) {
+            return true;
+        }
+
+        return ! str_starts_with($permissionName, 'platform.')
+            && $this->sameValue($context['tenant_id'] ?? $user->tenant_id, $user->tenant_id);
     }
 
     /**
@@ -241,7 +282,38 @@ class AccessService
      */
     private function roleIdsFor(User $user, ?int $tenantId): Collection
     {
-        $roleIds = collect([$user->role_id])->filter();
+        // The legacy users.role_id column carries no tenant of its own, so it
+        // has to be validated against the Role it points at. Without this, a
+        // stale or hand-edited role_id referencing another tenant's role would
+        // be honoured outright — the shared-schema role-collision risk. A role
+        // with a null tenant_id is a system template and stays valid for
+        // everyone; the UserRole join below already does the same check.
+        $roleIds = collect();
+
+        if ($user->role_id !== null) {
+            $legacyRoleIsUsable = Role::query()
+                ->whereKey($user->role_id)
+                ->where(function ($query) use ($tenantId): void {
+                    $query->whereNull('tenant_id')
+                        ->when($tenantId !== null, fn ($q) => $q->orWhere('tenant_id', $tenantId));
+                })
+                ->exists();
+
+            if ($legacyRoleIsUsable) {
+                $roleIds->push($user->role_id);
+            }
+        } elseif (filled($user->role) && ! in_array($user->role, ['admin', 'super_admin'], true)) {
+            // Older accounts carry only the users.role text (e.g. 'production_engineer').
+            // Resolve it to the system role of that slug so its real grants apply,
+            // rather than the legacy Production permission map. admin/super_admin
+            // text is never resolved here: legacyAdminRoleTextAllows() handles it
+            // and keeps it inside the user's own tenant.
+            $textRoleId = Role::query()->whereNull('tenant_id')->where('slug', $user->role)->value('id');
+
+            if ($textRoleId !== null) {
+                $roleIds->push($textRoleId);
+            }
+        }
 
         $assignedRoleIds = UserRole::query()
             ->where('user_id', $user->id)
@@ -258,6 +330,14 @@ class AccessService
     }
 
     /**
+     * Whether a grant held at $scope covers the record described by $context.
+     *
+     * Every scope below TENANT compares the record's value against the user's
+     * own — a branch-scoped grant means "records in *this user's* branch", not
+     * "records that happen to carry any branch at all". Both sides must be
+     * present for a narrow scope to match, so a caller that omits the relevant
+     * context key fails closed rather than silently widening the grant.
+     *
      * @param array<string, mixed> $context
      */
     private function scopeMatches(string $scope, User $user, array $context): bool
@@ -265,11 +345,18 @@ class AccessService
         return match ($scope) {
             RolePermission::SCOPE_PLATFORM => true,
             RolePermission::SCOPE_TENANT => $this->sameValue($context['tenant_id'] ?? null, $user->tenant_id),
-            RolePermission::SCOPE_BRANCH => isset($context['branch_id']),
-            RolePermission::SCOPE_COMPANY => isset($context['company_id']),
-            RolePermission::SCOPE_DEPARTMENT => isset($context['department_id']),
+            RolePermission::SCOPE_COMPANY => $this->sameValue($context['company_id'] ?? null, $user->company_id),
+            RolePermission::SCOPE_BRANCH => $this->sameValue($context['branch_id'] ?? null, $user->branch_id),
+            RolePermission::SCOPE_DEPARTMENT => $this->sameValue($context['department_id'] ?? null, $user->department_id),
             RolePermission::SCOPE_OWN => $this->sameValue($context['owner_id'] ?? null, $user->id),
-            RolePermission::SCOPE_TEAM => $this->sameValue($context['owner_id'] ?? null, $user->id),
+            // SCOPE_TEAM is aliased to the user's department for now: there is
+            // no dedicated team_id/Team relation in the schema (HRMS's
+            // Employee.reporting_manager_id is a domain-module concern this
+            // shared service must not reach into), but users.department_id
+            // already exists as a scope anchor. Kept as its own match arm
+            // (not merged into SCOPE_DEPARTMENT) so it can be redefined later
+            // without touching department-scoped grants.
+            RolePermission::SCOPE_TEAM => $this->sameValue($context['department_id'] ?? null, $user->department_id),
             default => false,
         };
     }
@@ -277,19 +364,5 @@ class AccessService
     private function sameValue(mixed $left, mixed $right): bool
     {
         return $left !== null && $right !== null && (string) $left === (string) $right;
-    }
-
-    private function allowsLegacyProductionPermission(User $user, string $permissionName): bool
-    {
-        $permissionMap = config('production.permissions', []);
-        $allowedRoles = $permissionMap[$permissionName] ?? [];
-
-        if (empty($allowedRoles)) {
-            return false;
-        }
-
-        $legacyRole = $user->role ?: ($user->primaryRole->slug ?? null);
-
-        return $legacyRole !== null && in_array($legacyRole, $allowedRoles, true);
     }
 }

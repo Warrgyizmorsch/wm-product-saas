@@ -52,6 +52,16 @@ class Milestone extends BaseModel
         'completion_percentage'  => 'integer',
     ];
 
+    public function getProgressAttribute(): int
+    {
+        return (int) ($this->completion_percentage ?? 0);
+    }
+
+    public function setProgressAttribute(mixed $value): void
+    {
+        $this->attributes['completion_percentage'] = $value !== null ? (int) $value : null;
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

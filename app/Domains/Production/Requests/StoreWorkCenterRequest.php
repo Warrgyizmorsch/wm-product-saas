@@ -29,10 +29,15 @@ class StoreWorkCenterRequest extends FormRequest
             'capacity_per_hour'     => 'nullable|numeric|min:0',
             'efficiency_percentage' => 'nullable|numeric|min:0|max:100',
             'cost_per_hour'         => 'nullable|numeric|min:0',
+            'overhead_rate'         => 'nullable|numeric|min:0',
             'status'                => 'required|in:active,inactive',
             'parent_id'             => [
                 'nullable', 'integer',
                 Rule::exists('production_work_centers', 'id')->where('tenant_id', $tenantId)
+            ],
+            'production_calendar_id' => [
+                'nullable', 'integer',
+                Rule::exists('production_calendars', 'id')->where('tenant_id', $tenantId)
             ],
             'type'                  => [
                 'nullable', 'string',

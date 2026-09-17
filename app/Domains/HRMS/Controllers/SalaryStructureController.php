@@ -104,6 +104,7 @@ class SalaryStructureController extends Controller
             'code' => 'required|string|max:50',
             'type' => 'required|in:earning,deduction',
             'calculation_type' => 'nullable|string|max:50',
+            'chart_of_account_id' => 'nullable|exists:chart_of_accounts,id',
             'is_adhoc' => 'required|boolean',
             'status' => 'required|boolean',
             'description' => 'nullable|string',
@@ -122,11 +123,25 @@ class SalaryStructureController extends Controller
             }
         }
 
-        $this->salaryStructureRepository->storeComponent($validated);
+        $component = $this->salaryStructureRepository->storeComponent($validated);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => __('hrms.salary.component_created_success'),
+                'component' => [
+                    'id' => $component->id,
+                    'name' => $component->name,
+                    'code' => $component->code,
+                    'type' => $component->type,
+                    'is_adhoc' => $component->is_adhoc,
+                ],
+            ]);
+        }
 
         $redirectUrl = route('hrms.salary-structure.index');
         if (!empty($validated['pay_group_id'])) {
-            $tab = $validated['is_adhoc'] ? 'components-adhoc' : 'components-recurring';
+            $tab = $request->input('redirect_tab', $validated['is_adhoc'] ? 'components-adhoc' : 'components-recurring');
             $redirectUrl .= '?pay_group_id=' . $validated['pay_group_id'] . '&active_tab=' . $tab;
         }
 
@@ -142,6 +157,7 @@ class SalaryStructureController extends Controller
             'code' => 'required|string|max:50',
             'type' => 'required|in:earning,deduction',
             'calculation_type' => 'nullable|string|max:50',
+            'chart_of_account_id' => 'nullable|exists:chart_of_accounts,id',
             'is_adhoc' => 'required|boolean',
             'status' => 'required|boolean',
             'description' => 'nullable|string',

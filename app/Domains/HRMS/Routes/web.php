@@ -28,6 +28,10 @@ use App\Domains\HRMS\Controllers\OrgStructureController;
 use App\Domains\HRMS\Controllers\HrmsDashboardController;
 use App\Domains\HRMS\Controllers\PipController;
 use App\Domains\HRMS\Controllers\BroadcastController;
+use App\Domains\HRMS\Controllers\HelpdeskTicketController;
+use App\Domains\HRMS\Controllers\HelpdeskCategoryController;
+use App\Domains\HRMS\Controllers\HelpdeskKbController;
+use App\Domains\HRMS\Controllers\RecruitmentController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -479,6 +483,31 @@ Route::prefix('hrms')
             Route::delete('/template/{template}', [PipController::class, 'destroyTemplate'])->name('template.destroy');
         });
 
+        // Helpdesk & Support Module
+        Route::prefix('helpdesk')->name('helpdesk.')->group(function (): void {
+            Route::get('/', [HelpdeskTicketController::class, 'index'])->name('tickets.index');
+            Route::get('/tickets/create', [HelpdeskTicketController::class, 'create'])->name('tickets.create');
+            Route::post('/tickets/store', [HelpdeskTicketController::class, 'store'])->name('tickets.store');
+            Route::get('/tickets/{ticket}', [HelpdeskTicketController::class, 'show'])->name('tickets.show');
+            Route::post('/tickets/{ticket}/reply', [HelpdeskTicketController::class, 'reply'])->name('tickets.reply');
+            Route::post('/tickets/{ticket}/status', [HelpdeskTicketController::class, 'updateStatus'])->name('tickets.status');
+            Route::post('/tickets/{ticket}/csat', [HelpdeskTicketController::class, 'submitCsat'])->name('tickets.csat');
+
+            // Categories Management
+            Route::get('/categories', [HelpdeskCategoryController::class, 'index'])->name('categories.index');
+            Route::post('/categories/store', [HelpdeskCategoryController::class, 'store'])->name('categories.store');
+            Route::put('/categories/{category}', [HelpdeskCategoryController::class, 'update'])->name('categories.update');
+            Route::delete('/categories/{category}', [HelpdeskCategoryController::class, 'destroy'])->name('categories.destroy');
+
+            // Knowledge Base (FAQ)
+            Route::get('/kb', [HelpdeskKbController::class, 'index'])->name('kb.index');
+            Route::post('/kb/store', [HelpdeskKbController::class, 'store'])->name('kb.store');
+            Route::put('/kb/{id}', [HelpdeskKbController::class, 'update'])->name('kb.update');
+            Route::delete('/kb/{id}', [HelpdeskKbController::class, 'destroy'])->name('kb.destroy');
+            Route::get('/kb/suggest', [HelpdeskKbController::class, 'suggest'])->name('kb.suggest');
+            Route::get('/kb/{slug}', [HelpdeskKbController::class, 'show'])->name('kb.show');
+        });
+
         // Company Broadcasts & Announcements Module
         Route::prefix('broadcasts')->name('broadcasts.')->group(function (): void {
             Route::get('/', [BroadcastController::class, 'index'])->name('index');
@@ -490,5 +519,41 @@ Route::prefix('hrms')
             Route::post('/{broadcast}/comment', [BroadcastController::class, 'storeComment'])->name('comment.store');
             Route::post('/comment/{comment}/pin', [BroadcastController::class, 'togglePinComment'])->name('comment.pin');
             Route::delete('/comment/{comment}', [BroadcastController::class, 'destroyComment'])->name('comment.destroy');
+        });
+
+        // Recruitment & Applicant Tracking System (ATS) Module
+        Route::prefix('recruitment')->name('recruitment.')->group(function (): void {
+            Route::get('/', [RecruitmentController::class, 'index'])->name('index');
+            
+            // Requisitions
+            Route::get('/requisitions', [RecruitmentController::class, 'requisitions'])->name('requisitions.index');
+            Route::post('/requisitions/store', [RecruitmentController::class, 'storeRequisition'])->name('requisitions.store');
+            Route::post('/requisitions/{requisition}/status', [RecruitmentController::class, 'updateRequisitionStatus'])->name('requisitions.status');
+
+            // Candidates
+            Route::get('/candidates', [RecruitmentController::class, 'candidates'])->name('candidates.index');
+            Route::post('/candidates/store', [RecruitmentController::class, 'storeCandidate'])->name('candidates.store');
+
+            // Pipeline & Kanban
+            Route::get('/pipeline/{requisition}', [RecruitmentController::class, 'pipeline'])->name('pipeline');
+            Route::post('/application/{application}/stage', [RecruitmentController::class, 'updateStage'])->name('stage.update');
+
+            // Interviews & Scorecards
+            Route::post('/application/{application}/interview', [RecruitmentController::class, 'scheduleInterview'])->name('interview.schedule');
+            Route::post('/interview/{interview}/scorecard', [RecruitmentController::class, 'submitScorecard'])->name('scorecard.submit');
+
+            // Offers & Employee Conversion
+            Route::post('/application/{application}/offer', [RecruitmentController::class, 'createOffer'])->name('offer.create');
+            Route::post('/offer/{offer}/send-email', [RecruitmentController::class, 'sendOfferEmail'])->name('offer.send-email');
+            Route::post('/offer/{offer}/convert-to-employee', [RecruitmentController::class, 'convertToEmployee'])->name('offer.convert');
+        });
+
+        // Notifications Center
+        Route::prefix('notifications')->name('notifications.')->group(function (): void {
+            Route::get('/', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'index'])->name('index');
+            Route::get('/unread', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'unread'])->name('unread');
+            Route::post('/{id}/read', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'markAsRead'])->name('read');
+            Route::post('/read-all', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'markAllRead'])->name('read-all');
+            Route::delete('/{id}', [\App\Domains\HRMS\Controllers\HrmsNotificationController::class, 'destroy'])->name('destroy');
         });
     });

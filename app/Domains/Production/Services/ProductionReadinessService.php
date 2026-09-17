@@ -125,17 +125,21 @@ class ProductionReadinessService
             $overallStatus = $readyQty > 0.0 ? self::STATUS_PARTIALLY_READY : self::STATUS_BLOCKED;
         }
 
-        return [
-            'operation_id' => $operation->id,
-            'operation_number' => $operation->operation_number,
-            'operation_name' => $operation->name,
-            'sequence' => $operation->sequence,
-            'overall_status' => $overallStatus,
-            'target_qty' => $orderQty,
-            'ready_qty' => $readyQty,
-            'blocked_qty' => $blockedQty,
-            'claimed_qty' => (float) ($operation->quantity_claimed ?? 0.0),
-            'remaining_executable_qty' => max(0.0, round($readyQty - (float) ($operation->quantity_claimed ?? 0.0), 4)),
+            $totalProcessed = (float) ($operation->quantity_produced ?? 0.0) + (float) ($operation->quantity_rejected ?? 0.0) + (float) ($operation->quantity_scrapped ?? 0.0);
+            $effectiveClaimed = max((float) ($operation->quantity_claimed ?? 0.0), $totalProcessed);
+            $remainingExecutable = ($operation->status === 'completed') ? 0.0 : max(0.0, round($readyQty - $effectiveClaimed, 4));
+
+            return [
+                'operation_id' => $operation->id,
+                'operation_number' => $operation->operation_number,
+                'operation_name' => $operation->name,
+                'sequence' => $operation->sequence,
+                'overall_status' => $overallStatus,
+                'target_qty' => $orderQty,
+                'ready_qty' => $readyQty,
+                'blocked_qty' => $blockedQty,
+                'claimed_qty' => $effectiveClaimed,
+                'remaining_executable_qty' => $remainingExecutable,
             'material' => $materialEval,
             'dependency' => $dependencyEval,
             'machine' => $machineEval,
@@ -291,12 +295,13 @@ class ProductionReadinessService
                 ->all();
         }
 
+        $bomItems = collect();
         if ($op->source_bom_id) {
-            $bomMaterialIds = ProductionBomItem::withoutGlobalScopes()
+            $bomItems = ProductionBomItem::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('bom_id', $op->source_bom_id)
-                ->pluck('material_id')
-                ->all();
+                ->get();
+            $bomMaterialIds = $bomItems->pluck('material_id')->all();
             $reservations = $reservations->filter(fn($r) => in_array($r->product_id, $bomMaterialIds, true) && !in_array($r->product_id, $sfgProductIds, true));
         } else {
             $reservations = $reservations->filter(fn($r) => !in_array($r->product_id, $sfgProductIds, true));
@@ -326,7 +331,16 @@ class ProductionReadinessService
         $minExecutableFromMaterial = $orderQty;
 
         foreach ($reservations as $res) {
-            $req = (float) $res->quantity_planned;
+            $bomItem = $bomItems->firstWhere('material_id', $res->product_id);
+            if ($bomItem && (float) $bomItem->quantity > 0) {
+                $scrapFactor = 1.0 + ((float) ($bomItem->material_scrap_percentage ?? 0) / 100.0);
+                $bomRatio = (float) $bomItem->quantity * $scrapFactor;
+                $req = round($bomRatio * $orderQty, 4);
+            } else {
+                $req = (float) $res->quantity_planned;
+                $bomRatio = ($req / max(1.0, $orderQty));
+            }
+
             $iss = (float) $res->quantity_issued;
             $resv = (float) $res->quantity_reserved;
 
@@ -344,8 +358,7 @@ class ProductionReadinessService
             $totalAvailable += $whStock;
             $usableForThisItem = $iss + $resv + $whStock;
 
-            // Ratio calculation if BOM quantity > 0
-            $bomRatio = ($req / max(1.0, $orderQty));
+            // Ratio calculation based on BOM component consumption
             $executableQtyForThisItem = $bomRatio > 0 ? ($usableForThisItem / $bomRatio) : $orderQty;
 
             $minExecutableFromMaterial = min($minExecutableFromMaterial, $executableQtyForThisItem);

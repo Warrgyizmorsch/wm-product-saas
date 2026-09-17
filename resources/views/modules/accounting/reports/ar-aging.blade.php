@@ -4,14 +4,17 @@
 @section('page-title', 'Accounts Receivable Aging')
 @section('breadcrumb', 'Accounting / Reports / AR Aging')
 
+@section('page-actions')
+    @include('modules.accounting.reports.partials.export-buttons', ['report' => 'ar-aging'])
+@endsection
+
 @section('content')
     <x-ui.card class="mb-4">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label fs-12 fw-semibold text-muted">As Of Date</label>
-                <input type="date" name="as_of" class="form-control" value="{{ $asOf->toDateString() }}" onchange="this.form.submit()">
-            </div>
-        </form>
+        <x-ui.filter-toolbar :resetUrl="route('accounting.reports.ar-aging')" searchLabel="View">
+            <x-ui.filter-field label="As Of Date" col="col-md-3">
+                <input type="date" name="as_of" class="form-control form-control-sm" value="{{ $asOf->toDateString() }}">
+            </x-ui.filter-field>
+        </x-ui.filter-toolbar>
     </x-ui.card>
 
     <x-ui.card title="Outstanding by Age" bodyClass="p-0" class="accounting-dense">

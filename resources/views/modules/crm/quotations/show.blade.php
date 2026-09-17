@@ -38,9 +38,49 @@
             @endif
         @endif
 
-        <a href="{{ route('crm.quotations.download', $quotation->id) }}" class="btn btn-sm btn-primary fw-bold px-3">
-            <i class="feather-download me-1.5"></i>Download PDF
-        </a>
+        <!-- MORE Dropdown Button -->
+        <div class="dropdown">
+            <button class="btn btn-sm btn-light border fw-bold px-3 py-1.5 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Quotation Actions">
+                <i class="feather-more-horizontal me-1"></i>MORE
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm border p-1" style="min-width: 210px;">
+                <li>
+                    <button type="button" 
+                            class="dropdown-item py-2 fs-12 fw-medium btn-open-send-quote-wa-modal d-flex align-items-center" 
+                            data-quotation-id="{{ $quotation->id }}" 
+                            data-quotation-num="{{ $quotation->quotation_number }}" 
+                            data-client-phone="{{ $quotation->prepared_for_phone !== '—' ? $quotation->prepared_for_phone : ($quotation->deal?->contact?->phone ?: ($quotation->lead?->company_phone ?: $quotation->lead?->phone)) }}" 
+                            data-deal-title="{{ addslashes($quotation->deal?->title ?? 'Quotation') }}">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="me-2"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
+                        Send via WhatsApp
+                    </button>
+                </li>
+                <li>
+                    <button type="button" 
+                            class="dropdown-item py-2 fs-12 fw-medium btn-open-send-quote-modal d-flex align-items-center" 
+                            data-quotation-id="{{ $quotation->id }}" 
+                            data-quotation-num="{{ $quotation->quotation_number }}" 
+                            data-client-email="{{ $quotation->prepared_for_email !== '—' ? $quotation->prepared_for_email : ($quotation->deal?->contact?->email ?: ($quotation->lead?->company_email ?: $quotation->lead?->email)) }}" 
+                            data-deal-title="{{ addslashes($quotation->deal?->title ?? 'Quotation') }}">
+                        <i class="feather-mail me-2 text-primary fs-14"></i>
+                        Send via Email
+                    </button>
+                </li>
+                <li>
+                    <a href="{{ route('crm.quotations.download', $quotation->id) }}" class="dropdown-item py-2 fs-12 fw-medium d-flex align-items-center">
+                        <i class="feather-download me-2 text-danger fs-14"></i>
+                        Download PDF Document
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider my-1"></li>
+                <li>
+                    <a href="javascript:void(0)" onclick="window.print()" class="dropdown-item py-2 fs-12 fw-medium d-flex align-items-center">
+                        <i class="feather-printer me-2 text-secondary fs-14"></i>
+                        Print Quotation
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
 @endsection
 
@@ -333,15 +373,19 @@
                             <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">Prepared For:</span>
                             <h6 class="fw-bold text-dark mb-1 fs-14">{{ $quotation->prepared_for_name }}</h6>
                             @if($quotation->prepared_for_email !== '—' || $quotation->prepared_for_phone !== '—')
-                                <div class="text-secondary mb-1">
+                                <div class="text-secondary mb-1 d-flex align-items-center flex-wrap gap-2">
                                     @if($quotation->prepared_for_email !== '—')
-                                        <span><i class="feather-mail me-1 fs-11 text-muted"></i>{{ $quotation->prepared_for_email }}</span>
+                                        <span class="d-inline-flex align-items-center">
+                                            <i class="feather-mail me-1 fs-11 text-muted"></i>{{ $quotation->prepared_for_email }}
+                                        </span>
                                     @endif
                                     @if($quotation->prepared_for_email !== '—' && $quotation->prepared_for_phone !== '—')
-                                        <span class="mx-1 text-muted">|</span>
+                                        <span class="text-muted">|</span>
                                     @endif
                                     @if($quotation->prepared_for_phone !== '—')
-                                        <span><i class="feather-phone me-1 fs-11 text-muted"></i>{{ $quotation->prepared_for_phone }}</span>
+                                        <span class="d-inline-flex align-items-center">
+                                            <i class="feather-phone me-1 fs-11 text-muted"></i>{{ $quotation->prepared_for_phone }}
+                                        </span>
                                     @endif
                                 </div>
                             @endif
@@ -485,6 +529,292 @@
         </div>
     </div>
 @endsection
+
+<!-- SEND QUOTATION EMAIL MODAL WITH PDF ATTACHMENT -->
+<x-ui.modal id="sendQuotationEmailModal" title="<i class='feather-send text-success me-1.5'></i>Send Quotation PDF Email to Client" size="lg" :centered="true" :showFooter="false">
+    <form id="sendQuotationEmailForm" action="" method="POST">
+        @csrf
+        @php
+            $availableSmtps = \App\Models\EmailConfiguration::where('is_active', true)->orderByDesc('is_default')->get();
+        @endphp
+        @if($availableSmtps->isNotEmpty())
+            <div class="mb-3">
+                <x-ui.modal-form-ui type="select" label="From SMTP Account" name="account_id" :searchable="false">
+                    @foreach($availableSmtps as $s)
+                        <option value="{{ $s->id }}" @selected($s->is_default)>{{ $s->name }} ({{ $s->email_address }})</option>
+                    @endforeach
+                </x-ui.modal-form-ui>
+            </div>
+        @endif
+
+        <div class="mb-3">
+            <x-ui.modal-form-ui type="input" inputType="email" label="Client Email Address (To)" name="to_email" id="sendQuoteToEmail" placeholder="client@company.com" :required="true" />
+        </div>
+
+        <div class="mb-3">
+            <x-ui.modal-form-ui type="input" label="Subject" name="subject" id="sendQuoteSubject" :required="true" />
+        </div>
+
+        <div class="p-2.5 rounded border bg-light-subtle mb-3 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <i class="feather-paperclip text-primary fs-16"></i>
+                <span class="fs-12 fw-bold text-dark" id="sendQuotePdfBadge">Quotation.pdf</span>
+                <span class="badge bg-soft-danger text-danger border px-1.5 py-0.5 fs-10">PDF Attached</span>
+            </div>
+            <span class="fs-11 text-muted">Auto-generated via DomPDF</span>
+        </div>
+
+        <div class="mb-3">
+            <x-ui.modal-form-ui type="textarea" label="Message Body" name="body_html" id="sendQuoteBody" rows="6" :required="true" />
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+            <span class="fs-11 text-muted"><i class="feather-info me-1"></i>Email will be dispatched immediately via SMTP server.</span>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" id="btnSubmitSendQuoteEmail" class="btn btn-sm btn-success fw-bold px-4">
+                    <i class="feather-send me-1"></i>Send Email Now
+                </button>
+            </div>
+        </div>
+    </form>
+</x-ui.modal>
+
+<!-- SEND QUOTATION WHATSAPP MODAL -->
+<x-ui.modal id="sendQuotationWhatsAppModal" title="<i class='feather-message-circle text-success me-1.5'></i>Send Quotation PDF via WhatsApp" size="lg" :centered="true" :showFooter="false">
+    <form id="sendQuotationWhatsAppForm" action="" method="POST">
+        @csrf
+        
+        <!-- WhatsApp Connection Status Banner -->
+        <div id="waStatusContainer" class="p-3 rounded border mb-3 text-start fs-12 bg-light">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <span id="waStatusBadge" class="badge bg-secondary">Checking WhatsApp...</span>
+                    <span id="waStatusText" class="text-muted fs-11">Connecting to WhatsApp Baileys bridge...</span>
+                </div>
+                <button type="button" id="btnConnectWA" class="btn btn-xs btn-outline-success fw-bold d-none">
+                    <i class="feather-smartphone me-1"></i>Connect / QR Scan
+                </button>
+            </div>
+            <div id="waQrContainer" class="text-center mt-3 d-none">
+                <p class="fs-12 fw-bold text-dark mb-1">Scan QR Code from WhatsApp app (Linked Devices)</p>
+                <img id="waQrImg" src="" alt="WhatsApp QR Code" class="img-thumbnail" style="max-width: 200px;">
+                <p class="fs-11 text-muted mt-1">Open WhatsApp on your phone -> Settings/Menu -> Linked Devices -> Link a Device</p>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <x-ui.modal-form-ui type="input" label="Recipient Mobile / WhatsApp Number" name="phone" id="sendWaPhone" placeholder="9876543210 (Country code 91 auto-added)" :required="true" />
+        </div>
+
+        <div class="p-2.5 rounded border bg-light-subtle mb-3 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <i class="feather-paperclip text-success fs-16"></i>
+                <span class="fs-12 fw-bold text-dark" id="sendWaPdfBadge">Quotation.pdf</span>
+                <span class="badge bg-soft-success text-success border px-1.5 py-0.5 fs-10">PDF Attached</span>
+            </div>
+            <span class="fs-11 text-muted">Base64 PDF Attachment</span>
+        </div>
+
+        <div class="mb-3">
+            <x-ui.modal-form-ui type="textarea" label="Caption / Message Text" name="caption" id="sendWaCaption" rows="5" :required="true" />
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+            <span class="fs-11 text-muted"><i class="feather-info me-1"></i>Document will be sent directly via linked WhatsApp account.</span>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" id="btnSubmitSendQuoteWA" class="btn btn-sm btn-success fw-bold px-4">
+                    <i class="feather-send me-1"></i>Send WhatsApp PDF
+                </button>
+            </div>
+        </div>
+    </form>
+</x-ui.modal>
+
+<!-- RESULT NOTIFICATION MODAL (COMMON COMPONENT) -->
+<x-ui.modal id="waResultModal" title="<i class='feather-info me-1.5 text-primary'></i>System Notification" size="lg" :centered="true" :showFooter="false">
+    <div class="py-4 px-3 text-center">
+        <div id="waResultIcon" class="mb-3 d-flex justify-content-center"></div>
+        <h4 id="waResultTitle" class="fw-bold text-dark mb-3 fs-18"></h4>
+        <div id="waResultMessage" class="alert alert-light border text-center fs-13 mb-4 font-monospace p-3.5 text-break shadow-2xs rounded-3 mx-auto" style="max-width: 520px; background-color: #f8fafc; border-color: #e2e8f0 !important; color: #334155; line-height: 1.6;"></div>
+        <div class="d-flex justify-content-center mt-3">
+            <button type="button" class="btn btn-primary fw-bold px-5 py-2 fs-13 shadow-2xs rounded-3" data-bs-dismiss="modal" style="min-width: 140px;">OK</button>
+        </div>
+    </div>
+</x-ui.modal>
+
+@push('scripts')
+<script>
+    function showNotificationModal(isSuccess, title, message) {
+        const iconHtml = isSuccess 
+            ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
+            : '<div class="avatar avatar-xl bg-soft-danger text-danger rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(239, 68, 68, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
+        
+        $('#waResultIcon').html(iconHtml);
+        $('#waResultTitle').text(title).attr('class', isSuccess ? 'fw-bold text-success mb-2 fs-18' : 'fw-bold text-danger mb-2 fs-18');
+        $('#waResultMessage').text(message);
+        
+        const modalEl = document.getElementById('waResultModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+
+    function checkWhatsAppStatus() {
+        $.ajax({
+            url: "/crm/whatsapp/status",
+            method: "GET",
+            success: function(res) {
+                if (res.status === 'connected') {
+                    $('#waStatusBadge').attr('class', 'badge bg-success').text('Connected');
+                    const userName = res.user ? (res.user.name || res.user.id || 'Linked Account') : 'Linked Account';
+                    $('#waStatusText').text('Connected: ' + userName);
+                    $('#waQrContainer').addClass('d-none');
+                    $('#btnConnectWA').addClass('d-none');
+                    $('#btnSubmitSendQuoteWA').prop('disabled', false);
+                } else if (res.status === 'qr' && res.qr) {
+                    $('#waStatusBadge').attr('class', 'badge bg-warning text-dark').text('Scan QR');
+                    $('#waStatusText').text('Open WhatsApp app on your phone to scan QR code');
+                    $('#waQrImg').attr('src', res.qr);
+                    $('#waQrContainer').removeClass('d-none');
+                    $('#btnConnectWA').addClass('d-none');
+                    $('#btnSubmitSendQuoteWA').prop('disabled', true);
+                } else if (res.status === 'connecting') {
+                    $('#waStatusBadge').attr('class', 'badge bg-info text-dark').text('Connecting...');
+                    $('#waStatusText').text('Initializing Baileys socket...');
+                    $('#waQrContainer').addClass('d-none');
+                    $('#btnConnectWA').addClass('d-none');
+                    $('#btnSubmitSendQuoteWA').prop('disabled', true);
+                } else {
+                    $('#waStatusBadge').attr('class', 'badge bg-danger').text('Disconnected');
+                    $('#waStatusText').text(res.message || 'No WhatsApp account linked.');
+                    $('#waQrContainer').addClass('d-none');
+                    $('#btnConnectWA').removeClass('d-none');
+                    $('#btnSubmitSendQuoteWA').prop('disabled', true);
+                }
+            },
+            error: function() {
+                $('#waStatusBadge').attr('class', 'badge bg-danger').text('Bridge Offline');
+                $('#waStatusText').text('Node.js WhatsApp bridge is offline. Start Node.js server (services/whatsapp-bridge).');
+                $('#btnConnectWA').removeClass('d-none');
+            }
+        });
+    }
+
+    $(document).on('click', '#btnConnectWA', function() {
+        $('#waStatusBadge').attr('class', 'badge bg-info text-dark').text('Connecting...');
+        $('#waStatusText').text('Requesting QR code connection...');
+        $.ajax({
+            url: "/crm/whatsapp/connect",
+            method: "POST",
+            data: { _token: "{{ csrf_token() }}" },
+            success: function() {
+                setTimeout(checkWhatsAppStatus, 1500);
+            }
+        });
+    });
+
+    $(document).on('click', '.btn-open-send-quote-wa-modal', function () {
+        const qId = $(this).attr('data-quotation-id');
+        const qNum = $(this).attr('data-quotation-num');
+        const cPhone = $(this).attr('data-client-phone') || '';
+        const dTitle = $(this).attr('data-deal-title') || 'Quotation';
+
+        $('#sendQuotationWhatsAppForm').attr('action', '/crm/quotations/' + qId + '/send-whatsapp');
+        $('#sendWaPhone').val(cPhone);
+        $('#sendWaPdfBadge').text('Quotation_' + qNum + '.pdf');
+
+        const defaultCaption = "Dear Valued Client,\n\nPlease find attached Quotation *" + qNum + "* for your review regarding " + dTitle + ".\n\nThank you,\nSales Team";
+        $('#sendWaCaption').val(defaultCaption);
+
+        const sendWaModal = new bootstrap.Modal(document.getElementById('sendQuotationWhatsAppModal'));
+        sendWaModal.show();
+        checkWhatsAppStatus();
+    });
+
+    $(document).on('submit', '#sendQuotationWhatsAppForm', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const btn = $('#btnSubmitSendQuoteWA');
+        const origHtml = btn.html();
+
+        btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Sending WhatsApp...');
+
+        $.ajax({
+            url: form.attr('action'),
+            method: "POST",
+            data: form.serialize(),
+            success: function (res) {
+                btn.prop('disabled', false).html(origHtml);
+                const modalEl = document.getElementById('sendQuotationWhatsAppModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                showNotificationModal(true, "WhatsApp Message Delivered!", res.message);
+            },
+            error: function (xhr) {
+                btn.prop('disabled', false).html(origHtml);
+                const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to send WhatsApp document.';
+                const modalEl = document.getElementById('sendQuotationWhatsAppModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                showNotificationModal(false, "WhatsApp Dispatch Failed", errMsg);
+            }
+        });
+    });
+
+    $(document).on('click', '.btn-open-send-quote-modal', function () {
+        const qId = $(this).attr('data-quotation-id');
+        const qNum = $(this).attr('data-quotation-num');
+        const cEmail = $(this).attr('data-client-email') || '';
+        const dTitle = $(this).attr('data-deal-title') || 'Quotation';
+
+        $('#sendQuotationEmailForm').attr('action', '/crm/quotations/' + qId + '/send-email');
+        $('#sendQuoteToEmail').val(cEmail);
+        $('#sendQuoteSubject').val('Quotation ' + qNum + ' - ' + dTitle);
+        $('#sendQuotePdfBadge').text('Quotation_' + qNum + '.pdf');
+
+        const defaultBody = "Dear Valued Client,\n\nPlease find attached Quotation " + qNum + " for your review regarding " + dTitle + ".\n\nWe look forward to your feedback. Please let us know if you have any questions.\n\nBest regards,\nSales Team";
+        $('#sendQuoteBody').val(defaultBody);
+
+        const sendModal = new bootstrap.Modal(document.getElementById('sendQuotationEmailModal'));
+        sendModal.show();
+    });
+
+    $(document).on('submit', '#sendQuotationEmailForm', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const btn = $('#btnSubmitSendQuoteEmail');
+        const origHtml = btn.html();
+
+        btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Sending Email...');
+
+        $.ajax({
+            url: form.attr('action'),
+            method: "POST",
+            data: form.serialize(),
+            success: function (res) {
+                btn.prop('disabled', false).html(origHtml);
+                const modalEl = document.getElementById('sendQuotationEmailModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                showNotificationModal(true, "Quotation Email Dispatched!", res.message);
+            },
+            error: function (xhr) {
+                btn.prop('disabled', false).html(origHtml);
+                const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to send Quotation Email.';
+                const modalEl = document.getElementById('sendQuotationEmailModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                showNotificationModal(false, "Email Dispatch Failed", errMsg);
+            }
+        });
+    });
+</script>
+@endpush
 
 @if(request()->has('print'))
     @push('scripts')

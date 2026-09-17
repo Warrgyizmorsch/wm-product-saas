@@ -5,12 +5,18 @@ namespace App\Domains\Access\Services;
 use App\Models\Access\Permission;
 use App\Models\Access\Role;
 use App\Models\Access\RolePermission;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class RoleService
 {
+    public function __construct(
+        private readonly AccessAuditLogger $auditLogger,
+    ) {
+    }
+
     /**
      * Roles visible to a tenant: global system roles plus this tenant's
      * own custom roles. Role has no BelongsToTenant scope, so this filter
@@ -28,9 +34,9 @@ class RoleService
             ->get();
     }
 
-    public function create(int $tenantId, array $data): Role
+    public function create(User $actor, int $tenantId, array $data): Role
     {
-        return Role::create([
+        $role = Role::create([
             'tenant_id' => $tenantId,
             'name' => $data['name'],
             'slug' => ($data['slug'] ?? null) ?: Str::slug($data['name']),
@@ -38,6 +44,17 @@ class RoleService
             'description' => $data['description'] ?? null,
             'is_system' => false,
         ]);
+
+        $this->auditLogger->log(
+            actor: $actor,
+            action: 'role.created',
+            tenantId: $tenantId,
+            subjectType: 'role',
+            subjectId: $role->id,
+            after: $role->only(['name', 'slug', 'level', 'description']),
+        );
+
+        return $role;
     }
 
     /**
@@ -76,9 +93,9 @@ class RoleService
      *
      * @param array<int|string, array<string, mixed>> $grants keyed by permission_id => [scope => bool]
      */
-    public function syncPermissions(Role $role, array $grants): void
+    public function syncPermissions(User $actor, Role $role, array $grants): void
     {
-        DB::transaction(function () use ($role, $grants) {
+        DB::transaction(function () use ($actor, $role, $grants) {
             $existing = RolePermission::query()
                 ->where('role_id', $role->id)
                 ->get()
@@ -101,6 +118,9 @@ class RoleService
                 }
             }
 
+            $added = [];
+            $removed = [];
+
             foreach ($desired as $key => [$permissionId, $scope]) {
                 if (! isset($existing[$key])) {
                     RolePermission::query()->create([
@@ -108,13 +128,27 @@ class RoleService
                         'permission_id' => $permissionId,
                         'scope' => $scope,
                     ]);
+                    $added[] = $key;
                 }
             }
 
             foreach ($existing as $key => $row) {
                 if (! isset($desired[$key])) {
                     $row->delete();
+                    $removed[] = $key;
                 }
+            }
+
+            if ($added !== [] || $removed !== []) {
+                $this->auditLogger->log(
+                    actor: $actor,
+                    action: 'role.permissions.updated',
+                    tenantId: $role->tenant_id,
+                    subjectType: 'role',
+                    subjectId: $role->id,
+                    before: ['removed' => $removed],
+                    after: ['added' => $added],
+                );
             }
         });
     }

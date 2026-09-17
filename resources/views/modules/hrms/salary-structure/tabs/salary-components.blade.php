@@ -3,6 +3,7 @@
     $salaryComponents = $salaryComponents ?? collect();
     $recurringComponents = $recurringComponents ?? $salaryComponents->filter(fn ($component) => !($component->is_adhoc ?? false));
     $adhocComponents = $adhocComponents ?? $salaryComponents->filter(fn ($component) => (bool) ($component->is_adhoc ?? false));
+    $chartOfAccounts = $chartOfAccounts ?? \App\Domains\Accounting\Models\ChartOfAccount::orderBy('code', 'asc')->get();
 @endphp
 
 <style>

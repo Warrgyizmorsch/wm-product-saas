@@ -29,7 +29,10 @@ class TaskDependencyController extends Controller
     {
         $this->authorize('update', $task);
 
-        $this->dependencies->create($task, (int) $request->validated()['depends_on_task_id']);
+        $validated = $request->validated();
+        $type = $validated['dependency_type'] ?? TaskDependency::TYPE_FINISH_TO_START;
+
+        $this->dependencies->create($task, (int) $validated['depends_on_task_id'], $type);
 
         return $this->respond($request, $project, $task, __('projects.dependency_added'));
     }

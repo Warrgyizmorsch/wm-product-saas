@@ -98,8 +98,9 @@
             $sigPosCss = 'top: 60px; right: 40px;';
         }
 
-        $fileUrl = asset('storage/' . $document->file_path);
-        $ext = strtolower(pathinfo($document->file_path, PATHINFO_EXTENSION));
+        $originalFile = $document->file_path;
+        $originalFileUrl = asset('storage/' . $originalFile);
+        $ext = strtolower(pathinfo($originalFile, PATHINFO_EXTENSION));
         $isImage = in_array($ext, ['png', 'jpg', 'jpeg', 'webp', 'gif']);
     @endphp
 
@@ -121,7 +122,7 @@
         </div>
 
         <div class="d-flex align-items-center gap-2">
-            <a href="{{ $fileUrl }}" download class="btn btn-outline-secondary btn-sm fw-semibold d-inline-flex align-items-center gap-1.5">
+            <a href="{{ $originalFileUrl }}" download class="btn btn-outline-secondary btn-sm fw-semibold d-inline-flex align-items-center gap-1.5">
                 <i data-feather="download" style="width: 14px; height: 14px;"></i> Download Original
             </a>
             @if($document->signed_file_path)
@@ -141,10 +142,10 @@
             <!-- ORIGINAL DOCUMENT CONTENT (PDF or IMAGE) -->
             @if($isImage)
                 <div class="d-flex justify-content-center align-items-center h-100 p-3 bg-secondary-subtle overflow-auto">
-                    <img src="{{ $fileUrl }}" class="img-fluid rounded shadow-sm" style="max-height: 740px; object-fit: contain;" alt="Original Document">
+                    <img src="{{ $originalFileUrl }}" class="img-fluid rounded shadow-sm" style="max-height: 740px; object-fit: contain;" alt="Original Document">
                 </div>
             @else
-                <iframe src="{{ $fileUrl }}" style="width: 100%; height: 100%; border: none;"></iframe>
+                <iframe src="{{ $originalFileUrl }}" style="width: 100%; height: 100%; border: none;"></iframe>
             @endif
         </div>
 

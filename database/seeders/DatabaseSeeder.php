@@ -47,6 +47,8 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             RbacSeeder::class,
+            PlatformAdminSeeder::class,
+            CurrencySeeder::class,
             AccountingChartOfAccountsSeeder::class,
             PaymentTermSeeder::class,
             InventoryMasterDemoSeeder::class,
@@ -58,6 +60,10 @@ class DatabaseSeeder extends Seeder
             TableManufacturingProductionSeeder::class,
             HrmsDemoSeeder::class,
         ]);
+
+        // Same default masters a tenant created from Tenant Console gets. Runs
+        // last so it reuses the demo company/branch instead of adding its own.
+        app(\App\Core\Tenant\TenantProvisioner::class)->provision($tenant->fresh());
 
         // $this->callWith(ProjectsDemoSeeder::class, ['options' => ['wipe' => true]]);
     }

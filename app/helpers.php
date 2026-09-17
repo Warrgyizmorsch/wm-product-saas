@@ -86,6 +86,28 @@ if (! function_exists('current_company_id')) {
     }
 }
 
+if (! function_exists('company_currency')) {
+    /**
+     * The selected company's base (reporting) currency — what every ledger amount
+     * is stored in. Not to be confused with active_currency(), the older
+     * session-based display switcher used by Production/Purchase screens.
+     *
+     * @return array{code: string, symbol: string, name: string, decimals: int}
+     */
+    function company_currency(): array
+    {
+        $code = app(\App\Domains\Accounting\Services\CurrencyService::class)->baseCurrencyFor(company_id());
+        $currency = \App\Models\Currency::query()->where('code', $code)->first(['code', 'name', 'symbol', 'decimals']);
+
+        return [
+            'code' => $code,
+            'symbol' => $currency?->symbol ?? $code,
+            'name' => $currency?->name ?? $code,
+            'decimals' => (int) ($currency?->decimals ?? 2),
+        ];
+    }
+}
+
 if (! function_exists('require_company_id')) {
     function require_company_id(): int
     {

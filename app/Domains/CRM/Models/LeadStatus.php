@@ -35,7 +35,7 @@ class LeadStatus extends Model
     /**
      * Default protected statuses that can never be deleted or renamed.
      */
-    public const PROTECTED_STATUSES = ['New', 'Qualified', 'Won', 'Lost'];
+    public const PROTECTED_STATUSES = ['New', 'Qualified', 'Converted', 'Won', 'Lost'];
 
     /**
      * Helper method to retrieve ordered statuses for a tenant.
@@ -71,8 +71,9 @@ class LeadStatus extends Model
         $defaults = [
             ['name' => 'New',       'sort_order' => 1, 'color' => 'bg-primary'],
             ['name' => 'Qualified', 'sort_order' => 2, 'color' => 'bg-teal'],
-            ['name' => 'Won',       'sort_order' => 3, 'color' => 'bg-success'],
-            ['name' => 'Lost',      'sort_order' => 4, 'color' => 'bg-danger'],
+            ['name' => 'Converted', 'sort_order' => 3, 'color' => 'bg-info'],
+            ['name' => 'Won',       'sort_order' => 4, 'color' => 'bg-success'],
+            ['name' => 'Lost',      'sort_order' => 5, 'color' => 'bg-danger'],
         ];
 
         foreach ($defaults as $def) {

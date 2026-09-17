@@ -46,7 +46,10 @@ class ApAgingController extends Controller
             $vendorName = $bill->vendor?->name ?? 'Unknown Vendor';
 
             $dueDate = $bill->due_date ? Carbon::parse($bill->due_date) : null;
-            $daysOverdue = ($dueDate && $dueDate->lt($asOf)) ? $asOf->diffInDays($dueDate) : 0;
+            // Carbon 3's diffInDays() is signed (not absolute) by default, so
+            // asOf->diffInDays(pastDate) returns a negative number — abs() it
+            // or every overdue bill falls into the "not_due" bucket.
+            $daysOverdue = ($dueDate && $dueDate->lt($asOf)) ? abs($asOf->diffInDays($dueDate)) : 0;
             $bucket = $this->bucketFor($daysOverdue);
 
             $balance = (float) $bill->due_amount;

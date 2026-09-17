@@ -18,14 +18,18 @@ class TaskDrawerPayload
         $task->loadMissing('subTasks.assignee');
 
         return $task->subTasks->map(fn ($subTask) => [
-            'id' => $subTask->id,
-            'title' => $subTask->title,
-            'isCompleted' => $subTask->is_completed,
-            'assigneeId' => $subTask->assignee_id,
-            'assigneeName' => $subTask->assignee?->name,
-            'updateUrl' => route('projects.tasks.subtasks.update', [$project, $task, $subTask]),
-            'toggleUrl' => route('projects.tasks.subtasks.toggle-complete', [$project, $task, $subTask]),
-            'deleteUrl' => route('projects.tasks.subtasks.destroy', [$project, $task, $subTask]),
+            'id'             => $subTask->id,
+            'title'          => $subTask->title,
+            'status'         => $subTask->status,
+            'isCompleted'    => (bool) $subTask->is_completed,
+            'assigneeId'     => $subTask->assignee_id,
+            'assigneeName'   => $subTask->assignee?->name,
+            'startDate'      => $subTask->start_date?->format('Y-m-d'),
+            'dueDate'        => $subTask->due_date?->format('Y-m-d'),
+            'estimatedHours' => $subTask->estimated_hours !== null ? (float) $subTask->estimated_hours : null,
+            'updateUrl'      => route('projects.tasks.subtasks.update', [$project, $task, $subTask]),
+            'toggleUrl'      => route('projects.tasks.subtasks.toggle-complete', [$project, $task, $subTask]),
+            'deleteUrl'      => route('projects.tasks.subtasks.destroy', [$project, $task, $subTask]),
         ])->values()->all();
     }
 
@@ -34,9 +38,10 @@ class TaskDrawerPayload
         $task->loadMissing('dependencies.dependsOn');
 
         return $task->dependencies->map(fn ($dependency) => [
-            'id' => $dependency->id,
-            'label' => $dependency->dependsOn?->task_code . ' — ' . $dependency->dependsOn?->title,
-            'deleteUrl' => route('projects.tasks.dependencies.destroy', [$project, $task, $dependency]),
+            'id'             => $dependency->id,
+            'dependencyType' => $dependency->dependency_type ?: 'Finish-to-Start',
+            'label'          => ($dependency->dependsOn?->task_code . ' — ' . $dependency->dependsOn?->title),
+            'deleteUrl'      => route('projects.tasks.dependencies.destroy', [$project, $task, $dependency]),
         ])->values()->all();
     }
 

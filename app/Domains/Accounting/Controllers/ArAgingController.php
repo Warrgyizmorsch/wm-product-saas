@@ -47,7 +47,10 @@ class ArAgingController extends Controller
             $customerName = $invoice->customer?->name ?? 'Unknown Customer';
 
             $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date) : null;
-            $daysOverdue = ($dueDate && $dueDate->lt($asOf)) ? $asOf->diffInDays($dueDate) : 0;
+            // Carbon 3's diffInDays() is signed (not absolute) by default, so
+            // asOf->diffInDays(pastDate) returns a negative number — abs() it
+            // or every overdue invoice falls into the "not_due" bucket.
+            $daysOverdue = ($dueDate && $dueDate->lt($asOf)) ? abs($asOf->diffInDays($dueDate)) : 0;
             $bucket = $this->bucketFor($daysOverdue);
 
             $balance = (float) $invoice->balance_due;

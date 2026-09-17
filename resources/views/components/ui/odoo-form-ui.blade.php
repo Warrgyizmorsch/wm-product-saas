@@ -396,6 +396,125 @@
                 border-color: #dc3545 !important;
                 color: #dc3545 !important;
             }
+
+            /* Dark Mode Support for Odoo Form UI */
+            html.app-skin-dark .odoo-sheet,
+            html.app-skin-dark .odoo-sheet.bg-white {
+                background: #0f172a !important;
+                background-color: #0f172a !important;
+                color: #b1b4c0 !important;
+            }
+            html.app-skin-dark .odoo-form-label {
+                color: #94a3b8 !important;
+            }
+            html.app-skin-dark .odoo-form-control {
+                color: #ffffff !important;
+                border-bottom: 1px solid #283c50 !important;
+                background-color: transparent !important;
+            }
+            html.app-skin-dark textarea.odoo-form-control {
+                border: 1px solid #283c50 !important;
+                background-color: #121a2d !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .form-check-input {
+                border-color: #334155 !important;
+                background-color: #121a2d !important;
+            }
+            html.app-skin-dark .form-check-label {
+                color: #e2e8f0 !important;
+            }
+            html.app-skin-dark .erp-custom-file-upload .file-upload-label {
+                border: 2px dashed #283c50 !important;
+                background-color: #121a2d !important;
+                color: #94a3b8 !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-selection {
+                border-bottom: 1px solid #283c50 !important;
+                background-color: transparent !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-dropdown {
+                background-color: #0f172a !important;
+                border-color: #1b2436 !important;
+            }
+            html.app-skin-dark body .select2-results__option[role=group],
+            html.app-skin-dark body .select2-results__option[role=group].select2-results__option--highlighted,
+            html.app-skin-dark body .select2-results__option[role=group]:hover {
+                background-color: #0f172a !important;
+                background: #0f172a !important;
+            }
+            html.app-skin-dark body .select2-results__group {
+                background-color: #162038 !important;
+                background: #162038 !important;
+                color: #94a3b8 !important;
+                border-bottom: 1px solid #1b2436 !important;
+            }
+            html.app-skin-dark body .select2-results__option:not([role=group]) {
+                background-color: #0f172a !important;
+                background: #0f172a !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark body .select2-results__option:not([role=group]).select2-results__option--highlighted {
+                background-color: #1c2438 !important;
+                background: #1c2438 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .custom-s2-search,
+            html.app-skin-dark .custom-s2-search.bg-white {
+                background-color: #0f172a !important;
+                border-bottom-color: #1b2436 !important;
+            }
+            html.app-skin-dark .custom-s2-search input {
+                background-color: #121a2d !important;
+                border: 1px solid #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .odoo-table thead,
+            html.app-skin-dark .odoo-table th {
+                background-color: #162038 !important;
+                color: #94a3b8 !important;
+                border-bottom: 2px solid #1b2436 !important;
+            }
+            html.app-skin-dark .odoo-table td {
+                border-bottom: 1px solid #1b2436 !important;
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .odoo-table-input,
+            html.app-skin-dark .odoo-table-select {
+                border-bottom: 1px solid #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper {
+                border: 1px solid #283c50 !important;
+                background-color: #121a2d !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-toolbar.ql-snow {
+                border-bottom: 1px solid #283c50 !important;
+                background-color: #162038 !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-toolbar .ql-stroke {
+                stroke: #cbd5e1 !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-toolbar .ql-fill {
+                fill: #cbd5e1 !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-toolbar .ql-picker {
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .odoo-editor-wrapper .ql-container.ql-snow {
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple {
+                border-bottom: 1px solid #283c50 !important;
+            }
+            html.app-skin-dark .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+                background-color: rgba(52, 84, 209, 0.2) !important;
+                border-color: rgba(52, 84, 209, 0.4) !important;
+                color: #93c5fd !important;
+            }
         </style>
     @endpush
     @push('scripts')
@@ -554,22 +673,78 @@
                     let firstErrEl = null;
 
                     // Query required fields (inputs, selects, textareas)
-                    let requiredFields = form.querySelectorAll('input[required], select[required], textarea[required]');
+                    let requiredFields = form.querySelectorAll('input[required], select[required], textarea[required], input[min]');
                     requiredFields.forEach(field => {
                         if (field.disabled || field.readOnly || field.type === 'hidden') return;
 
                         let val = field.value;
-                        let isEmpty = false;
+                        let isInvalid = false;
+                        let customErrorMsg = '';
 
-                        if (field.type === 'checkbox') {
-                            isEmpty = !field.checked;
-                        } else if (field.type === 'file') {
-                            isEmpty = !field.files || field.files.length === 0;
-                        } else {
-                            isEmpty = !val || !val.trim();
+                        // Find Label Text
+                        let labelName = '';
+                        let odooFormGroup = field.closest('.odoo-form-group');
+                        if (odooFormGroup) {
+                            let labelEl = odooFormGroup.querySelector('.odoo-form-label');
+                            if (labelEl) {
+                                labelName = labelEl.textContent.replace('*', '').trim();
+                            }
                         }
 
-                        if (isEmpty) {
+                        // Table support: trace header name from thead if inside a table column
+                        if (!labelName) {
+                            let td = field.closest('td');
+                            let tr = field.closest('tr');
+                            let table = field.closest('table');
+                            if (td && tr && table) {
+                                let colIndex = Array.from(tr.children).indexOf(td);
+                                let th = table.querySelector(`thead tr th:nth-child(${colIndex + 1})`);
+                                if (th) {
+                                    labelName = th.textContent.trim();
+                                }
+                            }
+                        }
+
+                        if (!labelName) {
+                            labelName = field.getAttribute('placeholder') || field.getAttribute('name') || 'This field';
+                        }
+
+                        if (field.type === 'checkbox') {
+                            isInvalid = !field.checked;
+                        } else if (field.type === 'file') {
+                            isInvalid = !field.files || field.files.length === 0;
+                        } else {
+                            let strVal = val ? val.trim() : '';
+                            if (field.hasAttribute('required') && !strVal) {
+                                isInvalid = true;
+                                customErrorMsg = `${labelName} is required.`;
+                            } else if (field.type === 'number' || field.hasAttribute('min')) {
+                                if (!strVal) {
+                                    if (field.hasAttribute('required')) {
+                                        isInvalid = true;
+                                        customErrorMsg = `${labelName} is required.`;
+                                    }
+                                } else {
+                                    let numVal = parseFloat(strVal);
+                                    let minVal = field.hasAttribute('min') ? parseFloat(field.getAttribute('min')) : null;
+                                    if (isNaN(numVal)) {
+                                        isInvalid = true;
+                                        customErrorMsg = `${labelName} is required.`;
+                                    } else if (minVal !== null && numVal < minVal) {
+                                        isInvalid = true;
+                                        if (minVal > 0) {
+                                            customErrorMsg = `${labelName} must be at least ${minVal}.`;
+                                        } else {
+                                            customErrorMsg = `${labelName} is invalid.`;
+                                        }
+                                    }
+                                }
+                            } else {
+                                isInvalid = !strVal;
+                            }
+                        }
+
+                        if (isInvalid) {
                             hasErrors = true;
                             field.classList.add('is-invalid');
 
@@ -602,38 +777,12 @@
                             if (!errorEl) {
                                 errorEl = document.createElement('div');
                                 errorEl.className = 'invalid-feedback dynamic-error-feedback d-block fs-11 mt-1';
+                            }
 
-                                // Find Label Text
-                                let labelName = '';
-                                let odooFormGroup = field.closest('.odoo-form-group');
-                                if (odooFormGroup) {
-                                    let labelEl = odooFormGroup.querySelector('.odoo-form-label');
-                                    if (labelEl) {
-                                        labelName = labelEl.textContent.replace('*', '').trim();
-                                    }
-                                }
+                            errorEl.textContent = customErrorMsg || `${labelName} is required.`;
 
-                                // Table support: trace header name from thead if inside a table column
-                                if (!labelName) {
-                                    let td = field.closest('td');
-                                    let tr = field.closest('tr');
-                                    let table = field.closest('table');
-                                    if (td && tr && table) {
-                                        let colIndex = Array.from(tr.children).indexOf(td);
-                                        let th = table.querySelector(`thead tr th:nth-child(${colIndex + 1})`);
-                                        if (th) {
-                                            labelName = th.textContent.trim();
-                                        }
-                                    }
-                                }
-
-                                if (!labelName) {
-                                    labelName = field.getAttribute('placeholder') || field.getAttribute('name') || 'This field';
-                                }
-
-                                errorEl.textContent = `${labelName} is required.`;
-
-                                // Insert error element
+                            // Insert error element
+                            if (!errorEl.parentNode) {
                                 if (field.tagName === 'SELECT' && $(field).data('select2')) {
                                     let s2Container = field.nextElementSibling;
                                     if (s2Container && s2Container.classList.contains('select2-container')) {

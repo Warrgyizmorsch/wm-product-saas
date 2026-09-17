@@ -204,10 +204,12 @@ class QuotationService
 
     public function handleQuotationStatusChange(Quotation $quotation, string $status, ?int $leadId = null): void
     {
+        $lead = $leadId ? Lead::find($leadId) : ($quotation->lead_id ? Lead::find($quotation->lead_id) : null);
+
         // 1. Automatic Deal Stage Transition when Quotation is Sent
         if (in_array($status, ['Quotation Sent', 'Sent'])) {
             $deal = $quotation->crm_deal_id ? CrmDeal::find($quotation->crm_deal_id) : null;
-            $leadObj = null;
+            $leadObj = $lead;
             if ($leadId) {
                 $leadObj = Lead::find($leadId);
             }
@@ -375,24 +377,20 @@ class QuotationService
             }
 
             // Sync CrmAccount
-            if (!$account) {
-                $account = CrmAccount::where('tenant_id', $tenantId)->where('customer_id', $customer->id)->first();
-                
-                if (!$account && !empty($customer->email)) {
-                    $account = CrmAccount::where('tenant_id', $tenantId)->where('email', $customer->email)->first();
-                }
-                if (!$account && !empty($customer->phone)) {
-                    $account = CrmAccount::where('tenant_id', $tenantId)->where('phone', $customer->phone)->first();
-                }
-                if (!$account && !empty($customer->gstin)) {
-                    $account = CrmAccount::where('tenant_id', $tenantId)->where('gstin', $customer->gstin)->first();
-                }
-                if (!$account && !empty($compName) && $compName !== 'New Client') {
-                    $account = CrmAccount::where('tenant_id', $tenantId)->where('name', $compName)->first();
-                }
+            $targetAccount = CrmAccount::where('tenant_id', $tenantId)->where('customer_id', $customer->id)->first();
+            if (!$targetAccount && !empty($customer->email)) {
+                $targetAccount = CrmAccount::where('tenant_id', $tenantId)->where('email', $customer->email)->first();
+            }
+            if (!$targetAccount && !empty($customer->phone)) {
+                $targetAccount = CrmAccount::where('tenant_id', $tenantId)->where('phone', $customer->phone)->first();
+            }
+            if (!$targetAccount && !empty($compName) && $compName !== 'New Client') {
+                $targetAccount = CrmAccount::where('tenant_id', $tenantId)->where('name', $compName)->first();
+            }
 
+            if (!$targetAccount) {
                 if (!$account) {
-                    $account = CrmAccount::create([
+                    $targetAccount = CrmAccount::create([
                         'tenant_id'     => $tenantId,
                         'customer_id'   => $customer->id,
                         'name'          => $compName,
@@ -408,35 +406,30 @@ class QuotationService
                         'owner_id'      => auth()->id() ?: 1,
                     ]);
                 } else {
-                    $account->update([
+                    $targetAccount = $account;
+                    $targetAccount->update([
                         'customer_id'   => $customer->id,
-                        'name'          => ($account->name === 'New Client' || empty($account->name)) ? $compName : $account->name,
-                        'email'         => $account->email ?: ($compEmail ?: $customer->email),
-                        'phone'         => $account->phone ?: ($compPhone ?: $customer->phone),
-                        'gstin'         => $account->gstin ?: ($gstin ?: $customer->gstin),
-                        'industry_type' => $account->industry_type ?: ($lead ? $lead->industry_type : null),
-                        'street'        => $account->street ?: ($lead ? $lead->address : null),
-                        'city'          => $account->city ?: ($lead ? $lead->city : null),
-                        'state'         => $account->state ?: ($lead ? $lead->state : null),
-                        'country'       => $account->country ?: ($lead ? $lead->country : null),
+                        'name'          => ($targetAccount->name === 'New Client' || empty($targetAccount->name)) ? $compName : $targetAccount->name,
+                        'email'         => $targetAccount->email ?: ($compEmail ?: $customer->email),
+                        'phone'         => $targetAccount->phone ?: ($compPhone ?: $customer->phone),
+                        'gstin'         => $targetAccount->gstin ?: ($gstin ?: $customer->gstin),
                         'status'        => 'active',
                     ]);
                 }
             } else {
-                $account->update([
+                $oldAccount = $account;
+                $targetAccount->update([
                     'customer_id'   => $customer->id,
-                    'name'          => ($account->name === 'New Client' || empty($account->name)) ? $compName : $account->name,
-                    'email'         => $account->email ?: ($compEmail ?: $customer->email),
-                    'phone'         => $account->phone ?: ($compPhone ?: $customer->phone),
-                    'gstin'         => $account->gstin ?: ($gstin ?: $customer->gstin),
-                    'industry_type' => $account->industry_type ?: ($lead ? $lead->industry_type : null),
-                    'street'        => $account->street ?: ($lead ? $lead->address : null),
-                    'city'          => $account->city ?: ($lead ? $lead->city : null),
-                    'state'         => $account->state ?: ($lead ? $lead->state : null),
-                    'country'       => $account->country ?: ($lead ? $lead->country : null),
                     'status'        => 'active',
                 ]);
+                if ($oldAccount && $oldAccount->id !== $targetAccount->id) {
+                    CrmContact::where('crm_account_id', $oldAccount->id)->update(['crm_account_id' => $targetAccount->id]);
+                    CrmDeal::where('crm_account_id', $oldAccount->id)->update(['crm_account_id' => $targetAccount->id]);
+                    Quotation::where('crm_account_id', $oldAccount->id)->update(['crm_account_id' => $targetAccount->id]);
+                    $oldAccount->delete();
+                }
             }
+            $account = $targetAccount;
 
             if ($customer) {
                 $customer->update([

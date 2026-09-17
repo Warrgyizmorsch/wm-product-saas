@@ -42,6 +42,9 @@ class ScannerController extends Controller
      */
     public function index()
     {
+        // Same gate as the other shop-floor (MES) screens.
+        abort_unless(auth()->user()?->hasProductionPermission('production.mes.execute'), 403);
+
         return view('modules.production.mes.operator.scanner');
     }
 
@@ -191,7 +194,7 @@ class ScannerController extends Controller
         // Machine
         if ($entity instanceof Machine) {
             return [
-                'redirect' => route('production.machines.show', $entity->id),
+                'redirect' => route('production.mes.machines.show', $entity->id),
                 'message'  => "Machine [{$entity->code}] scanned.",
                 'entity_summary' => ['type' => 'machine', 'id' => $entity->id, 'code' => $entity->code],
             ];

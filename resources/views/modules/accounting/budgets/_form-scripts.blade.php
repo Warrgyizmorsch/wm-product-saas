@@ -1,3 +1,38 @@
+@once
+    @push('styles')
+        <style>
+            .budget-line-action-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 30px;
+                height: 30px;
+                border-radius: 8px;
+                border: 1.5px solid #cbd5e1;
+                background-color: #ffffff;
+                color: #475569;
+                transition: all 0.2s ease;
+                flex-shrink: 0;
+            }
+            .budget-line-action-btn:hover {
+                background-color: color-mix(in srgb, var(--bs-primary) 12%, transparent);
+                border-color: var(--bs-primary);
+                color: var(--bs-primary);
+            }
+            .budget-line-action-btn--danger:hover {
+                background-color: color-mix(in srgb, var(--bs-danger) 12%, transparent);
+                border-color: var(--bs-danger);
+                color: var(--bs-danger);
+            }
+            .budget-line-action-btn:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+                pointer-events: none;
+            }
+        </style>
+    @endpush
+@endonce
+
 @push('scripts')
     <script>
         $(document).ready(function() {
@@ -82,12 +117,17 @@
                             </select>
                         </td>
                         <td>
-                            <input type="number" name="lines[${index}][amount]" class="odoo-table-input text-end amount-input" value="${line.amount ?? ''}" min="0.01" step="0.01" style="width: 130px; margin-left: auto;" required>
+                            <input type="number" name="lines[${index}][amount]" class="odoo-table-input text-end amount-input" value="${line.amount ?? ''}" min="0.01" step="0.01" required>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn mt-1">
-                                <i class="feather-trash-2"></i>
-                            </button>
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <button type="button" class="budget-line-action-btn clone-row-btn" title="Clone this line" data-bs-toggle="tooltip">
+                                    <i class="feather-copy fs-13"></i>
+                                </button>
+                                <button type="button" class="budget-line-action-btn budget-line-action-btn--danger remove-row-btn" title="Remove this line" data-bs-toggle="tooltip">
+                                    <i class="feather-trash-2 fs-13"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -117,17 +157,37 @@
                 }
             });
 
+            function reindexRemoveState() {
+                const rowCount = $('#itemsTable tbody .item-row').length;
+                $('.remove-row-btn').prop('disabled', rowCount <= 1);
+            }
+
             $('#addItemRow').on('click', function() {
                 addRow();
+                reindexRemoveState();
+            });
+
+            $(document).on('click', '.clone-row-btn', function() {
+                const $row = $(this).closest('tr');
+                const dimensionType = $row.find('.dimension-type-select').val();
+                const dimensionId = $row.find('.dimension-value-select').val();
+                const newRow = addRow({
+                    chart_of_account_id: $row.find('.account-select').val(),
+                    cost_center_id: dimensionType === 'cost_center' ? dimensionId : null,
+                    department_id: dimensionType === 'department' ? dimensionId : null,
+                    project_id: dimensionType === 'project' ? dimensionId : null,
+                    amount: $row.find('.amount-input').val(),
+                });
+                newRow.insertAfter($row);
+                reindexRemoveState();
             });
 
             $(document).on('click', '.remove-row-btn', function() {
-                const rowsCount = $('.item-row').length;
-                if (rowsCount > 1) {
-                    $(this).closest('tr').remove();
-                } else {
-                    alert('A budget requires at least one line.');
+                if ($('#itemsTable tbody .item-row').length <= 1) {
+                    return;
                 }
+                $(this).closest('tr').remove();
+                reindexRemoveState();
             });
 
             function addRow(line) {
@@ -140,11 +200,14 @@
                 }
 
                 if (typeof $.fn.select2 === 'function') {
-                    newRow.find('.account-select').select2({ theme: "bootstrap-5", width: "100%" });
-                    newRow.find('.dimension-value-select').select2({ theme: "bootstrap-5", width: "100%" });
+                    newRow.find('.account-select').select2({ theme: "bootstrap-5", width: "100%", dropdownParent: newRow.closest('.offcanvas, body') });
+                    newRow.find('.dimension-value-select').select2({ theme: "bootstrap-5", width: "100%", dropdownParent: newRow.closest('.offcanvas, body') });
                 }
 
                 rowIndex++;
+                reindexRemoveState();
+
+                return newRow;
             }
 
             if (existingLines.length > 0) {

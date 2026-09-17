@@ -16,6 +16,10 @@ class AttendanceController extends Controller
 
     public function index(Request $request)
     {
+        abort_unless(
+            auth()->user() && (auth()->user()->hasHrPermission('hrms.attendance.view') || auth()->user()->hasHrPermission('hr.settings.manage')),
+            403
+        );
         $filters = $request->only(['date', 'department_id', 'search', 'status', 'month']);
         if (!isset($filters['month']) && !isset($filters['date'])) {
             $filters['month'] = now()->format('Y-m');
@@ -674,6 +678,15 @@ class AttendanceController extends Controller
 
     public function getEmployeeLogs(\App\Domains\HRMS\Models\Employee $employee)
     {
+        $authUser = auth()->user();
+        $isOwn = $authUser && ($authUser->employee?->id === $employee->id || \App\Domains\HRMS\Models\Employee::resolveForUser($authUser)?->id === $employee->id);
+        if (!$isOwn) {
+            abort_unless(
+                $authUser && ($authUser->hasHrPermission('hrms.attendance.view') || $authUser->hasHrPermission('hr.settings.manage')),
+                403
+            );
+        }
+
         $monthFilter = request('month');
 
         if ($monthFilter === 'all') {
