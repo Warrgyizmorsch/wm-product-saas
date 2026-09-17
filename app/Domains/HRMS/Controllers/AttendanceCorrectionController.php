@@ -258,6 +258,14 @@ class AttendanceCorrectionController extends Controller
             'status'              => 'pending',
         ]);
 
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: 'Attendance Correction Request',
+            message: "{$employee->full_name} requested attendance correction for " . Carbon::parse($dateStr)->format('M d, Y') . ".",
+            actionUrl: route('hrms.attendance-corrections.index'),
+            type: 'attendance_correction_request',
+            iconClass: 'feather-clock'
+        );
+
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
@@ -430,6 +438,17 @@ class AttendanceCorrectionController extends Controller
 
             DB::commit();
 
+            if ($correction->employee_id) {
+                \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                    employeeId: $correction->employee_id,
+                    title: 'Attendance Correction Approved',
+                    message: 'Your attendance correction request for ' . $correction->date->format('M d, Y') . ' has been approved.',
+                    actionUrl: route('hrms.attendance-corrections.index'),
+                    type: 'attendance_correction_approved',
+                    iconClass: 'feather-check-circle'
+                );
+            }
+
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => true,
@@ -481,6 +500,17 @@ class AttendanceCorrectionController extends Controller
             'approved_by'     => auth()->id(),
             'rejected_reason' => $validated['rejected_reason']
         ]);
+
+        if ($correction->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $correction->employee_id,
+                title: 'Attendance Correction Rejected',
+                message: 'Your attendance correction request for ' . $correction->date->format('M d, Y') . ' was rejected.',
+                actionUrl: route('hrms.attendance-corrections.index'),
+                type: 'attendance_correction_rejected',
+                iconClass: 'feather-x-circle'
+            );
+        }
 
         if ($request->expectsJson()) {
             return response()->json([

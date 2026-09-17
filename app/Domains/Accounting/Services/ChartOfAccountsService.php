@@ -106,18 +106,22 @@ class ChartOfAccountsService
      * codes, which would undo a tenant's renames — so tenant provisioning only
      * runs it for a tenant that has no accounts yet.
      */
-    public function provisionDefaultsIfMissing(int $tenantId): bool
+    public function provisionDefaultsIfMissing(int $tenantId, ?int $companyId = null, ?int $branchId = null): bool
     {
-        if (ChartOfAccount::query()->where('tenant_id', $tenantId)->exists()) {
+        // withoutGlobalScopes(): existence must be checked tenant-wide, not
+        // filtered by the caller's company/branch scope — a tenant that
+        // already has a Chart of Accounts (even one seeded with no company
+        // assigned yet, see provisionDefaults()) must not get a second one.
+        if (ChartOfAccount::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->exists()) {
             return false;
         }
 
-        $this->provisionDefaults($tenantId);
+        $this->provisionDefaults($tenantId, $companyId, $branchId);
 
         return true;
     }
 
-    public function provisionDefaults(int $tenantId): void
+    public function provisionDefaults(int $tenantId, ?int $companyId = null, ?int $branchId = null): void
     {
         $headers = [
             ['code' => '1000', 'name' => 'Assets', 'type' => ChartOfAccount::TYPE_ASSET, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT],
@@ -130,12 +134,14 @@ class ChartOfAccountsService
         $headerIds = [];
 
         foreach ($headers as $header) {
-            $account = ChartOfAccount::query()->updateOrCreate(
+            $account = ChartOfAccount::query()->withoutGlobalScopes()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $header['code']],
                 [
                     'name' => $header['name'],
                     'type' => $header['type'],
                     'normal_balance' => $header['normal_balance'],
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'is_system' => true,
                     'is_active' => true,
                 ]
@@ -294,7 +300,7 @@ class ChartOfAccountsService
         ];
 
         foreach ($children as $child) {
-            ChartOfAccount::query()->updateOrCreate(
+            ChartOfAccount::query()->withoutGlobalScopes()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $child['code']],
                 [
                     'name' => $child['name'],
@@ -303,6 +309,8 @@ class ChartOfAccountsService
                     'normal_balance' => $child['normal_balance'],
                     'parent_id' => $headerIds[$child['parent']],
                     'is_cash_or_bank' => $child['is_cash_or_bank'] ?? false,
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'is_system' => true,
                     'is_active' => true,
                 ]

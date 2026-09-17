@@ -5,6 +5,7 @@ namespace Tests\Feature\Production;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Domains\Production\Models\WorkCenter;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,6 +22,8 @@ class WorkCenterTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->seed(RbacSeeder::class);
 
         $this->tenantA = Tenant::create([
             'name' => 'Tenant A',

@@ -9,9 +9,11 @@ use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\InterviewScorecard;
+use App\Domains\HRMS\Models\DocumentTemplate;
 use App\Domains\HRMS\Models\JobOffer;
 use App\Domains\HRMS\Models\JobRequisition;
 use App\Http\Controllers\Controller;
+use App\Services\Access\AccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,15 +22,35 @@ use Illuminate\View\View;
 
 class RecruitmentController extends Controller
 {
+    private function authorizeHrms(string $permission): void
+    {
+        $user = auth()->user();
+        if (! $user) {
+            abort(401);
+        }
+
+        $access = app(AccessService::class);
+        $context = ['tenant_id' => $user->tenant_id];
+
+        $allowed = $access->allows($user, $permission, $context)
+            || $access->allows($user, 'hr.settings.manage', $context)
+            || $access->allows($user, 'hrms.recruitment.manage', $context);
+
+        abort_unless($allowed, 403, 'Unauthorized action in Recruitment module.');
+    }
+
     // Main Recruitment Entry Point (Redirects to Job Requisitions)
     public function index(): RedirectResponse
     {
+        $this->authorizeHrms('hrms.recruitment.view');
+
         return redirect()->route('hrms.recruitment.requisitions.index');
     }
 
     // Requisitions List with Standard Search, Sort & Filter
     public function requisitions(Request $request): View
     {
+        $this->authorizeHrms('hrms.recruitment.view');
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
 
         $filters = [
@@ -85,7 +107,7 @@ class RecruitmentController extends Controller
             ->where('status', 'scheduled');
         $upcomingInterviews = $interviewsQuery->with(['application.candidate', 'application.requisition', 'interviewer'])
             ->orderBy('scheduled_at', 'asc')
-            ->take(5)
+            ->take(3)
             ->get();
 
         return view('modules.hrms.recruitment.requisitions', compact('requisitions', 'departments', 'designations', 'employees', 'filters', 'upcomingInterviews'));
@@ -94,6 +116,8 @@ class RecruitmentController extends Controller
     // Store Job Requisition
     public function storeRequisition(Request $request): RedirectResponse
     {
+        $this->authorizeHrms('hrms.recruitment.create');
+
         $request->validate([
             'job_title'             => 'required|string|max:255',
             'department_id'         => 'required|exists:departments,id',
@@ -142,6 +166,8 @@ class RecruitmentController extends Controller
     // Toggle/Approve Requisition Status
     public function updateRequisitionStatus(Request $request, JobRequisition $requisition): RedirectResponse
     {
+        $this->authorizeHrms('hrms.recruitment.update');
+
         $request->validate(['status' => 'required|in:draft,pending_approval,approved,published,closed,cancelled']);
         
         $requisition->update([
@@ -156,6 +182,8 @@ class RecruitmentController extends Controller
     // Candidates Directory with Search, Sort & Filter
     public function candidates(Request $request): View
     {
+        $this->authorizeHrms('hrms.recruitment.view');
+
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
 
         $filters = [
@@ -216,6 +244,8 @@ class RecruitmentController extends Controller
     // Store Candidate Internally
     public function storeCandidate(Request $request): RedirectResponse
     {
+        $this->authorizeHrms('hrms.recruitment.create');
+
         $request->validate([
             'first_name'            => 'required|string|max:100',
             'last_name'             => 'nullable|string|max:100',
@@ -272,6 +302,8 @@ class RecruitmentController extends Controller
     // Pipeline Kanban View
     public function pipeline(int $requisitionId): View
     {
+        $this->authorizeHrms('hrms.recruitment.view');
+
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
 
         $requisition = JobRequisition::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
@@ -283,6 +315,11 @@ class RecruitmentController extends Controller
             ->get();
 
         $employees = Employee::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->get();
+        $departments = Department::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->get();
+        $designations = Designation::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->get();
+        $templates = DocumentTemplate::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            ->where('status', 'active')
+            ->get();
 
         $stages = [
             'applied'     => 'Applied',
@@ -293,12 +330,14 @@ class RecruitmentController extends Controller
             'rejected'    => 'Rejected',
         ];
 
-        return view('modules.hrms.recruitment.pipeline', compact('requisition', 'applications', 'stages', 'employees'));
+        return view('modules.hrms.recruitment.pipeline', compact('requisition', 'applications', 'stages', 'employees', 'departments', 'designations', 'templates'));
     }
 
     // Update Application Stage
     public function updateStage(Request $request, CandidateApplication $application): RedirectResponse
     {
+        $this->authorizeHrms('hrms.recruitment.update');
+
         $request->validate([
             'current_stage' => 'required|in:applied,screening,interview,interview_round_1,interview_round_2,interview_round_3,final_hr,offer_sent,hired,rejected',
             'rejection_reason' => 'nullable|string',
@@ -316,6 +355,8 @@ class RecruitmentController extends Controller
     // Schedule Interview Round
     public function scheduleInterview(Request $request, CandidateApplication $application): RedirectResponse
     {
+        $this->authorizeHrms('hrms.recruitment.update');
+
         $request->validate([
             'round_number'              => 'required|integer|min:1',
             'round_name'                => 'required|string|max:100',
@@ -356,6 +397,8 @@ class RecruitmentController extends Controller
     // Submit Scorecard
     public function submitScorecard(Request $request, CandidateInterview $interview): RedirectResponse
     {
+        $this->authorizeHrms('hrms.recruitment.update');
+
         $request->validate([
             'technical_rating'      => 'required|integer|min:1|max:5',
             'communication_rating'  => 'required|integer|min:1|max:5',
@@ -397,17 +440,77 @@ class RecruitmentController extends Controller
     // Create Job Offer
     public function createOffer(Request $request, CandidateApplication $application): RedirectResponse
     {
+        $this->authorizeHrms('hrms.recruitment.update');
+
         $request->validate([
             'offered_designation_id' => 'required|exists:designations,id',
             'offered_department_id'  => 'required|exists:departments,id',
             'offered_annual_ctc'     => 'required|numeric|min:0',
             'joining_date'           => 'required|date',
+            'document_template_id'   => 'nullable|exists:document_templates,id',
             'offer_letter_notes'     => 'nullable|string',
         ]);
 
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
-        $offerCount = JobOffer::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->count() + 1;
-        $code = 'OFR-' . date('Y') . '-' . str_pad($offerCount, 3, '0', STR_PAD_LEFT);
+
+        $existingOffer = JobOffer::where('application_id', $application->id)->first();
+        if ($existingOffer && $existingOffer->offer_code) {
+            $code = $existingOffer->offer_code;
+        } else {
+            $i = JobOffer::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->count() + 1;
+            do {
+                $code = 'OFR-' . date('Y') . '-' . str_pad($i, 3, '0', STR_PAD_LEFT);
+                $exists = JobOffer::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->where('offer_code', $code)->exists();
+                $i++;
+            } while ($exists);
+        }
+
+        $offerLetterContent = null;
+        if ($request->filled('document_template_id')) {
+            $template = DocumentTemplate::find($request->document_template_id);
+            if ($template) {
+                $candidate = $application->candidate;
+                $department = Department::find($request->offered_department_id);
+                $designation = Designation::find($request->offered_designation_id);
+                $company = $department?->company ?? \App\Domains\HRMS\Models\Company::first();
+
+                $rawContent = trim(($template->header_content ?? '') . "\n" . ($template->body_content ?? '') . "\n" . ($template->footer_content ?? ''));
+                if (empty($rawContent)) {
+                    $rawContent = $template->body_content ?? '';
+                }
+
+                $replacements = [
+                    'candidate_name'  => $candidate?->full_name ?? 'Candidate',
+                    'employee_name'   => $candidate?->full_name ?? 'Candidate',
+                    'candidate_email' => $candidate?->email ?? '',
+                    'email'           => $candidate?->email ?? '',
+                    'candidate_phone' => $candidate?->phone ?? '',
+                    'phone'           => $candidate?->phone ?? '',
+                    'employee_id'     => $candidate?->candidate_code ?? '',
+                    'job_title'       => $designation?->name ?? '',
+                    'designation'     => $designation?->name ?? '',
+                    'department'      => $department?->name ?? '',
+                    'annual_ctc'      => number_format((float)$request->offered_annual_ctc, 2),
+                    'joining_date'    => date('d M, Y', strtotime($request->joining_date)),
+                    'offer_code'      => $code,
+                    'company_name'    => $company?->company_name ?? config('app.name'),
+                    'current_date'    => date('d M, Y'),
+                    'date'            => date('d M, Y'),
+                    'offer_notes'     => $request->offer_letter_notes ?? '',
+                ];
+
+                foreach ($replacements as $key => $val) {
+                    $rawContent = str_replace(
+                        ['{' . $key . '}', '{{' . $key . '}}', '{' . strtoupper($key) . '}', '{{' . strtoupper($key) . '}}'],
+                        $val,
+                        $rawContent
+                    );
+                }
+                // Strip any remaining curly braces around values e.g. {Sahil} -> Sahil
+                $rawContent = preg_replace('/\{([^{}\n]*)\}/', '$1', $rawContent);
+                $offerLetterContent = $rawContent;
+            }
+        }
 
         JobOffer::updateOrCreate(
             ['application_id' => $application->id],
@@ -418,6 +521,8 @@ class RecruitmentController extends Controller
                 'offered_department_id'  => $request->offered_department_id,
                 'offered_annual_ctc'     => $request->offered_annual_ctc,
                 'joining_date'           => $request->joining_date,
+                'document_template_id'   => $request->document_template_id,
+                'offer_letter_content'   => $offerLetterContent,
                 'offer_letter_notes'     => $request->offer_letter_notes,
                 'status'                 => 'accepted',
                 'accepted_at'            => now(),
@@ -429,48 +534,198 @@ class RecruitmentController extends Controller
             'stage_updated_at' => now(),
         ]);
 
-        return redirect()->back()->with('success', "Job Offer #{$code} generated and accepted!");
+        return redirect()->back()->with('success', "Job Offer #{$code} generated and sent successfully!");
     }
 
-    // 1-Click Candidate to HRMS Employee Conversion
-    public function convertToEmployee(JobOffer $offer): RedirectResponse
+    // Send Job Offer Email to Candidate
+    public function sendOfferEmail(Request $request, JobOffer $offer): RedirectResponse
     {
+        $this->authorizeHrms('hrms.recruitment.update');
+
+        $request->validate([
+            'to_email'   => 'required|email|max:255',
+            'subject'    => 'required|string|max:255',
+            'account_id' => 'nullable|exists:email_configurations,id',
+        ]);
+
+        $application = $offer->application;
+        $candidate = $application?->candidate;
+
+        if (!$candidate) {
+            return redirect()->back()->with('error', 'Candidate information not found.');
+        }
+
+        $rawContent = $offer->offer_letter_content;
+        if (empty($rawContent)) {
+            $rawContent = "
+                <div style='font-family: Arial, sans-serif; padding: 20px; color: #333;'>
+                    <h2 style='color: #1e293b; text-align: center;'>JOB OFFER LETTER</h2>
+                    <p>Dear <strong>{$candidate->full_name}</strong>,</p>
+                    <p>We are pleased to offer you employment for the position of <strong>" . ($offer->designation->name ?? 'Role') . "</strong>.</p>
+                    <p><strong>Offer Details:</strong></p>
+                    <ul>
+                        <li><strong>Offer Reference:</strong> {$offer->offer_code}</li>
+                        <li><strong>Annual Compensation (CTC):</strong> $" . number_format($offer->offered_annual_ctc, 2) . "</li>
+                        <li><strong>Target Joining Date:</strong> " . (optional($offer->joining_date)->format('d M, Y') ?? 'TBD') . "</li>
+                    </ul>
+                    <p>Please review your offer details and contact HR for confirmation.</p>
+                    <br><br>
+                    <p>Sincerely,<br><strong>Human Resources Team</strong></p>
+                </div>
+            ";
+        }
+
+        $cleanLetterContent = preg_replace('/\{([^{}\n]*)\}/', '$1', $rawContent);
+
+        // Render & compile PDF attachment
+        $pdfFileName = "Job_Offer_{$offer->offer_code}.pdf";
+        $pdfHtml = "
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset='utf-8'>
+                <title>Job Offer - {$offer->offer_code}</title>
+                <style>
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 30px; color: #1e293b; font-size: 13px; line-height: 1.6; }
+                    .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 25px; }
+                    .header h1 { margin: 0; color: #1e293b; font-size: 22px; font-weight: bold; }
+                    .header p { margin: 5px 0 0 0; color: #64748b; font-size: 12px; }
+                    .offer-body { margin-bottom: 30px; }
+                    .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 11px; color: #94a3b8; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <div class='header'>
+                    <h1>OFFICIAL JOB OFFER LETTER</h1>
+                    <p>Ref: {$offer->offer_code} | Date: " . date('d M, Y') . "</p>
+                </div>
+                <div class='offer-body'>
+                    {$cleanLetterContent}
+                </div>
+                <div class='footer'>
+                    This is an officially generated document. Confidential &copy; " . date('Y') . ".
+                </div>
+            </body>
+            </html>
+        ";
+
+        $tempPath = storage_path("app/public/recruitment/offers/{$pdfFileName}");
+        if (!file_exists(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
+
+        try {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($pdfHtml)->setPaper('a4', 'portrait');
+            file_put_contents($tempPath, $pdf->output());
+        } catch (\Throwable $pe) {
+            \Illuminate\Support\Facades\Log::error("Failed to generate offer PDF: " . $pe->getMessage());
+        }
+
+        // Cover email text
+        $designationName = $offer->designation->name ?? 'Role';
+        $joiningDateStr = optional($offer->joining_date)->format('d M, Y') ?? 'TBD';
+
+        $coverEmailBody = "
+            <div style='font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6; padding: 15px; background-color: #ffffff; border-radius: 8px;'>
+                <p>Dear <strong>{$candidate->full_name}</strong>,</p>
+                <p>We are pleased to inform you that your official Job Offer for the position of <strong>{$designationName}</strong> has been generated.</p>
+                <p>Please find attached your official <strong>Job Offer Letter PDF document</strong> (<code>{$pdfFileName}</code>) containing all employment details and terms.</p>
+                <div style='background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 4px;'>
+                    <strong style='color: #1e3a8a; font-size: 14px;'>Offer Summary:</strong>
+                    <ul style='margin: 8px 0 0 0; padding-left: 20px; color: #334155;'>
+                        <li><strong>Offer Reference:</strong> {$offer->offer_code}</li>
+                        <li><strong>Position:</strong> {$designationName}</li>
+                        <li><strong>Target Joining Date:</strong> {$joiningDateStr}</li>
+                    </ul>
+                </div>
+                <p>Please review the attached PDF document and let us know if you have any questions or require further clarification.</p>
+                <br>
+                <p>Best regards,<br><strong>Human Resources Team</strong></p>
+            </div>
+        ";
+
+        $attachments = [];
+        if (file_exists($tempPath)) {
+            $attachments[] = [
+                'path' => $tempPath,
+                'name' => $pdfFileName,
+                'mime' => 'application/pdf',
+            ];
+        }
+
+        try {
+            /** @var \App\Services\EmailService $emailService */
+            $emailService = app(\App\Services\EmailService::class);
+            $emailService->sendEmail([
+                'to'         => $request->to_email,
+                'subject'    => $request->subject,
+                'body_html'  => $coverEmailBody,
+                'account_id' => $request->account_id,
+            ], $attachments);
+
+            $offer->update(['status' => 'sent', 'sent_at' => now()]);
+
+            return redirect()->back()->with('success', "📧 Job Offer PDF document (#{$offer->offer_code}) sent successfully to {$request->to_email}!");
+        } catch (\Throwable $e) {
+            // Fallback to default Mail facade if EmailService DB config throws error
+            try {
+                \Illuminate\Support\Facades\Mail::send([], [], function ($msg) use ($request, $coverEmailBody, $tempPath, $pdfFileName) {
+                    $msg->to($request->to_email)
+                        ->subject($request->subject)
+                        ->html($coverEmailBody);
+
+                    if (file_exists($tempPath)) {
+                        $msg->attach($tempPath, [
+                            'as'   => $pdfFileName,
+                            'mime' => 'application/pdf',
+                        ]);
+                    }
+                });
+
+                $offer->update(['status' => 'sent', 'sent_at' => now()]);
+
+                return redirect()->back()->with('success', "📧 Job Offer PDF document (#{$offer->offer_code}) sent successfully to {$request->to_email}!");
+            } catch (\Throwable $ex) {
+                \Illuminate\Support\Facades\Log::error("Failed to send Job Offer Email: " . $ex->getMessage());
+                return redirect()->back()->with('error', "Could not send offer email: " . $ex->getMessage());
+            }
+        }
+    }
+
+    // Convert Candidate to HRMS Employee: Create User & Redirect to Pre-filled Employee Form
+    public function convertToEmployee(Request $request, JobOffer $offer): RedirectResponse
+    {
+        $this->authorizeHrms('hrms.recruitment.manage');
         if ($offer->converted_employee_id) {
             return redirect()->back()->with('error', "Candidate has already been converted to an Employee!");
         }
 
         $application = $offer->application;
-        $candidate = $application->candidate;
+        $candidate = $application?->candidate;
 
-        DB::transaction(function () use ($offer, $application, $candidate) {
-            $tenantId = function_exists('tenant_id') ? tenant_id() : null;
-            $empCount = Employee::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->count() + 1;
-            $empCode = 'EMP-' . date('Y') . '-' . str_pad($empCount, 3, '0', STR_PAD_LEFT);
+        if (!$candidate) {
+            return redirect()->back()->with('error', "Candidate information not found.");
+        }
 
-            // Inherit Company, Business Unit, Branch from Department
-            $department = Department::find($offer->offered_department_id);
+        $tenantId = function_exists('tenant_id') ? tenant_id() : null;
+        $user = \App\Models\User::where('email', $candidate->email)->first();
 
-            $employee = Employee::create([
-                'tenant_id'         => $tenantId,
-                'employee_code'     => $empCode,
-                'first_name'        => $candidate->first_name,
-                'last_name'         => $candidate->last_name,
-                'email'             => $candidate->email,
-                'phone'             => $candidate->phone,
-                'department_id'     => $offer->offered_department_id,
-                'designation_id'    => $offer->offered_designation_id,
-                'company_id'        => $department?->company_id,
-                'business_unit_id'  => $department?->business_unit_id,
-                'branch_id'         => $department?->branch_id,
-                'joining_date'      => $offer->joining_date ?? now(),
-                'employment_type'   => 'full_time',
-                'status'            => 'active',
+        if (!$user) {
+            $user = \App\Models\User::create([
+                'tenant_id' => $tenantId,
+                'name'      => $candidate->full_name,
+                'email'     => $candidate->email,
+                'password'  => \Illuminate\Support\Facades\Hash::make('12345678'),
+                'role'      => 'employee',
+                'is_active' => true,
             ]);
+        }
 
-            $offer->update(['converted_employee_id' => $employee->id]);
-            $candidate->update(['status' => 'hired']);
+        // 1. Immediately update Candidate status and Application stage to 'hired'
+        $candidate->update(['status' => 'hired']);
+        if ($application) {
             $application->update([
-                'current_stage' => 'hired',
+                'current_stage'    => 'hired',
                 'stage_updated_at' => now(),
             ]);
 
@@ -481,9 +736,13 @@ class RecruitmentController extends Controller
                     $req->update(['status' => 'closed']);
                 }
             }
-        });
+        }
 
-        return redirect()->route('hrms.employees.index')
-            ->with('success', "🎉 Candidate {$candidate->full_name} converted to Employee #{$empCode} successfully!");
+        // 2. Redirect to Employee Directory to complete Employee profile
+        return redirect()->route('hrms.employees.index', array_filter([
+            'convert_offer_id' => $offer->id,
+            'user_id'          => $user->id,
+            'account_id'       => $request->account_id,
+        ]))->with('success', "🎉 User account created for {$candidate->full_name}! Candidate moved to Hired stage. Please complete the Employee Profile below.");
     }
 }

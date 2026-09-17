@@ -71,7 +71,8 @@ class Employee extends BaseModel
         'emergency_contact_relation',
 
         'status',
-        'weekly_pattern'
+        'weekly_pattern',
+        'resume_path'
     ];
 
     protected $casts = [

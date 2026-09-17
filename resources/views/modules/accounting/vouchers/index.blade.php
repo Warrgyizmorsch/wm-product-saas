@@ -39,12 +39,21 @@
             </div>
         </form>
     </x-ui.filter>
-    <x-ui.button href="{{ route('accounting.vouchers.' . $type . '.create') }}" variant="primary" icon="feather-plus">
-        New {{ $label }}
-    </x-ui.button>
+    @if ($canCreate)
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="offcanvas" data-bs-target="#voucherCreateDrawer-{{ $type }}">
+            New {{ $label }}
+        </x-ui.button>
+    @endif
 @endsection
 
 @section('content')
+
+    <div class="d-flex flex-wrap gap-3 mb-4">
+        <x-ui.stat-pill icon="feather-layers" :value="$summary['total']" label="Total {{ $label }}s" color="primary" />
+        <x-ui.stat-pill icon="feather-check-circle" :value="$summary['posted']" label="Posted" color="success" />
+        <x-ui.stat-pill icon="feather-edit-3" :value="$summary['draft']" label="Draft" color="warning" />
+        <x-ui.stat-pill icon="feather-rotate-ccw" :value="$summary['reversed']" label="Reversed" color="secondary" />
+    </div>
 
     <x-ui.card bodyClass="p-0" class="accounting-dense">
         <div class="d-flex align-items-center gap-3 p-3 border-bottom">
@@ -111,7 +120,7 @@
                             @endif
                         </td>
                         <td class="text-end pe-4">
-                            <x-ui.icon-btn href="{{ route('accounting.vouchers.' . $type . '.show', $voucher) }}" variant="soft-primary" icon="feather-eye" title="View" />
+                            <x-ui.row-actions :view-url="route('accounting.vouchers.' . $type . '.show', $voucher)" class="justify-content-end" />
                         </td>
                     </tr>
                 @empty
@@ -131,6 +140,22 @@
             :totalResults="$vouchers->total()"
             :perPage="$vouchers->perPage()" />
     </x-ui.card>
+
+    @if ($canCreate)
+        <x-ui.drawer id="voucherCreateDrawer-{{ $type }}" title="New {{ $label }}" scroll style="--bs-offcanvas-width: min(760px, 92vw);">
+            @include('modules.accounting.vouchers._form', ['embedded' => true])
+        </x-ui.drawer>
+
+        @if ($errors->any())
+            @push('scripts')
+                <script>
+                    $(function () {
+                        new bootstrap.Offcanvas(document.getElementById('voucherCreateDrawer-{{ $type }}')).show();
+                    });
+                </script>
+            @endpush
+        @endif
+    @endif
 @endsection
 
 @push('styles')

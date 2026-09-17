@@ -73,6 +73,14 @@ class ShiftChangeRequestController extends Controller
 
         $this->shiftChangeRepository->storeShiftChangeRequest($validated, $request);
 
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: 'New Shift Change Request',
+            message: "{$employee->full_name} submitted a shift change request.",
+            actionUrl: route('hrms.shift-change.index'),
+            type: 'shift_change_request',
+            iconClass: 'feather-refresh-cw'
+        );
+
         return redirect()->back()->with('success', __('hrms.shift_change.submitted_successfully'));
     }
 
@@ -112,6 +120,17 @@ class ShiftChangeRequestController extends Controller
             'action'           => $action,
             'rejection_reason' => $reason,
         ], $request);
+
+        if ($shiftChangeRequest->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $shiftChangeRequest->employee_id,
+                title: 'Shift Change Request ' . ucfirst($action),
+                message: "Your shift change request has been {$action}.",
+                actionUrl: route('hrms.shift-change.index'),
+                type: 'shift_change_' . $action,
+                iconClass: $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle'
+            );
+        }
 
         return redirect()->back()->with('success', __('hrms.shift_change.status_updated'));
     }

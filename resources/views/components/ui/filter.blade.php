@@ -12,6 +12,7 @@
             .erp-filter-dropdown {
                 position: relative !important;
             }
+
             /* Override the theme's forced off-screen coordinates and width limits */
             .erp-filter-dropdown .dropdown-menu {
                 position: absolute !important;
@@ -31,27 +32,46 @@
                 transition: none !important;
                 background-color: #ffffff !important;
             }
+
             .erp-filter-dropdown .dropdown-menu.show {
                 display: block !important;
                 visibility: visible !important;
                 opacity: 1 !important;
             }
+
             /* Make form input lines clearly visible inside the filter dropdown */
             .erp-filter-dropdown .odoo-table-input {
                 border-bottom: 1px solid #ced4da !important;
+            }
+
+            /* Dark Mode Support */
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu,
+            html.app-skin-dark .theme-filter-dropdown-menu {
+                background-color: #0f172a !important;
+                border-color: #1b2436 !important;
+                color: #b1b4c0 !important;
+                box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.6) !important;
+            }
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu label,
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu .form-label,
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu h6,
+            html.app-skin-dark .erp-filter-dropdown .dropdown-menu .text-dark {
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .erp-filter-dropdown .odoo-table-input {
+                border-bottom: 1px solid #283c50 !important;
+                color: #ffffff !important;
+            }
+            html.app-skin-dark .erp-filter-dropdown .dropdown-divider {
+                border-color: #1b2436 !important;
             }
         </style>
     @endpush
 @endonce
 
 <div class="dropdown erp-filter-dropdown" {{ $attributes }}>
-    <x-ui.icon-btn type="button" 
-                   variant="transparent-dark"
-                   title="Filter"
-                   size="md"
-                   icon="feather-filter"
-                   class="filter-toggle-custom" 
-                   aria-expanded="false">
+    <x-ui.icon-btn type="button" variant="transparent-dark" title="Filter" size="md" icon="feather-filter"
+        class="filter-toggle-custom" aria-expanded="false">
         @if($label)
             <span>{{ $label }}</span>
         @endif
@@ -62,7 +82,8 @@
             <div class="dropdown-divider my-3"></div>
             <div class="d-flex gap-2">
                 <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ $submitLabel }}</x-ui.button>
-                <x-ui.button href="{{ $resetUrl }}" variant="light" size="sm" class="border flex-grow-1">{{ $resetLabel }}</x-ui.button>
+                <x-ui.button href="{{ $resetUrl }}" variant="light" size="sm"
+                    class="border flex-grow-1">{{ $resetLabel }}</x-ui.button>
             </div>
         @endif
     </div>
@@ -71,25 +92,25 @@
 @once
     @push('scripts')
         <script>
-            $(document).ready(function() {
+            $(document).ready(function () {
                 // Custom toggle handler to prevent Bootstrap double-event conflict on filters
-                $(document).on('click', '.filter-toggle-custom', function(e) {
+                $(document).on('click', '.filter-toggle-custom', function (e) {
                     e.preventDefault();
                     e.stopPropagation();
-                    
+
                     var parent = $(this).closest('.erp-filter-dropdown');
                     var menu = parent.find('.dropdown-menu');
-                    
+
                     // Close other open dropdowns
                     $('.dropdown-menu.show').not(menu).removeClass('show');
                     $('.dropdown.show').not(parent).removeClass('show');
-                    
+
                     parent.toggleClass('show');
                     menu.toggleClass('show');
                 });
-                
+
                 // Close dropdown when clicking outside (respecting auto-close outside behavior)
-                $(document).on('click', function(e) {
+                $(document).on('click', function (e) {
                     if (!$(e.target).closest('.erp-filter-dropdown').length) {
                         $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
                         $('.erp-filter-dropdown.show').removeClass('show');

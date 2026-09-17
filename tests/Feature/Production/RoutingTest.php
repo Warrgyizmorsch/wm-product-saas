@@ -9,6 +9,7 @@ use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -26,6 +27,8 @@ class RoutingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->seed(RbacSeeder::class);
 
         $this->tenantA = Tenant::create([
             'name' => 'Tenant A',

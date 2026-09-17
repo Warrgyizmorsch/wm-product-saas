@@ -1259,6 +1259,8 @@ return [
     'print_report' => 'रिपोर्ट प्रिंट करें',
     'period_start' => 'अवधि प्रारंभ',
     'period_end' => 'अवधि अंत',
+    'date_start' => 'प्रारंभ तिथि',
+    'date_end' => 'समाप्ति तिथि',
     'generated_at' => 'जनरेट किया गया',
     'total_units' => 'कुल इकाइयाँ',
     'downtime_events_log' => 'डाउनटाइम घटनाएँ लॉग',

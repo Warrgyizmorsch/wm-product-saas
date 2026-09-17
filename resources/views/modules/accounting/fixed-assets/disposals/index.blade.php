@@ -9,9 +9,11 @@
         '' => 'All Statuses', 'pending_approval' => 'Pending Approval', 'approved' => 'Approved',
         'rejected' => 'Rejected', 'posted' => 'Posted',
     ]" name="status" onchange="window.location = updateQueryParam('status', this.value)" />
-    <x-ui.button href="{{ route('accounting.fixed-assets.disposals.create') }}" variant="primary" icon="feather-plus">
-        New Disposal
-    </x-ui.button>
+    @if ($canCreate)
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="offcanvas" data-bs-target="#disposalCreateDrawer">
+            New Disposal
+        </x-ui.button>
+    @endif
 @endsection
 
 @section('content')
@@ -101,6 +103,22 @@
             </div>
         </form>
     </x-ui.modal>
+
+    @if ($canCreate)
+        <x-ui.drawer id="disposalCreateDrawer" title="New Disposal" scroll style="--bs-offcanvas-width: min(640px, 92vw);">
+            @include('modules.accounting.fixed-assets.disposals._form', ['embedded' => true])
+        </x-ui.drawer>
+
+        @if ($errors->any())
+            @push('scripts')
+                <script>
+                    $(function () {
+                        new bootstrap.Offcanvas(document.getElementById('disposalCreateDrawer')).show();
+                    });
+                </script>
+            @endpush
+        @endif
+    @endif
 @endsection
 
 @push('scripts')

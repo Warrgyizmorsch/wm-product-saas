@@ -152,10 +152,26 @@ class MenuBuilder
         foreach ((array) $permissions as $permission) {
             // Platform permissions are checked without a tenant: tenant owners hold every
             // permission at tenant scope, which must not open platform-wide screens.
+            //
+            // For every other permission, the context describes "this user's own
+            // records" (owner/branch/department/company = the user's own id/values)
+            // rather than any specific record — a sidebar link has no single record
+            // to check against, so it should show whenever the user could see *at
+            // least their own* data under the grant. Without this, a grant held only
+            // at SCOPE_OWN/SCOPE_BRANCH/etc. (e.g. sales_executive's crm.leads.view)
+            // would never match here, since scopeMatches() fails closed when the
+            // relevant context key is absent — hiding the link from the very role
+            // the grant was written for.
             $this->permissionResults[$permission] ??= $this->access->allows(
                 $this->user,
                 $permission,
-                str_starts_with($permission, 'platform.') ? [] : ['tenant_id' => $this->user->tenant_id],
+                str_starts_with($permission, 'platform.') ? [] : [
+                    'tenant_id' => $this->user->tenant_id,
+                    'owner_id' => $this->user->id,
+                    'branch_id' => $this->user->branch_id,
+                    'department_id' => $this->user->department_id,
+                    'company_id' => $this->user->company_id,
+                ],
             );
 
             if ($this->permissionResults[$permission]) {

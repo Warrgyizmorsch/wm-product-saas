@@ -1346,6 +1346,8 @@ return [
     'print_report' => 'Print Report',
     'period_start' => 'Period Start',
     'period_end' => 'Period End',
+    'date_start' => 'Start Date',
+    'date_end' => 'End Date',
     'generated_at' => 'Generated At',
     'total_units' => 'Total Units',
     'downtime_events_log' => 'Downtime Events Log',

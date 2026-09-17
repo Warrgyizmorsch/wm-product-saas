@@ -232,3 +232,71 @@ select.odoo-form-control {
     font-size: 11px;
     font-weight: 700;
 }
+
+/* Dark Mode Support for Production Workflow Strip */
+html.app-skin-dark .production-workflow-card,
+html.app-skin-dark .production-workflow-card.bg-white {
+    background-color: #0f172a !important;
+    border-color: #1b2436 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.app-skin-dark .production-workflow-card .border-bottom {
+    border-color: #1b2436 !important;
+}
+
+html.app-skin-dark .production-workflow-card .btn-light {
+    background-color: #1c2438 !important;
+    border-color: #283c50 !important;
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .production-workflow-card .btn-light:hover {
+    background-color: #283c50 !important;
+    border-color: #334155 !important;
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .production-flow-tab-item.future-step {
+    background-color: #162038 !important;
+    color: #cbd5e1 !important;
+    border-color: #283c50 !important;
+}
+
+html.app-skin-dark .production-flow-tab-item.future-step:hover {
+    background-color: color-mix(in srgb, var(--bs-primary) 22%, #162038) !important;
+    color: #ffffff !important;
+    border-color: var(--bs-primary) !important;
+}
+
+html.app-skin-dark .production-flow-tab-item.passed-step {
+    background-color: color-mix(in srgb, var(--bs-primary) 18%, #121a2d) !important;
+    color: #93c5fd !important;
+    border-color: color-mix(in srgb, var(--bs-primary) 35%, transparent) !important;
+}
+
+html.app-skin-dark .production-flow-tab-item.passed-step:hover {
+    background-color: color-mix(in srgb, var(--bs-primary) 28%, #121a2d) !important;
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .production-flow-tab-item.passed-step .step-circle-badge {
+    background-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .production-flow-tab-item.active-step {
+    background-color: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--bs-primary) 45%, transparent) !important;
+}
+
+html.app-skin-dark .production-flow-tab-item.active-step .step-circle-badge {
+    background-color: #ffffff !important;
+    color: var(--bs-primary) !important;
+}
+
+html.app-skin-dark .production-workflow-card .step-connector-arrow i {
+    color: #475569 !important;
+}

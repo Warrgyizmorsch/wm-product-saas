@@ -116,9 +116,113 @@
                             default => 'primary',
                         };
                         $readiness = app(\App\Domains\Production\Services\MesExecutionService::class)->calculateOperationReadiness($op);
+
+                        // Unified progress and quantity metrics (matching Shopfloor execution)
+                        $opTargetQty = isset($targetQty) ? (float) $targetQty : (float) ($op->target_produced_qty > 0 ? $op->target_produced_qty : ($order->quantity_ordered ?? 0.0));
+                        $opDoneQty = isset($doneQty) ? (float) $doneQty : (float) ($op->quantity_produced ?? 0.0);
+                        $opScrapQty = isset($scrapQty) ? (float) $scrapQty : (float) ($op->quantity_scrapped ?? 0.0);
+                        $opRejectedQty = isset($rejectedQty) ? (float) $rejectedQty : (float) ($op->quantity_rejected ?? 0.0);
+                        $opPendingQcQty = isset($pendingQcQty) ? (float) $pendingQcQty : (float) app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op->id);
+                        $opRemainingQty = isset($remainingQty) ? (float) $remainingQty : max(0.0, $opTargetQty - ($opDoneQty + $opScrapQty + $opRejectedQty));
+                        $opProgressPercent = isset($progressPercent) ? (float) $progressPercent : ($opTargetQty > 0 ? min(100.0, round(($opDoneQty / $opTargetQty) * 100, 1)) : ($op->status === 'completed' ? 100.0 : 0.0));
+                        $itemUom = $op->sourceProduct->uom->symbol ?? $order->product->uom->symbol ?? 'PCS';
+                        $isQcRequired = (bool) ($op->quality_required || ($op->routingOperation?->quality_required ?? false));
                     @endphp
                     <x-ui.badge :variant="$statusVariant"
                         class="fs-13 px-3 py-2 fw-bold">{{ strtoupper($op->status) }}</x-ui.badge>
+                </div>
+            </div>
+
+            {{-- Operation Execution Progress & Output Status Card --}}
+            <div class="card border border-light shadow-sm mb-4" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-body p-3 bg-light-subtle">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded">
+                                <i class="feather-activity fs-16"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold text-dark mb-0 fs-13">Operation Output and Completion Progress</h6>
+                                <span class="fs-11 text-muted">Item: <strong class="text-dark">{{ $op->sourceProduct->name ?? $order->product->name }}</strong> ({{ $itemUom }})</span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            @if($op->status === 'completed' || ($opTargetQty > 0 && $opDoneQty >= ($opTargetQty - 0.0001)))
+                                <span class="badge bg-success text-white px-2.5 py-1.5 fs-11 font-monospace">
+                                    <i class="feather-check-circle me-1"></i>COMPLETED
+                                </span>
+                            @else
+                                <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2.5 py-1.5 fs-11 font-monospace">
+                                    <i class="feather-clock me-1"></i>IN PROGRESS ({{ number_format($opProgressPercent, 1) }}%)
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Progress Bar --}}
+                    <div class="progress mb-3" style="height: 8px; border-radius: 6px;">
+                        <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" role="progressbar"
+                            style="width: {{ $opProgressPercent }}%;"
+                            aria-valuenow="{{ $opProgressPercent }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+
+                    {{-- Metric Grid --}}
+                    <div class="row g-2 text-center">
+                        <div class="col-6 col-sm-4 col-md">
+                            <div class="bg-white border rounded p-2.5 h-100 shadow-2xs">
+                                <span class="fs-10 text-muted text-uppercase fw-bold d-block mb-1">Target Quantity</span>
+                                <span class="fs-18 fw-extrabold text-dark font-monospace">{{ number_format($opTargetQty, 2) }}</span>
+                                <small class="text-muted d-block fs-10">{{ $itemUom }}</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-4 col-md">
+                            <div class="bg-white border border-success-subtle rounded p-2.5 h-100 shadow-2xs bg-soft-success-subtle">
+                                <span class="fs-10 text-success text-uppercase fw-bold d-block mb-1">
+                                    <i class="feather-check text-success me-0.5"></i>Completed / Produced
+                                </span>
+                                <span class="fs-18 fw-extrabold text-success font-monospace">{{ number_format($opDoneQty, 2) }}</span>
+                                <small class="text-muted d-block fs-10">{{ $itemUom }}</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-4 col-md">
+                            <div class="bg-white border border-danger-subtle rounded p-2.5 h-100 shadow-2xs {{ $opRemainingQty > 0 ? 'bg-soft-danger-subtle' : '' }}">
+                                <span class="fs-10 text-danger text-uppercase fw-bold d-block mb-1">
+                                    <i class="feather-alert-circle text-danger me-0.5"></i>Remaining Left
+                                </span>
+                                <span class="fs-18 fw-extrabold text-danger font-monospace">{{ number_format($opRemainingQty, 2) }}</span>
+                                <small class="text-muted d-block fs-10">{{ $itemUom }}</small>
+                            </div>
+                        </div>
+                        @if($isQcRequired)
+                            <div class="col-6 col-sm-4 col-md">
+                                <div class="bg-white border border-warning-subtle rounded p-2.5 h-100 shadow-2xs">
+                                    <span class="fs-10 text-warning text-uppercase fw-bold d-block mb-1">
+                                        <i class="feather-shield text-warning me-0.5"></i>Pending QC
+                                    </span>
+                                    <span class="fs-18 fw-extrabold text-warning font-monospace">{{ number_format($opPendingQcQty, 2) }}</span>
+                                    <small class="text-muted d-block fs-10">{{ $itemUom }}</small>
+                                </div>
+                            </div>
+                        @endif
+                        @if($opScrapQty > 0)
+                            <div class="col-6 col-sm-4 col-md">
+                                <div class="bg-white border border-secondary-subtle rounded p-2.5 h-100 shadow-2xs">
+                                    <span class="fs-10 text-secondary text-uppercase fw-bold d-block mb-1">Scrapped</span>
+                                    <span class="fs-18 fw-extrabold text-secondary font-monospace">{{ number_format($opScrapQty, 2) }}</span>
+                                    <small class="text-muted d-block fs-10">{{ $itemUom }}</small>
+                                </div>
+                            </div>
+                        @endif
+                        @if($opRejectedQty > 0)
+                            <div class="col-6 col-sm-4 col-md">
+                                <div class="bg-white border border-danger-subtle rounded p-2.5 h-100 shadow-2xs">
+                                    <span class="fs-10 text-danger text-uppercase fw-bold d-block mb-1">Rejected</span>
+                                    <span class="fs-18 fw-extrabold text-danger font-monospace">{{ number_format($opRejectedQty, 2) }}</span>
+                                    <small class="text-muted d-block fs-10">{{ $itemUom }}</small>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
                 </div>
             </div>
 
@@ -128,7 +232,9 @@
                     <div class="card-body p-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="fw-bold text-dark mb-0"><i class="feather-shield text-primary me-2"></i>Multi-Level Component Execution Readiness</h6>
-                            @if($readiness['is_ready'])
+                            @if($op->status === 'completed')
+                                <span class="badge bg-soft-success text-success fw-bold px-2 py-1"><i class="feather-check-circle me-1"></i>Completed</span>
+                            @elseif($readiness['is_ready'])
                                 <span class="badge bg-soft-success text-success fw-bold px-2 py-1"><i class="feather-check-circle me-1"></i>Executable</span>
                             @else
                                 <span class="badge bg-soft-danger text-danger fw-bold px-2 py-1"><i class="feather-alert-triangle me-1"></i>Dependency Waiting</span>
@@ -145,7 +251,7 @@
                                 <strong class="fs-14 text-dark font-monospace">{{ number_format($readiness['executable_qty'], 2) }}</strong>
                             </div>
                             <div class="col-6 col-md-3">
-                                <span class="fs-11 text-muted text-uppercase d-block">Already Claimed</span>
+                                <span class="fs-11 text-muted text-uppercase d-block">Already Claimed / Processed</span>
                                 <strong class="fs-14 text-secondary font-monospace">{{ number_format($readiness['claimed_qty'], 2) }}</strong>
                             </div>
                             <div class="col-6 col-md-3">
@@ -305,6 +411,8 @@
                                 @if($op->status === 'running' || $op->status === 'paused')
                                     @php
                                         $isQcRequired = (bool) ($op->quality_required || ($op->routingOperation?->quality_required ?? false));
+                                        $touchPendingQcQty = $pendingQcQty ?? app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op->id);
+                                        $touchRejectedQty = (float) ($op->quantity_rejected ?? 0.0);
                                     @endphp
 
                                     <div class="col">
@@ -315,30 +423,57 @@
                                         </x-ui.button>
                                     </div>
 
+                                    <div class="col">
+                                        <x-ui.button variant="outline-danger" icon="feather-trash-2"
+                                            class="btn-touch-large w-100" data-bs-toggle="modal"
+                                            data-bs-target="#scrapModal">
+                                            LOG SCRAP
+                                        </x-ui.button>
+                                    </div>
+
                                     @if($isQcRequired)
                                         <div class="col">
                                             <x-ui.button variant="warning" icon="feather-shield-check"
-                                                class="btn-touch-large w-100 text-dark" data-bs-toggle="modal"
+                                                class="btn-touch-large w-100 text-dark btn-badge-container" data-bs-toggle="modal"
                                                 data-bs-target="#quickQcModal">
                                                 QC CHECK
+                                                @if($touchPendingQcQty > 0)
+                                                    <span class="btn-badge-count">{{ number_format($touchPendingQcQty, 0) }}</span>
+                                                @endif
                                             </x-ui.button>
                                         </div>
                                     @endif
 
-                                    <div class="col">
-                                        <x-ui.button variant="primary" icon="feather-check-circle" class="btn-touch-large w-100"
-                                            data-bs-toggle="modal" data-bs-target="#completeModal">
-                                            COMPLETE
-                                        </x-ui.button>
-                                    </div>
+                                    @if($touchRejectedQty > 0)
+                                        <div class="col">
+                                            <x-ui.button variant="danger" icon="feather-alert-triangle"
+                                                class="btn-touch-large w-100 text-white btn-badge-container" data-bs-toggle="modal"
+                                                data-bs-target="#dispositionModal">
+                                                REWORK / SCRAP
+                                                <span class="btn-badge-count">{{ number_format($touchRejectedQty, 0) }}</span>
+                                            </x-ui.button>
+                                        </div>
+                                    @endif
                                 @endif
 
                                 @if($op->status === 'completed')
+                                    @php
+                                        $touchRejectedQty = (float) ($op->quantity_rejected ?? 0.0);
+                                    @endphp
                                     <div class="col-12 text-center py-4">
                                         <i class="feather-check-circle text-success fs-48 mb-2 d-block"></i>
                                         <h5 class="fw-bold text-dark">Operation is Completed</h5>
-                                        <p class="text-muted mb-0 fs-13">This operation's steps on the shop floor have finished
-                                            successfully.</p>
+                                        <p class="text-muted mb-0 fs-13">This operation's steps on the shop floor have finished successfully.</p>
+                                        @if($touchRejectedQty > 0)
+                                            <div class="mt-3">
+                                                <x-ui.button variant="danger" icon="feather-alert-triangle"
+                                                    class="btn-touch-large text-white px-4 btn-badge-container" data-bs-toggle="modal"
+                                                    data-bs-target="#dispositionModal">
+                                                    DISPOSITION REJECTED UNITS
+                                                    <span class="btn-badge-count">{{ number_format($touchRejectedQty, 0) }}</span>
+                                                </x-ui.button>
+                                            </div>
+                                        @endif
                                     </div>
                                 @endif
                             </div>
@@ -446,112 +581,16 @@
             placeholder="Enter reason (e.g. material shortage, machine breakdown)..." :required="true" rows="3" />
     </x-ui.modal>
 
-    {{-- Complete Modal (Touch Numeric Pad) --}}
-    <x-ui.modal id="completeModal" title="Log Progress & Complete" centered="true" size="lg"
-        formAction="{{ route('production.mes.complete', optional($scheduleOp)->id ?? $op->id) }}"
-        submitText="Submit & Complete" closeText="Cancel">
-        <div class="row g-4 text-start">
-            {{-- Numeric Pad & Inputs --}}
-            <div class="col-md-7 border-end pe-md-4">
-                <div class="mb-3">
-                    <label class="form-label uppercase font-semibold fs-11 text-muted">Active Input field</label>
-                    <div class="d-flex gap-2">
-                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn active"
-                            onclick="selectInput('produced', this)">Produced</x-ui.button>
-                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn"
-                            onclick="selectInput('rejected', this)">Rejected</x-ui.button>
-                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn"
-                            onclick="selectInput('scrapped', this)">Scrapped</x-ui.button>
-                    </div>
-                </div>
-
-                <div class="row g-2 mb-3">
-                    @for($i = 1; $i <= 9; $i++)
-                        <div class="col-4">
-                            <x-ui.button type="button" variant="light" class="num-btn w-100"
-                                onclick="numPress('{{ $i }}')">{{ $i }}</x-ui.button>
-                        </div>
-                    @endfor
-                    <div class="col-4">
-                        <x-ui.button type="button" variant="light" class="num-btn w-100"
-                            onclick="numPress('.')">.</x-ui.button>
-                    </div>
-                    <div class="col-4">
-                        <x-ui.button type="button" variant="light" class="num-btn w-100"
-                            onclick="numPress('0')">0</x-ui.button>
-                    </div>
-                    <div class="col-4">
-                        <x-ui.button type="button" variant="soft-danger" class="num-btn w-100" onclick="numPress('C')"><i
-                                class="feather-delete"></i></x-ui.button>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Target Quantities --}}
-            <div class="col-md-5 ps-md-4">
-                @php
-                    $opTargetQty = 0.0;
-                    if ((float) ($op->target_produced_qty ?? 0) > 0) {
-                        $opTargetQty = (float) $op->target_produced_qty;
-                    } elseif ($op->source_product_id && (int) $op->source_product_id !== (int) $order->product_id) {
-                        $bomItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $op->tenant_id)
-                            ->where('bom_id', $order->bom_id)
-                            ->where('material_id', $op->source_product_id)
-                            ->first();
-                        $ratio = ($bomItem && (float) $bomItem->quantity > 0) ? (float) $bomItem->quantity : 1.0;
-                        $opTargetQty = (float) $order->quantity_ordered * $ratio;
-                    } else {
-                        $opTargetQty = (float) $order->quantity_ordered;
-                    }
-
-                    if (isset($batchQueue['active']) && !empty($batchQueue['active'])) {
-                        $activeBatch = reset($batchQueue['active']);
-                        if ($activeBatch && (float) ($activeBatch['planned_quantity'] ?? 0) > 0) {
-                            $opTargetQty = min($opTargetQty, (float) $activeBatch['planned_quantity']);
-                        }
-                    }
-
-                    $opOutputProductId = $op->product_id ?? $op->source_product_id ?? $op->order?->product_id;
-                    $totalScrappedAtOp = max(
-                        (float) ($op->quantity_scrapped ?? 0),
-                        (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $op->tenant_id)
-                            ->where('production_order_id', $op->production_order_id)
-                            ->where('production_order_operation_id', $op->id)
-                            ->where(function($q) use ($opOutputProductId) {
-                                $q->where('product_id', $opOutputProductId)
-                                  ->orWhereNull('product_id');
-                            })
-                            ->sum('quantity')
-                    );
-                    $remainingToComplete = max(0.0, $opTargetQty - (($op->quantity_produced ?? 0) + $totalScrappedAtOp + ($op->quantity_rejected ?? 0)));
-                @endphp
-                <x-ui.odoo-form-ui type="input" label="Quantity Produced" name="quantity_produced" id="producedInput"
-                    inputType="number" step="0.0001" :value="$remainingToComplete" :required="true" />
-                <input type="hidden" name="quantity_rejected" value="0" id="rejectedInput">
-                <input type="hidden" name="quantity_scrapped" value="0" id="scrappedInput">
-                <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" placeholder="Optional comments..."
-                    rows="2" />
-            </div>
-        </div>
-    </x-ui.modal>
-
     {{-- Log Daily/Partial Progress Modal (Touch Numeric Pad) --}}
-    <x-ui.modal id="logProgressModal" title="Log Daily / Shift Progress" centered="true" size="lg"
-        formAction="{{ route('production.mes.log-progress', optional($scheduleOp)->id ?? $op->id) }}"
+    <x-ui.modal id="logProgressModal" title="Log Shift / Daily Progress" centered="true" size="lg"
+        formAction="{{ route('production.mes.complete', optional($scheduleOp)->id ?? $op->id) }}"
         submitText="Submit Progress Log" closeText="Cancel">
         <div class="row g-4 text-start">
             {{-- Numeric Pad & Inputs --}}
             <div class="col-md-7 border-end pe-md-4">
-                <div class="mb-3">
-                    <label class="form-label uppercase font-semibold fs-11 text-muted">Active Input field</label>
-                    <div class="d-flex gap-2">
-                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn active"
-                            onclick="selectInput('log_produced', this)">Produced</x-ui.button>
-                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn"
-                            onclick="selectInput('log_rejected', this)">Rejected</x-ui.button>
-                        <x-ui.button type="button" variant="outline-primary" class="active-input-btn"
-                            onclick="selectInput('log_scrapped', this)">Scrapped</x-ui.button>
-                    </div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <label class="form-label uppercase font-semibold fs-11 text-muted mb-0">Touch Keypad (Quantity Produced)</label>
+                    <span class="fs-11 text-muted">Remaining: <strong class="text-danger font-monospace">{{ number_format($opRemainingQty, 2) }} {{ $itemUom }}</strong></span>
                 </div>
 
                 <div class="row g-2 mb-3">
@@ -578,6 +617,29 @@
 
             {{-- Target Quantities --}}
             <div class="col-md-5 ps-md-4">
+                <div class="bg-light p-2.5 rounded border mb-3 fs-11">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Target Output:</span>
+                        <strong class="font-monospace text-dark">{{ number_format($opTargetQty, 2) }} {{ $itemUom }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Already Done:</span>
+                        <strong class="font-monospace text-success">{{ number_format($opDoneQty, 2) }} {{ $itemUom }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between border-top pt-1 mt-1">
+                        <span class="fw-bold text-dark">Remaining to Produce:</span>
+                        <strong class="font-monospace text-danger">{{ number_format($opRemainingQty, 2) }} {{ $itemUom }}</strong>
+                    </div>
+                </div>
+
+                @if($isQcRequired)
+                    <div class="alert alert-soft-warning py-2 fs-11 mb-3 border border-warning-subtle">
+                        <i class="feather-shield text-warning me-1"></i>
+                        <strong>Quality Check Required:</strong>
+                        <div>Output logged here enters <strong>Pending QC</strong> status until inspected. Rejections must be recorded through <strong>QC Check</strong>, and scrap through <strong>Log Scrap</strong>.</div>
+                    </div>
+                @endif
+
                 @if(!empty($batchQueue['active']))
                     <x-ui.odoo-form-ui type="select" label="Production Batch" name="production_batch_id">
                         @foreach($batchQueue['active'] as $item)
@@ -588,12 +650,12 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
                 @endif
-                <x-ui.odoo-form-ui type="input" label="Quantity Produced (Today)" name="quantity_produced"
-                    id="log_producedInput" inputType="number" step="0.0001" value="0" :required="true" />
-                <x-ui.odoo-form-ui type="input" label="Quantity Rejected (Today)" name="quantity_rejected"
-                    id="log_rejectedInput" inputType="number" step="0.0001" value="0" />
-                <x-ui.odoo-form-ui type="input" label="Quantity Scrapped (Today)" name="quantity_scrapped"
-                    id="log_scrappedInput" inputType="number" step="0.0001" value="0" />
+                <x-ui.odoo-form-ui type="input"
+                    label="{{ $isQcRequired ? 'Processed Output Qty (Pending QC)' : 'Quantity Produced / Output' }}"
+                    name="quantity_produced"
+                    id="log_producedInput" inputType="number" step="0.0001" value="{{ $opRemainingQty > 0 ? (float) $opRemainingQty : 0 }}" :required="true" />
+                <input type="hidden" name="quantity_rejected" value="0" id="log_rejectedInput">
+                <input type="hidden" name="quantity_scrapped" value="0" id="log_scrappedInput">
                 <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks"
                     placeholder="Optional shift handover comments..." rows="2" />
             </div>
@@ -623,29 +685,162 @@
 
     {{-- Operator Shopfloor Quality Inspection Modal --}}
     @php
-        $touchPendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op->id);
+        $touchPendingQcQty = $pendingQcQty ?? app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op->id);
         $touchRejectedQty = (float) ($op->quantity_rejected ?? 0.0);
     @endphp
 
     <x-ui.modal id="quickQcModal" title="Shopfloor Quality Inspection Check" centered="true" size="lg"
-        formAction="{{ route('production.mes.quality-inspection', $op->id) }}" submitText="Complete QC Inspection"
+        formAction="{{ route('production.mes.quality-inspection', $op->id) }}" submitText="Submit QC Inspection"
         closeText="Cancel">
-        <div class="alert alert-info py-2 fs-12 mb-3 d-flex justify-content-between align-items-center">
+        <div class="bg-soft-warning p-3 rounded mb-3 border border-warning-subtle d-flex justify-content-between align-items-center">
             <div>
-                <i class="feather-shield me-1"></i> Perform inline quality inspection for <strong>{{ $op->name }}</strong>.
+                <h6 class="fw-bold text-dark mb-1"><i class="feather-shield-check text-warning me-2"></i>In-Process Quality Inspection</h6>
+                <span class="fs-11 text-muted">Order: <strong>{{ $order->order_number }}</strong> | Item: <strong>{{ $op->sourceProduct->name ?? $order->product->name }}</strong></span>
             </div>
-            <span class="badge bg-warning text-dark font-monospace fs-12 px-2 py-1">Pending QC: {{ number_format($touchPendingQcQty, 0) }}</span>
+            <span class="badge bg-warning text-dark fs-12 px-3 py-2 font-monospace">Pending QC: {{ number_format($touchPendingQcQty, 0) }}</span>
         </div>
+
+        @php
+            $selectedPlanId = null;
+            // 1. Prioritize source product quality plan if operation processes an SFG
+            if ($op->source_product_id) {
+                foreach ($qualityPlans ?? [] as $qp) {
+                    if ($qp->product_id == $op->source_product_id) {
+                        $selectedPlanId = $qp->id;
+                        break;
+                    }
+                }
+            }
+            // 2. Prioritize in_process quality plan for order finished good
+            if (!$selectedPlanId) {
+                foreach ($qualityPlans ?? [] as $qp) {
+                    if ($qp->product_id == $order->product_id && ($qp->type ?? '') === 'in_process') {
+                        $selectedPlanId = $qp->id;
+                        break;
+                    }
+                }
+            }
+            // 3. Match any plan for order finished good
+            if (!$selectedPlanId) {
+                foreach ($qualityPlans ?? [] as $qp) {
+                    if ($qp->product_id == $order->product_id) {
+                        $selectedPlanId = $qp->id;
+                        break;
+                    }
+                }
+            }
+            // 4. Default to first available plan
+            if (!$selectedPlanId && count($qualityPlans ?? []) > 0) {
+                $selectedPlanId = $qualityPlans->first()->id;
+            }
+        @endphp
 
         <div class="row g-3 text-start">
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="Accepted Quantity (Good Output)" name="accepted_qty" inputType="number" step="any" value="{{ $touchPendingQcQty }}" :required="true" />
+                <x-ui.odoo-form-ui type="select" label="Quality Plan" name="quality_plan_id"
+                    id="quality_plan_id_{{ $op->id }}" class="quality-plan-select"
+                    data-op-id="{{ $op->id }}" :required="true">
+                    <option value="">-- Select Quality Plan --</option>
+                    @foreach($qualityPlans ?? [] as $qp)
+                        <option value="{{ $qp->id }}" @selected($selectedPlanId == $qp->id)>
+                            {{ $qp->name }} ({{ strtoupper($qp->type ?? 'in_process') }})
+                        </option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="Rejected Quantity (Defective Output)" name="rejected_qty" inputType="number" step="any" value="0" :required="true" />
+                <x-ui.odoo-form-ui type="select" label="Quality Auditor / Inspector" name="audited_by" :required="true">
+                    @foreach($operators as $opUser)
+                        <option value="{{ $opUser->id }}" {{ (auth()->id() == $opUser->id) ? 'selected' : '' }}>
+                            {{ $opUser->name }} ({{ ucfirst($opUser->role ?? 'Operator') }})
+                        </option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
             </div>
+
             <div class="col-md-12">
-                <x-ui.odoo-form-ui type="textarea" label="Inspection Remarks & Notes" name="remarks" placeholder="Enter measured dimensions, batch details, or quality observations..." rows="3" />
+                <label class="form-label fw-semibold fs-11 text-uppercase text-dark mb-1">
+                    <i class="feather-check-square text-primary me-1"></i>Quality Specification Checklist Parameters
+                </label>
+                <div class="p-3 border rounded bg-light fs-11" id="qualityChecklistContainer_{{ $op->id }}">
+                    {{-- Standard Fallback Checklist (Uses odoo-form-ui) --}}
+                    <div class="qc-plan-group" id="qc_plan_group_{{ $op->id }}_none" style="{{ empty($selectedPlanId) ? '' : 'display: none;' }}">
+                        <x-ui.odoo-form-ui type="checkbox" label="Visual Finish" name="parameter_values[visual]" value="pass" placeholder="Visual Surface Finish & Coating Inspection (Pass)" :checked="true" :disabled="!empty($selectedPlanId)" />
+                        <x-ui.odoo-form-ui type="checkbox" label="Dimensional Spec" name="parameter_values[dimensional]" value="pass" placeholder="Dimensional & Thickness Tolerance Within Specification (Pass)" :checked="true" :disabled="!empty($selectedPlanId)" />
+                        <x-ui.odoo-form-ui type="checkbox" label="Structural Test" name="parameter_values[structural]" value="pass" placeholder="Assembly & Structural Integrity Test (Pass)" :checked="true" :disabled="!empty($selectedPlanId)" />
+                    </div>
+
+                    {{-- Dynamic Quality Plan Checklist Parameters (All using odoo-form-ui) --}}
+                    @foreach($qualityPlans ?? [] as $qp)
+                        @php
+                            $isThisPlanActive = ($selectedPlanId == $qp->id);
+                        @endphp
+                        <div class="qc-plan-group" id="qc_plan_group_{{ $op->id }}_{{ $qp->id }}" style="{{ $isThisPlanActive ? '' : 'display: none;' }}">
+                            @forelse($qp->parameters as $param)
+                                @php
+                                    $uom = $param->unit_of_measure ?? '';
+                                    $hasMin = $param->min_value !== null && $param->min_value !== '';
+                                    $hasMax = $param->max_value !== null && $param->max_value !== '';
+                                    $specInfo = ($hasMin || $hasMax) ? ' [Spec: ' . ($hasMin ? $param->min_value : '') . ' - ' . ($hasMax ? $param->max_value : '') . ($uom ? ' ' . $uom : '') . ']' : ($uom ? ' (' . $uom . ')' : '');
+                                    $paramLabel = $param->name . $specInfo;
+                                    $measuredPlaceholder = 'Enter measured value' . ($uom ? ' (' . $uom . ')' : '');
+                                @endphp
+                                @if($param->type === 'numeric')
+                                    <x-ui.odoo-form-ui type="input" inputType="number" step="any"
+                                        label="{{ $paramLabel }}"
+                                        name="parameter_values[{{ $param->id }}]"
+                                        id="param_{{ $op->id }}_{{ $param->id }}"
+                                        :placeholder="$measuredPlaceholder"
+                                        :required="$param->is_mandatory"
+                                        :disabled="!$isThisPlanActive" />
+                                @elseif($param->type === 'text')
+                                    <x-ui.odoo-form-ui type="input" inputType="text"
+                                        label="{{ $paramLabel }}"
+                                        name="parameter_values[{{ $param->id }}]"
+                                        id="param_{{ $op->id }}_{{ $param->id }}"
+                                        placeholder="Enter observation / inspection notes..."
+                                        :required="$param->is_mandatory"
+                                        :disabled="!$isThisPlanActive" />
+                                @else
+                                    <x-ui.odoo-form-ui type="checkbox"
+                                        label="{{ $param->name }}"
+                                        name="parameter_values[{{ $param->id }}]"
+                                        id="param_{{ $op->id }}_{{ $param->id }}"
+                                        value="pass"
+                                        placeholder="{{ $param->name }} (Pass)"
+                                        :checked="true"
+                                        :disabled="!$isThisPlanActive" />
+                                @endif
+                            @empty
+                                <div class="text-muted fs-12 py-1">
+                                    <i class="feather-info text-primary me-1"></i> Quality Plan <strong>{{ $qp->name }}</strong> has no custom checklist parameters configured.
+                                </div>
+                            @endforelse
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <x-ui.odoo-form-ui type="input" label="Accepted Qty (Good Usable Output)" name="accepted_qty" inputType="number" step="any" value="{{ $touchPendingQcQty }}" :required="true" />
+            </div>
+            <div class="col-md-4">
+                <x-ui.odoo-form-ui type="input" label="Rejected Qty (Defective Output)" name="rejected_qty" inputType="number" step="any" value="0" :required="true" />
+            </div>
+            <div class="col-md-4">
+                <x-ui.odoo-form-ui type="select" label="Defect Reason (If Rejected)" name="defect_reason">
+                    <option value="">-- None / Meets Quality Standard --</option>
+                    <option value="Surface Scratch / Coating Damage">Surface Scratch / Coating Damage</option>
+                    <option value="Out of Dimension / Thickness Error">Out of Dimension / Thickness Error</option>
+                    <option value="Chipped Edge / Structural Defect">Chipped Edge / Structural Defect</option>
+                    <option value="Raw Material Defect">Raw Material Defect</option>
+                    <option value="Machine Calibration Error">Machine Calibration Error</option>
+                    <option value="Operator Assembly Error">Operator Assembly Error</option>
+                </x-ui.odoo-form-ui>
+            </div>
+
+            <div class="col-md-12">
+                <x-ui.odoo-form-ui type="textarea" label="Inspection Remarks & Quality Notes" name="remarks" placeholder="Enter measured dimensions, batch details, or quality observations..." rows="2" />
             </div>
         </div>
     </x-ui.modal>
@@ -653,60 +848,168 @@
     {{-- Record Operational Scrap Modal --}}
     <x-ui.modal id="scrapModal" title="Record Operational Scrap" centered="true" size="md"
         formAction="{{ route('production.mes.scrap', $op->id) }}" submitText="Record Scrap" closeText="Cancel">
-        <div class="alert alert-danger py-2 fs-12 mb-3">
-            <i class="feather-trash-2 me-1"></i> Record operational scrap / setup damage for <strong>{{ $op->name }}</strong>.
+        <div class="bg-soft-danger p-3 rounded mb-3 border border-danger-subtle">
+            <h6 class="fw-bold text-danger mb-1"><i class="feather-trash-2 me-2"></i>Record Operational Loss / Damaged Output</h6>
+            <span class="fs-11 text-muted">Order: <strong>{{ $order->order_number }}</strong> | Operation: <strong>{{ $op->name }}</strong></span>
         </div>
+
         <div class="row g-3 text-start">
             <div class="col-md-12">
+                <x-ui.odoo-form-ui type="select" label="Component / Material to Scrap" name="product_id" :required="true">
+                    @php
+                        $scrappableMats = $op->scrappable_materials;
+                    @endphp
+                    @foreach($scrappableMats as $idx => $mat)
+                        <option value="{{ $mat['id'] }}" {{ $idx === 0 ? 'selected' : '' }}>
+                            {{ $mat['name'] }} — {{ $mat['type_label'] }}
+                        </option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            </div>
+            <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="Scrap Quantity" name="quantity" inputType="number" step="any" value="1" :required="true" />
             </div>
-            <div class="col-md-12">
-                <x-ui.odoo-form-ui type="select" label="Scrap Reason" name="reason" :required="true">
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="select" label="Scrap Reason Category" name="reason" :required="true">
                     <option value="Cutting Error / Wrong Dimension">Cutting Error / Wrong Dimension</option>
                     <option value="Setup Damage / Calibration Loss">Setup Damage / Calibration Loss</option>
                     <option value="Machine Breakdown / Tool Defect">Machine Breakdown / Tool Defect</option>
-                    <option value="Raw Material Defect">Raw Material Defect</option>
-                    <option value="Operator Error">Operator Error</option>
+                    <option value="Raw Material Void / Internal Defect">Raw Material Void / Internal Defect</option>
+                    <option value="Operator Mishap / Handling Damage">Operator Mishap / Handling Damage</option>
                     <option value="Other Operational Loss">Other Operational Loss</option>
                 </x-ui.odoo-form-ui>
+            </div>
+            <div class="col-md-12">
+                <x-ui.odoo-form-ui type="textarea" label="Scrap Observations & Material Notes" name="remarks"
+                    placeholder="Provide additional details regarding scrap cause..." rows="2" />
             </div>
         </div>
     </x-ui.modal>
 
     {{-- Rejected Quantity Disposition Modal --}}
-    <x-ui.modal id="dispositionModal" title="Rejected Output Disposition" centered="true" size="lg"
+    <x-ui.modal id="dispositionModal" title="REJECTED OUTPUT DISPOSITION — {{ html_entity_decode($op->name ?? 'Op #' . $op->sequence, ENT_QUOTES, 'UTF-8') }}" centered="true" size="lg"
         formAction="{{ route('production.mes.disposition', $op->id) }}" submitText="Submit Disposition" closeText="Cancel">
-        <div class="alert alert-warning py-2 fs-12 mb-3 d-flex justify-content-between align-items-center">
+        <div class="bg-soft-danger p-3 rounded mb-3 border border-danger-subtle d-flex justify-content-between align-items-center">
             <div>
-                <i class="feather-alert-triangle me-1"></i> Disposition rejected units for <strong>{{ $op->name }}</strong>.
+                <h6 class="fw-bold text-danger mb-1"><i class="feather-alert-triangle me-2"></i>Quality Rejection Disposition</h6>
+                <span class="fs-11 text-muted">Order: <strong>{{ $order->order_number }}</strong> | Item: <strong>{{ $op->sourceProduct->name ?? $order->product->name }}</strong></span>
             </div>
-            <span class="badge bg-danger text-white font-monospace fs-12 px-2 py-1">Rejected Qty: {{ number_format($touchRejectedQty, 0) }}</span>
+            <span class="badge bg-danger text-white fs-12 px-3 py-2 font-monospace">Rejected Qty: {{ number_format($touchRejectedQty, 0) }}</span>
         </div>
+
+        @php
+            $isOutsourcedOp = (bool) ($op->is_external || $op->isOutsourced() || $op->work_center_id === null);
+            $vendorName = $op->vendor->name ?? 'Subcontract Vendor';
+        @endphp
+
         <div class="row g-3 text-start">
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="select" label="Disposition Choice" name="disposition_type" :required="true">
-                    <option value="rework" selected>Rework (Reprocess Defect)</option>
-                    <option value="scrap">Scrap (Scrap & Request Replacement)</option>
+                    <option value="rework" selected>Rework (Create Repair Order & Reprocess Defect)</option>
+                    <option value="scrap">Scrap (Scrap Material & Evaluate Replacement)</option>
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="Quantity to Dispose" name="quantity" inputType="number" step="any" value="{{ $touchRejectedQty }}" :required="true" />
             </div>
+
+            @if($isOutsourcedOp)
+                <div class="col-md-12">
+                    <label class="form-label fw-bold text-dark fs-11">Rework Location / Pathway <span class="text-danger">*</span></label>
+                    <select class="form-select form-select-sm" name="rework_location" id="reworkLocationOp" onchange="toggleReworkFieldsOp(this.value)">
+                        <option value="vendor_rework" selected>Return to Subcontract Vendor (Generate Return Gate Pass / DC)</option>
+                        <option value="internal_repair">Perform In-House Repair (Internal Workstation)</option>
+                    </select>
+                </div>
+
+                <div id="vendorReworkBannerOp" class="col-md-12">
+                    <div class="alert alert-info border border-info-subtle p-2.5 rounded fs-11 mb-0">
+                        <i class="feather-truck me-1"></i>
+                        <strong>Subcontract Vendor Rework</strong>: A Rework Delivery Challan (Return Gate Pass) will be created to dispatch <strong>{{ number_format($touchRejectedQty, 0) }} unit(s)</strong> back to <strong>{{ $vendorName }}</strong> for rework/rectification.
+                    </div>
+                </div>
+            @endif
+
+            <div class="col-md-12 p-0 m-0">
+                <div id="internalReworkFieldsOp" class="row g-3 m-0" style="{{ $isOutsourcedOp ? 'display: none;' : '' }}">
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="select" label="Target Workstation / Process (For Rework)" name="work_center_id">
+                            @foreach($workCenters ?? [] as $wc)
+                                <option value="{{ $wc->id }}" {{ ($op->work_center_id == $wc->id) ? 'selected' : '' }}>
+                                    {{ $wc->name }} ({{ $wc->code }})
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="select" label="Target Machine / Equipment" name="machine_id">
+                            <option value="">-- Default Workstation Machine --</option>
+                            @foreach($machines ?? [] as $m)
+                                <option value="{{ $m->id }}" {{ ($op->machine_id == $m->id) ? 'selected' : '' }}>
+                                    {{ $m->name }} ({{ $m->code ?? 'MACH' }})
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="select" label="Assigned Repair Technician" name="assigned_to">
+                            @foreach($operators as $tech)
+                                <option value="{{ $tech->id }}" {{ (auth()->id() == $tech->id) ? 'selected' : '' }}>
+                                    {{ $tech->name }} ({{ ucfirst($tech->role ?? 'Technician') }})
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="select" label="Rework Strategy" name="rework_type">
+                    <option value="reprocess" selected>Reprocess / Re-run Machine</option>
+                    <option value="repair">Manual Touch-up / Spot Repair</option>
+                    <option value="re_machining">Re-machining / Trim Specification</option>
+                    <option value="re_coating">Strip & Re-surface / Re-paint</option>
+                </x-ui.odoo-form-ui>
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" label="Estimated Repair Cost ($)" name="cost_estimate" inputType="number" step="0.01" value="50.00" />
+            </div>
+
             <div class="col-md-12">
-                <x-ui.odoo-form-ui type="textarea" label="Reason / Defect Description" name="reason" placeholder="Explain rejection cause..." rows="2" />
+                <x-ui.odoo-form-ui type="textarea" label="Reason / Defect Description" name="reason"
+                    placeholder="Explain defect cause (e.g. Surface Scratch, Dimension Out of Spec)..." rows="2" />
             </div>
             <div class="col-md-12">
-                <x-ui.odoo-form-ui type="textarea" label="Rework Instructions (For Rework Disposition)" name="instructions" placeholder="Provide instructions for operator during rework execution..." rows="2" />
+                <x-ui.odoo-form-ui type="textarea" label="Detailed Rework Instructions for Vendor / Technician" name="instructions"
+                    placeholder="Provide step-by-step repair instructions..." rows="2" />
             </div>
         </div>
+        @if($isOutsourcedOp)
+            <script>
+                function toggleReworkFieldsOp(val) {
+                    const internalDiv = document.getElementById('internalReworkFieldsOp');
+                    const vendorBanner = document.getElementById('vendorReworkBannerOp');
+                    if (val === 'internal_repair') {
+                        if (internalDiv) internalDiv.style.display = 'flex';
+                        if (vendorBanner) vendorBanner.style.display = 'none';
+                    } else {
+                        if (internalDiv) internalDiv.style.display = 'none';
+                        if (vendorBanner) vendorBanner.style.display = 'block';
+                    }
+                }
+            </script>
+        @endif
     </x-ui.modal>
 
     @push('scripts')
         <script>
-            let currentField = 'produced';
+            let currentField = 'log_produced';
+            let keypadReplaceNext = true;
 
             function selectInput(field, btnEl) {
                 currentField = field;
+                keypadReplaceNext = true;
                 const modal = btnEl.closest('.modal');
                 modal.querySelectorAll('.active-input-btn').forEach(btn => btn.classList.remove('active'));
                 btnEl.classList.add('active');
@@ -718,12 +1021,15 @@
 
                 if (val === 'C') {
                     input.value = '0';
+                    keypadReplaceNext = true;
                     return;
                 }
 
-                if (input.value === '0') {
-                    input.value = val;
+                if (keypadReplaceNext || input.value === '0') {
+                    input.value = (val === '.' ? '0.' : val);
+                    keypadReplaceNext = false;
                 } else {
+                    if (val === '.' && input.value.includes('.')) return;
                     input.value += val;
                 }
             }
@@ -733,14 +1039,155 @@
                 if (logModal) {
                     logModal.addEventListener('shown.bs.modal', function () {
                         currentField = 'log_produced';
+                        keypadReplaceNext = true;
                     });
                 }
-                const compModal = document.getElementById('completeModal');
-                if (compModal) {
-                    compModal.addEventListener('shown.bs.modal', function () {
-                        currentField = 'produced';
+
+                // Dynamic Quality Plan Checklist Synchronization (aligned with Shopfloor MES)
+                const qualityPlansMap = @json($qualityPlans->keyBy('id'));
+
+                function updateQualityChecklist(selectEl) {
+                    if (!selectEl) return;
+                    const form = selectEl.closest('form');
+                    const container = form ? form.querySelector('[id^="qualityChecklistContainer_"]') : null;
+                    if (!container) return;
+
+                    const opId = container.id.replace('qualityChecklistContainer_', '');
+                    const planId = selectEl.value;
+
+                    // Toggle pre-rendered odoo-form-ui parameter groups
+                    const allGroups = container.querySelectorAll('.qc-plan-group');
+                    if (allGroups.length > 0) {
+                        allGroups.forEach(group => {
+                            group.style.display = 'none';
+                            group.querySelectorAll('input, select, textarea').forEach(input => {
+                                input.disabled = true;
+                            });
+                        });
+
+                        const targetGroup = planId
+                            ? container.querySelector('#qc_plan_group_' + opId + '_' + planId)
+                            : container.querySelector('#qc_plan_group_' + opId + '_none');
+
+                        if (targetGroup) {
+                            targetGroup.style.display = 'block';
+                            targetGroup.querySelectorAll('input, select, textarea').forEach(input => {
+                                input.disabled = false;
+                            });
+                            return;
+                        }
+
+                        const fallback = container.querySelector('#qc_plan_group_' + opId + '_none');
+                        if (fallback) {
+                            fallback.style.display = 'block';
+                            fallback.querySelectorAll('input, select, textarea').forEach(input => {
+                                input.disabled = false;
+                            });
+                            return;
+                        }
+                    }
+
+                    // Dynamic fallback using identical odoo-form-ui structure
+                    const plan = qualityPlansMap[planId];
+                    if (plan && plan.parameters && plan.parameters.length > 0) {
+                        let html = '';
+                        plan.parameters.forEach((param) => {
+                            const isMandatory = param.is_mandatory ? '<span class="text-danger">*</span>' : '';
+                            const uom = param.unit_of_measure || param.uom || '';
+                            const hasMin = param.min_value !== null && param.min_value !== undefined && param.min_value !== '';
+                            const hasMax = param.max_value !== null && param.max_value !== undefined && param.max_value !== '';
+                            const specInfo = (hasMin || hasMax) ? ` [Spec: ${hasMin ? param.min_value : ''} - ${hasMax ? param.max_value : ''} ${uom}]` : (uom ? ` (${uom})` : '');
+                            const label = `${param.name}${specInfo}`;
+
+                            if (param.type === 'numeric') {
+                                html += `
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">
+                                        ${label} ${isMandatory}
+                                    </label>
+                                    <div class="flex-grow-1">
+                                        <input type="number" step="any" class="odoo-form-control" name="parameter_values[${param.id}]" id="param_${opId}_${param.id}" placeholder="Enter measured value (${uom})" ${param.is_mandatory ? 'required' : ''}>
+                                    </div>
+                                </div>
+                            `;
+                            } else if (param.type === 'text') {
+                                html += `
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">
+                                        ${label} ${isMandatory}
+                                    </label>
+                                    <div class="flex-grow-1">
+                                        <input type="text" class="odoo-form-control" name="parameter_values[${param.id}]" id="param_${opId}_${param.id}" placeholder="Enter observation / inspection notes..." ${param.is_mandatory ? 'required' : ''}>
+                                    </div>
+                                </div>
+                            `;
+                            } else {
+                                html += `
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label" for="param_${opId}_${param.id}">${param.name}</label>
+                                    <div class="flex-grow-1">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" checked name="parameter_values[${param.id}]" value="pass" id="param_${opId}_${param.id}">
+                                            <label class="form-check-label" for="param_${opId}_${param.id}">${param.name} (Pass)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            }
+                        });
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = `
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label" for="chkVisual${opId}">Visual Finish</label>
+                            <div class="flex-grow-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[visual]" value="pass" id="chkVisual${opId}">
+                                    <label class="form-check-label" for="chkVisual${opId}">Visual Surface Finish & Coating Inspection (Pass)</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label" for="chkDim${opId}">Dimensional Spec</label>
+                            <div class="flex-grow-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[dimensional]" value="pass" id="chkDim${opId}">
+                                    <label class="form-check-label" for="chkDim${opId}">Dimensional & Thickness Tolerance Within Specification (Pass)</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label" for="chkFunc${opId}">Structural Test</label>
+                            <div class="flex-grow-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" checked name="parameter_values[structural]" value="pass" id="chkFunc${opId}">
+                                    <label class="form-check-label" for="chkFunc${opId}">Assembly & Structural Integrity Test (Pass)</label>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    }
+                }
+
+                if (window.jQuery) {
+                    window.jQuery(document).on('change change.select2', 'select[name="quality_plan_id"]', function () {
+                        updateQualityChecklist(this);
+                    });
+
+                    window.jQuery(document).on('shown.bs.modal', function (e) {
+                        const select = e.target.querySelector('select[name="quality_plan_id"]');
+                        if (select) {
+                            updateQualityChecklist(select);
+                        }
                     });
                 }
+
+                document.querySelectorAll('select[name="quality_plan_id"]').forEach(selectEl => {
+                    selectEl.addEventListener('change', function () {
+                        updateQualityChecklist(this);
+                    });
+                    updateQualityChecklist(selectEl);
+                });
 
                 // Live Operation Timer (HH:MM:SS format)
                 const liveTimerEl = document.getElementById('opLiveTimer');

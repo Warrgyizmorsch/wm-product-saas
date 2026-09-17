@@ -35,6 +35,30 @@
             </x-ui.badge>
         </div>
         <div class="card-body p-4">
+            <!-- Candidate Resume / CV Document Upload -->
+            <div class="p-3 bg-light border rounded-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle bg-soft-primary text-primary" style="width: 36px; height: 36px; min-width: 36px;">
+                        <i class="feather-file-text fs-16"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0 fs-13">Candidate Resume / CV Document</h6>
+                        <span class="text-muted fs-11">Attach official resume file (PDF, DOC, DOCX - max 5MB).</span>
+                    </div>
+                </div>
+                <div style="min-width: 280px;" class="flex-grow-1 flex-md-grow-0">
+                    <input type="file" name="resume" id="{{ $prefix }}_resume" class="form-control form-control-sm" accept=".pdf,.doc,.docx" data-field-group="hr_admin" {{ $isEmployeeSelfService ? 'disabled' : '' }}>
+                    <input type="hidden" name="existing_resume_path" id="{{ $prefix }}_existing_resume_path" value="{{ $fieldValue('resume_path', $convertOfferPayload['resume_path'] ?? '') }}">
+                    
+                    @php
+                        $existingResume = $fieldValue('resume_path', $convertOfferPayload['resume_path'] ?? '');
+                    @endphp
+                    <div id="{{ $prefix }}_resume_preview_container" class="mt-1 fs-11 text-muted {{ !empty($existingResume) ? '' : 'd-none' }}">
+                        Attached Resume: <a href="{{ !empty($existingResume) ? asset('storage/' . $existingResume) : '#' }}" id="{{ $prefix }}_resume_preview_link" target="_blank" class="text-primary fw-semibold"><i class="feather-paperclip me-1"></i>View Candidate Resume</a>
+                    </div>
+                </div>
+            </div>
+
             <!-- 1.1 Organizational Mapping -->
             <div class="employee-modal-section-title mt-0">{{ __('hrms.employees.org_mapping') }}</div>
             <div class="row g-3 mb-4">

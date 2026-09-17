@@ -4,12 +4,21 @@
 @section('page-title', 'Pipeline: ' . $requisition->job_title)
 @section('breadcrumb', 'HRMS / Recruitment / Pipeline')
 
+@php
+    $authUser = auth()->user();
+    $canCreateRecruitment = $authUser && ($authUser->hasHrPermission('hrms.recruitment.create') || $authUser->hasHrPermission('hr.settings.manage') || $authUser->hasHrPermission('hrms.recruitment.manage'));
+    $canUpdateRecruitment = $authUser && ($authUser->hasHrPermission('hrms.recruitment.update') || $authUser->hasHrPermission('hr.settings.manage') || $authUser->hasHrPermission('hrms.recruitment.manage'));
+    $canManageRecruitment = $authUser && ($authUser->hasHrPermission('hrms.recruitment.manage') || $authUser->hasHrPermission('hr.settings.manage'));
+@endphp
+
 @section('page-actions')
-    <div class="d-flex align-items-center gap-2">
-        <x-ui.button variant="primary" icon="feather-user-plus" data-bs-toggle="modal" data-bs-target="#addCandidateModal">
-            Add Candidate to Job
-        </x-ui.button>
-    </div>
+    @if($canCreateRecruitment)
+        <div class="d-flex align-items-center gap-2">
+            <x-ui.button variant="primary" icon="feather-user-plus" data-bs-toggle="modal" data-bs-target="#addCandidateModal">
+                Add Candidate to Job
+            </x-ui.button>
+        </div>
+    @endif
 @endsection
 
 @push('styles')
@@ -150,7 +159,7 @@
             $isFirstStage = true;
             foreach($stages as $stageKey => $stageLabel) {
                 if ($stageKey === 'interview') {
-                    $count = $applications->filter(fn($a) => in_array($a->current_stage, ['interview', 'interview_round_1', 'interview_round_2', 'interview_round_3']))->count();
+                    $count = $applications->filter(fn($a) => in_array($a->current_stage, ['interview', 'interview_round_1', 'interview_round_2', 'interview_round_3', 'final_hr']))->count();
                 } else {
                     $count = $applications->where('current_stage', $stageKey)->count();
                 }
@@ -175,7 +184,7 @@
             @foreach($stages as $stageKey => $stageLabel)
                 @php
                     if ($stageKey === 'interview') {
-                        $stageApps = $applications->filter(fn($a) => in_array($a->current_stage, ['interview', 'interview_round_1', 'interview_round_2', 'interview_round_3']));
+                        $stageApps = $applications->filter(fn($a) => in_array($a->current_stage, ['interview', 'interview_round_1', 'interview_round_2', 'interview_round_3', 'final_hr']));
                     } else {
                         $stageApps = $applications->where('current_stage', $stageKey);
                     }
@@ -243,53 +252,65 @@
                                         </button>
                                     @endif
 
-                                    <div class="mt-auto pt-3 border-top d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                                        <!-- Change Stage Dropdown -->
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-light text-secondary border dropdown-toggle fw-semibold fs-12" type="button" data-bs-toggle="dropdown">
-                                                Move Stage
-                                            </button>
-                                            <ul class="dropdown-menu fs-12 shadow-sm border-0">
-                                                @foreach($stages as $key => $lbl)
-                                                    <li>
-                                                        <form action="{{ route('hrms.recruitment.stage.update', $app->id) }}" method="POST">
-                                                            @csrf
-                                                            <input type="hidden" name="current_stage" value="{{ $key }}">
-                                                            <button type="submit" class="dropdown-item {{ $key === $stageKey ? 'active' : '' }}">{{ $lbl }}</button>
-                                                        </form>
-                                                    </li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-
-                                        <div class="d-flex align-items-center gap-1">
-                                            @if(!in_array($stageKey, ['hired', 'rejected']))
-                                                <button class="btn btn-sm btn-outline-success fw-semibold fs-12" data-bs-toggle="modal" data-bs-target="#scheduleInterviewModal{{ $app->id }}">
-                                                    <i class="feather-calendar me-1"></i> + Round
-                                                </button>
-                                            @endif
-
-                                            @if($latestInterview && $latestInterview->status === 'scheduled' && !in_array($stageKey, ['hired', 'rejected']))
-                                                <button class="btn btn-sm btn-outline-warning fw-semibold fs-12" data-bs-toggle="modal" data-bs-target="#scorecardModal{{ $latestInterview->id }}">
-                                                    <i class="feather-check-square me-1"></i> Scorecard
-                                                </button>
-                                            @endif
-
-                                            @if(!in_array($stageKey, ['hired', 'rejected']) && ($app->interviews->count() > 0 || $offer || $stageKey === 'offer_sent'))
-                                                <button class="btn btn-sm btn-outline-info fw-semibold fs-12" data-bs-toggle="modal" data-bs-target="#offerModal{{ $app->id }}">
-                                                    <i class="feather-file-plus me-1"></i> Offer
-                                                </button>
-                                            @endif
-
-                                            @if($offer && $stageKey !== 'hired' && $stageKey !== 'rejected')
-                                                <form action="{{ route('hrms.recruitment.offer.convert', $offer->id) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-success text-white fw-bold shadow-xs fs-12" onclick="return confirm('Convert {{ $candidate->full_name }} to active HRMS Employee?')">
-                                                        ⚡ Convert
+                                    @if($canUpdateRecruitment || $canManageRecruitment)
+                                        <div class="mt-auto pt-2 border-top d-flex align-items-center flex-nowrap gap-1 w-100 overflow-x-auto pb-1">
+                                            @if($canUpdateRecruitment)
+                                                <!-- Change Stage Dropdown (Left) -->
+                                                <div class="dropdown flex-shrink-0 me-auto">
+                                                    <button class="btn btn-sm btn-light text-secondary border dropdown-toggle fw-semibold fs-11 px-2 py-1" type="button" data-bs-toggle="dropdown" title="Move Stage">
+                                                        Move
                                                     </button>
-                                                </form>
+                                                    <ul class="dropdown-menu fs-12 shadow-sm border-0">
+                                                        @foreach($stages as $key => $lbl)
+                                                            <li>
+                                                                <form action="{{ route('hrms.recruitment.stage.update', $app->id) }}" method="POST">
+                                                                    @csrf
+                                                                    <input type="hidden" name="current_stage" value="{{ $key }}">
+                                                                    <button type="submit" class="dropdown-item {{ $key === $stageKey ? 'active' : '' }}">{{ $lbl }}</button>
+                                                                </form>
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                </div>
+
+                                                <!-- Action Buttons Group (Right) -->
+                                                <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                                                    @if(!in_array($stageKey, ['offer_sent', 'hired', 'rejected']))
+                                                        <button class="btn btn-sm btn-outline-success fw-semibold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#scheduleInterviewModal{{ $app->id }}">
+                                                            <i class="feather-calendar me-1"></i>+ Round
+                                                        </button>
+                                                    @endif
+
+                                                    @if($latestInterview && $latestInterview->status === 'scheduled' && !in_array($stageKey, ['offer_sent', 'hired', 'rejected']))
+                                                        <button class="btn btn-sm btn-outline-warning fw-semibold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#scorecardModal{{ $latestInterview->id }}">
+                                                            <i class="feather-check-square me-1"></i>Scorecard
+                                                        </button>
+                                                    @endif
+
+                                                    @if(!in_array($stageKey, ['hired', 'rejected']) && ($app->interviews->count() > 0 || $offer || $stageKey === 'offer_sent'))
+                                                        @if(!$offer)
+                                                            <button class="btn btn-sm btn-outline-info fw-semibold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#offerModal{{ $app->id }}">
+                                                                <i class="feather-file-plus me-1"></i>Offer
+                                                            </button>
+                                                        @else
+                                                            <button class="btn btn-sm btn-info text-white fw-semibold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#viewOfferModal{{ $offer->id }}">
+                                                                <i class="feather-file-text me-1"></i>View Offer
+                                                            </button>
+                                                            <button class="btn btn-sm btn-primary fw-semibold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#sendOfferEmailModal{{ $offer->id }}">
+                                                                <i class="feather-send me-1"></i>Send Mail
+                                                            </button>
+                                                        @endif
+                                                    @endif
+
+                                                    @if($canManageRecruitment && $offer && $stageKey !== 'hired' && $stageKey !== 'rejected')
+                                                        <button type="button" class="btn btn-sm btn-success text-white fw-bold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#confirmConvertModal{{ $offer->id }}">
+                                                            ⚡ Convert
+                                                        </button>
+                                                    @endif
+                                                </div>
                                             @endif
                                         </div>
+                                    @endif
 
                                         @if($stageKey === 'hired')
                                             <div class="badge bg-soft-success text-success fw-bold p-2 w-100 text-center"><i class="feather-check-circle me-1"></i>Hired Employee</div>
@@ -300,7 +321,6 @@
                                         @endif
                                     </div>
                                 </div>
-                            </div>
 
                             <!-- Modal: Detailed View of All Interviews & Scorecards for this Candidate -->
                             <div class="modal fade" id="interviewDetailsModal{{ $app->id }}" tabindex="-1" aria-hidden="true">
@@ -568,13 +588,26 @@
                                             </div>
                                             <div class="modal-body p-4 text-start">
                                                 <div class="mb-3">
+                                                    <x-ui.odoo-form-ui type="select" label="Document Master Template" name="document_template_id">
+                                                        <option value="">-- Standard Offer Letter --</option>
+                                                        @foreach($templates as $tmpl)
+                                                            <option value="{{ $tmpl->id }}">{{ $tmpl->name }} ({{ $tmpl->code }})</option>
+                                                        @endforeach
+                                                    </x-ui.odoo-form-ui>
+                                                    <small class="text-muted fs-11 ms-1">Choose template from Document Master or use system default.</small>
+                                                </div>
+                                                <div class="mb-3">
                                                     <x-ui.odoo-form-ui type="select" label="Offered Role" name="offered_designation_id" :required="true">
-                                                        <option value="{{ $requisition->designation_id }}">{{ $requisition->designation->name ?? 'Target Designation' }}</option>
+                                                        @foreach($designations as $desig)
+                                                            <option value="{{ $desig->id }}" {{ $desig->id == $requisition->designation_id ? 'selected' : '' }}>{{ $desig->name }}</option>
+                                                        @endforeach
                                                     </x-ui.odoo-form-ui>
                                                 </div>
                                                 <div class="mb-3">
                                                     <x-ui.odoo-form-ui type="select" label="Department" name="offered_department_id" :required="true">
-                                                        <option value="{{ $requisition->department_id }}">{{ $requisition->department->name ?? 'Target Department' }}</option>
+                                                        @foreach($departments as $dept)
+                                                            <option value="{{ $dept->id }}" {{ $dept->id == $requisition->department_id ? 'selected' : '' }}>{{ $dept->name }}</option>
+                                                        @endforeach
                                                     </x-ui.odoo-form-ui>
                                                 </div>
                                                 <div class="mb-3">
@@ -582,6 +615,9 @@
                                                 </div>
                                                 <div class="mb-3">
                                                     <x-ui.odoo-form-ui type="input" inputType="date" label="Joining Date" name="joining_date" value="{{ optional($requisition->target_joining_date)->format('Y-m-d') }}" :required="true" />
+                                                </div>
+                                                <div class="mb-3">
+                                                    <x-ui.odoo-form-ui type="textarea" label="Offer Letter Notes / Terms" name="offer_letter_notes" rows="2" placeholder="e.g. Probation period, signing bonus, special conditions..." />
                                                 </div>
                                             </div>
                                             <div class="modal-footer bg-light py-2">
@@ -592,6 +628,173 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Modal: View Rendered Job Offer Letter -->
+                            @if($offer)
+                                <div class="modal fade" id="viewOfferModal{{ $offer->id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                                        <div class="modal-content border-0 shadow-lg">
+                                            <div class="modal-header bg-light">
+                                                <div>
+                                                    <h5 class="modal-title fw-bold text-dark"><i class="feather-file-text text-info me-2"></i>Job Offer Letter — {{ $offer->offer_code }}</h5>
+                                                    <small class="text-muted">Issued to <strong>{{ $candidate->full_name }}</strong> on {{ optional($offer->created_at)->format('d M, Y') }}</small>
+                                                </div>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body p-4 text-start">
+                                                <!-- Key Offer Summary Pill Row -->
+                                                <div class="row g-3 mb-4 bg-light p-3 rounded-3 border">
+                                                    <div class="col-md-3 col-6">
+                                                        <small class="text-muted d-block fs-11">Candidate Name</small>
+                                                        <strong class="text-dark fs-13">{{ $candidate->full_name }}</strong>
+                                                    </div>
+                                                    <div class="col-md-3 col-6">
+                                                        <small class="text-muted d-block fs-11">Offered Role</small>
+                                                        <strong class="text-dark fs-13">{{ $offer->designation->name ?? $requisition->designation->name ?? 'N/A' }}</strong>
+                                                    </div>
+                                                    <div class="col-md-3 col-6">
+                                                        <small class="text-muted d-block fs-11">Annual CTC</small>
+                                                        <strong class="text-success fs-13">${{ number_format($offer->offered_annual_ctc, 2) }}</strong>
+                                                    </div>
+                                                    <div class="col-md-3 col-6">
+                                                        <small class="text-muted d-block fs-11">Joining Date</small>
+                                                        <strong class="text-primary fs-13">{{ optional($offer->joining_date)->format('d M, Y') ?? 'TBD' }}</strong>
+                                                    </div>
+                                                </div>
+
+                                                @if($offer->offer_letter_content)
+                                                    <div class="border rounded-3 p-4 bg-white shadow-xs text-dark fs-13 lh-base position-relative" style="white-space: pre-wrap;">
+                                                        {!! preg_replace('/\{([^{}\n]*)\}/', '$1', $offer->offer_letter_content) !!}
+                                                    </div>
+                                                @else
+                                                    <div class="border rounded-3 p-4 bg-white shadow-xs text-dark fs-13 lh-base">
+                                                        <h5 class="fw-bold text-dark mb-3">JOB OFFER LETTER</h5>
+                                                        <p>Dear <strong>{{ $candidate->full_name }}</strong>,</p>
+                                                        <p>We are pleased to offer you the position of <strong>{{ $offer->designation->name ?? $requisition->designation->name }}</strong> in our <strong>{{ $offer->department->name ?? $requisition->department->name }}</strong> department.</p>
+                                                        <p><strong>Offer Details:</strong></p>
+                                                        <ul>
+                                                            <li><strong>Offer Reference:</strong> {{ $offer->offer_code }}</li>
+                                                            <li><strong>Annual Compensation (CTC):</strong> ${{ number_format($offer->offered_annual_ctc, 2) }} per annum</li>
+                                                            <li><strong>Target Joining Date:</strong> {{ optional($offer->joining_date)->format('d M, Y') }}</li>
+                                                        </ul>
+                                                        @if($offer->offer_letter_notes)
+                                                            <p><strong>Special Terms & Notes:</strong> {{ $offer->offer_letter_notes }}</p>
+                                                        @endif
+                                                        <p class="mt-4">We look forward to welcoming you to the team!</p>
+                                                        <p class="mt-3 mb-0">Sincerely,<br><strong>HR Talent Acquisition Team</strong></p>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            <div class="modal-footer bg-light py-2 justify-content-between">
+                                                <button type="button" class="btn btn-outline-secondary px-3" onclick="window.print()"><i class="feather-printer me-1"></i> Print / Download PDF</button>
+                                                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            <!-- Modal: Send Email Confirmation for Job Offer -->
+                                <x-ui.modal id="sendOfferEmailModal{{ $offer->id }}" title="<i class='feather-send text-primary me-2'></i>Send Job Offer Email to Candidate" size="lg" :centered="true" :showFooter="false">
+                                    <form action="{{ route('hrms.recruitment.offer.send-email', $offer->id) }}" method="POST">
+                                        @csrf
+                                        @php
+                                            $availableSmtps = \App\Models\EmailConfiguration::where('is_active', true)->orderByDesc('is_default')->get();
+                                            $offerDocText = $offer->offer_letter_content ? preg_replace('/\{([^{}\n]*)\}/', '$1', $offer->offer_letter_content) : '';
+                                        @endphp
+
+                                        @if($availableSmtps->isNotEmpty())
+                                            <div class="mb-3">
+                                                <x-ui.modal-form-ui type="select" label="From Sender Email (SMTP Account)" name="account_id">
+                                                    @foreach($availableSmtps as $s)
+                                                        <option value="{{ $s->id }}" {{ $s->is_default ? 'selected' : '' }}>
+                                                            {{ $s->name }} ({{ $s->email_address }})
+                                                        </option>
+                                                    @endforeach
+                                                </x-ui.modal-form-ui>
+                                            </div>
+                                        @endif
+
+                                        <div class="row g-3 mb-3">
+                                            <div class="col-md-6">
+                                                <x-ui.modal-form-ui type="input" inputType="email" label="Candidate Email Address (To)" name="to_email" value="{{ $candidate->email }}" :required="true" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <x-ui.modal-form-ui type="input" label="Email Subject" name="subject" value="Job Offer Letter — {{ $offer->offer_code }} ({{ $requisition->job_title }})" :required="true" />
+                                            </div>
+                                        </div>
+
+                                        <div class="p-3 rounded-3 border bg-light mb-3 d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="feather-file-text text-danger fs-18"></i>
+                                                <span class="fs-13 fw-bold text-dark">Job_Offer_{{ $offer->offer_code }}.pdf</span>
+                                                <span class="badge bg-soft-danger text-danger border px-2 py-1 fs-11"><i class="feather-paperclip me-1"></i>Official PDF Document Attached</span>
+                                            </div>
+                                            <span class="fs-12 text-muted">Recipient: <strong>{{ $candidate->full_name }}</strong></span>
+                                        </div>
+
+                                        <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top">
+                                            <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-primary px-4 fw-bold"><i class="feather-send me-1"></i> Send Offer Email</button>
+                                        </div>
+                                    </form>
+                                </x-ui.modal>
+
+                                <!-- Modal: Confirmation for Candidate to Employee Conversion -->
+                                <x-ui.modal id="confirmConvertModal{{ $offer->id }}" title="<i class='feather-user-check text-success me-2'></i>Convert Candidate to HRMS Employee" size="md" :centered="true" :showFooter="false">
+                                    <form action="{{ route('hrms.recruitment.offer.convert', $offer->id) }}" method="POST">
+                                        @csrf
+                                        @php
+                                            $availableSmtps = \App\Models\EmailConfiguration::where('is_active', true)->orderByDesc('is_default')->get();
+                                        @endphp
+
+                                        @if($availableSmtps->isNotEmpty())
+                                            <div class="mb-3 text-start">
+                                                <x-ui.modal-form-ui type="select" label="From Sender Email (SMTP Account)" name="account_id">
+                                                    @foreach($availableSmtps as $s)
+                                                        <option value="{{ $s->id }}" {{ $s->is_default ? 'selected' : '' }}>
+                                                            {{ $s->name }} ({{ $s->email_address }})
+                                                        </option>
+                                                    @endforeach
+                                                </x-ui.modal-form-ui>
+                                            </div>
+                                        @endif
+
+                                        <div class="text-center py-2">
+                                            <div class="avatar-lg bg-soft-success text-success rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
+                                                <i class="feather-user-plus fs-22"></i>
+                                            </div>
+                                            <h5 class="fw-bold text-dark mb-1">Convert Candidate to Employee?</h5>
+                                            <p class="text-muted fs-12 mb-3">
+                                                This action will create/link a system User account for <code>{{ $candidate->email }}</code> and open the Employee Profile form.
+                                            </p>
+
+                                            <div class="p-3 bg-light border rounded-3 text-start mb-3 fs-12">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">Candidate Name:</span>
+                                                    <strong class="text-dark">{{ $candidate->full_name }}</strong>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">Email Address:</span>
+                                                    <strong class="text-dark">{{ $candidate->email }}</strong>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">Offered Position:</span>
+                                                    <strong class="text-dark">{{ $offer->designation->name ?? 'N/A' }}</strong>
+                                                </div>
+                                                <div class="d-flex justify-content-between">
+                                                    <span class="text-muted">Department:</span>
+                                                    <strong class="text-dark">{{ $offer->department->name ?? 'N/A' }}</strong>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top">
+                                            <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-success text-white px-4 fw-bold"><i class="feather-check-circle me-1"></i> Confirm & Proceed</button>
+                                        </div>
+                                    </form>
+                                </x-ui.modal>
+                            @endif
 
                         @empty
                             <div class="text-center text-muted py-5 fs-12">

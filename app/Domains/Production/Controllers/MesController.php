@@ -698,6 +698,47 @@ class MesController extends Controller
         // Try mapping the schedule operation if it exists
         $scheduleOp = ProductionScheduleOperation::where('production_order_operation_id', $opId)->first();
 
+        // Shared MES Master Data for aligned QC, Scrap, and Rework workflows
+        $qualityPlans = \App\Domains\Production\Models\ProductionQualityPlan::where('tenant_id', $tenantId)
+            ->whereIn('status', ['approved', 'draft', 'active'])
+            ->with('parameters')
+            ->get();
+        $workCenters = \App\Domains\Production\Models\WorkCenter::where('tenant_id', $tenantId)->where(function($q) { $q->where('status', 'active')->orWhereNull('status'); })->get();
+        $machines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->get();
+        $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($opId);
+
+        // Unified production execution progress metrics (identical to Shopfloor dashboard calculations)
+        $targetQty = 0.0;
+        if ((float) ($op->target_produced_qty ?? 0) > 0) {
+            $targetQty = (float) $op->target_produced_qty;
+        } elseif ($op->source_product_id && (int) $op->source_product_id !== (int) $order->product_id) {
+            $bomItem = \App\Domains\Production\Models\ProductionBomItem::where('tenant_id', $tenantId)
+                ->where('bom_id', $order->bom_id)
+                ->where('material_id', $op->source_product_id)
+                ->first();
+            $ratio = ($bomItem && (float) $bomItem->quantity > 0) ? (float) $bomItem->quantity : 1.0;
+            $targetQty = (float) $order->quantity_ordered * $ratio;
+        } else {
+            $targetQty = (float) ($order->quantity_ordered ?? 0.0);
+        }
+
+        $doneQty = (float) ($op->quantity_produced ?? 0.0);
+        $outputPid = $op->product_id ?? $op->source_product_id ?? $order->product_id;
+        $scrapQty = max(
+            (float) ($op->quantity_scrapped ?? 0.0),
+            (float) \App\Domains\Production\Models\ProductionOrderScrap::where('tenant_id', $tenantId)
+                ->where('production_order_id', $op->production_order_id)
+                ->where('production_order_operation_id', $op->id)
+                ->where(function ($q) use ($outputPid) {
+                    $q->where('product_id', $outputPid)
+                        ->orWhereNull('product_id');
+                })
+                ->sum('quantity')
+        );
+        $rejectedQty = (float) ($op->quantity_rejected ?? 0.0);
+        $remainingQty = max(0.0, $targetQty - ($doneQty + $scrapQty + $rejectedQty));
+        $progressPercent = $targetQty > 0 ? min(100.0, round(($doneQty / $targetQty) * 100, 1)) : ($op->status === 'completed' ? 100.0 : 0.0);
+
         return view('modules.production.mes.operator.operation-execution', compact(
             'op',
             'order',
@@ -706,7 +747,17 @@ class MesController extends Controller
             'serials',
             'assignment',
             'operators',
-            'scheduleOp'
+            'scheduleOp',
+            'qualityPlans',
+            'workCenters',
+            'machines',
+            'pendingQcQty',
+            'targetQty',
+            'doneQty',
+            'scrapQty',
+            'rejectedQty',
+            'remainingQty',
+            'progressPercent'
         ));
     }
 }

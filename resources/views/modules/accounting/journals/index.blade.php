@@ -43,14 +43,21 @@
             </div>
         </form>
     </x-ui.filter>
-    @can('post', \App\Domains\Accounting\Models\Journal::class)
-        <x-ui.button href="{{ route('accounting.journals.create') }}" variant="primary" icon="feather-plus">
+    @if ($canCreate)
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="offcanvas" data-bs-target="#journalCreateDrawer">
             New Journal
         </x-ui.button>
-    @endcan
+    @endif
 @endsection
 
 @section('content')
+
+    <div class="d-flex flex-wrap gap-3 mb-4">
+        <x-ui.stat-pill icon="feather-layers" :value="$summary['total']" label="Total Journals" color="primary" />
+        <x-ui.stat-pill icon="feather-check-circle" :value="$summary['posted']" label="Posted" color="success" />
+        <x-ui.stat-pill icon="feather-edit-3" :value="$summary['draft']" label="Draft" color="warning" />
+        <x-ui.stat-pill icon="feather-rotate-ccw" :value="$summary['reversed']" label="Reversed" color="secondary" />
+    </div>
 
     <x-ui.card bodyClass="p-0" class="accounting-dense">
         <div class="d-flex align-items-center gap-3 p-3 border-bottom">
@@ -125,7 +132,7 @@
                             @endif
                         </td>
                         <td class="text-end pe-4">
-                            <x-ui.icon-btn href="{{ route('accounting.journals.show', $journal) }}" variant="soft-primary" icon="feather-eye" title="View" />
+                            <x-ui.row-actions :view-url="route('accounting.journals.show', $journal)" class="justify-content-end" />
                         </td>
                     </tr>
                 @empty
@@ -145,6 +152,22 @@
             :totalResults="$journals->total()"
             :perPage="$journals->perPage()" />
     </x-ui.card>
+
+    @if ($canCreate)
+        <x-ui.drawer id="journalCreateDrawer" title="New Journal" scroll style="--bs-offcanvas-width: min(920px, 94vw);">
+            @include('modules.accounting.journals._form', ['embedded' => true])
+        </x-ui.drawer>
+
+        @if ($errors->any())
+            @push('scripts')
+                <script>
+                    $(function () {
+                        new bootstrap.Offcanvas(document.getElementById('journalCreateDrawer')).show();
+                    });
+                </script>
+            @endpush
+        @endif
+    @endif
 @endsection
 
 @push('styles')

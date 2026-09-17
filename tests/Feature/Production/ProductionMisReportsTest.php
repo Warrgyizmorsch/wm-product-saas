@@ -274,6 +274,19 @@ class ProductionMisReportsTest extends TestCase
         $response->assertSee('Production Orders & Output', false);
         $response->assertSee('Material Consumption & Variance', false);
         $response->assertSee('Production Cost & Variance', false);
+
+        // Verify filter date translations
+        $response->assertDontSee('production.date_start');
+        $response->assertDontSee('production.date_end');
+        $response->assertSee('Start Date');
+        $response->assertSee('End Date');
+
+        $responseDetail = $this->get(route('production.intelligence.reports.show', 'machine'));
+        $responseDetail->assertStatus(200);
+        $responseDetail->assertDontSee('production.date_start');
+        $responseDetail->assertDontSee('production.date_end');
+        $responseDetail->assertSee('Start Date');
+        $responseDetail->assertSee('End Date');
     }
 
     /**

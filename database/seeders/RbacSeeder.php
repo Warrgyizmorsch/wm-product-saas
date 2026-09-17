@@ -288,7 +288,22 @@ class RbacSeeder extends Seeder
             'hrms.pip.manage' => $permissions['hrms.pip.manage'],
             'hrms.roster.manage' => $permissions['hrms.roster.manage'],
             'hrms.shift_roster.manage' => $permissions['hrms.shift_roster.manage'],
+            'hrms.recruitment.view' => $permissions['hrms.recruitment.view'],
+            'hrms.recruitment.create' => $permissions['hrms.recruitment.create'],
+            'hrms.recruitment.update' => $permissions['hrms.recruitment.update'],
+            'hrms.recruitment.manage' => $permissions['hrms.recruitment.manage'],
         ], RolePermission::SCOPE_TENANT);
+
+        // Employee Self-Service (own Leave/WFH/Attendance/Travel-Expense/Payslip/
+        // Broadcasts/Helpdesk) — every real working-staff role gets it, since any
+        // employee needs to manage their own HR record regardless of job function.
+        // Excludes auditor/read_only (reviewer accounts, not working staff) and the
+        // three admin-tier roles above, which already hold every permission.
+        foreach (['production_manager', 'production_engineer', 'sales_manager', 'sales_executive', 'inventory_manager', 'purchase_manager', 'hr_manager', 'accountant'] as $roleSlug) {
+            $this->grant($roles[$roleSlug], [
+                'hrms.self_service.use' => $permissions['hrms.self_service.use'],
+            ], RolePermission::SCOPE_TENANT);
+        }
 
         // Day-to-day bookkeeping only — deleting accounts/tax rates, closing fiscal
         // years/periods, and reversing posted journals or vouchers stay reserved for
@@ -478,6 +493,7 @@ class RbacSeeder extends Seeder
             ['name' => 'hrms.leave_structures.manage', 'module' => 'hrms', 'entity' => 'leave_structures', 'action' => 'manage'],
             ['name' => 'hrms.leave_encashments.view', 'module' => 'hrms', 'entity' => 'leave_encashments', 'action' => 'view'],
             ['name' => 'hrms.leave_encashments.approve', 'module' => 'hrms', 'entity' => 'leave_encashments', 'action' => 'approve'],
+            ['name' => 'hrms.self_service.use', 'module' => 'hrms', 'entity' => 'self_service', 'action' => 'use'],
             ['name' => 'fixed_assets.categories.view', 'module' => 'fixed_assets', 'entity' => 'categories', 'action' => 'view'],
             ['name' => 'fixed_assets.categories.create', 'module' => 'fixed_assets', 'entity' => 'categories', 'action' => 'create'],
             ['name' => 'fixed_assets.categories.edit', 'module' => 'fixed_assets', 'entity' => 'categories', 'action' => 'edit'],
@@ -644,6 +660,10 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.exchange_rates.update', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'update'],
             ['name' => 'accounting.exchange_rates.delete', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'delete'],
             ['name' => 'accounting.exchange_rates.sync', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'sync'],
+            ['name' => 'hrms.recruitment.view', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'view'],
+            ['name' => 'hrms.recruitment.create', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'create'],
+            ['name' => 'hrms.recruitment.update', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'update'],
+            ['name' => 'hrms.recruitment.manage', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'manage'],
         ];
 
         $permissions = [];

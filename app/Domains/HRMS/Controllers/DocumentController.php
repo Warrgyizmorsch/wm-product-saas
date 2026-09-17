@@ -255,6 +255,15 @@ class DocumentController extends Controller
                     'status'             => $docStatus,
                     'requested_by_id'    => auth()->id(),
                 ]);
+
+                \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                    employeeId: $employee->id,
+                    title: 'New Document Issued',
+                    message: "A new document '{$title}' has been issued to your document vault.",
+                    actionUrl: route('hrms.documents.index'),
+                    type: 'document_issued',
+                    iconClass: 'feather-file-text'
+                );
             }
 
             return redirect()->route('hrms.documents.index')->with('success', 'Documents generated from template successfully.');

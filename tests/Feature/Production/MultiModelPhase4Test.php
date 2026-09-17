@@ -26,6 +26,7 @@ use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Purchase\Services\GoodsReceiptNoteService;
 use App\Models\Tenant;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use Tests\TestCase;
@@ -40,6 +41,8 @@ class MultiModelPhase4Test extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->seed(RbacSeeder::class);
 
         Tenant::factory()->create([
             'id' => $this->tenantId,
