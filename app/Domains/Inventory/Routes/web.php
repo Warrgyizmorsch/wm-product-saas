@@ -16,6 +16,9 @@ use App\Domains\Sales\Controllers\MaterialRequirementController;
 use App\Domains\Sales\Controllers\MaterialRequestController;
 use App\Domains\Sales\Controllers\DispatchOrderController;
 use App\Domains\Production\Controllers\MrpShortageController;
+use App\Domains\Inventory\Controllers\SupplyChainDashboardController;
+
+Route::get('supply-chain/dashboard', [SupplyChainDashboardController::class, 'index'])->name('supply-chain.dashboard');
 
 Route::prefix('inventory')
     ->as('inventory.')

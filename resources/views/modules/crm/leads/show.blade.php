@@ -5,6 +5,10 @@
 @section('breadcrumb', 'CRM / ' . __('crm.leads') . ' / ' . __('crm.profile'))
 
 @section('content')
+    @php
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+    @endphp
     <style>
         .requirement-clickable-box {
             cursor: pointer;
@@ -1634,11 +1638,6 @@
                                                 <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.expiration')" name="expiry_date"
                                                     :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :errorText="$errors->first('expiry_date')" />
 
-                                                @php
-                                                    $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
-                                                    $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
-                                                @endphp
-
                                                 @if(!$isQuotationAutoApprove)
                                                     <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" :required="true" :errorText="$errors->first('status')">
                                                          <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
@@ -2895,7 +2894,7 @@
                             <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="max-width: 80px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="max-width: 120px; margin-left: auto; text-align: right;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0.01" step="0.01" required style="max-width: 120px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
                             <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="max-width: 80px; margin-left: auto; text-align: right;">

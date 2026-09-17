@@ -11,12 +11,18 @@ use App\Domains\CRM\Controllers\LeadStatusController;
 use App\Domains\CRM\Controllers\DealStatusController;
 use App\Domains\CRM\Controllers\QuotationController;
 use App\Domains\CRM\Controllers\CrmSettingsController;
+use App\Domains\CRM\Controllers\CrmDashboardController;
 use App\Domains\CRM\Controllers\GoogleCalendarController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('crm')
     ->as('crm.')
     ->group(function (): void {
+        // CRM Executive Dashboard Routes
+        Route::get('/', fn () => redirect()->route('crm.dashboard'));
+        Route::get('dashboard', [CrmDashboardController::class, 'index'])->name('dashboard');
+        Route::get('dashboard/export/{format}', [CrmDashboardController::class, 'export'])->name('dashboard.export');
+
         // CRM Settings Routes
         Route::get('settings', [CrmSettingsController::class, 'index'])->name('settings.index');
         Route::post('settings/invoicing-policy', [CrmSettingsController::class, 'updateInvoicingPolicy'])->name('settings.update-invoicing-policy');

@@ -8,6 +8,7 @@ use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\DealStatus;
 use App\Domains\CRM\Services\DealHealthService;
 use Illuminate\Http\Request;
@@ -672,23 +673,41 @@ class CrmDealController extends Controller
         if ($mode === 'existing' && $existingCustomerId) {
             $customer = Customer::find($existingCustomerId);
 
-            if ($account) {
-                $account->update([
-                    'customer_id' => $customer->id,
-                    'status'      => 'active',
-                ]);
-            } else {
-                $account = CrmAccount::create([
-                    'tenant_id'   => $tenantId,
-                    'customer_id' => $customer->id,
-                    'name'        => $customer->name,
-                    'email'       => $customer->email,
-                    'phone'       => $customer->phone,
-                    'gstin'       => $customer->gstin,
-                    'status'      => 'active',
-                    'owner_id'    => auth()->id() ?: 1,
-                ]);
+            // Find existing account attached to this customer
+            $targetAccount = CrmAccount::where('tenant_id', $tenantId)
+                ->where('customer_id', $customer->id)
+                ->first();
+
+            if (!$targetAccount) {
+                // If customer has no account yet, search by email/phone/name or create one
+                $targetAccount = CrmAccount::where('tenant_id', $tenantId)
+                    ->where(function($q) use ($customer) {
+                        if (!empty($customer->email)) $q->orWhere('email', $customer->email);
+                        if (!empty($customer->phone)) $q->orWhere('phone', $customer->phone);
+                        if (!empty($customer->name)) $q->orWhere('name', $customer->name);
+                    })->first();
+
+                if (!$targetAccount) {
+                    $targetAccount = CrmAccount::create([
+                        'tenant_id'   => $tenantId,
+                        'customer_id' => $customer->id,
+                        'name'        => $customer->name,
+                        'email'       => $customer->email,
+                        'phone'       => $customer->phone,
+                        'gstin'       => $customer->gstin,
+                        'status'      => 'active',
+                        'owner_id'    => auth()->id() ?: 1,
+                    ]);
+                } else {
+                    $targetAccount->update([
+                        'customer_id' => $customer->id,
+                        'status'      => 'active',
+                    ]);
+                }
             }
+
+            $oldAccount = $account; // The temporary lead account, if any
+            $account = $targetAccount;
 
             $deal->update([
                 'crm_account_id' => $account->id,
@@ -706,8 +725,28 @@ class CrmDealController extends Controller
                 ]);
             }
 
-            // Sync lead contacts → account
+            // Sync all quotations linked to this deal or lead
+            Quotation::where('crm_deal_id', $deal->id)
+                ->orWhere(function($q) use ($leadObj) {
+                    if ($leadObj) $q->where('lead_id', $leadObj->id);
+                })
+                ->update([
+                    'crm_account_id' => $account->id,
+                ]);
+
+            // Sync lead contacts → existing account
             $this->syncLeadContactsToAccount($account, $leadObj, $tenantId);
+
+            // Clean up temporary lead account if it is now orphaned
+            if ($oldAccount && $oldAccount->id !== $account->id) {
+                $hasDeals = CrmDeal::where('crm_account_id', $oldAccount->id)->exists();
+                $hasQuotations = Quotation::where('crm_account_id', $oldAccount->id)->exists();
+                if (!$hasDeals && !$hasQuotations) {
+                    CrmContact::where('crm_account_id', $oldAccount->id)
+                        ->update(['crm_account_id' => $account->id]);
+                    $oldAccount->delete();
+                }
+            }
 
             return redirect()->route('crm.deals.show', $deal->id)
                 ->with('success', "Deal #{$deal->deal_number} marked as Won and linked to existing customer '{$customer->name}'!");

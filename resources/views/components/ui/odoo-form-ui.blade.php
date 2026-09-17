@@ -554,22 +554,78 @@
                     let firstErrEl = null;
 
                     // Query required fields (inputs, selects, textareas)
-                    let requiredFields = form.querySelectorAll('input[required], select[required], textarea[required]');
+                    let requiredFields = form.querySelectorAll('input[required], select[required], textarea[required], input[min]');
                     requiredFields.forEach(field => {
                         if (field.disabled || field.readOnly || field.type === 'hidden') return;
 
                         let val = field.value;
-                        let isEmpty = false;
+                        let isInvalid = false;
+                        let customErrorMsg = '';
 
-                        if (field.type === 'checkbox') {
-                            isEmpty = !field.checked;
-                        } else if (field.type === 'file') {
-                            isEmpty = !field.files || field.files.length === 0;
-                        } else {
-                            isEmpty = !val || !val.trim();
+                        // Find Label Text
+                        let labelName = '';
+                        let odooFormGroup = field.closest('.odoo-form-group');
+                        if (odooFormGroup) {
+                            let labelEl = odooFormGroup.querySelector('.odoo-form-label');
+                            if (labelEl) {
+                                labelName = labelEl.textContent.replace('*', '').trim();
+                            }
                         }
 
-                        if (isEmpty) {
+                        // Table support: trace header name from thead if inside a table column
+                        if (!labelName) {
+                            let td = field.closest('td');
+                            let tr = field.closest('tr');
+                            let table = field.closest('table');
+                            if (td && tr && table) {
+                                let colIndex = Array.from(tr.children).indexOf(td);
+                                let th = table.querySelector(`thead tr th:nth-child(${colIndex + 1})`);
+                                if (th) {
+                                    labelName = th.textContent.trim();
+                                }
+                            }
+                        }
+
+                        if (!labelName) {
+                            labelName = field.getAttribute('placeholder') || field.getAttribute('name') || 'This field';
+                        }
+
+                        if (field.type === 'checkbox') {
+                            isInvalid = !field.checked;
+                        } else if (field.type === 'file') {
+                            isInvalid = !field.files || field.files.length === 0;
+                        } else {
+                            let strVal = val ? val.trim() : '';
+                            if (field.hasAttribute('required') && !strVal) {
+                                isInvalid = true;
+                                customErrorMsg = `${labelName} is required.`;
+                            } else if (field.type === 'number' || field.hasAttribute('min')) {
+                                if (!strVal) {
+                                    if (field.hasAttribute('required')) {
+                                        isInvalid = true;
+                                        customErrorMsg = `${labelName} is required.`;
+                                    }
+                                } else {
+                                    let numVal = parseFloat(strVal);
+                                    let minVal = field.hasAttribute('min') ? parseFloat(field.getAttribute('min')) : null;
+                                    if (isNaN(numVal)) {
+                                        isInvalid = true;
+                                        customErrorMsg = `${labelName} is required.`;
+                                    } else if (minVal !== null && numVal < minVal) {
+                                        isInvalid = true;
+                                        if (minVal > 0) {
+                                            customErrorMsg = `${labelName} must be at least ${minVal}.`;
+                                        } else {
+                                            customErrorMsg = `${labelName} is invalid.`;
+                                        }
+                                    }
+                                }
+                            } else {
+                                isInvalid = !strVal;
+                            }
+                        }
+
+                        if (isInvalid) {
                             hasErrors = true;
                             field.classList.add('is-invalid');
 
@@ -602,38 +658,12 @@
                             if (!errorEl) {
                                 errorEl = document.createElement('div');
                                 errorEl.className = 'invalid-feedback dynamic-error-feedback d-block fs-11 mt-1';
+                            }
 
-                                // Find Label Text
-                                let labelName = '';
-                                let odooFormGroup = field.closest('.odoo-form-group');
-                                if (odooFormGroup) {
-                                    let labelEl = odooFormGroup.querySelector('.odoo-form-label');
-                                    if (labelEl) {
-                                        labelName = labelEl.textContent.replace('*', '').trim();
-                                    }
-                                }
+                            errorEl.textContent = customErrorMsg || `${labelName} is required.`;
 
-                                // Table support: trace header name from thead if inside a table column
-                                if (!labelName) {
-                                    let td = field.closest('td');
-                                    let tr = field.closest('tr');
-                                    let table = field.closest('table');
-                                    if (td && tr && table) {
-                                        let colIndex = Array.from(tr.children).indexOf(td);
-                                        let th = table.querySelector(`thead tr th:nth-child(${colIndex + 1})`);
-                                        if (th) {
-                                            labelName = th.textContent.trim();
-                                        }
-                                    }
-                                }
-
-                                if (!labelName) {
-                                    labelName = field.getAttribute('placeholder') || field.getAttribute('name') || 'This field';
-                                }
-
-                                errorEl.textContent = `${labelName} is required.`;
-
-                                // Insert error element
+                            // Insert error element
+                            if (!errorEl.parentNode) {
                                 if (field.tagName === 'SELECT' && $(field).data('select2')) {
                                     let s2Container = field.nextElementSibling;
                                     if (s2Container && s2Container.classList.contains('select2-container')) {

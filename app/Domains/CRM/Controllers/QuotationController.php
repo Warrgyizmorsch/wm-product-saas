@@ -138,7 +138,7 @@ class QuotationController extends Controller
             'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1'],
-            'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
+            'items.*.unit_price'  => ['required', 'numeric', 'min:0.01'],
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
@@ -337,7 +337,7 @@ class QuotationController extends Controller
             'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1'],
-            'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
+            'items.*.unit_price'  => ['required', 'numeric', 'min:0.01'],
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 

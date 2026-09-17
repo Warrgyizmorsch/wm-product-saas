@@ -285,7 +285,7 @@
                             <input type="number" name="items[${itemIndex}][quantity]" class="odoo-table-input item-qty text-end" value="${qty}" min="1" required>
                         </td>
                         <td class="text-end">
-                            <input type="number" name="items[${itemIndex}][unit_price]" class="odoo-table-input item-price text-end" value="${price}" step="0.01" min="0" required>
+                            <input type="number" name="items[${itemIndex}][unit_price]" class="odoo-table-input item-price text-end" value="${price}" step="0.01" min="0.01" required>
                         </td>
                         <td class="text-end">
                             <input type="number" name="items[${itemIndex}][tax_rate]" class="odoo-table-input item-tax text-end" value="${taxRate}" step="0.01" min="0">
