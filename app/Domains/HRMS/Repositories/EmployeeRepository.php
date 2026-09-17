@@ -262,6 +262,10 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             $validated['photo'] = $request->file('photo')->store('employees', 'public');
         }
 
+        if ($request->hasFile('resume')) {
+            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'public');
+        }
+
         $employee = Employee::create($validated);
 
         if ($request->filled('role_id') && $employee->user) {
@@ -280,6 +284,13 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                 Storage::disk('public')->delete($employee->photo);
             }
             $validated['photo'] = $request->file('photo')->store('employees', 'public');
+        }
+
+        if ($request->hasFile('resume')) {
+            if ($employee->resume_path) {
+                Storage::disk('public')->delete($employee->resume_path);
+            }
+            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'public');
         }
 
         $updated = $employee->update($validated);

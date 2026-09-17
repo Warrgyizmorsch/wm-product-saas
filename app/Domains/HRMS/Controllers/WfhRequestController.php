@@ -102,6 +102,14 @@ class WfhRequestController extends Controller
 
         $this->wfhRequestRepository->storeWfhRequest($validated, $request);
 
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: 'New WFH Request',
+            message: "{$employee->full_name} applied for {$duration} day(s) WFH.",
+            actionUrl: route('hrms.wfh.index'),
+            type: 'wfh_request',
+            iconClass: 'feather-home'
+        );
+
         return redirect()->back()->with('success', 'WFH application submitted successfully.');
     }
 
@@ -139,6 +147,19 @@ class WfhRequestController extends Controller
             'action'           => $action,
             'rejection_reason' => $reason,
         ], $request);
+
+        if ($wfhRequest->employee) {
+            $statusText = ucfirst($action);
+            $iconClass = $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle';
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employee: $wfhRequest->employee,
+                title: "WFH Request {$statusText}",
+                message: "Your WFH request status is now {$statusText}.",
+                actionUrl: route('hrms.wfh.index'),
+                type: 'wfh_' . $action,
+                iconClass: $iconClass
+            );
+        }
 
         $msg = match($action) {
             'approved' => 'WFH request approved successfully.',

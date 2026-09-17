@@ -288,6 +288,10 @@ class RbacSeeder extends Seeder
             'hrms.pip.manage' => $permissions['hrms.pip.manage'],
             'hrms.roster.manage' => $permissions['hrms.roster.manage'],
             'hrms.shift_roster.manage' => $permissions['hrms.shift_roster.manage'],
+            'hrms.recruitment.view' => $permissions['hrms.recruitment.view'],
+            'hrms.recruitment.create' => $permissions['hrms.recruitment.create'],
+            'hrms.recruitment.update' => $permissions['hrms.recruitment.update'],
+            'hrms.recruitment.manage' => $permissions['hrms.recruitment.manage'],
         ], RolePermission::SCOPE_TENANT);
 
         // Employee Self-Service (own Leave/WFH/Attendance/Travel-Expense/Payslip/
@@ -656,6 +660,10 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.exchange_rates.update', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'update'],
             ['name' => 'accounting.exchange_rates.delete', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'delete'],
             ['name' => 'accounting.exchange_rates.sync', 'module' => 'accounting', 'entity' => 'exchange_rates', 'action' => 'sync'],
+            ['name' => 'hrms.recruitment.view', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'view'],
+            ['name' => 'hrms.recruitment.create', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'create'],
+            ['name' => 'hrms.recruitment.update', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'update'],
+            ['name' => 'hrms.recruitment.manage', 'module' => 'hrms', 'entity' => 'recruitment', 'action' => 'manage'],
         ];
 
         $permissions = [];

@@ -247,6 +247,15 @@ class TravelExpenseController extends Controller
             }
         });
 
+        $emp = Employee::find($validated['employee_id']);
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: 'New Travel Request',
+            message: ($emp ? $emp->full_name : 'Employee') . " submitted a travel request to {$validated['destination']}.",
+            actionUrl: route('hrms.travel-expense.index', ['tab' => 'travel']),
+            type: 'travel_request',
+            iconClass: 'feather-map-pin'
+        );
+
         $message = 'Travel request submitted successfully.';
         if ($request->boolean('request_advance')) {
             $message .= ' Linked cash advance request submitted.';
@@ -280,6 +289,17 @@ class TravelExpenseController extends Controller
             }
         }
 
+        if ($travelRequest->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $travelRequest->employee_id,
+                title: 'Travel Request Approved',
+                message: "Your travel request to {$travelRequest->destination} has been approved.",
+                actionUrl: route('hrms.travel-expense.index', ['tab' => 'travel']),
+                type: 'travel_approved',
+                iconClass: 'feather-check-circle'
+            );
+        }
+
         return redirect()->back()->with('success', "Travel request{$advanceMsg} approved successfully.");
     }
 
@@ -289,6 +309,18 @@ class TravelExpenseController extends Controller
 
         $travelRequest->update(['status' => 'rejected']);
         $travelRequest->cashAdvances()->where('status', 'pending')->update(['status' => 'rejected']);
+
+        if ($travelRequest->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $travelRequest->employee_id,
+                title: 'Travel Request Rejected',
+                message: "Your travel request to {$travelRequest->destination} has been rejected.",
+                actionUrl: route('hrms.travel-expense.index', ['tab' => 'travel']),
+                type: 'travel_rejected',
+                iconClass: 'feather-x-circle'
+            );
+        }
+
         return redirect()->back()->with('success', 'Travel request and linked cash advance rejected.');
     }
 
@@ -317,7 +349,16 @@ class TravelExpenseController extends Controller
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
 
-        CashAdvance::create($validated);
+        $cashAdvance = CashAdvance::create($validated);
+
+        $emp = Employee::find($validated['employee_id']);
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: 'New Cash Advance Request',
+            message: ($emp ? $emp->full_name : 'Employee') . " requested a cash advance of $" . number_format($validated['amount'], 2) . ".",
+            actionUrl: route('hrms.travel-expense.index', ['tab' => 'advance']),
+            type: 'cash_advance_request',
+            iconClass: 'feather-dollar-sign'
+        );
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'advance'])
             ->with('success', 'Cash advance request submitted.');
@@ -333,6 +374,17 @@ class TravelExpenseController extends Controller
             'status' => 'approved',
             'approved_amount' => $approvedAmount
         ]);
+
+        if ($cashAdvance->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $cashAdvance->employee_id,
+                title: 'Cash Advance Approved',
+                message: "Your cash advance request of $" . number_format($approvedAmount, 2) . " has been approved.",
+                actionUrl: route('hrms.travel-expense.index', ['tab' => 'advance']),
+                type: 'cash_advance_approved',
+                iconClass: 'feather-check-circle'
+            );
+        }
 
         return redirect()->back()->with('success', 'Cash advance request approved with amount: $' . number_format($approvedAmount, 2));
     }
@@ -388,6 +440,18 @@ class TravelExpenseController extends Controller
         $this->authorizeHrms('hrms.travel_expenses.approve');
 
         $cashAdvance->update(['status' => 'rejected']);
+
+        if ($cashAdvance->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $cashAdvance->employee_id,
+                title: 'Cash Advance Rejected',
+                message: "Your cash advance request for {$cashAdvance->purpose} has been rejected.",
+                actionUrl: route('hrms.travel-expense.index', ['tab' => 'advance']),
+                type: 'cash_advance_rejected',
+                iconClass: 'feather-x-circle'
+            );
+        }
+
         return redirect()->back()->with('success', 'Cash advance request rejected.');
     }
 
@@ -781,6 +845,16 @@ class TravelExpenseController extends Controller
 
         $expenseReport->update(['status' => 'submitted']);
         $expenseReport->claims()->update(['status' => 'submitted']);
+
+        $emp = Employee::find($expenseReport->employee_id);
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: 'Expense Report Submitted',
+            message: ($emp ? $emp->full_name : 'Employee') . " submitted expense report '{$expenseReport->title}' for approval.",
+            actionUrl: route('hrms.travel-expense.index', ['tab' => 'report']),
+            type: 'expense_report_submitted',
+            iconClass: 'feather-file-text'
+        );
+
         return redirect()->back()->with('success', 'Expense report submitted for approval.');
     }
 
@@ -998,6 +1072,17 @@ class TravelExpenseController extends Controller
             }
         }
 
+        if ($expenseReport->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $expenseReport->employee_id,
+                title: 'Expense Report ' . ucfirst($status),
+                message: "Your expense report '{$expenseReport->title}' status is now {$status}.",
+                actionUrl: route('hrms.travel-expense.index', ['tab' => 'report']),
+                type: 'expense_report_' . $status,
+                iconClass: $status === 'approved' ? 'feather-check-circle' : 'feather-info'
+            );
+        }
+
         return redirect()->back()->with('success', 'Expense report approved with approved budget: $' . number_format($approvedAmount, 2));
     }
 
@@ -1006,6 +1091,18 @@ class TravelExpenseController extends Controller
         $this->authorizeHrms('hrms.travel_expenses.approve');
 
         $expenseReport->update(['status' => 'rejected']);
+
+        if ($expenseReport->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $expenseReport->employee_id,
+                title: 'Expense Report Rejected',
+                message: "Your expense report '{$expenseReport->title}' has been rejected.",
+                actionUrl: route('hrms.travel-expense.index', ['tab' => 'report']),
+                type: 'expense_report_rejected',
+                iconClass: 'feather-x-circle'
+            );
+        }
+
         return redirect()->back()->with('success', 'Expense report rejected.');
     }
 

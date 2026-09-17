@@ -134,7 +134,18 @@ class PipController extends Controller
         ]);
 
         $validated['hr_representative_id'] = auth()->id();
-        $this->pipService->createPip($validated);
+        $pip = $this->pipService->createPip($validated);
+
+        if (!empty($validated['employee_id'])) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: (int) $validated['employee_id'],
+                title: 'PIP Initiated',
+                message: 'A Performance Improvement Plan (PIP) has been initiated for you.',
+                actionUrl: route('hrms.pip.index'),
+                type: 'pip_initiated',
+                iconClass: 'feather-alert-triangle'
+            );
+        }
 
         return redirect()->route('hrms.pip.index')
             ->with('success', 'Performance Improvement Plan initiated successfully.');

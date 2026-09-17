@@ -99,7 +99,26 @@ class LeaveRequestController extends Controller
 
         $validated['company_id'] = $employee->company_id;
 
-        $this->leaveRequestRepository->storeLeaveRequest($validated, $request);
+        $leaveRequest = $this->leaveRequestRepository->storeLeaveRequest($validated, $request);
+
+        // Send Notifications
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+            title: 'New Leave Request',
+            message: "{$employee->full_name} applied for {$duration} day(s) leave ({$startDate->format('M d')} - {$endDate->format('M d')}).",
+            actionUrl: route('hrms.leaves.index'),
+            type: 'leave_request',
+            iconClass: 'feather-calendar'
+        );
+        if ($employee->reportingManager) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employee: $employee->reportingManager,
+                title: 'New Leave Request Applied',
+                message: "{$employee->full_name} applied for {$duration} day(s) leave.",
+                actionUrl: route('hrms.leaves.index'),
+                type: 'leave_request',
+                iconClass: 'feather-calendar'
+            );
+        }
 
         return redirect()->back()->with('success', __('hrms.leave.app.submitted_successfully'));
     }
@@ -134,6 +153,22 @@ class LeaveRequestController extends Controller
         ]);
 
         $this->leaveRequestRepository->updateStatus($leaveRequest, $validated, $request);
+
+        // Send Status Notification to Employee
+        if ($leaveRequest->employee) {
+            $statusText = ucfirst($validated['action']);
+            $iconClass = $validated['action'] === 'approved' ? 'feather-check-circle' : 'feather-x-circle';
+            $startFormatted = \Carbon\Carbon::parse($leaveRequest->start_date)->format('M d, Y');
+            $endFormatted = \Carbon\Carbon::parse($leaveRequest->end_date)->format('M d, Y');
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employee: $leaveRequest->employee,
+                title: "Leave Request {$statusText}",
+                message: "Your leave application ({$startFormatted} to {$endFormatted}) status is now {$statusText}.",
+                actionUrl: route('hrms.leaves.index'),
+                type: 'leave_' . $validated['action'],
+                iconClass: $iconClass
+            );
+        }
 
         $statusLabels = [
             'approved'     => __('hrms.leave.app.approved_successfully') ?? 'Leave application approved successfully.',

@@ -193,6 +193,15 @@ class EmployeeExitController extends Controller
         $computedFnF = $this->fnfService->calculateFnF($exit);
         $this->fnfService->saveSettlement($exit, $computedFnF);
 
+        \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            employeeId: $employee->id,
+            title: 'Exit Process Initiated',
+            message: "Exit / Resignation process has been initiated with expected LWD: {$exit->approved_lwd}.",
+            actionUrl: route('hrms.exits.index'),
+            type: 'exit_initiated',
+            iconClass: 'feather-log-out'
+        );
+
         if ($request->has('redirect_back') || str_contains(url()->previous(), '/hrms/employees/')) {
             return redirect()->back()->with('success', "Exit / Resignation initiated successfully for {$employee->full_name}. Multi-department clearance checklist created.");
         }
@@ -361,6 +370,17 @@ class EmployeeExitController extends Controller
         // Re-calculate FnF
         $computedFnF = $this->fnfService->calculateFnF($exit);
         $this->fnfService->saveSettlement($exit, $computedFnF);
+
+        if ($exit->employee_id) {
+            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                employeeId: $exit->employee_id,
+                title: 'Exit Request Approved',
+                message: "Your exit has been approved. Last working day set to {$exit->approved_lwd}.",
+                actionUrl: route('hrms.exits.index'),
+                type: 'exit_approved',
+                iconClass: 'feather-check-circle'
+            );
+        }
 
         return redirect()->back()->with('success', "Exit approved. Last working day set to {$exit->approved_lwd}.");
     }

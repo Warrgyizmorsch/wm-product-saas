@@ -123,11 +123,25 @@ class SalaryStructureController extends Controller
             }
         }
 
-        $this->salaryStructureRepository->storeComponent($validated);
+        $component = $this->salaryStructureRepository->storeComponent($validated);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => __('hrms.salary.component_created_success'),
+                'component' => [
+                    'id' => $component->id,
+                    'name' => $component->name,
+                    'code' => $component->code,
+                    'type' => $component->type,
+                    'is_adhoc' => $component->is_adhoc,
+                ],
+            ]);
+        }
 
         $redirectUrl = route('hrms.salary-structure.index');
         if (!empty($validated['pay_group_id'])) {
-            $tab = $validated['is_adhoc'] ? 'components-adhoc' : 'components-recurring';
+            $tab = $request->input('redirect_tab', $validated['is_adhoc'] ? 'components-adhoc' : 'components-recurring');
             $redirectUrl .= '?pay_group_id=' . $validated['pay_group_id'] . '&active_tab=' . $tab;
         }
 

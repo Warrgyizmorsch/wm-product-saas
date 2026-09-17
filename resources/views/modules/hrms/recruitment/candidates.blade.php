@@ -4,12 +4,21 @@
 @section('page-title', 'Candidate Database')
 @section('breadcrumb', 'HRMS / Recruitment / Candidates')
 
+@php
+    $authUser = auth()->user();
+    $canCreateRecruitment = $authUser && ($authUser->hasHrPermission('hrms.recruitment.create') || $authUser->hasHrPermission('hr.settings.manage') || $authUser->hasHrPermission('hrms.recruitment.manage'));
+    $canUpdateRecruitment = $authUser && ($authUser->hasHrPermission('hrms.recruitment.update') || $authUser->hasHrPermission('hr.settings.manage') || $authUser->hasHrPermission('hrms.recruitment.manage'));
+    $canManageRecruitment = $authUser && ($authUser->hasHrPermission('hrms.recruitment.manage') || $authUser->hasHrPermission('hr.settings.manage'));
+@endphp
+
 @section('page-actions')
-    <div class="d-flex align-items-center gap-2">
-        <x-ui.button variant="primary" icon="feather-user-plus" data-bs-toggle="modal" data-bs-target="#addCandidateModal">
-            Add Candidate
-        </x-ui.button>
-    </div>
+    @if($canCreateRecruitment)
+        <div class="d-flex align-items-center gap-2">
+            <x-ui.button variant="primary" icon="feather-user-plus" data-bs-toggle="modal" data-bs-target="#addCandidateModal">
+                Add Candidate
+            </x-ui.button>
+        </div>
+    @endif
 @endsection
 
 @push('styles')

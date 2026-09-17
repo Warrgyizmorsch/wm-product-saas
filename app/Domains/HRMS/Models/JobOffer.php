@@ -15,9 +15,11 @@ class JobOffer extends BaseModel
         'offer_code',
         'offered_designation_id',
         'offered_department_id',
+        'document_template_id',
         'offered_annual_ctc',
         'joining_date',
         'offer_letter_notes',
+        'offer_letter_content',
         'status',
         'accepted_at',
         'converted_employee_id',
@@ -42,6 +44,11 @@ class JobOffer extends BaseModel
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class, 'offered_department_id');
+    }
+
+    public function documentTemplate(): BelongsTo
+    {
+        return $this->belongsTo(DocumentTemplate::class, 'document_template_id');
     }
 
     public function convertedEmployee(): BelongsTo
