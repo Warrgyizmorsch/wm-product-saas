@@ -10,6 +10,13 @@
                 border-right: none;
                 gap: 6px;
             }
+            .erp-vertical-tabs .erp-vtab-header {
+                letter-spacing: 0.08em;
+                font-size: 9px;
+                font-weight: 800;
+                color: #475569;
+                border-bottom: 1.5px solid #cbd5e1 !important;
+            }
             .erp-vertical-tabs .nav-link {
                 border: none !important;
                 background: transparent !important;
@@ -47,6 +54,25 @@
                 transform: scale(1.15);
                 color: #ffffff !important;
             }
+
+            /* Dark Mode Support for Vertical Tabs */
+            html.app-skin-dark .erp-vertical-tabs .erp-vtab-header {
+                color: #94a3b8 !important;
+                border-bottom: 1.5px solid #1e293b !important;
+            }
+            html.app-skin-dark .erp-vertical-tabs .nav-link {
+                color: #cbd5e1 !important;
+            }
+            html.app-skin-dark .erp-vertical-tabs .nav-link:hover {
+                color: #ffffff !important;
+                background-color: rgba(255, 255, 255, 0.07) !important;
+            }
+            html.app-skin-dark .erp-vertical-tabs .nav-link.active {
+                color: #ffffff !important;
+                background-color: var(--bs-primary) !important;
+                border-left: 2px solid #ffffff !important;
+                box-shadow: 0 4px 14px color-mix(in srgb, var(--bs-primary) 40%, transparent) !important;
+            }
         </style>
     @endpush
 @endonce
@@ -54,7 +80,7 @@
 <div class="nav flex-column nav-pills erp-vertical-tabs" id="{{ $id }}" role="tablist" aria-orientation="vertical" {{ $attributes }}>
     @foreach($tabs as $tab)
         @if(!empty($tab['is_header']) || !empty($tab['header']))
-            <div class="px-2 pt-3 pb-1 fw-extrabold mb-2 mt-1" style="letter-spacing: 0.08em; font-size: 9px; font-weight: 800; color: #475569; border-bottom: 1.5px solid #cbd5e1 !important;">
+            <div class="px-2 pt-3 pb-1 fw-extrabold mb-2 mt-1 erp-vtab-header">
                 {{ $tab['header'] ?? $tab['label'] }}
             </div>
         @else

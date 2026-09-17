@@ -39,7 +39,17 @@ class ProductionOrderRepository implements ProductionOrderRepositoryInterface
             $query->where('end_date', '<=', $filters['end_date']);
         }
 
-        return $query->orderBy('id', 'desc')->paginate($perPage);
+        $sortBy = $filters['sort_by'] ?? 'id';
+        $sortOrder = strtolower($filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        $allowedSorts = ['id', 'order_number', 'start_date', 'end_date', 'quantity_ordered', 'status'];
+
+        if (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        return $query->paginate($perPage);
     }
 
     public function getStatusCounts(): array

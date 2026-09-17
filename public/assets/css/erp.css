@@ -1805,3 +1805,147 @@ html.app-skin-dark .production-flow-tab-item.active-step .step-circle-badge {
 html.app-skin-dark .production-workflow-card .step-connector-arrow i {
     color: #475569 !important;
 }
+
+/* Sidebar Dropdown & Navigation in Dark Mode */
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.open > a,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.nxl-trigger > a {
+    background: color-mix(in srgb, var(--bs-primary) 22%, transparent) !important;
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 40%, transparent) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25) !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a .nxl-mtext,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-mtext,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.open > a .nxl-mtext,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.nxl-trigger > a .nxl-mtext {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a .nxl-micon i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-micon i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.open > a .nxl-micon i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.nxl-trigger > a .nxl-micon i {
+    color: color-mix(in srgb, var(--bs-primary) 70%, #ffffff) !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a .nxl-arrow i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-arrow i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.open > a .nxl-arrow i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.nxl-trigger > a .nxl-arrow i {
+    color: #ffffff !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-submenu {
+    border-left: 1.5px dashed color-mix(in srgb, var(--bs-primary) 45%, transparent) !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-navbar li:hover > .nxl-submenu,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.active > .nxl-submenu {
+    border-left-color: var(--bs-primary) !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-submenu .nxl-link {
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-submenu .nxl-link:hover {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-submenu li.active > .nxl-link {
+    background: color-mix(in srgb, var(--bs-primary) 32%, transparent) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 55%, transparent) !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--bs-primary) 35%, transparent) !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-submenu li::before {
+    background-color: #0f172a !important;
+    border: 1.5px solid #94a3b8 !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-submenu li:hover::before {
+    background-color: color-mix(in srgb, var(--bs-primary) 75%, #ffffff) !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--bs-primary) 65%, transparent) !important;
+}
+html.app-skin-dark .nxl-navigation .nxl-submenu li.active::before {
+    background-color: color-mix(in srgb, var(--bs-primary) 70%, #ffffff) !important;
+    border: 2px solid #ffffff !important;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--bs-primary) 70%, transparent) !important;
+}
+
+/* Workflow Guide Component in Dark Mode */
+html.app-skin-dark .erp-workflow-guide-box .erp-workflow-guide-inner {
+    background-color: #131c31 !important;
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 35%, transparent) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+}
+html.app-skin-dark .erp-workflow-guide-box .erp-workflow-guide-avatar {
+    background-color: color-mix(in srgb, var(--bs-primary) 25%, transparent) !important;
+    color: color-mix(in srgb, var(--bs-primary) 70%, #ffffff) !important;
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 45%, transparent) !important;
+}
+html.app-skin-dark .erp-workflow-guide-box .erp-workflow-guide-title {
+    color: color-mix(in srgb, var(--bs-primary) 70%, #ffffff) !important;
+}
+html.app-skin-dark .erp-workflow-guide-box .erp-workflow-guide-body {
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .erp-workflow-guide-box .erp-workflow-guide-body a {
+    color: color-mix(in srgb, var(--bs-primary) 75%, #ffffff) !important;
+    text-decoration: underline !important;
+}
+html.app-skin-dark .erp-workflow-guide-box .erp-workflow-guide-dismiss {
+    color: #94a3b8 !important;
+}
+html.app-skin-dark .erp-workflow-guide-box .erp-workflow-guide-dismiss:hover {
+    color: #ffffff !important;
+}
+
+/* Horizontal Tabs in Dark Mode */
+html.app-skin-dark .erp-horizontal-tabs {
+    border-bottom: 2px solid #1e293b !important;
+}
+html.app-skin-dark .erp-horizontal-tabs .nav-link {
+    color: #94a3b8 !important;
+}
+html.app-skin-dark .erp-horizontal-tabs .nav-link:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+html.app-skin-dark .erp-horizontal-tabs .nav-link.active {
+    background-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+    border-color: var(--bs-primary) !important;
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--bs-primary) 40%, transparent) !important;
+}
+html.app-skin-dark .erp-horizontal-tabs .erp-tab-header-badge {
+    background-color: #162038 !important;
+    color: #cbd5e1 !important;
+    border-color: #283c50 !important;
+}
+
+/* Vertical Tabs in Dark Mode */
+html.app-skin-dark .erp-vertical-tabs .erp-vtab-header {
+    color: #94a3b8 !important;
+    border-bottom: 1.5px solid #1e293b !important;
+}
+html.app-skin-dark .erp-vertical-tabs .nav-link {
+    color: #cbd5e1 !important;
+}
+html.app-skin-dark .erp-vertical-tabs .nav-link:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.07) !important;
+}
+html.app-skin-dark .erp-vertical-tabs .nav-link.active {
+    color: #ffffff !important;
+    background-color: var(--bs-primary) !important;
+    border-left: 2px solid #ffffff !important;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--bs-primary) 40%, transparent) !important;
+}
+
+/* Production Main Content & Tab Panes in Dark Mode */
+html.app-skin-dark .production-main-content-scroll {
+    background-color: #111a2e !important;
+    border-color: #1e293b !important;
+}
+html.app-skin-dark .production-order-tab-content {
+    background-color: transparent !important;
+}

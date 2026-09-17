@@ -606,6 +606,129 @@
 .nxl-navigation .navbar-content .nxl-submenu .nxl-link {
     margin-left: 0 !important;
 }
+
+/* =========================================================
+   DARK MODE SUPPORT FOR SIDEBAR NAVIGATION & SUBMENUS
+   ========================================================= */
+html.app-skin-dark {
+    --sidebar-text: #cbd5e1;
+    --sidebar-heading: #94a3b8;
+    --sidebar-muted: #64748b;
+}
+
+html.app-skin-dark .nxl-navigation .nxl-navbar a {
+    color: #cbd5e1;
+}
+
+/* Hover Main Item Link in Dark Mode */
+html.app-skin-dark .nxl-navigation .nxl-navbar li:hover > a {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.07) !important;
+}
+
+html.app-skin-dark .nxl-navigation .nxl-navbar li:hover > a .nxl-micon i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li:hover > a .nxl-arrow i {
+    color: #ffffff !important;
+}
+
+/* Open / Active Main Item (e.g. Execution tab) in Dark Mode */
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.open > a,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.nxl-trigger > a {
+    background: color-mix(in srgb, var(--bs-primary) 22%, transparent) !important;
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 40%, transparent) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a .nxl-mtext,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-mtext,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.open > a .nxl-mtext,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.nxl-trigger > a .nxl-mtext {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a .nxl-micon,
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a .nxl-micon i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-micon,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-micon i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.open > a .nxl-micon i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.nxl-trigger > a .nxl-micon i {
+    color: color-mix(in srgb, var(--bs-primary) 70%, #ffffff) !important;
+}
+
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a .nxl-arrow,
+html.app-skin-dark .nxl-navigation .nxl-navbar > li.active > a .nxl-arrow i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.active > a .nxl-arrow i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.open > a .nxl-arrow i,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.nxl-hasmenu.nxl-trigger > a .nxl-arrow i {
+    color: #ffffff !important;
+}
+
+/* Timeline border in Dark Mode */
+html.app-skin-dark .nxl-navigation .nxl-submenu {
+    border-left: 1.5px dashed color-mix(in srgb, var(--bs-primary) 45%, transparent) !important;
+}
+
+html.app-skin-dark .nxl-navigation .nxl-navbar li:hover > .nxl-submenu,
+html.app-skin-dark .nxl-navigation .nxl-navbar li.active > .nxl-submenu {
+    border-left-color: var(--bs-primary) !important;
+}
+
+/* Timeline node dots in Dark Mode */
+html.app-skin-dark .nxl-navigation .nxl-submenu li::before {
+    background-color: #0f172a !important;
+    border: 1.5px solid #94a3b8 !important;
+}
+
+html.app-skin-dark .nxl-navigation .nxl-submenu li:hover::before {
+    background-color: color-mix(in srgb, var(--bs-primary) 75%, #ffffff) !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--bs-primary) 65%, transparent) !important;
+}
+
+html.app-skin-dark .nxl-navigation .nxl-submenu li.active::before {
+    background-color: color-mix(in srgb, var(--bs-primary) 70%, #ffffff) !important;
+    border: 2px solid #ffffff !important;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--bs-primary) 70%, transparent) !important;
+}
+
+/* Submenu Links in Dark Mode (High contrast, bright & crisp) */
+html.app-skin-dark .nxl-navigation .nxl-submenu .nxl-link {
+    color: #cbd5e1 !important;
+}
+
+html.app-skin-dark .nxl-navigation .nxl-submenu .nxl-link:hover {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Active Submenu Item (e.g. Production Orders) in Dark Mode */
+html.app-skin-dark .nxl-navigation .nxl-submenu li.active > .nxl-link {
+    background: color-mix(in srgb, var(--bs-primary) 32%, transparent) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 55%, transparent) !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--bs-primary) 35%, transparent) !important;
+}
+
+/* Module Section Header in Dark Mode */
+html.app-skin-dark .premium-module-header-title {
+    color: #94a3b8 !important;
+}
+
+html.app-skin-dark .premium-module-header:hover .premium-module-header-title {
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .premium-module-accordion-btn {
+    color: #64748b !important;
+}
+
+html.app-skin-dark .premium-module-header:hover .premium-module-accordion-btn {
+    color: #ffffff !important;
+}
 </style>
 
 {{-- Accordion Expanded State Persistence Script --}}

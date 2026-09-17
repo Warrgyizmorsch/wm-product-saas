@@ -14,6 +14,98 @@
         .table-responsive {
             position: relative;
         }
+
+        /* Work Center Filter Strip */
+        .wip-filter-strip {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0 !important;
+        }
+
+        html.app-skin-dark .wip-filter-strip,
+        body.app-skin-dark .wip-filter-strip,
+        [data-bs-theme="dark"] .wip-filter-strip,
+        [data-theme="dark"] .wip-filter-strip {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .wip-filter-strip label,
+        body.app-skin-dark .wip-filter-strip label,
+        [data-bs-theme="dark"] .wip-filter-strip label,
+        [data-theme="dark"] .wip-filter-strip label {
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .wip-filter-strip .form-select,
+        body.app-skin-dark .wip-filter-strip .form-select,
+        [data-bs-theme="dark"] .wip-filter-strip .form-select,
+        [data-theme="dark"] .wip-filter-strip .form-select {
+            background-color: #0f172a !important;
+            border-color: #283c50 !important;
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .wip-filter-strip .btn.btn-light,
+        body.app-skin-dark .wip-filter-strip .btn.btn-light,
+        [data-bs-theme="dark"] .wip-filter-strip .btn.btn-light,
+        [data-theme="dark"] .wip-filter-strip .btn.btn-light {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .wip-filter-strip .btn.btn-light:hover,
+        body.app-skin-dark .wip-filter-strip .btn.btn-light:hover,
+        [data-bs-theme="dark"] .wip-filter-strip .btn.btn-light:hover,
+        [data-theme="dark"] .wip-filter-strip .btn.btn-light:hover {
+            background-color: #283c50 !important;
+            border-color: #3b82f6 !important;
+            color: #ffffff !important;
+        }
+
+        /* WIP Accordions & Sub-Cards in Dark Mode */
+        html.app-skin-dark .wip-order-collapse,
+        body.app-skin-dark .wip-order-collapse,
+        [data-bs-theme="dark"] .wip-order-collapse,
+        [data-theme="dark"] .wip-order-collapse {
+            background-color: #111a2e !important;
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .wip-order-collapse .bg-light,
+        body.app-skin-dark .wip-order-collapse .bg-light,
+        [data-bs-theme="dark"] .wip-order-collapse .bg-light,
+        [data-theme="dark"] .wip-order-collapse .bg-light {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .wip-order-collapse .bg-white,
+        body.app-skin-dark .wip-order-collapse .bg-white,
+        [data-bs-theme="dark"] .wip-order-collapse .bg-white,
+        [data-theme="dark"] .wip-order-collapse .bg-white {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .wip-order-collapse thead.bg-light,
+        body.app-skin-dark .wip-order-collapse thead.bg-light,
+        [data-bs-theme="dark"] .wip-order-collapse thead.bg-light,
+        [data-theme="dark"] .wip-order-collapse thead.bg-light {
+            background-color: #162038 !important;
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .wip-order-collapse .card,
+        body.app-skin-dark .wip-order-collapse .card,
+        [data-bs-theme="dark"] .wip-order-collapse .card,
+        [data-theme="dark"] .wip-order-collapse .card {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
     </style>
 @endpush
 
@@ -34,51 +126,109 @@
         @endif
     </x-ui.workflow-guide>
 
-    <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
+    <div class="erp-single-panel">
         <!-- Success & Error Messages -->
 
         {{-- WIP Summary Cards --}}
         @if(isset($wipSummary))
             <div class="row g-3 mb-4">
-                <div class="col">
-                    <div class="bg-light border rounded p-3 text-center">
-                        <span class="text-muted fs-11 text-uppercase fw-bold">Total WIP Cards</span>
-                        <h4 class="text-dark fw-bold mt-1 mb-0">{{ number_format($wipSummary['total_count']) }}</h4>
+                <div class="col-md col-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-text avatar-md bg-soft-primary text-primary rounded me-3">
+                                    <i class="feather-layers"></i>
+                                </div>
+                                <div>
+                                    <div class="fs-18 fw-bold text-dark">{{ number_format($wipSummary['total_count']) }}</div>
+                                    <div class="fs-11 text-muted text-uppercase">Total WIP Cards</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col">
-                    <div class="bg-soft-primary border rounded p-3 text-center">
-                        <span class="text-primary fs-11 text-uppercase fw-bold">Active / In-Process</span>
-                        <h4 class="text-primary fw-bold mt-1 mb-0">{{ number_format($wipSummary['active_count']) }}</h4>
-                        <small class="fs-10 text-muted">({{ number_format($wipSummary['total_available'], 2) }} units)</small>
+                <div class="col-md col-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-text avatar-md bg-soft-primary text-primary rounded me-3">
+                                    <i class="feather-activity"></i>
+                                </div>
+                                <div>
+                                    <div class="fs-18 fw-bold text-dark d-flex align-items-baseline gap-1">
+                                        {{ number_format($wipSummary['active_count']) }}
+                                        <span class="fs-10 text-muted fw-normal">({{ number_format($wipSummary['total_available'], 1) }} u)</span>
+                                    </div>
+                                    <div class="fs-11 text-muted text-uppercase">Active / In-Process</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col">
-                    <div class="bg-soft-warning border rounded p-3 text-center">
-                        <span class="text-warning fs-11 text-uppercase fw-bold">Quality Hold</span>
-                        <h4 class="text-warning fw-bold mt-1 mb-0">{{ number_format($wipSummary['hold_count']) }}</h4>
+                <div class="col-md col-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-text avatar-md bg-soft-warning text-warning rounded me-3">
+                                    <i class="feather-alert-triangle"></i>
+                                </div>
+                                <div>
+                                    <div class="fs-18 fw-bold text-dark">{{ number_format($wipSummary['hold_count']) }}</div>
+                                    <div class="fs-11 text-muted text-uppercase">Quality Hold</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col">
-                    <div class="bg-soft-danger border rounded p-3 text-center">
-                        <span class="text-danger fs-11 text-uppercase fw-bold">Rework</span>
-                        <h4 class="text-danger fw-bold mt-1 mb-0">{{ number_format($wipSummary['rework_count']) }}</h4>
+                <div class="col-md col-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-text avatar-md bg-soft-danger text-danger rounded me-3">
+                                    <i class="feather-refresh-cw"></i>
+                                </div>
+                                <div>
+                                    <div class="fs-18 fw-bold text-dark">{{ number_format($wipSummary['rework_count']) }}</div>
+                                    <div class="fs-11 text-muted text-uppercase">Rework</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col">
-                    <div class="bg-soft-warning border rounded p-3 text-center">
-                        <span class="text-warning fs-11 text-uppercase fw-bold">At Vendor (Subcontract)</span>
-                        <h4 class="text-dark fw-bold mt-1 mb-0">{{ number_format($wipSummary['subcontract_count'] ?? 0) }}</h4>
+                <div class="col-md col-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-text avatar-md bg-soft-warning text-warning rounded me-3">
+                                    <i class="feather-truck"></i>
+                                </div>
+                                <div>
+                                    <div class="fs-18 fw-bold text-dark">{{ number_format($wipSummary['subcontract_count'] ?? 0) }}</div>
+                                    <div class="fs-11 text-muted text-uppercase">At Vendor</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col">
-                    <div class="bg-soft-success border rounded p-3 text-center">
-                        <span class="text-success fs-11 text-uppercase fw-bold">Completed</span>
-                        <h4 class="text-success fw-bold mt-1 mb-0">{{ number_format($wipSummary['completed_count']) }}</h4>
+                <div class="col-md col-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-text avatar-md bg-soft-success text-success rounded me-3">
+                                    <i class="feather-check-circle"></i>
+                                </div>
+                                <div>
+                                    <div class="fs-18 fw-bold text-dark">{{ number_format($wipSummary['completed_count']) }}</div>
+                                    <div class="fs-11 text-muted text-uppercase">Completed</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         @endif
+
+        <div class="bg-white p-4 rounded shadow-sm">
 
         <!-- Toolbar: Sort, Filters, View Switcher -->
         <div class="d-flex align-items-center mb-3">
@@ -128,11 +278,14 @@
                         </div>
                     </x-ui.filter>
                 </form>
+
+                {{-- Export Options --}}
+                <x-ui.import-export-dropdown type="wip" :can-import="false" :can-download-template="false" />
             </div>
         </div>
 
         {{-- Work Center Filter & Bulk Accordion Controls --}}
-        <div class="d-flex align-items-center justify-content-between gap-3 mb-3 bg-light p-2 rounded border">
+        <div class="d-flex align-items-center justify-content-between gap-3 mb-3 wip-filter-strip p-2 rounded border">
             <form method="GET" action="{{ route('production.wip.index') }}" class="d-flex align-items-center gap-2 flex-grow-1">
                 <input type="hidden" name="view" value="{{ $viewMode }}" />
                 @foreach(request()->except(['work_center_id', 'page']) as $k => $v)
@@ -554,6 +707,7 @@
                 :perPage="$wips->perPage()"
             />
         @endif
+        </div>
     </div>
 @endsection
 

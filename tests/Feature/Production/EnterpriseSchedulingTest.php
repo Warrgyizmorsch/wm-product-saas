@@ -926,5 +926,34 @@ class EnterpriseSchedulingTest extends TestCase
         $subtracted = $this->schedulingService->subtractWorkingMinutes(null, $start, 60);
         $this->assertEquals('2026-07-06 07:00:00', $subtracted->toDateTimeString());
     }
+
+    /** @test */
+    public function schedules_index_renders_export_only_dropdown(): void
+    {
+        $response = $this->withHeader('X-Tenant', 'enterprise-corp')
+            ->actingAs($this->admin)
+            ->get(route('production.schedules.index'));
+
+        $response->assertStatus(200);
+        // Renders export dropdown and modal
+        $response->assertSee('exportModal_schedules_', false);
+        $response->assertSee('Export Options: Production Schedules', false);
+        $response->assertSee(route('production.import-export.export', 'schedules'));
+        // Must NOT render import triggers
+        $response->assertDontSee('#importSchedulesModal', false);
+        $response->assertDontSee(route('production.import-export.download-template', 'schedules'));
+    }
+
+    /** @test */
+    public function schedules_export_endpoint_returns_excel_download(): void
+    {
+        $response = $this->withHeader('X-Tenant', 'enterprise-corp')
+            ->actingAs($this->admin)
+            ->get(route('production.import-export.export', 'schedules'));
+
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Disposition');
+        $this->assertStringContainsString('production_schedules_export.xlsx', $response->headers->get('Content-Disposition'));
+    }
 }
 
