@@ -111,6 +111,22 @@ class HeaderThemeToggleTest extends TestCase
         // Odoo form component dark mode
         $this->assertStringContainsString('html.app-skin-dark .odoo-sheet', $css);
         $this->assertStringContainsString('html.app-skin-dark .odoo-form-control', $css);
+
+        // Sidebar dropdown dark mode
+        $this->assertStringContainsString('html.app-skin-dark .nxl-navigation', $css);
+        $this->assertStringContainsString('html.app-skin-dark .nxl-navigation .nxl-submenu', $css);
+
+        // Workflow guide dark mode
+        $this->assertStringContainsString('html.app-skin-dark .erp-workflow-guide-box', $css);
+
+        // Horizontal tabs dark mode
+        $this->assertStringContainsString('html.app-skin-dark .erp-horizontal-tabs', $css);
+
+        // Vertical tabs dark mode
+        $this->assertStringContainsString('html.app-skin-dark .erp-vertical-tabs', $css);
+
+        // Production order content scroll container dark mode
+        $this->assertStringContainsString('html.app-skin-dark .production-main-content-scroll', $css);
     }
 
     public function test_common_blade_components_render_dark_mode_styles(): void
@@ -124,6 +140,9 @@ class HeaderThemeToggleTest extends TestCase
                 <x-ui.icon-btn variant="transparent-dark" icon="feather-search" />
                 <x-ui.action-dropdown :viewUrl="route(\'dashboard\')"><li>Item</li></x-ui.action-dropdown>
                 <x-ui.odoo-form-ui type="sheet"><div>Sheet Content</div></x-ui.odoo-form-ui>
+                <x-ui.workflow-guide title="Workflow Guide">Test guide text</x-ui.workflow-guide>
+                <x-ui.horizontal-tabs id="testHTabs" :tabs="[[\'id\' => \'tab1\', \'label\' => \'Tab 1\']]" />
+                <x-ui.vertical-tabs id="testVTabs" :tabs="[[\'id\' => \'vtab1\', \'label\' => \'VTab 1\']]" />
             </div>
             @stack("styles")'
         );
@@ -134,6 +153,9 @@ class HeaderThemeToggleTest extends TestCase
         $this->assertStringContainsString('html.app-skin-dark .erp-icon-btn--transparent-dark', $renderedHtml);
         $this->assertStringContainsString('html.app-skin-dark .action-dropdown-btn', $renderedHtml);
         $this->assertStringContainsString('html.app-skin-dark .odoo-sheet', $renderedHtml);
+        $this->assertStringContainsString('html.app-skin-dark .erp-workflow-guide-box', $renderedHtml);
+        $this->assertStringContainsString('html.app-skin-dark .erp-horizontal-tabs', $renderedHtml);
+        $this->assertStringContainsString('html.app-skin-dark .erp-vertical-tabs', $renderedHtml);
     }
 
     public function test_production_workflow_strip_supports_dark_mode(): void

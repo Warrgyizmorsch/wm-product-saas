@@ -63,7 +63,7 @@ class ProductionPlanController extends Controller
         $sortBy = $request->input('sort_by', 'id');
         $sortOrder = $request->input('sort_order', 'desc');
 
-        if (! in_array($sortBy, ['id', 'plan_number', 'name', 'quantity', 'start_date'])) {
+        if (! in_array($sortBy, ['id', 'plan_number', 'name', 'quantity', 'start_date', 'end_date', 'status'])) {
             $sortBy = 'id';
         }
         if (! in_array($sortOrder, ['asc', 'desc'])) {

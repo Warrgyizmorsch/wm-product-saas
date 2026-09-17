@@ -18,6 +18,10 @@ use App\Exports\WorkCenterExport;
 use App\Exports\MachineExport;
 use App\Exports\BomExport;
 use App\Exports\RoutingExport;
+use App\Exports\ProductionOrderExport;
+use App\Exports\ProductionPlanExport;
+use App\Exports\ProductionWipExport;
+use App\Exports\ProductionScheduleExport;
 use App\Exports\WorkCenterTemplate;
 use App\Exports\MachineTemplate;
 use App\Exports\BomTemplate;
@@ -59,6 +63,10 @@ class ProductionImportExportController extends Controller
             'machines' => Excel::download(new MachineExport($tenantId, $request->all()), 'machines_export.xlsx'),
             'boms' => Excel::download(new BomExport($tenantId, $request->all()), 'boms_export.xlsx'),
             'routings' => Excel::download(new RoutingExport($tenantId, $request->all()), 'routings_export.xlsx'),
+            'orders' => Excel::download(new ProductionOrderExport($tenantId, $request->all()), 'production_orders_export.xlsx'),
+            'plans' => Excel::download(new ProductionPlanExport($tenantId, $request->all()), 'production_plans_export.xlsx'),
+            'wip' => Excel::download(new ProductionWipExport($tenantId, $request->all()), 'production_wip_export.xlsx'),
+            'schedules' => Excel::download(new ProductionScheduleExport($tenantId, $request->all()), 'production_schedules_export.xlsx'),
             default => abort(404, 'Invalid export type'),
         };
     }
@@ -69,6 +77,24 @@ class ProductionImportExportController extends Controller
     public function importPreview(Request $request, string $type)
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $cancelRoute = match ($type) {
+            'work-centers' => 'production.work-centers.index',
+            'machines' => 'production.machines.index',
+            'boms' => 'production.boms.index',
+            'routings' => 'production.routing.index',
+            default => 'production.work-centers.index',
+        };
+
+        if ($request->isMethod('get')) {
+            $previewRows = Session::get("production_import_preview_{$type}");
+            if (!empty($previewRows)) {
+                $errorCount = collect($previewRows)->where('valid', false)->count();
+                return view('modules.production.import_preview', compact('previewRows', 'type', 'errorCount'));
+            }
+
+            return redirect()->route($cancelRoute)->with('info', 'No active import preview found. Please upload a file to import.');
+        }
 
         $request->validate([
             'file' => 'required|file|max:10240|mimes:xlsx,xls,csv,txt',
@@ -514,11 +540,16 @@ class ProductionImportExportController extends Controller
                 }
 
                 // Validate each parsed operation
+                $seenSequences = [];
                 foreach ($opsGrouped as $opNumber => &$op) {
                     $opErrors = [];
 
                     if (!is_numeric($op['sequence']) || $op['sequence'] <= 0) {
                         $opErrors[] = "Operation sequence for '{$opNumber}' must be a positive integer.";
+                    } elseif (isset($seenSequences[$op['sequence']])) {
+                        $opErrors[] = "Duplicate operation sequence '{$op['sequence']}' found in operation '{$opNumber}' (conflicts with '{$seenSequences[$op['sequence']]}'). Operation sequences within a routing must be unique.";
+                    } else {
+                        $seenSequences[$op['sequence']] = $opNumber;
                     }
 
                     if (empty($op['name'])) {
@@ -611,6 +642,18 @@ class ProductionImportExportController extends Controller
     public function importConfirm(Request $request, string $type)
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $redirectRoute = match ($type) {
+            'work-centers' => 'production.work-centers.index',
+            'machines' => 'production.machines.index',
+            'boms' => 'production.boms.index',
+            'routings' => 'production.routing.index',
+            default => 'production.work-centers.index',
+        };
+
+        if ($request->isMethod('get')) {
+            return redirect()->route($redirectRoute);
+        }
 
         $strategy = $request->input('strategy', 'create'); // 'create' or 'update'
         $tenantId = require_tenant_id();
@@ -790,10 +833,10 @@ class ProductionImportExportController extends Controller
                             ]);
 
                             // Recreate operations
-                            // Gather existing operation IDs to clear materials
-                            $opIds = $routing->operations()->pluck('id');
+                            // Gather existing operation IDs (including soft-deleted) to clear materials
+                            $opIds = $routing->operations()->withTrashed()->pluck('id');
                             RoutingOperationMaterial::whereIn('routing_operation_id', $opIds)->delete();
-                            $routing->operations()->delete();
+                            $routing->operations()->withTrashed()->forceDelete();
 
                             foreach ($data['operations'] as $op) {
                                 $newOp = RoutingOperation::create([
@@ -837,6 +880,9 @@ class ProductionImportExportController extends Controller
                             'status' => 'draft',
                             'created_by' => auth()->id()
                         ]);
+
+                        // Ensure no soft-deleted operations exist for this routing
+                        RoutingOperation::withTrashed()->where('routing_id', $routing->id)->forceDelete();
 
                         foreach ($data['operations'] as $op) {
                             $newOp = RoutingOperation::create([

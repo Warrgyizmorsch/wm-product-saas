@@ -25,7 +25,7 @@
                     $isDiscarded = $scen && $scen->isDiscarded();
                 @endphp
                 <div
-                    class="alert {{ $isPromoted ? 'alert-success border-success' : ($isDiscarded ? 'alert-secondary border-secondary' : 'alert-warning border-warning') }} d-flex align-items-center justify-content-between mb-4 shadow-sm py-2 px-3">
+                    class="dispatch-scenario-banner alert {{ $isPromoted ? 'alert-success border-success' : ($isDiscarded ? 'alert-secondary border-secondary' : 'alert-warning border-warning') }} d-flex align-items-center justify-content-between mb-4 shadow-sm py-2 px-3">
                     <div class="d-flex align-items-center gap-2">
                         <i
                             class="feather-{{ $isPromoted ? 'check-circle text-success' : ($isDiscarded ? 'x-circle text-secondary' : 'alert-triangle text-warning') }} fs-5"></i>
@@ -62,13 +62,13 @@
 
             {{-- Active Schedule Focus Banner --}}
             @if(isset($activeSchedule) && $activeSchedule)
-                <div class="alert alert-info border-info d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 rounded shadow-sm">
+                <div class="dispatch-focus-banner alert border d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 rounded shadow-sm">
                     <div class="d-flex align-items-center gap-2">
-                        <i class="feather-calendar text-info fs-18"></i>
+                        <i class="feather-calendar text-primary fs-18"></i>
                         <div>
-                            <strong class="text-dark">Focused Schedule:</strong>
+                            <strong class="text-dark banner-title">Focused Schedule:</strong>
                             <span class="font-monospace fw-bold text-primary me-2">#{{ $activeSchedule->schedule_number }}</span>
-                            <span class="text-muted">Order: <strong>{{ $activeSchedule->order->order_number ?? 'N/A' }}</strong> ({{ $activeSchedule->order->product->name ?? 'N/A' }})</span>
+                            <span class="text-muted banner-subtitle">Order: <strong class="text-dark">{{ $activeSchedule->order->order_number ?? 'N/A' }}</strong> ({{ $activeSchedule->order->product->name ?? 'N/A' }})</span>
                             <span class="badge {{ $activeSchedule->isReleased() ? 'bg-success' : 'bg-primary' }} ms-2 text-capitalize">{{ $activeSchedule->status }}</span>
                         </div>
                     </div>
@@ -250,37 +250,37 @@
             {{-- Summary Stat Cards --}}
             <div class="row g-3 mb-4">
                 <div class="col-md-2">
-                    <div class="p-3 bg-light rounded border text-center">
+                    <div class="p-3 dispatch-stat-card rounded border text-center">
                         <span class="text-muted fs-11 uppercase fw-bold">Visible Operations</span>
                         <h4 id="statTotalOps" class="fw-bold text-dark mb-0 mt-1">—</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <div class="p-3 bg-light rounded border text-center">
+                    <div class="p-3 dispatch-stat-card rounded border text-center">
                         <span class="text-muted fs-11 uppercase fw-bold">Active Swimlanes</span>
                         <h4 id="statTotalResources" class="fw-bold text-primary mb-0 mt-1">—</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <div class="p-3 bg-light rounded border text-center">
+                    <div class="p-3 dispatch-stat-card rounded border text-center">
                         <span class="text-muted fs-11 uppercase fw-bold">Locked Ops</span>
                         <h4 id="statTotalLocked" class="fw-bold text-danger mb-0 mt-1">0</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <div class="p-3 bg-light rounded border text-center">
+                    <div class="p-3 dispatch-stat-card rounded border text-center">
                         <span class="text-muted fs-11 uppercase fw-bold">Manual Adjustments</span>
                         <h4 id="statTotalManual" class="fw-bold text-warning mb-0 mt-1">0</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <div class="p-3 bg-light rounded border text-center">
+                    <div class="p-3 dispatch-stat-card rounded border text-center">
                         <span class="text-muted fs-11 uppercase fw-bold">Active Conflicts</span>
                         <h4 id="statTotalConflicts" class="fw-bold text-danger mb-0 mt-1">0</h4>
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <div class="p-3 bg-light rounded border text-center">
+                    <div class="p-3 dispatch-stat-card rounded border text-center">
                         <span class="text-muted fs-11 uppercase fw-bold">Work Center Overloads</span>
                         <h4 id="statTotalOverloads" class="fw-bold text-warning mb-0 mt-1">0</h4>
                     </div>
@@ -325,7 +325,7 @@
             </div>
 
             {{-- Legend Bar --}}
-            <div class="d-flex flex-wrap align-items-center justify-content-between p-3 bg-light rounded border fs-12">
+            <div class="d-flex flex-wrap align-items-center justify-content-between p-3 dispatch-legend-bar rounded border fs-12">
                 <div class="d-flex align-items-center gap-3">
                     <span class="fw-semibold text-dark"><i class="feather-info me-1"></i> Legend:</span>
                     <span class="d-flex align-items-center gap-1"><span class="d-inline-block rounded-circle bg-primary"
@@ -1138,7 +1138,7 @@
                 data.resources.forEach(res => {
                     // Work Center Header Row
                     const wcRow = document.createElement('div');
-                    wcRow.className = 'gantt-row-wc d-flex align-items-center bg-light border-bottom fw-bold fs-12 py-1.5 px-2';
+                    wcRow.className = 'gantt-row-wc d-flex align-items-center border-bottom fw-bold fs-12 py-1.5 px-2';
 
                     const wcUtil = res.capacity_utilization_percent || 0;
                     const wcUtilBadge = wcUtil > 100
@@ -1168,7 +1168,7 @@
 
                         const mIcon = m.id ? 'feather-cpu text-secondary' : 'feather-user text-info';
                         const laneResourceCol = `
-                                    <div class="gantt-resource-col border-end p-2 fs-12 d-flex align-items-center justify-content-between bg-white sticky-start" style="width: 280px; min-width: 280px; z-index: 5;">
+                                    <div class="gantt-resource-col border-end p-2 fs-12 d-flex align-items-center justify-content-between sticky-start" style="width: 280px; min-width: 280px; z-index: 5;">
                                         <div class="text-truncate" title="${m.name}">
                                             <i class="${mIcon} me-1"></i> <strong>${m.name}</strong>
                                             ${m.code ? `<span class="text-muted fs-11">(${m.code})</span>` : ''}
@@ -1178,12 +1178,16 @@
                                 `;
 
                         const laneTimelineCol = document.createElement('div');
-                        laneTimelineCol.className = 'gantt-timeline-lane flex-grow-1 position-relative bg-white';
+                        laneTimelineCol.className = 'gantt-timeline-lane flex-grow-1 position-relative';
                         laneTimelineCol.style.minHeight = '52px';
 
                         // Swimlane Column Grid Lines Background
                         const stepPct = currentScale === 'week' ? (100 / Math.max(1, Math.ceil(tickDays / 7))) : (100 / Math.max(1, tickDays));
-                        laneTimelineCol.style.backgroundImage = `linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px)`;
+                        const isDarkSkin = document.documentElement.classList.contains('app-skin-dark') || 
+                                           document.body.classList.contains('app-skin-dark') ||
+                                           document.documentElement.getAttribute('data-bs-theme') === 'dark';
+                        const gridLineColor = isDarkSkin ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+                        laneTimelineCol.style.backgroundImage = `linear-gradient(to right, ${gridLineColor} 1px, transparent 1px)`;
                         laneTimelineCol.style.backgroundSize = `${stepPct}% 100%`;
 
                         // Render Machine Downtime Blockers
@@ -1880,12 +1884,54 @@
 
     {{-- Gantt Custom Styles --}}
     <style>
+        /* Stat Cards & Legend */
+        .dispatch-stat-card {
+            background-color: #f8fafc;
+            border-color: #e2e8f0 !important;
+            transition: all 0.2s ease;
+        }
+
+        .dispatch-legend-bar {
+            background-color: #f8fafc;
+            border-color: #e2e8f0 !important;
+        }
+
+        /* Gantt Base Elements */
         .gantt-board-wrapper {
             font-family: inherit;
+            background-color: #ffffff;
+            border-color: #e2e8f0;
+        }
+
+        .gantt-header {
+            background-color: #f8fafc;
+            border-color: #e2e8f0;
+        }
+
+        .gantt-header .gantt-resource-col {
+            background-color: #f8fafc;
+            border-color: #e2e8f0;
+        }
+
+        .gantt-row-wc {
+            background-color: #f8fafc;
+            border-color: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .gantt-row-machine .gantt-resource-col {
+            background-color: #ffffff;
+            border-color: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .gantt-timeline-lane {
+            background-color: #ffffff;
         }
 
         .gantt-header-tick {
             min-width: 90px;
+            border-color: #e2e8f0;
         }
 
         .gantt-op-bar {
@@ -1907,6 +1953,295 @@
             position: sticky;
             left: 0;
             z-index: 5;
+        }
+
+        /* ==========================================================================
+           Dark Mode Overrides for Dispatch Board
+           ========================================================================== */
+        html.app-skin-dark .dispatch-stat-card,
+        body.app-skin-dark .dispatch-stat-card,
+        [data-bs-theme="dark"] .dispatch-stat-card,
+        [data-theme="dark"] .dispatch-stat-card {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+        }
+
+        html.app-skin-dark .dispatch-stat-card .text-dark,
+        body.app-skin-dark .dispatch-stat-card .text-dark,
+        [data-bs-theme="dark"] .dispatch-stat-card .text-dark,
+        [data-theme="dark"] .dispatch-stat-card .text-dark {
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .dispatch-stat-card .text-muted,
+        body.app-skin-dark .dispatch-stat-card .text-muted,
+        [data-bs-theme="dark"] .dispatch-stat-card .text-muted,
+        [data-theme="dark"] .dispatch-stat-card .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        /* Legend Bar Dark Mode */
+        html.app-skin-dark .dispatch-legend-bar,
+        body.app-skin-dark .dispatch-legend-bar,
+        [data-bs-theme="dark"] .dispatch-legend-bar,
+        [data-theme="dark"] .dispatch-legend-bar {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .dispatch-legend-bar .text-dark,
+        body.app-skin-dark .dispatch-legend-bar .text-dark,
+        [data-bs-theme="dark"] .dispatch-legend-bar .text-dark,
+        [data-theme="dark"] .dispatch-legend-bar .text-dark {
+            color: #f1f5f9 !important;
+        }
+
+        /* Gantt Board Container & Headers Dark Mode */
+        html.app-skin-dark .gantt-board-wrapper,
+        body.app-skin-dark .gantt-board-wrapper,
+        [data-bs-theme="dark"] .gantt-board-wrapper,
+        [data-theme="dark"] .gantt-board-wrapper {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .gantt-header,
+        body.app-skin-dark .gantt-header,
+        [data-bs-theme="dark"] .gantt-header,
+        [data-theme="dark"] .gantt-header {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .gantt-header .gantt-resource-col,
+        body.app-skin-dark .gantt-header .gantt-resource-col,
+        [data-bs-theme="dark"] .gantt-header .gantt-resource-col,
+        [data-theme="dark"] .gantt-header .gantt-resource-col {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .gantt-header .text-dark,
+        body.app-skin-dark .gantt-header .text-dark,
+        [data-bs-theme="dark"] .gantt-header .text-dark,
+        [data-theme="dark"] .gantt-header .text-dark {
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .gantt-header-tick,
+        body.app-skin-dark .gantt-header-tick,
+        [data-bs-theme="dark"] .gantt-header-tick,
+        [data-theme="dark"] .gantt-header-tick {
+            border-color: #283c50 !important;
+            color: #cbd5e1 !important;
+        }
+
+        /* Gantt Work Center Swimlane Header Rows Dark Mode */
+        html.app-skin-dark .gantt-row-wc,
+        body.app-skin-dark .gantt-row-wc,
+        [data-bs-theme="dark"] .gantt-row-wc,
+        [data-theme="dark"] .gantt-row-wc {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .gantt-row-wc .text-muted,
+        body.app-skin-dark .gantt-row-wc .text-muted,
+        [data-bs-theme="dark"] .gantt-row-wc .text-muted,
+        [data-theme="dark"] .gantt-row-wc .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        /* Gantt Machine Swimlane Lanes Dark Mode */
+        html.app-skin-dark .gantt-row-machine,
+        body.app-skin-dark .gantt-row-machine,
+        [data-bs-theme="dark"] .gantt-row-machine,
+        [data-theme="dark"] .gantt-row-machine {
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .gantt-row-machine .gantt-resource-col,
+        body.app-skin-dark .gantt-row-machine .gantt-resource-col,
+        [data-bs-theme="dark"] .gantt-row-machine .gantt-resource-col,
+        [data-theme="dark"] .gantt-row-machine .gantt-resource-col {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .gantt-row-machine .gantt-resource-col strong,
+        body.app-skin-dark .gantt-row-machine .gantt-resource-col strong,
+        [data-bs-theme="dark"] .gantt-row-machine .gantt-resource-col strong,
+        [data-theme="dark"] .gantt-row-machine .gantt-resource-col strong {
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .gantt-timeline-lane,
+        body.app-skin-dark .gantt-timeline-lane,
+        [data-bs-theme="dark"] .gantt-timeline-lane,
+        [data-theme="dark"] .gantt-timeline-lane {
+            background-color: #0b1120 !important;
+            border-color: #1e293b !important;
+        }
+
+        /* Modals in Dispatch Board Dark Mode */
+        html.app-skin-dark #modalQuickEditOp .bg-light,
+        body.app-skin-dark #modalQuickEditOp .bg-light,
+        [data-bs-theme="dark"] #modalQuickEditOp .bg-light,
+        [data-theme="dark"] #modalQuickEditOp .bg-light,
+        html.app-skin-dark #modalPreReleaseCheck .bg-light,
+        body.app-skin-dark #modalPreReleaseCheck .bg-light,
+        [data-bs-theme="dark"] #modalPreReleaseCheck .bg-light,
+        [data-theme="dark"] #modalPreReleaseCheck .bg-light {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark #modalQuickEditOp .text-dark,
+        body.app-skin-dark #modalQuickEditOp .text-dark,
+        [data-bs-theme="dark"] #modalQuickEditOp .text-dark,
+        [data-theme="dark"] #modalQuickEditOp .text-dark,
+        html.app-skin-dark #modalPreReleaseCheck .text-dark,
+        body.app-skin-dark #modalPreReleaseCheck .text-dark,
+        [data-bs-theme="dark"] #modalPreReleaseCheck .text-dark,
+        [data-theme="dark"] #modalPreReleaseCheck .text-dark {
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark #modalPreReleaseCheck .bg-white,
+        body.app-skin-dark #modalPreReleaseCheck .bg-white,
+        [data-bs-theme="dark"] #modalPreReleaseCheck .bg-white,
+        [data-theme="dark"] #modalPreReleaseCheck .bg-white {
+            background-color: #111a2e !important;
+            border-color: #283c50 !important;
+        }
+
+        html.app-skin-dark #modalChangeHistory thead.table-light,
+        body.app-skin-dark #modalChangeHistory thead.table-light,
+        [data-bs-theme="dark"] #modalChangeHistory thead.table-light,
+        [data-theme="dark"] #modalChangeHistory thead.table-light {
+            background-color: #162038 !important;
+            color: #cbd5e1 !important;
+        }
+
+        /* Focus & Scenario Banners Base Styles */
+        .dispatch-focus-banner {
+            background-color: color-mix(in srgb, var(--bs-primary) 8%, #ffffff);
+            border: 1px solid color-mix(in srgb, var(--bs-primary) 20%, transparent) !important;
+            border-left: 4px solid var(--bs-primary) !important;
+            color: #1e293b;
+        }
+
+        .dispatch-focus-banner .banner-title {
+            color: #0f172a;
+        }
+
+        .dispatch-focus-banner .banner-subtitle {
+            color: #475569;
+        }
+
+        /* Focus & Scenario Banners Dark Mode */
+        html.app-skin-dark .dispatch-focus-banner,
+        body.app-skin-dark .dispatch-focus-banner,
+        [data-bs-theme="dark"] .dispatch-focus-banner,
+        [data-theme="dark"] .dispatch-focus-banner {
+            background-color: color-mix(in srgb, var(--bs-primary) 12%, #111a2e) !important;
+            border: 1px solid color-mix(in srgb, var(--bs-primary) 25%, #1e293b) !important;
+            border-left: 4px solid var(--bs-primary) !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .dispatch-focus-banner .text-dark,
+        body.app-skin-dark .dispatch-focus-banner .text-dark,
+        [data-bs-theme="dark"] .dispatch-focus-banner .text-dark,
+        [data-theme="dark"] .dispatch-focus-banner .text-dark,
+        html.app-skin-dark .dispatch-focus-banner .banner-title,
+        body.app-skin-dark .dispatch-focus-banner .banner-title,
+        [data-bs-theme="dark"] .dispatch-focus-banner .banner-title,
+        [data-theme="dark"] .dispatch-focus-banner .banner-title {
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .dispatch-focus-banner .text-muted,
+        body.app-skin-dark .dispatch-focus-banner .text-muted,
+        [data-bs-theme="dark"] .dispatch-focus-banner .text-muted,
+        [data-theme="dark"] .dispatch-focus-banner .text-muted,
+        html.app-skin-dark .dispatch-focus-banner .banner-subtitle,
+        body.app-skin-dark .dispatch-focus-banner .banner-subtitle,
+        [data-bs-theme="dark"] .dispatch-focus-banner .banner-subtitle,
+        [data-theme="dark"] .dispatch-focus-banner .banner-subtitle {
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .dispatch-focus-banner .btn-outline-secondary,
+        body.app-skin-dark .dispatch-focus-banner .btn-outline-secondary,
+        [data-bs-theme="dark"] .dispatch-focus-banner .btn-outline-secondary,
+        [data-theme="dark"] .dispatch-focus-banner .btn-outline-secondary {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .dispatch-focus-banner .btn-outline-secondary:hover,
+        body.app-skin-dark .dispatch-focus-banner .btn-outline-secondary:hover,
+        [data-bs-theme="dark"] .dispatch-focus-banner .btn-outline-secondary:hover,
+        [data-theme="dark"] .dispatch-focus-banner .btn-outline-secondary:hover {
+            background-color: #283c50 !important;
+            border-color: #64748b !important;
+            color: #ffffff !important;
+        }
+
+        html.app-skin-dark .dispatch-scenario-banner,
+        body.app-skin-dark .dispatch-scenario-banner,
+        [data-bs-theme="dark"] .dispatch-scenario-banner,
+        [data-theme="dark"] .dispatch-scenario-banner {
+            background-color: #162038 !important;
+            border-color: #283c50 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .dispatch-scenario-banner .text-dark,
+        body.app-skin-dark .dispatch-scenario-banner .text-dark,
+        [data-bs-theme="dark"] .dispatch-scenario-banner .text-dark,
+        [data-theme="dark"] .dispatch-scenario-banner .text-dark {
+            color: #f1f5f9 !important;
+        }
+
+        html.app-skin-dark .dispatch-scenario-banner .text-muted,
+        body.app-skin-dark .dispatch-scenario-banner .text-muted,
+        [data-bs-theme="dark"] .dispatch-scenario-banner .text-muted,
+        [data-theme="dark"] .dispatch-scenario-banner .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .dispatch-scenario-banner .btn-outline-dark,
+        body.app-skin-dark .dispatch-scenario-banner .btn-outline-dark,
+        [data-bs-theme="dark"] .dispatch-scenario-banner .btn-outline-dark,
+        [data-theme="dark"] .dispatch-scenario-banner .btn-outline-dark {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark #dispatchWarningsContainer .alert-warning,
+        body.app-skin-dark #dispatchWarningsContainer .alert-warning,
+        [data-bs-theme="dark"] #dispatchWarningsContainer .alert-warning,
+        [data-theme="dark"] #dispatchWarningsContainer .alert-warning {
+            background-color: rgba(245, 158, 11, 0.12) !important;
+            border-color: rgba(245, 158, 11, 0.35) !important;
+            color: #fde68a !important;
+        }
+
+        html.app-skin-dark #dispatchWarningsContainer .text-dark,
+        body.app-skin-dark #dispatchWarningsContainer .text-dark,
+        [data-bs-theme="dark"] #dispatchWarningsContainer .text-dark,
+        [data-theme="dark"] #dispatchWarningsContainer .text-dark {
+            color: #fef08a !important;
         }
     </style>
 

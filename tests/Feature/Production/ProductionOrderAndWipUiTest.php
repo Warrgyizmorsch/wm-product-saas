@@ -443,6 +443,35 @@ class ProductionOrderAndWipUiTest extends TestCase
         $responseAfterReceipt->assertStatus(200);
         $responseAfterReceipt->assertDontSee('Receive Completed FG (5)');
     }
+
+    /** @test */
+    public function wip_index_renders_export_only_dropdown(): void
+    {
+        $response = $this->withHeader('X-Tenant', 'test-tenant')
+            ->actingAs($this->user)
+            ->get(route('production.wip.index'));
+
+        $response->assertStatus(200);
+        // Has export dropdown and custom export modal
+        $response->assertSee('exportModal_wip_', false);
+        $response->assertSee('Export Options: Work-In-Progress (WIP)', false);
+        $response->assertSee(route('production.import-export.export', 'wip'));
+        // Must NOT render import triggers
+        $response->assertDontSee('#importWipModal', false);
+        $response->assertDontSee(route('production.import-export.download-template', 'wip'));
+    }
+
+    /** @test */
+    public function wip_export_endpoint_returns_excel_download(): void
+    {
+        $response = $this->withHeader('X-Tenant', 'test-tenant')
+            ->actingAs($this->user)
+            ->get(route('production.import-export.export', 'wip'));
+
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Disposition');
+        $this->assertStringContainsString('production_wip_export.xlsx', $response->headers->get('Content-Disposition'));
+    }
 }
 
 
