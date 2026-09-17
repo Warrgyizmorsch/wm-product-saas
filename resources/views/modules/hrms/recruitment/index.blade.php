@@ -197,7 +197,7 @@
                                             <span class="fw-semibold text-primary">{{ $req->vacancies }} Openings</span>
                                         </td>
                                         <td>
-                                             <x-ui.status-badge :status="$req->status" />
+                                             <x-ui.status-badge :status="$req->status" :label="in_array($req->status, ['approved', 'published', 'open']) ? 'Open' : null" />
                                         </td>
                                         <td>
                                             <a href="{{ route('hrms.recruitment.pipeline', $req->id) }}" class="btn btn-sm btn-outline-primary fw-semibold">

@@ -125,7 +125,14 @@ class WfhRequestController extends Controller
 
     public function updateStatus(Request $request, WfhRequest $wfhRequest, ?string $overrideAction = null): RedirectResponse
     {
-        abort_unless($request->user()->hasHrPermission('hr.settings.manage'), 403);
+        $user = $request->user();
+        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $authEmployee = Employee::resolveForUser($user);
+        $emp = $wfhRequest->employee;
+        $isReportingManager = $emp && $authEmployee && (string) $emp->reporting_manager_id === (string) $authEmployee->id;
+        $isDepartmentHead   = $emp && $emp->department && $authEmployee && (string) $emp->department->head_employee_id === (string) $authEmployee->id;
+
+        abort_unless($isHrAdmin || $isReportingManager || $isDepartmentHead, 403, 'Unauthorized to process WFH request.');
 
         if ($wfhRequest->status === 'cancelled') {
             return redirect()->back()->with('error', 'Cannot change the status of a cancelled WFH application.');

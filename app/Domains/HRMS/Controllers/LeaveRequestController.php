@@ -137,7 +137,7 @@ class LeaveRequestController extends Controller
 
     public function updateStatus(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
-        abort_unless($request->user()->hasHrPermission('hr.settings.manage'), 403);
+        abort_unless($this->canApproveLeaveRequest($request->user(), $leaveRequest), 403, 'Unauthorized to process leave request at current level.');
 
         if ($leaveRequest->status === 'cancelled') {
             return redirect()->back()->with('error', 'Cannot change the status of a cancelled leave application.');
@@ -384,5 +384,58 @@ class LeaveRequestController extends Controller
             'rest_days' => $restDays,
         ]);
     }
+
+    public function canApproveLeaveRequest(?\App\Models\User $user, LeaveRequest $leaveRequest): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $isHrAdmin = $user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve');
+        if ($isHrAdmin) {
+            return true;
+        }
+
+        $authEmployee = Employee::resolveForUser($user);
+        if (!$authEmployee) {
+            return false;
+        }
+
+        $emp = $leaveRequest->employee;
+        if (!$emp) {
+            return false;
+        }
+
+        $isReportingManager = (string) $emp->reporting_manager_id === (string) $authEmployee->id;
+        $isDepartmentHead   = $emp->department && (string) $emp->department->head_employee_id === (string) $authEmployee->id;
+
+        $rules = $leaveRequest->leaveType->rules ?? [];
+        $workflowLevel = $rules['approval']['workflow_level'] ?? '1_level';
+        $firstApprover = $rules['approval']['first_approver'] ?? 'reporting_manager';
+        $secondApprover = $rules['approval']['second_approver'] ?? 'hr_manager';
+
+        $currentLevel = (string) ($leaveRequest->current_level ?? '1');
+
+        if ($currentLevel === '1' || $currentLevel === '') {
+            if ($firstApprover === 'department_head') {
+                return $isDepartmentHead;
+            } elseif ($firstApprover === 'reporting_manager') {
+                return $isReportingManager;
+            } else {
+                return $isReportingManager || $isDepartmentHead;
+            }
+        } elseif ($currentLevel === '2' && $workflowLevel === '2_level') {
+            if ($secondApprover === 'department_head') {
+                return $isDepartmentHead;
+            } elseif ($secondApprover === 'reporting_manager') {
+                return $isReportingManager;
+            } else {
+                return false;
+            }
+        }
+
+        return false;
+    }
 }
+
 

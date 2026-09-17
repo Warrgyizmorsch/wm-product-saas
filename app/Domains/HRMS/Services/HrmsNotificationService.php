@@ -52,40 +52,46 @@ class HrmsNotificationService
      * Send notification to an Employee model instance.
      */
     public static function sendToEmployee(
-        Employee|int $employeeId,
-        string $title,
-        string $message,
+        Employee|int|string|null $employee = null,
+        string $title = '',
+        string $message = '',
         ?string $actionUrl = null,
         string $type = 'general',
         string $iconClass = 'feather-bell',
-        ?array $extraData = null
+        ?array $extraData = null,
+        Employee|int|string|null $employeeId = null
     ): ?HrmsNotification {
-        $employee = $employeeId instanceof Employee ? $employeeId : Employee::find($employeeId);
-        if (!$employee) {
+        $target = $employee ?? $employeeId;
+        if (!$target) {
             return null;
         }
 
-        if (!$employee->user_id) {
-            $user = User::where('email', $employee->office_email)
-                ->orWhere('email', $employee->personal_email)
+        $employeeModel = $target instanceof Employee ? $target : Employee::find($target);
+        if (!$employeeModel) {
+            return null;
+        }
+
+        if (!$employeeModel->user_id) {
+            $user = User::where('email', $employeeModel->office_email)
+                ->orWhere('email', $employeeModel->personal_email)
                 ->first();
             if ($user) {
-                $employee->user_id = $user->id;
-                $employee->saveQuietly();
+                $employeeModel->user_id = $user->id;
+                $employeeModel->saveQuietly();
             }
         }
 
-        if (!$employee->user_id) {
+        if (!$employeeModel->user_id) {
             return null;
         }
 
         return HrmsNotification::create([
-            'tenant_id' => $employee->tenant_id ?? tenant_id() ?? 1,
-            'company_id' => $employee->company_id,
-            'business_unit_id' => $employee->business_unit_id,
-            'branch_id' => $employee->branch_id,
-            'user_id' => $employee->user_id,
-            'employee_id' => $employee->id,
+            'tenant_id' => $employeeModel->tenant_id ?? tenant_id() ?? 1,
+            'company_id' => $employeeModel->company_id,
+            'business_unit_id' => $employeeModel->business_unit_id,
+            'branch_id' => $employeeModel->branch_id,
+            'user_id' => $employeeModel->user_id,
+            'employee_id' => $employeeModel->id,
             'type' => $type,
             'title' => $title,
             'message' => $message,
