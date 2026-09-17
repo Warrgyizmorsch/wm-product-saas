@@ -5,54 +5,52 @@
 @section('breadcrumb', 'Accounting / Fixed Assets / Depreciation')
 
 @section('page-actions')
-    <x-ui.button href="{{ route('accounting.fixed-assets.index') }}" variant="light" icon="feather-list" class="border">
-        Asset Register
-    </x-ui.button>
-@endsection
-
-@section('content')
-    <x-ui.card class="mb-4">
-        <form method="GET" id="periodFilterForm">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold fs-12 text-uppercase text-muted mb-1">Year</label>
-                    <input type="number" name="year" value="{{ $year }}" class="form-control form-control-sm" min="2000" max="2100">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold fs-12 text-uppercase text-muted mb-1">Month</label>
-                    <select name="month" class="form-select form-select-sm">
-                        @for ($m = 1; $m <= 12; $m++)
-                            <option value="{{ $m }}" @selected($m === $month)>{{ \Carbon\Carbon::create()->month($m)->format('F') }}</option>
-                        @endfor
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold fs-12 text-uppercase text-muted mb-1">Status</label>
-                    <select name="status" class="form-select form-select-sm">
-                        <option value="">All</option>
-                        @foreach (['draft' => 'Draft', 'reviewed' => 'Reviewed', 'approved' => 'Approved', 'posted' => 'Posted'] as $val => $label)
-                            <option value="{{ $val }}" @selected($status === $val)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-3 d-flex gap-2">
-                    <button type="submit" class="btn btn-sm btn-light border">Apply</button>
-                </div>
-            </div>
-        </form>
-
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.button href="{{ route('accounting.fixed-assets.index') }}" variant="light" icon="feather-list" class="border">
+            Asset Register
+        </x-ui.button>
         @if ($canGenerate)
-            <form method="POST" action="{{ route('accounting.fixed-assets.depreciation.generate') }}" id="generateForm" class="mt-3">
+            <form method="POST" action="{{ route('accounting.fixed-assets.depreciation.generate') }}" id="generateForm">
                 @csrf
                 <input type="hidden" name="year" value="{{ $year }}">
                 <input type="hidden" name="month" value="{{ $month }}">
-                <button type="button" class="btn btn-sm btn-primary" onclick="confirmAction({title: 'Generate Depreciation', message: 'Generate draft depreciation schedules for all eligible active assets for {{ $month }}/{{ $year }}?', variant: 'primary', confirmText: 'Generate'}, function() { document.getElementById('generateForm').submit(); })">
+                <button type="button" class="btn btn-sm btn-primary text-nowrap" onclick="confirmAction({title: 'Generate Depreciation', message: 'Generate draft depreciation schedules for all eligible active assets for {{ $month }}/{{ $year }}?', variant: 'primary', confirmText: 'Generate'}, function() { document.getElementById('generateForm').submit(); })">
                     <i class="feather-play me-1"></i> Generate for {{ $month }}/{{ $year }}
                 </button>
             </form>
         @endif
-    </x-ui.card>
+    </div>
+    <x-ui.filter label="Filters">
+        <form method="GET">
+            <div class="mb-3">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <label for="year" class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark">Year</label>
+                    </div>
+                    <div class="col-md-8">
+                        <input type="number" name="year" id="year" value="{{ $year }}" min="2000" max="2100" class="form-control erp-premium-input">
+                    </div>
+                </div>
+            </div>
+            <x-ui.select label="Month" name="month" :selected="$month" :options="
+                collect(range(1, 12))->mapWithKeys(fn ($m) => [$m => \Carbon\Carbon::create()->month($m)->format('F')])->all()
+            " />
+            <x-ui.select label="Status" name="status" :selected="$status" :options="[
+                '' => 'All',
+                'draft' => 'Draft',
+                'reviewed' => 'Reviewed',
+                'approved' => 'Approved',
+                'posted' => 'Posted',
+            ]" />
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                <x-ui.button href="{{ route('accounting.fixed-assets.depreciation.index') }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+            </div>
+        </form>
+    </x-ui.filter>
+@endsection
 
+@section('content')
     <x-ui.card bodyClass="p-0">
         <x-ui.table hoverable>
             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">

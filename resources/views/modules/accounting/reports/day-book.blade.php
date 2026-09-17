@@ -10,12 +10,11 @@
 
 @section('content')
     <x-ui.card class="mb-4">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark">Date</label>
-                <input type="date" name="date" value="{{ $date->toDateString() }}" onchange="this.form.submit()" class="form-control">
-            </div>
-        </form>
+        <x-ui.filter-toolbar :resetUrl="route('accounting.reports.day-book')" searchLabel="View">
+            <x-ui.filter-field label="Date" col="col-md-4">
+                <input type="date" name="date" value="{{ $date->toDateString() }}" class="form-control form-control-sm">
+            </x-ui.filter-field>
+        </x-ui.filter-toolbar>
     </x-ui.card>
 
     <x-ui.card class="mb-3">

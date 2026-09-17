@@ -10,13 +10,15 @@
 
 @section('content')
     <x-ui.card class="mb-4">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-6">
-                <x-ui.select label="Budget" name="budget_id" onchange="this.form.submit()" :options="$allBudgets->mapWithKeys(fn ($b) => [
-                    $b->id => $b->name . ' — ' . ($b->fiscalYear?->name) . ' (' . $b->status . ')',
-                ])->all()" :selected="$budget?->id" />
-            </div>
-        </form>
+        <x-ui.filter-toolbar :resetUrl="route('accounting.reports.budget-vs-actual')" searchLabel="View">
+            <x-ui.filter-field label="Budget" col="col-md-6">
+                <select name="budget_id" class="form-select form-select-sm">
+                    @foreach ($allBudgets as $b)
+                        <option value="{{ $b->id }}" @selected($budget?->id == $b->id)>{{ $b->name }} — {{ $b->fiscalYear?->name }} ({{ $b->status }})</option>
+                    @endforeach
+                </select>
+            </x-ui.filter-field>
+        </x-ui.filter-toolbar>
     </x-ui.card>
 
     @if ($budget)

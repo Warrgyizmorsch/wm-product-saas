@@ -10,13 +10,15 @@
 
 @section('content')
     <x-ui.card class="mb-4">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-6">
-                <x-ui.select label="Accounting Period" name="period_id" onchange="this.form.submit()" :options="$allPeriods->mapWithKeys(fn ($p) => [
-                    $p->id => ($p->fiscalYear?->name) . ' — ' . $p->name . ' (' . $p->status . ')',
-                ])->all()" :selected="$period?->id" />
-            </div>
-        </form>
+        <x-ui.filter-toolbar :resetUrl="route('accounting.reports.cash-flow')" searchLabel="View">
+            <x-ui.filter-field label="Accounting Period" col="col-md-6">
+                <select name="period_id" class="form-select form-select-sm">
+                    @foreach ($allPeriods as $p)
+                        <option value="{{ $p->id }}" @selected($period?->id == $p->id)>{{ $p->fiscalYear?->name }} — {{ $p->name }} ({{ $p->status }})</option>
+                    @endforeach
+                </select>
+            </x-ui.filter-field>
+        </x-ui.filter-toolbar>
     </x-ui.card>
 
     @if (!$period)

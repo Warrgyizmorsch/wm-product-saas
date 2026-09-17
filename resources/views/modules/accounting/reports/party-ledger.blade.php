@@ -10,9 +10,8 @@
 
 @section('content')
     <x-ui.card class="mb-4">
-        <form method="GET" class="row g-3 align-items-end" id="partyLedgerForm">
-            <div class="col-md-4">
-                <label class="form-label fw-semibold fs-12 text-uppercase mb-1 text-dark">Party</label>
+        <x-ui.filter-toolbar formId="partyLedgerForm" :resetUrl="route('accounting.reports.party-ledger')" searchLabel="View">
+            <x-ui.filter-field label="Party" col="col-md-4">
                 <select id="partySelect" class="form-select erp-premium-select">
                     <option value="">Select Customer / Vendor / Transporter...</option>
                     <optgroup label="Customers">
@@ -33,17 +32,14 @@
                 </select>
                 <input type="hidden" name="party_type" id="partyTypeInput" value="{{ $partyType }}">
                 <input type="hidden" name="party_id" id="partyIdInput" value="{{ $partyId }}">
-            </div>
-            <div class="col-md-3">
-                <x-ui.input label="From" name="from" type="date" :value="$from->toDateString()" />
-            </div>
-            <div class="col-md-3">
-                <x-ui.input label="To" name="to" type="date" :value="$to->toDateString()" />
-            </div>
-            <div class="col-md-2">
-                <x-ui.button type="submit" variant="primary" class="w-100">View</x-ui.button>
-            </div>
-        </form>
+            </x-ui.filter-field>
+            <x-ui.filter-field label="From" col="col-md-3">
+                <x-ui.input name="from" type="date" :value="$from->toDateString()" />
+            </x-ui.filter-field>
+            <x-ui.filter-field label="To" col="col-md-3">
+                <x-ui.input name="to" type="date" :value="$to->toDateString()" />
+            </x-ui.filter-field>
+        </x-ui.filter-toolbar>
     </x-ui.card>
 
     <x-ui.card bodyClass="{{ $party ? 'p-0' : '' }}">

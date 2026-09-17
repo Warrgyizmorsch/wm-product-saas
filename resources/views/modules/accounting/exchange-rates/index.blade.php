@@ -17,27 +17,31 @@
     ];
 @endphp
 
+@section('page-actions')
+    <x-ui.filter label="Filters">
+        <form method="GET">
+            <x-ui.select label="Currency" name="currency" :selected="$filters['currency'] ?? ''" :options="
+                ['' => 'All Currencies'] + $currencies->mapWithKeys(fn ($currency) => [$currency->code => $currency->code . ' — ' . $currency->name])->all()
+            " />
+            <x-ui.select label="Source" name="source" :selected="$filters['source'] ?? ''" :options="[
+                '' => 'All Sources',
+                ExchangeRate::SOURCE_MANUAL => 'Manual',
+                ExchangeRate::SOURCE_API => 'Auto-synced',
+            ]" />
+            <div class="d-flex gap-2">
+                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                <x-ui.button href="{{ route('accounting.exchange-rates.index') }}" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+            </div>
+        </form>
+    </x-ui.filter>
+@endsection
+
 @section('content')
 
     <div class="row">
         <!-- Left: rate history -->
         <div class="col-lg-8">
             <x-ui.card title="Rate History" bodyClass="p-0" class="accounting-dense">
-                <form method="GET" action="{{ route('accounting.exchange-rates.index') }}" class="d-flex flex-wrap align-items-center gap-3 p-3 border-bottom">
-                    <select name="currency" class="form-select form-select-sm" style="max-width: 220px;">
-                        <option value="">All Currencies</option>
-                        @foreach ($currencies as $currency)
-                            <option value="{{ $currency->code }}" @selected(($filters['currency'] ?? '') === $currency->code)>{{ $currency->code }} — {{ $currency->name }}</option>
-                        @endforeach
-                    </select>
-                    <select name="source" class="form-select form-select-sm" style="max-width: 150px;">
-                        <option value="">All Sources</option>
-                        <option value="{{ ExchangeRate::SOURCE_MANUAL }}" @selected(($filters['source'] ?? '') === ExchangeRate::SOURCE_MANUAL)>Manual</option>
-                        <option value="{{ ExchangeRate::SOURCE_API }}" @selected(($filters['source'] ?? '') === ExchangeRate::SOURCE_API)>Auto-synced</option>
-                    </select>
-                    <x-ui.button type="submit" variant="light" size="sm" class="border">Filter</x-ui.button>
-                </form>
-
                 <x-ui.table hoverable>
                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                         <tr>

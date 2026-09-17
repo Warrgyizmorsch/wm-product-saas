@@ -10,22 +10,17 @@
 
 @section('content')
     <x-ui.card class="mb-4">
-        <form method="GET" class="row g-3 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark" for="from">From</label>
+        <x-ui.filter-toolbar :resetUrl="route('accounting.reports.vouchers-by-staff')">
+            <x-ui.filter-field label="From" col="col-md-3">
                 <input type="date" id="from" name="from" value="{{ $from->toDateString() }}" class="form-control">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold fs-12 text-uppercase mb-0 text-dark" for="to">To</label>
+            </x-ui.filter-field>
+            <x-ui.filter-field label="To" col="col-md-3">
                 <input type="date" id="to" name="to" value="{{ $to->toDateString() }}" class="form-control">
-            </div>
-            <div class="col-md-auto">
-                <x-ui.button type="submit" variant="primary">Apply</x-ui.button>
-            </div>
-            <div class="col-md text-md-end fs-13 text-muted">
-                Posted and reversed journals &amp; vouchers dated {{ $from->format('d M Y') }} – {{ $to->format('d M Y') }}
-            </div>
-        </form>
+            </x-ui.filter-field>
+        </x-ui.filter-toolbar>
+        <div class="fs-13 text-muted mt-2 pt-2 border-top">
+            Posted and reversed journals &amp; vouchers dated {{ $from->format('d M Y') }} – {{ $to->format('d M Y') }}
+        </div>
     </x-ui.card>
 
     <x-ui.card bodyClass="p-0" class="accounting-dense">

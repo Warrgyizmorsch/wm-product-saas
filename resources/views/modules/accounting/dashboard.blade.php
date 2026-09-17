@@ -65,55 +65,45 @@
 
     {{-- Filters --}}
     <x-ui.card class="mb-3">
-        <form method="GET" action="{{ route('accounting.dashboard') }}" class="row g-2 align-items-end" id="dashboard-period-form">
+        <x-ui.filter-toolbar formId="dashboard-period-form" :resetUrl="route('accounting.dashboard')">
             <input type="hidden" name="view" value="{{ $activeView }}">
-            <div class="col-md-2">
-                <label class="form-label fs-12 text-uppercase fw-semibold text-muted mb-1" for="preset">Period</label>
+            <x-ui.filter-field label="Period" col="col-md-2">
                 <select name="preset" id="preset" class="form-select form-select-sm">
                     @foreach ($presets as $value => $label)
                         <option value="{{ $value }}" @selected($period->preset === $value)>{{ $label }}</option>
                     @endforeach
                 </select>
-            </div>
-            <div class="col-md-2 custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
-                <label class="form-label fs-12 text-uppercase fw-semibold text-muted mb-1" for="from">From</label>
+            </x-ui.filter-field>
+            <x-ui.filter-field label="From" col="col-md-2" class="custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
                 <input type="date" name="from" id="from" class="form-control form-control-sm" value="{{ $period->from->toDateString() }}">
-            </div>
-            <div class="col-md-2 custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
-                <label class="form-label fs-12 text-uppercase fw-semibold text-muted mb-1" for="to">To</label>
+            </x-ui.filter-field>
+            <x-ui.filter-field label="To" col="col-md-2" class="custom-range {{ $period->preset === 'custom' ? '' : 'd-none' }}">
                 <input type="date" name="to" id="to" class="form-control form-control-sm" value="{{ $period->to->toDateString() }}">
-            </div>
+            </x-ui.filter-field>
             @if ($companyCount > 1)
-                <div class="col-md-2">
-                    <label class="form-label fs-12 text-uppercase fw-semibold text-muted mb-1" for="company_scope">Companies</label>
+                <x-ui.filter-field label="Companies" col="col-md-2">
                     <select name="company_scope" id="company_scope" class="form-select form-select-sm">
                         <option value="current" @selected(! $filters['consolidated'])>{{ company()?->company_name ?? 'Selected company' }}</option>
                         <option value="all" @selected($filters['consolidated'])>All companies (consolidated)</option>
                     </select>
-                </div>
+                </x-ui.filter-field>
             @endif
             @if ($costCenters->isNotEmpty())
-                <div class="col-md-2">
-                    <label class="form-label fs-12 text-uppercase fw-semibold text-muted mb-1" for="cost_center_id">Cost center</label>
+                <x-ui.filter-field label="Cost center" col="col-md-2">
                     <select name="cost_center_id" id="cost_center_id" class="form-select form-select-sm">
                         <option value="">All cost centers</option>
                         @foreach ($costCenters as $costCenter)
                             <option value="{{ $costCenter->id }}" @selected($filters['cost_center']?->id === $costCenter->id)>{{ $costCenter->code }} — {{ $costCenter->name }}</option>
                         @endforeach
                     </select>
-                </div>
+                </x-ui.filter-field>
             @endif
-            <div class="col-md-auto">
-                <button type="submit" class="btn btn-sm btn-primary">Apply</button>
-            </div>
-            <div class="col-md text-md-end fs-12 text-muted">
-                <div><strong class="text-dark">{{ $period->label() }}</strong> ({{ $period->days() }} days) · vs {{ $period->previousLabel() }}</div>
-                <div>
-                    Figures as of {{ ($generatedAt ?? now())->format('H:i') }}
-                    · <a href="{{ route('accounting.dashboard', $query + ['refresh' => 1]) }}"><i class="feather-refresh-cw"></i> Refresh</a>
-                </div>
-            </div>
-        </form>
+        </x-ui.filter-toolbar>
+        <div class="text-end fs-12 text-muted mt-2 pt-2 border-top">
+            <strong class="text-dark">{{ $period->label() }}</strong> ({{ $period->days() }} days) · vs {{ $period->previousLabel() }}
+            · Figures as of {{ ($generatedAt ?? now())->format('H:i') }}
+            · <a href="{{ route('accounting.dashboard', $query + ['refresh' => 1]) }}"><i class="feather-refresh-cw" style="vertical-align: middle;"></i> Refresh</a>
+        </div>
     </x-ui.card>
 
     @if ($mixedCurrencies)
