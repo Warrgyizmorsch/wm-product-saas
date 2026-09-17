@@ -7,6 +7,8 @@ return [
         'section' => 'revenue_cycle', 'order' => 10,
         'label' => 'ui.crm', 'default' => 'CRM', 'icon' => 'feather-users',
         'children' => [
+            ['label' => 'CRM Dashboard', 'default' => 'CRM Executive Dashboard', 'route' => 'crm.dashboard'],
+            ['label' => 'crm.leads', 'default' => 'Leads', 'route' => 'crm.leads.index'],
             ['label' => 'crm.leads', 'default' => 'Leads', 'route' => 'crm.leads.index', 'permission' => 'crm.leads.view'],
             ['label' => 'crm.deals_sidebar', 'default' => 'Deals (Pipeline)', 'route' => 'crm.deals.index'],
             ['label' => 'crm.accounts_sidebar', 'default' => 'Accounts (Companies)', 'route' => 'crm.accounts.index'],

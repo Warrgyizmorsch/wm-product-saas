@@ -40,13 +40,6 @@
             ['label' => 'Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],
             ]],
-             ['label' => __('ui.sales'), 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
-                ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
-                ['label' => 'Sales Orders', 'route' => 'sales.orders.index'],
-                ['label' => 'Invoices', 'route' => 'sales.invoices.index'],
-                ['label' => 'Receipts (Payments)', 'route' => 'sales.payments.index'],
-                ['label' => 'Sales Returns', 'route' => 'sales.returns.index'],
-            ]],
             ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [
                 ['label' => __('ui.projects'), 'route' => 'projects.index'],
                 ['label' => __('projects.milestones'), 'route' => 'projects.milestones.index'],
@@ -55,6 +48,14 @@
             ]],
         ],
         __('ui.supply_chain') => [
+            ['label' => 'Supply Chain Dashboard', 'icon' => 'feather-grid', 'route' => 'supply-chain.dashboard'],
+            ['label' => __('ui.sales'), 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
+                ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
+                ['label' => 'Sales Orders', 'route' => 'sales.orders.index'],
+                ['label' => 'Invoices', 'route' => 'sales.invoices.index'],
+                ['label' => 'Receipts (Payments)', 'route' => 'sales.payments.index'],
+                ['label' => 'Sales Returns', 'route' => 'sales.returns.index'],
+            ]],
             ['label' => 'Store', 'icon' => 'feather-archive', 'url' => '#', 'children' => [
                 ['label' => 'Material Requirements', 'route' => 'inventory.material-requirements.index'],
                 ['label' => 'MRP & Shortage Analysis', 'route' => 'inventory.mrp-shortage.index'],

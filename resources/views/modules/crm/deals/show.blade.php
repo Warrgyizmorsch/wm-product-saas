@@ -364,6 +364,11 @@
 @endphp
 
 @section('content')
+    @php
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+    @endphp
+
     <!-- Hidden Stage Change Form -->
     <form id="dealStageForm" action="{{ route('crm.deals.updateStage', $deal) }}" method="POST" style="display: none;">
         @csrf
@@ -1208,11 +1213,6 @@
 
                                                 <x-ui.odoo-form-ui type="input" inputType="date" label="Expiration Date" name="expiry_date"
                                                     :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :errorText="$errors->first('expiry_date')" />
-
-                                                @php
-                                                    $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
-                                                    $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
-                                                @endphp
 
                                                 @if(!$isQuotationAutoApprove)
                                                     <x-ui.odoo-form-ui type="select" label="Initial Status" name="status" :required="true" :errorText="$errors->first('status')">
@@ -2395,7 +2395,7 @@
                             <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0.01" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
                         </td>
                         <td>
                             <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
