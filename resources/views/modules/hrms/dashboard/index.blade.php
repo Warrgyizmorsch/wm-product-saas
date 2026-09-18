@@ -566,7 +566,7 @@
                     <div class="row align-items-center">
                         <div class="col-lg-7">
                             <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
-                                <div class="fw-bolder text-dark" id="liveDigitalClock" style="font-size: 32px; letter-spacing: -0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1;">
+                                <div class="text-dark fw-semibold" id="liveDigitalClock" style="font-size: 32px; font-weight: 600; letter-spacing: -0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1;">
                                     {{ date('h:i:s A') }}
                                 </div>
                                 <div class="badge bg-soft-secondary text-dark fs-12 fw-normal px-2.5 py-1 d-inline-flex align-items-center rounded-2">

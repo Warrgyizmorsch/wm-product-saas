@@ -248,7 +248,7 @@ class TravelExpenseController extends Controller
         });
 
         $emp = Employee::find($validated['employee_id']);
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New Travel Request',
             message: ($emp ? $emp->full_name : 'Employee') . " submitted a travel request to {$validated['destination']}.",
             actionUrl: route('hrms.travel-expense.index', ['tab' => 'travel']),
@@ -290,7 +290,7 @@ class TravelExpenseController extends Controller
         }
 
         if ($travelRequest->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $travelRequest->employee_id,
                 title: 'Travel Request Approved',
                 message: "Your travel request to {$travelRequest->destination} has been approved.",
@@ -311,7 +311,7 @@ class TravelExpenseController extends Controller
         $travelRequest->cashAdvances()->where('status', 'pending')->update(['status' => 'rejected']);
 
         if ($travelRequest->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $travelRequest->employee_id,
                 title: 'Travel Request Rejected',
                 message: "Your travel request to {$travelRequest->destination} has been rejected.",
@@ -352,7 +352,7 @@ class TravelExpenseController extends Controller
         $cashAdvance = CashAdvance::create($validated);
 
         $emp = Employee::find($validated['employee_id']);
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New Cash Advance Request',
             message: ($emp ? $emp->full_name : 'Employee') . " requested a cash advance of $" . number_format($validated['amount'], 2) . ".",
             actionUrl: route('hrms.travel-expense.index', ['tab' => 'advance']),
@@ -376,7 +376,7 @@ class TravelExpenseController extends Controller
         ]);
 
         if ($cashAdvance->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $cashAdvance->employee_id,
                 title: 'Cash Advance Approved',
                 message: "Your cash advance request of $" . number_format($approvedAmount, 2) . " has been approved.",
@@ -442,7 +442,7 @@ class TravelExpenseController extends Controller
         $cashAdvance->update(['status' => 'rejected']);
 
         if ($cashAdvance->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $cashAdvance->employee_id,
                 title: 'Cash Advance Rejected',
                 message: "Your cash advance request for {$cashAdvance->purpose} has been rejected.",
@@ -847,7 +847,7 @@ class TravelExpenseController extends Controller
         $expenseReport->claims()->update(['status' => 'submitted']);
 
         $emp = Employee::find($expenseReport->employee_id);
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'Expense Report Submitted',
             message: ($emp ? $emp->full_name : 'Employee') . " submitted expense report '{$expenseReport->title}' for approval.",
             actionUrl: route('hrms.travel-expense.index', ['tab' => 'report']),
@@ -1073,7 +1073,7 @@ class TravelExpenseController extends Controller
         }
 
         if ($expenseReport->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $expenseReport->employee_id,
                 title: 'Expense Report ' . ucfirst($status),
                 message: "Your expense report '{$expenseReport->title}' status is now {$status}.",
@@ -1093,7 +1093,7 @@ class TravelExpenseController extends Controller
         $expenseReport->update(['status' => 'rejected']);
 
         if ($expenseReport->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $expenseReport->employee_id,
                 title: 'Expense Report Rejected',
                 message: "Your expense report '{$expenseReport->title}' has been rejected.",

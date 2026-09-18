@@ -102,7 +102,7 @@ class LeaveRequestController extends Controller
         $leaveRequest = $this->leaveRequestRepository->storeLeaveRequest($validated, $request);
 
         // Send Notifications
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New Leave Request',
             message: "{$employee->full_name} applied for {$duration} day(s) leave ({$startDate->format('M d')} - {$endDate->format('M d')}).",
             actionUrl: route('hrms.leaves.index'),
@@ -110,7 +110,7 @@ class LeaveRequestController extends Controller
             iconClass: 'feather-calendar'
         );
         if ($employee->reportingManager) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+        \App\Services\Notification\NotificationService::sendToEmployee(
                 employee: $employee->reportingManager,
                 title: 'New Leave Request Applied',
                 message: "{$employee->full_name} applied for {$duration} day(s) leave.",
@@ -160,7 +160,7 @@ class LeaveRequestController extends Controller
             $iconClass = $validated['action'] === 'approved' ? 'feather-check-circle' : 'feather-x-circle';
             $startFormatted = \Carbon\Carbon::parse($leaveRequest->start_date)->format('M d, Y');
             $endFormatted = \Carbon\Carbon::parse($leaveRequest->end_date)->format('M d, Y');
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+        \App\Services\Notification\NotificationService::sendToEmployee(
                 employee: $leaveRequest->employee,
                 title: "Leave Request {$statusText}",
                 message: "Your leave application ({$startFormatted} to {$endFormatted}) status is now {$statusText}.",

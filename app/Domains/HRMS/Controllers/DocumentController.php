@@ -256,7 +256,7 @@ class DocumentController extends Controller
                     'requested_by_id'    => auth()->id(),
                 ]);
 
-                \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                \App\Services\Notification\NotificationService::sendToEmployee(
                     employeeId: $employee->id,
                     title: 'New Document Issued',
                     message: "A new document '{$title}' has been issued to your document vault.",

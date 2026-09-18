@@ -193,7 +193,7 @@ class EmployeeExitController extends Controller
         $computedFnF = $this->fnfService->calculateFnF($exit);
         $this->fnfService->saveSettlement($exit, $computedFnF);
 
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+        \App\Services\Notification\NotificationService::sendToEmployee(
             employeeId: $employee->id,
             title: 'Exit Process Initiated',
             message: "Exit / Resignation process has been initiated with expected LWD: {$exit->approved_lwd}.",
@@ -372,7 +372,7 @@ class EmployeeExitController extends Controller
         $this->fnfService->saveSettlement($exit, $computedFnF);
 
         if ($exit->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $exit->employee_id,
                 title: 'Exit Request Approved',
                 message: "Your exit has been approved. Last working day set to {$exit->approved_lwd}.",
