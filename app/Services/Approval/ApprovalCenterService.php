@@ -465,7 +465,7 @@ class ApprovalCenterService
                             'type' => 'Asset Request',
                             'title' => "{$empName} - {$catName}",
                             'subtitle' => 'Asset allocation pending',
-                            'url' => Route::has('hrms.assets.index') ? route('hrms.assets.index') : url('/hrms/assets'),
+                            'url' => Route::has('hrms.assets-module.index') ? route('hrms.assets-module.index') : url('/hrms/assets-module'),
                             'icon' => 'feather-box',
                             'time' => $assetReq->created_at?->diffForHumans(),
                             'created_at' => $assetReq->created_at?->toIso8601String(),

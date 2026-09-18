@@ -128,11 +128,11 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
         $comment = $validated['rejection_reason'] ?? null;
 
         $user = auth()->user();
-        $adminEmployee = null;
-        if ($user && $user->email) {
-            $adminEmployee = Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        $approvalService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $adminEmployee = $user ? $approvalService->getEmployeeFromUser($user) : null;
+
+        if ($action === 'approved' && $user && $wfhRequest->employee) {
+            $approvalService->authorizeApproval($user, $wfhRequest->employee);
         }
 
         if ($action === 'approved') {

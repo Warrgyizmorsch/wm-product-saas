@@ -90,7 +90,7 @@ class OvertimeRequestController extends Controller
         \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New Overtime Request',
             message: "{$employee->full_name} submitted an overtime request for {$durationHours} hrs.",
-            actionUrl: route('hrms.overtime.index'),
+            actionUrl: \Illuminate\Support\Facades\Route::has('hrms.overtime.index') ? route('hrms.overtime.index') : (\Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime')),
             type: 'overtime_request',
             iconClass: 'feather-clock'
         );
@@ -145,7 +145,7 @@ class OvertimeRequestController extends Controller
                 employeeId: $overtimeRequest->employee_id,
                 title: 'Overtime Request ' . ucfirst($action),
                 message: "Your overtime request for {$overtimeRequest->date} has been {$action}.",
-                actionUrl: route('hrms.overtime.index'),
+                actionUrl: \Illuminate\Support\Facades\Route::has('hrms.overtime.index') ? route('hrms.overtime.index') : (\Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime')),
                 type: 'overtime_' . $action,
                 iconClass: $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle'
             );

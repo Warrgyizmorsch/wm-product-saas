@@ -76,7 +76,7 @@ class ShiftChangeRequestController extends Controller
         \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New Shift Change Request',
             message: "{$employee->full_name} submitted a shift change request.",
-            actionUrl: route('hrms.shift-change.index'),
+            actionUrl: \Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime'),
             type: 'shift_change_request',
             iconClass: 'feather-refresh-cw'
         );
@@ -126,7 +126,7 @@ class ShiftChangeRequestController extends Controller
                 employeeId: $shiftChangeRequest->employee_id,
                 title: 'Shift Change Request ' . ucfirst($action),
                 message: "Your shift change request has been {$action}.",
-                actionUrl: route('hrms.shift-change.index'),
+                actionUrl: \Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime'),
                 type: 'shift_change_' . $action,
                 iconClass: $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle'
             );

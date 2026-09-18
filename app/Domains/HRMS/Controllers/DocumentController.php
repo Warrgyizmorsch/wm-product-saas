@@ -262,14 +262,27 @@ class DocumentController extends Controller
                     'requested_by_id'    => auth()->id(),
                 ]);
 
-                \App\Services\Notification\NotificationService::sendToEmployee(
-                    employeeId: $employee->id,
-                    title: 'New Document Issued',
-                    message: "A new document '{$title}' has been issued to your document vault.",
-                    actionUrl: route('hrms.documents.index'),
-                    type: 'document_issued',
-                    iconClass: 'feather-file-text'
-                );
+                if ($docTemplate->requires_signature) {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employeeId: $employee->id,
+                        title: 'Action Required: Digital Signature Needed',
+                        message: "Document '{$title}' requires your digital signature.",
+                        actionUrl: route('hrms.documents.index'),
+                        module: 'hrms',
+                        type: 'signature_required',
+                        iconClass: 'feather-pen-tool'
+                    );
+                } else {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employeeId: $employee->id,
+                        title: 'New Document Issued',
+                        message: "A new document '{$title}' has been issued to your document vault.",
+                        actionUrl: route('hrms.documents.index'),
+                        module: 'hrms',
+                        type: 'document_issued',
+                        iconClass: 'feather-file-text'
+                    );
+                }
             }
 
             return redirect()->route('hrms.documents.index')->with('success', 'Documents generated from template successfully.');
@@ -323,6 +336,28 @@ class DocumentController extends Controller
                     'status'             => $status,
                     'requested_by_id'    => auth()->id(),
                 ]);
+            }
+
+            if ($requiresSignature) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employeeId: $employee->id,
+                    title: 'Action Required: Digital Signature Needed',
+                    message: "Document '{$documentMaster->name}' requires your digital signature.",
+                    actionUrl: route('hrms.documents.index'),
+                    module: 'hrms',
+                    type: 'signature_required',
+                    iconClass: 'feather-pen-tool'
+                );
+            } else {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employeeId: $employee->id,
+                    title: 'New Document Uploaded',
+                    message: "A new document '{$documentMaster->name}' has been uploaded to your vault.",
+                    actionUrl: route('hrms.documents.index'),
+                    module: 'hrms',
+                    type: 'document_uploaded',
+                    iconClass: 'feather-file-text'
+                );
             }
         }
 
