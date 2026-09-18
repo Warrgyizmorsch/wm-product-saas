@@ -54,6 +54,24 @@ Route::middleware(['tenant'])->group(function (): void {
         Route::get('/global-approvals', [ApprovalController::class, 'index'])
             ->name('global-approvals');
 
+        // System-Wide Notifications Engine
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index'])->name('index');
+            Route::get('/unread', [\App\Http\Controllers\NotificationController::class, 'unread'])->name('unread');
+            Route::post('/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('read');
+            Route::post('/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllRead'])->name('read-all');
+            Route::delete('/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy'])->name('destroy');
+        });
+
+        // Backward compatibility aliases for HRMS Notification routes
+        Route::prefix('hrms/notifications')->name('hrms.notifications.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index'])->name('index');
+            Route::get('/unread', [\App\Http\Controllers\NotificationController::class, 'unread'])->name('unread');
+            Route::post('/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('read');
+            Route::post('/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllRead'])->name('read-all');
+            Route::delete('/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy'])->name('destroy');
+        });
+
         Route::middleware(['module.access'])->group(function (): void {
             foreach (glob(str_replace('/', DIRECTORY_SEPARATOR, app_path('Domains/*/Routes/web.php'))) as $moduleRoutes) {
                 require $moduleRoutes;

@@ -233,7 +233,7 @@ class BroadcastController extends Controller
         $broadcast = $this->broadcastService->createBroadcast($validated);
 
         // Notify all active employees
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToAllEmployees(
+        \App\Services\Notification\NotificationService::sendToAllEmployees(
             title: "Announcement: {$validated['title']}",
             message: \Illuminate\Support\Str::limit(strip_tags($validated['content']), 100),
             actionUrl: route('hrms.broadcasts.index'),

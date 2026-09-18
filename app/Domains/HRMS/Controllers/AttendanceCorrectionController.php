@@ -258,7 +258,7 @@ class AttendanceCorrectionController extends Controller
             'status'              => 'pending',
         ]);
 
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'Attendance Correction Request',
             message: "{$employee->full_name} requested attendance correction for " . Carbon::parse($dateStr)->format('M d, Y') . ".",
             actionUrl: route('hrms.attendance-corrections.index'),
@@ -439,7 +439,7 @@ class AttendanceCorrectionController extends Controller
             DB::commit();
 
             if ($correction->employee_id) {
-                \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+                \App\Services\Notification\NotificationService::sendToEmployee(
                     employeeId: $correction->employee_id,
                     title: 'Attendance Correction Approved',
                     message: 'Your attendance correction request for ' . $correction->date->format('M d, Y') . ' has been approved.',
@@ -502,7 +502,7 @@ class AttendanceCorrectionController extends Controller
         ]);
 
         if ($correction->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $correction->employee_id,
                 title: 'Attendance Correction Rejected',
                 message: 'Your attendance correction request for ' . $correction->date->format('M d, Y') . ' was rejected.',

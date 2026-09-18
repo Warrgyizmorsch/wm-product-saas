@@ -87,7 +87,7 @@ class OvertimeRequestController extends Controller
 
         $this->overtimeRepository->storeOvertimeRequest($validated, $request);
 
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New Overtime Request',
             message: "{$employee->full_name} submitted an overtime request for {$durationHours} hrs.",
             actionUrl: route('hrms.overtime.index'),
@@ -141,7 +141,7 @@ class OvertimeRequestController extends Controller
         ], $request);
 
         if ($overtimeRequest->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $overtimeRequest->employee_id,
                 title: 'Overtime Request ' . ucfirst($action),
                 message: "Your overtime request for {$overtimeRequest->date} has been {$action}.",

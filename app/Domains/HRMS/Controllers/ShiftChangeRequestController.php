@@ -73,7 +73,7 @@ class ShiftChangeRequestController extends Controller
 
         $this->shiftChangeRepository->storeShiftChangeRequest($validated, $request);
 
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New Shift Change Request',
             message: "{$employee->full_name} submitted a shift change request.",
             actionUrl: route('hrms.shift-change.index'),
@@ -122,7 +122,7 @@ class ShiftChangeRequestController extends Controller
         ], $request);
 
         if ($shiftChangeRequest->employee_id) {
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employeeId: $shiftChangeRequest->employee_id,
                 title: 'Shift Change Request ' . ucfirst($action),
                 message: "Your shift change request has been {$action}.",

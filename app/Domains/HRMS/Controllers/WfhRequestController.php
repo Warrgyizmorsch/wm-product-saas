@@ -102,7 +102,7 @@ class WfhRequestController extends Controller
 
         $this->wfhRequestRepository->storeWfhRequest($validated, $request);
 
-        \App\Domains\HRMS\Services\HrmsNotificationService::sendToHrAdmins(
+        \App\Services\Notification\NotificationService::sendToHrAdmins(
             title: 'New WFH Request',
             message: "{$employee->full_name} applied for {$duration} day(s) WFH.",
             actionUrl: route('hrms.wfh.index'),
@@ -158,7 +158,7 @@ class WfhRequestController extends Controller
         if ($wfhRequest->employee) {
             $statusText = ucfirst($action);
             $iconClass = $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle';
-            \App\Domains\HRMS\Services\HrmsNotificationService::sendToEmployee(
+            \App\Services\Notification\NotificationService::sendToEmployee(
                 employee: $wfhRequest->employee,
                 title: "WFH Request {$statusText}",
                 message: "Your WFH request status is now {$statusText}.",

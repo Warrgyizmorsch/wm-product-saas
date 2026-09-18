@@ -1,15 +1,32 @@
 <?php
 
-namespace App\Domains\HRMS\Models;
+namespace App\Models;
 
 use App\Core\Database\BaseModel;
-use App\Models\User;
+use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\Company;
+use App\Domains\HRMS\Models\BusinessUnit;
+use App\Domains\HRMS\Models\Branch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
-class HrmsNotification extends BaseModel
+class Notification extends BaseModel
 {
-    protected $table = 'hrms_notifications';
+    protected $table = 'notifications';
+
+    public function getTable()
+    {
+        if (parent::getTable() === 'notifications' && !Schema::hasTable('notifications')) {
+            if (Schema::hasTable('system_notifications')) {
+                return 'system_notifications';
+            }
+            if (Schema::hasTable('hrms_notifications')) {
+                return 'hrms_notifications';
+            }
+        }
+        return parent::getTable();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -18,6 +35,7 @@ class HrmsNotification extends BaseModel
         'branch_id',
         'user_id',
         'employee_id',
+        'module',
         'type',
         'title',
         'message',
@@ -70,5 +88,10 @@ class HrmsNotification extends BaseModel
     public function scopeForUser(Builder $query, int $userId): Builder
     {
         return $query->where('user_id', $userId);
+    }
+
+    public function scopeForModule(Builder $query, string $module): Builder
+    {
+        return $query->where('module', strtolower($module));
     }
 }
