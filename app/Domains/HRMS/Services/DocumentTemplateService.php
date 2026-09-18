@@ -142,6 +142,33 @@ class DocumentTemplateService
         return $wrapper;
     }
 
+    /**
+     * Wrap a renderTemplate() fragment as a standalone A4 document for PDF/print
+     * output (DomPDF's `@page` support, not the on-screen preview/DB fragment).
+     */
+    public function toPrintableDocument(string $renderedContent, string $title = 'Document'): string
+    {
+        $safeTitle = e($title);
+
+        return <<<HTML
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>{$safeTitle}</title>
+                <style>
+                    @page { size: A4; margin: 15mm; }
+                    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #1e293b; }
+                    .generated-doc-container { padding: 0 !important; }
+                </style>
+            </head>
+            <body>
+                {$renderedContent}
+            </body>
+            </html>
+            HTML;
+    }
+
     private function renderEducationTable(Employee $employee): string
     {
         try {

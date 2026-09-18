@@ -189,10 +189,16 @@ class DocumentController extends Controller
                 $renderedContent = $templateService->renderTemplate($docTemplate, $employee, $refNo, $extraData);
                 $title = $customTitle ?: ($docTemplate->name . ' - ' . $employee->full_name);
 
-                // Save rendered HTML file to storage
-                $fileName = \Str::slug($docTemplate->name . '-' . $employee->full_name) . '-' . time() . '.html';
+                // Render to a proper A4 PDF so "view"/"download" open a printable, correctly
+                // paginated document instead of a raw, unstyled HTML fragment.
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($templateService->toPrintableDocument($renderedContent, $title))
+                    ->setPaper('a4', 'portrait')
+                    ->setWarnings(false);
+                $pdfContent = $pdf->output();
+
+                $fileName = \Str::slug($docTemplate->name . '-' . $employee->full_name) . '-' . time() . '.pdf';
                 $path = "documents/tenant_{$tenantId}/employee_{$employee->id}/{$fileName}";
-                \Storage::disk('public')->put($path, $renderedContent);
+                \Storage::disk('public')->put($path, $pdfContent);
 
                 // Resolve or associate DocumentMaster for category tracking
                 $masterId = null;
@@ -250,8 +256,8 @@ class DocumentController extends Controller
                     'description'        => "Generated from template: " . $docTemplate->name,
                     'file_name'          => $fileName,
                     'file_path'          => $path,
-                    'file_type'          => 'text/html',
-                    'file_size'          => strlen($renderedContent),
+                    'file_type'          => 'pdf',
+                    'file_size'          => strlen($pdfContent),
                     'status'             => $docStatus,
                     'requested_by_id'    => auth()->id(),
                 ]);
